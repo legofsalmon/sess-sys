@@ -3,6 +3,39 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: staff sign-in built
+
+**Done**
+
+- Staff sign in with their Google account. Staff means a sessionhire.com
+  Workspace account, or an address listed by hand, such as a tester's.
+  Everything the app reads or changes now needs sign-in, except the health
+  check and freelancers' private links.
+  [Decision 0003](adr/0003-staff-sign-in.md) has the reasons.
+- A signed-in phone stays signed in for 60 days after it was last used, and
+  keeps working with no signal. It only shows the sign-in page when the
+  server says so, and anything changed offline waits until someone signs in
+  rather than being lost.
+- Every change now records who made it, in the audit trail and the export.
+- New **Account** tab: who is signed in, and **Sign out**, which also clears
+  the device's copy of the data (with a warning if changes haven't synced).
+- Safety catch: once anyone has signed in, the server won't start without
+  the Google key, so a lost setting can't quietly open the app to everyone.
+- Checked: 26 new server tests (signing in; turning away personal accounts,
+  other companies and unverified addresses; forged returns from Google; sign
+  out, expiry and switched-off accounts; live updates only for signed-in
+  devices) and 3 new browser tests (the sign-in page keeping waiting
+  changes, a refused account, signing out clearing the device). All earlier
+  tests still pass.
+
+**Next**
+
+- Colly: make the Google sign-in key and add it in Railway, about ten
+  minutes: [the steps](sign-in-setup.md). Until then the app stays open to
+  anyone with the address, so keep to made-up data.
+- Phone field test: [the steps](field-test.md).
+- Backups with a tested restore, then error tracking and uptime alerts.
+
 ## 29 September 2026: app live on Railway
 
 **Done**

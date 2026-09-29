@@ -338,7 +338,7 @@ Crewbox.
 | Database       | Postgres in an EU region, managed, with point-in-time recovery    | Relational data, range queries for availability   |
 | Jobs           | Postgres-backed queue (pg-boss or graphile-worker)                | No extra service                                  |
 | Files          | S3-compatible storage in the EU                                   | Quotes, photos of damage, documents               |
-| Auth           | Google Workspace sign-in for staff; email magic link for freelancers | Staff already have Workspace; freelancers do not |
+| Auth           | Google Workspace sign-in for staff ([ADR 0003](adr/0003-staff-sign-in.md)); a private link per freelancer ([ADR 0002](adr/0002-crew-booking-links.md)) | Staff already have Workspace; freelancers do not |
 | Hosting        | One EU region to start (Dublin or Frankfurt)                      | GDPR, latency                                     |
 | Tests          | Vitest, Playwright including offline scenarios                    | Same as Crewbox                                   |
 
