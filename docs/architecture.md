@@ -45,6 +45,33 @@ product covers well. They set the priorities below:
 Where not to compete: Rentman's quoting and invoicing breadth and HireHop's
 core stock handling. Matching them is enough.
 
+## Principle: open and flexible, not "our way or no way"
+
+Session Hire's main complaint about Rentman and TeamTrack is that they are
+closed and rigid: the product decides how the business works. So these
+rules hold everywhere in the design:
+
+- **Your data, always reachable.** A documented API over everything the UI
+  can do, webhooks on every change, and a full export (CSV, JSON, Excel)
+  any time. Nothing is locked behind a paid tier.
+- **Configurable, not hard-coded.** Phase types, job statuses, departments,
+  crew roles, rate rules, custom fields on any record, checklists and
+  document templates (quotes, call sheets, pick lists) are settings, not
+  code. The defaults match how Session Hire works today.
+- **Workflows you can bend.** Status changes trigger rules the business
+  sets ("when a job is confirmed, email the crew chief and reserve the
+  van"), and any rule can be switched off. Nothing forces an order of steps
+  the job doesn't need, such as a quote before a booking.
+- **Escape hatches.** Any number can be overridden with a note (a price, an
+  availability warning, a crew clash), and the override is logged rather
+  than blocked.
+- **Modules, like Crewbox.** Warehouse, crew and finance are separate
+  modules on one core, so a new department or process is a new module, not
+  a fork.
+- **Plays well with others.** Google Calendar, Crewbox and file exports
+  from day one; anything else (accounting, CRM, messaging) through the same
+  API a customer could use.
+
 ## The shape of the system
 
 ```
@@ -302,10 +329,13 @@ Crewbox.
 2. ~~Which accounting package do you use?~~ Answered: bookkeeping is
    fairly offline, so finance is a dashboard and exporter first, with
    integration added if that grows.
-3. Roughly how many serialised assets, bulk lines, freelancers and jobs a
-   year? Is any stock already barcoded, and is there a spreadsheet or old
-   system to import from?
-4. What made you rule out Rentman and TeamTrack: price, missing features,
-   or something they do badly? That tells us where to spend effort first.
+3. ~~Roughly how many assets, freelancers and jobs a year?~~ Answered:
+   thousands of assets, 100+ freelancers, hundreds of jobs a year. **No
+   stock is barcoded**, so choosing and rolling out a tracking method is
+   part of the project; see [research/stock-tracking.md](research/stock-tracking.md).
+   Still open: is there a spreadsheet or old list of stock to import?
+4. ~~What made you rule out Rentman and TeamTrack?~~ Answered: closed
+   ecosystems and lack of flexibility. That became the "open and flexible"
+   principle above.
 5. Is Crewbox always going to be owned by the same people, so its sync code
    can be shared as a package?
