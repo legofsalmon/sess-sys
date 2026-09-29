@@ -52,10 +52,13 @@ waiting on someone.
   and a job added with no signal.
 - Also fixed: things added in a burst on one device, such as a new job's
   phases, now always keep the order they were added in.
+- Merged into `main` at 23:33 UTC and live by 23:38: the live app has the
+  Jobs tab, and the live database took its new tables when the new version
+  started.
 
 **Next**
 
-- Nothing to set up for this: it's on once it's live.
+- Nothing to set up for this: it's on.
 - The phone field test now opens on Jobs; its steps say to tap **Stock**
   first.
 - Next in Phase 1: the calendar sync, tried on Colly's test calendar, then
