@@ -1,8 +1,15 @@
+/// <reference types="node" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Which code this is, for error reports (ADR 0005). Railway says when it builds.
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) ?? 'dev'),
+    // Leaves Sentry's own debug logging out of the app.
+    __SENTRY_DEBUG__: false,
+  },
   plugins: [
     react(),
     VitePWA({

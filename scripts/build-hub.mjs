@@ -15,6 +15,7 @@ const DOCS = [
   ['Switching on sign-in', 'docs/sign-in-setup.md'],
   ['Design system', 'docs/design-system.md'],
   ['Backups', 'docs/backups.md'],
+  ['Error alerts', 'docs/monitoring.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],

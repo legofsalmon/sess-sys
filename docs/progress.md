@@ -3,6 +3,56 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: error alerts and uptime checks built
+
+**Done**
+
+- With a Sentry key set, the app server reports its own faults to Sentry,
+  which emails whoever looks after the app: a request that failed on the
+  server, a crash, a start-up that went wrong, and a backup that failed or
+  couldn't start. [Decision 0005](adr/0005-error-alerts.md) has the
+  reasons, and Colly chose Sentry for its EU data and one account covering
+  all of it.
+- The app on each phone and laptop reports its own errors too. A report
+  made with no signal waits on the device and goes when the signal is
+  back, or the next time the app opens. Phones only download Sentry's code
+  while reporting is on.
+- Reports are built to leave out anyone's details: no sign-in, request
+  contents, cookies or IP addresses. The server names a failed request by
+  its route as the code writes it, never the address used, and email
+  addresses and anything shaped like a private link in an error's text are
+  replaced.
+- A new uptime address, `/api/up`, answers without asking the database, so
+  Sentry's check every minute doesn't keep Neon's database awake and use up
+  its free hours.
+- Each scheduled backup checks in with Sentry, which emails when a night's
+  backup fails or hasn't started by 03:00 UTC.
+- Two fixes to backups on the way: pressing **Back up now** shortly before
+  a scheduled run no longer makes a second backup straight after it; and
+  after the `new-generation` command, phones start afresh on their next
+  sync rather than after the server next restarts.
+- Checked: 9 new server tests against a stand-in Sentry that keeps what
+  it's sent (among them a failed request carrying a private link, an email
+  address, a cookie and a form, none of which reached the report; 400s and
+  404s not reported; the backup's check-ins, and a failed backup's report;
+  nothing sent while reporting is off), 2 new backup tests, and 3 new
+  browser tests: a phone's report with nothing personal in it and a browser
+  extension's error left out; a report made with no signal sent when the
+  signal came back; and one still waiting when the app was closed, sent
+  when it next opened. Each browser test was also run against a
+  deliberately broken app, and failed.
+
+**Next**
+
+- Colly: make a free Sentry account and give its key to the app server,
+  about ten minutes: [the steps](monitoring.md). Until then the health
+  check says `"errors":"off"`.
+- Colly, still waiting: the Railway bucket for backups
+  ([the steps](backups.md)), the Google sign-in key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+- The last Phase 0 item: the audit trail and export-everything.
+
 ## 29 September 2026: design system in Figma
 
 **Done**

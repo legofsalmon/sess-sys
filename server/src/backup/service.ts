@@ -39,8 +39,18 @@ interface Log {
   error(obj: object, msg: string): void
 }
 
+/** Something outside the server watching the backups, such as Sentry (ADR 0005). */
+export interface BackupWatch {
+  /** A run is under way; whatever this returns comes back to `finished`. */
+  started(trigger: BackupRun['trigger']): unknown
+  finished(handle: unknown, run: BackupRun): void
+  /** A scheduled run couldn't even begin, for example with the database unreachable. */
+  couldNotStart(err: unknown): void
+}
+
 export interface BackupsOptions {
   log?: Log
+  watch?: BackupWatch
   now?: () => Date
   /** Hour of the day, in UTC, for the nightly run. 02:00 UTC is 3am in Dublin in summer, 2am in winter. */
   hourUtc?: number
@@ -120,6 +130,7 @@ export class Backups {
 
     const log = this.options.log
     const at = this.now()
+    const watching = this.options.watch?.started(trigger)
     let run: BackupRun
     try {
       const backup = await writeBackup(this.db, { now: at, commit: this.options.commit })
@@ -136,6 +147,7 @@ export class Backups {
     }
     this.last = run
     if (run.status === 'ok') this.lastOk = run
+    this.options.watch?.finished(watching, run)
     return run
   }
 
@@ -181,6 +193,7 @@ export class Backups {
             // Another run under way is fine; anything else (the database asleep or unreachable, say) is worth a retry.
             if (err instanceof Busy) return true
             this.options.log?.error({ err }, 'Backup could not start')
+            this.options.watch?.couldNotStart(err)
             return false
           })
           .then((ok) => {

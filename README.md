@@ -6,8 +6,9 @@ Offline-first web app for phone and laptop, coexisting with Google Calendar
 during the move and handing off to [Crewbox](https://github.com/legofsalmon/crewbox)
 on site.
 
-Phase 0 is under way: the offline sync engine, crew booking and staff
-sign-in are built, and the app runs on Railway. Start with the
+Phase 0 is under way: the offline sync engine, crew booking, staff
+sign-in, nightly backups and error alerts are built, and the app runs on
+Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the
 research, principles, architecture, stock tracking, roadmap and decisions,

@@ -100,3 +100,9 @@ export interface BackupStatus {
   /** When the next one is due. */
   next?: string
 }
+
+/** GET /api/config: what the app needs from the server before anyone has signed in. */
+export interface ClientConfig {
+  /** Where the app sends reports of its own errors (ADR 0005); null while error reporting is off. */
+  errors: { dsn: string; environment: string } | null
+}
