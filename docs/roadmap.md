@@ -22,6 +22,15 @@ architecture doc are answered.
 within a second of the phone reconnecting, and survives the server being
 restarted mid-sync.
 
+## Alongside Phase 0 and 1: labelling pilot
+
+No stock is barcoded yet and labelling thousands of items takes months,
+so the label trial starts early: order sample QR labels, metal tags and
+cable labels, put them on a few cases and cables, and see what survives a
+few jobs. Hardware to start is roughly £4-6k (two rugged Android scanners,
+pocket and ring scanners, a label printer and a portable labeller); see the
+research for the list. UHF RFID for cables is a later option.
+
 ## Phase 1: Projects and the calendar (replace the invite-by-hand workflow)
 
 - Clients, venues, projects, phases, crew requirements and assignments.
@@ -37,8 +46,13 @@ the same Google invites, and nobody has to type a job twice.
 
 ## Phase 2: Warehouse and stock
 
-- Catalogue, products, assets, cases and kits, bulk stock, locations.
-- Label printing (QR and Code 128) and bulk labelling of existing stock.
+- Catalogue, products, assets, containers, bulk stock, locations.
+- Label printing: QR plus a readable number on polyester labels, riveted
+  metal tags for cases and rigging, heat-shrink or flag labels for cables.
+- The labelling rollout from [research/stock-tracking.md](research/stock-tracking.md):
+  pilot the label materials, then compliance items, then high-value gear
+  labelled as it comes back from jobs, then cases, then cables as bundles,
+  then a baseline stocktake and rolling cycle counts.
 - Equipment lines on projects, with live availability and shortage
   warnings, including subhire lines.
 - Pick lists per project, **scan out and scan in on a phone, offline**,

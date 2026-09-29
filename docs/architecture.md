@@ -204,15 +204,27 @@ personal details of other crew.
 **Warehouse and stock**
 
 - **Product**: a model (d&b Y10P). Serialised or bulk.
-- **Asset**: one serialised item with a barcode or QR label; has a status and
-  a location.
+- **Asset**: one serialised item; has a status and a location. Its id is
+  internal and never printed, so a label can be replaced without touching
+  history.
+- **Identifier**: a tag on an asset or case. One asset can carry several
+  (the Session Hire QR label with its readable number such as `SH-004217`,
+  the manufacturer's serial barcode, and later an NFC or UHF RFID tag).
+  See [research/stock-tracking.md](research/stock-tracking.md).
 - **Bulk stock**: quantities per location (cables, clamps).
-- **Kit / case**: a fixed set of assets or products (a "Y10P stack" or a
-  "ops kit"), scanned as one unit and checked on return.
+- **Container**: a case, rack, bag or cable bundle that holds assets or
+  quantities, and can sit inside another container (a rack in a truck
+  pack). Permanent containers (an amp rack) are sealed: scanning the case
+  moves everything in it. Temporary ones (a job's mixed case) are packed
+  per job. Checked on return against what went out.
 - **Movement**: every scan out, scan in, transfer between warehouses, or
   write-off, with who, when, where and the device's offline time.
-- **Maintenance record**: fault reports, repairs, PAT tests, inspections,
-  with due dates. An asset under repair is not available.
+- **Maintenance record**: fault reports, repairs, electrical inspection and
+  testing, and thorough examination of lifting gear, with due dates. An
+  asset under repair, or overdue an inspection, cannot be scanned out
+  without an override. Lifting accessories need a thorough examination
+  every 6 months under S.I. 299/2007 and a register with a lasting mark on
+  each item, which the asset label provides.
 - **Availability** is computed from equipment lines, movements and
   maintenance, per product per hour, including prep and return buffers.
 
