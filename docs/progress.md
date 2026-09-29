@@ -27,12 +27,16 @@ waiting on someone.
   devices) and 3 new browser tests (the sign-in page keeping waiting
   changes, a refused account, signing out clearing the device). All earlier
   tests still pass.
+- Merged into `main` at 19:36 UTC. It reaches the live app with the next
+  deploy; until the Google key is added the health check will say
+  `"auth":"off"` and the app stays open as before.
 
 **Next**
 
-- Colly: make the Google sign-in key and add it in Railway, about ten
-  minutes: [the steps](sign-in-setup.md). Until then the app stays open to
-  anyone with the address, so keep to made-up data.
+- Colly: make the Google sign-in key, add it in Railway, then **Deploy
+  Latest Commit**, about ten minutes: [the steps](sign-in-setup.md). Until
+  then the app stays open to anyone with the address, so keep to made-up
+  data.
 - Phone field test: [the steps](field-test.md).
 - Backups with a tested restore, then error tracking and uptime alerts.
 
