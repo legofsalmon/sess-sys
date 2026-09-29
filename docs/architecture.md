@@ -26,6 +26,25 @@ is in [roadmap.md](roadmap.md).
 - **Hands off to Crewbox** for the on-site part.
 - **Irish:** EUR, Irish VAT, GDPR, data held in the EU.
 
+## Where this beats the off-the-shelf tools
+
+The [competitor audit](research/competitor-audit.md) found five gaps no
+product covers well. They set the priorities below:
+
+1. **Offline-first warehouse and site work.** No product documents real
+   offline scanning with sync afterwards; Current RMS's scanner is iOS-only.
+2. **Two-way Google Calendar sync.** Everyone offers a one-way iCal feed
+   that Google refreshes about once a day.
+3. **Handoff to on-site comms and back.** Rental tools stop at the call
+   sheet; nothing brings damage, shortages and extra kit back from site.
+4. **Contractor-heavy crewing in the same system as the kit.** Crew is
+   bolted on, or lives in a separate tool with fragile one-way links.
+5. **Irish defaults:** 23% and 13.5% VAT, EU reverse charge, GBP for
+   Northern Ireland work, certificate expiry blocking assignment.
+
+Where not to compete: Rentman's quoting and invoicing breadth and HireHop's
+core stock handling. Matching them is enough.
+
 ## The shape of the system
 
 ```
@@ -147,18 +166,22 @@ personal details of other crew.
   rates, contact details, emergency contact.
 - **Documents**: Safe Pass, manual handling, working at height, IPAF/PASMA,
   driving licence, insurance for companies; with expiry dates and reminders.
+  An expired required certificate blocks the assignment, the same way an
+  overdue PAT test blocks an asset.
 - **Availability**: freelancers mark unavailable days; offers respect them.
 - **Crew assignment**: person on a phase in a role at an agreed rate, with a
   status (proposed, offered, accepted, declined, confirmed, cancelled) and a
-  call time.
+  call time. Offers go out by app, email, calendar invite, and SMS or
+  WhatsApp.
 - **Timesheet**: actual hours per assignment, approved by ops.
 
 **Finance (light)**
 
 - Price lists and discounts per client, day and week rates, multi-day
   factors.
-- Quotes and invoices in EUR with Irish VAT (23% standard, rate per line so
-  it can change), deposits, and credit notes.
+- Quotes and invoices in EUR with Irish VAT (23% and 13.5%, rate per line
+  so it can change), EU reverse charge, GBP for Northern Ireland jobs,
+  deposits and credit notes.
 - Freelancer costs from confirmed assignments and timesheets.
 - Job profitability: quoted versus actual kit, crew, subhire and transport.
 - Export to the accounting package (Xero, QuickBooks Online or Sage;

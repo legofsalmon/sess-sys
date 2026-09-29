@@ -53,7 +53,8 @@ availability for next week is trusted without walking the shelves.
 
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: freelancers mark days off in the app.
-- Offers: send a role to one person or a shortlist, first to accept gets it;
+- Offers by app, email, SMS or WhatsApp: send a role to one person or a
+  shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.
 - Call sheets per phase: call time, venue, access, parking, contacts, run
   of show, available offline on the crew chief's phone.
