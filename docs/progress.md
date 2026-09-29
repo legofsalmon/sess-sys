@@ -7,21 +7,22 @@ waiting on someone.
 
 **Done**
 
-- The app runs at shserver-production.up.railway.app, deployed from `main`.
-  A Railway incident ("slow or stuck deployments") held the first deploy up
-  for a few minutes.
+- The app runs at shserver-production.up.railway.app, deployed from `main`,
+  with its data in a Neon Postgres database created through Vercel's
+  storage menu. A Railway incident ("slow or stuck deployments") held the
+  first deploy up for a few minutes.
 - The health check (`/api/health`) now says where the data lives:
-  `postgres`, `file` or `memory`. The first deploy showed the app was on a
-  throwaway in-memory store because the database setting hadn't reached it.
+  `postgres`, `file` or `memory`. Before this, there was no way to tell from
+  outside which database a deploy was using.
 - On a host the server now refuses to start without a database, so a missing
   `DATABASE_URL` fails the deploy with a reason in its logs instead of
-  quietly losing data on the next restart.
+  running on a throwaway in-memory store that loses everything on restart.
 - Checked: new server tests for each setting and for the health check.
 
 **Waiting on**
 
-- Colly: apply the `DATABASE_URL` change in Railway so the health check
-  reads `"db":"postgres"`. Then the phone field test can start.
+- Colly: confirm the database's region is in Europe. Then the phone field
+  test can start.
 
 ## 29 September 2026: crew booking started early
 
