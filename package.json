@@ -1,0 +1,12 @@
+{
+  "name": "session-hire",
+  "private": true,
+  "type": "module",
+  "description": "Session Hire management system. For now: the Session Hire Blueprint reference page.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build-hub.mjs && node -e \"require('fs').mkdirSync('dist',{recursive:true});require('fs').copyFileSync('docs/hub/index.html','dist/index.html')\""
+  }
+}

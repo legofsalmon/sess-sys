@@ -12,6 +12,14 @@ research, principles, architecture, stock tracking, roadmap and decisions,
 with the full documents embedded. Open it in a browser. After editing any
 markdown file in `docs/`, rebuild it with `node scripts/build-hub.mjs`.
 
+### Deploying the blueprint on Vercel
+
+Import this repo in Vercel; no settings are needed, `vercel.json` covers it.
+Each push rebuilds the page from the markdown in `docs/` (`npm run build`
+writes `dist/index.html`). The page asks search engines not to index it,
+but a production deployment is public to anyone with the URL unless you
+turn on Deployment Protection in the Vercel project settings.
+
 The source documents:
 
 - [docs/architecture.md](docs/architecture.md): the proposed design
