@@ -2,13 +2,13 @@ import {
   commandSchemas,
   type CommandArgs,
   type CommandName,
-  type EntityName,
   type Mutation,
   type MutationResult,
-  type Rejection,
 } from '@sh/shared'
 import { newId } from '@sh/shared'
+import { crewHandlers } from './crew/handlers.ts'
 import type { Db, Queryable } from './db.ts'
+import { emit, Refused, type Ctx } from './kernel.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -18,33 +18,7 @@ import type { Db, Queryable } from './db.ts'
  * to resend and get a clean answer.
  */
 
-class Refused extends Error {
-  constructor(readonly reason: Rejection) {
-    super(reason.message)
-  }
-}
-
-interface Ctx {
-  tx: Queryable
-  mutationId: string
-  /** Last sequence number written in this transaction. */
-  seq: number
-}
-
-/**
- * Append to the change feed. Commits are serialised by the advisory lock
- * taken in `applyMutation`, so sequence numbers become visible in order and
- * a device pulling "after N" can never skip one that commits late.
- */
-async function emit(ctx: Ctx, entity: EntityName, id: string, data: unknown) {
-  const { rows } = await ctx.tx.query<{ seq: string }>(
-    'INSERT INTO changes (entity, entity_id, op, data, mutation_id) VALUES ($1, $2, $3, $4, $5) RETURNING seq',
-    [entity, id, 'put', JSON.stringify(data), ctx.mutationId]
-  )
-  ctx.seq = Number(rows[0]!.seq)
-}
-
-type Handler<N extends CommandName> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
+export type Handler<N extends CommandName> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const handlers: { [N in CommandName]: Handler<N> } = {
   async 'product.upsert'(ctx, a) {
@@ -138,6 +112,8 @@ const handlers: { [N in CommandName]: Handler<N> } = {
       await emit(ctx, 'issue', issueId, { id: issueId, ...problem, scanId: a.id, resolved: false })
     }
   },
+
+  ...crewHandlers,
 }
 
 /**
@@ -172,7 +148,11 @@ function bookingFromRow(r: BookingRow) {
   return { id: r.id, productId: r.product_id, project: r.project, qty: r.qty, start: r.start_day, end: r.end_day, status: r.status }
 }
 
-export async function applyMutation(db: Db, clientId: string, m: Mutation): Promise<MutationResult> {
+/**
+ * `via` is 'link' only when the server itself runs a command for a person
+ * using their private link; a device can't claim it.
+ */
+export async function applyMutation(db: Db, clientId: string, m: Mutation, via: Ctx['via'] = 'app'): Promise<MutationResult> {
   return db.transaction(async (tx) => {
     // One writer at a time; see `emit`. At Session Hire's volume (a few
     // people, hundreds of jobs a year) this costs nothing.
@@ -181,7 +161,7 @@ export async function applyMutation(db: Db, clientId: string, m: Mutation): Prom
     const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
     if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
 
-    const ctx: Ctx = { tx, mutationId: m.id, seq: 0 }
+    const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via }
     let result: MutationResult
     // Record the mutation first so the changes it writes can point at it.
     await tx.query(

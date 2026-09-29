@@ -1,0 +1,200 @@
+import { dayLabel, daysLabel, eachDay, euro, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
+
+/**
+ * The freelancer's private page. Plain server-rendered HTML with ordinary
+ * forms: it works on any phone, in any in-app browser (WhatsApp, Gmail),
+ * with no app, no login and no JavaScript.
+ */
+
+const h = (s: unknown) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+
+export interface PageData {
+  person: Person
+  jobs: { offer: Offer; call: CrewCall; openDays: string[] }[]
+  away: Unavailability[]
+  base: string
+  flash?: { ok: boolean; text: string }
+  today: string
+}
+
+const STATUS_TEXT: Record<Offer['status'], string> = {
+  offered: 'Waiting on you',
+  countered: 'Rate sent to the office',
+  accepted: 'Accepted, the office will confirm',
+  confirmed: 'Confirmed',
+  declined: 'You declined',
+  filled: 'Filled by someone else',
+  cancelled: 'Withdrawn',
+}
+
+function facts(call: CrewCall, offer: Offer) {
+  const rate = offer.status === 'countered' ? `${euro(offer.counterRateCents)} a day asked (offered ${euro(call.dayRateCents)})` : `${euro(offer.dayRateCents)}${offer.dayRateCents !== null ? ' a day' : ''}`
+  return `<dl class="facts">
+    <dt>Role</dt><dd>${h(call.role)}</dd>
+    <dt>Dates</dt><dd>${h(daysLabel(offer.status === 'offered' ? eachDay(call.start, call.end) : offer.days))}</dd>
+    ${call.callTime ? `<dt>Call</dt><dd>${h(call.callTime)}</dd>` : ''}
+    ${call.venue ? `<dt>Venue</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.venue)}">${h(call.venue)}</a></dd>` : ''}
+    <dt>Rate</dt><dd>${h(rate)}</dd>
+    ${call.replyBy && offer.status === 'offered' ? `<dt>Reply by</dt><dd>${h(dayLabel(call.replyBy))}</dd>` : ''}
+  </dl>
+  ${call.details ? `<p class="details">${h(call.details).replace(/\n/g, '<br>')}</p>` : ''}`
+}
+
+function offerCard(d: PageData, job: PageData['jobs'][number]) {
+  const { offer, call, openDays } = job
+  const days = eachDay(call.start, call.end)
+  const action = `${d.base}/offers/${encodeURIComponent(offer.id)}`
+  const title = `${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}`
+  const canAnswer = offer.status === 'offered' || offer.status === 'countered' || offer.status === 'accepted'
+  const dayPicker =
+    days.length > 1
+      ? `<input type="hidden" name="picker" value="1"><fieldset class="days"><legend>Your days</legend>${days
+          .map((day) => {
+            const open = openDays.includes(day) || (offer.status === 'accepted' && offer.days.includes(day))
+            const checked = offer.status === 'offered' ? open : offer.days.includes(day)
+            return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day))}${open ? '' : ' <small>filled</small>'}</label>`
+          })
+          .join('')}</fieldset>`
+      : ''
+  return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
+    <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
+    ${facts(call, offer)}
+    ${
+      canAnswer
+        ? `<form method="post" action="${action}">
+      ${dayPicker}
+      <div class="buttons">
+        <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
+        <button class="no" name="answer" value="decline">${offer.status === 'accepted' ? 'I can no longer do it' : 'Decline'}</button>
+      </div>
+      <details${offer.status === 'countered' ? ' open' : ''}><summary>Ask for a different rate or add a note</summary>
+        <label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>
+        <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(offer.note)}</textarea></label>
+        <button name="answer" value="counter">Send rate</button>
+      </details>
+    </form>`
+        : ''
+    }
+  </article>`
+}
+
+export function renderPage(d: PageData): string {
+  const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
+  const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
+  const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
+  const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
+  const first = d.person.name.split(' ')[0]
+  const feed = `${d.base}/calendar.ics`
+
+  return `<!doctype html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#ee3744">
+<title>Session Hire: your work</title>
+<style>${CSS}</style>
+</head>
+<body>
+<main>
+  <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
+  ${d.flash ? `<p class="flash ${d.flash.ok ? 'ok' : 'bad'}" role="status">${h(d.flash.text)}</p>` : ''}
+
+  <section>
+    <h2>Offers waiting on you</h2>
+    ${waiting.length ? waiting.map((j) => offerCard(d, j)).join('') : '<p class="empty">Nothing waiting right now.</p>'}
+  </section>
+
+  <section>
+    <h2>Your bookings</h2>
+    ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
+    <p class="small">See these in your own calendar: <a href="${h(feed.replace(/^https?:/, 'webcal:'))}">subscribe</a> (Apple, Outlook) or add <code>${h(feed)}</code> in Google Calendar under “From URL”.</p>
+  </section>
+
+  <section>
+    <h2>Days you can't work</h2>
+    ${
+      d.away.length
+        ? `<ul class="away">${d.away
+            .filter((u) => u.end >= d.today)
+            .map(
+              (u) => `<li><span>${h(daysLabel(eachDay(u.start, u.end)))}${u.note ? ` <small>${h(u.note)}</small>` : ''}</span>
+          <form method="post" action="${d.base}/away/${encodeURIComponent(u.id)}/remove"><button>Remove</button></form></li>`
+            )
+            .join('')}</ul>`
+        : ''
+    }
+    <form method="post" action="${d.base}/away" class="add-away">
+      <label>From <input type="date" name="start" required min="${d.today}"></label>
+      <label>To <input type="date" name="end" min="${d.today}"></label>
+      <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour"></label>
+      <button>Add days off</button>
+    </form>
+  </section>
+
+  ${
+    closed.length
+      ? `<section><h2>Earlier</h2><ul class="closed">${closed
+          .map((j) => `<li>${h(j.call.project)} · ${h(j.call.role)} · ${h(daysLabel(eachDay(j.call.start, j.call.end)))} <small>${STATUS_TEXT[j.offer.status]}</small></li>`)
+          .join('')}</ul></section>`
+      : ''
+  }
+
+  <footer>
+    <a href="${d.base}/data.json">Download everything we hold on you</a>
+    <span>Keep this link to yourself: anyone with it can answer for you. Ask the office for a new one if it gets shared.</span>
+  </footer>
+</main>
+</body>
+</html>`
+}
+
+export function renderGone(): string {
+  return `<!doctype html><html lang="en-IE"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Session Hire</title><style>${CSS}</style></head>
+<body><main><header class="top"><span class="mark">SH</span><div><b>Session Hire</b></div></header>
+<p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p></main></body></html>`
+}
+
+const CSS = `
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--accent:#ee3744;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#9a6200;--warn-soft:#fbefd6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
+main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
+a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
+.top{display:flex;gap:12px;align-items:center}.top b{display:block;text-transform:uppercase;letter-spacing:.03em}.top small{color:var(--muted)}
+.mark{width:40px;height:40px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+section{display:grid;gap:10px}
+.offer{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
+.offer.offered{border-left-color:var(--accent)}.offer.confirmed{border-left-color:var(--good)}.offer.accepted,.offer.countered{border-left-color:var(--warn)}
+.offer header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+h3{margin:0;font-size:1.1rem}h3 span{font-weight:500;color:var(--muted)}
+.tag{font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--line);white-space:nowrap}
+.tag.offered{background:var(--accent);color:#fff}.tag.confirmed{background:var(--good-soft);color:var(--good)}.tag.accepted,.tag.countered{background:var(--warn-soft);color:var(--warn)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0}.facts dt{color:var(--muted)}.facts dd{margin:0}
+.details{margin:0;padding:10px;background:var(--bg);border-radius:8px;font-size:.92rem}
+form{display:grid;gap:10px;margin:0}
+fieldset.days{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}fieldset.days legend{font-size:.85rem;color:var(--muted);margin-bottom:4px}
+fieldset.days label{display:flex;gap:6px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+fieldset.days label.gone{opacity:.55}fieldset.days input{width:20px;height:20px;accent-color:var(--accent)}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;min-height:48px}
+button.yes{background:var(--accent);border-color:var(--accent);color:#fff}
+details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
+details[open]{display:grid;gap:8px}
+label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
+fieldset.days input{width:20px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--warn-soft);color:var(--warn)}
+.empty,.small{color:var(--muted);margin:0;font-size:.92rem}code{word-break:break-all;font-size:.8rem}
+.away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+.away li button{min-height:36px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}
+.closed li{font-size:.92rem}
+.add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
+footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+`

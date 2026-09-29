@@ -1,0 +1,491 @@
+import {
+  daysLabel,
+  eachDay,
+  euro,
+  newId,
+  offerMessage,
+  personConflicts,
+  whatsappNumber,
+  type CallView,
+  type CrewView,
+  type OfferView,
+  type PersonView,
+  type View,
+} from '@sh/shared'
+import { useEffect, useState, type FormEvent } from 'react'
+import { client, syncSoon } from '../sync.ts'
+
+/**
+ * Ops' crew screen: jobs that need people, the offers out for them, and
+ * the people who can be offered work. Answers arrive from freelancers'
+ * private links and show up here live; everything also works with no
+ * signal and syncs later, like the rest of the app.
+ */
+
+const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
+
+const STATUS: Record<OfferView['status'], [string, string]> = {
+  offered: ['Offered', 'pending'],
+  countered: ['Asked for more', 'pending'],
+  accepted: ['Accepted', 'accepted'],
+  confirmed: ['Confirmed', 'confirmed'],
+  declined: ['Declined', 'cancelled'],
+  filled: ['Filled', 'cancelled'],
+  cancelled: ['Withdrawn', 'cancelled'],
+}
+
+const act = async (fn: () => Promise<unknown>) => {
+  await fn()
+  syncSoon()
+}
+
+export const linkFor = (p: PersonView) => (p.linkToken ? `${location.origin}/f/${p.linkToken}` : '')
+
+function useView(): View {
+  const [view, setView] = useState(() => client.view())
+  useEffect(() => client.subscribe(setView), [])
+  return view
+}
+
+export function CrewScreen() {
+  const view = useView()
+  const crew = view.crew
+  const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
+  const people = new Map(crew.people.map((p) => [p.id, p]))
+  const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
+  const toCheck = upcoming.flatMap((c) => c.offers.filter((o) => o.status === 'accepted' || o.status === 'countered').map((o) => ({ c, o })))
+  const problems = view.problems.filter((p) => /^(person|call|offer|unavailability)\./.test(p.mutation.name))
+
+  return (
+    <div className="app crew">
+      <header className="top">
+        <div className="brand">
+          <span className="mark">SH</span>
+          <span>
+            <b>Session Hire</b>
+            <small>Crew</small>
+          </span>
+        </div>
+        <span className={`conn ${view.connection === 'offline' ? 'offline' : view.pendingCount ? 'syncing' : 'online'}`} role="status">
+          {view.connection === 'offline' ? `No signal${view.pendingCount ? ` · ${view.pendingCount} waiting` : ''}` : view.pendingCount ? `${view.pendingCount} waiting` : 'Up to date'}
+        </span>
+      </header>
+
+      {problems.length > 0 && (
+        <section className="card attention">
+          <h2>Not done</h2>
+          {problems.map((p) => (
+            <div className="row" key={p.mutation.id}>
+              <p>{p.reason.message}</p>
+              <button type="button" onClick={() => client.dismissProblem(p.mutation.id)}>
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {toCheck.length > 0 && (
+        <section className="card">
+          <h2>Answers to check</h2>
+          {toCheck.map(({ c, o }) => (
+            <div className="row" key={o.id}>
+              <div>
+                <b>{o.person?.name ?? 'Someone'}</b> {o.status === 'accepted' ? 'accepted' : `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`}
+                <p>
+                  {c.project} · {c.role} · {daysLabel(o.days)}
+                  {o.note && <><br />“{o.note}”</>}
+                </p>
+              </div>
+              <div className="actions">
+                <button type="button" className="primary" onClick={() => act(() => client.mutate('offer.confirm', { id: o.id }))}>
+                  {o.status === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
+                </button>
+                <button type="button" onClick={() => act(() => client.mutate('offer.cancel', { id: o.id }))}>
+                  {o.status === 'countered' ? 'Say no' : 'Release'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="card">
+        <h2>Jobs needing crew</h2>
+        {upcoming.length === 0 && <p className="empty">No upcoming jobs. Add one below.</p>}
+        {upcoming.map((c) => (
+          <CallCard key={c.id} call={c} crew={crew} onShare={(person) => setShare({ person, call: c })} />
+        ))}
+      </section>
+
+      {share && <SharePanel {...share} onClose={() => setShare(undefined)} />}
+
+      <section className="card">
+        <h2>New job</h2>
+        <NewCall />
+      </section>
+
+      <section className="card">
+        <h2>People</h2>
+        {crew.people.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
+        {crew.people.map((p) => (
+          <PersonRow key={p.id} person={p} crew={crew} />
+        ))}
+        <NewPerson />
+      </section>
+
+      <p className="hint">
+        Freelancers answer from their own private link: no app or login. Send it with an offer by WhatsApp, text or email.
+        {people.size > 0 && ' Their bookings also appear in their own calendar if they subscribe from that page.'}
+      </p>
+    </div>
+  )
+}
+
+function CallCard({ call, crew, onShare }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void }) {
+  const [personId, setPersonId] = useState('')
+  const [override, setOverride] = useState(false)
+  const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
+  const candidates = crew.people.filter((p) => !offered.has(p.id))
+  const chosen = candidates.find((p) => p.id === personId)
+  const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
+  const filled = call.openDays.length === 0
+
+  const send = (e: FormEvent) => {
+    e.preventDefault()
+    if (!chosen) return
+    const p = chosen
+    void act(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override }))
+    setPersonId('')
+    setOverride(false)
+    onShare(p)
+  }
+
+  return (
+    <article className={`job ${call.pending ? 'is-pending' : ''}`}>
+      <header>
+        <div>
+          <b>
+            {call.project}
+            {call.phase && <span className="muted"> · {call.phase}</span>}
+          </b>
+          <p>
+            {call.needed} × {call.role} · {daysLabel(call.days)}
+            {call.callTime && ` · call ${call.callTime}`} · {euro(call.dayRateCents)}
+            {call.venue && <><br />{call.venue}</>}
+          </p>
+        </div>
+        <span className={`pill ${filled ? 'confirmed' : 'pending'}`}>
+          {filled ? 'Filled' : call.days.length > 1 ? `${call.days.filter((d) => call.heldByDay[d]! >= call.needed).length}/${call.days.length} days filled` : `${call.heldByDay[call.days[0]!]}/${call.needed}`}
+        </span>
+      </header>
+
+      {call.offers.length > 0 && (
+        <ul className="offers">
+          {call.offers.map((o) => {
+            const [label, tone] = STATUS[o.status]
+            const partial = o.days.length < call.days.length && (o.status === 'accepted' || o.status === 'confirmed' || o.status === 'countered')
+            return (
+              <li key={o.id}>
+                <span>
+                  {o.person?.name ?? 'Unknown'}
+                  {partial && <small> {daysLabel(o.days)}</small>}
+                  {o.override && <small> (override)</small>}
+                </span>
+                <span className="actions">
+                  <span className={`pill ${o.pending ? 'pending' : tone}`}>{o.pending ? 'Waiting to sync' : label}</span>
+                  {o.status === 'offered' && o.person && (
+                    <button type="button" className="link" onClick={() => onShare(o.person as PersonView)}>
+                      Send
+                    </button>
+                  )}
+                  {(o.status === 'offered' || o.status === 'confirmed') && (
+                    <button type="button" className="link" onClick={() => act(() => client.mutate('offer.cancel', { id: o.id }))}>
+                      Withdraw
+                    </button>
+                  )}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {!filled && (
+        <form className="offer-form" onSubmit={send}>
+          <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
+            <option value="">Offer to…</option>
+            {candidates.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.skills.length ? ` (${p.skills.join(', ')})` : ''}
+                {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
+              </option>
+            ))}
+          </select>
+          <button type="submit" disabled={!chosen || (conflicts.length > 0 && !override)}>
+            Offer
+          </button>
+          {conflicts.length > 0 && (
+            <label className="warn">
+              <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+              <span>
+                {conflicts.join('. ')}. <b>Offer anyway</b>
+              </span>
+            </label>
+          )}
+        </form>
+      )}
+      <div className="actions end">
+        <button type="button" className="link" onClick={() => confirm(`Cancel ${call.project}? Everyone offered is told it's withdrawn.`) && act(() => client.mutate('call.cancel', { id: call.id }))}>
+          Cancel job
+        </button>
+      </div>
+    </article>
+  )
+}
+
+/** The offer, ready to go wherever the freelancer already looks. Nothing is sent for you. */
+function SharePanel({ person, call, onClose }: { person: PersonView; call: CallView; onClose: () => void }) {
+  const link = linkFor(person)
+  const [copied, setCopied] = useState(false)
+  if (!link)
+    return (
+      <section className="card share">
+        <h2>Send to {person.name}</h2>
+        <p className="empty">Their private link is made when this device next syncs. Try again once it says “Up to date”.</p>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </section>
+    )
+  const text = offerMessage(person, call, link)
+  const subject = `Work: ${call.project}, ${daysLabel(call.days)}`
+  return (
+    <section className="card share" aria-label={`Send offer to ${person.name}`}>
+      <h2>Send to {person.name}</h2>
+      <textarea readOnly value={text} rows={6} />
+      <div className="actions">
+        {person.phone && (
+          <>
+            <a className="button primary" href={`https://wa.me/${whatsappNumber(person.phone)}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">
+              WhatsApp
+            </a>
+            <a className="button" href={`sms:${person.phone}?&body=${encodeURIComponent(text)}`}>
+              Text
+            </a>
+          </>
+        )}
+        {person.email && (
+          <a className="button" href={`mailto:${person.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`}>
+            Email
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(text).then(() => setCopied(true))
+          }}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button type="button" className="link" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
+  const [open, setOpen] = useState(false)
+  const [away, setAway] = useState({ start: today, end: today, note: '' })
+  const booked = crew.calls.flatMap((c) =>
+    c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')).map((o) => ({ c, o })) : []
+  )
+  const off = crew.unavailability.filter((u) => u.personId === person.id && u.end >= today)
+  const link = linkFor(person)
+  return (
+    <div className="row person">
+      <button type="button" className="who" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <b>{person.name}</b>
+        <small>
+          {[person.kind === 'staff' ? 'Staff' : null, person.skills.join(', '), person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null]
+            .filter(Boolean)
+            .join(' · ')}
+          {booked.length > 0 && ` · ${booked.length} booking${booked.length === 1 ? '' : 's'}`}
+          {off.length > 0 && ' · has days off'}
+        </small>
+      </button>
+      {person.pending && <span className="pill pending">Waiting to sync</span>}
+      {open && (
+        <div className="detail">
+          {booked.map(({ c, o }) => (
+            <p key={o.id}>
+              {c.project} · {daysLabel(o.days)} · {STATUS[o.status][0]}
+            </p>
+          ))}
+          {off.map((u) => (
+            <p key={u.id}>
+              Off {daysLabel(eachDay(u.start, u.end))}
+              {u.note && ` (${u.note})`}
+              {u.source === 'self' && ' · said on their link'}{' '}
+              <button type="button" className="link" onClick={() => act(() => client.mutate('unavailability.remove', { id: u.id }))}>
+                Remove
+              </button>
+            </p>
+          ))}
+          <form
+            className="away-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void act(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
+            }}
+          >
+            <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} aria-label="Off from" />
+            <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} aria-label="Off until" />
+            <input placeholder="Note" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+            <button type="submit">Mark days off</button>
+          </form>
+          <div className="actions">
+            {link && (
+              <>
+                <a className="button" href={link} target="_blank" rel="noreferrer">
+                  Open their page
+                </a>
+                <button type="button" onClick={() => navigator.clipboard?.writeText(link)}>
+                  Copy link
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="link"
+              onClick={() => confirm(`Make a new link for ${person.name}? The old one stops working.`) && act(() => client.mutate('person.newLink', { id: person.id }))}
+            >
+              New link
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const euroToCents = (s: string) => (s.trim() === '' ? null : Math.round(Number(s.replace(',', '.')) * 100))
+
+function NewCall() {
+  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
+  const [f, setF] = useState(blank)
+  const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.project.trim() || !f.role.trim()) return
+    void act(() =>
+      client.mutate('call.create', {
+        id: newId(),
+        project: f.project.trim(),
+        phase: f.phase.trim(),
+        venue: f.venue.trim(),
+        role: f.role.trim(),
+        start: f.start,
+        end: f.end < f.start ? f.start : f.end,
+        callTime: f.callTime || null,
+        needed: Math.max(1, f.needed),
+        dayRateCents: euroToCents(f.rate),
+        details: f.details.trim(),
+        replyBy: null,
+      })
+    )
+    setF({ ...blank, project: f.project, venue: f.venue, start: f.start, end: f.end })
+  }
+  return (
+    <form className="grid-form" onSubmit={submit}>
+      <label className="wide">
+        Project <input value={f.project} onChange={set('project')} placeholder="e.g. Electric Picnic" required />
+      </label>
+      <label>
+        Phase <input value={f.phase} onChange={set('phase')} placeholder="Build, Show…" />
+      </label>
+      <label>
+        Role <input value={f.role} onChange={set('role')} placeholder="Audio tech" required />
+      </label>
+      <label>
+        From <input type="date" value={f.start} onChange={set('start')} />
+      </label>
+      <label>
+        To <input type="date" value={f.end} min={f.start} onChange={set('end')} />
+      </label>
+      <label>
+        Call time <input type="time" value={f.callTime} onChange={set('callTime')} />
+      </label>
+      <label>
+        How many <input type="number" min={1} value={f.needed} onChange={set('needed')} />
+      </label>
+      <label>
+        Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
+      </label>
+      <label>
+        Venue <input value={f.venue} onChange={set('venue')} />
+      </label>
+      <label className="wide">
+        Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
+      </label>
+      <button type="submit" className="primary wide">
+        Add job
+      </button>
+    </form>
+  )
+}
+
+function NewPerson() {
+  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff' }
+  const [f, setF] = useState(blank)
+  const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.name.trim()) return
+    void act(() =>
+      client.mutate('person.upsert', {
+        id: newId(),
+        name: f.name.trim(),
+        kind: f.kind,
+        phone: f.phone.trim() || null,
+        email: f.email.trim() || null,
+        skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        dayRateCents: euroToCents(f.rate),
+        notes: '',
+      })
+    ).catch((err: Error) => alert(err.message))
+    setF(blank)
+  }
+  return (
+    <form className="grid-form" onSubmit={submit}>
+      <label className="wide">
+        Name <input value={f.name} onChange={set('name')} placeholder="Full name" required />
+      </label>
+      <label>
+        Mobile <input type="tel" value={f.phone} onChange={set('phone')} placeholder="+353 87…" />
+      </label>
+      <label>
+        Email <input type="email" value={f.email} onChange={set('email')} />
+      </label>
+      <label>
+        Skills <input value={f.skills} onChange={set('skills')} placeholder="audio, rigger" />
+      </label>
+      <label>
+        Usual day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} />
+      </label>
+      <label>
+        Type
+        <select value={f.kind} onChange={set('kind')}>
+          <option value="freelancer">Freelancer</option>
+          <option value="staff">Staff</option>
+        </select>
+      </label>
+      <button type="submit" className="wide">
+        Add person
+      </button>
+    </form>
+  )
+}

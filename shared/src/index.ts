@@ -1,5 +1,7 @@
 export * from './ids.ts'
 export * from './model.ts'
+export * from './crew.ts'
 export * from './commands.ts'
 export * from './protocol.ts'
 export * from './sync/client.ts'
+export * from './sync/crew-view.ts'

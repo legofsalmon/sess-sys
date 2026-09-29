@@ -1,0 +1,132 @@
+import type { CrewCall, Offer, Person, Unavailability } from '@sh/shared'
+import type { Queryable } from '../db.ts'
+
+/** Reading crew rows back as the entities devices and pages see. */
+
+const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token`
+const CALL = `id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
+const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override`
+const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
+
+type Row = Record<string, any>
+
+export const toPerson = (r: Row): Person => ({
+  id: r.id,
+  name: r.name,
+  kind: r.kind,
+  email: r.email,
+  phone: r.phone,
+  skills: r.skills,
+  dayRateCents: r.day_rate_cents,
+  notes: r.notes,
+  linkToken: r.link_token,
+})
+export const toCall = (r: Row): CrewCall => ({
+  id: r.id,
+  project: r.project,
+  phase: r.phase,
+  venue: r.venue,
+  role: r.role,
+  start: r.start_day,
+  end: r.end_day,
+  callTime: r.call_time,
+  needed: r.needed,
+  dayRateCents: r.day_rate_cents,
+  details: r.details,
+  replyBy: r.reply_by,
+  status: r.status,
+})
+export const toOffer = (r: Row): Offer => ({
+  id: r.id,
+  callId: r.call_id,
+  personId: r.person_id,
+  status: r.status,
+  days: r.days,
+  dayRateCents: r.day_rate_cents,
+  counterRateCents: r.counter_rate_cents,
+  note: r.note,
+  respondedAt: r.responded_at ? new Date(r.responded_at).toISOString() : null,
+  respondedVia: r.responded_via,
+  override: r.override,
+})
+export const toAway = (r: Row): Unavailability => ({
+  id: r.id,
+  personId: r.person_id,
+  start: r.start_day,
+  end: r.end_day,
+  note: r.note,
+  source: r.source,
+})
+
+export async function getPerson(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE id = $1`, [id])
+  return rows[0] ? toPerson(rows[0]) : undefined
+}
+export async function personByToken(q: Queryable, token: string) {
+  if (!token || token.length < 16) return undefined
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE link_token = $1`, [token])
+  return rows[0] ? toPerson(rows[0]) : undefined
+}
+export async function getCall(q: Queryable, id: string, lock = false) {
+  const { rows } = await q.query(`SELECT ${CALL} FROM crew_calls WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id])
+  return rows[0] ? toCall(rows[0]) : undefined
+}
+export async function getOffer(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE id = $1`, [id])
+  return rows[0] ? toOffer(rows[0]) : undefined
+}
+export async function offersForCall(q: Queryable, callId: string) {
+  const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE call_id = $1`, [callId])
+  return rows.map(toOffer)
+}
+export async function getAway(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${AWAY} FROM unavailability WHERE id = $1`, [id])
+  return rows[0] ? toAway(rows[0]) : undefined
+}
+export async function awayFor(q: Queryable, personId: string) {
+  const { rows } = await q.query(`SELECT ${AWAY} FROM unavailability WHERE person_id = $1 ORDER BY start_day`, [personId])
+  return rows.map(toAway)
+}
+
+/** A person's offers with their calls, newest call first. */
+export async function offersFor(q: Queryable, personId: string) {
+  const { rows } = await q.query(
+    `SELECT o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
+            o.responded_at, o.responded_via, o.override,
+            c.id AS c_id, c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
+            c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,
+            c.needed AS c_needed, c.day_rate_cents AS c_day_rate_cents, c.details AS c_details,
+            c.reply_by::text AS c_reply_by, c.status AS c_status
+       FROM offers o JOIN crew_calls c ON c.id = o.call_id
+      WHERE o.person_id = $1
+      ORDER BY c.start_day, c.project`,
+    [personId]
+  )
+  return rows.map((r) => {
+    const c: Row = {}
+    for (const [k, v] of Object.entries(r)) if (k.startsWith('c_')) c[k.slice(2)] = v
+    return { offer: toOffer(r), call: toCall(c) }
+  })
+}
+
+/** Offers, other than one, that hold any of these days for a person. */
+export async function heldElsewhere(q: Queryable, personId: string, days: string[], exceptCallId: string) {
+  const { rows } = await q.query<Row>(
+    `SELECT o.days, c.project, c.phase FROM offers o JOIN crew_calls c ON c.id = o.call_id
+      WHERE o.person_id = $1 AND o.call_id <> $2 AND o.status IN ('accepted', 'confirmed') AND c.status = 'open'`,
+    [personId, exceptCallId]
+  )
+  const out: { project: string; days: string[] }[] = []
+  for (const r of rows) {
+    const hit = (r.days as string[]).filter((d) => days.includes(d))
+    if (hit.length) out.push({ project: r.phase ? `${r.project} (${r.phase})` : r.project, days: hit })
+  }
+  return out
+}
+
+export async function awayOn(q: Queryable, personId: string, days: string[]) {
+  const all = await awayFor(q, personId)
+  return all
+    .map((u) => ({ u, hit: days.filter((d) => d >= u.start && d <= u.end) }))
+    .filter((x) => x.hit.length)
+}
