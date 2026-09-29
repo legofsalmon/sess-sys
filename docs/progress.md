@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: app live on Railway
+
+**Done**
+
+- The app runs at shserver-production.up.railway.app, deployed from `main`,
+  with its data in a Neon Postgres database created through Vercel's
+  storage menu. A Railway incident ("slow or stuck deployments") held the
+  first deploy up for a few minutes.
+- The health check (`/api/health`) now says where the data lives:
+  `postgres`, `file` or `memory`. Before this, there was no way to tell from
+  outside which database a deploy was using.
+- On a host the server now refuses to start without a database, so a missing
+  `DATABASE_URL` fails the deploy with a reason in its logs instead of
+  running on a throwaway in-memory store that loses everything on restart.
+- Checked: new server tests for each setting and for the health check.
+
+- The database is in Frankfurt (confirmed by Colly), as planned for GDPR
+  and latency.
+
+**Next**
+
+- Phone field test on the live app.
+
 ## 29 September 2026: crew booking started early
 
 Built in parallel with Phase 0, so the freelancer side can be tried as soon

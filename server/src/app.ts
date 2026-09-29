@@ -39,7 +39,7 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
     for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
   }
 
-  app.get('/api/health', async () => ({ ok: true, cursor: await currentSeq(db) }))
+  app.get('/api/health', async () => ({ ok: true, db: db.kind, cursor: await currentSeq(db) }))
 
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
