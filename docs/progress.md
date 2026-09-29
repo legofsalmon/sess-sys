@@ -21,10 +21,17 @@ waiting on someone.
 
 - The database is in Frankfurt (confirmed by Colly), as planned for GDPR
   and latency.
+- Confirmed live at 19:19 UTC: the health check reads `"db":"postgres"`.
+  Railway didn't start a deploy by itself for the merges after the first
+  one, so Colly deployed the latest commit by hand (Railway's command
+  palette, **Deploy Latest Commit**).
 
 **Next**
 
-- Phone field test on the live app: [the steps](field-test.md).
+- Phone field test on the live app: [the steps](field-test.md) (Colly).
+- Find out why Railway skips merges: the reason it shows on skipped
+  deployments. Until then, each merge to `main` needs Deploy Latest Commit.
+- Staff sign-in with Google, so real jobs and crew can go in: being built.
 
 ## 29 September 2026: crew booking started early
 
