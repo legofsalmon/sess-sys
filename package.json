@@ -2,11 +2,26 @@
   "name": "session-hire",
   "private": true,
   "type": "module",
-  "description": "Session Hire management system. For now: the Session Hire Blueprint reference page.",
+  "description": "Session Hire management system",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
-    "build": "node scripts/build-hub.mjs && node -e \"require('fs').mkdirSync('dist',{recursive:true});require('fs').copyFileSync('docs/hub/index.html','dist/index.html')\""
+    "build": "npm run build:hub",
+    "build:hub": "node scripts/build-hub.mjs && node -e \"require('fs').mkdirSync('dist',{recursive:true});require('fs').copyFileSync('docs/hub/index.html','dist/index.html')\"",
+    "dev": "concurrently -n server,web -c yellow,cyan \"npm:dev -w server\" \"npm:dev -w web\"",
+    "typecheck": "npm run typecheck -w shared -w server -w web",
+    "test": "npm test -w shared -w server",
+    "build:web": "npm run build -w web"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
   }
 }

@@ -160,10 +160,10 @@ patch sheets.
 | PowerSync (Postgres to on-device SQLite) | Mature partial replication, self-hostable, upload queue you control | Another service to run; its rule language for who sees what   |
 | ElectricSQL / Zero / Replicache | Good real-time read sync                          | Offline writes weak or left to you; younger products          |
 
-**Recommendation:** build our own, reusing Crewbox's outbox and sequence
+**Decided (29 September 2026, [ADR 0001](adr/0001-sync-engine.md)):** build our own, reusing Crewbox's outbox and sequence
 code, with PowerSync as the fallback if the partial replication (each
-freelancer only sees their own jobs) turns out harder than expected. This
-is decided in an ADR in the first build phase, after a one-week spike.
+freelancer only sees their own jobs) turns out harder than expected. The
+spike that decided it, and its test results, are in the ADR.
 
 ### What lives on the device
 

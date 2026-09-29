@@ -4,18 +4,28 @@
 // Writes docs/hub/index.html (a complete page you can open in a browser).
 // With an argument, also writes the bare fragment there (used to publish the
 // page as a claude.ai Artifact, which supplies its own <html>/<head>).
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS = [
+  ['Build progress', 'docs/progress.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],
   ['Competitor audit', 'docs/research/competitor-audit.md'],
   ['How booking works today', 'docs/research/current-process.md'],
   ['Crewbox handoff', 'docs/research/crewbox-handoff.md'],
+  // Every decision record, in order, titled from its first heading.
+  ...readdirSync(join(root, 'docs/adr'))
+    .filter((f) => f.endsWith('.md'))
+    .sort()
+    .map((f) => {
+      const md = readFileSync(join(root, 'docs/adr', f), 'utf8')
+      const title = (md.match(/^# (.+)$/m)?.[1] ?? f).replace(/^ADR (\d+):\s*/, 'Decision $1: ')
+      return [title, `docs/adr/${f}`]
+    }),
 ];
 
 const docs = DOCS.map(([title, path]) => ({ title, path, md: readFileSync(join(root, path), 'utf8') }));
@@ -26,7 +36,13 @@ const data = `<script type="application/json" id="docs-data" data-built="${built
 
 const template = readFileSync(join(root, 'docs/hub/template.html'), 'utf8');
 if (!template.includes('<!--DOCS-DATA-->')) throw new Error('template is missing <!--DOCS-DATA-->');
-const fragment = template.replace('<!--DOCS-DATA-->', () => data);
+// Inline images from docs/hub/img so the page stays a single file.
+const fragment = template
+  .replace('<!--DOCS-DATA-->', () => data)
+  .replace(/src="img\/([\w.-]+\.(png|jpe?g|svg|webp))"/g, (_, file, ext) => {
+    const type = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', webp: 'image/webp' }[ext];
+    return `src="data:${type};base64,${readFileSync(join(root, 'docs/hub/img', file)).toString('base64')}"`;
+  });
 
 const page = `<!doctype html>
 <html lang="en">

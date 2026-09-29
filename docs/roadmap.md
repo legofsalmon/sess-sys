@@ -11,6 +11,8 @@ architecture doc are answered.
 
 ## Phase 0: Foundations
 
+**Status: in progress.** Sync engine built and decided ([ADR 0001](adr/0001-sync-engine.md)); see [progress.md](progress.md).
+
 - Repo, CI, preview deploys, EU hosting, backups with a tested restore.
 - Staff sign-in with Google Workspace; freelancer magic links.
 - **Sync spike**: the outbox, command handlers and change feed on one toy

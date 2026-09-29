@@ -1,3 +1,6 @@
 dist/
 node_modules/
 .vercel/
+.e2e-data/
+test-results/
+playwright-report/

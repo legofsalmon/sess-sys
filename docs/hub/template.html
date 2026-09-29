@@ -98,6 +98,29 @@ section { display: grid; gap: 22px; scroll-margin-top: 24px; min-width: 0; }
 .btn { font: 600 .9rem var(--body); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
+
+/* progress */
+.tracker { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.tk { display: grid; gap: 6px; align-content: start; font-size: .82rem; }
+.tk .bar { height: 8px; border-radius: 4px; background: var(--line); }
+.tk.done .bar { background: var(--good); }
+.tk.now .bar { background: linear-gradient(90deg, var(--accent) 0 45%, var(--line) 45%); }
+.tk b { font-family: var(--display); font-stretch: 112%; font-size: .9rem; }
+.tk span { color: var(--muted); }
+.tk.now span { color: var(--accent-ink); font-weight: 600; }
+.latest h2 { font-size: 1.2rem; }
+.latest h2, .latest h3 { margin: 0; }
+.latest p, .latest ul { margin: 0; }
+.latest pre { white-space: pre-wrap; margin: 0; font-size: .8rem; }
+.latest ul { padding-left: 1.1em; display: grid; gap: 4px; font-size: .95rem; }
+.latest strong { display: block; margin-top: 6px; font-family: var(--display); font-stretch: 112%; }
+.phones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.phones figure { margin: 0; display: grid; gap: 6px; }
+.phones img { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); aspect-ratio: 390 / 844; object-fit: cover; object-position: top; max-height: 460px; }
+.phones figcaption { font-size: .85rem; color: var(--muted); }
+.state.progress { background: var(--accent-soft); color: var(--accent-ink); }
+@media (max-width: 980px) { .tracker { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
 /* principles */
 .principle { display: grid; gap: 10px; }
 .principle .quote { font-style: italic; color: var(--muted); border-left: 3px solid var(--tape); padding-left: 12px; }
@@ -254,16 +277,17 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     </div>
     <nav class="toc" id="toc" aria-label="Sections">
       <a href="#overview"><span>00</span>Overview</a>
-      <a href="#principles"><span>01</span>Principles</a>
-      <a href="#today"><span>02</span>How it works today</a>
-      <a href="#market"><span>03</span>The market</a>
-      <a href="#architecture"><span>04</span>Architecture</a>
-      <a href="#calendar"><span>05</span>Google Calendar</a>
-      <a href="#crewbox"><span>06</span>Crewbox</a>
-      <a href="#stock"><span>07</span>Stock tracking</a>
-      <a href="#roadmap"><span>08</span>Roadmap</a>
-      <a href="#decisions"><span>09</span>Decisions</a>
-      <a href="#library"><span>10</span>Full documents</a>
+      <a href="#progress"><span>01</span>Progress</a>
+      <a href="#principles"><span>02</span>Principles</a>
+      <a href="#today"><span>03</span>How it works today</a>
+      <a href="#market"><span>04</span>The market</a>
+      <a href="#architecture"><span>05</span>Architecture</a>
+      <a href="#calendar"><span>06</span>Google Calendar</a>
+      <a href="#crewbox"><span>07</span>Crewbox</a>
+      <a href="#stock"><span>08</span>Stock tracking</a>
+      <a href="#roadmap"><span>09</span>Roadmap</a>
+      <a href="#decisions"><span>10</span>Decisions</a>
+      <a href="#library"><span>11</span>Full documents</a>
     </nav>
     <button class="theme-btn" id="themeBtn" type="button">Switch theme</button>
   </aside>
@@ -271,7 +295,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Research and plan · awaiting go-ahead to build</div>
+      <div class="status">Phase 0 under way · offline sync proven</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -287,9 +311,27 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 01 PRINCIPLES -->
+
+    <!-- 01 PROGRESS -->
+    <section id="progress">
+      <div class="eyebrow"><b>01</b>Progress</div>
+      <h2>Where the build is</h2>
+      <div class="tracker" id="tracker" aria-label="Phase status"></div>
+      <div class="grid2 now">
+        <div class="panel latest" id="latest"><p class="small">Loading the latest entry…</p></div>
+        <div class="panel shots">
+          <h3>The sync test app</h3>
+          <div class="phones">
+            <figure><img src="img/demo-offline.png" alt="Phone with no signal: a booking for Fuel shows as waiting to sync" width="390" height="844" loading="lazy"><figcaption><b>No signal.</b> The booking waits on the phone.</figcaption></figure>
+            <figure><img src="img/demo-online.png" alt="Phone back online: the booking was turned down because the office booked the speakers first" width="390" height="844" loading="lazy"><figcaption><b>Signal back.</b> The office got there first, so the phone shows why.</figcaption></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 PRINCIPLES -->
     <section id="principles">
-      <div class="eyebrow"><b>01</b>Principles</div>
+      <div class="eyebrow"><b>02</b>Principles</div>
       <h2>Three rules everything else follows</h2>
       <div class="grid3">
         <div class="panel principle">
@@ -326,7 +368,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 02 TODAY -->
     <section id="today">
-      <div class="eyebrow"><b>02</b>How it works today</div>
+      <div class="eyebrow"><b>03</b>How it works today</div>
       <h2>A gig is a row of all-day calendar events</h2>
       <p>Read from the calendars on 29 September 2026: 58 events from June to October. Each phase of each day is its own event, titled <code>Project - Phase n/m</code>, with the venue as location and the crew invited as attendees. Accepting the invite is the crew's confirmation.</p>
       <div class="panel">
@@ -358,7 +400,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 03 MARKET -->
     <section id="market">
-      <div class="eyebrow"><b>03</b>The market</div>
+      <div class="eyebrow"><b>04</b>The market</div>
       <h2>Six tools, the same five blind spots</h2>
       <p>Rentman, TeamTrack, Current RMS (being renamed OnRent Events), Flex, HireHop and easyjob, compared from vendor sites and reviews in September 2026. The last column is what Session Hire's system aims for.</p>
       <div class="btns" role="group" aria-label="Filter rows">
@@ -374,7 +416,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 04 ARCHITECTURE -->
     <section id="architecture">
-      <div class="eyebrow"><b>04</b>Architecture</div>
+      <div class="eyebrow"><b>05</b>Architecture</div>
       <h2>Phones send requests; the server decides</h2>
       <p>Each device keeps a local copy of what its user needs and an outbox of changes. Changes are sent as requests ("add 4 × Y10P to Nissan") that the server confirms or turns down, so two people offline cannot both book the last four speakers. Things that already happened in the real world, like a scan, are always accepted and reconciled afterwards.</p>
       <div class="panel">
@@ -460,7 +502,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Server</th><td>Fastify with shared schemas</td><td>Same as Crewbox</td></tr>
             <tr><th>Database</th><td>Postgres, EU region, point-in-time recovery</td><td>Date-range queries for availability</td></tr>
             <tr><th>Sign-in</th><td>Google Workspace for staff, email link for freelancers</td><td>Staff already have Workspace</td></tr>
-            <tr><th>Sync engine</th><td>Our own, on the Crewbox pattern; PowerSync as fallback</td><td>Decided after a one-week test</td></tr>
+            <tr><th>Sync engine</th><td>Our own, on the Crewbox pattern</td><td>Decided and tested (Decision 0001)</td></tr>
           </tbody>
         </table>
       </div>
@@ -468,7 +510,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 05 CALENDAR -->
     <section id="calendar">
-      <div class="eyebrow"><b>05</b>Google Calendar</div>
+      <div class="eyebrow"><b>06</b>Google Calendar</div>
       <h2>Keep the calendar, change nothing on day one</h2>
       <p>The system writes to the shared <b>Session Hire Gigs</b> calendar in today's format and listens for changes in seconds. Each project runs in one of two modes, and new projects switch to app-led once Phase 1 is live.</p>
       <div class="btns" role="group" aria-label="Sync mode">
@@ -509,7 +551,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 06 CREWBOX -->
     <section id="crewbox">
-      <div class="eyebrow"><b>06</b>Crewbox</div>
+      <div class="eyebrow"><b>07</b>Crewbox</div>
       <h2>Office to site, and back again</h2>
       <p>Crewbox runs on site with no internet: chat, push-to-talk, running order, patch, lighting and the show log. Session Hire's system covers everything before and after. They meet twice per event.</p>
       <div class="panel">
@@ -540,7 +582,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 07 STOCK -->
     <section id="stock">
-      <div class="eyebrow"><b>07</b>Stock tracking</div>
+      <div class="eyebrow"><b>08</b>Stock tracking</div>
       <h2>From zero labels to trusted availability</h2>
       <p>No stock is barcoded yet. The recommendation is a QR code plus a readable number on every item, scanned with phone cameras first, with RFID kept for later where it pays off most: cables.</p>
       <div class="panel">
@@ -616,7 +658,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 08 ROADMAP -->
     <section id="roadmap">
-      <div class="eyebrow"><b>08</b>Roadmap</div>
+      <div class="eyebrow"><b>09</b>Roadmap</div>
       <h2>Build order</h2>
       <p>Each phase replaces something people do today and is useful on its own. The riskiest piece, offline sync, is proven first.</p>
       <div class="road" id="road"></div>
@@ -624,14 +666,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
     <!-- 09 DECISIONS -->
     <section id="decisions">
-      <div class="eyebrow"><b>09</b>Decisions</div>
+      <div class="eyebrow"><b>10</b>Decisions</div>
       <h2>What's settled and what's open</h2>
       <div class="dec" id="dec"></div>
     </section>
 
     <!-- 10 LIBRARY -->
     <section id="library">
-      <div class="eyebrow"><b>10</b>Full documents</div>
+      <div class="eyebrow"><b>11</b>Full documents</div>
       <h2>The source documents</h2>
       <p>Everything above is drawn from these files in the repo's <code>docs/</code> folder. They are rebuilt into this page whenever they change.</p>
       <div class="lib">
@@ -673,6 +715,20 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     const ev = t ? `<div class="ev ${cls}" style="animation-delay:${i * 90}ms"><b>${t.replace('Google Summer Party - ', '')}</b><span class="small" style="color:inherit;opacity:.8">${t}</span><span class="small" style="color:inherit;opacity:.8">${loc}</span><div class="dots" aria-label="${ok} accepted, ${pend} not answered">${dots}</div></div>` : '<div class="small" style="padding:10px">No event</div>';
     return `<div style="display:grid;gap:6px;align-content:start"><span class="day">${d}</span>${ev}</div>`;
   }).join('');
+
+
+  // progress tracker (update states as phases move)
+  const PHASES = [
+    ['0', 'Foundations', 'now', 'In progress'],
+    ['+', 'Label trial', 'todo', 'Not started'],
+    ['1', 'Projects and calendar', 'todo', 'Next'],
+    ['2', 'Warehouse', 'todo', 'Planned'],
+    ['3', 'Crew', 'todo', 'Planned'],
+    ['4', 'Finance', 'todo', 'Planned'],
+    ['5', 'Crewbox link', 'todo', 'Planned'],
+    ['6', 'Grow', 'todo', 'Planned']
+  ];
+  $('#tracker').innerHTML = PHASES.map(([n, t, st, lbl]) => `<div class="tk ${st}"><div class="bar"></div><b>${n === '+' ? '' : n + ' · '}${t}</b><span>${lbl}</span></div>`).join('');
 
   // market matrix
   const P = ['Rentman', 'TeamTrack', 'Current RMS', 'Flex', 'HireHop', 'easyjob'];
@@ -753,7 +809,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['5', '', 'Crewbox link and on-site mode', ['Crewbox additions: keyed import, show log by key, asset tags on faults', 'Push job to the box; pull faults back as repair tickets', 'Crew chief view: kit check by scan, crew present, notes, offline'], 'the box is set up from the job in one step and faults from site are waiting in the repair queue.'],
     ['6', '', 'Grow', ['Utilisation and revenue per product', 'Multi-warehouse, vehicles and drivers', 'Client portal', 'RFID, app store builds if needed', 'Retire calendar-led mode'], '']
   ];
-  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span></div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
+  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span>${n === '0' ? '<span class="state progress">In progress</span>' : ''}</div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
 
   // decisions
   const dec = [
@@ -762,11 +818,11 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Why not Rentman or TeamTrack', 'Closed and rigid, and cumbersome for freelancers. Became the first two principles.', 'decided'],
     ['Google Workspace', 'sessionhire.com is on Workspace. A test calendar is available now.', 'decided'],
     ['Calendar admin access', 'To be granted later for the import and live sync.', 'waiting'],
-    ['Sync engine', 'Our own on the Crewbox pattern, or PowerSync. Decided after the Phase 0 test.', 'open'],
+    ['Sync engine', 'Our own, on the Crewbox pattern. Proven by tests; field test on phones still to do (Decision 0001).', 'decided'],
     ['Existing stock list', 'Is there a spreadsheet or old list of stock to import?', 'open'],
     ['Crewbox code sharing', 'Can Crewbox\'s sync code become a shared package both use?', 'open'],
-    ['Hosting and budget', 'Provider and monthly budget for hosting.', 'open'],
-    ['Start the build', 'Go-ahead to begin Phase 0.', 'waiting']
+    ['Hosting', 'Where the server and database run, so the test app can be tried on real phones. Vercel keeps the blueprint.', 'open'],
+    ['Start the build', 'Go-ahead given 29 September; Phase 0 under way.', 'decided']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');
@@ -783,6 +839,16 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     view.innerHTML = window.marked ? window.marked.parse(d.md) : `<pre>${d.md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;')}</pre>`;
     view.scrollTop = 0;
   };
+
+  // latest progress entry, straight from docs/progress.md
+  const prog = docs.find(d => d.path === 'docs/progress.md');
+  if (prog) {
+    const entry = prog.md.split(/^## /m)[1] || '';
+    const md = '## ' + entry.trim();
+    $('#latest').innerHTML = window.marked ? window.marked.parse(md) : `<pre>${md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;')}</pre>`;
+    $$('#latest a').forEach(a => { a.href = '#library'; });
+  }
+
   nav.innerHTML = docs.map((d, i) => `<button type="button" role="tab">${d.title}<small>${d.path}</small></button>`).join('');
   $$('button', nav).forEach((b, i) => b.addEventListener('click', () => render(i)));
   render(0);
