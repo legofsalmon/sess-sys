@@ -133,4 +133,4 @@ faults reported on site are waiting in the warehouse repair queue on return.
 2. ~~Calendar or warehouse first?~~ Decided 2026-09-29: calendar first.
    Stock labelling research runs alongside, since no stock is barcoded
    yet and the rollout takes time.
-3. Hosting provider and budget.
+3. ~~Hosting provider and budget.~~ Decided 29 September 2026: Railway for the app server, Neon (EU) for Postgres.

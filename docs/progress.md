@@ -3,6 +3,25 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: hosting picked
+
+**Decided:** the app server runs on Railway and the database on Neon
+(Postgres, EU). Vercel keeps serving this blueprint at sh.letissier.ie.
+
+**Done**
+
+- `railway.json` added: Railway builds the app, starts the server and checks
+  `/api/health` before switching traffic over. The server already serves the
+  app and its live connections from one place.
+- Checked: a production-style start locally serves the app and answers the
+  health check.
+
+**Waiting on**
+
+- The Neon database (Colly's Neon account is connected, so it can be created
+  from here on a yes) and a Railway project linked to the repo with
+  `DATABASE_URL` set as a secret.
+
 ## 29 September 2026: Phase 0 started
 
 **Done**
