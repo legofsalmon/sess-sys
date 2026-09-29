@@ -354,8 +354,9 @@ Crewbox.
 
 ## Open questions for Session Hire
 
-1. Is `sessionhire.com` on Google Workspace, and can an admin grant the
-   calendar access for the import and sync?
+1. ~~Is `sessionhire.com` on Google Workspace?~~ Answered: yes. Admin
+   access for the import and sync will be granted later; until then the
+   sync is built and tested against a test calendar.
 2. ~~Which accounting package do you use?~~ Answered: bookkeeping is
    fairly offline, so finance is a dashboard and exporter first, with
    integration added if that grows.
