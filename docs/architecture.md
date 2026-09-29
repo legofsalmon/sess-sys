@@ -351,7 +351,10 @@ Crewbox.
 - The outbox means no scan or change is lost if the server is down; devices
   keep working from their replica.
 - Every command is idempotent by its client id, so retries are safe.
-- Health checks, error tracking and an uptime alert from day one.
+- Health checks, error alerts and an uptime check from day one, with
+  Sentry, which also emails when a night's backup fails or doesn't happen.
+  Reports are built to leave out anyone's details
+  ([ADR 0005](adr/0005-error-alerts.md)).
 - An export of everything (CSV and JSON) that the company can run any time,
   so it is never locked in, which is a common complaint about the incumbents.
 

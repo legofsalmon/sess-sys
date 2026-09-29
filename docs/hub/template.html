@@ -516,6 +516,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Sign-in</th><td>Google Workspace for staff; a private link for each freelancer</td><td>Built (Decisions 0002 and 0003)</td></tr>
             <tr><th>Sync engine</th><td>Our own, on the Crewbox pattern</td><td>Decided and tested (Decision 0001)</td></tr>
             <tr><th>Backups</th><td>Nightly, to a separate bucket, each proved by a test restore</td><td>Built (Decision 0004)</td></tr>
+            <tr><th>Error alerts</th><td>Sentry, EU data, from the server and every phone; uptime and backup checks</td><td>Built (Decision 0005)</td></tr>
           </tbody>
         </table>
       </div>
@@ -813,7 +814,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
   // roadmap
   const road = [
-    ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'Audit trail and export-everything from the start'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
+    ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'Audit trail and export-everything from the start'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
     ['1', '', 'Projects and the calendar', ['Clients, venues, projects, phases, crew assignments', 'Two-way sync with the Session Hire Gigs calendar; RSVPs update crew', 'Import past calendar events as draft projects', 'Week and month planner with clashes flagged', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
     ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
@@ -839,7 +840,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Crew booking', 'Started early, in parallel. Freelancers answer from a private link with no app or login; ops send offers by WhatsApp, text or email (Decision 0002).', 'decided'],
     ['Automatic offer messages', 'Offers are sent by ops from their own phone for now. Send by SMS/WhatsApp Business or email automatically later?', 'open'],
     ['Staff sign-in', 'Google sign-in for sessionhire.com accounts; phones stay signed in while in use and keep working offline (Decision 0003). Built; switches on once the Google key is added in Railway.', 'waiting'],
-    ['Backups', 'Every night into a Railway bucket in Amsterdam, each proved by a test restore; kept 35 days, then monthly for a year (Decision 0004). Built; switches on once the bucket is added in Railway.', 'waiting']
+    ['Backups', 'Every night into a Railway bucket in Amsterdam, each proved by a test restore; kept 35 days, then monthly for a year (Decision 0004). Built; switches on once the bucket is added in Railway.', 'waiting'],
+    ['Error alerts', 'Sentry, chosen over Better Stack: its free plan keeps data in Frankfurt and emails about errors, downtime and a missed backup; reports are built to leave out anyone\'s details (Decision 0005). Built; switches on once the Sentry key is added in Railway.', 'waiting']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

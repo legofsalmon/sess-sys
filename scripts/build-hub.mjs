@@ -14,6 +14,7 @@ const DOCS = [
   ['Phone field test', 'docs/field-test.md'],
   ['Switching on sign-in', 'docs/sign-in-setup.md'],
   ['Backups', 'docs/backups.md'],
+  ['Error alerts', 'docs/monitoring.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],

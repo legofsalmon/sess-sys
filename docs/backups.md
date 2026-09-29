@@ -67,7 +67,9 @@ buckets do), also add `BACKUP_S3_PATH_STYLE=true`.
 - Backups are kept for 35 days, then the first of each month for a year,
   and never fewer than the newest seven.
 - The health check's `fresh` turns `false` when the last good backup is
-  more than 26 hours old. The uptime alert, next on the list, will watch it.
+  more than 26 hours old. Once error alerts are on, Sentry also emails you
+  when a night's backup fails or doesn't happen
+  ([error alerts](monitoring.md)).
 - Cost: Railway charges $0.015 per GB a month, and a year of backups at
   Session Hire's size is well under a gigabyte, so a few cents a month.
 
