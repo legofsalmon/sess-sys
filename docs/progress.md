@@ -19,10 +19,12 @@ waiting on someone.
   running on a throwaway in-memory store that loses everything on restart.
 - Checked: new server tests for each setting and for the health check.
 
-**Waiting on**
+- The database is in Frankfurt (confirmed by Colly), as planned for GDPR
+  and latency.
 
-- Colly: confirm the database's region is in Europe. Then the phone field
-  test can start.
+**Next**
+
+- Phone field test on the live app.
 
 ## 29 September 2026: crew booking started early
 
