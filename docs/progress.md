@@ -53,6 +53,29 @@ waiting on someone.
   ([the steps](field-test.md)).
 - The last Phase 0 item: the audit trail and export-everything.
 
+## 29 September 2026: design system in Figma
+
+**Done**
+
+- A Figma design system built from the app as it is today:
+  [Session Hire Design System](https://www.figma.com/design/GO1I1Zv2iEfT07uMOk89ZN).
+  Colour tokens in light and dark carrying the same names as the CSS,
+  spacing, radius and type styles, and 11 components (brand mark, button,
+  status pill, connection badge, input, alert, card, list row, tab bar, top
+  bar). The Crew area is rebuilt from them as a worked example.
+  [Design system](design-system.md) has the details.
+- Checked: every component screenshotted; the example screen flips to dark
+  by switching one setting; contrast measured for every text colour pair.
+
+- Contrast fixes, chosen by Colly: text on red uses the darker #c8202e
+  (5.7:1 with white), light-mode warn text is #8a5800, and buttons and
+  fields are at least 44px tall. Done in the app, the freelancer page and
+  Figma. Checked: typecheck, all server tests, all 8 browser tests.
+
+**Next**
+
+- Add the spacing and radius tokens to `app.css` so code and Figma share them.
+
 ## 29 September 2026: nightly backups built
 
 **Done**

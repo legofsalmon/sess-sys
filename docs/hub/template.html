@@ -339,6 +339,11 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           <figure><img src="img/crew-office-confirmed.png" alt="Office crew screen after the answer: Aoife confirmed for two of three days" width="390" height="844" loading="lazy"><figcaption><b>Back in the office.</b> Answer arrives live and is confirmed.</figcaption></figure>
         </div>
       </div>
+      <div class="panel shots">
+        <h3>Design system</h3>
+        <p class="small">Colours, type and components from the app, now in <a href="https://www.figma.com/design/GO1I1Zv2iEfT07uMOk89ZN" target="_blank" rel="noopener">Figma</a>. Same names as the code, light and dark. Below: the Crew area rebuilt only from the library.</p>
+        <figure><img src="img/design-crew-light-dark.png" alt="The Crew screen built from design system components, in light and dark" width="820" height="888" loading="lazy" style="max-width:100%;height:auto"><figcaption><b>Light and dark.</b> One frame, one setting switched.</figcaption></figure>
+      </div>
     </section>
 
     <!-- 02 PRINCIPLES -->
@@ -840,6 +845,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Crew booking', 'Started early, in parallel. Freelancers answer from a private link with no app or login; ops send offers by WhatsApp, text or email (Decision 0002).', 'decided'],
     ['Automatic offer messages', 'Offers are sent by ops from their own phone for now. Send by SMS/WhatsApp Business or email automatically later?', 'open'],
     ['Staff sign-in', 'Google sign-in for sessionhire.com accounts; phones stay signed in while in use and keep working offline (Decision 0003). Built; switches on once the Google key is added in Railway.', 'waiting'],
+    ['Design system', 'Built in Figma from the app as it is; the CSS stays the source of truth and Figma follows it.', 'decided'],
+    ['Contrast fixes', 'Text on red uses a darker red (#c8202e), warn text is darker, and buttons and fields are 44px tall. Chosen by Colly 29 September; done in the app and Figma.', 'decided'],
     ['Backups', 'Every night into a Railway bucket in Amsterdam, each proved by a test restore; kept 35 days, then monthly for a year (Decision 0004). Built; switches on once the bucket is added in Railway.', 'waiting'],
     ['Error alerts', 'Sentry, chosen over Better Stack: its free plan keeps data in Frankfurt and emails about errors, downtime and a missed backup; reports are built to leave out anyone\'s details (Decision 0005). Built; switches on once the Sentry key is added in Railway.', 'waiting']
   ];
