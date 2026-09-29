@@ -15,6 +15,8 @@ markdown file in `docs/`, rebuild it with `node scripts/build-hub.mjs`.
 ### Deploying the blueprint on Vercel
 
 Import this repo in Vercel; no settings are needed, `vercel.json` covers it.
+The planned domain is `sess.letissier.ie`: add it under the project's
+Domains settings and point a `CNAME` for `sess` at the target Vercel shows.
 Each push rebuilds the page from the markdown in `docs/` (`npm run build`
 writes `dist/index.html`). The page asks search engines not to index it,
 but a production deployment is public to anyone with the URL unless you
