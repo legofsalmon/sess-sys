@@ -54,12 +54,18 @@ export const unavailability = z.object({
 export type Unavailability = z.infer<typeof unavailability>
 
 /**
- * A role a job needs: "2 x audio tech, Build and Show, 3 to 5 October". The
- * project and phase are plain text until the Phase 1 project model lands;
- * then `project` becomes a reference and this stays the same shape.
+ * A role a job needs: "2 x audio tech, Build and Show, 3 to 5 October".
+ * Usually part of a job in Jobs, and of one of its phases (ADR 0007): then
+ * the server writes the job's, phase's and venue's names here and keeps them
+ * in step, so freelancers' pages and messages read them as text. A call not
+ * tied to a job has them as typed.
  */
 export const crewCall = z.object({
   id,
+  /** The job, when the call is part of one. Missing on calls synced before jobs existed. */
+  projectId: id.nullable(),
+  /** The phase, when the call is for one; null for a call across several, or not tied to a job. */
+  phaseId: id.nullable(),
   project: z.string().min(1).max(200),
   phase: z.string().max(100),
   venue: z.string().max(300),
@@ -147,6 +153,9 @@ export const crewCommandSchemas = {
   'call.create': z
     .object({
       id,
+      /** Optional so versions of the app from before jobs can still send it. */
+      projectId: id.nullable().default(null),
+      phaseId: id.nullable().default(null),
       project: z.string().min(1).max(200),
       phase: z.string().max(100),
       venue: z.string().max(300),

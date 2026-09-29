@@ -9,7 +9,7 @@ import {
   MemoryStorage,
   newId,
   SyncClient,
-  type CommandArgs,
+  type CommandInput,
   type CommandName,
   type Mutation,
   type MutationResult,
@@ -26,9 +26,10 @@ import { createSession, upsertUser } from '../src/auth/sessions.ts'
 import { newGeneration, readGeneration, restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toThin } from '../src/backup/service.ts'
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
-import { migrateCrew } from '../src/crew/schema.ts'
+import { CREW, migrateCrew } from '../src/crew/schema.ts'
 import { pgliteDb, type Db } from '../src/db.ts'
 import { moduleVersion } from '../src/migrations.ts'
+import { PROJECTS } from '../src/projects/schema.ts'
 import { CORE, migrate } from '../src/schema.ts'
 
 /**
@@ -62,7 +63,7 @@ function folder() {
   return dir
 }
 
-function m<N extends CommandName>(name: N, args: CommandArgs<N>): Mutation {
+function m<N extends CommandName>(name: N, args: CommandInput<N>): Mutation {
   return { id: newId(), name, args, createdAt: new Date().toISOString() } as Mutation
 }
 
@@ -119,6 +120,30 @@ async function seed(app: FastifyInstance, db: Db) {
     }),
     m('offer.send', { id: 'o1', callId: 'c1', personId: 'p1', override: false })
   )
+  // A job with a phase, and crew for it: rows that refer to rows in other modules.
+  await push(
+    app,
+    'office',
+    m('client.upsert', { id: 'cl1', name: 'Fáilte Ireland', contacts: [{ name: 'Orla Kavanagh', role: 'Producer', email: 'orla@example.ie', phone: null }], notes: '' }),
+    m('venue.upsert', { id: 'v1', name: 'Dublin Castle', address: 'Dame St, Dublin 2\nD02 R590', notes: 'Load in via the Ship St gate.' }),
+    m('project.create', { id: 'j1', name: 'Culture Night', clientId: 'cl1', venueId: 'v1', status: 'confirmed', notes: '' }),
+    m('phase.add', { id: 'ph1', projectId: 'j1', name: 'Build', start: '2026-09-18', end: '2026-09-18', venueId: null, notes: '' }),
+    m('call.create', {
+      id: 'c2',
+      phaseId: 'ph1',
+      project: 'Culture Night',
+      phase: 'Build',
+      venue: '',
+      role: 'Rigger',
+      start: '2026-09-18',
+      end: '2026-09-18',
+      callTime: '07:00',
+      needed: 2,
+      dayRateCents: 26000,
+      details: '',
+      replyBy: null,
+    })
+  )
   const user = await upsertUser(db, { subject: 'g-1', email: 'aoife@sessionhire.com', emailVerified: true, name: 'Aoife Byrne', hostedDomain: 'sessionhire.com' })
   await createSession(db, user.id, 'test')
   // A time to the microsecond, which JavaScript dates would round off.
@@ -156,6 +181,8 @@ describe('the backup file', () => {
     expect(tables.indexOf('products')).toBeLessThan(tables.indexOf('bookings'))
     expect(tables.indexOf('people')).toBeLessThan(tables.indexOf('offers'))
     expect(tables.indexOf('crew_calls')).toBeLessThan(tables.indexOf('offers'))
+    expect(tables.indexOf('projects')).toBeLessThan(tables.indexOf('phases'))
+    expect(tables.indexOf('phases')).toBeLessThan(tables.indexOf('crew_calls'))
     // Plain text inside: readable without this app.
     expect(gunzipSync(backup.data).toString()).toContain('"name":"Seán Ó Briain"')
 
@@ -214,18 +241,19 @@ describe('the backup file', () => {
   })
 
   it('restores a backup made before the latest table changes, then brings it up to date', async () => {
-    // As the database was before backups existed.
+    // As the database was before backups existed, and before jobs.
     const old = await database()
     await migrate(old, 2)
-    await migrateCrew(old)
+    await migrateCrew(old, 1)
     await migrateAuth(old)
     await old.query(`INSERT INTO products (id, name, quantity) VALUES ('y10p', 'd&b Y10P', 4)`)
     const backup = await writeBackup(old)
     expect(backup.header.schemas.schema_version).toBe(2)
+    expect(backup.header.schemas.projects_schema_version).toBe(0)
 
     const copy = await database()
     await restoreBackup(copy, backup.data)
-    expect(await moduleVersion(copy, CORE)).toBe(CORE.migrations.length)
+    for (const mod of [CORE, PROJECTS, CREW]) expect(await moduleVersion(copy, mod)).toBe(mod.migrations.length)
     expect(await readGeneration(copy)).toMatch(/^[0-9a-f-]{36}$/)
     expect((await copy.query(`SELECT name FROM products`)).rows).toEqual([{ name: 'd&b Y10P' }])
     await server(copy)

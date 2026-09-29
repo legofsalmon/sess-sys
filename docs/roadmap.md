@@ -35,7 +35,13 @@ research for the list. UHF RFID for cables is a later option.
 
 ## Phase 1: Projects and the calendar (replace the invite-by-hand workflow)
 
-- Clients, venues, projects, phases, crew requirements and assignments.
+**Status: started 29 September 2026.** Jobs with their phases, clients and
+venues built and on, with crew asked for from the job
+([ADR 0007](adr/0007-jobs.md)); the calendar sync is next. See
+[progress.md](progress.md).
+
+- Clients, venues, projects, phases, crew requirements and assignments
+  (built).
 - Two-way sync with the **Session Hire Gigs** calendar in today's event
   format; RSVPs update assignments.
 - Importer for the organisers' existing calendars into draft projects.
@@ -73,8 +79,9 @@ Built to the "meet freelancers in the middle" principle in
 **Started early, 29 September 2026**, in parallel with Phase 0 and 1
 ([ADR 0002](adr/0002-crew-booking-links.md)). Done so far: offers to one
 person or a shortlist, private freelancer links (accept some days, decline,
-counter the rate, days off), no double booking, personal calendar feeds, and
-offer messages ready for WhatsApp, text or email.
+counter the rate, days off), no double booking, personal calendar feeds,
+offer messages ready for WhatsApp, text or email, and crew asked for from a
+job's phases ([ADR 0007](adr/0007-jobs.md)).
 
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
+import { jobCommandSchemas } from './jobs.ts'
 import { day } from './model.ts'
 
 /**
@@ -31,10 +32,14 @@ export const commandSchemas = {
     at: z.string(),
   }),
   ...crewCommandSchemas,
+  ...jobCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas
+/** A command's arguments once checked, as its handler gets them. */
 export type CommandArgs<N extends CommandName> = z.infer<(typeof commandSchemas)[N]>
+/** What a device may send: the same, with fields added since then left out if it likes. */
+export type CommandInput<N extends CommandName> = z.input<(typeof commandSchemas)[N]>
 
 export const COMMAND_NAMES = Object.keys(commandSchemas) as CommandName[]
 

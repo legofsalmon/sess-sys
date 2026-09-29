@@ -34,7 +34,7 @@ const STATUS: Record<OfferView['status'], [string, string]> = {
   cancelled: ['Withdrawn', 'cancelled'],
 }
 
-const act = async (fn: () => Promise<unknown>) => {
+export const act = async (fn: () => Promise<unknown>) => {
   await fn()
   syncSoon()
 }
@@ -111,8 +111,8 @@ export function CrewScreen() {
       )}
 
       <section className="card">
-        <h2>Jobs needing crew</h2>
-        {upcoming.length === 0 && <p className="empty">No upcoming jobs. Add one below.</p>}
+        <h2>Crew needed</h2>
+        {upcoming.length === 0 && <p className="empty">No crew needed yet. Ask for crew from a job in Jobs, or below.</p>}
         {upcoming.map((c) => (
           <CallCard key={c.id} call={c} crew={crew} onShare={(person) => setShare({ person, call: c })} />
         ))}
@@ -121,7 +121,8 @@ export function CrewScreen() {
       {share && <SharePanel {...share} onClose={() => setShare(undefined)} />}
 
       <section className="card">
-        <h2>New job</h2>
+        <h2>Crew for something not in Jobs</h2>
+        <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
         <NewCall />
       </section>
 
@@ -142,7 +143,8 @@ export function CrewScreen() {
   )
 }
 
-function CallCard({ call, crew, onShare }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void }) {
+/** One crew call: who's been offered it and how they answered, and offering it to someone else. */
+export function CallCard({ call, crew, onShare, inJob = false }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void; inJob?: boolean }) {
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
@@ -165,14 +167,23 @@ function CallCard({ call, crew, onShare }: { call: CallView; crew: CrewView; onS
     <article className={`job ${call.pending ? 'is-pending' : ''}`}>
       <header>
         <div>
-          <b>
-            {call.project}
-            {call.phase && <span className="muted"> · {call.phase}</span>}
-          </b>
+          {inJob ? (
+            // On the job's own page the job needs no saying, and the phase shows only for a call across phases.
+            <b>
+              {call.needed} × {call.role}
+              {!call.phaseId && call.phase && <span className="muted"> · {call.phase}</span>}
+            </b>
+          ) : (
+            <b>
+              {call.project}
+              {call.phase && <span className="muted"> · {call.phase}</span>}
+            </b>
+          )}
           <p>
-            {call.needed} × {call.role} · {daysLabel(call.days)}
+            {!inJob && `${call.needed} × ${call.role} · `}
+            {daysLabel(call.days)}
             {call.callTime && ` · call ${call.callTime}`} · {euro(call.dayRateCents)}
-            {call.venue && <><br />{call.venue}</>}
+            {call.venue && !inJob && <><br />{call.venue}</>}
           </p>
         </div>
         <span className={`pill ${filled ? 'confirmed' : 'pending'}`}>
@@ -237,8 +248,20 @@ function CallCard({ call, crew, onShare }: { call: CallView; crew: CrewView; onS
         </form>
       )}
       <div className="actions end">
-        <button type="button" className="link" onClick={() => confirm(`Cancel ${call.project}? Everyone offered is told it's withdrawn.`) && act(() => client.mutate('call.cancel', { id: call.id }))}>
-          Cancel job
+        {call.projectId && !inJob && (
+          <a className="link" href={`#jobs/${call.projectId}`}>
+            Open job
+          </a>
+        )}
+        <button
+          type="button"
+          className="link"
+          onClick={() =>
+            confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`) &&
+            act(() => client.mutate('call.cancel', { id: call.id }))
+          }
+        >
+          Cancel crew call
         </button>
       </div>
     </article>
@@ -246,7 +269,7 @@ function CallCard({ call, crew, onShare }: { call: CallView; crew: CrewView; onS
 }
 
 /** The offer, ready to go wherever the freelancer already looks. Nothing is sent for you. */
-function SharePanel({ person, call, onClose }: { person: PersonView; call: CallView; onClose: () => void }) {
+export function SharePanel({ person, call, onClose }: { person: PersonView; call: CallView; onClose: () => void }) {
   const link = linkFor(person)
   const [copied, setCopied] = useState(false)
   if (!link)
@@ -372,7 +395,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   )
 }
 
-const euroToCents = (s: string) => (s.trim() === '' ? null : Math.round(Number(s.replace(',', '.')) * 100))
+export const euroToCents = (s: string) => (s.trim() === '' ? null : Math.round(Number(s.replace(',', '.')) * 100))
 
 function NewCall() {
   const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
@@ -432,7 +455,7 @@ function NewCall() {
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
       <button type="submit" className="primary wide">
-        Add job
+        Ask for crew
       </button>
     </form>
   )

@@ -183,10 +183,14 @@ describe('staff sign-in', () => {
     expect(cancelled.headers.location).toBe('/?signin=cancelled')
   })
 
-  it('only lands on one of the app’s own areas', async () => {
+  it('only lands on one of the app’s own areas, or a record in one', async () => {
     const { app, google } = await server()
     const { back } = await signIn(app, google, aoife, 'https://evil.example/')
     expect(back.headers.location).toBe('/')
+    const job = await signIn(app, google, aoife, '#jobs/mg4x2k1q0abcdefghij12')
+    expect(job.back.headers.location).toBe('/#jobs/mg4x2k1q0abcdefghij12')
+    const odd = await signIn(app, google, aoife, '#jobs/../evil.example')
+    expect(odd.back.headers.location).toBe('/')
   })
 
   it('signs out, and a session ends when it expires or the account is switched off', async () => {

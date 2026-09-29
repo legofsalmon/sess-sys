@@ -1,4 +1,4 @@
-import { MemoryStorage, newId, SyncClient, type CommandArgs, type CommandName, type MutationResult, type Offer, type Person } from '@sh/shared'
+import { MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type MutationResult, type Offer, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
@@ -27,7 +27,7 @@ async function server() {
   return app
 }
 
-async function send<N extends CommandName>(app: FastifyInstance, name: N, args: CommandArgs<N>): Promise<MutationResult> {
+async function send<N extends CommandName>(app: FastifyInstance, name: N, args: CommandInput<N>): Promise<MutationResult> {
   const res = await app.inject({
     method: 'POST',
     url: '/api/sync/push',
@@ -48,7 +48,7 @@ async function person(app: FastifyInstance, name: string): Promise<Person> {
   return entity<Person>(app, 'person', id)
 }
 
-async function call(app: FastifyInstance, over: Partial<CommandArgs<'call.create'>> = {}) {
+async function call(app: FastifyInstance, over: Partial<CommandInput<'call.create'>> = {}) {
   const id = newId()
   const r = await send(app, 'call.create', {
     id,

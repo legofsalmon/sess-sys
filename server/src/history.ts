@@ -1,4 +1,4 @@
-import { daysLabel, eachDay, euro, newId, OFFLINE_AFTER_SECONDS, type HistoryEntry, type HistoryPage } from '@sh/shared'
+import { daysLabel, eachDay, euro, newId, OFFLINE_AFTER_SECONDS, STATUS_LABELS, type HistoryEntry, type HistoryPage, type ProjectStatus } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -178,11 +178,12 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
 type Data = Record<string, unknown>
 type Look = (entity: string, id: unknown) => Data | undefined
 
-const REFERENCES = ['id', 'productId', 'bookingId', 'personId', 'callId'] as const
+const REFERENCES = ['id', 'productId', 'bookingId', 'personId', 'callId', 'projectId', 'phaseId', 'clientId', 'venueId'] as const
 
 /**
  * The latest known state of every record the entries mention, and of the
- * records those refer to (an offer's person and call), from the change feed.
+ * records those refer to (an offer's person and call, a phase's job), from
+ * the change feed.
  */
 async function lookup(q: Queryable, rows: Row[]): Promise<Look> {
   const known = new Map<string, Data>()
@@ -210,6 +211,8 @@ const text = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v :
 const dates = (start: unknown, end: unknown) =>
   typeof start === 'string' && typeof end === 'string' ? daysLabel(eachDay(start, end)) : 'on dates since removed'
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+/** "a", "a and b", "a, b and c". */
+const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
 
 /** What an entry did, in words, as the History tab and the exported history show it. */
 export function describe(command: string, a: Data, look: Look): string {
@@ -223,6 +226,10 @@ export function describe(command: string, a: Data, look: Look): string {
     const o = look('offer', id)
     return { who: person(o?.personId), what: call(o?.callId) }
   }
+  const job = (id: unknown) => text(look('project', id)?.name, 'a job')
+  const client = (id: unknown) => text(look('client', id)?.name, 'a client')
+  const venue = (id: unknown) => text(look('venue', id)?.name, 'a venue')
+  const status = (s: unknown) => (typeof s === 'string' && s in STATUS_LABELS ? STATUS_LABELS[s as ProjectStatus].toLowerCase() : 'another status')
 
   switch (command) {
     case 'product.upsert':
@@ -266,6 +273,36 @@ export function describe(command: string, a: Data, look: Look): string {
     case 'offer.cancel': {
       const o = offer(a.id)
       return `Withdrew the offer of ${o.what} to ${o.who}`
+    }
+    case 'client.upsert':
+      return `Saved the client ${text(a.name, 'a client')}`
+    case 'venue.upsert':
+      return `Saved the venue ${text(a.name, 'a venue')}`
+    case 'project.create':
+      return `Added the job ${text(a.name, 'a job')}${a.clientId ? ` for ${client(a.clientId)}` : ''}, ${status(a.status)}`
+    case 'project.update': {
+      const parts: string[] = []
+      if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a job')}`)
+      if (a.status !== undefined) parts.push(`status to ${status(a.status)}`)
+      if (a.clientId !== undefined) parts.push(a.clientId ? `client to ${client(a.clientId)}` : 'no client')
+      if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : 'no venue')
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed the job ${job(a.id)}: ${inWords(parts)}`
+    }
+    case 'phase.add':
+      return `Added ${text(a.name, 'a phase')} to ${job(a.projectId)}, ${dates(a.start, a.end)}`
+    case 'phase.update': {
+      const p = look('phase', a.id)
+      const parts: string[] = []
+      if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a phase')}`)
+      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}`)
+      if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : "venue to the job's")
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed ${text(p?.name, 'a phase')} on ${job(p?.projectId)}: ${inWords(parts)}`
+    }
+    case 'phase.remove': {
+      const p = look('phase', a.id)
+      return p ? `Removed ${text(p.name, 'a phase')} from ${job(p.projectId)}` : 'Removed a phase'
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

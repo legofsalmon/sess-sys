@@ -3,6 +3,68 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: Phase 1 starts with jobs, their phases, clients and venues
+
+**Done**
+
+- A new **Jobs** tab, now the one the app opens on. Each job has a client,
+  a main venue, a status (enquiry, quoted, confirmed, cancelled or lost),
+  notes, and its phases: Prep, Build, Show, Load out or any name typed,
+  each one or more whole days, and each with its own venue if it needs
+  one, such as Prep at the warehouse. [Decision 0007](adr/0007-jobs.md)
+  has the reasons.
+- Each phase shows how its days will read on the calendar, in today's
+  format ("Nissan launch - Build 1/2"), which is what the calendar sync
+  will write.
+- A new job is one form: name, client, venue, status and phases. A client
+  or venue not yet in the app is added as it's typed. Clients keep their
+  contacts; venues keep an address, with a map link, and notes for access,
+  load-in, power and parking.
+- The list shows jobs coming up, past, and not going ahead, with a search
+  across jobs, clients and venues, and how much of each job's crew is
+  booked.
+- Crew are now asked for from the job, for one of its phases or across
+  several. The job's, phase's and venue's names go onto the crew call and
+  stay current: rename any of them and freelancers' pages, offer messages
+  and calendar feeds say the new name. The Crew tab still takes crew for
+  something not in Jobs.
+- Cancelling a job, or marking it lost, cancels its crew calls too, after
+  the app asks and says how many people it affects. A phase with crew on
+  it can't be removed until they're cancelled. Nothing is ever deleted, so
+  the history and the download keep every job.
+- Two people changing different things about the same job both keep their
+  change, with or without signal. A job added with no signal waits on the
+  phone and goes through when the signal is back.
+- The History tab describes job changes in words ("Added the job Nissan
+  launch for Nissan Ireland, confirmed"; "Changed Show on Nissan launch:
+  dates to Sat 10 Oct"), and Download everything includes the clients,
+  venues, jobs and phases.
+- The live database gets its new tables by itself when the new version
+  starts. Existing crew calls are kept as they are, not tied to any job.
+- Checked: 16 new server tests (a job with its phases, client and venue;
+  calendar titles; dates that don't make sense turned down; two phones
+  editing one job offline; a rename reaching the freelancer's page;
+  removing a phase that has crew; cancelling a job cancelling its crew;
+  crew for a phase of a different job turned down; an older copy of the
+  app still able to ask for crew; the history wording), all 116 server
+  tests on both PGlite and a real Postgres like the live one, and 2 new
+  browser tests: a job with its phases and crew, renamed for the crew too,
+  and a job added with no signal.
+- Also fixed: things added in a burst on one device, such as a new job's
+  phases, now always keep the order they were added in.
+
+**Next**
+
+- Nothing to set up for this: it's on once it's live.
+- The phone field test now opens on Jobs; its steps say to tap **Stock**
+  first.
+- Next in Phase 1: the calendar sync, tried on Colly's test calendar, then
+  a week and month planner showing who is on what, with clashes flagged.
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google sign-in
+  key ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 29 September 2026: a history of every change, and download everything
 
 **Done**

@@ -1,4 +1,4 @@
-import { newId, type CommandArgs, type CommandName, type HistoryPage, type MutationResult } from '@sh/shared'
+import { newId, type CommandInput, type CommandName, type HistoryPage, type MutationResult } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, expect } from 'vitest'
 import { buildApp } from '../src/app.ts'
@@ -51,7 +51,7 @@ export async function staff(app: FastifyInstance, db: Db, name: string, userAgen
     email,
     session,
     cookies,
-    async send<N extends CommandName>(command: N, args: CommandArgs<N>, opts: SendOptions = {}): Promise<MutationResult> {
+    async send<N extends CommandName>(command: N, args: CommandInput<N>, opts: SendOptions = {}): Promise<MutationResult> {
       const clock = Date.now() + (opts.clockOffHours ?? 0) * 3_600_000
       const createdAt = new Date(clock - (opts.hoursWaiting ?? 0) * 3_600_000).toISOString()
       const res = await app.inject({

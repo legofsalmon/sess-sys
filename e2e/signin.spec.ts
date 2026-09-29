@@ -25,7 +25,7 @@ const notSignedIn = async (page: Page) => {
 }
 
 test('a device that is signed out sees only the way in, and keeps what it has waiting', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
   // Sign-in gets switched on while this device holds a change. The test

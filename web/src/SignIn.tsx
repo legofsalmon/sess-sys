@@ -46,7 +46,7 @@ export function SignIn() {
           </p>
         )}
         <p>Use your Session Hire Google account.</p>
-        <a className="button primary" href={signInUrl(location.hash || '#stock')}>
+        <a className="button primary" href={signInUrl(location.hash || '#jobs')}>
           Sign in with Google
         </a>
         {!online && <p className="hint">No signal right now. Sign in when you're back online.</p>}

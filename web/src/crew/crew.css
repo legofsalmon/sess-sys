@@ -21,6 +21,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .offer-form .warn input { accent-color: var(--accent); margin-top: 3px; }
 .crew button:disabled { opacity: .5; cursor: not-allowed; }
 .crew button.link { border: 0; background: none; padding: 4px 6px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.crew a.link { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 6px; color: var(--muted); font: 600 .9rem system-ui, sans-serif; text-underline-offset: 2px; }
 .crew .end { justify-content: flex-end; }
 .crew a.button { font: 600 .9rem system-ui, sans-serif; min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 .crew a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
