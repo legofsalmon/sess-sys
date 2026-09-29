@@ -846,11 +846,29 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   try { docs = JSON.parse(($('#docs-data') || {}).textContent || '[]'); } catch (e) { docs = []; }
   const nav = $('#libNav'), view = $('#docView');
   $('#builtAt').textContent = (($('#docs-data') || {}).dataset || {}).built || 'locally';
+  // A link from one document to another (e.g. "adr/0001-sync-engine.md")
+  // opens that document here instead of a page that doesn't exist.
+  const resolve = (from, href) => {
+    const parts = from.split('/').slice(0, -1);
+    for (const seg of href.split('#')[0].split('/')) {
+      if (seg === '..') parts.pop(); else if (seg && seg !== '.') parts.push(seg);
+    }
+    return parts.join('/');
+  };
+  const wireLinks = (root, from) => $$('a', root).forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if (/^[a-z]+:|^#/i.test(href) || !/\.md(#|$)/.test(href)) return;
+    const i = docs.findIndex(d => d.path === resolve(from, href));
+    if (i < 0) return;
+    a.href = '#library';
+    a.addEventListener('click', () => render(i));
+  });
   const render = i => {
     $$('button', nav).forEach((b, j) => b.setAttribute('aria-selected', i === j));
     const d = docs[i];
     if (!d) { view.innerHTML = '<p class="small">No documents embedded. Run the build script to include them.</p>'; return; }
     view.innerHTML = window.marked ? window.marked.parse(d.md) : `<pre>${d.md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;')}</pre>`;
+    wireLinks(view, d.path);
     view.scrollTop = 0;
   };
 
@@ -860,7 +878,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     const entry = prog.md.split(/^## /m)[1] || '';
     const md = '## ' + entry.trim();
     $('#latest').innerHTML = window.marked ? window.marked.parse(md) : `<pre>${md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;')}</pre>`;
-    $$('#latest a').forEach(a => { a.href = '#library'; });
+    wireLinks($('#latest'), prog.path);
   }
 
   nav.innerHTML = docs.map((d, i) => `<button type="button" role="tab">${d.title}<small>${d.path}</small></button>`).join('');
