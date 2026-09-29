@@ -1,5 +1,8 @@
 import type { Poke, PullResponse, PushRequest, PushResponse, Transport } from '@sh/shared'
 
+/** The server wants a signed-in person, and this device isn't one (any more). */
+export class SignedOutError extends Error {}
+
 /**
  * HTTP for push and pull, plus a WebSocket that only says "something new".
  * `forcedOffline` is the demo's "no signal" switch: it makes every request
@@ -23,6 +26,7 @@ export class HttpTransport implements Transport {
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
     if (this.forcedOffline) throw new Error('No signal (simulated)')
     const res = await fetch(this.base + path, { ...init, signal: AbortSignal.timeout(10_000) })
+    if (res.status === 401) throw new SignedOutError('Not signed in')
     if (!res.ok) throw new Error(`Server answered ${res.status}`)
     return res.json() as Promise<T>
   }

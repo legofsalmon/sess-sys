@@ -4,6 +4,9 @@ import websocket from '@fastify/websocket'
 import { pushRequest, type Change, type EntityName, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
+import type { AuthConfig } from './auth/config.ts'
+import { registerAuth } from './auth/routes.ts'
+import { migrateAuth } from './auth/schema.ts'
 import { applyMutation, currentSeq } from './commands.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import { CREW_TABLES, migrateCrew } from './crew/schema.ts'
@@ -17,6 +20,8 @@ export interface AppOptions {
   logger?: boolean
   /** Built web app to serve alongside the API (web/dist), if any. */
   webRoot?: string
+  /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
+  auth?: AuthConfig
 }
 
 /**
@@ -24,9 +29,10 @@ export interface AppOptions {
  * the "your data, always reachable" promise from the principles, present
  * from the first commit rather than bolted on.
  */
-export async function buildApp({ db, logger = false, webRoot }: AppOptions): Promise<FastifyInstance> {
+export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions): Promise<FastifyInstance> {
   await migrate(db)
   await migrateCrew(db)
+  await migrateAuth(db)
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024 })
   await app.register(cors, { origin: true })
   await app.register(websocket)
@@ -39,7 +45,14 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
     for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
   }
 
-  app.get('/api/health', async () => ({ ok: true, db: db.kind, cursor: await currentSeq(db) }))
+  registerAuth(app, db, auth)
+
+  app.get('/api/health', { config: { public: true } }, async () => ({
+    ok: true,
+    db: db.kind,
+    auth: auth ? 'google' : 'off',
+    cursor: await currentSeq(db),
+  }))
 
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
@@ -47,7 +60,7 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
     const { clientId, mutations } = parsed.data
     const results = []
     // In order: a device's later request may depend on an earlier one.
-    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never))
+    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, 'app', req.user?.id))
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) void poke()
     return { results }
   })
@@ -76,7 +89,7 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
   registerCrewLinks(app, db, () => void poke())
 
   app.get('/api/export', async () => {
-    const tables = ['products', 'bookings', 'scans', 'issues', ...CREW_TABLES, 'mutations'] as const
+    const tables = ['products', 'bookings', 'scans', 'issues', ...CREW_TABLES, 'users', 'mutations'] as const
     const out: Record<string, unknown[]> = {}
     for (const t of tables) out[t] = (await db.query(`SELECT * FROM ${t}`)).rows
     return { exportedAt: new Date().toISOString(), ...out }

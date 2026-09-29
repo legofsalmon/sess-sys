@@ -48,3 +48,18 @@ export interface Poke {
   type: 'poke'
   cursor: number
 }
+
+/** A member of staff, signed in to the app with their Google account. */
+export interface StaffUser {
+  id: string
+  email: string
+  name: string
+  picture?: string
+}
+
+/**
+ * GET /api/me: whether this server has sign-in switched on, and who the
+ * device is signed in as. Answers 401 when sign-in is on and the device
+ * isn't signed in.
+ */
+export type MeResponse = { auth: 'off' } | { auth: 'google'; user: StaffUser }
