@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS = [
   ['Build progress', 'docs/progress.md'],
+  ['Phone field test', 'docs/field-test.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],

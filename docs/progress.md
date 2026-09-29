@@ -24,7 +24,7 @@ waiting on someone.
 
 **Next**
 
-- Phone field test on the live app.
+- Phone field test on the live app: [the steps](field-test.md).
 
 ## 29 September 2026: crew booking started early
 
