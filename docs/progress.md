@@ -45,10 +45,15 @@ waiting on someone.
   broken on purpose, and its test failed.
 - Also fixed: two older browser tests could pick up each other's speakers
   when they ran at the same time; each now uses names of its own.
+- Merged into `main` at 22:41 UTC and live by 22:46: the live server
+  answers the new history address.
+- Also upgraded the part of the server that sends the app's pages to
+  phones and laptops, which had a security warning. The real risk was
+  low, since it only sends the app's own public files.
 
 **Next**
 
-- Nothing to set up for this: it is on once it's live.
+- Nothing to set up for this: it is on.
 - Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
   Railway bucket for backups ([the steps](backups.md)), the Google sign-in
   key ([the steps](sign-in-setup.md)) and the phone field test
