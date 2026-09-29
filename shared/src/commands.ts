@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { crewCommandSchemas } from './crew.ts'
 import { day } from './model.ts'
 
 /**
@@ -29,6 +30,7 @@ export const commandSchemas = {
     direction: z.enum(['out', 'in']),
     at: z.string(),
   }),
+  ...crewCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas
@@ -55,7 +57,7 @@ export const mutationSchema = z.object({
 
 /** Why the server turned a command down, in words for the person who sent it. */
 export interface Rejection {
-  code: 'invalid' | 'not-found' | 'short' | 'conflict'
+  code: 'invalid' | 'not-found' | 'short' | 'conflict' | 'clash' | 'filled' | 'forbidden'
   message: string
   /** For `short`: how many more would be needed. */
   short?: number

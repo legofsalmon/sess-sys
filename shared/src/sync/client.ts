@@ -2,6 +2,7 @@ import { commandSchemas, type CommandArgs, type CommandName, type Mutation, type
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
 import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
+import { crewView, type CrewView } from './crew-view.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -65,6 +66,7 @@ export interface View {
   scans: ScanView[]
   issues: Entities['issue'][]
   problems: Problem[]
+  crew: CrewView
   pendingCount: number
   connection: Connection
   cursor: number
@@ -74,7 +76,7 @@ export function emptySnapshot(clientId: string): Snapshot {
   return {
     clientId,
     cursor: 0,
-    entities: { product: {}, booking: {}, scan: {}, issue: {} },
+    entities: Object.fromEntries(ENTITY_NAMES.map((n) => [n, {}])) as Snapshot['entities'],
     outbox: [],
     problems: [],
   }
@@ -202,6 +204,7 @@ export class SyncClient {
       scans: [...scans.values()].sort((a, b) => b.at.localeCompare(a.at)),
       issues: Object.values(entities.issue).filter((i) => !i.resolved),
       problems: [...this.state.problems],
+      crew: crewView(entities, outbox, this.state.cursor),
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
       connection: this.connection,
       cursor: this.state.cursor,
@@ -278,7 +281,8 @@ function strip(m: PendingMutation): Mutation {
 
 export function applyChange(state: Snapshot, change: Change) {
   if (!ENTITY_NAMES.includes(change.entity)) return
-  const table = state.entities[change.entity] as Record<string, unknown>
+  // Snapshots saved before a module existed have no table for it yet.
+  const table = (state.entities[change.entity] ??= {} as never) as Record<string, unknown>
   if (change.op === 'delete') delete table[change.id]
   else table[change.id] = change.data
 }

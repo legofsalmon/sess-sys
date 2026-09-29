@@ -118,6 +118,9 @@ section { display: grid; gap: 22px; scroll-margin-top: 24px; min-width: 0; }
 .phones figure { margin: 0; display: grid; gap: 6px; }
 .phones img { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); aspect-ratio: 390 / 844; object-fit: cover; object-position: top; max-height: 460px; }
 .phones figcaption { font-size: .85rem; color: var(--muted); }
+.crewshots { margin-top: 16px; }
+.crewshots .phones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .crewshots .phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .state.progress { background: var(--accent-soft); color: var(--accent-ink); }
 @media (max-width: 980px) { .tracker { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
@@ -325,6 +328,15 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <figure><img src="img/demo-offline.png" alt="Phone with no signal: a booking for Fuel shows as waiting to sync" width="390" height="844" loading="lazy"><figcaption><b>No signal.</b> The booking waits on the phone.</figcaption></figure>
             <figure><img src="img/demo-online.png" alt="Phone back online: the booking was turned down because the office booked the speakers first" width="390" height="844" loading="lazy"><figcaption><b>Signal back.</b> The office got there first, so the phone shows why.</figcaption></figure>
           </div>
+        </div>
+      </div>
+      <div class="panel shots crewshots">
+        <h3>Crew booking, started early</h3>
+        <p class="small">The office offers a job and sends it by WhatsApp, text or email. The freelancer answers from their own link, with no app or login, and can take only some of the days. Nobody is double booked, and on a shortlist the first to say yes gets it. (Decision 0002)</p>
+        <div class="phones">
+          <figure><img src="img/crew-office-offer.png" alt="Office crew screen: a job for Electric Picnic with an offer to Aoife ready to send by WhatsApp" width="390" height="844" loading="lazy"><figcaption><b>Office.</b> Offer made, message ready for WhatsApp.</figcaption></figure>
+          <figure><img src="img/crew-freelancer-offer.png" alt="Freelancer's private page on a phone: the offer in full with day checkboxes and Accept or Decline" width="390" height="844" loading="lazy"><figcaption><b>Freelancer.</b> No app: pick days, accept or decline.</figcaption></figure>
+          <figure><img src="img/crew-office-confirmed.png" alt="Office crew screen after the answer: Aoife confirmed for two of three days" width="390" height="844" loading="lazy"><figcaption><b>Back in the office.</b> Answer arrives live and is confirmed.</figcaption></figure>
         </div>
       </div>
     </section>
@@ -723,7 +735,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'todo', 'Next'],
     ['2', 'Warehouse', 'todo', 'Planned'],
-    ['3', 'Crew', 'todo', 'Planned'],
+    ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
     ['6', 'Grow', 'todo', 'Planned']
@@ -809,7 +821,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['5', '', 'Crewbox link and on-site mode', ['Crewbox additions: keyed import, show log by key, asset tags on faults', 'Push job to the box; pull faults back as repair tickets', 'Crew chief view: kit check by scan, crew present, notes, offline'], 'the box is set up from the job in one step and faults from site are waiting in the repair queue.'],
     ['6', '', 'Grow', ['Utilisation and revenue per product', 'Multi-warehouse, vehicles and drivers', 'Client portal', 'RFID, app store builds if needed', 'Retire calendar-led mode'], '']
   ];
-  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span>${n === '0' ? '<span class="state progress">In progress</span>' : ''}</div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
+  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span>${n === '0' ? '<span class="state progress">In progress</span>' : n === '3' ? '<span class="state progress">Started early</span>' : ''}</div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
 
   // decisions
   const dec = [
@@ -822,7 +834,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Existing stock list', 'Is there a spreadsheet or old list of stock to import?', 'open'],
     ['Crewbox code sharing', 'Can Crewbox\'s sync code become a shared package both use?', 'open'],
     ['Hosting', 'App server on Railway, database on Neon Postgres in the EU. Vercel keeps the blueprint.', 'decided'],
-    ['Start the build', 'Go-ahead given 29 September; Phase 0 under way.', 'decided']
+    ['Start the build', 'Go-ahead given 29 September; Phase 0 under way.', 'decided'],
+    ['Crew booking', 'Started early, in parallel. Freelancers answer from a private link with no app or login; ops send offers by WhatsApp, text or email (Decision 0002).', 'decided'],
+    ['Automatic offer messages', 'Offers are sent by ops from their own phone for now. Send by SMS/WhatsApp Business or email automatically later?', 'open']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

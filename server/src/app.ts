@@ -5,6 +5,8 @@ import { pushRequest, type Change, type EntityName, type Poke, type PullResponse
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
 import { applyMutation, currentSeq } from './commands.ts'
+import { registerCrewLinks } from './crew/links.ts'
+import { CREW_TABLES, migrateCrew } from './crew/schema.ts'
 import type { Db } from './db.ts'
 import { migrate } from './schema.ts'
 
@@ -24,6 +26,7 @@ export interface AppOptions {
  */
 export async function buildApp({ db, logger = false, webRoot }: AppOptions): Promise<FastifyInstance> {
   await migrate(db)
+  await migrateCrew(db)
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024 })
   await app.register(cors, { origin: true })
   await app.register(websocket)
@@ -69,8 +72,11 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
     socket.send(JSON.stringify({ type: 'poke', cursor: await currentSeq(db) } satisfies Poke))
   })
 
+  // Freelancers' private links: no app or login needed to answer an offer.
+  registerCrewLinks(app, db, () => void poke())
+
   app.get('/api/export', async () => {
-    const tables = ['products', 'bookings', 'scans', 'issues', 'mutations'] as const
+    const tables = ['products', 'bookings', 'scans', 'issues', ...CREW_TABLES, 'mutations'] as const
     const out: Record<string, unknown[]> = {}
     for (const t of tables) out[t] = (await db.query(`SELECT * FROM ${t}`)).rows
     return { exportedAt: new Date().toISOString(), ...out }
@@ -80,7 +86,7 @@ export async function buildApp({ db, logger = false, webRoot }: AppOptions): Pro
     await app.register(fastifyStatic, { root: webRoot })
     // Anything that is not an API call or a file is the app; the app routes it.
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
+      req.url.startsWith('/api/') || req.url.startsWith('/f/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
     )
   }
 

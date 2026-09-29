@@ -70,6 +70,12 @@ availability for next week is trusted without walking the shelves.
 Built to the "meet freelancers in the middle" principle in
 [architecture.md](architecture.md): no app or login needed to get work.
 
+**Started early, 29 September 2026**, in parallel with Phase 0 and 1
+([ADR 0002](adr/0002-crew-booking-links.md)). Done so far: offers to one
+person or a shortlist, private freelancer links (accept some days, decline,
+counter the rate, days off), no double booking, personal calendar feeds, and
+offer messages ready for WhatsApp, text or email.
+
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.

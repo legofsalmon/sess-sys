@@ -15,10 +15,11 @@ export default defineConfig({
         display: 'standalone',
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
-      workbox: { navigateFallbackDenylist: [/^\/api\//] },
+      // Freelancer links are server pages, never the app shell.
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/f\//] },
     }),
   ],
   server: {
-    proxy: { '/api': { target: 'http://localhost:3030', ws: true } },
+    proxy: { '/api': { target: 'http://localhost:3030', ws: true }, '/f': 'http://localhost:3030' },
   },
 })

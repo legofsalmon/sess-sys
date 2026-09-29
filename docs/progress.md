@@ -3,6 +3,46 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: crew booking started early
+
+Built in parallel with Phase 0, so the freelancer side can be tried as soon
+as the app is hosted. The decision is recorded in
+[ADR 0002](adr/0002-crew-booking-links.md).
+
+**Done**
+
+- **Crew screen for ops** (the Crew tab in the app): people with skills,
+  rates and contact details; jobs that need crew (project, phase, role,
+  dates, call time, how many, day rate, venue, details); offers to one
+  person or a shortlist; answers to check, with Confirm, "Agree €300" for
+  counters, and Release.
+- **Send an offer where the freelancer already looks:** the app writes the
+  message with every detail and their link, and opens WhatsApp, text or
+  email with it filled in. Nothing is sent automatically yet.
+- **Freelancer's private link, no app or login:** see offers in full, accept
+  all or some days, decline, ask for a different rate, mark days off,
+  subscribe to bookings in Google, Apple or Outlook calendar, and download
+  everything held on them. Works with JavaScript off, so it opens instantly
+  from WhatsApp.
+- **Rules the server enforces**, whichever way an answer arrives: nobody is
+  double booked; the first to accept a shortlisted role gets it and the rest
+  are told it's filled; days someone marked off need an explicit override.
+- Checked: 12 new server tests (shortlists, part-days, counters, clashes,
+  days off, links, calendar feed, offline ops device) and a browser test
+  where the office offers a job and a phone answers from the link. All
+  earlier tests still pass.
+
+**Next for crew**
+
+- Link crew calls to Phase 1 projects and phases, and add confirmed crew to
+  the Google Calendar event as attendees; read RSVPs back as answers.
+- Documents with expiry (Safe Pass, manual handling) that block an offer.
+- Timesheets from confirmed days, then ready-made freelancer invoices.
+
+**Waiting on**
+
+- Nothing new. Real freelancer data waits until staff sign-in is in.
+
 ## 29 September 2026: hosting picked
 
 **Decided:** the app server runs on Railway and the database on Neon
