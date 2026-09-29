@@ -6,12 +6,14 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
-import { migrateAuth } from './auth/schema.ts'
+import { registerBackupRoutes } from './backup/routes.ts'
+import { Backups } from './backup/service.ts'
+import type { BackupStore } from './backup/store.ts'
 import { applyMutation, currentSeq } from './commands.ts'
 import { registerCrewLinks } from './crew/links.ts'
-import { CREW_TABLES, migrateCrew } from './crew/schema.ts'
+import { CREW_TABLES } from './crew/schema.ts'
 import type { Db } from './db.ts'
-import { migrate } from './schema.ts'
+import { migrateAll } from './modules.ts'
 
 const PULL_LIMIT = 500
 
@@ -22,6 +24,17 @@ export interface AppOptions {
   webRoot?: string
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
+  /** Where nightly backups go (ADR 0004). Without it there are none. */
+  backupStore?: BackupStore
+  /** Which code is running, recorded in each backup. */
+  commit?: string
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** The nightly backup; the caller starts its schedule once the server is listening. */
+    backups: Backups
+  }
 }
 
 /**
@@ -29,11 +42,11 @@ export interface AppOptions {
  * the "your data, always reachable" promise from the principles, present
  * from the first commit rather than bolted on.
  */
-export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions): Promise<FastifyInstance> {
-  await migrate(db)
-  await migrateCrew(db)
-  await migrateAuth(db)
+export async function buildApp({ db, logger = false, webRoot, auth, backupStore, commit }: AppOptions): Promise<FastifyInstance> {
+  await migrateAll(db)
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024 })
+  const backups = await new Backups(db, backupStore, { log: app.log, commit }).load()
+  app.decorate('backups', backups)
   await app.register(cors, { origin: true })
   await app.register(websocket)
 
@@ -47,12 +60,17 @@ export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions
 
   registerAuth(app, db, auth)
 
-  app.get('/api/health', { config: { public: true } }, async () => ({
-    ok: true,
-    db: db.kind,
-    auth: auth ? 'google' : 'off',
-    cursor: await currentSeq(db),
-  }))
+  app.get('/api/health', { config: { public: true } }, async () => {
+    const backup = backups.status()
+    return {
+      ok: true,
+      db: db.kind,
+      auth: auth ? 'google' : 'off',
+      // For an uptime monitor to watch: "fresh" false means the nightly backup has stopped working.
+      backups: backup.configured ? { last: backup.lastOk?.finishedAt ?? null, fresh: backup.fresh } : 'off',
+      cursor: await currentSeq(db),
+    }
+  })
 
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
@@ -75,8 +93,16 @@ export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions
     const changes: Change[] = rows
       .slice(0, PULL_LIMIT)
       .map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data }))
-    const cursor = changes.length ? changes[changes.length - 1]!.seq : Math.max(after, await currentSeq(db))
-    return { changes, cursor, more }
+    // Where the feed ends, and which copy of the data this is: a device ahead of the
+    // head, or holding another generation, has seen data this server no longer has.
+    // Read each time, so a new generation counts at once, without a restart.
+    const { rows: meta } = await db.query<{ head: string | null; generation: string | null }>(
+      `SELECT (SELECT max(seq) FROM changes) AS head, (SELECT value FROM server_meta WHERE key = 'generation') AS generation`
+    )
+    const head = Number(meta[0]?.head ?? 0)
+    const generation = meta[0]?.generation ?? undefined
+    const cursor = changes.length ? changes[changes.length - 1]!.seq : Math.max(after, head)
+    return { changes, cursor, more, generation, head }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {
@@ -87,6 +113,7 @@ export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions
 
   // Freelancers' private links: no app or login needed to answer an offer.
   registerCrewLinks(app, db, () => void poke())
+  registerBackupRoutes(app, backups)
 
   app.get('/api/export', async () => {
     const tables = ['products', 'bookings', 'scans', 'issues', ...CREW_TABLES, 'users', 'mutations'] as const
@@ -104,6 +131,7 @@ export async function buildApp({ db, logger = false, webRoot, auth }: AppOptions
   }
 
   app.addHook('onClose', async () => {
+    backups.stop()
     for (const ws of sockets) ws.close()
   })
   return app

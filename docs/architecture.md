@@ -345,8 +345,9 @@ Crewbox.
 ## Resilience
 
 - Postgres with point-in-time recovery, plus a nightly logical backup to
-  separate storage, restored into a scratch database weekly to prove it
-  works.
+  separate storage, each one restored into a scratch database to prove it
+  works before it counts ([ADR 0004](adr/0004-backups.md)). After a
+  restore, devices reload their copy and send again what the backup missed.
 - The outbox means no scan or change is lost if the server is down; devices
   keep working from their replica.
 - Every command is idempotent by its client id, so retries are safe.

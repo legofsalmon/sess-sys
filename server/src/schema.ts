@@ -1,4 +1,5 @@
 import type { Db } from './db.ts'
+import { runMigrations, type Module } from './migrations.ts'
 
 /**
  * Tables for the sync spike. Two of them are the sync machinery and will
@@ -67,17 +68,32 @@ const MIGRATIONS: string[] = [
   // Who sent each command, once staff sign in. Empty for freelancers'
   // links (client_id says whose link) and for anything from before.
   `ALTER TABLE mutations ADD COLUMN IF NOT EXISTS user_id text;`,
+  // Backups (ADR 0004). `generation` names this copy of the data: a
+  // database restored from a backup gets a new one, which tells devices to
+  // start their copy afresh. `backup_runs` is the log of nightly backups.
+  // Neither is itself backed up.
+  `
+  CREATE TABLE IF NOT EXISTS server_meta (
+    key   text PRIMARY KEY,
+    value text NOT NULL
+  );
+  INSERT INTO server_meta (key, value) VALUES ('generation', gen_random_uuid()::text) ON CONFLICT (key) DO NOTHING;
+  CREATE TABLE IF NOT EXISTS backup_runs (
+    id          text PRIMARY KEY,
+    started_at  timestamptz NOT NULL DEFAULT now(),
+    finished_at timestamptz,
+    status      text NOT NULL CHECK (status IN ('running', 'ok', 'failed')),
+    trigger     text NOT NULL,
+    key         text,
+    bytes       integer,
+    row_count   integer,
+    error       text
+  );
+  `,
 ]
 
-export async function migrate(db: Db) {
-  await db.query('CREATE TABLE IF NOT EXISTS schema_version (version integer NOT NULL)')
-  const { rows } = await db.query<{ version: number }>('SELECT version FROM schema_version')
-  let version = rows[0]?.version ?? 0
-  if (rows.length === 0) await db.query('INSERT INTO schema_version (version) VALUES (0)')
-  for (; version < MIGRATIONS.length; version++) {
-    await db.transaction(async (tx) => {
-      await tx.exec(MIGRATIONS[version]!)
-      await tx.query('UPDATE schema_version SET version = $1', [version + 1])
-    })
-  }
+export const CORE: Module = { versionTable: 'schema_version', migrations: MIGRATIONS }
+
+export function migrate(db: Db, upTo?: number) {
+  return runMigrations(db, CORE, upTo)
 }

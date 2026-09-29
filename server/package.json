@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "backup": "tsx src/backup/cli.ts",
     "typecheck": "tsc -p .",
     "test": "vitest run"
   },
@@ -14,6 +15,7 @@
     "@fastify/static": "^8.3.0",
     "@fastify/websocket": "^11.2.0",
     "@sh/shared": "*",
+    "aws4fetch": "^1.0.20",
     "fastify": "^5.4.0",
     "pg": "^8.16.3",
     "tsx": "^4.20.3",

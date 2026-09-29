@@ -1,4 +1,5 @@
 import type { Db } from '../db.ts'
+import { runMigrations, type Module } from '../migrations.ts'
 
 /**
  * Crew tables. Versioned on their own (crew_schema_version) so the crew
@@ -63,15 +64,8 @@ const MIGRATIONS: string[] = [
 /** In the order a full export should list them. */
 export const CREW_TABLES = ['people', 'unavailability', 'crew_calls', 'offers'] as const
 
-export async function migrateCrew(db: Db) {
-  await db.query('CREATE TABLE IF NOT EXISTS crew_schema_version (version integer NOT NULL)')
-  const { rows } = await db.query<{ version: number }>('SELECT version FROM crew_schema_version')
-  let version = rows[0]?.version ?? 0
-  if (rows.length === 0) await db.query('INSERT INTO crew_schema_version (version) VALUES (0)')
-  for (; version < MIGRATIONS.length; version++) {
-    await db.transaction(async (tx) => {
-      await tx.exec(MIGRATIONS[version]!)
-      await tx.query('UPDATE crew_schema_version SET version = $1', [version + 1])
-    })
-  }
+export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }
+
+export function migrateCrew(db: Db, upTo?: number) {
+  return runMigrations(db, CREW, upTo)
 }

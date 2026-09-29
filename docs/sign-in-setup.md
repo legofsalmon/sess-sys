@@ -41,19 +41,16 @@ In Railway, open the **shserver** service, then **Variables**, and add:
 | `GOOGLE_CLIENT_SECRET` | The Client secret from step 1 |
 | `STAFF_EMAILS` | Only if people outside sessionhire.com should sign in (for example a tester): their Google addresses, separated by commas |
 
-Railway then asks to deploy the change; let it. Then, still in the
-**shserver** service, press **Cmd+K** (Mac) or **Ctrl+K** (Windows), type
-**Deploy Latest Commit** and choose it. Railway isn't yet picking up new
-code on its own, and deploying a change of variables only restarts the
-version already running, which may not have sign-in yet.
+Railway then asks to deploy the change; let it.
 
 ## 3. Check it
 
 1. Open
    [shserver-production.up.railway.app/api/health](https://shserver-production.up.railway.app/api/health).
    It should say `"auth":"google"`. If it doesn't mention `auth` at all,
-   the older version is still running: do **Deploy Latest Commit** as in
-   step 2.
+   an older version is still running: in the **shserver** service press
+   **Cmd+K** (Mac) or **Ctrl+K** (Windows), type **Deploy Latest Commit**
+   and choose it.
 2. Open the app. It shows **Sign in**; tap **Sign in with Google** and pick
    your account. You land back in the app, and the **Account** tab shows
    your name.

@@ -13,6 +13,7 @@ const DOCS = [
   ['Build progress', 'docs/progress.md'],
   ['Phone field test', 'docs/field-test.md'],
   ['Switching on sign-in', 'docs/sign-in-setup.md'],
+  ['Backups', 'docs/backups.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],

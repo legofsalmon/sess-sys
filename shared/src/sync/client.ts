@@ -27,6 +27,10 @@ export interface Snapshot {
   entities: { [E in EntityName]: Record<string, Entities[E]> }
   outbox: PendingMutation[]
   problems: Problem[]
+  /** Which copy of the server's data this is a copy of; see `restart`. */
+  generation?: string
+  /** What this device has had applied lately, kept to send again if the server's data is ever restored from a backup. */
+  sent?: SentMutation[]
 }
 
 export interface Storage {
@@ -42,6 +46,18 @@ export interface PendingMutation extends Mutation {
    */
   appliedSeq?: number
 }
+
+/** A command the server has applied, and when it left the outbox. */
+export interface SentMutation extends Mutation {
+  sentAt: string
+}
+
+/**
+ * How long a device remembers what it has sent. A restore uses last night's
+ * backup, so two weeks covers even a problem found days later.
+ */
+const REMEMBER_MS = 14 * 24 * 3_600_000
+const REMEMBER_MAX = 2000
 
 /** A command the server turned down, kept until the person deals with it. */
 export interface Problem {
@@ -248,13 +264,49 @@ export class SyncClient {
   private async pull() {
     for (;;) {
       const res = await this.transport.pull(this.state.cursor)
+      const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
+      const behind = res.head !== undefined && res.head < this.state.cursor
+      if (restored || behind) return this.restart(res.generation)
+      if (res.generation) this.state.generation = res.generation
       for (const change of res.changes) applyChange(this.state, change)
       this.state.cursor = Math.max(this.state.cursor, res.cursor)
       // Applied mutations leave the outbox once their result has arrived.
+      const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)
       this.state.outbox = this.state.outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > this.state.cursor)
+      if (done.length) this.remember(done)
       await this.persist()
       if (!res.more) return
     }
+  }
+
+  private remember(done: PendingMutation[]) {
+    const now = this.now()
+    const sentAt = now.toISOString()
+    this.state.sent = [...(this.state.sent ?? []), ...done.map((m) => ({ ...strip(m), sentAt }))]
+      .filter((m) => now.getTime() - Date.parse(m.sentAt) < REMEMBER_MS)
+      .slice(-REMEMBER_MAX)
+  }
+
+  /**
+   * The server's data has been put back from a backup (it says it holds a
+   * different copy, or it is behind this device). Its copy may be missing
+   * the latest work, so this device starts its own copy afresh from the
+   * server and sends again everything it has done lately, in the order it
+   * did it. The server skips whatever it already has, since every command
+   * carries its own id, and anything that no longer fits shows up as a
+   * problem to deal with, as it would after a long time offline.
+   */
+  private async restart(generation: string | undefined) {
+    const seen = new Set<string>()
+    const replay: PendingMutation[] = []
+    for (const m of [...(this.state.sent ?? []), ...this.state.outbox]) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      replay.push(strip(m))
+    }
+    this.state = { ...emptySnapshot(this.state.clientId), generation, outbox: replay, problems: this.state.problems }
+    await this.persist()
+    this.again = true
   }
 
   private setConnection(c: Connection) {
