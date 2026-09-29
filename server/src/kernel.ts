@@ -35,3 +35,12 @@ export async function emit(ctx: Ctx, entity: EntityName, id: string, data: unkno
   )
   ctx.seq = Number(rows[0]!.seq)
 }
+
+/** Tell devices a record is gone. */
+export async function emitRemoved(ctx: Ctx, entity: EntityName, id: string) {
+  const { rows } = await ctx.tx.query<{ seq: string }>(
+    `INSERT INTO changes (entity, entity_id, op, data, mutation_id) VALUES ($1, $2, 'delete', NULL, $3) RETURNING seq`,
+    [entity, id, ctx.mutationId]
+  )
+  ctx.seq = Number(rows[0]!.seq)
+}

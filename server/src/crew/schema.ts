@@ -59,6 +59,15 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS offers_call ON offers (call_id);
   CREATE INDEX IF NOT EXISTS offers_person ON offers (person_id);
   `,
+  // Calls as part of a job, and of one of its phases (ADR 0007). A phase
+  // can only be removed once its calls are cancelled; they then keep the
+  // job but lose the phase.
+  `
+  ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS project_id text REFERENCES projects(id);
+  ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS phase_id text REFERENCES phases(id) ON DELETE SET NULL;
+  CREATE INDEX IF NOT EXISTS crew_calls_project ON crew_calls (project_id);
+  CREATE INDEX IF NOT EXISTS crew_calls_phase ON crew_calls (phase_id);
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

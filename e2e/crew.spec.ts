@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
  * Crew booking end to end: the office adds a freelancer and a job and makes
  * an offer; the freelancer opens their private link on a phone (no app, no
  * login), takes two of the three days; the office sees it live and confirms.
- * Set SHOTS=1 to refresh the blueprint screenshots.
+ * To refresh the blueprint screenshots, run this file on its own with SHOTS=1.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -22,7 +22,8 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await person.getByRole('button', { name: 'Add person' }).click()
   await expect(office.getByText('Aoife Byrne')).toBeVisible()
 
-  const job = office.locator('form').filter({ has: office.getByRole('button', { name: 'Add job' }) })
+  // A one-off, not in Jobs: the crew screen still takes the job's details as typed.
+  const job = office.locator('form').filter({ has: office.getByRole('button', { name: 'Ask for crew' }) })
   await job.getByLabel('Project').fill('Electric Picnic')
   await job.getByLabel('Phase').fill('Build')
   await job.getByLabel('Role').fill('Audio tech')
@@ -32,7 +33,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await job.getByLabel('Day rate €').fill('250')
   await job.getByLabel('Venue').fill('Stradbally Hall, Co. Laois')
   await job.getByLabel('Details for crew').fill('Food on site. Parking at gate C.')
-  await job.getByRole('button', { name: 'Add job' }).click()
+  await job.getByRole('button', { name: 'Ask for crew' }).click()
   await expect(office.getByText('Electric Picnic').first()).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
@@ -62,6 +63,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await answers.getByRole('button', { name: 'Confirm' }).click()
   await expect(office.getByText('Confirmed')).toBeVisible()
   await office.getByRole('link', { name: 'Done' }).or(office.getByRole('button', { name: 'Done' })).click()
+  await office.evaluate(() => scrollTo(0, 0))
   await office.screenshot(shot('crew-office-confirmed'))
 
   await phone.reload()

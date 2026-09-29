@@ -183,21 +183,28 @@ personal details of other crew.
 
 **Projects**
 
+Clients, venues, projects and phases are built, and the app calls a project
+a job ([ADR 0007](adr/0007-jobs.md)).
+
 - **Client**, **Contact**, **Venue** (address, access notes, load-in details,
-  power, parking, what3words).
+  power, parking, what3words). Contacts are held inside the client for now.
 - **Project**: a job for a client (for example, Nissan at the Heritage).
-  Has a status: enquiry, quoted, confirmed, in progress, returned, invoiced,
-  closed, lost.
+  Has a status people set: enquiry, quoted, confirmed, cancelled, lost.
+  What the system can see for itself comes from the records that show it:
+  on now from the dates, out and returned from scans, invoiced and closed
+  from the invoices.
 - **Phase**: an ordered part of a project with its own dates and location:
   Prep, Build, Load in, Rehearsal, Show, Babysit, Load out, or custom. A
-  phase spans one or more days. This is the thing that becomes a calendar
-  event today.
+  phase spans one or more whole days. Each phase-day is what becomes a
+  calendar event today.
 - **Equipment line**: product and quantity against a project, optionally
   against specific phases, grouped by department (Audio, Lighting, Video,
   Staging, Power, Transport and labour). Includes subhire lines from
   another company.
 - **Crew requirement**: a role needed on a phase ("2 x audio tech, Build and
-  Show"), filled by **Crew assignments**.
+  Show"), filled by **Crew assignments**. Built as crew calls, asked for from
+  the job ([ADR 0002](adr/0002-crew-booking-links.md),
+  [ADR 0007](adr/0007-jobs.md)).
 - **Quote**: versioned, frozen snapshot of lines and prices sent to the
   client.
 

@@ -4,10 +4,16 @@ import { App } from './App.tsx'
 import { useAuth } from './auth.ts'
 import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
+import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 
-/** Switches between the app's areas. The address keeps the area, so a reload or a shared link lands in the same place. */
+/**
+ * Switches between the app's areas. The address keeps the area, and within
+ * it the record open (#jobs/<id>), so a reload or a shared link lands in the
+ * same place.
+ */
 const AREAS = [
+  { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
   { hash: '#stock', label: 'Stock', Screen: App },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
   { hash: '#history', label: 'History', Screen: HistoryScreen },
@@ -24,7 +30,7 @@ export function Shell() {
   }, [])
   // Only once the server has said so: offline, the device carries on.
   if (auth.status === 'signed-out') return <SignIn />
-  const area = AREAS.find((a) => a.hash === hash) ?? AREAS[0]
+  const area = AREAS.find((a) => hash === a.hash || hash.startsWith(`${a.hash}/`)) ?? AREAS[0]
   return (
     <>
       <area.Screen />

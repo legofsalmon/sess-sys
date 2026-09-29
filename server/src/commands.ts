@@ -9,6 +9,7 @@ import { newId } from '@sh/shared'
 import { crewHandlers } from './crew/handlers.ts'
 import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
+import { projectHandlers } from './projects/handlers.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -114,6 +115,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   },
 
   ...crewHandlers,
+  ...projectHandlers,
 }
 
 /**

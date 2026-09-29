@@ -1,8 +1,9 @@
-import { commandSchemas, type CommandArgs, type CommandName, type Mutation, type Rejection } from '../commands.ts'
+import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
 import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
+import { jobsView, type JobsView } from './jobs-view.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -83,6 +84,7 @@ export interface View {
   issues: Entities['issue'][]
   problems: Problem[]
   crew: CrewView
+  jobs: JobsView
   pendingCount: number
   connection: Connection
   cursor: number
@@ -146,7 +148,7 @@ export class SyncClient {
    * on the device, saved to the outbox before anything else happens, and
    * shown straight away as pending.
    */
-  async mutate<N extends CommandName>(name: N, args: CommandArgs<N>): Promise<Mutation<N>> {
+  async mutate<N extends CommandName>(name: N, args: CommandInput<N>): Promise<Mutation<N>> {
     const parsed = commandSchemas[name].safeParse(args)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
@@ -214,13 +216,15 @@ export class SyncClient {
     }
 
     const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id)
+    const crew = crewView(entities, outbox, this.state.cursor)
     return {
       products: Object.values(entities.product).sort(byName),
       bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
       scans: [...scans.values()].sort((a, b) => b.at.localeCompare(a.at)),
       issues: Object.values(entities.issue).filter((i) => !i.resolved),
       problems: [...this.state.problems],
-      crew: crewView(entities, outbox, this.state.cursor),
+      crew,
+      jobs: jobsView(entities, outbox, this.state.cursor, crew.calls),
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
       connection: this.connection,
       cursor: this.state.cursor,

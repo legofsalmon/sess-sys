@@ -179,15 +179,19 @@ const ABOUT: Record<string, string> = {
   backup_runs: 'The nightly backups: when each ran and how it went.',
   bookings: 'Stock booked for jobs (sync test).',
   changes: 'Every change to every record, in order: what phones and laptops receive.',
+  clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show.',
   issues: 'Things someone has to sort out, such as more scanned out than booked (sync test).',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
   people: 'Staff and freelancers on the crew list: contact details, skills and rates.',
+  phases: "The parts of each job, such as Build and Show, and their days.",
   products: 'Stock items (sync test).',
+  projects: 'Jobs: who for, where, and whether they are going ahead.',
   scans: 'Stock scanned out and back in (sync test).',
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
+  venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',
 }
 
 function readme(e: Everything, by?: { name: string; email: string }): string {

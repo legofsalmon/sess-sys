@@ -2,10 +2,11 @@ import { AUTH } from './auth/schema.ts'
 import { CREW } from './crew/schema.ts'
 import type { Db, Queryable } from './db.ts'
 import { runMigrations, runMigrationsIn, type Module } from './migrations.ts'
+import { PROJECTS } from './projects/schema.ts'
 import { CORE } from './schema.ts'
 
-/** Every module's tables, in the order they are set up. */
-export const MODULES: readonly Module[] = [CORE, CREW, AUTH]
+/** Every module's tables, in the order they are set up: crew calls refer to jobs, so jobs come first. */
+export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH]
 
 /** Set up or upgrade the whole database. */
 export async function migrateAll(db: Db) {

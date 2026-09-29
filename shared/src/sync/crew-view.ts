@@ -1,5 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { eachDay, HOLDING, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { STOPPED } from '../jobs.ts'
 
 /**
  * The crew screen's view of a device's data: what the server has said, with
@@ -39,7 +40,8 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
   const people = new Map<string, PersonView>()
   for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, pending: false })
   const calls = new Map<string, CrewCall & { pending: boolean }>()
-  for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, pending: false })
+  // Calls synced before jobs existed have no job or phase.
+  for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
   const offers = new Map<string, Offer & { pending: boolean }>()
   for (const o of Object.values(entities.offer ?? {})) offers.set(o.id, { ...o, pending: false })
   const away = new Map<string, UnavailabilityView>()
@@ -55,7 +57,14 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
       }
       case 'call.create': {
         const a = m.args as CommandArgs<'call.create'>
-        if (!calls.has(a.id)) calls.set(a.id, { ...a, status: 'open', pending: true })
+        if (!calls.has(a.id)) calls.set(a.id, { ...a, projectId: a.projectId ?? null, phaseId: a.phaseId ?? null, status: 'open', pending: true })
+        break
+      }
+      case 'project.update': {
+        // A job being stopped takes its crew calls with it (ADR 0007).
+        const a = m.args as CommandArgs<'project.update'>
+        if (!a.status || !STOPPED.includes(a.status)) break
+        for (const c of calls.values()) if (c.projectId === a.id && c.status === 'open') calls.set(c.id, { ...c, status: 'cancelled', pending: true })
         break
       }
       case 'call.cancel': {

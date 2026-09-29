@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
-import { daysLabel, eachDay, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
-import { emit, Refused, type Ctx } from '../kernel.ts'
+import { daysLabel, eachDay, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
+import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, offersForCall } from './store.ts'
 
 /**
@@ -88,6 +89,38 @@ async function closeIfFull(ctx: Ctx, call: CrewCall) {
   for (const o of offers) if (o.status === 'offered' || o.status === 'countered') await setOffer(ctx, o.id, { status: 'filled' })
 }
 
+/**
+ * Cancel a call: everyone still offered is told it's withdrawn, and anyone
+ * booked on it is released. Also how a job being stopped takes its crew.
+ */
+export async function cancelCall(ctx: Ctx, callId: string) {
+  await ctx.tx.query(`UPDATE crew_calls SET status = 'cancelled' WHERE id = $1`, [callId])
+  await emit(ctx, 'crewCall', callId, await getCall(ctx.tx, callId))
+  for (const o of await offersForCall(ctx.tx, callId))
+    if (!['declined', 'filled', 'cancelled'].includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
+}
+
+/**
+ * The job and phase a new call is part of, and the names it takes from
+ * them (ADR 0007). A call not tied to a job keeps the names as typed.
+ */
+async function callJob(ctx: Ctx, a: CommandArgs<'call.create'>) {
+  let projectId = a.projectId
+  if (a.phaseId) {
+    const phase = await getPhase(ctx.tx, a.phaseId)
+    if (!phase) throw new Refused({ code: 'not-found', message: 'That phase of the job no longer exists.' })
+    if (projectId && projectId !== phase.projectId) throw new Refused({ code: 'invalid', message: 'That phase is part of a different job.' })
+    projectId = phase.projectId
+  }
+  if (!projectId) return { projectId: null, phaseId: null, project: a.project, phase: a.phase, venue: a.venue }
+  const job = await getProject(ctx.tx, projectId)
+  if (!job) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
+  if (STOPPED.includes(job.status))
+    throw new Refused({ code: 'conflict', message: `${job.name} has been ${job.status === 'lost' ? 'marked as lost' : 'cancelled'}, so it needs no crew.` })
+  const names = await namesForCall(ctx.tx, projectId, a.phaseId)
+  return { projectId, phaseId: a.phaseId, project: names!.project, phase: names!.phase ?? a.phase, venue: names!.venue ?? a.venue }
+}
+
 async function openCall(ctx: Ctx, callId: string) {
   const call = await getCall(ctx.tx, callId, true)
   if (!call) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
@@ -126,19 +159,16 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'unavailability.remove'(ctx, a) {
     const { rows } = await ctx.tx.query('DELETE FROM unavailability WHERE id = $1 RETURNING id', [a.id])
     if (!rows.length) return
-    const { rows: seq } = await ctx.tx.query<{ seq: string }>(
-      `INSERT INTO changes (entity, entity_id, op, data, mutation_id) VALUES ('unavailability', $1, 'delete', NULL, $2) RETURNING seq`,
-      [a.id, ctx.mutationId]
-    )
-    ctx.seq = Number(seq[0]!.seq)
+    await emitRemoved(ctx, 'unavailability', a.id)
   },
 
   async 'call.create'(ctx, a) {
     if (await getCall(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This job already exists.' })
+    const job = await callJob(ctx, a)
     await ctx.tx.query(
-      `INSERT INTO crew_calls (id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open')`,
-      [a.id, a.project, a.phase, a.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy]
+      `INSERT INTO crew_calls (id, project_id, phase_id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open')`,
+      [a.id, job.projectId, job.phaseId, job.project, job.phase, job.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy]
     )
     await emit(ctx, 'crewCall', a.id, await getCall(ctx.tx, a.id))
   },
@@ -146,10 +176,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'call.cancel'(ctx, a) {
     const call = await getCall(ctx.tx, a.id, true)
     if (!call) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
-    await ctx.tx.query(`UPDATE crew_calls SET status = 'cancelled' WHERE id = $1`, [a.id])
-    await emit(ctx, 'crewCall', a.id, await getCall(ctx.tx, a.id))
-    for (const o of await offersForCall(ctx.tx, a.id))
-      if (!['declined', 'filled', 'cancelled'].includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
+    await cancelCall(ctx, a.id)
   },
 
   async 'offer.send'(ctx, a) {

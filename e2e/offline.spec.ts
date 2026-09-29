@@ -9,7 +9,7 @@ import { expect, test, type Page } from '@playwright/test'
  */
 
 async function ready(page: Page) {
-  await page.goto('/')
+  await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 }
 

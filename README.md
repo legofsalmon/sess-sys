@@ -8,8 +8,9 @@ on site.
 
 Phase 0 is built, with the phone field test left: the offline sync
 engine, crew booking, staff sign-in, nightly backups, error alerts, and a
-history of every change with a download of everything. The app runs on
-Railway. Start with the
+history of every change with a download of everything. Phase 1 has
+started with jobs: clients, venues and each job's phases, with crew asked
+for from the job. The app runs on Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the
 research, principles, architecture, stock tracking, roadmap and decisions,

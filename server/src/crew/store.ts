@@ -4,7 +4,7 @@ import type { Queryable } from '../db.ts'
 /** Reading crew rows back as the entities devices and pages see. */
 
 const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token`
-const CALL = `id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
+const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
 
@@ -23,6 +23,8 @@ export const toPerson = (r: Row): Person => ({
 })
 export const toCall = (r: Row): CrewCall => ({
   id: r.id,
+  projectId: r.project_id ?? null,
+  phaseId: r.phase_id ?? null,
   project: r.project,
   phase: r.phase,
   venue: r.venue,
@@ -93,7 +95,8 @@ export async function offersFor(q: Queryable, personId: string) {
   const { rows } = await q.query(
     `SELECT o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
             o.responded_at, o.responded_via, o.override,
-            c.id AS c_id, c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
+            c.id AS c_id, c.project_id AS c_project_id, c.phase_id AS c_phase_id,
+            c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
             c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,
             c.needed AS c_needed, c.day_rate_cents AS c_day_rate_cents, c.details AS c_details,
             c.reply_by::text AS c_reply_by, c.status AS c_status
@@ -107,6 +110,13 @@ export async function offersFor(q: Queryable, personId: string) {
     for (const [k, v] of Object.entries(r)) if (k.startsWith('c_')) c[k.slice(2)] = v
     return { offer: toOffer(r), call: toCall(c) }
   })
+}
+
+/** A job's calls still open, for stopping the job or removing a phase. */
+export async function openCallsFor(q: Queryable, by: { projectId: string } | { phaseId: string }) {
+  const [column, value] = 'projectId' in by ? ['project_id', by.projectId] : ['phase_id', by.phaseId]
+  const { rows } = await q.query(`SELECT ${CALL} FROM crew_calls WHERE ${column} = $1 AND status = 'open' ORDER BY start_day, id`, [value])
+  return rows.map(toCall)
 }
 
 /** Offers, other than one, that hold any of these days for a person. */
