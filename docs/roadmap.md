@@ -114,8 +114,7 @@ faults reported on site are waiting in the warehouse repair queue on return.
 ## Decisions to make before the build starts
 
 1. Answers to the open questions at the end of [architecture.md](architecture.md).
-2. Whether Phase 2 (warehouse) should come before Phase 1 (calendar). The
-   plan puts the calendar first because it is how the business runs today
-   and gives immediate value with low risk; if stock is the bigger pain,
-   swap them.
+2. ~~Calendar or warehouse first?~~ Decided 2026-09-29: calendar first.
+   Stock labelling research runs alongside, since no stock is barcoded
+   yet and the rollout takes time.
 3. Hosting provider and budget.
