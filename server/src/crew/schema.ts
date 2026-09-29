@@ -61,9 +61,6 @@ const MIGRATIONS: string[] = [
   `,
 ]
 
-/** In the order a full export should list them. */
-export const CREW_TABLES = ['people', 'unavailability', 'crew_calls', 'offers'] as const
-
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }
 
 export function migrateCrew(db: Db, upTo?: number) {

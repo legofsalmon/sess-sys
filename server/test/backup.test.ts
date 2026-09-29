@@ -140,7 +140,7 @@ function contents(db: Db, table: string) {
   })
 }
 
-describe('the backup file', { timeout: 30_000 }, () => {
+describe('the backup file', () => {
   it('copies every table and puts it back exactly, in a new database', async () => {
     const db = await database()
     const app = await server(db)
@@ -232,7 +232,7 @@ describe('the backup file', { timeout: 30_000 }, () => {
   })
 })
 
-describe('the nightly backup', { timeout: 30_000 }, () => {
+describe('the nightly backup', () => {
   it('puts each backup in storage, proves it with a test restore, and reports it', async () => {
     const dir = folder()
     const db = await database()
@@ -354,7 +354,7 @@ describe('the nightly backup', { timeout: 30_000 }, () => {
   })
 })
 
-describe('putting the data back', { timeout: 30_000 }, () => {
+describe('putting the data back', () => {
   it('restores the newest backup into an empty database on start-up, and never over data', async () => {
     const dir = folder()
     const store = dirStore(dir)
@@ -402,7 +402,7 @@ async function phone(app: FastifyInstance, now?: () => Date) {
 const Y10P = { id: 'y10p', name: 'd&b Y10P', quantity: 4 }
 const day = { start: '2026-10-05', end: '2026-10-05' }
 
-describe('phones, after the server is restored from a backup', { timeout: 30_000 }, () => {
+describe('phones, after the server is restored from a backup', () => {
   it('start their copy afresh and send again what the backup missed', async () => {
     const db = await database()
     const app = await server(db)

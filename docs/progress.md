@@ -3,6 +3,60 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: a history of every change, and download everything
+
+**Done**
+
+- A new **History** tab shows every change anyone makes, newest first:
+  what was done, in words ("Booked 4 × d&b Y10P for Electric Picnic, Fri 2
+  Oct to Sun 4 Oct"), who did it, on what kind of device (such as "Safari
+  on iPhone", with the device code its Account tab shows) and when. It can
+  be narrowed to one person. [Decision 0006](adr/0006-audit-trail-and-export.md)
+  has the reasons.
+- A change made with no signal says so, and how long it waited on the phone
+  before it reached the server. The wait is measured on the phone's own
+  clock and the time placed on the server's, so a phone set to the wrong
+  time still shows the right one.
+- Requests the server turned down, such as a booking for kit that was
+  already out, are in the history with the reason. Freelancers' own
+  answers on their private links (accept, decline, a counter-offer, days
+  off) show as theirs.
+- **Download everything**, on the Account tab, gives one ZIP file: a
+  spreadsheet for each kind of record, all of it as JSON for moving to
+  another system, the history in words, and a README saying what each file
+  holds. The spreadsheets open cleanly in Excel: names like Seán and Irish
+  times come through, and text Excel would run as a formula (a risk with
+  notes freelancers type) shows as the text it is. Tables added later are
+  in it automatically.
+- Left out of the file on purpose: freelancers' private link codes and
+  staff sign-in sessions, so whoever holds it can't act as anyone. Each
+  download shows in the history, with who took it and on what device.
+- The History tab needs signal: the history is kept on the server rather
+  than on every phone.
+- Checked: 14 new server tests (who, what, which device and what was
+  turned down; a change made offline on a phone whose clock was wrong;
+  freelancers' answers; paging and narrowing to one person or one record;
+  every file in the download, with no link codes or sessions anywhere in
+  it; spreadsheets that open safely; each download recorded), one of them
+  on a real Postgres database like the live one, and 3 new browser tests:
+  a booking made with no signal and sent two hours later showing as made
+  offline; the History tab saying it needs signal; and Download everything
+  giving the file and showing in the history. Each safeguard was also
+  broken on purpose, and its test failed.
+- Also fixed: two older browser tests could pick up each other's speakers
+  when they ran at the same time; each now uses names of its own.
+
+**Next**
+
+- Nothing to set up for this: it is on once it's live.
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google sign-in
+  key ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)), which is what's left of Phase 0.
+- Phase 1, projects and the calendar: clients, venues and projects first,
+  which need no Google access, then the calendar sync, tried on Colly's
+  test calendar.
+
 ## 29 September 2026: error alerts and uptime checks built
 
 **Done**

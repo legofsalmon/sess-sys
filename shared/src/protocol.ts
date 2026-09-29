@@ -17,8 +17,15 @@ import type { EntityName } from './model.ts'
  */
 
 export const pushRequest = z.object({
-  clientId: z.string().min(1).max(64),
+  // "link:…" marks a freelancer's own answers in the history, so no device may call itself that.
+  clientId: z.string().min(1).max(64).refine((id) => !id.startsWith('link:'), { message: 'That device id is reserved.' }),
   mutations: z.array(mutationSchema).max(500),
+  /**
+   * When this push left the device, by the device's own clock. Against each
+   * mutation's `createdAt`, on the same clock, it says how long the change
+   * waited on the device (ADR 0006). Absent from older versions of the app.
+   */
+  sentAt: z.string().datetime({ offset: true }).optional(),
 })
 export type PushRequest = z.infer<typeof pushRequest>
 
@@ -105,4 +112,50 @@ export interface BackupStatus {
 export interface ClientConfig {
   /** Where the app sends reports of its own errors (ADR 0005); null while error reporting is off. */
   errors: { dsn: string; environment: string } | null
+}
+
+/**
+ * One entry in the history (ADR 0006): something a person asked for, or a
+ * download of everything, with who, when, from which device, and what the
+ * server said.
+ */
+export interface HistoryEntry {
+  id: string
+  /** What was done, in words, such as "Booked 4 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct". */
+  what: string
+  /** The command's name, such as `booking.create`. */
+  command: string
+  outcome: 'done' | 'turned-down'
+  /** Why the server turned it down. */
+  reason?: string
+  who: {
+    kind: 'staff' | 'link' | 'unknown'
+    /** The person's name; "Someone" when sign-in was off. */
+    name: string
+    /** The filter value for this person, as in `HistoryPage.people`. */
+    key?: string
+  }
+  /** The kind of device, such as "Safari on iPhone", when it said. */
+  device?: string
+  /** The end of the device's own code, as its Account tab shows it. */
+  deviceCode?: string
+  /** When it was done, on the server's clock. */
+  madeAt: string
+  /** When it reached the server. */
+  arrivedAt: string
+  /** How long it waited on the device before it was sent, when the device said. */
+  waitedSeconds?: number
+  /** Waited on the device a minute or more: made with no signal, or with the app closed before it could send. */
+  madeOffline: boolean
+  /** The records it changed. */
+  records: { entity: string; id: string }[]
+}
+
+/** GET /api/history: newest first. */
+export interface HistoryPage {
+  entries: HistoryEntry[]
+  /** Pass as `before` for the next, older page; absent at the start of the history. */
+  next?: string
+  /** Everyone the history can be narrowed to, on the first page only. */
+  people?: { key: string; name: string }[]
 }

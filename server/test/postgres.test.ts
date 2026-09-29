@@ -1,11 +1,14 @@
-import { newId, type Mutation } from '@sh/shared'
+import { newId, type Mutation, type Person } from '@sh/shared'
+import { strFromU8, unzipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
+import type { IdentityProvider } from '../src/auth/google.ts'
 import { migrateAuth } from '../src/auth/schema.ts'
 import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/sessions.ts'
 import { restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { checkRestores } from '../src/backup/service.ts'
 import { postgresDb, type Db } from '../src/db.ts'
+import { IPHONE, onLink, staff } from './people.ts'
 
 /**
  * PGlite runs one query at a time, so it cannot show what happens when
@@ -103,6 +106,72 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await app.close()
       await target.close()
       await db.query('DROP DATABASE IF EXISTS sh_restore_test')
+      await db.close()
+    }
+  })
+
+  it('keeps the history and downloads everything, as on PGlite', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      await colly.send('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
+      await colly.send('booking.create', { id: 'b1', productId: 'y10p', project: 'Electric Picnic', qty: 4, start: '2026-10-02', end: '2026-10-04' }, { hoursWaiting: 2 })
+      await colly.send('booking.create', { id: 'b2', productId: 'y10p', project: 'Body & Soul', qty: 1, start: '2026-10-03', end: '2026-10-03' })
+      await colly.send('person.upsert', { id: 'p1', name: 'Seán Ó Briain', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: 25000, notes: '' })
+      await colly.send('call.create', {
+        id: 'c1',
+        project: 'Electric Picnic',
+        phase: 'Build',
+        venue: 'Stradbally Hall',
+        role: 'Audio tech',
+        start: '2026-10-02',
+        end: '2026-10-04',
+        callTime: '08:00',
+        needed: 1,
+        dayRateCents: 25000,
+        details: '',
+        replyBy: null,
+      })
+      await colly.send('offer.send', { id: 'o1', callId: 'c1', personId: 'p1', override: false })
+      const { linkToken } = await colly.record<Person>('person', 'p1')
+      await onLink(app, `/f/${linkToken}/offers/o1`, { answer: 'accept' })
+
+      // Newest first, a page at a time, as the History tab reads it.
+      const first = await colly.history('?limit=4')
+      expect(first.entries.map((e) => [e.who.name, e.what])).toEqual([
+        ['Seán Ó Briain', 'Seán Ó Briain accepted Audio tech on Electric Picnic'],
+        ['Colly Hewson', 'Offered Audio tech on Electric Picnic to Seán Ó Briain'],
+        ['Colly Hewson', 'Asked for 1 × Audio tech for Electric Picnic (Build), Fri 2 Oct to Sun 4 Oct'],
+        ['Colly Hewson', "Saved Seán Ó Briain's details"],
+      ])
+      expect(first.people).toEqual([
+        { key: `user:${colly.id}`, name: 'Colly Hewson' },
+        { key: 'link:p1', name: 'Seán Ó Briain' },
+      ])
+      const second = await colly.history(`?limit=4&before=${first.next}`)
+      expect(second.entries.map((e) => [e.what, e.outcome, e.madeOffline])).toEqual([
+        ['Booked 1 × d&b Y10P for Body & Soul, Sat 3 Oct', 'turned-down', false],
+        ['Booked 4 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct', 'done', true],
+        ['Set d&b Y10P to 4 in stock', 'done', false],
+      ])
+      expect(second.next).toBeUndefined()
+      expect(second.entries[1]).toMatchObject({ device: 'Safari on iPhone', deviceCode: 'c0ffee', waitedSeconds: 7200 })
+      expect((await colly.history('?who=link:p1')).entries.map((e) => e.who)).toEqual([{ kind: 'link', name: 'Seán Ó Briain', key: 'link:p1' }])
+      expect((await colly.history('?id=b1&entity=booking')).entries.map((e) => e.id)).toEqual([second.entries[1]!.id])
+
+      // Everything at one moment, with no link secret in it, and the download itself in the history.
+      const res = await app.inject({ url: '/api/export.zip?client=phonec0ffee', cookies: colly.cookies, headers: { 'user-agent': IPHONE } })
+      expect(res.statusCode).toBe(200)
+      const files = Object.fromEntries(Object.entries(unzipSync(new Uint8Array(res.rawPayload))).map(([name, data]) => [name, strFromU8(data)]))
+      expect(files['history.csv']).toContain('Seán Ó Briain accepted Audio tech on Electric Picnic')
+      for (const [name, text] of Object.entries(files)) expect(text, name).not.toContain(linkToken)
+      expect(files['tables/people.csv']).not.toContain('link_token')
+      expect(JSON.parse(files['everything.json']!).mutations[0].received_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+\+00:00$/)
+      expect((await colly.history('?limit=1')).entries[0]).toMatchObject({ what: expect.stringMatching(/^Downloaded everything \(\d+ rows\)$/), deviceCode: 'c0ffee' })
+    } finally {
+      await app.close()
       await db.close()
     }
   })

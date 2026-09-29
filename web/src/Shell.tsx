@@ -3,12 +3,14 @@ import { AccountScreen } from './AccountScreen.tsx'
 import { App } from './App.tsx'
 import { useAuth } from './auth.ts'
 import { CrewScreen } from './crew/CrewScreen.tsx'
+import { HistoryScreen } from './HistoryScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 
 /** Switches between the app's areas. The address keeps the area, so a reload or a shared link lands in the same place. */
 const AREAS = [
   { hash: '#stock', label: 'Stock', Screen: App },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
+  { hash: '#history', label: 'History', Screen: HistoryScreen },
   { hash: '#account', label: 'Account', Screen: AccountScreen },
 ] as const
 

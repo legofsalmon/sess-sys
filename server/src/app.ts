@@ -2,7 +2,7 @@ import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { pushRequest, type Change, type ClientConfig, type EntityName, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
@@ -11,8 +11,10 @@ import { Backups, type BackupWatch } from './backup/service.ts'
 import type { BackupStore } from './backup/store.ts'
 import { applyMutation, currentSeq } from './commands.ts'
 import { registerCrewLinks } from './crew/links.ts'
-import { CREW_TABLES } from './crew/schema.ts'
 import type { Db } from './db.ts'
+import { describeDevice } from './devices.ts'
+import { everythingJson, everythingZip, readEverything, rowCount, zipName } from './export.ts'
+import { BadCursor, readHistory, recordExport } from './history.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 
@@ -43,9 +45,9 @@ declare module 'fastify' {
 }
 
 /**
- * The sync API. Three routes do the work (push, pull, live); `export` is
- * the "your data, always reachable" promise from the principles, present
- * from the first commit rather than bolted on.
+ * The sync API. Three routes do the work (push, pull, live); `history` and
+ * `export` keep the principles' promises of an audit trail on everything and
+ * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp({ db, logger = false, webRoot, auth, backupStore, commit, errorReporting, backupWatch }: AppOptions): Promise<FastifyInstance> {
   await migrateAll(db)
@@ -100,10 +102,11 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
-    const { clientId, mutations } = parsed.data
+    const { clientId, mutations, sentAt } = parsed.data
+    const from = { userId: req.user?.id, sentAt, device: describeDevice(req.headers['user-agent']) }
     const results = []
     // In order: a device's later request may depend on an earlier one.
-    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, 'app', req.user?.id))
+    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, from))
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) void poke()
     return { results }
   })
@@ -140,11 +143,45 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
   registerCrewLinks(app, db, () => void poke())
   registerBackupRoutes(app, backups)
 
-  app.get('/api/export', async () => {
-    const tables = ['products', 'bookings', 'scans', 'issues', ...CREW_TABLES, 'users', 'mutations'] as const
-    const out: Record<string, unknown[]> = {}
-    for (const t of tables) out[t] = (await db.query(`SELECT * FROM ${t}`)).rows
-    return { exportedAt: new Date().toISOString(), ...out }
+  // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
+  app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
+    try {
+      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined })
+    } catch (err) {
+      if (err instanceof BadCursor) return reply.code(400).send({ error: err.message })
+      throw err
+    }
+  })
+
+  // Everything, from one moment (ADR 0006). It holds everyone's details, so each download
+  // goes in the history: who, when and on what device. `client` is the app's device code.
+  const exported = async (req: FastifyRequest<{ Querystring: { client?: string } }>, format: 'zip' | 'json', rows: number) => {
+    const client = req.query.client ?? ''
+    await recordExport(db, {
+      clientId: /^[a-z0-9]{1,64}$/.test(client) ? client : 'server',
+      userId: req.user?.id,
+      device: describeDevice(req.headers['user-agent']),
+      format,
+      rows,
+    })
+  }
+
+  app.get<{ Querystring: { client?: string } }>('/api/export.zip', async (req, reply) => {
+    const everything = await readEverything(db)
+    const zip = everythingZip(everything, req.user ?? undefined)
+    await exported(req, 'zip', rowCount(everything))
+    return reply
+      .type('application/zip')
+      .header('content-disposition', `attachment; filename="${zipName(everything)}"`)
+      .header('cache-control', 'no-store')
+      .send(Buffer.from(zip.buffer, zip.byteOffset, zip.byteLength))
+  })
+
+  // The same, as JSON, for scripts.
+  app.get<{ Querystring: { client?: string } }>('/api/export', async (req, reply) => {
+    const everything = await readEverything(db)
+    await exported(req, 'json', rowCount(everything))
+    return reply.header('cache-control', 'no-store').send(everythingJson(everything))
   })
 
   if (webRoot) {

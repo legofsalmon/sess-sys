@@ -248,6 +248,8 @@ export class SyncClient {
     const { results } = await this.transport.push({
       clientId: this.state.clientId,
       mutations: waiting.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
+      // On the same clock as each createdAt, so the server can tell how long each waited here.
+      sentAt: this.now().toISOString(),
     })
     const byId = new Map<string, MutationResult>(results.map((r) => [r.id, r]))
     const kept: PendingMutation[] = []
