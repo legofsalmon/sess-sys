@@ -41,6 +41,9 @@ waiting on someone.
   signal came back; and one still waiting when the app was closed, sent
   when it next opened. Each browser test was also run against a
   deliberately broken app, and failed.
+- Merged into `main` at 21:40 UTC and live by 21:47. The live health check
+  says `"errors":"off"` until the Sentry key is added, and `/api/up`
+  answers.
 
 **Next**
 
