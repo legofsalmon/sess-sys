@@ -1,4 +1,5 @@
 import type { Db } from '../db.ts'
+import { runMigrations, type Module } from '../migrations.ts'
 
 /**
  * Staff accounts and their sessions. Versioned on their own
@@ -32,15 +33,8 @@ const MIGRATIONS: string[] = [
   `,
 ]
 
-export async function migrateAuth(db: Db) {
-  await db.query('CREATE TABLE IF NOT EXISTS auth_schema_version (version integer NOT NULL)')
-  const { rows } = await db.query<{ version: number }>('SELECT version FROM auth_schema_version')
-  let version = rows[0]?.version ?? 0
-  if (rows.length === 0) await db.query('INSERT INTO auth_schema_version (version) VALUES (0)')
-  for (; version < MIGRATIONS.length; version++) {
-    await db.transaction(async (tx) => {
-      await tx.exec(MIGRATIONS[version]!)
-      await tx.query('UPDATE auth_schema_version SET version = $1', [version + 1])
-    })
-  }
+export const AUTH: Module = { versionTable: 'auth_schema_version', migrations: MIGRATIONS }
+
+export function migrateAuth(db: Db, upTo?: number) {
+  return runMigrations(db, AUTH, upTo)
 }

@@ -3,6 +3,47 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 September 2026: nightly backups built
+
+**Done**
+
+- Every night at 02:00 UTC the app server copies the whole database into
+  one file and puts it in storage outside the database. It then restores
+  that file into a scratch database and checks every table before counting
+  it as a backup, so a backup that can't be restored is caught the night
+  it's made, not the day it's needed.
+  [Decision 0004](adr/0004-backups.md) has the reasons.
+- The file is plain text inside, a line per row with a checksum per table,
+  so it can be read without the app.
+- Backups are kept for 35 days, then the first of each month for a year. A
+  failed backup is tried again each hour, up to three times.
+- Putting the data back means pointing the server at a new, empty database
+  with `RESTORE_FROM` set, and deploying: [the steps](backups.md). Phones
+  and laptops notice on their next sync, reload their copy, and send again
+  everything they changed in the last two weeks, so work done after the
+  backup isn't lost.
+- The **Account** tab has a **Backups** card: when the last backup was
+  made, what went wrong if the last try failed, and **Back up now**. The
+  health check says whether backups are fresh, ready for the uptime alert.
+- Checked: 21 new server tests (every table coming back exactly, accents,
+  emoji and times to the microsecond included; damaged and cut-short files
+  refused with nothing changed; an older backup restoring into newer code;
+  the schedule, retries and what's kept; phones catching up after a
+  restore; the storage's signed requests), one of them restoring into a
+  fresh real Postgres database, and 3 new browser tests for the card. A
+  trial on a local server restored a backup into an empty database on
+  start-up, and left a database with data in it alone.
+
+**Next**
+
+- Colly: make a Railway bucket and give it to the app server, a few
+  minutes: [the steps](backups.md). Until then the Account tab says
+  backups are off.
+- Colly, still waiting: the Google sign-in key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+- Error tracking and uptime alerts.
+
 ## 29 September 2026: staff sign-in built
 
 **Done**

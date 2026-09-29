@@ -70,5 +70,6 @@ is offline, would break that.
 - On an iPhone, a home-screen app keeps its own cookies separate from
   Safari, so it needs signing in once from the home-screen app itself. The
   field test should confirm Google's page opens and returns there cleanly.
-- Machine access, such as a nightly backup pulling `/api/export`, will need
-  its own key when backups are built; it can't use a person's session.
+- Machine access can't use a person's session, so anything outside the app
+  that needs the data will need its own key. Backups don't: the server makes
+  them itself ([ADR 0004](0004-backups.md)).

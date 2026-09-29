@@ -1,9 +1,10 @@
 import type { View } from '@sh/shared'
 import { useEffect, useState } from 'react'
 import { signOut, useAuth } from './auth.ts'
+import { BackupsCard } from './BackupsCard.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, and the device's own sync state. */
+/** Who this device is signed in as, signing out, the company's backups, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -84,6 +85,8 @@ export function AccountScreen() {
           <p>This device hasn't reached the server yet to find out who it's signed in as.</p>
         </section>
       )}
+
+      {(auth.status === 'signed-in' || auth.status === 'open') && <BackupsCard />}
 
       <section className="card">
         <h2>This device</h2>
