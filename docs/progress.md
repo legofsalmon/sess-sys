@@ -33,6 +33,8 @@ waiting on someone.
   fresh real Postgres database, and 3 new browser tests for the card. A
   trial on a local server restored a backup into an empty database on
   start-up, and left a database with data in it alone.
+- Merged into `main` at 20:25 UTC and live by 20:32. The live health check
+  says `"backups":"off"` until the bucket is added.
 
 **Next**
 
