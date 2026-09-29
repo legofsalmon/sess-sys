@@ -72,6 +72,36 @@ rules hold everywhere in the design:
   from day one; anything else (accounting, CRM, messaging) through the same
   API a customer could use.
 
+## Principle: meet freelancers in the middle
+
+With Rentman and TeamTrack, freelancers have to come to the company's
+system: another app, another login, another profile to maintain for each
+company they work for. Most of Session Hire's crew are freelancers who
+also work for other companies, so the system bends to them instead:
+
+- **No app or account required.** Offers, call sheets and changes arrive
+  where they already look: SMS or WhatsApp, email, and a Google or Apple
+  calendar invite. Each message has a one-tap link (accept, decline, view
+  the call sheet) that works without signing in. The app is there for
+  those who want it, never a condition of getting work.
+- **Their calendar, not ours.** A freelancer can share free/busy from
+  their own calendar (Google, Apple, Outlook, any iCal) so ops see real
+  availability without the freelancer filling in a second calendar. Only
+  busy or free is read; never who else they work for.
+- **Enter things once.** Certificates, insurance, bank details and rates
+  are uploaded once and kept up to date by expiry reminders, not re-asked
+  per job. A freelancer can download everything the company holds on
+  them at any time.
+- **Offers that suit how they work.** Full details up front (dates, call
+  times, venue, rate, travel, food), a clear deadline to answer, the option
+  to accept only some days of a multi-day job, and to counter the rate.
+- **Get paid without chasing.** Hours and extras from the job become a
+  ready-made invoice (self-billing, if they agree) that they check and
+  approve in one step, with the payment status visible to them.
+- **Two-way.** Freelancers can tell the company things too: flag they're
+  running late, add a note to the call sheet, swap a shift with another
+  approved freelancer if ops allow it.
+
 ## The shape of the system
 
 ```
@@ -335,7 +365,8 @@ Crewbox.
    part of the project; see [research/stock-tracking.md](research/stock-tracking.md).
    Still open: is there a spreadsheet or old list of stock to import?
 4. ~~What made you rule out Rentman and TeamTrack?~~ Answered: closed
-   ecosystems and lack of flexibility. That became the "open and flexible"
-   principle above.
+   ecosystems, lack of flexibility, and a cumbersome, company-centred way
+   for freelancers to deal with the business. These became the "open and
+   flexible" and "meet freelancers in the middle" principles above.
 5. Is Crewbox always going to be owned by the same people, so its sync code
    can be shared as a package?

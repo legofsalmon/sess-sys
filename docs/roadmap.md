@@ -51,8 +51,16 @@ availability for next week is trusted without walking the shelves.
 
 ## Phase 3: Crew
 
+Built to the "meet freelancers in the middle" principle in
+[architecture.md](architecture.md): no app or login needed to get work.
+
 - Freelancer profiles, skills, rates, documents with expiry reminders.
-- Availability: freelancers mark days off in the app.
+- Availability: read free/busy from the freelancer's own calendar if they
+  share it, or they mark days off by link.
+- One-tap links in SMS, WhatsApp and email for accept, decline and the
+  call sheet; partial acceptance of multi-day jobs; rate counter-offers.
+- Ready-made freelancer invoices from hours and extras, approved in one
+  step, with payment status visible to them.
 - Offers by app, email, SMS or WhatsApp: send a role to one person or a
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.
