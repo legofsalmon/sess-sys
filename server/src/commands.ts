@@ -148,13 +148,22 @@ function bookingFromRow(r: BookingRow) {
   return { id: r.id, productId: r.product_id, project: r.project, qty: r.qty, start: r.start_day, end: r.end_day, status: r.status }
 }
 
-/**
- * `via` is 'link' only when the server itself runs a command for a person
- * using their private link; a device can't claim it. `userId` is the
- * signed-in member of staff whose device sent it, kept on the mutation as
- * the audit trail's "who".
- */
-export async function applyMutation(db: Db, clientId: string, m: Mutation, via: Ctx['via'] = 'app', userId?: string): Promise<MutationResult> {
+/** Where a command came from, kept on it for the history (ADR 0006). */
+export interface From {
+  /**
+   * 'link' only when the server itself runs a command for a person using
+   * their private link; a device can't claim it.
+   */
+  via?: Ctx['via']
+  /** The signed-in member of staff whose device sent it: the history's "who". */
+  userId?: string
+  /** When the device sent it, by the device's own clock. */
+  sentAt?: string
+  /** The kind of device, such as "Safari on iPhone". */
+  device?: string
+}
+
+export async function applyMutation(db: Db, clientId: string, m: Mutation, from: From = {}): Promise<MutationResult> {
   return db.transaction(async (tx) => {
     // One writer at a time; see `emit`. At Session Hire's volume (a few
     // people, hundreds of jobs a year) this costs nothing.
@@ -163,12 +172,14 @@ export async function applyMutation(db: Db, clientId: string, m: Mutation, via: 
     const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
     if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
 
-    const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via }
+    const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app' }
     let result: MutationResult
     // Record the mutation first so the changes it writes can point at it.
+    // Arrival is read after taking the lock, so the history's order is the order changes were made in.
     await tx.query(
-      `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, status, result) VALUES ($1, $2, $3, $4, $5, $6, 'applied', '{}')`,
-      [m.id, clientId, userId ?? null, m.name, JSON.stringify(m.args), m.createdAt]
+      `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp(), 'applied', '{}')`,
+      [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), m.createdAt, from.sentAt ?? null, from.device ?? null]
     )
     const parsed = commandSchemas[m.name].safeParse(m.args)
     if (!parsed.success) {

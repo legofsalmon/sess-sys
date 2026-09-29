@@ -28,21 +28,23 @@ test('a device that is signed out sees only the way in, and keeps what it has wa
   await page.goto('/')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
-  // Sign-in gets switched on while this device holds a change.
+  // Sign-in gets switched on while this device holds a change. The test
+  // server is shared with the other browser tests, so the kit has a name of its own.
+  const kit = `d&b Y10P ${Math.random().toString(36).slice(2, 8)}`
   await notSignedIn(page)
-  await page.locator('#product-name').fill('d&b Y10P')
+  await page.locator('#product-name').fill(kit)
   await page.locator('#product-qty').fill('4')
   await page.getByRole('button', { name: 'Add' }).click()
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(page.getByText('d&b Y10P')).toHaveCount(0)
+  await expect(page.getByText(kit)).toHaveCount(0)
   await expect(page.getByText('1 change made on this device is waiting')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sign in with Google' })).toHaveAttribute('href', '/api/auth/google/start?next=%23stock')
 
   // Once the device is let in again, the waiting change goes through.
   await page.unrouteAll()
   await page.reload()
-  await expect(page.getByText('4 of 4 free')).toBeVisible()
+  await expect(page.locator('.stock li', { hasText: kit })).toContainText('4 of 4 free')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 })
 

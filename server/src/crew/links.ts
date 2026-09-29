@@ -2,6 +2,7 @@ import { eachDay, newId, type CommandArgs, type CommandName, type MutationResult
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
+import { describeDevice } from '../devices.ts'
 import { publicOrigin } from '../http.ts'
 import { calendarFeed } from './ical.ts'
 import { renderGone, renderPage } from './page.ts'
@@ -27,8 +28,13 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
 
   const base = (req: FastifyRequest, token: string) => `${publicOrigin(req)}/f/${token}`
 
-  async function run<N extends CommandName>(personId: string, name: N, args: CommandArgs<N>): Promise<MutationResult> {
-    const result = await applyMutation(db, `link:${personId}`, { id: newId(), name, args, createdAt: new Date().toISOString() }, 'link')
+  async function run<N extends CommandName>(req: FastifyRequest, personId: string, name: N, args: CommandArgs<N>): Promise<MutationResult> {
+    const result = await applyMutation(
+      db,
+      `link:${personId}`,
+      { id: newId(), name, args, createdAt: new Date().toISOString() },
+      { via: 'link', device: describeDevice(req.headers['user-agent']) }
+    )
     if (result.status === 'applied') onChange()
     return result
   }
@@ -70,12 +76,12 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const days = picked.length ? picked : null
 
     let result: MutationResult
-    if (answer === 'accept') result = await run(person.id, 'offer.respond', { id: offer.id, answer: 'accept', days, note })
-    else if (answer === 'decline') result = await run(person.id, 'offer.respond', { id: offer.id, answer: 'decline', note })
+    if (answer === 'accept') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'accept', days, note })
+    else if (answer === 'decline') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'decline', note })
     else if (answer === 'counter') {
       const euros = Number((form.get('rate') ?? '').replace(',', '.'))
       if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, `#o-${offer.id}`)
-      result = await run(person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: Math.round(euros * 100), days, note })
+      result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: Math.round(euros * 100), days, note })
     } else return back(reply, person.linkToken, 'Something went wrong; please try again.', false)
 
     if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false, `#o-${offer.id}`)
@@ -94,7 +100,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const form = (req.body ?? new URLSearchParams()) as Form
     const start = form.get('start') ?? ''
     const end = form.get('end') || start
-    const result = await run(person.id, 'unavailability.add', {
+    const result = await run(req, person.id, 'unavailability.add', {
       id: newId(),
       personId: person.id,
       start,
@@ -111,7 +117,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (!person) return reply.code(404).type('text/html').send(renderGone())
     const away = await getAway(db, req.params.id!)
     if (!away || away.personId !== person.id) return back(reply, person.linkToken, 'Already removed.', true)
-    await run(person.id, 'unavailability.remove', { id: away.id })
+    await run(req, person.id, 'unavailability.remove', { id: away.id })
     return back(reply, person.linkToken, 'Removed. You can be offered work on those days again.', true)
   })
 

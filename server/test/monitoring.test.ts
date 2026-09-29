@@ -85,8 +85,7 @@ async function sent() {
   return all
 }
 
-// Each test builds a database or two, which takes seconds when the other test files are busy too.
-describe('uptime checks', { timeout: 30_000 }, () => {
+describe('uptime checks', () => {
   it('get an answer without the database being asked anything', async () => {
     const db = await database()
     const app = await server(db)
@@ -100,7 +99,7 @@ describe('uptime checks', { timeout: 30_000 }, () => {
   })
 })
 
-describe('error reporting settings', { timeout: 30_000 }, () => {
+describe('error reporting settings', () => {
   it('is off without SENTRY_DSN, and refuses a DSN that is not one', () => {
     expect(errorReportingFromEnv({})).toBeUndefined()
     expect(() => errorReportingFromEnv({ SENTRY_DSN: 'my-project' })).toThrow('should be the DSN Sentry shows')
@@ -140,7 +139,7 @@ describe('error reporting settings', { timeout: 30_000 }, () => {
   })
 })
 
-describe('with reporting on', { timeout: 30_000 }, () => {
+describe('with reporting on', () => {
   beforeAll(() => startErrorReporting({ dsn, environment: 'test', release: 'abc123' }))
 
   it('reports a request that failed on the server by its route, never its address or who sent it', async () => {

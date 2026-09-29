@@ -268,7 +268,8 @@ personal details of other crew.
     without reworking anything.
 
 **Everything** carries an audit trail: who changed what, when, from which
-device, and whether it was made offline.
+device, and whether it was made offline. Built in Phase 0 as the History
+tab ([ADR 0006](adr/0006-audit-trail-and-export.md)).
 
 ## Google Calendar during the transition
 
@@ -357,6 +358,9 @@ Crewbox.
   ([ADR 0005](adr/0005-error-alerts.md)).
 - An export of everything (CSV and JSON) that the company can run any time,
   so it is never locked in, which is a common complaint about the incumbents.
+  Built as **Download everything**: one file with a spreadsheet for each
+  table, all of it as JSON, and the history in words
+  ([ADR 0006](adr/0006-audit-trail-and-export.md)).
 
 ## Security and GDPR
 

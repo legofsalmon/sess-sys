@@ -7,8 +7,10 @@ import { runMigrations, type Module } from './migrations.ts'
  *
  * - `mutations`: every command a device has sent, with the answer it got.
  *   A repeat of the same id gets the same answer and changes nothing, which
- *   is what makes resending an outbox safe. It is also the audit trail:
- *   who asked, from which device, when they did it, and when it arrived.
+ *   is what makes resending an outbox safe. It is also the history (ADR
+ *   0006): who asked, from which device, when they did it, and when it
+ *   arrived. The server adds each download of everything to it too, under a
+ *   name no device can send (`data.export`).
  * - `changes`: an append-only feed with a sequence number. Devices pull
  *   "everything after N".
  *
@@ -89,6 +91,20 @@ const MIGRATIONS: string[] = [
     row_count   integer,
     error       text
   );
+  `,
+  // The history (ADR 0006). `sent_at` is when the device sent the command,
+  // by its own clock, like `created_at`, so the gap between the two is how
+  // long it waited there. `device` is the kind of device, such as "Safari on
+  // iPhone". Both are empty for what came before. The indexes serve the
+  // History tab: newest first, for one person, or for one record.
+  `
+  ALTER TABLE mutations ADD COLUMN IF NOT EXISTS sent_at timestamptz;
+  ALTER TABLE mutations ADD COLUMN IF NOT EXISTS device text;
+  CREATE INDEX IF NOT EXISTS mutations_received ON mutations (received_at, id);
+  CREATE INDEX IF NOT EXISTS mutations_user ON mutations (user_id, received_at, id);
+  CREATE INDEX IF NOT EXISTS mutations_client ON mutations (client_id, received_at, id);
+  CREATE INDEX IF NOT EXISTS changes_entity_id ON changes (entity_id, seq);
+  CREATE INDEX IF NOT EXISTS changes_mutation ON changes (mutation_id);
   `,
 ]
 

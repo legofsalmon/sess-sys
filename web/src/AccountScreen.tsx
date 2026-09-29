@@ -2,9 +2,10 @@ import type { View } from '@sh/shared'
 import { useEffect, useState } from 'react'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
+import { ExportCard } from './ExportCard.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, the company's backups, and the device's own sync state. */
+/** Who this device is signed in as, signing out, the company's backups and data, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -86,7 +87,12 @@ export function AccountScreen() {
         </section>
       )}
 
-      {(auth.status === 'signed-in' || auth.status === 'open') && <BackupsCard />}
+      {(auth.status === 'signed-in' || auth.status === 'open') && (
+        <>
+          <BackupsCard />
+          <ExportCard />
+        </>
+      )}
 
       <section className="card">
         <h2>This device</h2>
