@@ -16,11 +16,16 @@ waiting on someone.
 - Checked: a production-style start locally serves the app and answers the
   health check.
 
+- Neon project `session-hire` created (Postgres 17, Frankfurt, free tier).
+  The server creates its tables on first start.
+- `main` branch created from the working branch, so production deploys
+  from `main` and new work arrives through pull requests.
+
 **Waiting on**
 
-- The Neon database (Colly's Neon account is connected, so it can be created
-  from here on a yes) and a Railway project linked to the repo with
-  `DATABASE_URL` set as a secret.
+- Colly: make `main` the default branch on GitHub, then create the Railway
+  project from `main` with `DATABASE_URL` set as a secret, and share the URL
+  for the phone field test.
 
 ## 29 September 2026: Phase 0 started
 
