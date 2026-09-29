@@ -1,0 +1,795 @@
+<title>Session Hire Blueprint</title>
+<meta name="description" content="Central reference for the Session Hire management system: research, principles, architecture, stock tracking and roadmap.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,500;112,700;125,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a working binder. Fixed index rail on the left (chips on phones), one long
+   reference column on the right, sections tagged like flight-case stencils. */
+:root {
+  --bg: #eef1f4;          /* brushed aluminium */
+  --panel: #ffffff;
+  --panel-2: #f6f8fa;
+  --ink: #16202b;          /* case-lid navy */
+  --muted: #5a6776;
+  --line: #d3dae2;
+  --accent: #1f5fd1;       /* patch-bay blue */
+  --accent-soft: #e3ecfb;
+  --tape: #f2b705;         /* gaffer yellow, used sparingly */
+  --tape-ink: #3b2c00;
+  --good: #1d7a4c;  --good-soft: #dff2e8;
+  --warn: #9a6200;  --warn-soft: #fbefd6;
+  --bad: #b23a3a;   --bad-soft: #f8e1e1;
+  --none: #7a8593;  --none-soft: #eceff3;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151c; --panel: #17202a; --panel-2: #1c2632; --ink: #e6ecf2; --muted: #9aa8b7;
+    --line: #2b3745; --accent: #7aa7ff; --accent-soft: #1b2a45; --tape: #f5c330; --tape-ink: #2a1f00;
+    --good: #5fd09a; --good-soft: #15352a; --warn: #f0b85a; --warn-soft: #3a2c12;
+    --bad: #f08a8a; --bad-soft: #3d1c1c; --none: #8d98a6; --none-soft: #222c37;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151c; --panel: #17202a; --panel-2: #1c2632; --ink: #e6ecf2; --muted: #9aa8b7;
+  --line: #2b3745; --accent: #7aa7ff; --accent-soft: #1b2a45; --tape: #f5c330; --tape-ink: #2a1f00;
+  --good: #5fd09a; --good-soft: #15352a; --warn: #f0b85a; --warn-soft: #3a2c12;
+  --bad: #f08a8a; --bad-soft: #3d1c1c; --none: #8d98a6; --none-soft: #222c37;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+body { background: var(--bg); color: var(--ink); font: 17px/1.55 var(--body); margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.12; margin: 0; }
+h2 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem); font-stretch: 112%; font-weight: 700; }
+h3 { font-size: 1.15rem; font-stretch: 112%; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; max-width: 1280px; margin: 0 auto; padding-inline: 24px; padding-block: 28px 80px; }
+.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; display: grid; gap: 18px; }
+.brand { display: grid; gap: 6px; }
+.brand .stencil { font: 800 1.3rem/1 var(--display); font-stretch: 125%; letter-spacing: .02em; text-transform: uppercase; }
+.brand .sub { font-size: .85rem; color: var(--muted); }
+.toc { display: grid; gap: 2px; }
+.toc a { display: grid; grid-template-columns: 2.2em 1fr; align-items: baseline; padding: 6px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: .95rem; }
+.toc a span { font: 500 .72rem var(--mono); color: var(--muted); }
+.toc a:hover { background: var(--panel); }
+.toc a.on { background: var(--accent-soft); color: var(--accent); }
+.toc a.on span { color: var(--accent); }
+.theme-btn { justify-self: start; font: 600 .82rem var(--body); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+
+main { display: grid; gap: 72px; min-width: 0; }
+section { display: grid; gap: 22px; scroll-margin-top: 24px; min-width: 0; }
+.eyebrow { display: flex; gap: 10px; align-items: center; font: 500 .75rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { background: var(--ink); color: var(--bg); padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+.lede { font-size: 1.12rem; color: var(--muted); }
+
+/* hero */
+.hero { display: grid; gap: 22px; padding-block: 6px 4px; }
+.hero h1 { font-size: clamp(2.1rem, 1.4rem + 3.4vw, 3.6rem); font-weight: 800; font-stretch: 125%; letter-spacing: -.01em; text-transform: uppercase; }
+.status { display: inline-flex; gap: 10px; align-items: center; background: var(--tape); color: var(--tape-ink); font: 700 .8rem var(--display); font-stretch: 112%; letter-spacing: .06em; text-transform: uppercase; padding: 6px 12px; border-radius: 3px; justify-self: start; transform: rotate(-1deg); }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 4px; }
+.fact b { font: 800 1.7rem/1 var(--display); font-stretch: 112%; font-variant-numeric: tabular-nums; }
+.fact span { font-size: .88rem; color: var(--muted); }
+.fact.alert b { color: var(--bad); }
+
+/* generic */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.list { display: grid; gap: 8px; margin: 0; padding-left: 1.1em; }
+.list li { max-width: 66ch; }
+.small { font-size: .9rem; color: var(--muted); }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tag { font: 500 .72rem var(--mono); padding: 2px 7px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font: 600 .9rem var(--body); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* principles */
+.principle { display: grid; gap: 10px; }
+.principle .quote { font-style: italic; color: var(--muted); border-left: 3px solid var(--tape); padding-left: 12px; }
+.principle ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: .96rem; }
+
+/* phase-day strip */
+.cal { display: grid; grid-template-columns: repeat(6, minmax(92px, 1fr)); gap: 8px; min-width: 600px; }
+.cal .day { font: 500 .72rem var(--mono); color: var(--muted); text-transform: uppercase; }
+.ev { border-radius: 8px; padding: 10px; display: grid; gap: 8px; font-size: .85rem; background: var(--accent-soft); border: 1px solid var(--line); animation: drop .5s both; }
+.ev b { font-family: var(--display); font-stretch: 112%; font-size: .92rem; }
+.ev.show { background: var(--tape); color: var(--tape-ink); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--good); background: var(--good); }
+.dot.pending { background: transparent; border-color: var(--muted); border-style: dashed; }
+@keyframes drop { from { transform: translateY(-6px); opacity: .4; } to { transform: none; opacity: 1; } }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: .85rem; color: var(--muted); align-items: center; }
+.legend .dot { display: inline-block; vertical-align: -2px; margin-right: 6px; }
+
+/* matrix */
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 .78rem var(--body); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+thead th { position: sticky; top: 0; background: var(--panel); }
+tbody th { text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--ink); min-width: 160px; }
+tr.gap th { color: var(--accent); }
+.chip { display: inline-block; font: 600 .76rem var(--body); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.Strong { background: var(--good-soft); color: var(--good); }
+.chip.Partial { background: var(--warn-soft); color: var(--warn); }
+.chip.Weak { background: var(--bad-soft); color: var(--bad); }
+.chip.None, .chip.No { background: var(--none-soft); color: var(--none); }
+.chip.Us { background: var(--accent); color: var(--bg); }
+td .note { display: block; color: var(--muted); font-size: .8rem; margin-top: 3px; }
+.gaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.gapcard { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 6px; align-content: start; }
+.gapcard .n { font: 500 .72rem var(--mono); color: var(--accent); }
+
+/* diagrams */
+svg text { font-family: var(--body); fill: var(--ink); }
+svg .lbl { font-size: 13px; }
+svg .cap { font-size: 11px; fill: var(--muted); }
+svg .box { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.5; }
+svg .box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .wire { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 5; }
+svg .wire-solid { fill: none; stroke: var(--accent); stroke-width: 2; }
+svg .pkt { fill: var(--accent); }
+svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
+.diagram { width: 100%; height: auto; display: block; }
+
+/* scenario stepper */
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.step { border: 1px solid var(--line); border-radius: var(--r); padding: 14px; background: var(--panel-2); display: grid; gap: 6px; align-content: start; transition: background .25s, border-color .25s, opacity .25s; opacity: .55; }
+.step.on { background: var(--panel); border-color: var(--accent); opacity: 1; }
+.step .k { font: 500 .72rem var(--mono); color: var(--muted); }
+.phone { display: grid; gap: 6px; }
+.line { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .85rem; padding: 6px 8px; border-radius: 6px; background: var(--bg); }
+.pill { white-space: nowrap; flex: none; font: 600 .72rem var(--body); padding: 1px 7px; border-radius: 999px; }
+.pill.pending { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--good-soft); color: var(--good); }
+.pill.task { background: var(--bad-soft); color: var(--bad); }
+
+/* model */
+.model { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ent { border-top: 4px solid var(--accent); background: var(--panel); border-radius: 0 0 var(--r) var(--r); padding: 14px; display: grid; gap: 8px; align-content: start; }
+.ent.stock { border-top-color: var(--tape); }
+.ent.people { border-top-color: var(--good); }
+.ent.money { border-top-color: var(--muted); }
+.ent ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: .9rem; }
+.ent li b { font-weight: 600; }
+
+/* stock */
+.label-demo { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.asset-label { display: grid; grid-template-columns: 64px auto; gap: 12px; align-items: center; background: #fdfdfb; color: #111; border: 1px solid #c9ccd1; border-radius: 6px; padding: 10px 14px; box-shadow: 0 1px 0 #0000000d; }
+.asset-label .id { font: 700 1.25rem/1 var(--mono); letter-spacing: .03em; }
+.asset-label .co { font: 800 .62rem var(--display); font-stretch: 125%; text-transform: uppercase; letter-spacing: .12em; color: #444; }
+.asset-label .what { font-size: .72rem; color: #555; }
+.metal { background: linear-gradient(135deg, #c9ced4, #eef0f2 45%, #b9bfc6); border-color: #9aa2ab; }
+.nest { display: grid; gap: 8px; font-size: .9rem; }
+.nest .c { border: 1.5px dashed var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; }
+.nest .c > .h { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.rollout { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 0; min-width: 820px; counter-reset: r; }
+.rollout div { border-top: 4px solid var(--line); padding: 12px 12px 0 0; display: grid; gap: 4px; align-content: start; font-size: .88rem; position: relative; }
+.rollout div::before { counter-increment: r; content: counter(r); font: 500 .72rem var(--mono); color: var(--muted); }
+.rollout div.first { border-top-color: var(--tape); }
+.rollout b { font-family: var(--display); font-stretch: 112%; }
+
+/* roadmap */
+.road { display: grid; gap: 0; }
+.ph { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 20px; padding-block: 18px; border-top: 1px solid var(--line); }
+.ph .when { display: grid; gap: 6px; align-content: start; }
+.ph .when .num { font: 800 1.9rem/1 var(--display); font-stretch: 125%; color: var(--accent); }
+.ph .when .num.side { color: var(--tape); -webkit-text-stroke: .5px var(--tape-ink); }
+.ph .body { display: grid; gap: 10px; min-width: 0; }
+.ph ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: .95rem; }
+.done-when { background: var(--panel-2); border-left: 3px solid var(--good); padding: 8px 12px; font-size: .92rem; border-radius: 0 6px 6px 0; }
+.done-when b { color: var(--good); }
+
+/* decisions */
+.dec { display: grid; gap: 0; }
+.dec .row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 110px; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.dec .row .q { font-weight: 600; }
+.state { font: 600 .74rem var(--body); padding: 2px 8px; border-radius: 999px; justify-self: start; }
+.state.decided { background: var(--good-soft); color: var(--good); }
+.state.open { background: var(--warn-soft); color: var(--warn); }
+.state.waiting { background: var(--none-soft); color: var(--none); }
+
+/* library */
+.lib { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; }
+.lib nav { display: grid; gap: 4px; align-content: start; }
+.lib nav button { text-align: left; font: 600 .92rem var(--body); padding: 9px 12px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; }
+.lib nav button[aria-selected="true"] { background: var(--panel); border-color: var(--line); color: var(--accent); }
+.lib nav button small { display: block; font: 500 .72rem var(--mono); color: var(--muted); }
+.doc { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 24px clamp(16px, 3vw, 36px); min-width: 0; max-height: 80vh; overflow: auto; }
+.doc h1 { font-size: 1.7rem; font-stretch: 112%; margin: 0 0 14px; }
+.doc h2 { font-size: 1.3rem; margin: 28px 0 10px; }
+.doc h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+.doc p, .doc li { max-width: 72ch; }
+.doc p { margin: 0 0 12px; }
+.doc table { display: block; overflow-x: auto; margin: 12px 0; font-size: .85rem; }
+.doc pre { background: var(--panel-2); border: 1px solid var(--line); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: .8rem; line-height: 1.35; }
+.doc blockquote { margin: 12px 0; padding: 4px 14px; border-left: 3px solid var(--tape); color: var(--muted); }
+.doc hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+.foot { font-size: .85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 980px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-inline: 16px; padding-block: 0 60px; }
+  .rail { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 12px 10px; border-bottom: 1px solid var(--line); gap: 10px; }
+  .brand .sub, .theme-btn { display: none; }
+  .toc { display: flex; overflow-x: auto; gap: 6px; scrollbar-width: none; }
+  .toc a { display: block; white-space: nowrap; background: var(--panel); border: 1px solid var(--line); padding: 5px 10px; font-size: .85rem; }
+  .toc a span { display: none; }
+  .facts, .model { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid3 { grid-template-columns: minmax(0, 1fr); }
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lib { grid-template-columns: minmax(0, 1fr); }
+  .lib nav { display: flex; overflow-x: auto; }
+  .lib nav button { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .steps, .model { grid-template-columns: minmax(0, 1fr); }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ph { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .ph .when { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 12px; }
+  .dec .row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <div class="stencil">Session Hire</div>
+      <div class="sub">System blueprint · live reference</div>
+    </div>
+    <nav class="toc" id="toc" aria-label="Sections">
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#principles"><span>01</span>Principles</a>
+      <a href="#today"><span>02</span>How it works today</a>
+      <a href="#market"><span>03</span>The market</a>
+      <a href="#architecture"><span>04</span>Architecture</a>
+      <a href="#calendar"><span>05</span>Google Calendar</a>
+      <a href="#crewbox"><span>06</span>Crewbox</a>
+      <a href="#stock"><span>07</span>Stock tracking</a>
+      <a href="#roadmap"><span>08</span>Roadmap</a>
+      <a href="#decisions"><span>09</span>Decisions</a>
+      <a href="#library"><span>10</span>Full documents</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" type="button">Switch theme</button>
+  </aside>
+
+  <main>
+    <!-- 00 OVERVIEW -->
+    <section id="overview" class="hero">
+      <div class="status">Research and plan · awaiting go-ahead to build</div>
+      <h1>One system for the whole job</h1>
+      <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
+      <div class="facts">
+        <div class="fact"><b>1,000s</b><span>assets in the warehouse</span></div>
+        <div class="fact alert"><b>0</b><span>of them barcoded today</span></div>
+        <div class="fact"><b>100+</b><span>freelancers on the books</span></div>
+        <div class="fact"><b>100s</b><span>jobs a year</span></div>
+      </div>
+      <div class="grid3">
+        <div class="panel"><h3>Projects and planning</h3><p class="small">Jobs split into phases (prep, build, show, load out) with their own dates, kit and crew.</p></div>
+        <div class="panel"><h3>Warehouse and stock</h3><p class="small">Labels, scanning out and in, availability you can trust, repairs and inspections.</p></div>
+        <div class="panel"><h3>Crew and light finance</h3><p class="small">Freelancer offers, call sheets and timesheets, then quotes, invoices and exports.</p></div>
+      </div>
+    </section>
+
+    <!-- 01 PRINCIPLES -->
+    <section id="principles">
+      <div class="eyebrow"><b>01</b>Principles</div>
+      <h2>Three rules everything else follows</h2>
+      <div class="grid3">
+        <div class="panel principle">
+          <h3>Open and flexible</h3>
+          <p class="quote">"The closed ecosystems, their way is the only way."</p>
+          <ul>
+            <li>Full API, webhooks and export of everything, any time.</li>
+            <li>Phases, statuses, roles, fields and templates are settings, not code.</li>
+            <li>Any warning can be overridden with a note; overrides are logged, not blocked.</li>
+            <li>New departments arrive as modules on one core, like Crewbox.</li>
+          </ul>
+        </div>
+        <div class="panel principle">
+          <h3>Meet freelancers in the middle</h3>
+          <p class="quote">"A they come to us, not a meet in the middle."</p>
+          <ul>
+            <li>No app or login needed to get work: SMS, WhatsApp, email and calendar invites with one-tap links.</li>
+            <li>Availability read from their own calendar, busy or free only.</li>
+            <li>Certificates and bank details entered once.</li>
+            <li>Hours become a ready-made invoice they approve.</li>
+          </ul>
+        </div>
+        <div class="panel principle">
+          <h3>Offline is normal</h3>
+          <p class="quote">Being on site means the internet may be poor.</p>
+          <ul>
+            <li>Reading and common actions work with no signal: scan out and in, report a fault, accept a job.</li>
+            <li>Nothing is lost: every change waits on the device until the server confirms it.</li>
+            <li>Real time when online: changes show on other screens within a second.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 TODAY -->
+    <section id="today">
+      <div class="eyebrow"><b>02</b>How it works today</div>
+      <h2>A gig is a row of all-day calendar events</h2>
+      <p>Read from the calendars on 29 September 2026: 58 events from June to October. Each phase of each day is its own event, titled <code>Project - Phase n/m</code>, with the venue as location and the crew invited as attendees. Accepting the invite is the crew's confirmation.</p>
+      <div class="panel">
+        <div class="scroll">
+          <div class="cal" id="calStrip" aria-label="Example: Google Summer Party at the RDS, as it appears in the calendar today"></div>
+        </div>
+        <div class="legend"><span><i class="dot"></i>Accepted</span><span><i class="dot pending"></i>Not answered</span><span class="tag">Example shape; crew counts illustrative</span></div>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>What the calendar carries</h3>
+          <ul class="list">
+            <li>Two ops staff organise; crew are invited. About two thirds of attendees use personal Gmail, Outlook or iCloud addresses.</li>
+            <li>Descriptions are usually empty. When filled, they hold a kit list (<code>4 x d&amp;b Y10P</code>) and a run of show.</li>
+            <li>A shared <b>Session Hire Gigs</b> calendar exists but is empty.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>What that means for the design</h3>
+          <ul class="list">
+            <li>The unit of scheduling is the phase-day, so the model has projects with phases.</li>
+            <li>Calendar sync must produce this exact shape so crew see no change on day one.</li>
+            <li>RSVPs map onto crew assignment status, both ways.</li>
+            <li>Freelancers need magic links, not company logins.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 MARKET -->
+    <section id="market">
+      <div class="eyebrow"><b>03</b>The market</div>
+      <h2>Six tools, the same five blind spots</h2>
+      <p>Rentman, TeamTrack, Current RMS (being renamed OnRent Events), Flex, HireHop and easyjob, compared from vendor sites and reviews in September 2026. The last column is what Session Hire's system aims for.</p>
+      <div class="btns" role="group" aria-label="Filter rows">
+        <button class="btn" type="button" data-filter="all" aria-pressed="true">All areas</button>
+        <button class="btn" type="button" data-filter="gap" aria-pressed="false">Only the gaps</button>
+      </div>
+      <div class="panel" style="padding: 0;">
+        <div class="scroll"><table id="matrix"></table></div>
+      </div>
+      <div class="gaps" id="gaps"></div>
+      <p class="small">Where not to compete: Rentman's quoting and invoicing breadth and HireHop's core stock handling. Matching them is enough. Full detail and sources in the competitor audit under <a href="#library">Full documents</a>.</p>
+    </section>
+
+    <!-- 04 ARCHITECTURE -->
+    <section id="architecture">
+      <div class="eyebrow"><b>04</b>Architecture</div>
+      <h2>Phones send requests; the server decides</h2>
+      <p>Each device keeps a local copy of what its user needs and an outbox of changes. Changes are sent as requests ("add 4 × Y10P to Nissan") that the server confirms or turns down, so two people offline cannot both book the last four speakers. Things that already happened in the real world, like a scan, are always accepted and reconciled afterwards.</p>
+      <div class="panel">
+        <div class="scroll">
+          <svg class="diagram" id="archSvg" viewBox="0 0 900 330" role="img" aria-label="Devices with a local copy and outbox sync over the network to an API server backed by Postgres; the server pushes changes back to all devices.">
+            <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+            <rect class="box" x="20" y="20" width="250" height="290" rx="12"/>
+            <text class="lbl" x="40" y="48" style="font-weight:700">Phone or laptop</text>
+            <rect class="box-accent" x="40" y="66" width="210" height="52" rx="8"/><text class="lbl" x="56" y="90">App (PWA)</text><text class="cap" x="56" y="107">works with or without signal</text>
+            <rect class="box-accent" x="40" y="134" width="210" height="52" rx="8"/><text class="lbl" x="56" y="158">Local copy</text><text class="cap" x="56" y="175">only this person's jobs and stock</text>
+            <rect class="box-accent" x="40" y="202" width="210" height="52" rx="8"/><text class="lbl" x="56" y="226">Outbox</text><text class="cap" x="56" y="243">changes wait here until confirmed</text>
+            <text class="cap" x="40" y="286">Free text (notes, run of show) uses</text><text class="cap" x="40" y="300">shared documents that merge, as in Crewbox</text>
+            <path class="wire" d="M270 228 C 335 228, 335 212, 400 212" id="upPath"/>
+            <path class="wire" d="M400 118 C 335 118, 335 160, 270 160" id="downPath"/>
+            <text class="cap" x="290" y="252">requests up</text><text class="cap" x="288" y="96">changes down,</text><text class="cap" x="288" y="110">by sequence number</text>
+            <rect class="box" x="400" y="80" width="250" height="170" rx="12"/>
+            <text class="lbl" x="420" y="108" style="font-weight:700">API server</text>
+            <text class="cap" x="420" y="132">checks availability and rules</text>
+            <text class="cap" x="420" y="150">confirms or turns down each request</text>
+            <text class="cap" x="420" y="168">streams changes to every device</text>
+            <text class="cap" x="420" y="186">runs calendar sync, emails, PDFs</text>
+            <text class="cap" x="420" y="204">talks to Crewbox and exports</text>
+            <path class="wire-solid" d="M650 165 L 700 165" marker-end="url(#arr)"/>
+            <rect class="box" x="706" y="100" width="170" height="130" rx="12"/>
+            <text class="lbl" x="724" y="128" style="font-weight:700">Postgres</text>
+            <text class="cap" x="724" y="150">EU region</text>
+            <text class="cap" x="724" y="168">point-in-time recovery</text>
+            <text class="cap" x="724" y="186">nightly backup, tested</text>
+            <text class="cap" x="724" y="204">full audit trail</text>
+            <circle r="6" class="pkt-tape"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#upPath"/></animateMotion></circle>
+            <circle r="5" class="pkt"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite"><mpath href="#downPath"/></animateMotion></circle>
+          </svg>
+        </div>
+      </div>
+
+      <h3>Walk through it: two people, four speakers, no signal</h3>
+      <div class="btns" role="group" aria-label="Scenario steps">
+        <button class="btn" type="button" data-step="0" aria-pressed="true">1. Offline</button>
+        <button class="btn" type="button" data-step="1" aria-pressed="false">2. Back online</button>
+        <button class="btn" type="button" data-step="2" aria-pressed="false">3. Server decides</button>
+        <button class="btn" type="button" data-step="3" aria-pressed="false">4. People resolve</button>
+        <button class="btn" type="button" id="playBtn" aria-pressed="false">Play</button>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step on"><span class="k">Step 1</span><b>Both book offline</b>
+          <div class="phone"><div class="line">Aoife: 4 × Y10P → Nissan <span class="pill pending">pending</span></div><div class="line">Dara: 4 × Y10P → Fuel <span class="pill pending">pending</span></div></div>
+          <p class="small">Only 4 are free that week. Both phones show the booking as pending.</p></div>
+        <div class="step"><span class="k">Step 2</span><b>Outboxes send</b><p class="small">Each request carries its own id, so a retry is never counted twice.</p></div>
+        <div class="step"><span class="k">Step 3</span><b>First in wins</b>
+          <div class="phone"><div class="line">Nissan <span class="pill ok">confirmed</span></div><div class="line">Fuel <span class="pill task">short by 4</span></div></div>
+          <p class="small">The server checks availability and turns the second one down with a reason.</p></div>
+        <div class="step"><span class="k">Step 4</span><b>A task, not a silent undo</b><p class="small">Dara sees "4 short, subhire or swap?" and picks a subhire. Nothing was lost and stock was never overbooked.</p></div>
+      </div>
+
+      <h3>What each device keeps</h3>
+      <div class="scroll panel" style="padding:0">
+        <table>
+          <thead><tr><th>Who</th><th>Synced to their device</th></tr></thead>
+          <tbody>
+            <tr><th>Ops and office</th><td>Live projects from 30 days back to 12 months ahead, full catalogue, crew</td></tr>
+            <tr><th>Warehouse</th><td>Catalogue, assets, cases, locations, pick lists for the next 14 days</td></tr>
+            <tr><th>Crew chief on a job</th><td>That job: phases, crew and phone numbers, kit list, run of show, venue</td></tr>
+            <tr><th>Freelancer</th><td>Their own offers and bookings, call times, venues, their documents. Never other people's rates.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The data at a glance</h3>
+      <div class="model">
+        <div class="ent"><b>Projects</b><ul><li><b>Project</b> for a client, with a status</li><li><b>Phase</b>: prep, build, show, load out…</li><li><b>Equipment line</b> by department</li><li><b>Crew requirement</b> per phase</li><li><b>Quote</b>, versioned</li><li>Client, contact, venue</li></ul></div>
+        <div class="ent stock"><b>Stock</b><ul><li><b>Product</b>: the model</li><li><b>Asset</b>: one item, hidden id</li><li><b>Identifier</b>: QR, serial, RFID…</li><li><b>Container</b>: case, rack, bundle</li><li><b>Movement</b>: every scan</li><li><b>Maintenance</b>: faults, tests</li></ul></div>
+        <div class="ent people"><b>People</b><ul><li><b>Person</b>: staff, freelancer, supplier</li><li><b>Documents</b> with expiry</li><li><b>Availability</b></li><li><b>Assignment</b>: offered → confirmed</li><li><b>Timesheet</b></li></ul></div>
+        <div class="ent money"><b>Money</b><ul><li>Price lists and rates</li><li>Quotes and invoices in EUR</li><li>VAT 23% and 13.5% per line</li><li>Freelancer costs</li><li>Dashboard and exports</li></ul></div>
+      </div>
+
+      <div class="scroll panel" style="padding:0">
+        <table>
+          <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><th>Language</th><td>TypeScript throughout</td><td>Same as Crewbox; shared types</td></tr>
+            <tr><th>App</th><td>React, Vite, installable PWA; Capacitor for scanning later</td><td>Same as Crewbox</td></tr>
+            <tr><th>On the device</th><td>SQLite in the browser, IndexedDB fallback</td><td>Real availability queries offline</td></tr>
+            <tr><th>Server</th><td>Fastify with shared schemas</td><td>Same as Crewbox</td></tr>
+            <tr><th>Database</th><td>Postgres, EU region, point-in-time recovery</td><td>Date-range queries for availability</td></tr>
+            <tr><th>Sign-in</th><td>Google Workspace for staff, email link for freelancers</td><td>Staff already have Workspace</td></tr>
+            <tr><th>Sync engine</th><td>Our own, on the Crewbox pattern; PowerSync as fallback</td><td>Decided after a one-week test</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 05 CALENDAR -->
+    <section id="calendar">
+      <div class="eyebrow"><b>05</b>Google Calendar</div>
+      <h2>Keep the calendar, change nothing on day one</h2>
+      <p>The system writes to the shared <b>Session Hire Gigs</b> calendar in today's format and listens for changes in seconds. Each project runs in one of two modes, and new projects switch to app-led once Phase 1 is live.</p>
+      <div class="btns" role="group" aria-label="Sync mode">
+        <button class="btn" type="button" data-mode="cal" aria-pressed="true">Calendar-led (during the move)</button>
+        <button class="btn" type="button" data-mode="app" aria-pressed="false">App-led (after)</button>
+      </div>
+      <div class="panel">
+        <div class="scroll">
+          <svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="Two-way sync between the Session Hire system and Google Calendar">
+            <rect class="box-accent" x="20" y="60" width="240" height="130" rx="12"/>
+            <text class="lbl" x="40" y="92" style="font-weight:700">Session Hire system</text>
+            <text class="cap" x="40" y="114">projects, phases, crew</text>
+            <text class="cap" x="40" y="132">own id stored on each event</text>
+            <rect class="box" x="640" y="60" width="240" height="130" rx="12"/>
+            <text class="lbl" x="660" y="92" style="font-weight:700">Session Hire Gigs calendar</text>
+            <text class="cap" x="660" y="114">one all-day event per phase-day</text>
+            <text class="cap" x="660" y="132">crew as attendees</text>
+            <path class="wire-solid" d="M262 95 L 636 95" marker-end="url(#arr2)"/>
+            <text class="lbl" x="330" y="84">new and changed phases, crew invites</text>
+            <path id="rsvpPath" class="wire-solid" d="M636 130 L 262 130" marker-end="url(#arr2)"/>
+            <text class="lbl" x="360" y="152">RSVPs: accepted, declined</text>
+            <g id="editArrow">
+              <path class="wire-solid" d="M636 172 L 262 172" marker-end="url(#arr2)"/>
+              <text class="lbl" id="editText" x="330" y="196">edits in Google move the phase</text>
+            </g>
+            <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+            <circle r="5" class="pkt"><animateMotion dur="3s" repeatCount="indefinite" path="M262 95 L 636 95"/></circle>
+            <circle r="5" class="pkt-tape"><animateMotion dur="3s" begin="1.5s" repeatCount="indefinite" path="M636 130 L 262 130"/></circle>
+          </svg>
+        </div>
+        <p class="small" id="modeText">Calendar-led: ops can keep working in Google. Moving an event moves the phase; RSVPs update crew status.</p>
+      </div>
+      <div class="grid2">
+        <div class="panel"><h3>Importing history</h3><p class="small">A one-off import reads the organisers' calendars and turns events into draft projects: grouped by the text before the first " - ", phases in order, attendees matched to people, kit lists parsed into draft lines marked for review.</p></div>
+        <div class="panel"><h3>Personal feeds</h3><p class="small">Every person also gets a private calendar feed of their own bookings that works in any calendar app. Workspace is confirmed; admin access will follow, and a test calendar is ready.</p></div>
+      </div>
+    </section>
+
+    <!-- 06 CREWBOX -->
+    <section id="crewbox">
+      <div class="eyebrow"><b>06</b>Crewbox</div>
+      <h2>Office to site, and back again</h2>
+      <p>Crewbox runs on site with no internet: chat, push-to-talk, running order, patch, lighting and the show log. Session Hire's system covers everything before and after. They meet twice per event.</p>
+      <div class="panel">
+        <div class="scroll">
+          <svg class="diagram" viewBox="0 0 900 230" role="img" aria-label="Before the show, a show pack goes to Crewbox; after the show, technical faults come back as repair tickets">
+            <rect class="box-accent" x="20" y="50" width="230" height="130" rx="12"/>
+            <text class="lbl" x="40" y="82" style="font-weight:700">Session Hire</text>
+            <text class="cap" x="40" y="104">job, crew, running order,</text><text class="cap" x="40" y="120">patch and lighting plans</text>
+            <text class="cap" x="40" y="150">repair queue for assets</text>
+            <rect class="box" x="650" y="50" width="230" height="130" rx="12"/>
+            <text class="lbl" x="670" y="82" style="font-weight:700">Crewbox on site</text>
+            <text class="cap" x="670" y="104">offline comms box</text><text class="cap" x="670" y="120">show log records faults</text>
+            <path id="packPath" class="wire-solid" d="M252 88 L 646 88" marker-end="url(#arr3)"/>
+            <text class="lbl" x="320" y="76">Before: show pack (files, then direct push)</text>
+            <path id="faultPath" class="wire" d="M646 150 L 252 150" marker-end="url(#arr3)"/>
+            <text class="lbl" x="330" y="176">After: technical faults become repair tickets</text>
+            <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+            <rect width="16" height="12" rx="2" class="pkt-tape"><animateMotion dur="3.2s" repeatCount="indefinite" path="M252 82 L 630 82"/></rect>
+            <circle r="5" class="pkt"><animateMotion dur="3.2s" begin="1.6s" repeatCount="indefinite" path="M646 150 L 262 150"/></circle>
+          </svg>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="panel"><span class="tag" style="justify-self:start">Step 1 · works now</span><h3>Show pack as files</h3><ul class="list"><li>Patch CSV and lighting CSV in Crewbox's own formats</li><li>Running order and a crew list with the join QR</li><li>The crew chief loads it on the box</li></ul></div>
+        <div class="panel"><span class="tag" style="justify-self:start">Step 2 · needs Crewbox work</span><h3>Direct link</h3><ul class="list"><li>Keyed import: event, channels, named crew, running order</li><li>Show log readable by key, as JSON</li><li>Asset tag on fault reports</li><li>Optional crew clock-in for timesheets</li></ul></div>
+      </div>
+    </section>
+
+    <!-- 07 STOCK -->
+    <section id="stock">
+      <div class="eyebrow"><b>07</b>Stock tracking</div>
+      <h2>From zero labels to trusted availability</h2>
+      <p>No stock is barcoded yet. The recommendation is a QR code plus a readable number on every item, scanned with phone cameras first, with RFID kept for later where it pays off most: cables.</p>
+      <div class="panel">
+        <div class="label-demo">
+          <div class="asset-label" aria-label="Example polyester asset label">
+            <svg viewBox="0 0 21 21" width="64" height="64" id="qr1" aria-hidden="true"></svg>
+            <div><div class="co">Session Hire</div><div class="id">SH-004217</div><div class="what">d&amp;b Y10P · polyester label</div></div>
+          </div>
+          <div class="asset-label metal" aria-label="Example riveted metal tag for a road case">
+            <svg viewBox="0 0 21 21" width="64" height="64" id="qr2" aria-hidden="true"></svg>
+            <div><div class="co">Session Hire</div><div class="id">SH-C00318</div><div class="what">Amp rack · riveted metal tag</div></div>
+          </div>
+          <p class="small" style="flex:1 1 220px">The number is what people read out; the QR is what phones scan. The item's real id is hidden, so a worn label can be replaced without losing its history.</p>
+        </div>
+      </div>
+      <div class="scroll panel" style="padding:0">
+        <table>
+          <thead><tr><th>Method</th><th>Cost per tag</th><th>Reads from a phone browser?</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><th>QR code</th><td>Cents</td><td><span class="chip Strong">Yes</span> Android native, iPhone via a library</td><td><span class="chip Us">Primary</span></td></tr>
+            <tr><th>Code 128 barcode</th><td>Cents</td><td><span class="chip Strong">Yes</span></td><td>Reads manufacturer serials</td></tr>
+            <tr><th>UHF RFID</th><td>€0.50 to €4</td><td><span class="chip No">No</span> needs a handheld reader</td><td>Later, for cables and bulk</td></tr>
+            <tr><th>NFC</th><td>€1 to €3</td><td><span class="chip Partial">Android only</span></td><td>Optional backup</td></tr>
+            <tr><th>Bluetooth tracker</th><td>€5 to €40</td><td><span class="chip No">No</span></td><td>Find a few high-value cases</td></tr>
+            <tr><th>GPS tracker</th><td>€35 to €100 + SIM</td><td><span class="chip No">No</span></td><td>Vans</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>Labels by kind of kit</h3>
+          <ul class="list">
+            <li><b>Most gear:</b> polyester, thermal transfer with resin ribbon, laminated.</li>
+            <li><b>Road cases and rigging:</b> riveted or bonded metal tags.</li>
+            <li><b>Cables:</b> heat-shrink or wrap-around flag labels, or tracked as bundles.</li>
+            <li><b>Rigging hardware:</b> engraved mark, which the law requires anyway.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Cases hold things; scanning the case moves them</h3>
+          <div class="nest" aria-label="Example of nested containers">
+            <div class="c"><div class="h"><span>Truck pack · Nissan</span><span class="tag">temporary</span></div>
+              <div class="c"><div class="h"><span>Amp rack SH-C00318</span><span class="tag">sealed</span></div><span class="small">3 × d&amp;b D20 · power distro · network switch</span></div>
+              <div class="c"><div class="h"><span>Cable bundle: 20 × XLR 10 m</span><span class="tag">bundle</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>Rollout</h3>
+      <div class="panel">
+        <div class="scroll">
+          <div class="rollout">
+            <div class="first"><b>Label trial</b><span class="small">Test materials on a few cases and cables over real jobs. Starts now.</span></div>
+            <div><b>Compliance items</b><span class="small">Lifting gear and electrical items that need inspections.</span></div>
+            <div><b>High-value gear</b><span class="small">Labelled as it comes back from each job.</span></div>
+            <div><b>Cases</b><span class="small">Metal tags; contents recorded.</span></div>
+            <div><b>Cables</b><span class="small">As bundles first.</span></div>
+            <div><b>Stocktake</b><span class="small">A full baseline count.</span></div>
+            <div><b>Cycle counts</b><span class="small">Rolling spot counts, most valuable first.</span></div>
+          </div>
+        </div>
+        <p class="small">Starter hardware is roughly £4,000 to £6,000: two rugged Android scanners, pocket and ring scanners, a label printer and a portable labeller. Prices are estimates; get supplier quotes.</p>
+      </div>
+      <div class="panel">
+        <h3>Irish rules to build in</h3>
+        <ul class="list">
+          <li><b>Lifting gear</b> (S.I. 299/2007): thorough examination every 6 months for lifting accessories and hoists, 12 months for items that support lifting gear, a register, and a lasting mark on each item.</li>
+          <li><b>Electrical equipment</b> (Reg. 81): user checks before use, periodic inspection, and testing where appropriate, at risk-based intervals.</li>
+          <li>Anything overdue cannot be scanned out without an override.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 08 ROADMAP -->
+    <section id="roadmap">
+      <div class="eyebrow"><b>08</b>Roadmap</div>
+      <h2>Build order</h2>
+      <p>Each phase replaces something people do today and is useful on its own. The riskiest piece, offline sync, is proven first.</p>
+      <div class="road" id="road"></div>
+    </section>
+
+    <!-- 09 DECISIONS -->
+    <section id="decisions">
+      <div class="eyebrow"><b>09</b>Decisions</div>
+      <h2>What's settled and what's open</h2>
+      <div class="dec" id="dec"></div>
+    </section>
+
+    <!-- 10 LIBRARY -->
+    <section id="library">
+      <div class="eyebrow"><b>10</b>Full documents</div>
+      <h2>The source documents</h2>
+      <p>Everything above is drawn from these files in the repo's <code>docs/</code> folder. They are rebuilt into this page whenever they change.</p>
+      <div class="lib">
+        <nav id="libNav" role="tablist" aria-label="Documents"></nav>
+        <article class="doc" id="docView" role="tabpanel" aria-live="polite"></article>
+      </div>
+      <p class="foot">Built <span id="builtAt"></span> from <code>docs/</code> on branch <code>claude/project-thread-04q8mi</code> of legofsalmon/sess-sys. To update: edit a markdown file, then run <code>node scripts/build-hub.mjs</code>.</p>
+    </section>
+  </main>
+</div>
+
+<!--DOCS-DATA-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+(function () {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) $$('svg').forEach(s => s.pauseAnimations && s.pauseAnimations());
+
+  // theme toggle
+  $('#themeBtn').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  // calendar strip
+  const cal = [
+    ['Tue 9 Jun', 'Google Summer Party - Prep', 'Warehouse', 4, 1, ''],
+    ['Wed 10 Jun', 'Google Summer Party - Build', 'RDS Hall 1', 7, 2, ''],
+    ['Thu 11 Jun', 'Google Summer Party - Build 2/2', 'RDS Hall 1', 7, 1, ''],
+    ['Fri 12 Jun', 'Google Summer Party - Show', 'RDS Hall 1', 5, 0, 'show'],
+    ['Sat 13 Jun', 'Google Summer Party - Load Out', 'RDS Hall 1', 6, 3, ''],
+    ['Sun 14 Jun', '', '', 0, 0, '']
+  ];
+  $('#calStrip').innerHTML = cal.map(([d, t, loc, ok, pend, cls], i) => {
+    const dots = '<i class="dot"></i>'.repeat(ok) + '<i class="dot pending"></i>'.repeat(pend);
+    const ev = t ? `<div class="ev ${cls}" style="animation-delay:${i * 90}ms"><b>${t.replace('Google Summer Party - ', '')}</b><span class="small" style="color:inherit;opacity:.8">${t}</span><span class="small" style="color:inherit;opacity:.8">${loc}</span><div class="dots" aria-label="${ok} accepted, ${pend} not answered">${dots}</div></div>` : '<div class="small" style="padding:10px">No event</div>';
+    return `<div style="display:grid;gap:6px;align-content:start"><span class="day">${d}</span>${ev}</div>`;
+  }).join('');
+
+  // market matrix
+  const P = ['Rentman', 'TeamTrack', 'Current RMS', 'Flex', 'HireHop', 'easyjob'];
+  const M = [
+    ['Price', 0, ['€39/mo + €14–24 per planner per module', 'from £41/mo, freelancers per use', '€69 first user, €49 each extra', 'from about $510/mo', '£46 first user, £23 each extra', 'not published'], 'Your own'],
+    ['Booking and planning', 0, ['Strong', 'Partial', 'Strong', 'Strong', 'Strong', 'Strong'], 'Strong'],
+    ['Warehouse and stock', 0, ['Strong', 'None', 'Strong', 'Strong', 'Strong', 'Strong'], 'Strong'],
+    ['Crew scheduling', 1, ['Strong', 'Strong', 'Partial', 'Partial', 'Partial', 'Partial'], 'Freelancer-first'],
+    ['Finance', 0, ['Strong', 'Weak', 'Strong', 'Partial', 'Strong', 'Strong'], 'Light, exports'],
+    ['Mobile and offline', 1, ['Partial', 'Partial', 'Weak', 'Partial', 'Partial', 'Partial'], 'Offline-first'],
+    ['Real-time collaboration', 0, ['Partial', 'Partial', 'Partial', 'Weak', 'Partial', 'Weak'], 'Live'],
+    ['Integrations and API', 0, ['Strong', 'Partial', 'Strong', 'Partial', 'Strong', 'Partial'], 'Open API, webhooks'],
+    ['Irish and EU fit', 1, ['Strong', 'Partial', 'Partial', 'Weak', 'Partial', 'Partial'], 'Irish defaults'],
+    ['Two-way Google Calendar', 1, ['No', 'No', 'No', 'No', 'No', 'No'], 'Two-way'],
+    ['Hands off to site comms', 1, ['No', 'No', 'No', 'No', 'No', 'No'], 'Crewbox link']
+  ];
+  const cell = v => /^(Strong|Partial|Weak|None|No)$/.test(v) ? `<span class="chip ${v}">${v}</span>` : `<span class="small">${v}</span>`;
+  $('#matrix').innerHTML = `<thead><tr><th>Area</th>${P.map(p => `<th>${p}</th>`).join('')}<th>Session Hire</th></tr></thead><tbody>` +
+    M.map(([a, g, vals, us]) => `<tr class="${g ? 'gap' : ''}" data-gap="${g}"><th>${a}</th>${vals.map(v => `<td>${cell(v)}</td>`).join('')}<td><span class="chip Us">${us}</span></td></tr>`).join('') + '</tbody>';
+  $$('[data-filter]').forEach(b => b.addEventListener('click', () => {
+    $$('[data-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    $$('#matrix tbody tr').forEach(r => { r.hidden = b.dataset.filter === 'gap' && r.dataset.gap !== '1'; });
+  }));
+  const gaps = [
+    ['Offline warehouse and site work', 'None document real offline scanning with sync afterwards. One scanner app is iOS-only.'],
+    ['Two-way Google Calendar', 'All offer a one-way feed that Google refreshes about once a day.'],
+    ['Handoff to site and back', 'Rental tools stop at the call sheet. Nothing brings damage and extras back from site.'],
+    ['Freelancers in the same system as the kit', 'Crew is bolted on, or lives in another tool with one-way links.'],
+    ['Irish defaults', '23% and 13.5% VAT, EU reverse charge, GBP for Northern Ireland, certificate expiry blocks bookings.']
+  ];
+  $('#gaps').innerHTML = gaps.map(([t, d], i) => `<div class="gapcard"><span class="n">Gap ${i + 1}</span><b>${t}</b><span class="small">${d}</span></div>`).join('');
+
+  // scenario stepper
+  const stepBtns = $$('[data-step]'); const steps = $$('#steps .step'); let timer = null;
+  const show = n => { stepBtns.forEach(b => b.setAttribute('aria-pressed', +b.dataset.step === n)); steps.forEach((s, i) => s.classList.toggle('on', i <= n)); };
+  stepBtns.forEach(b => b.addEventListener('click', () => { stop(); show(+b.dataset.step); }));
+  const stop = () => { clearInterval(timer); timer = null; $('#playBtn').setAttribute('aria-pressed', 'false'); $('#playBtn').textContent = 'Play'; };
+  $('#playBtn').addEventListener('click', () => {
+    if (timer) return stop();
+    let n = 0; show(0); $('#playBtn').setAttribute('aria-pressed', 'true'); $('#playBtn').textContent = 'Pause';
+    timer = setInterval(() => { n = (n + 1) % 4; show(n); }, 1800);
+  });
+
+  show(0);
+
+  // calendar mode
+  $$('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    $$('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    const app = b.dataset.mode === 'app';
+    $('#editText').textContent = app ? 'edits in Google are reverted, with a note' : 'edits in Google move the phase';
+    $('#editArrow').style.opacity = app ? .45 : 1;
+    $('#modeText').textContent = app
+      ? 'App-led: the system owns dates, titles and attendees. RSVPs still flow in; a change made in Google is put back and the person is told why.'
+      : 'Calendar-led: ops can keep working in Google. Moving an event moves the phase; RSVPs update crew status.';
+  }));
+
+  // fake QR-like marks (decorative)
+  const qr = (el, seed) => {
+    let s = seed, out = '';
+    const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+    const finder = (x, y) => `<rect x="${x}" y="${y}" width="7" height="7" fill="#111"/><rect x="${x + 1}" y="${y + 1}" width="5" height="5" fill="#fdfdfb"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" fill="#111"/>`;
+    for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) {
+      const inF = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
+      if (!inF && rnd() > .52) out += `<rect x="${x}" y="${y}" width="1" height="1" fill="#111"/>`;
+    }
+    el.innerHTML = `<rect width="21" height="21" fill="#fdfdfb"/>` + out + finder(0, 0) + finder(14, 0) + finder(0, 14);
+  };
+  qr($('#qr1'), 4217); qr($('#qr2'), 318);
+
+  // roadmap
+  const road = [
+    ['0', '', 'Foundations', ['Repo, CI, EU hosting, backups with a tested restore', 'Staff sign-in with Google; freelancer email links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'Audit trail and export-everything from the start'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
+    ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
+    ['1', '', 'Projects and the calendar', ['Clients, venues, projects, phases, crew assignments', 'Two-way sync with the Session Hire Gigs calendar; RSVPs update crew', 'Import past calendar events as draft projects', 'Week and month planner with clashes flagged', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
+    ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
+    ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
+    ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
+    ['5', '', 'Crewbox link and on-site mode', ['Crewbox additions: keyed import, show log by key, asset tags on faults', 'Push job to the box; pull faults back as repair tickets', 'Crew chief view: kit check by scan, crew present, notes, offline'], 'the box is set up from the job in one step and faults from site are waiting in the repair queue.'],
+    ['6', '', 'Grow', ['Utilisation and revenue per product', 'Multi-warehouse, vehicles and drivers', 'Client portal', 'RFID, app store builds if needed', 'Retire calendar-led mode'], '']
+  ];
+  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span></div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
+
+  // decisions
+  const dec = [
+    ['Build order', 'Calendar first, then warehouse.', 'decided'],
+    ['Finance', 'Bookkeeping is fairly offline, so finance is a dashboard and exports first; accounting integration only if it grows.', 'decided'],
+    ['Why not Rentman or TeamTrack', 'Closed and rigid, and cumbersome for freelancers. Became the first two principles.', 'decided'],
+    ['Google Workspace', 'sessionhire.com is on Workspace. A test calendar is available now.', 'decided'],
+    ['Calendar admin access', 'To be granted later for the import and live sync.', 'waiting'],
+    ['Sync engine', 'Our own on the Crewbox pattern, or PowerSync. Decided after the Phase 0 test.', 'open'],
+    ['Existing stock list', 'Is there a spreadsheet or old list of stock to import?', 'open'],
+    ['Crewbox code sharing', 'Can Crewbox\'s sync code become a shared package both use?', 'open'],
+    ['Hosting and budget', 'Provider and monthly budget for hosting.', 'open'],
+    ['Start the build', 'Go-ahead to begin Phase 0.', 'waiting']
+  ];
+  const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
+  $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');
+
+  // library
+  let docs = [];
+  try { docs = JSON.parse(($('#docs-data') || {}).textContent || '[]'); } catch (e) { docs = []; }
+  const nav = $('#libNav'), view = $('#docView');
+  $('#builtAt').textContent = (($('#docs-data') || {}).dataset || {}).built || 'locally';
+  const render = i => {
+    $$('button', nav).forEach((b, j) => b.setAttribute('aria-selected', i === j));
+    const d = docs[i];
+    if (!d) { view.innerHTML = '<p class="small">No documents embedded. Run the build script to include them.</p>'; return; }
+    view.innerHTML = window.marked ? window.marked.parse(d.md) : `<pre>${d.md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;')}</pre>`;
+    view.scrollTop = 0;
+  };
+  nav.innerHTML = docs.map((d, i) => `<button type="button" role="tab">${d.title}<small>${d.path}</small></button>`).join('');
+  $$('button', nav).forEach((b, i) => b.addEventListener('click', () => render(i)));
+  render(0);
+
+  // active section in rail
+  const links = $$('#toc a');
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+  }), { rootMargin: '-35% 0px -60% 0px' });
+  $$('main section').forEach(s => io.observe(s));
+})();
+</script>
