@@ -1,6 +1,8 @@
 import { newId, type Mutation } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
+import { migrateAuth } from '../src/auth/schema.ts'
+import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/sessions.ts'
 import { postgresDb } from '../src/db.ts'
 
 /**
@@ -37,6 +39,29 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       expect(seqs).toEqual(seqs.map((_, i) => seqs[0]! + i))
     } finally {
       await app.close()
+      await db.close()
+    }
+  })
+
+  it('keeps staff sessions: sign in, renew while used, sign out', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP TABLE IF EXISTS sessions, users, auth_schema_version CASCADE')
+    await migrateAuth(db)
+    try {
+      const identity = { subject: 's1', email: 'aoife@sessionhire.com', emailVerified: true, name: 'Aoife Byrne', hostedDomain: 'sessionhire.com' }
+      const user = await upsertUser(db, identity)
+      expect(await upsertUser(db, { ...identity, name: 'Aoife B.' })).toEqual(user)
+      const token = await createSession(db, user.id, 'test')
+      expect(await sessionUser(db, token)).toEqual({ user: { id: user.id, email: 'aoife@sessionhire.com', name: 'Aoife B.' }, renewed: false })
+
+      await db.query("UPDATE sessions SET last_seen_at = now() - interval '2 days', expires_at = now() + interval '1 day'")
+      expect((await sessionUser(db, token))?.renewed).toBe(true)
+      const { rows } = await db.query<{ days: number }>('SELECT round(extract(epoch FROM expires_at - now()) / 86400)::int AS days FROM sessions')
+      expect(rows[0]!.days).toBe(60)
+
+      await endSession(db, token)
+      expect(await sessionUser(db, token)).toBeUndefined()
+    } finally {
       await db.close()
     }
   })

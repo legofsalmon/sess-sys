@@ -1,9 +1,11 @@
 import { SyncClient } from '@sh/shared'
+import { markSignedOut } from './auth.ts'
 import { IndexedDbStorage } from './storage.ts'
-import { HttpTransport } from './transport.ts'
+import { HttpTransport, SignedOutError } from './transport.ts'
 
 export const transport = new HttpTransport(import.meta.env.VITE_API_BASE ?? '')
-export const client = await new SyncClient({ storage: new IndexedDbStorage(), transport }).open()
+export const storage = new IndexedDbStorage()
+export const client = await new SyncClient({ storage, transport }).open()
 
 /** Try now, and keep trying while offline, backing off to once every 30 s. */
 let failures = 0
@@ -14,7 +16,9 @@ export function syncSoon() {
     () => {
       failures = 0
     },
-    () => {
+    (err) => {
+      // Changes stay in the outbox; they go once the person signs in again.
+      if (err instanceof SignedOutError) return markSignedOut()
       failures++
       timer = setTimeout(syncSoon, Math.min(30_000, 1000 * 2 ** failures))
     }

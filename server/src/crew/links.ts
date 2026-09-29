@@ -2,6 +2,7 @@ import { eachDay, newId, type CommandArgs, type CommandName, type MutationResult
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
+import { publicOrigin } from '../http.ts'
 import { calendarFeed } from './ical.ts'
 import { renderGone, renderPage } from './page.ts'
 import { awayFor, getAway, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
@@ -138,11 +139,4 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       jobs: await offersFor(db, person.id),
     })
   })
-}
-
-/** PUBLIC_URL when set (behind Railway's proxy), otherwise what the request came in on. */
-export function publicOrigin(req: FastifyRequest): string {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '')
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0] ?? req.protocol
-  return `${proto}://${req.headers['x-forwarded-host'] ?? req.headers.host}`
 }

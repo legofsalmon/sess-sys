@@ -150,9 +150,11 @@ function bookingFromRow(r: BookingRow) {
 
 /**
  * `via` is 'link' only when the server itself runs a command for a person
- * using their private link; a device can't claim it.
+ * using their private link; a device can't claim it. `userId` is the
+ * signed-in member of staff whose device sent it, kept on the mutation as
+ * the audit trail's "who".
  */
-export async function applyMutation(db: Db, clientId: string, m: Mutation, via: Ctx['via'] = 'app'): Promise<MutationResult> {
+export async function applyMutation(db: Db, clientId: string, m: Mutation, via: Ctx['via'] = 'app', userId?: string): Promise<MutationResult> {
   return db.transaction(async (tx) => {
     // One writer at a time; see `emit`. At Session Hire's volume (a few
     // people, hundreds of jobs a year) this costs nothing.
@@ -165,8 +167,8 @@ export async function applyMutation(db: Db, clientId: string, m: Mutation, via: 
     let result: MutationResult
     // Record the mutation first so the changes it writes can point at it.
     await tx.query(
-      `INSERT INTO mutations (id, client_id, name, args, created_at, status, result) VALUES ($1, $2, $3, $4, $5, 'applied', '{}')`,
-      [m.id, clientId, m.name, JSON.stringify(m.args), m.createdAt]
+      `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, status, result) VALUES ($1, $2, $3, $4, $5, $6, 'applied', '{}')`,
+      [m.id, clientId, userId ?? null, m.name, JSON.stringify(m.args), m.createdAt]
     )
     const parsed = commandSchemas[m.name].safeParse(m.args)
     if (!parsed.success) {

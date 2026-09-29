@@ -64,6 +64,9 @@ const MIGRATIONS: string[] = [
     resolved boolean NOT NULL DEFAULT false
   );
   `,
+  // Who sent each command, once staff sign in. Empty for freelancers'
+  // links (client_id says whose link) and for anything from before.
+  `ALTER TABLE mutations ADD COLUMN IF NOT EXISTS user_id text;`,
 ]
 
 export async function migrate(db: Db) {

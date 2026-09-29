@@ -20,6 +20,7 @@ function open(): Promise<IDBDatabase> {
 
 export class IndexedDbStorage implements Storage {
   private db = open()
+  private wiped = false
 
   async load(): Promise<Snapshot | undefined> {
     const db = await this.db
@@ -31,10 +32,23 @@ export class IndexedDbStorage implements Storage {
   }
 
   async save(snapshot: Snapshot): Promise<void> {
+    if (this.wiped) return
     const db = await this.db
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite')
       tx.objectStore(STORE).put(snapshot, KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  /** Forget this device's copy and stop saving, ahead of reloading the app signed out. */
+  async wipe(): Promise<void> {
+    this.wiped = true
+    const db = await this.db
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite')
+      tx.objectStore(STORE).delete(KEY)
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
