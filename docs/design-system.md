@@ -51,17 +51,19 @@ follow-up that lets the two stay in step.
   burnt-orange **bad** tone, never the brand red, so red never means "broken".
 - Areas live in a tab bar at the bottom, where a thumb reaches.
 
-## Accessibility, still to decide
+## Accessibility
 
 Checked against WCAG AA (4.5:1 for normal text). Dark mode passes everywhere.
-In light mode:
+On 29 September 2026 Colly chose to fix the three light-mode gaps, in the
+app and in Figma:
 
-- White on the brand red is 4.0:1 for 14px button text. Filling primary
-  buttons with `accent-ink` (#c8202e) instead gives 5.7:1 and keeps the look.
-- Warn pill text is 4.5:1 and the grey pill 4.1:1 at 12px. A darker warn
-  (#8a5800) gives 5.3:1.
-- Buttons and fields are 36 to 40px tall. 44px is the comfortable touch
-  target, which matters with gloves on in a dark venue.
+- White text sits on `accent-fill` (#c8202e), 5.7:1, instead of the brand
+  red (4.0:1). That covers primary buttons in the app and the Accept button
+  and "Offered" tag on the freelancer page. The brand red stays for the mark,
+  the current tab and focus rings.
+- Warn text is #8a5800 in light mode, 5.3:1 on its pill.
+- Buttons and fields are at least 44px tall, which matters with gloves on in
+  a dark venue.
 
-None of these are changed yet: they alter how the brand red reads, so they
-wait on Colly's word.
+Still short: the grey pill is 4.1:1 at 12px, and the current tab is white on
+the brand red.

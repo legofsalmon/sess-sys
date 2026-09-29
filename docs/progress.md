@@ -17,10 +17,13 @@ waiting on someone.
 - Checked: every component screenshotted; the example screen flips to dark
   by switching one setting; contrast measured for every text colour pair.
 
+- Contrast fixes, chosen by Colly: text on red uses the darker #c8202e
+  (5.7:1 with white), light-mode warn text is #8a5800, and buttons and
+  fields are at least 44px tall. Done in the app, the freelancer page and
+  Figma. Checked: typecheck, all server tests, all 8 browser tests.
+
 **Next**
 
-- Colly: three contrast choices in light mode (button red, warn pill, touch
-  target size); see [Design system](design-system.md#accessibility-still-to-decide).
 - Add the spacing and radius tokens to `app.css` so code and Figma share them.
 
 ## 29 September 2026: nightly backups built
