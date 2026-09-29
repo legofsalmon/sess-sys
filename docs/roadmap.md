@@ -71,11 +71,17 @@ calendar invite is a courtesy rather than the record.
 - Quotes with versions and PDF output; accept online.
 - Invoices, deposits and credit notes in EUR with Irish VAT.
 - Freelancer cost lines from timesheets.
-- Export or sync to the accounting package.
+- Finance dashboard: revenue by month (quoted, confirmed, invoiced),
+  outstanding and overdue invoices, freelancer costs owed, margin per job.
+- Exports for the accountant: invoice register, VAT summary by rate and
+  period, freelancer payments, job profit, as CSV and Excel with the PDFs.
 - Job profitability: quoted versus actual.
+- Later, only if needed: a connector to Xero, QuickBooks or Sage, built on
+  the same export table.
 
 **Done when:** a job goes from enquiry to invoice without leaving the
-system, and the accountant gets what they need without re-keying.
+system, and the accountant gets a VAT period's figures from one export
+without re-keying.
 
 ## Phase 5: Crewbox link and on-site mode
 

@@ -61,7 +61,7 @@ core stock handling. Matching them is enough.
  │  ├─ command handlers: validate, check availability, write │
  │  ├─ change feed: per-scope sequence numbers               │
  │  ├─ jobs: calendar sync, emails, PDF quotes, exports      │
- │  └─ integrations: Google Calendar, Crewbox, accounting    │
+ │  └─ integrations: Google Calendar, Crewbox, exports       │
  └──────────────┬────────────────────────────────────────────┘
                 │
        Postgres (EU region, point-in-time recovery)
@@ -184,8 +184,19 @@ personal details of other crew.
   deposits and credit notes.
 - Freelancer costs from confirmed assignments and timesheets.
 - Job profitability: quoted versus actual kit, crew, subhire and transport.
-- Export to the accounting package (Xero, QuickBooks Online or Sage;
-  to be confirmed) rather than becoming one.
+- **No accounting integration at first.** Session Hire's bookkeeping is
+  fairly offline today, so the system is the place to *see* the money and
+  hand it on, not a ledger:
+  - a finance dashboard: quoted, confirmed and invoiced revenue by month,
+    what is outstanding and overdue, freelancer costs owed, and margin per
+    job;
+  - exports an accountant can use as they are: invoice and credit note
+    registers, a VAT summary by rate and period, freelancer payments, and
+    per-job profit, as CSV and Excel, plus the invoice PDFs;
+  - every export built from one internal ledger-style table (date,
+    document, client, net, VAT rate, VAT, gross, category), so a Xero,
+    QuickBooks or Sage connector can be added later by mapping that table,
+    without reworking anything.
 
 **Everything** carries an audit trail: who changed what, when, from which
 device, and whether it was made offline.
@@ -288,7 +299,9 @@ Crewbox.
 
 1. Is `sessionhire.com` on Google Workspace, and can an admin grant the
    calendar access for the import and sync?
-2. Which accounting package do you use?
+2. ~~Which accounting package do you use?~~ Answered: bookkeeping is
+   fairly offline, so finance is a dashboard and exporter first, with
+   integration added if that grows.
 3. Roughly how many serialised assets, bulk lines, freelancers and jobs a
    year? Is any stock already barcoded, and is there a spreadsheet or old
    system to import from?
