@@ -223,6 +223,7 @@ const REFERENCES = [
   'fromCaseId',
   'toPlaceId',
   'toCaseId',
+  'contactId',
 ] as const
 
 /**
@@ -393,6 +394,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}`)
       if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : "venue to the job's")
       if (a.notes !== undefined) parts.push('the notes')
+      if (a.contactId !== undefined) parts.push(a.contactId ? `the contact on the day to ${person(a.contactId)}` : 'no contact on the day')
       return `Changed ${text(p?.name, 'a phase')} on ${job(p?.projectId)}: ${inWords(parts)}`
     }
     case 'phase.remove': {

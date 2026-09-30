@@ -148,6 +148,14 @@ describe('made-up data', () => {
     expect(offers.filter((o) => o.person?.name === 'Dara Quinn' && o.override)).toHaveLength(1)
     expect(view.crew.unavailability).toHaveLength(1)
 
+    // Call sheets: a contact on the day and a running order, and every number from the range kept for TV and radio drama.
+    const show = view.jobs.jobs.find((j) => j.name === 'Harbour Lights Festival')!.phases.find((p) => p.name === 'Show')!
+    expect(view.crew.people.find((p) => p.id === show.contactId)?.name).toBe('Aoife Brennan')
+    expect(show.notes).toContain('17:30 Doors')
+    const drama = /^\+44 7700 900\d{3}$/
+    expect(view.crew.people.every((p) => drama.test(p.phone ?? ''))).toBe(true)
+    expect(view.jobs.clients.every((c) => c.contacts.every((k) => drama.test(k.phone ?? '')))).toBe(true)
+
     // Kit: speakers short between two jobs, and the quote short of moving heads, which the launch would be too if it goes ahead.
     const short = view.kit.short.map((l) => [l.job?.name, l.model?.name, l.short])
     expect(short).toHaveLength(3)

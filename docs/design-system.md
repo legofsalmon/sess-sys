@@ -108,6 +108,17 @@ in px too.
   under it, the picture shrinks to 180 px so the form's button stays on
   screen. A camera that can't start shows why, in words that say what to
   do, and Try again. Not in Figma yet.
+- A call sheet ([ADR 0021](adr/0021-call-sheets.md)) is a page of
+  cards in the order a crew member reads it on the day: the job and its
+  days with Print and Copy for a WhatsApp group, who to ring, where,
+  the running order, the crew by call time, the kit, and the client. In
+  the crew list each person has their number as a phone link, a pill
+  (Booked in green, To confirm in amber, Offered in grey) and Send.
+  Places still to find are an amber pill beside the call. On the
+  freelancer's page their own call is the first card, with a green edge,
+  and who to ring the next, with a red one. On paper it's black on
+  white, one A4 page where it fits, only those who've said yes, and it
+  says it's the office's copy. Not in Figma yet.
 - Made-up data ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md))
   is named beside every screen's name in the top bar, "· made-up data" in
   the bold amber warn tone, on every phone while it's in. Deleting

@@ -183,6 +183,12 @@ Nobody's phone holds the whole company. Each device syncs **scopes**:
 Scopes also enforce privacy: a freelancer's device never receives rates or
 personal details of other crew.
 
+Call sheets follow the same scopes ([ADR 0021](adr/0021-call-sheets.md)):
+the office's shows everything; the contact on the day, the crew chief of
+the table above, sees everyone booked with their numbers and the kit on
+their private link; the rest of the crew see who else is on by name and
+role, and only the contact's number.
+
 ## Domain model (first cut)
 
 **Projects**

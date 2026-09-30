@@ -191,3 +191,32 @@
 .pick .count-row .alert { grid-column: 1 / -1; }
 .jobs .pick-lists h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .jobs .job-row small.flag.ok { color: var(--good); }
+
+/* Call sheets (ADR 0021): the office's, and a plain one on paper. */
+.jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.jobs .lines, .call-sheet .lines { white-space: pre-line; }
+.sheet-screen .card p { margin: 0; }
+.sheet-screen h3 { margin: var(--space-6) 0 0; font-size: .95rem; }
+.sheet-screen .sheet-call { display: grid; gap: var(--space-4); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.sheet-screen .sheet-call:first-of-type { border-top: 0; padding-top: 0; }
+.sheet-screen .sheet-call header { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: baseline; }
+.sheet-screen .sheet-call ul, .sheet-screen .sheet-kit ul, .sheet-screen .sheet-contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+.sheet-screen .sheet-call li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-8); }
+.sheet-screen .sheet-call li > span:first-child { flex: 1 1 10em; }
+.sheet-screen .sheet-call button.link { min-height: 36px; padding: var(--space-2) var(--space-6); }
+.sheet-screen .card a:not(.button) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
+.sheet-screen a[href^='tel:'] { white-space: nowrap; }
+.pill.offered { background: var(--line); color: var(--muted); }
+@media print {
+  .print-sheet.call-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
+  .call-sheet h1 { font-size: 17pt; margin: 2pt 0; }
+  .call-sheet h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 4pt; padding-bottom: 2pt; border-bottom: 1px solid #999; }
+  .call-sheet h3 { font-size: 10.5pt; margin: 4pt 0 2pt; }
+  .call-sheet p { margin: 0; }
+  .call-sheet section { break-inside: avoid; }
+  .call-sheet ul { margin: 0; padding-left: 1.1em; }
+  .call-sheet .muted, .call-sheet .kicker { color: #444; }
+  .call-sheet .sheet-call { break-inside: avoid; margin-bottom: 4pt; }
+  .call-sheet .sheet-call header { font-weight: 700; }
+  .call-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
+}

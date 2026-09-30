@@ -142,7 +142,9 @@ Built to the "meet freelancers in the middle" principle in
 person or a shortlist, private freelancer links (accept some days, decline,
 counter the rate, days off), no double booking, personal calendar feeds,
 offer messages ready for WhatsApp, text or email, and crew asked for from a
-job's phases ([ADR 0007](adr/0007-jobs.md)).
+job's phases ([ADR 0007](adr/0007-jobs.md)). Call sheets for each phase are
+built too ([ADR 0021](adr/0021-call-sheets.md)): in the app, on paper, and
+on each freelancer's private link.
 
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they
@@ -155,7 +157,11 @@ job's phases ([ADR 0007](adr/0007-jobs.md)).
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.
 - Call sheets per phase: call time, venue, access, parking, contacts, run
-  of show, available offline on the crew chief's phone.
+  of show, available offline on the crew chief's phone (built: each
+  phase's sheet in the app with no signal, printed on A4, copied for a
+  WhatsApp group, and sent to each person as a link to their own; a
+  contact on the day who sees everyone's number and the kit; the rest of
+  the crew see who's on by name only).
 - Timesheets from assignments, adjusted and approved by ops.
 - **Crewbox show pack** (files: patch CSV, lighting CSV, running order,
   crew list with the join QR).

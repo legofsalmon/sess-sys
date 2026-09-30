@@ -62,6 +62,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
     ${facts(call, offer)}
+    ${(offer.status === 'accepted' || offer.status === 'confirmed') && call.status === 'open' ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
     ${
       canAnswer
         ? `<form method="post" action="${action}">
@@ -160,7 +161,7 @@ export function renderGone(): string {
 <p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p></main></body></html>`
 }
 
-const CSS = `
+export const CSS = `
 :root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 @media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
@@ -198,4 +199,5 @@ fieldset.days input{width:20px}
 .closed li{font-size:.92rem}
 .add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
 footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+.sheet-link{font-weight:600;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-decoration:none}
 `

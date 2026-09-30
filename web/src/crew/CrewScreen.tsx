@@ -315,7 +315,18 @@ export function CallCard({
 }
 
 /** The offer, ready to go wherever the freelancer already looks. Nothing is sent for you. */
-export function SharePanel({ person, call, onClose }: { person: PersonView; call: CallView; onClose: () => void }) {
+/** Send a person something on their private link: an offer, or with `message`, something else such as their call sheet (ADR 0021). */
+export function SharePanel({
+  person,
+  call,
+  onClose,
+  message,
+}: {
+  person: PersonView
+  call: CallView
+  onClose: () => void
+  message?: (link: string) => { text: string; subject: string; what: string }
+}) {
   const link = linkFor(person)
   const [copied, setCopied] = useState(false)
   if (!link)
@@ -328,10 +339,11 @@ export function SharePanel({ person, call, onClose }: { person: PersonView; call
         </button>
       </section>
     )
-  const text = offerMessage(person, call, link)
-  const subject = `Work: ${call.project}, ${daysLabel(call.days)}`
+  const custom = message?.(link)
+  const text = custom?.text ?? offerMessage(person, call, link)
+  const subject = custom?.subject ?? `Work: ${call.project}, ${daysLabel(call.days)}`
   return (
-    <section className="card share" aria-label={`Send offer to ${person.name}`}>
+    <section className="card share" aria-label={`Send ${custom?.what ?? 'offer'} to ${person.name}`}>
       <h2>Send to {person.name}</h2>
       <textarea readOnly value={text} rows={6} />
       <div className="actions">
