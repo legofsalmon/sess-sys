@@ -24,7 +24,10 @@ the app; a pick list for each job, with kit scanned out and back in
 on a phone, with no signal too; and damaged and missing kit reported as
 it comes back, with a repair list; and PAT tests and thorough
 examinations recorded, a batch at a time by scanning, with failed and
-overdue kit kept off jobs. The app runs on Railway. Start with the
+overdue kit kept off jobs. Until the real stock and crew lists
+are in, the Account tab puts in made-up data to try every part of the
+app with, and Start fresh clears it all before the real data goes in.
+The app runs on Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the
 research, principles, architecture, stock tracking, roadmap and decisions,

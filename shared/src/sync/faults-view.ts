@@ -33,7 +33,7 @@ export interface FaultsView {
   ofJob(jobId: string): FaultView[]
   /** The open fault keeping an item from going out, if any: missing before damaged, then its case's, if that's missing. */
   stopping(assetId: string): FaultView | undefined
-  /** Whether an item can't go out: a fault stops it, or an inspection it failed or is overdue (ADR 0019). */
+  /** Whether an item can't go out: a fault stops it, or an inspection it failed or is overdue (ADR 0020). */
   cantGoOut(assetId: string): boolean
   /** How many of a product can't go out: items stopped, and counted kit reported, at most what's counted. */
   unusable(modelId: string): number
@@ -49,7 +49,7 @@ export function faultsView(
   cursor: number,
   jobs: JobsView,
   warehouse: WarehouseView,
-  /** Items an inspection keeps from going out (ADR 0019). */
+  /** Items an inspection keeps from going out (ADR 0020). */
   blocked: (assetId: string) => boolean = () => false
 ): FaultsView {
   const faults = new Map<string, Fault & { pending: boolean }>()

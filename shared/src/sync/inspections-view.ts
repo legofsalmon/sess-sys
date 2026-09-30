@@ -6,7 +6,7 @@ import { addDays } from './plan.ts'
 import type { AssetView, WarehouseView } from './stock-view.ts'
 
 /**
- * Inspections (ADR 0019) as a device sees them: each item's records, with
+ * Inspections (ADR 0020) as a device sees them: each item's records, with
  * this person's waiting ones laid over them, and for each inspection its
  * product needs, when it's next due. An item whose last one failed, or
  * that's overdue, can't go out; one never recorded here is listed, but not

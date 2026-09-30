@@ -1,4 +1,4 @@
-# ADR 0019: Inspections
+# ADR 0020: Inspections
 
 - **Status:** Accepted, 30 September 2026. The seventh part of Phase 2.
 - **Decides:** how electrical tests (PAT) and thorough examinations of

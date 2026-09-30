@@ -2,6 +2,8 @@ import { waitLabel, type HistoryEntry, type HistoryPage } from '@sh/shared'
 import { useEffect, useRef, useState } from 'react'
 import { markSignedOut } from './auth.ts'
 import { when } from './format.ts'
+import { MadeUp } from './jobs/common.tsx'
+import { client } from './sync.ts'
 
 /**
  * The history (ADR 0006): who did what, when, on which device, whether it
@@ -73,7 +75,10 @@ export function HistoryScreen() {
           <span className="mark">SH</span>
           <span>
             <b>Session Hire</b>
-            <small>History</small>
+            <small>
+              History
+              <MadeUp view={client.view()} />
+            </small>
           </span>
         </div>
       </header>

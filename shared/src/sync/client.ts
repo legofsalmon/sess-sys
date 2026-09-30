@@ -39,6 +39,8 @@ export interface Snapshot {
   generation?: string
   /** What this device has had applied lately, kept to send again if the server's data is ever restored from a backup. */
   sent?: SentMutation[]
+  /** The server holds made-up data (ADR 0019). */
+  madeUp?: boolean
 }
 
 export interface Storage {
@@ -102,13 +104,15 @@ export interface View {
   moves: MovesView
   /** Faults and missing kit, and the repair list (ADR 0018). */
   faults: FaultsView
-  /** Inspections, and what's due (ADR 0019). */
+  /** Inspections, and what's due (ADR 0020). */
   inspections: InspectionsView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
   connection: Connection
   cursor: number
+  /** The server holds made-up data to try the app with (ADR 0019), as of the last sync. */
+  madeUp: boolean
 }
 
 export function emptySnapshot(clientId: string): Snapshot {
@@ -263,6 +267,7 @@ export class SyncClient {
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
       connection: this.connection,
       cursor: this.state.cursor,
+      madeUp: this.state.madeUp === true,
     }
   }
 
@@ -284,12 +289,15 @@ export class SyncClient {
   private async push() {
     const waiting = this.state.outbox.filter((m) => m.appliedSeq === undefined)
     if (waiting.length === 0) return
-    const { results } = await this.transport.push({
+    const { results, stale } = await this.transport.push({
       clientId: this.state.clientId,
       mutations: waiting.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
       // On the same clock as each createdAt, so the server can tell how long each waited here.
       sentAt: this.now().toISOString(),
+      ...(this.state.generation ? { generation: this.state.generation } : {}),
     })
+    // The app started fresh after this device's copy: the pull that follows starts it afresh, dropping these.
+    if (stale) return
     const byId = new Map<string, MutationResult>(results.map((r) => [r.id, r]))
     const kept: PendingMutation[] = []
     for (const m of this.state.outbox) {
@@ -307,8 +315,9 @@ export class SyncClient {
       const res = await this.transport.pull(this.state.cursor)
       const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
       const behind = res.head !== undefined && res.head < this.state.cursor
-      if (restored || behind) return this.restart(res.generation)
+      if (restored || behind) return this.restart(res.generation, restored && res.cleared === true)
       if (res.generation) this.state.generation = res.generation
+      this.state.madeUp = res.madeUp === true
       for (const change of res.changes) applyChange(this.state, change)
       this.state.cursor = Math.max(this.state.cursor, res.cursor)
       // Applied mutations leave the outbox once their result has arrived.
@@ -336,16 +345,21 @@ export class SyncClient {
    * did it. The server skips whatever it already has, since every command
    * carries its own id, and anything that no longer fits shows up as a
    * problem to deal with, as it would after a long time offline.
+   *
+   * Unless the server was cleared on purpose (someone started fresh, ADR
+   * 0019): then everything this device did belongs to what was cleared, so
+   * it's dropped, along with any problems left from then, rather than sent
+   * again.
    */
-  private async restart(generation: string | undefined) {
+  private async restart(generation: string | undefined, cleared = false) {
     const seen = new Set<string>()
     const replay: PendingMutation[] = []
-    for (const m of [...(this.state.sent ?? []), ...this.state.outbox]) {
+    for (const m of cleared ? [] : [...(this.state.sent ?? []), ...this.state.outbox]) {
       if (seen.has(m.id)) continue
       seen.add(m.id)
       replay.push(strip(m))
     }
-    this.state = { ...emptySnapshot(this.state.clientId), generation, outbox: replay, problems: this.state.problems }
+    this.state = { ...emptySnapshot(this.state.clientId), generation, outbox: replay, problems: cleared ? [] : this.state.problems }
     await this.persist()
     this.again = true
   }

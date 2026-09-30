@@ -35,7 +35,7 @@ import './stock.css'
  * short (ADR 0014); labels (ADR 0015); the camera, to scan them (ADR 0016);
  * the pick lists going out and still out (ADR 0017); and faults and
  * missing kit waiting to be sorted out (ADR 0018); and inspections due
- * (ADR 0019). A product, item or place opens on its own page
+ * (ADR 0020). A product, item or place opens on its own page
  * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>), labels on
  * theirs (#stock/labels, #stock/labels/<id>), and testing a batch on
  * #stock/testing. The Phase 0

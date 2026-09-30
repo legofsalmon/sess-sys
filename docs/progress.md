@@ -10,7 +10,7 @@ waiting on someone.
 - The seventh part of Phase 2: electrical tests (PAT) and thorough
   examinations of lifting gear are recorded on each item, the app works
   out when each is next due, and kit that failed or is overdue can't go
-  out. [Decision 0019](adr/0019-inspections.md) has the reasons.
+  out. [Decision 0020](adr/0020-inspections.md) has the reasons.
 - A numbered product's **Change details** has **PAT every, in months**
   and **Thorough examination every, in months** (blank for never). Its
   page says "Testing: PAT every 12 months", how many of its items can't
@@ -40,8 +40,55 @@ waiting on someone.
   a retest with no signal) and a new browser test at phone size (the
   interval set, a test on paper recorded and overdue, the Stock tab's
   list, a batch tested with one fail and one with no signal, the failed
-  item's page, the job short, and the scan out warned). All 36 browser
-  tests and all 229 server tests pass.
+  item's page, the job short, and the scan out warned). All 37 browser
+  tests and all 240 server tests pass, with the made-up data work merged in.
+
+## 30 September 2026: made-up data to try the app with, and starting fresh
+
+**Done**
+
+- The real stock list, crew lists and calendars won't be in until next
+  week, so the app can now be tried in full with made-up data, and cleared
+  before the real data goes in.
+  [Decision 0019](adr/0019-made-up-data-and-starting-fresh.md) has the
+  reasons.
+- On the Account tab, **Put in made-up data** fills an empty app with a
+  few weeks of made-up jobs, crew and stock: speakers short between two
+  jobs, a quote that would leave the moving heads short, an LED wall
+  hired in, crew booked, offered, countered and declined, a freelancer
+  on two jobs at once, labelled items and amps in racks, a roll of label
+  numbers, pick lists for the jobs going out, and a job that's over with
+  two speakers not back and one on the repair list. Every name is
+  invented and nobody can be
+  emailed or texted. The jobs are always in the coming weeks.
+- While it's in, every screen says **made-up data** beside its name, on
+  every phone.
+- **Start fresh**, on the same card, deletes everything but the staff
+  accounts, once "delete everything" is typed: made-up data and anything
+  tried on top of it, the history too, and label numbers start again
+  from SH-000001. It makes a backup first where backups are on, and waits
+  for Google Calendar to be disconnected. One entry is left in the
+  history, saying who did it.
+- Every phone empties its copy by itself, and drops what it had waiting
+  rather than sending it again, so nothing made up comes back, even from
+  a phone that was out of signal.
+- Checked: 10 new server tests (the made-up data through the server's own
+  rules, with what each tab shows; only into an empty app; the typed
+  words; everything deleted but the staff accounts, with one history
+  entry; phones emptied and a phone's waiting changes dropped; a backup
+  first, and nothing deleted if it fails; neither while Google Calendar
+  is connected), one on real Postgres with twenty phones sending while
+  the office starts fresh, and a new browser test (made-up data in,
+  marked on every tab, then deleted with the words typed while another
+  phone empties by itself). All 36 browser tests and all 236 server
+  tests pass, on real Postgres too.
+
+**Next**
+
+- Colly, to try it: on the Account tab, tap **Put in made-up data**, then
+  look round Jobs, Crew and Stock.
+- When the real data is ready next week: Account tab, open **Start
+  fresh**, type "delete everything" and tap **Delete everything**.
 
 ## 30 September 2026: faults, missing kit and repairs
 

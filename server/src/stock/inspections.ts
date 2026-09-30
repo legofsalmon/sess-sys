@@ -4,7 +4,7 @@ import { emit, Refused, type Ctx } from '../kernel.ts'
 import { getAsset } from './store.ts'
 
 /**
- * Inspections (ADR 0019): each electrical test and thorough examination
+ * Inspections (ADR 0020): each electrical test and thorough examination
  * of a numbered item, kept for good as the register the law asks for. A
  * record says something that already happened, so it's kept whoever sends
  * it; only one for an item never saved, or retired, is turned down. When

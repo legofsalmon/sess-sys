@@ -37,7 +37,7 @@ import {
  * here (ADR 0015). Retiring keeps it and its number for the record; it can
  * be brought back. Damage, or its going missing, is reported here, and
  * each fault is fixed, found or written off here too (ADR 0018), and its
- * electrical tests and thorough examinations are recorded (ADR 0019).
+ * electrical tests and thorough examinations are recorded (ADR 0020).
  */
 export function ItemScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse

@@ -47,7 +47,7 @@ import { dueText } from './Inspections.tsx'
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
  * and where it's counted, faults in what's counted (ADR 0018), and how
- * often its items need testing (ADR 0019). Items are added one after another while
+ * often its items need testing (ADR 0020). Items are added one after another while
  * labelling: the number field is ready for the next label as soon as one is
  * added, and where stays put.
  */

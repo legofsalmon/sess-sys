@@ -108,7 +108,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     if (found) await act(() => client.mutate('fault.close', { id: fault.id, outcome: 'found', at: new Date().toISOString() }))
     if (found) notes.push("It was reported missing, so it's marked found.")
     else if (fault && mode === 'out') notes.push(`It's reported ${faultState(fault).toLowerCase()}${fault.note ? `: ${fault.note}` : ''}. Check it before it goes.`)
-    // Failed or overdue its PAT or examination (ADR 0019): it shouldn't go.
+    // Failed or overdue its PAT or examination (ADR 0020): it shouldn't go.
     const check = mode === 'out' ? client.view().inspections.blocks(a.id) : undefined
     if (check) notes.push(`${dueText(check)}. Test it before it goes.`)
 

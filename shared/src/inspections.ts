@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 /**
- * Inspections (ADR 0019): the electrical test (PAT) and the thorough
+ * Inspections (ADR 0020): the electrical test (PAT) and the thorough
  * examination of lifting gear, recorded on numbered items. A product says
  * how often its items need each; an item whose last one failed, or that's
  * overdue, can't go out until it passes again. A record says something that

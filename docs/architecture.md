@@ -270,7 +270,7 @@ says product and item; the code says model and asset.
   closed as fixed, not faulty, found or written off. Since a scan records
   what already happened, scanning out faulty kit is warned about and
   kept, not refused. Inspections are built
-  ([ADR 0019](adr/0019-inspections.md)): each PAT and thorough
+  ([ADR 0020](adr/0020-inspections.md)): each PAT and thorough
   examination recorded on an item, passed or failed, kept for good; a
   product says how many months apart its items need each, and each
   device works out when it's next due. Failed or overdue kit is warned
@@ -283,7 +283,7 @@ says product and item; the code says model and asset.
   recorded now (ADR 0017), but kit out past its job isn't yet taken off
   what's free. Kit missing, or damaged and not fit to use, is
   (ADR 0018), and so is kit that failed or is overdue a test
-  (ADR 0019); hours and buffers come next.
+  (ADR 0020); hours and buffers come next.
 
 **People**
 
@@ -459,6 +459,12 @@ Crewbox.
   separate storage, each one restored into a scratch database to prove it
   works before it counts ([ADR 0004](adr/0004-backups.md)). After a
   restore, devices reload their copy and send again what the backup missed.
+- Start fresh on the Account tab deletes everything but the staff
+  accounts, after a backup, to clear made-up data before the real data
+  goes in ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)).
+  Devices reload their copy as after a restore, but drop what they had
+  waiting instead of sending it again, and the server turns down changes
+  made on the copy from before.
 - The outbox means no scan or change is lost if the server is down; devices
   keep working from their replica.
 - Every command is idempotent by its client id, so retries are safe.

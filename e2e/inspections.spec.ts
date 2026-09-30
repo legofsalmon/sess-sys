@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Inspections end to end (ADR 0019), at phone size: a speaker product is
+ * Inspections end to end (ADR 0020), at phone size: a speaker product is
  * set to need a PAT every 12 months, with three items. One's last PAT,
  * done on paper over a year ago, is recorded on its page: it's overdue, so
  * it can't go out, and the Stock tab lists it. Then a batch is tested by

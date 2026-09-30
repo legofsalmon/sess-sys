@@ -68,7 +68,7 @@ export const model = z.object({
   /** What one would cost to replace. */
   valueCents: cents.nullable(),
   notes: z.string().max(2000),
-  /** How often its items need an electrical test (PAT), and a thorough examination, in months; null for never (ADR 0019). */
+  /** How often its items need an electrical test (PAT), and a thorough examination, in months; null for never (ADR 0020). */
   patMonths: months.default(null),
   liftingMonths: months.default(null),
 })

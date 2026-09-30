@@ -48,7 +48,7 @@ export type Tone = 'bad' | 'warn' | 'ok' | 'quiet'
 /**
  * Whether a line has enough, in words: "Short 2 on Wed 8 Oct: 10 owned, 4
  * on Fuel". Kit damaged or missing (ADR 0018), or failed or overdue a test
- * (ADR 0019), isn't counted as owned. Short on a confirmed job is bad; on
+ * (ADR 0020), isn't counted as owned. Short on a confirmed job is bad; on
  * an enquiry or a quote it's a warning, as is enough that the pencilled jobs would use up. Undefined
  * when there's nothing to say: a stopped job, or days gone by.
  */

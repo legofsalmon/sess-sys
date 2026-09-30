@@ -23,7 +23,7 @@ import { pgliteDb } from '../src/db.ts'
 import { readHistory } from '../src/history.ts'
 
 /**
- * Inspections (ADR 0019): a product says how often its items need an
+ * Inspections (ADR 0020): a product says how often its items need an
  * electrical test (PAT) or a thorough examination; each one done is kept,
  * as a scan is; and each device works out when each item is next due. An
  * item whose last one failed, or that's overdue, can't go out, and comes

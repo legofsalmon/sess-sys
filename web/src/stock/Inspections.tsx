@@ -17,7 +17,7 @@ import { numberLabel, Pending, STOCK_COMMANDS } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
- * Inspections (ADR 0019): the electrical test (PAT) and the thorough
+ * Inspections (ADR 0020): the electrical test (PAT) and the thorough
  * examination of lifting gear. A product says how often its items need
  * each; each one done is recorded on the item's page, or a batch at a
  * time by scanning (#stock/testing), and the Stock tab lists what's

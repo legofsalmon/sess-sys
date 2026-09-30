@@ -7,7 +7,7 @@ import { runMigrations, type Module } from '../migrations.ts'
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
  * the numbers set aside for printing labels (ADR 0015); kit scanned out
  * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
- * inspections (ADR 0019).
+ * inspections (ADR 0020).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -150,7 +150,7 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS faults_model ON faults (model_id);
   CREATE INDEX IF NOT EXISTS faults_project ON faults (project_id);
   `,
-  // Inspections (ADR 0019): how often a product's items need an electrical
+  // Inspections (ADR 0020): how often a product's items need an electrical
   // test and a thorough examination, and each one done. Kept for good, as
   // the register the law asks for.
   `

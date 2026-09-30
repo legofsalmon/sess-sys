@@ -82,7 +82,7 @@ const byNumber = (a: Asset, b: Asset) => (a.number ? 0 : 1) - (b.number ? 0 : 1)
 
 export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number): WarehouseView {
   const models = new Map<string, Model & { pending: boolean }>()
-  // Products saved before inspections (ADR 0019) have no intervals yet.
+  // Products saved before inspections (ADR 0020) have no intervals yet.
   const checks = (m: Partial<Model>) => ({ patMonths: m.patMonths ?? null, liftingMonths: m.liftingMonths ?? null })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })
   const places = new Map<string, Place & { pending: boolean }>()
