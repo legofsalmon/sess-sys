@@ -39,3 +39,24 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .detail p { margin: 0; color: var(--ink); }
 .crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
 .crew .away-form input:nth-child(3), .crew .away-form button { grid-column: 1 / -1; }
+
+/* Timesheets (ADR 0022): what's waiting on the office in the Crew tab, and a booking's timesheet to check and approve. */
+.crew .ts-group { display: grid; gap: var(--space-8); }
+.crew .ts-group + .ts-group { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.crew .ts-group h3, .timesheet-screen h3 { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.crew .ts-group .row:first-of-type { border-top: 0; padding-top: 0; }
+.crew .ts-row > div:first-child { flex: 1 1 14em; }
+.crew .ts-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.timesheet-screen .ts-days { display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.timesheet-screen .ts-days label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
+.timesheet-screen .ts-days label.extra-day { border-style: dashed; }
+.timesheet-screen .ts-days input { width: 20px; height: 20px; accent-color: var(--accent); }
+.timesheet-screen .ts-days small { color: var(--muted); }
+.timesheet-screen .ts-extras { display: grid; gap: var(--space-6); }
+.timesheet-screen .ts-extra { display: grid; grid-template-columns: 1fr 6.5em auto; gap: var(--space-6); align-items: center; }
+.timesheet-screen button.link.start { justify-self: start; min-height: 44px; }
+.timesheet-screen .ts-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+.timesheet-screen .ts-lines li { display: flex; justify-content: space-between; gap: var(--space-10); }
+.timesheet-screen .ts-lines li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.timesheet-screen .ts-changes { margin: var(--space-4) 0 0; padding-left: 1.2em; }
+.timesheet-screen .ts-total { margin: 0; font-weight: 700; }

@@ -7,6 +7,7 @@ import {
 } from '@sh/shared'
 import { newId } from '@sh/shared'
 import { crewHandlers } from './crew/handlers.ts'
+import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
 import { projectHandlers } from './projects/handlers.ts'
@@ -128,6 +129,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...moveHandlers,
   ...faultHandlers,
   ...inspectionHandlers,
+  ...timesheetHandlers,
 }
 
 /**

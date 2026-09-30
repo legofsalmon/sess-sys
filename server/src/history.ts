@@ -12,6 +12,7 @@ import {
   OFFLINE_AFTER_SECONDS,
   RETIRED_LABELS,
   STATUS_LABELS,
+  timesheetSummary,
   valueLabel,
   type Department,
   type HistoryEntry,
@@ -536,6 +537,21 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
       const day = typeof a.at === 'string' ? ` on ${dayLabel(irishToday(new Date(a.at)))}` : ''
       return `Recorded ${item(a.assetId)} ${a.passed ? 'passing' : 'failing'} its ${what}${day}${by}${note}`
+    }
+    case 'timesheet.send': {
+      const o = offer(a.id)
+      const n = Array.isArray(a.days) ? a.days.length : 0
+      const extras = Array.isArray(a.extras) ? (a.extras as { cents?: unknown }[]).reduce((sum, e) => sum + (typeof e.cents === 'number' ? e.cents : 0), 0) : 0
+      return `Sent ${o.who}'s timesheet for ${o.what}: ${n} day${n === 1 ? '' : 's'}${extras ? `, and ${euro(extras)} of extras` : ''}`
+    }
+    case 'timesheet.approve': {
+      const o = offer(a.id)
+      const figures = { days: Array.isArray(a.days) ? (a.days as string[]) : [], dayRateCents: typeof a.dayRateCents === 'number' ? a.dayRateCents : null, extras: Array.isArray(a.extras) ? (a.extras as { what: string; cents: number }[]) : [] }
+      return `Approved ${o.who}'s timesheet for ${o.what}: ${timesheetSummary(figures)}`
+    }
+    case 'timesheet.reopen': {
+      const o = offer(a.id)
+      return `Reopened ${o.who}'s timesheet for ${o.what}, to change it`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

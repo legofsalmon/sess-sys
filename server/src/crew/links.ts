@@ -1,4 +1,4 @@
-import { eachDay, feedCodeFor, feedPath, newId, type CommandArgs, type CommandName, type MutationResult } from '@sh/shared'
+import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
@@ -7,12 +7,14 @@ import { publicOrigin } from '../http.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
 import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
-import { awayFor, getAway, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
+import { awayFor, getAway, getCall, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
+import { renderTimesheet } from './timesheet-page.ts'
+import { getTimesheet, timesheetsFor } from './timesheets.ts'
 
 /**
  * A freelancer's private link, /f/<token>: their page, the answers they
- * post from it, their bookings' call sheets, their calendar feed and their
- * data. The token is the only
+ * post from it, their bookings' call sheets and timesheets, their calendar
+ * feed and their data. The token is the only
  * credential, so every action checks the thing it touches belongs to the
  * link's person. Answers go through the same command handlers as the app,
  * so the same rules (first to accept, no double booking) hold.
@@ -67,7 +69,18 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
     return reply
       .type('text/html')
-      .send(renderPage({ person, jobs, away: await awayFor(db, person.id), base: base(req, person.linkToken), feed, flash, today: today() }))
+      .send(
+        renderPage({
+          person,
+          jobs,
+          away: await awayFor(db, person.id),
+          base: base(req, person.linkToken),
+          feed,
+          flash,
+          today: today(),
+          timesheets: await timesheetsFor(db, person.id),
+        })
+      )
   })
 
   // A booking's call sheet (ADR 0021): only the person's own, while it's going ahead.
@@ -78,6 +91,56 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const sheet = await sheetFor(db, person.id, req.params.id ?? '')
     if (!sheet) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken)))
     return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken)))
+  })
+
+  // A booking's timesheet (ADR 0022): the person's own, from its first day.
+  app.get('/f/:token/timesheet/:id', async (req: Req, reply) => {
+    noStore(reply)
+    const person = await personByToken(db, req.params.token)
+    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    const offer = await getOffer(db, req.params.id ?? '')
+    const call = offer && offer.personId === person.id ? await getCall(db, offer.callId) : undefined
+    if (!offer || !call) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken), 'timesheet'))
+    const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300) } : undefined
+    return reply.type('text/html').send(
+      renderTimesheet({
+        offer,
+        call,
+        timesheet: await getTimesheet(db, offer.id),
+        why: noTimesheetReason(offer, call, person, today()),
+        base: base(req, person.linkToken),
+        flash,
+      })
+    )
+  })
+
+  app.post('/f/:token/timesheet/:id', async (req: Req, reply) => {
+    const person = await personByToken(db, req.params.token)
+    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    const offer = await getOffer(db, req.params.id ?? '')
+    if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, "That booking isn't one of yours.", false)
+    const again = (text: string, ok: boolean) =>
+      reply.redirect(`/f/${person.linkToken}/timesheet/${encodeURIComponent(offer.id)}?${new URLSearchParams({ m: text, ok: ok ? '1' : '0' })}`, 303)
+    const form = (req.body ?? new URLSearchParams()) as Form
+    const days = form.getAll('days')
+    if (days.length === 0) return again('Tick at least one day you worked.', false)
+    const whats = form.getAll('what')
+    const euros = form.getAll('euro')
+    const extras: TimesheetExtra[] = []
+    for (let i = 0; i < Math.max(whats.length, euros.length); i++) {
+      const what = (whats[i] ?? '').trim().slice(0, 100)
+      const amount = (euros[i] ?? '').replace(/[€\s]/g, '').replace(',', '.')
+      if (!what && !amount) continue
+      if (!what) return again('Say what each extra is for.', false)
+      const n = Number(amount)
+      if (!amount || !Number.isFinite(n) || n <= 0) return again(`Put in the amount for ${what}, in euro.`, false)
+      extras.push({ what, cents: Math.round(n * 100) })
+    }
+    if (extras.length > MAX_EXTRAS) return again(`There's room for ${MAX_EXTRAS} extras: put the rest together, or in the note.`, false)
+    const note = (form.get('note') ?? '').slice(0, 1000)
+    const result = await run(req, person.id, 'timesheet.send', { id: offer.id, days, extras, note })
+    if (result.status === 'rejected') return again(result.reason.message, false)
+    return again("Thanks, it's gone to the office. You can change it until they approve it.", true)
   })
 
   app.post('/f/:token/offers/:id', async (req: Req, reply) => {
@@ -162,6 +225,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       profile,
       daysOff: await awayFor(db, person.id),
       jobs: await offersFor(db, person.id),
+      timesheets: [...(await timesheetsFor(db, person.id)).values()],
     })
   })
 }

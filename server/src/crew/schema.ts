@@ -68,6 +68,23 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS crew_calls_project ON crew_calls (project_id);
   CREATE INDEX IF NOT EXISTS crew_calls_phase ON crew_calls (phase_id);
   `,
+  // Timesheets (ADR 0022): one for a booking, so it has the booking's offer
+  // id. What was sent is kept beside what the office approved.
+  `
+  CREATE TABLE IF NOT EXISTS timesheets (
+    id              text PRIMARY KEY REFERENCES offers(id),
+    status          text NOT NULL CHECK (status IN ('sent', 'approved')),
+    days            jsonb NOT NULL,
+    day_rate_cents  integer,
+    extras          jsonb NOT NULL DEFAULT '[]',
+    sent            jsonb NOT NULL,
+    note            text NOT NULL DEFAULT '',
+    office_note     text NOT NULL DEFAULT '',
+    sent_at         timestamptz NOT NULL,
+    sent_via        text NOT NULL CHECK (sent_via IN ('link', 'app')),
+    approved_at     timestamptz
+  );
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

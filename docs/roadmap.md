@@ -144,7 +144,9 @@ counter the rate, days off), no double booking, personal calendar feeds,
 offer messages ready for WhatsApp, text or email, and crew asked for from a
 job's phases ([ADR 0007](adr/0007-jobs.md)). Call sheets for each phase are
 built too ([ADR 0021](adr/0021-call-sheets.md)): in the app, on paper, and
-on each freelancer's private link.
+on each freelancer's private link. So are timesheets
+([ADR 0022](adr/0022-timesheets.md)): the days worked at the day rate and
+the extras, sent from a freelancer's link and approved by the office.
 
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they
@@ -162,7 +164,10 @@ on each freelancer's private link.
   WhatsApp group, and sent to each person as a link to their own; a
   contact on the day who sees everyone's number and the kit; the rest of
   the crew see who's on by name only).
-- Timesheets from assignments, adjusted and approved by ops.
+- Timesheets from assignments, adjusted and approved by ops (built: the
+  days worked at the booking's day rate and the extras, sent from the
+  freelancer's link or filled in by the office, changed if need be and
+  approved in one step, with what changed shown to the freelancer).
 - **Crewbox show pack** (files: patch CSV, lighting CSV, running order,
   crew list with the join QR).
 

@@ -26,7 +26,9 @@ it comes back, with a repair list; and PAT tests and thorough
 examinations recorded, a batch at a time by scanning, with failed and
 overdue kit kept off jobs. Phase 3, crew, has call sheets for each
 phase: in the app, on paper, and on each freelancer's private link,
-with who to ring on the day. Until the real stock and crew lists
+with who to ring on the day; and timesheets, the days worked at the day
+rate and the extras, sent from a freelancer's link and approved by the
+office in one step. Until the real stock and crew lists
 are in, the Account tab puts in made-up data to try every part of the
 app with, and Start fresh clears it all before the real data goes in.
 The app runs on Railway. Start with the

@@ -11,6 +11,7 @@ import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
 import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
+import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -106,6 +107,8 @@ export interface View {
   faults: FaultsView
   /** Inspections, and what's due (ADR 0020). */
   inspections: InspectionsView
+  /** Freelancers' timesheets for their bookings (ADR 0022). */
+  timesheets: TimesheetsView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -262,6 +265,7 @@ export class SyncClient {
       moves: movesView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today, faults),
       faults,
       inspections,
+      timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

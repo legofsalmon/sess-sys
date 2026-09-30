@@ -8,6 +8,7 @@ import { labelCommandSchemas } from './labels.ts'
 import { day } from './model.ts'
 import { moveCommandSchemas } from './moves.ts'
 import { stockCommandSchemas } from './stock.ts'
+import { timesheetCommandSchemas } from './timesheets.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -45,6 +46,7 @@ export const commandSchemas = {
   ...moveCommandSchemas,
   ...faultCommandSchemas,
   ...inspectionCommandSchemas,
+  ...timesheetCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

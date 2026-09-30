@@ -25,7 +25,9 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  * - pick lists for the jobs going out soon, and a job that's over with two
  *   speakers still not back, and one back with a rattle, on the repair list;
  * - call sheets (ADR 0021): a contact on the day and a running order for
- *   the festival's days, and a crew chief booked who sees everyone's number.
+ *   the festival's days, and a crew chief booked who sees everyone's number;
+ * - timesheets (ADR 0022) for the gala that's over: one sent with extras,
+ *   waiting on the office; one approved with a change; and one not in yet.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -82,7 +84,7 @@ export function madeUpData(today: string): Mutation[] {
   phase(showcase, 'Show', 30, 30)
   add('project.update', { id: showcase, status: 'cancelled' })
   const gala = job('Autumn Gala', brightwater, northbank.id, 'confirmed')
-  phase(gala, 'Show', -10, -9)
+  const galaShow = phase(gala, 'Show', -10, -9)
 
   // Crew: staff, freelancers, and some days off.
   const person = (name: string, kind: 'staff' | 'freelancer', skills: string[], euroADay: number | null) =>
@@ -133,6 +135,7 @@ export function madeUpData(today: string): Mutation[] {
     const id = offer(callId, personId)
     add('offer.respond', { id, answer: 'accept', days: null, note: '' })
     add('offer.confirm', { id })
+    return id
   }
   const riggers = call(harbourIn, 'Harbour Lights Festival', riverside.id, 'Rigger', 2, 290, '07:00')
   booked(riggers, padraig)
@@ -154,6 +157,33 @@ export function madeUpData(today: string): Mutation[] {
   for (const p of [harbourIn, harbourShow, harbourOut]) add('phase.update', { id: p.id, contactId: aoife })
   add('phase.update', { id: summitShow.id, contactId: cian })
   add('phase.update', { id: launchShow.id, contactId: orla })
+
+  // The gala's crew, and their timesheets, sent from their private links.
+  const galaSound = call(galaShow, 'Autumn Gala', northbank.id, 'Sound No.1', 1, 320, '10:00')
+  const galaHands = call(galaShow, 'Autumn Gala', northbank.id, 'Stagehand', 2, 200, '10:00')
+  const daraGala = booked(galaSound, dara)
+  const tadhgGala = booked(galaHands, tadhg)
+  booked(galaHands, laoise)
+  const both = [galaShow.start, galaShow.end]
+  add('timesheet.send', {
+    id: daraGala,
+    days: both,
+    extras: [
+      { what: 'Parking', cents: 1800 },
+      { what: 'Mileage', cents: 2550 },
+    ],
+    note: 'Receipts in the post.',
+  })
+  add('timesheet.send', {
+    id: tadhgGala,
+    days: both,
+    extras: [
+      { what: 'Parking', cents: 1200 },
+      { what: 'Dinner', cents: 2200 },
+    ],
+    note: '',
+  })
+  add('timesheet.approve', { id: tadhgGala, days: both, dayRateCents: 20000, extras: [{ what: 'Parking', cents: 1200 }], officeNote: 'Food was on site, so no dinner.' })
 
   // The warehouse: places, products, counts and labelled items.
   const place = (name: string) => add('place.upsert', { id: newId(), name, notes: '' }).id
