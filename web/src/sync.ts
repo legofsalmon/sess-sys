@@ -25,8 +25,9 @@ export function syncSoon() {
   )
 }
 
+// Behind this device too: the server started fresh or was restored, which a pull finds out.
 transport.listen((cursor) => {
-  if (cursor > client.view().cursor) syncSoon()
+  if (cursor !== client.view().cursor) syncSoon()
 })
 addEventListener('online', syncSoon)
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncSoon())

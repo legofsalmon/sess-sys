@@ -14,6 +14,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Top } from '../jobs/common.tsx'
 import { client, syncSoon } from '../sync.ts'
 import { useFeedAddress } from './feed.ts'
 
@@ -73,18 +74,7 @@ export function CrewScreen() {
 
   return (
     <div className="app crew">
-      <header className="top">
-        <div className="brand">
-          <span className="mark">SH</span>
-          <span>
-            <b>Session Hire</b>
-            <small>Crew</small>
-          </span>
-        </div>
-        <span className={`conn ${view.connection === 'offline' ? 'offline' : view.pendingCount ? 'syncing' : 'online'}`} role="status">
-          {view.connection === 'offline' ? `No signal${view.pendingCount ? ` · ${view.pendingCount} waiting` : ''}` : view.pendingCount ? `${view.pendingCount} waiting` : 'Up to date'}
-        </span>
-      </header>
+      <Top view={view} title="Crew" />
 
       {problems.length > 0 && (
         <section className="card attention">

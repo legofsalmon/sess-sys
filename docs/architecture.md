@@ -453,6 +453,12 @@ Crewbox.
   separate storage, each one restored into a scratch database to prove it
   works before it counts ([ADR 0004](adr/0004-backups.md)). After a
   restore, devices reload their copy and send again what the backup missed.
+- Start fresh on the Account tab deletes everything but the staff
+  accounts, after a backup, to clear made-up data before the real data
+  goes in ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)).
+  Devices reload their copy as after a restore, but drop what they had
+  waiting instead of sending it again, and the server turns down changes
+  made on the copy from before.
 - The outbox means no scan or change is lost if the server is down; devices
   keep working from their replica.
 - Every command is idempotent by its client id, so retries are safe.

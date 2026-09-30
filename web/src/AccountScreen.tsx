@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
+import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
+import { MadeUp } from './jobs/common.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, and the device's own sync state. */
+/** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -48,7 +50,10 @@ export function AccountScreen() {
           <span className="mark">SH</span>
           <span>
             <b>Session Hire</b>
-            <small>Account</small>
+            <small>
+              Account
+              <MadeUp view={view} />
+            </small>
           </span>
         </div>
       </header>
@@ -96,6 +101,7 @@ export function AccountScreen() {
           <CalendarCard view={view} available={auth.status === 'signed-in'} />
           <BackupsCard />
           <ExportCard />
+          <DataCard view={view} />
         </>
       )}
 

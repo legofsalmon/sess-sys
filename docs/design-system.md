@@ -107,6 +107,13 @@ in px too.
   under it, the picture shrinks to 180 px so the form's button stays on
   screen. A camera that can't start shows why, in words that say what to
   do, and Try again. Not in Figma yet.
+- Made-up data ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md))
+  is named beside every screen's name in the top bar, "· made-up data" in
+  the bold amber warn tone, on every phone while it's in. Deleting
+  everything is the one button in the **bad** tone, filled, with the
+  soft bad tone for its text (4.7:1 light, 6.9:1 dark): it stays off
+  until "delete everything" is typed in the field above it, and says what
+  it does, not "OK". Not in Figma yet.
 - A pick list ([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md))
   has **Going out** and **Coming back** as two buttons, the pressed one
   ink, over the total in bold ("12 of 40 out"), the scan field with
