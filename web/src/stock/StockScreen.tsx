@@ -22,6 +22,7 @@ import { client } from '../sync.ts'
 import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
+import { InspectionsDue, TestingScreen } from './Inspections.tsx'
 import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
@@ -33,9 +34,11 @@ import './stock.css'
  * where everything is kept, and what's counted; the kit on jobs that's
  * short (ADR 0014); labels (ADR 0015); the camera, to scan them (ADR 0016);
  * the pick lists going out and still out (ADR 0017); and faults and
- * missing kit waiting to be sorted out (ADR 0018). A product, item or place opens
- * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
- * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
+ * missing kit waiting to be sorted out (ADR 0018); and inspections due
+ * (ADR 0019). A product, item or place opens on its own page
+ * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>), labels on
+ * theirs (#stock/labels, #stock/labels/<id>), and testing a batch on
+ * #stock/testing. The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -44,6 +47,7 @@ export function StockScreen() {
   const hash = useHash()
   if (hash === '#stock/sync-test') return <App />
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
+  if (hash === '#stock/testing') return <TestingScreen view={view} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
   if (run) return <RunScreen key={run} view={view} id={decodeURIComponent(run)} />
   const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
@@ -200,6 +204,8 @@ function Catalogue({ view }: { view: View }) {
       <PickLists view={view} />
 
       <RepairList view={view} />
+
+      <InspectionsDue view={view} />
 
       <ShortKit view={view} />
 

@@ -64,9 +64,9 @@ export interface PickRow {
   missingItems: AssetView[]
   countedMissing: number
   missing: number
-  /** How many of the product are missing or not fit to use, anywhere. */
+  /** How many of the product can't go out, anywhere: missing, not fit to use, or not passed an inspection. */
   unusable: number
-  /** Where to find the ones that aren't out, by place: items missing or not fit to use left out. */
+  /** Where to find the ones that aren't out, by place: items that can't go out left out. */
   from: PickFrom[]
 }
 
@@ -270,7 +270,7 @@ export function movesView(
       // Where to find the rest: items not out with any job, and what's counted, place by place.
       const from = new Map<string, PickFrom>()
       const at = (where: string) => from.get(where) ?? (from.set(where, { where, items: [], counted: 0 }), from.get(where)!)
-      for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.stopping(a.id)) at(whereKept(a)).items.push(a)
+      for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.cantGoOut(a.id)) at(whereKept(a)).items.push(a)
       for (const s of r.model?.counted ?? []) at(whereKept(s)).counted += s.qty
       r.from = [...from.values()].sort((a, b) => a.where.localeCompare(b.where, 'en-IE', { numeric: true }))
     }

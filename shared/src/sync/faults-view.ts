@@ -33,6 +33,8 @@ export interface FaultsView {
   ofJob(jobId: string): FaultView[]
   /** The open fault keeping an item from going out, if any: missing before damaged, then its case's, if that's missing. */
   stopping(assetId: string): FaultView | undefined
+  /** Whether an item can't go out: a fault stops it, or an inspection it failed or is overdue (ADR 0019). */
+  cantGoOut(assetId: string): boolean
   /** How many of a product can't go out: items stopped, and counted kit reported, at most what's counted. */
   unusable(modelId: string): number
 }
@@ -46,7 +48,9 @@ export function faultsView(
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number,
   jobs: JobsView,
-  warehouse: WarehouseView
+  warehouse: WarehouseView,
+  /** Items an inspection keeps from going out (ADR 0019). */
+  blocked: (assetId: string) => boolean = () => false
 ): FaultsView {
   const faults = new Map<string, Fault & { pending: boolean }>()
   for (const f of Object.values(entities.fault ?? {})) faults.set(f.id, { ...f, pending: false })
@@ -130,10 +134,11 @@ export function faultsView(
     }
     return undefined
   }
+  const cantGoOut = (assetId: string) => !!stopping(assetId) || blocked(assetId)
   const unusable = (modelId: string) => {
     const m = modelById.get(modelId)
     if (!m) return 0
-    const items = m.items.filter((a) => stopping(a.id)).length
+    const items = m.items.filter((a) => cantGoOut(a.id)).length
     const counted = (byModel.get(modelId) ?? []).filter((f) => f.stops).reduce((n, f) => n + f.qty, 0)
     return items + Math.min(counted, m.countedTotal)
   }
@@ -145,6 +150,7 @@ export function faultsView(
     ofModel: (id) => byModel.get(id) ?? [],
     ofJob: (id) => byJob.get(id) ?? [],
     stopping,
+    cantGoOut,
     unusable,
   }
 }

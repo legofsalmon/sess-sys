@@ -124,8 +124,10 @@ faults, missing kit and repairs
 - Faults, repairs, PAT and inspection records; unavailable while in repair
   (built: faults and missing kit on items and counted kit, the Stock
   tab's repair list with repair notes, fixed, found or written off, and
-  kit that can't go out taken off what's free for jobs. To come: PAT
-  tests and inspections, with kit overdue blocked).
+  kit that can't go out taken off what's free for jobs; PAT tests and
+  thorough examinations recorded per item or a batch by scanning, with
+  when each is next due, and failed or overdue kit taken off what's
+  free and warned about when scanned out).
 
 **Done when:** a job's kit is picked and returned by scanning, and
 availability for next week is trusted without walking the shelves.

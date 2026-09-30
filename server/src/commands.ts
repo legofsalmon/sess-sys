@@ -14,6 +14,7 @@ import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
 import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
+import { inspectionHandlers } from './stock/inspections.ts'
 import { moveHandlers } from './stock/moves.ts'
 
 /**
@@ -126,6 +127,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...labelHandlers,
   ...moveHandlers,
   ...faultHandlers,
+  ...inspectionHandlers,
 }
 
 /**

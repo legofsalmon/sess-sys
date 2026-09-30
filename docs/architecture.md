@@ -269,7 +269,12 @@ says product and item; the code says model and asset.
   some counted kit, reported damaged or missing, with repair notes, and
   closed as fixed, not faulty, found or written off. Since a scan records
   what already happened, scanning out faulty kit is warned about and
-  kept, not refused. Inspections come next.
+  kept, not refused. Inspections are built
+  ([ADR 0019](adr/0019-inspections.md)): each PAT and thorough
+  examination recorded on an item, passed or failed, kept for good; a
+  product says how many months apart its items need each, and each
+  device works out when it's next due. Failed or overdue kit is warned
+  about when scanned out, the same way.
 - **Availability** is computed from equipment lines, movements and
   maintenance, per product per hour, including prep and return buffers.
   Built for now from kit lines and what's owned, per product per whole
@@ -277,7 +282,8 @@ says product and item; the code says model and asset.
   jobs hold kit, enquiries and quotes are pencilled in. Movements are
   recorded now (ADR 0017), but kit out past its job isn't yet taken off
   what's free. Kit missing, or damaged and not fit to use, is
-  (ADR 0018); inspections, hours and buffers come next.
+  (ADR 0018), and so is kit that failed or is overdue a test
+  (ADR 0019); hours and buffers come next.
 
 **People**
 
