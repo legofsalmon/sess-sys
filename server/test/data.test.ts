@@ -172,6 +172,10 @@ describe('made-up data', () => {
     expect(view.labels.runs).toHaveLength(1)
     expect(view.labels.runs[0]).toMatchObject({ name: 'Made-up roll', firstNumber: 'SH-000027', lastNumber: 'SH-000046' })
     expect(view.labels.next).toBe('SH-000047')
+
+    // Pick lists: the jobs going out soon, and the gala over with two speakers not back.
+    expect(view.moves.soon.map((p) => p.job.name)).toEqual(['Harbour Lights Festival', 'Brightwater Tech Summit', 'Liffey Brands Launch'])
+    expect(view.moves.stillOut.map((p) => [p.job.name, p.stillOut, p.back])).toEqual([['Autumn Gala', 2, 6]])
     expect(view.problems).toEqual([])
 
     // In the history as Aoife's, from "Made-up data", and one entry saying she put it in.

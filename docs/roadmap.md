@@ -11,7 +11,7 @@ architecture doc are answered.
 
 ## Phase 0: Foundations
 
-**Status: built; the phone field test is left.** Sync engine built and decided ([ADR 0001](adr/0001-sync-engine.md)); app live on Railway with Postgres in Frankfurt; staff sign-in built ([ADR 0003](adr/0003-staff-sign-in.md)) and waiting on its Google key; nightly backups with a test restore built ([ADR 0004](adr/0004-backups.md)) and waiting on their bucket; error alerts and uptime checks with Sentry built ([ADR 0005](adr/0005-error-alerts.md)) and waiting on the Sentry key; the history of every change and Download everything built and on ([ADR 0006](adr/0006-audit-trail-and-export.md)). See [progress.md](progress.md).
+**Status: built; the phone field test is left.** Sync engine built and decided ([ADR 0001](adr/0001-sync-engine.md)); app live on Railway with Postgres in Frankfurt; staff sign-in built ([ADR 0003](adr/0003-staff-sign-in.md)) and waiting on its Google key; nightly backups with a test restore built ([ADR 0004](adr/0004-backups.md)) and waiting on their bucket; error alerts and uptime checks with Sentry built ([ADR 0005](adr/0005-error-alerts.md)) and waiting on the Sentry key; the history of every change and Download everything built and on ([ADR 0006](adr/0006-audit-trail-and-export.md)). Made-up data to try every part of the app with, and Start fresh to clear it all before the real data goes in, built and on ([ADR 0018](adr/0018-made-up-data-and-starting-fresh.md)). See [progress.md](progress.md).
 
 - Repo, CI, preview deploys, EU hosting, backups with a tested restore.
 - Staff sign-in with Google Workspace; freelancer magic links.

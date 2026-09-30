@@ -1,7 +1,7 @@
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { pushRequest, type Change, type ClientConfig, type EntityName, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
@@ -13,8 +13,8 @@ import { Google } from './calendar/google.ts'
 import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
-import { applyMutation, currentSeq } from './commands.ts'
-import { startedFresh } from './data/fresh.ts'
+import { applyMutationIn, currentSeq } from './commands.ts'
+import { clearedSince, startedFresh } from './data/fresh.ts'
 import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerCrewLinks } from './crew/links.ts'
@@ -158,18 +158,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
     const { clientId, mutations, sentAt, generation } = parsed.data
-    // Made on a copy of the data from before someone started fresh (ADR 0018): none of it belongs any more.
-    if (generation) {
-      const { rows } = await db.query<{ value: string }>(`SELECT value FROM server_meta WHERE key = 'generation'`)
-      const current = rows[0]?.value
-      if (current && generation !== current && (await startedFresh(db, current))) return { results: [], stale: true }
-    }
     const from = { userId: req.user?.id, sentAt, device: describeDevice(req.headers['user-agent']) }
-    const results = []
+    const results: MutationResult[] = []
+    let stale = false
     // In order: a device's later request may depend on an earlier one.
-    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, from))
+    for (const m of mutations) {
+      const result = await db.transaction(async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(7331)')
+        // Made on a copy of the data from before someone started fresh (ADR 0018): none of it belongs any more.
+        if (generation && (await clearedSince(tx, generation))) return undefined
+        return applyMutationIn(tx, clientId, m as never, from)
+      })
+      if (!result) {
+        stale = true
+        break
+      }
+      results.push(result)
+    }
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
-    return { results }
+    return stale ? { results: [], stale } : { results }
   })
 
   app.get<{ Querystring: { after?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {

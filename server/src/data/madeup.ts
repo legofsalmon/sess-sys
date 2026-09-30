@@ -16,10 +16,12 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   the confirmed job whose spare it would use;
  * - an LED wall hired in, as nothing like it is owned;
  * - crew booked, offered, countered and declined; a freelancer offered a
- *   second job on days he's booked (a check in the planner), and days off;
+ *   second job on days they're booked (a check in the planner), and days off;
  * - labelled items, some still counted and not labelled yet, amp racks
  *   holding their amps, counted cables and mics, and a roll of label
- *   numbers set aside.
+ *   numbers set aside;
+ * - pick lists for the jobs going out soon, and a job that's over with two
+ *   speakers still not back.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -138,7 +140,7 @@ export function madeUpData(today: string): Mutation[] {
   add('offer.respond', { id: offer(lx, fionn), answer: 'counter', counterRateCents: 32000, days: null, note: 'Two long days; can you do 320?' })
   booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00'), tadhg)
   booked(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Video', 1, 300), grainne)
-  // Dara is booked at Harbour Lights then: sent anyway, so the planner shows it as a check.
+  // Dara is booked at Harbour Lights then: offered anyway, so the planner shows it as a check.
   offer(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Sound No.1', 1, 320), dara, true)
   booked(call(launchShow, 'Liffey Brands Launch', pier3.id, 'LX op', 1, 280, '10:00'), orla)
 
@@ -164,7 +166,7 @@ export function madeUpData(today: string): Mutation[] {
     add('asset.add', { id: newId(), modelId, number: null, serial: '', ...where, notes: '', fromCount }).id
   // 16 speakers counted, 12 of them labelled so far.
   count(y10p, bayA1, 16)
-  for (let i = 0; i < 12; i++) item(y10p, { placeId: bayA1, caseId: null }, true)
+  const speakers = Array.from({ length: 12 }, () => item(y10p, { placeId: bayA1, caseId: null }, true))
   for (let r = 0; r < 2; r++) {
     const inRack = item(rack, { placeId: bayA2, caseId: null })
     for (let i = 0; i < 2; i++) item(d20, { placeId: null, caseId: inRack })
@@ -198,5 +200,11 @@ export function madeUpData(today: string): Mutation[] {
   kit(wedding, sm58, 4)
   kit(wedding, xlr, 10)
   kit(gala, y10p, 8)
+
+  // The gala's speakers went out and came back, all but two.
+  const scan = (direction: 'out' | 'in', assetId: string, on: number, time: string) =>
+    add('move.record', { id: newId(), projectId: gala, direction, assetId, modelId: y10p, qty: 1, at: `${day(on)}T${time}:00.000Z` })
+  for (const s of speakers.slice(0, 8)) scan('out', s, -11, '09:00')
+  for (const s of speakers.slice(0, 6)) scan('in', s, -8, '11:00')
   return out
 }

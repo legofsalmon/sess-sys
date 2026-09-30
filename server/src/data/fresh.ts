@@ -1,5 +1,5 @@
 import { irishToday, newId, type DataStatus } from '@sh/shared'
-import { newGeneration } from '../backup/format.ts'
+import { newGeneration, readGeneration } from '../backup/format.ts'
 import { readLink } from '../calendar/store.ts'
 import { applyMutationIn, type From } from '../commands.ts'
 import type { Db, Queryable } from '../db.ts'
@@ -64,6 +64,16 @@ export async function dataStatus(q: Queryable, backups: boolean): Promise<DataSt
 /** Whether this generation began with someone starting fresh, so devices drop what they had waiting rather than send it. */
 export async function startedFresh(q: Queryable, generation: string): Promise<boolean> {
   return (await readMark(q, 'fresh'))?.generation === generation
+}
+
+/**
+ * Whether the app has started fresh since a device's copy, `generation`,
+ * so what it made on that copy belongs to what was cleared. Read under the
+ * command lock, so starting fresh can't come between this and the command.
+ */
+export async function clearedSince(q: Queryable, generation: string): Promise<boolean> {
+  const current = await readGeneration(q)
+  return current !== '' && current !== generation && (await startedFresh(q, current))
 }
 
 export interface Who {
