@@ -67,6 +67,10 @@ waiting on someone.
   still read once, the camera turned off on leaving; a blocked camera and
   Try again), and the real camera path once with Chromium's test camera.
   All 33 browser tests and all 213 server tests pass.
+- Merged into `main` at 12:32 UTC, once GitHub's checks passed (they're
+  running again), and live by 12:38: Railway deployed it on its own. The
+  first run on GitHub found two browser tests getting in each other's way
+  on a shared test server, so the tests now run one at a time.
 
 **Next**
 
