@@ -95,8 +95,8 @@ also work for other companies, so the system bends to them instead:
 - **Offers that suit how they work.** Full details up front (dates, call
   times, venue, rate, travel, food), a clear deadline to answer, the option
   to accept only some days of a multi-day job, and to counter the rate.
-- **Get paid without chasing.** Hours and extras from the job become a
-  ready-made invoice (self-billing, if they agree) that they check and
+- **Get paid without chasing.** The days worked and the extras from the
+  job (a timesheet, sent from their link) become a ready-made invoice (self-billing, if they agree) that they check and
   approve in one step, with the payment status visible to them.
 - **Two-way.** Freelancers can tell the company things too: flag they're
   running late, add a note to the call sheet, swap a shift with another
@@ -305,7 +305,11 @@ says product and item; the code says model and asset.
   status (proposed, offered, accepted, declined, confirmed, cancelled) and a
   call time. Offers go out by app, email, calendar invite, and SMS or
   WhatsApp.
-- **Timesheet**: actual hours per assignment, approved by ops.
+- **Timesheet**: the days worked on a booking at its day rate, and the
+  extras (parking, mileage), sent by the freelancer from their link and
+  approved by ops, who can change it and say why
+  ([ADR 0022](adr/0022-timesheets.md)). Session Hire's freelancers bill a
+  day rate, not hours.
 
 **Finance (light)**
 

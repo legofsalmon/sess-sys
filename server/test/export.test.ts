@@ -121,6 +121,7 @@ describe('download everything', () => {
       'projects',
       'scans',
       'stock',
+      'timesheets',
       'unavailability',
       'users',
       'venues',

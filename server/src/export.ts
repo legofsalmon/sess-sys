@@ -205,6 +205,7 @@ const ABOUT: Record<string, string> = {
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   scans: 'Stock scanned out and back in (sync test).',
   stock: 'Counted stock: how many of a product are at a place or in a case.',
+  timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
   venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',

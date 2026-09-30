@@ -148,6 +148,12 @@ describe('made-up data', () => {
     expect(offers.filter((o) => o.person?.name === 'Dara Quinn' && o.override)).toHaveLength(1)
     expect(view.crew.unavailability).toHaveLength(1)
 
+    // Timesheets for the gala that's over: Dara's to approve, Tadhg's approved without his dinner, and Laoise's not in yet.
+    const ts = view.timesheets
+    expect(ts.toApprove.map((r) => [r.person?.name, r.total.total, r.timesheet?.sentVia])).toEqual([['Dara Quinn', 68350, 'link']])
+    expect(ts.approved.map((r) => [r.person?.name, r.total.total, r.timesheet?.officeNote])).toEqual([['Tadhg Brady', 41200, 'Food was on site, so no dinner.']])
+    expect(ts.notIn.map((r) => [r.person?.name, r.call.project])).toEqual([['Laoise Keane', 'Autumn Gala']])
+
     // Call sheets: a contact on the day and a running order, and every number from the range kept for TV and radio drama.
     const show = view.jobs.jobs.find((j) => j.name === 'Harbour Lights Festival')!.phases.find((p) => p.name === 'Show')!
     expect(view.crew.people.find((p) => p.id === show.contactId)?.name).toBe('Aoife Brennan')
@@ -187,10 +193,16 @@ describe('made-up data', () => {
     expect(view.faults.open.map((f) => [f.kind, f.usable, f.note])).toEqual([['damaged', true, 'Rattles at high level. Fine for speech meanwhile.']])
     expect(view.problems).toEqual([])
 
-    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in.
+    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets as sent on the freelancers' links.
     const history: HistoryPage = await aoife.history('?limit=500')
     expect(history.entries).toHaveLength(madeUpData('2026-10-01').length + 1)
-    expect(history.entries.every((e) => e.outcome === 'done' && e.who.name === 'Aoife Brennan')).toBe(true)
+    expect(history.entries.every((e) => e.outcome === 'done')).toBe(true)
+    const [sent, others] = [history.entries.filter((e) => e.command === 'timesheet.send'), history.entries.filter((e) => e.command !== 'timesheet.send')]
+    expect(sent.map((e) => [e.who.kind, e.who.name]).sort()).toEqual([
+      ['link', 'Dara Quinn'],
+      ['link', 'Tadhg Brady'],
+    ])
+    expect(others.every((e) => e.who.name === 'Aoife Brennan')).toBe(true)
     const [latest, ...rest] = history.entries
     expect(latest).toMatchObject({ command: 'data.made-up', device: 'Safari on iPhone', deviceCode: CODE.slice(-6) })
     expect(latest!.what).toMatch(/^Put in made-up data/)

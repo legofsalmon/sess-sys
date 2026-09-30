@@ -1,4 +1,4 @@
-import { dayLabel, daysLabel, eachDay, euro, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
+import { dayLabel, daysLabel, eachDay, euro, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -18,6 +18,8 @@ export interface PageData {
   feed: string
   flash?: { ok: boolean; text: string }
   today: string
+  /** Their timesheets (ADR 0022), by booking. */
+  timesheets: ReadonlyMap<string, Timesheet>
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -82,6 +84,31 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   </article>`
 }
 
+/** How long an approved timesheet stays on the page. */
+const APPROVED_SHOWN_DAYS = 60
+
+/** Bookings whose timesheet is to send, sent, or lately approved: to send first. */
+function timesheets(d: PageData): string {
+  const since = new Date(Date.now() - APPROVED_SHOWN_DAYS * 86_400_000).toISOString()
+  const rows = d.jobs
+    .map((j) => ({ ...j, t: d.timesheets.get(j.offer.id) }))
+    .filter((j) => (j.t ? j.t.status !== 'approved' || (j.t.approvedAt ?? '') >= since : noTimesheetReason(j.offer, j.call, d.person, d.today) === null))
+    .sort((a, b) => rank(a.t) - rank(b.t) || a.call.start.localeCompare(b.call.start))
+  if (!rows.length) return ''
+  return `<section><h2>Timesheets</h2><ul class="ts-list">${rows
+    .map(({ offer, call, t }) => {
+      const state = !t ? 'to-send' : t.status
+      const text = !t
+        ? 'Send your days and extras ›'
+        : t.status === 'sent'
+          ? `Sent: ${euro(timesheetTotal(t).total)}. The office will check it ›`
+          : `Approved: ${euro(timesheetTotal(t).total)} ›`
+      return `<li><a class="${state}" href="${d.base}/timesheet/${encodeURIComponent(offer.id)}"><b>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</b><small>${h(call.role)} · ${h(daysLabel(offer.days))}</small><span>${h(text)}</span></a></li>`
+    })
+    .join('')}</ul></section>`
+}
+const rank = (t: Timesheet | undefined) => (!t ? 0 : t.status === 'sent' ? 1 : 2)
+
 export function renderPage(d: PageData): string {
   const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
@@ -109,6 +136,8 @@ export function renderPage(d: PageData): string {
     <h2>Offers waiting on you</h2>
     ${waiting.length ? waiting.map((j) => offerCard(d, j)).join('') : '<p class="empty">Nothing waiting right now.</p>'}
   </section>
+
+  ${timesheets(d)}
 
   <section>
     <h2>Your bookings</h2>
@@ -200,4 +229,8 @@ fieldset.days input{width:20px}
 .add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
 footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
 .sheet-link{font-weight:600;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-decoration:none}
+.ts-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ts-list a{display:grid;gap:2px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none}
+.ts-list a.to-send{border-left-color:var(--accent)}.ts-list a.sent{border-left-color:var(--warn)}.ts-list a.approved{border-left-color:var(--good)}
+.ts-list small{color:var(--muted)}.ts-list b span{font-weight:500;color:var(--muted)}.ts-list a>span{font-weight:600}
 `

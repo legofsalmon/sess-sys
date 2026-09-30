@@ -14,16 +14,18 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Top } from '../jobs/common.tsx'
+import { Top, useHash } from '../jobs/common.tsx'
 import { client, syncSoon } from '../sync.ts'
 import { useFeedAddress } from './feed.ts'
+import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
  * the people who can be offered work. Answers arrive from freelancers'
  * private links, and from Google Calendar when crew invites are on (ADR
  * 0009), and show up here live; everything also works with no signal and
- * syncs later, like the rest of the app.
+ * syncs later, like the rest of the app. Timesheets for bookings that
+ * have happened are checked and approved here too (ADR 0022).
  */
 
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
@@ -53,6 +55,7 @@ function useView(): View {
 
 export function CrewScreen() {
   const view = useView()
+  const hash = useHash()
   const crew = view.crew
   const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
   const people = new Map(crew.people.map((p) => [p.id, p]))
@@ -70,7 +73,9 @@ export function CrewScreen() {
         return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
       })
   )
-  const problems = view.problems.filter((p) => /^(person|call|offer|unavailability)\./.test(p.mutation.name))
+  const problems = view.problems.filter((p) => /^(person|call|offer|unavailability|timesheet)\./.test(p.mutation.name))
+  const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
+  if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
 
   return (
     <div className="app crew">
@@ -137,6 +142,8 @@ export function CrewScreen() {
           ))}
         </section>
       )}
+
+      <TimesheetsCard view={view} />
 
       <section className="card">
         <h2>Crew needed</h2>

@@ -3,6 +3,51 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: timesheets
+
+**Done**
+
+- The second part of Phase 3: freelancers send a timesheet for each
+  booking, and the office checks and approves it.
+  [Decision 0022](adr/0022-timesheets.md) has the reasons.
+- Freelancers bill a day rate, so a timesheet is the **days worked** at
+  the booking's agreed rate, plus **extras** such as parking, tolls or
+  mileage, and a note. There's one for each confirmed booking, from its
+  first day. Staff are paid through payroll, so they have none.
+- A freelancer's private page lists their **Timesheets**: to send, sent,
+  and approved lately. Each opens with their booked days ticked and rows
+  for extras, sent with no app, and they can change it until the office
+  approves it.
+- The Crew tab has **Timesheets**: to approve, not in yet, and approved
+  lately. **Check** opens one to change the days, rate or extras, with a
+  note and a preview of what the freelancer will see changed, then
+  **Approve** in one step. **Ask** sends someone a link straight to
+  theirs. **Fill in** puts one in for someone who won't. An approved one
+  is reopened to change it.
+- Once approved, the freelancer sees the total, each line, and anything
+  the office changed, in words: "Mileage: €20, not €25.50".
+- The made-up data has the Autumn Gala's crew, which is over: Dara's
+  timesheet waiting to be approved, Tadhg's approved without his
+  dinner, and Laoise's not in yet.
+- Checked: 5 new tests of totals, changes and which bookings have one,
+  and of the office's list with changes waiting to sync. Also 4 new
+  server tests: sent from a link and shown on the freelancer's page;
+  only for their own confirmed booking, from its first day, on their
+  booked days; approved with changes, settled, and reopened; and put in
+  by the office. A new browser test runs from the office's check and
+  approval to a freelancer's phone and back.
+- Call sheets, merged earlier today, went live by themselves once main's
+  checks passed.
+
+**Next**
+
+- Colly, to try it: put in the made-up data, then **Crew**, and
+  **Check** under Timesheets.
+- Is anything paid by the half day, or with overtime? For now the office
+  changes the rate or adds an extra line.
+- Next in Phase 3: ready-made freelancer invoices from the approved
+  timesheets, with their payment status on the freelancer's page.
+
 ## 30 September 2026: call sheets
 
 **Done**

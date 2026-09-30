@@ -101,13 +101,22 @@ export async function fillWithMadeUpData(db: Db, who: Who, now = new Date()): Pr
       throw new DataRefused('Disconnect Google Calendar first, above: the made-up jobs would go on it.')
     if (!(await isEmpty(tx))) throw new DataRefused('Made-up data only goes into an empty app. Start fresh first, then put it in.')
     for (const m of commands) {
-      const result = await applyMutationIn(tx, 'server', m, from)
+      // Timesheets come from freelancers' private links (ADR 0022), as they would.
+      const link = m.name === 'timesheet.send' ? await personOfOffer(tx, (m.args as { id: string }).id) : undefined
+      const result = link
+        ? await applyMutationIn(tx, `link:${link}`, m, { device: from.device, via: 'link' })
+        : await applyMutationIn(tx, 'server', m, from)
       if (result.status !== 'applied') throw new Error(`Made-up data: ${m.name} was turned down: ${result.reason.message}`)
     }
     await recordAction(tx, who, DATA_ACTIONS.madeUp, { commands: commands.length }, now)
     await writeMark(tx, 'made_up', { at: now.toISOString(), by: who.name ?? null })
   })
   return { commands: commands.length }
+}
+
+async function personOfOffer(q: Queryable, offerId: string): Promise<string | undefined> {
+  const { rows } = await q.query<{ person_id: string }>('SELECT person_id FROM offers WHERE id = $1', [offerId])
+  return rows[0]?.person_id
 }
 
 /**
