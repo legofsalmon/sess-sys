@@ -675,9 +675,13 @@ waiting on someone.
   fields are at least 44px tall. Done in the app, the freelancer page and
   Figma. Checked: typecheck, all server tests, all 8 browser tests.
 
-**Next**
-
-- Add the spacing and radius tokens to `app.css` so code and Figma share them.
+- Spacing and radius tokens, added on 30 September: `app.css` names them as
+  Figma does (`--space-2` to `--space-40`, `--radius-control`,
+  `--radius-tab`, `--radius-card`, `--radius-full`), and `app.css` and
+  `crew.css` use them wherever a value is on the scale. Nothing on screen
+  moved. Checked: typecheck, the web build, all 31 browser tests, and 12
+  screens screenshotted before and after in light and dark, two also at
+  laptop width: all 28 identical to the pixel.
 
 ## 29 September 2026: nightly backups built
 
