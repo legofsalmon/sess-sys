@@ -38,9 +38,12 @@ and Figma gets updated. Every colour token carries its CSS name (for example
   own font (`system-ui`: SF on iPhone, Roboto on Android); Inter stands in
   inside Figma.
 
-Spacing and radius are named in Figma (`var(--space-8)`, `var(--radius-card)`)
-but are still plain px values in the CSS. Adding them to `app.css` is a small
-follow-up that lets the two stay in step.
+Spacing and radius carry their CSS names the same way: `space/8` is
+`var(--space-8)` and `radius/card` is `var(--radius-card)`, set on `:root` in
+`app.css` next to the colours. `app.css` and `crew.css` use them wherever a
+value is on the scale, and anything off it, such as a 1px line or a 3px
+nudge, stays in px. The stylesheets for screens not in Figma yet, `jobs.css`
+and `stock.css`, still have plain px values.
 
 ## Rules the components encode
 
