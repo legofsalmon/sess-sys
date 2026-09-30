@@ -22,11 +22,13 @@ import { Choices, clientNamed, NotDone, StatusPill, today, Top, useHash, useView
 import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
+import { PickScreen } from './PickScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
- * A job opens on its own page (#jobs/<id>) with its phases, kit and crew, the
+ * A job opens on its own page (#jobs/<id>) with its phases, kit and crew,
+ * its pick list on another (#jobs/<id>/pick, ADR 0017), the
  * planner (#plan, ADR 0010) shows them by week or month, and jobs already
  * on Google Calendar can be brought in (#import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
@@ -49,6 +51,8 @@ export function JobsScreen() {
   const hash = useHash()
   if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
   if (hash === '#import') return <ImportScreen view={view} />
+  const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
+  if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const open = hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
   if (open) return <JobScreen view={view} id={open} />
   return <JobList view={view} />

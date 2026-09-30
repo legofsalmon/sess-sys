@@ -4,6 +4,7 @@ import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
 import { labelCommandSchemas } from './labels.ts'
 import { day } from './model.ts'
+import { moveCommandSchemas } from './moves.ts'
 import { stockCommandSchemas } from './stock.ts'
 
 /**
@@ -39,6 +40,7 @@ export const commandSchemas = {
   ...stockCommandSchemas,
   ...kitCommandSchemas,
   ...labelCommandSchemas,
+  ...moveCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

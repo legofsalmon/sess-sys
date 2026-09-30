@@ -216,6 +216,7 @@ const REFERENCES = [
   'modelId',
   'placeId',
   'caseId',
+  'assetId',
   'fromPlaceId',
   'fromCaseId',
   'toPlaceId',
@@ -487,6 +488,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       if (a.name !== undefined) parts.push(typeof a.name === 'string' && a.name.trim() ? `what they're for to ${clip(a.name.trim())}` : "what they're for")
       if (a.notes !== undefined) parts.push('the notes')
       return `Changed the labels ${runRange(look('labelRun', a.id)) ?? 'set aside'}: ${inWords(parts)}`
+    }
+    case 'move.record': {
+      const way = a.direction === 'in' ? 'back in from' : 'out to'
+      if (a.assetId) return `Scanned ${item(a.assetId)} ${way} ${job(a.projectId)}`
+      return `Counted ${typeof a.qty === 'number' ? a.qty : 'some'} × ${model(a.modelId)} ${way} ${job(a.projectId)}`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

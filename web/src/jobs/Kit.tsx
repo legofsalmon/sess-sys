@@ -103,6 +103,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
   return (
     <section className="card kit" aria-label="Kit">
       <h2>Kit</h2>
+      <PickLink job={job} view={view} lines={lines} />
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
       {lines.length === 0 && <p className="empty">No kit yet. Add what the job needs from the stock list below, for the whole job or one phase.</p>}
       {DEPARTMENTS.filter((d) => byDepartment.has(d)).map((d) => (
@@ -121,6 +122,30 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
         ))}
       </datalist>
     </section>
+  )
+}
+
+/** The way to the job's pick list (ADR 0017), with how much is out. */
+function PickLink({ job, view, lines }: { job: JobView; view: View; lines: readonly KitLineView[] }) {
+  const pick = view.moves.pickList(job.id)
+  if (!pick || (lines.length === 0 && pick.stillOut === 0)) return null
+  const said =
+    pick.stillOut === 0 && pick.back > 0
+      ? 'All back'
+      : pick.stillOut > 0
+        ? pick.need
+          ? `Out: ${pick.out} of ${pick.need}`
+          : `${pick.stillOut} out`
+        : pick.need
+          ? `${pick.need} to go out`
+          : 'All subhired'
+  return (
+    <div className="pick-link">
+      <a className="button" href={`#jobs/${job.id}/pick`}>
+        Pick list
+      </a>
+      <span>{said}</span>
+    </div>
   )
 }
 

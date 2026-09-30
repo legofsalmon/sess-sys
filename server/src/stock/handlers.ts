@@ -1,6 +1,7 @@
 import { MAX_CASE_DEPTH, MAX_NUMBER, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { jobsWithKit } from './kit.ts'
+import { movementsOf } from './moves.ts'
 import {
   atPlace,
   caseChain,
@@ -223,6 +224,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         code: 'conflict',
         message: `${m.name} is on the kit for ${jobs.length === 1 ? jobs[0] : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`}. Take it off ${jobs.length === 1 ? 'that job' : 'those'} first.`,
       })
+    if ((await movementsOf(ctx.tx, a.id)) > 0)
+      throw new Refused({ code: 'conflict', message: `${m.name} has been out on jobs, which is kept for the record, so it can't be removed.` })
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },
