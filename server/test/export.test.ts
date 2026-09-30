@@ -109,6 +109,7 @@ describe('download everything', () => {
       'kit_lines',
       'label_runs',
       'models',
+      'movements',
       'mutations',
       'offers',
       'people',

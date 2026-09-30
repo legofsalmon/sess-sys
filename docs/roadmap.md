@@ -86,7 +86,9 @@ for the whole job or a phase, with shortages worked out on each device
 and subhire. So is printing labels ([ADR 0015](adr/0015-printing-labels.md)):
 numbers set aside a run at a time, printed here or by a label maker, and
 put on items by scanning them. And so is scanning with the phone's camera
-in the app ([ADR 0016](adr/0016-camera-scanning.md)). See
+in the app ([ADR 0016](adr/0016-camera-scanning.md)), and so are pick
+lists with scanning kit out to jobs and back in
+([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md)). See
 [progress.md](progress.md).
 
 - Catalogue, products, assets, containers, bulk stock, locations (built:
@@ -110,7 +112,11 @@ in the app ([ADR 0016](adr/0016-camera-scanning.md)). See
   makers' barcodes in the Stock search, one after another).
 - Pick lists per project, **scan out and scan in on a phone, offline**,
   missing and damaged items on return, and a conflict queue for scans that
-  did not match the plan.
+  did not match the plan (built: each job's pick list with where to find
+  its kit, scanned or counted out and back with no signal, a case taking
+  what's in it along; a scan that doesn't match the plan is kept and
+  said; the Stock tab lists jobs going out soon and kit still out. To
+  come: missing and damaged on return, and sorting out what didn't match).
 - Faults, repairs, PAT and inspection records; unavailable while in repair.
 
 **Done when:** a job's kit is picked and returned by scanning, and
