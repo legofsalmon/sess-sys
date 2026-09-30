@@ -3,11 +3,6 @@
 .warehouse h1.number { letter-spacing: .02em; }
 .warehouse h3 { margin: 0; font-size: .95rem; }
 .warehouse .facts .wide { grid-column: 1 / -1; }
-/* The search, with the camera's button beside it where the phone has one (ADR 0016). */
-.warehouse form.with-scan { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-.warehouse form.with-scan button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-/* Scrolled to after the camera reads a new label, clear of the tabs. */
-.warehouse .claim button[type='submit'] { scroll-margin-bottom: 84px; }
 .warehouse input[type='number'] { width: 100%; }
 /* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
 .warehouse .card > form:has(> h3) { padding-top: 12px; border-top: 1px solid var(--line); }
@@ -96,3 +91,19 @@
   .print-sheet .page:last-child { break-after: auto; }
   .print-sheet.sheet .page { width: 210mm; height: 297mm; padding: 10.7mm 4.75mm 0; display: grid; grid-template-columns: repeat(5, 38.1mm); grid-auto-rows: 21.2mm; column-gap: 2.5mm; align-content: start; }
 }
+
+/* Scanning with the camera (ADR 0016): a square picture, as the reader looks at its middle square. */
+.warehouse .scan-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.warehouse .scanner { display: grid; gap: 8px; }
+.warehouse .viewfinder { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; justify-self: center; overflow: hidden; border-radius: 12px; background: #000; }
+.warehouse .scanner.small .viewfinder { max-width: 180px; }
+.warehouse .scan-row button[aria-pressed='true'], .warehouse .scan-controls button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.warehouse .viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.warehouse .viewfinder .frame { position: absolute; inset: 14%; border: 3px solid #fff8; border-radius: 10px; box-shadow: 0 0 0 999px #0005; pointer-events: none; }
+.warehouse .viewfinder .frame[data-read] { animation: scan-read .6s ease-out; }
+@keyframes scan-read { from { border-color: var(--good); background: #1d7a4c40; } to { border-color: #fff8; background: transparent; } }
+.warehouse .viewfinder .starting { position: absolute; inset: auto 0 12px; margin: 0; text-align: center; color: #fff; font-size: .9rem; }
+.warehouse .scan-status { margin: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+.warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.warehouse .scanner .alert { display: grid; gap: 8px; justify-items: start; }
+.warehouse .scanner .alert p { margin: 0; }

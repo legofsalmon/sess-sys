@@ -95,13 +95,14 @@ follow-up that lets the two stay in step.
   form right under the search, with the cursor in its first field. Not in
   Figma yet.
 - The camera ([ADR 0016](adr/0016-camera-scanning.md)) opens under the
-  search from a **Scan** button beside it, dark while the camera is on: a
-  4 : 3 picture at most a third of the screen high, darkened round a
-  white frame to aim with, a grey line saying what it read, and its
-  buttons under that (Light, where the phone has one; Close camera).
-  While something is done with what it read, it shrinks to a strip, its
-  frame dashed, so the form under it fits with its button in reach of a
-  thumb. Not in Figma yet.
+  search from **Scan**, which stays pressed while it's on: a square
+  picture with rounded corners, the outside dimmed round a white frame,
+  which flashes green on each read. Under it, "Read SH-000123" (or "Point
+  the camera at a label.") in bold, then Light, Sound and Stop camera as
+  small buttons, Light and Sound pressed when on. With a form to fill in
+  under it, the picture shrinks to 180 px so the form's button stays on
+  screen. A camera that can't start shows why, in words that say what to
+  do, and Try again. Not in Figma yet.
 
 ## Accessibility
 

@@ -11,26 +11,24 @@ import {
   type Tracking,
   type View,
 } from '@sh/shared'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { App } from '../App.tsx'
 import { act, euroToCents } from '../crew/CrewScreen.tsx'
 import { NotDone, StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
-import type { Read } from '../scan/reader.ts'
-import { canScan, Scanner } from '../scan/Scanner.tsx'
 import { client } from '../sync.ts'
 import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
+import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
  * where everything is kept, and what's counted; the kit on jobs that's
- * short (ADR 0014); labels (ADR 0015), and scanning them with the phone's
- * camera from the search (ADR 0016). A product, item or place opens
+ * short (ADR 0014); labels (ADR 0015); and the camera, to scan them (ADR 0016). A product, item or place opens
  * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
  * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
@@ -52,92 +50,59 @@ export function StockScreen() {
   return <Catalogue view={view} />
 }
 
-/**
- * What the Stock search finds for some text, typed or scanned: the item
- * with that number, a label that isn't on anything yet (ADR 0015), items by
- * number or serial, and products by name. A maker's barcode read by the
- * camera is a serial number, not a Session Hire one, so it's looked up by
- * serial only (ADR 0016).
- */
-function lookup(text: string, view: View, department: Department | 'all', serialOnly = false) {
-  const w = view.warehouse
-  const q = text.trim().toLowerCase()
-  const words = q.split(/\s+/).filter(Boolean)
-  const number = serialOnly ? undefined : normaliseNumber(text)
-  const exact = number ? w.byNumber.get(number) : undefined
-  // A label that isn't on anything yet: one from a run, or anything typed as a label rather than a bare number.
-  const unclaimed = number && !exact && (view.labels.runOf(number) || /^\s*sh|\/a\//i.test(text)) ? number : undefined
-  // Items by number or serial, once there's enough typed to mean something.
-  const items =
-    q.length >= 3
-      ? [...w.assets.values()]
-          .filter((a) => a !== exact && (serialOnly ? [a.serial] : [a.number, a.serial, ...a.formerNumbers]).some((t) => t.toLowerCase().includes(q)))
-          .sort((a, b) => a.number.localeCompare(b.number))
-          .slice(0, 20)
-      : []
-  // A serial read whole: the one item with exactly that serial, whatever else has it inside theirs.
-  const serial = serialOnly ? items.filter((a) => a.serial.trim().toLowerCase() === q) : []
-  const inDepartment = (m: ModelView) => department === 'all' || m.department === department
-  const matches = (m: ModelView) => {
-    const about = `${m.name} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
-    return words.every((x) => about.includes(x))
-  }
-  const shown = w.models.filter((m) => inDepartment(m) && matches(m))
-  return { number, exact, unclaimed, items, one: serial.length === 1 ? serial[0] : items.length === 1 ? items[0] : undefined, shown }
-}
-
 function Catalogue({ view }: { view: View }) {
   const w = view.warehouse
   const [department, setDepartment] = useState<Department | 'all'>('all')
   const [search, setSearch] = useState('')
-  // What's in the search came from a maker's barcode, so it's a serial (ADR 0016).
-  const [serialOnly, setSerialOnly] = useState(false)
-  const found = lookup(search, view, department, serialOnly)
-  const { number, exact, unclaimed, items, shown } = found
+  const q = search.trim().toLowerCase()
+  const words = q.split(/\s+/).filter(Boolean)
+  const number = normaliseNumber(search)
+  const exact = number ? w.byNumber.get(number) : undefined
+  // A label that isn't on anything yet (ADR 0015): one from a run, or anything typed as a label rather than a bare number.
+  const unclaimed = number && !exact && (view.labels.runOf(number) || /^\s*sh|\/a\//i.test(search)) ? number : undefined
   const searchField = useRef<HTMLInputElement>(null)
   const claimField = useRef<HTMLInputElement>(null)
   const memory = useRef<ClaimMemory>({ product: '', where: '' })
   const [claimed, setClaimed] = useState('')
-  const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
   const [camera, setCamera] = useState(false)
-  // Once a label read by the camera turns out not to be on anything yet: the cursor goes to its form for the
-  // first one; after that, with the product still there, its button is scrolled to, with no keyboard in the way.
-  const toClaim = useRef<'type' | 'tap' | null>(null)
-  useEffect(() => {
-    if (!unclaimed || !toClaim.current) return
-    const field = claimField.current
-    if (toClaim.current === 'type') field?.focus()
-    else field?.form?.querySelector('button[type="submit"]')?.scrollIntoView({ block: 'nearest' })
-    toClaim.current = null
-  }, [unclaimed])
+  const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
+  // Items by number or serial, once there's enough typed to mean something.
+  const items =
+    q.length >= 3
+      ? [...w.assets.values()]
+          .filter((a) => a !== exact && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
+          .sort((a, b) => a.number.localeCompare(b.number))
+          .slice(0, 20)
+      : []
+  const inDepartment = (m: ModelView) => department === 'all' || m.department === department
+  const matches = (m: ModelView) => {
+    const text = `${m.name} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
+    return words.every((x) => text.includes(x))
+  }
+  const shown = w.models.filter((m) => inDepartment(m) && matches(m))
   const count = (d: Department) => w.models.filter((m) => m.department === d).length
 
-  // What a scanner does, typing a label's number and Enter, and what the camera does once it's read one:
-  // straight to the item, or to saying what a new label is on.
-  const open = (found: ReturnType<typeof lookup>) => {
-    if (found.exact) location.hash = `#stock/item/${found.exact.id}`
-    else if (found.unclaimed) return true
-    else if (found.one) location.hash = `#stock/item/${found.one.id}`
-    else if (found.shown.length === 1) location.hash = `#stock/product/${found.shown[0]!.id}`
-    return false
-  }
+  // A scanner types a label's number and Enter: straight to the item, or to saying what a new label is on.
   const go = (e: FormEvent) => {
     e.preventDefault()
-    if (open(found)) claimField.current?.focus()
+    if (exact) location.hash = `#stock/item/${exact.id}`
+    else if (unclaimed) claimField.current?.focus()
+    else if (items.length === 1) location.hash = `#stock/item/${items[0]!.id}`
+    else if (shown.length === 1) location.hash = `#stock/product/${shown[0]!.id}`
   }
-  const read = ({ rawValue, format }: Read) => {
-    const text = rawValue.trim()
-    const serial = format !== 'qr_code' && !/^\s*sh/i.test(text)
-    setSearch(text)
-    setSerialOnly(serial)
-    if (open(lookup(text, view, department, serial))) toClaim.current = memory.current.product ? 'tap' : 'type'
-  }
-  // Ready for the next label: the camera carries on, or the cursor goes back for a scanner.
+  // Ready for the next label: the camera's still on, or the search is, for a scanner that types.
   const onClaimed = (id: string) => {
     setClaimed(id)
     setSearch('')
-    setSerialOnly(false)
     if (!camera) searchField.current?.focus()
+  }
+  // Read by the camera: an item's label or its maker's serial opens it; a label on nothing yet asks what it's on.
+  const onRead = (code: string) => {
+    const n = normaliseNumber(code)
+    const serial = code.toLowerCase()
+    const found = (n && w.byNumber.get(n)) || only([...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial))
+    if (found) location.hash = `#stock/item/${found.id}`
+    else setSearch(code)
   }
 
   return (
@@ -147,37 +112,29 @@ function Catalogue({ view }: { view: View }) {
 
       <section className="card">
         <h2>Stock</h2>
-        <form role="search" onSubmit={go} className={canScan() ? 'with-scan' : undefined}>
+        <form role="search" className="scan-row" onSubmit={go}>
           <input
             ref={searchField}
             className="search"
             type="search"
             enterKeyHint="go"
-            placeholder="Product, number or serial"
+            placeholder="Find a product, number or serial"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setSerialOnly(false)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             aria-label="Find"
           />
-          {canScan() && (
-            <button type="button" aria-pressed={camera} onClick={() => setCamera(!camera)}>
-              Scan
-            </button>
-          )}
-        </form>
-        {camera && (
-          <Scanner
-            onRead={read}
-            onClose={() => setCamera(false)}
-            paused={!!unclaimed}
-            onSkip={() => {
-              setSearch('')
-              setSerialOnly(false)
+          <button
+            type="button"
+            aria-pressed={camera}
+            onClick={() => {
+              if (!camera) primeSound()
+              setCamera(!camera)
             }}
-          />
-        )}
+          >
+            Scan
+          </button>
+        </form>
+        {camera && <CameraScanner onRead={onRead} onStop={() => setCamera(false)} small={!!unclaimed} />}
         {justClaimed && (
           <p className="added" role="status">
             Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
@@ -416,3 +373,6 @@ function Places({ view }: { view: View }) {
     </section>
   )
 }
+
+/** The one thing in a list, if there's exactly one. */
+const only = <T,>(list: T[]) => (list.length === 1 ? list[0] : undefined)
