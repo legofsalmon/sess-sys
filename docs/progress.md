@@ -46,10 +46,8 @@ waiting on someone.
 
 **Next**
 
-- Colly: before ordering a roll, the QR code could hold a Session Hire
-  web address instead of just the number, so a phone's own camera opens
-  the item. That needs a subdomain pointed at the app, and printed labels
-  keep it for life. Just the number is the default.
+- Decided by Colly on 30 September: the QR code holds just the number,
+  not a web address, so rolls can be ordered as built.
 - Colly, to try it: in **Stock**, **Print labels**, set aside a few
   numbers, print them on A4 or download the spreadsheet, then type one in
   the Stock search and put it on a made-up product.

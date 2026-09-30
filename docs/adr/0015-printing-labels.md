@@ -47,10 +47,11 @@ The [stock research](../research/stock-tracking.md) (§0, §5) recommends:
   date, it isn't tied to any web address or to this app, and it's the
   smallest QR code there is (21 × 21) even with the most error correction
   (up to 30% can be scuffed off and it still reads). The Stock search, a
-  scanner and the app all read it back as the number typed. The other way,
-  a Session Hire web address in the QR code so a phone's own camera opens
-  the item, is Colly's to choose before any roll is ordered: labels
-  already printed with just the number would keep working.
+  scanner and the app all read it back as the number typed. Colly chose
+  this on 30 September 2026 over the other way, a Session Hire web
+  address in the QR code so a phone's own camera opens the item, which
+  would need an address kept working for as long as the labels last; the
+  app's own camera scanning comes next instead.
 - **Printed here**, from the browser, in three layouts: a label printer
   one label to a page, 50 × 25 mm or 25 × 25 mm, or A4 sheets of 65
   (38 × 21 mm) in an office printer for trials. Up to 500 at a time, from
