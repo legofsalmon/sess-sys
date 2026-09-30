@@ -2,10 +2,11 @@ import type { View } from '@sh/shared'
 import { useEffect, useState } from 'react'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
+import { CalendarCard } from './CalendarCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, the company's backups and data, and the device's own sync state. */
+/** Who this device is signed in as, signing out, Google Calendar, the company's backups and data, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -89,6 +90,7 @@ export function AccountScreen() {
 
       {(auth.status === 'signed-in' || auth.status === 'open') && (
         <>
+          <CalendarCard view={view} available={auth.status === 'signed-in'} />
           <BackupsCard />
           <ExportCard />
         </>

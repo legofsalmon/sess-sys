@@ -23,8 +23,10 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * The secret in each freelancer's private link, wherever it turns up: in
  * their row, and in every copy of their record in the change feed, including
  * links since replaced. Whoever held the file could otherwise act as them.
+ * Likewise the app's key to the connected Google calendar (ADR 0008), even
+ * though it is stored locked; devices never see it, so the feed has no copies.
  */
-const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'] }
+const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'] }
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>
@@ -178,6 +180,8 @@ function historyCsv(history: HistoryEntry[]): string {
 const ABOUT: Record<string, string> = {
   backup_runs: 'The nightly backups: when each ran and how it went.',
   bookings: 'Stock booked for jobs (sync test).',
+  calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
+  calendar_link: 'The Google calendar confirmed jobs are written to, the account that writes them, and who connected it.',
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show.',
@@ -222,8 +226,9 @@ ${tables.join('\n')}
 
 Left out on purpose
 -------------------
-- The secrets in freelancers' private links, old and current, and staff
-  sign-in sessions: whoever held this file could otherwise act as them.
+- The secrets in freelancers' private links, old and current, staff
+  sign-in sessions, and the app's key to Google Calendar: whoever held this
+  file could otherwise act as them.
 - The server's own bookkeeping: schema versions, and which copy of the data
   this is.
 

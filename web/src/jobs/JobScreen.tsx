@@ -2,8 +2,11 @@ import {
   calendarTitles,
   crewFill,
   daysLabel,
+  eachDay,
+  irishToday,
   mapLink,
   newId,
+  phaseOnCalendar,
   PHASE_NAMES,
   PROJECT_STATUSES,
   STATUS_LABELS,
@@ -205,12 +208,59 @@ function EditJob({ job, view, onDone }: { job: JobView; view: View; onDone: () =
   )
 }
 
-/** "“Nissan - Build 1/2” and “Nissan - Build 2/2”"; a long phase gives its first and last. */
-function calendarLine(job: string, p: PhaseView) {
-  const titles = calendarTitles(job, p).map((t) => `“${t}”`)
+/** "“Nissan - Build 1/2” and “Nissan - Build 2/2”"; a long phase gives its first and last. Only the days from `from` on, when given. */
+function titlesLine(job: string, p: PhaseView, from = '') {
+  const days = eachDay(p.start, p.end)
+  const titles = calendarTitles(job, p)
+    .filter((_, i) => days[i]! >= from)
+    .map((t) => `“${t}”`)
   if (titles.length === 1) return titles[0]
   if (titles.length === 2) return `${titles[0]} and ${titles[1]}`
   return `${titles[0]} to ${titles.at(-1)}`
+}
+
+/** How a phase stands with Google Calendar (ADR 0008), in a line. */
+function CalendarLine({ job, phase, view }: { job: JobView; phase: PhaseView; view: View }) {
+  const today = irishToday()
+  const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
+  switch (on.state) {
+    case 'waiting':
+      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase)} once the job is confirmed.</p>
+    case 'stopped':
+      return <p className="cal">Not on the calendar: the job is {job.status}.</p>
+    case 'past':
+      return <p className="cal">Over, so the calendar keeps it as it was.</p>
+    case 'unconnected':
+      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase, today)} once one is connected on the Account tab.</p>
+    case 'paused':
+      return <p className="warn-line">Not being updated on the calendar: it needs connecting again on the Account tab.</p>
+    case 'going':
+      return (
+        <p className="cal">
+          Going on {on.calendar} as {titlesLine(job.name, phase, today)}…
+        </p>
+      )
+    case 'on':
+      return (
+        <p className="cal">
+          On {on.calendar} as {titlesLine(job.name, phase, today)}.
+          {on.link && (
+            <>
+              {' '}
+              <a href={on.link} target="_blank" rel="noreferrer">
+                Open it
+              </a>
+            </>
+          )}
+        </p>
+      )
+    case 'failed':
+      return (
+        <p className="warn-line">
+          {on.failed === on.days ? phase.name : `${on.failed} of its ${on.days} days`} couldn't go on {on.calendar}. {on.problem}
+        </p>
+      )
+  }
 }
 
 function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; view: View; onShare: (c: CallView) => (p: PersonView) => void }) {
@@ -233,7 +283,7 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
           </button>
         )}
       </header>
-      <p className="cal">On the calendar as {calendarLine(job.name, phase)}</p>
+      <CalendarLine job={job} phase={phase} view={view} />
       {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} />}
       {outside.map((c) => (
         <p className="warn-line" key={c.id}>

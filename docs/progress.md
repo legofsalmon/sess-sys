@@ -3,6 +3,70 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: confirmed jobs onto Google Calendar
+
+**Done**
+
+- The app now puts every day of every confirmed job, from today on, on a
+  Google calendar, in the shape crew know: one all-day event per phase per
+  day, titled "Nissan - Build 1/2", with the venue and its address as the
+  location. The description has the client, the phase and which day of it,
+  the venue's access notes, the job and phase notes, the crew booked for
+  that day by role with call times and places still to fill, and a link to
+  the job in the app. Crew show by name only: rates, phone numbers and
+  emails never go on the calendar. [Decision 0008](adr/0008-calendar-sync.md)
+  has the reasons.
+- The **Account** tab connects it: **Connect Google Calendar** goes to
+  Google to pick the account that writes the jobs, then back to pick which
+  of its calendars they go on. The card then shows the calendar, how many
+  days are on it, and anything wrong in words, with **Check now**,
+  **Change calendar** and **Disconnect**.
+- The calendar follows the jobs: renaming a job, moving or adding a phase,
+  changing a venue, booking crew or a freelancer answering from their link
+  reaches the calendar within seconds, touching only the events that
+  changed. Cancelling a job takes its days off; confirming it again puts
+  them back. Days that have gone are never changed.
+- The app leads: an event changed or deleted in Google is put back each
+  night, a few minutes after the backup while the database is awake
+  anyway, or straight away with **Check now**. Nothing else wakes the
+  database.
+- Each job's page says, for each phase, whether its days are on the
+  calendar (with a link to open it), on their way, or couldn't be written
+  and why. Enquiries say they go on once confirmed.
+- Nothing doubles: each event's id is worked out from the job, so a write
+  whose answer was lost, or two servers during a deploy, update the same
+  event. The app only ever touches its own events, found by a hidden mark.
+- Google being busy only delays things (tried again after a minute, then
+  longer); the Account tab says so only if it goes on. If Google stops
+  accepting the app's access, or the Calendar API is switched off, the
+  Account tab says exactly that and what to do, and nothing else in the
+  app is affected.
+- The key Google gives the app is kept encrypted with the app's Google
+  secret, never reaches a phone or laptop, and is left out of Download
+  everything. Disconnecting hands it back to Google. Connecting, choosing a
+  calendar and disconnecting show in the History tab.
+- Checked: 19 new server tests against a pretend Google that answers as
+  the real one does (connecting, and what Google is asked for; the
+  events' contents; renames, moves, cancelling and confirming again; a lost
+  answer; the nightly check putting back edits and deletions and clearing
+  strays while leaving people's own events alone; Google busy; a day turned
+  down; access taken away; the API off; a calendar unshared; changing
+  calendar; disconnecting; the key never in the export or on devices), one
+  more on a real Postgres like the live one, all 137 server tests, and 2
+  new browser tests for the Account card and the job page.
+
+**Next**
+
+- Colly: when adding the Google key, also switch on the Google Calendar
+  API and add the second redirect address, then connect your test
+  calendar from the Account tab ([the steps](sign-in-setup.md), updated).
+- Next in Phase 1: crew invites on the events and their answers read back
+  (behind a switch that starts off), then the week and month planner.
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 29 September 2026: Phase 1 starts with jobs, their phases, clients and venues
 
 **Done**

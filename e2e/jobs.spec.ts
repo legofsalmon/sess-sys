@@ -50,8 +50,8 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.locator('.title .pill')).toHaveText('Confirmed')
   await expect(office.locator('.facts')).toContainText(named('Nissan Ireland', id))
   await expect(office.locator('.facts')).toContainText('Mon 7 Oct to Wed 9 Oct')
-  await expect(office.getByText(`On the calendar as “${job} - Build 1/2” and “${job} - Build 2/2”`)).toBeVisible()
-  await expect(office.getByText(`On the calendar as “${job} - Show”`)).toBeVisible()
+  await expect(office.getByText(`Goes on the calendar as “${job} - Build 1/2” and “${job} - Build 2/2” once one is connected on the Account tab.`)).toBeVisible()
+  await expect(office.getByText(`Goes on the calendar as “${job} - Show” once one is connected on the Account tab.`)).toBeVisible()
 
   // Crew for the build.
   const ask = office.getByRole('form', { name: 'Ask for crew' })

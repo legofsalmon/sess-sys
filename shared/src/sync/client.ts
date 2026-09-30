@@ -1,3 +1,4 @@
+import { CALENDAR_LINK_ID, type CalendarDay, type CalendarLink } from '../calendar.ts'
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
@@ -85,6 +86,8 @@ export interface View {
   problems: Problem[]
   crew: CrewView
   jobs: JobsView
+  /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
+  calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
   connection: Connection
   cursor: number
@@ -225,6 +228,8 @@ export class SyncClient {
       problems: [...this.state.problems],
       crew,
       jobs: jobsView(entities, outbox, this.state.cursor, crew.calls),
+      // Snapshots saved before the calendar existed have no tables for it.
+      calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
       connection: this.connection,
       cursor: this.state.cursor,

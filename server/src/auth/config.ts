@@ -38,6 +38,16 @@ export function authFromEnv(env: NodeJS.ProcessEnv = process.env): AuthConfig | 
 }
 
 /**
+ * The Google client for the calendar sync (ADR 0008): the same one as
+ * sign-in, so the calendar is available exactly when sign-in is on.
+ */
+export function googleClientFromEnv(env: NodeJS.ProcessEnv = process.env): { clientId: string; clientSecret: string } | undefined {
+  const clientId = env.GOOGLE_CLIENT_ID?.trim()
+  const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim()
+  return clientId && clientSecret ? { clientId, clientSecret } : undefined
+}
+
+/**
  * Staff means a verified address that is either listed by itself or on a
  * Workspace account of a listed domain. The domain comes from Google's `hd`
  * claim, not the email's ending: a personal Google account can be made

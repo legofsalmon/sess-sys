@@ -87,6 +87,9 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .account .who b, .account .who span { display: block; }
 .account .who span { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
 .account .card button { justify-self: start; }
+.account button.link { border: 0; background: none; padding: 4px 6px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.choices { display: grid; gap: 8px; }
+.choices .signal b { display: block; overflow-wrap: anywhere; }
 
 /* History. */
 .field { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }

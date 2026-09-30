@@ -8,6 +8,7 @@ import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/
 import { restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { checkRestores } from '../src/backup/service.ts'
 import { postgresDb, type Db } from '../src/db.ts'
+import { FakeGoogle } from './fake-google-calendar.ts'
 import { IPHONE, onLink, staff } from './people.ts'
 
 /**
@@ -170,6 +171,73 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       expect(files['tables/people.csv']).not.toContain('link_token')
       expect(JSON.parse(files['everything.json']!).mutations[0].received_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+\+00:00$/)
       expect((await colly.history('?limit=1')).entries[0]).toMatchObject({ what: expect.stringMatching(/^Downloaded everything \(\d+ rows\)$/), deviceCode: 'c0ffee' })
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('puts confirmed jobs on Google Calendar, as on PGlite', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const google = new FakeGoogle()
+    const app = await buildApp({
+      db,
+      auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
+      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now: () => new Date('2030-03-02T10:00:00Z') },
+    })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      await colly.send('client.upsert', { id: 'nissan', name: 'Nissan Ireland', contacts: [], notes: '' })
+      await colly.send('venue.upsert', { id: 'ccd', name: 'The Convention Centre Dublin', address: 'Spencer Dock, Dublin 1', notes: '' })
+      await colly.send('project.create', { id: 'j1', name: 'Nissan', clientId: 'nissan', venueId: 'ccd', status: 'confirmed', notes: '' })
+      await colly.send('phase.add', { id: 'build', projectId: 'j1', name: 'Build', start: '2030-03-01', end: '2030-03-03', venueId: null, notes: '' })
+      await colly.send('person.upsert', { id: 'p1', name: 'Seán Ó Briain', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: 25000, notes: '' })
+      await colly.send('call.create', {
+        id: 'c1',
+        projectId: 'j1',
+        phaseId: 'build',
+        project: 'Nissan',
+        phase: 'Build',
+        venue: '',
+        role: 'Audio tech',
+        start: '2030-03-01',
+        end: '2030-03-03',
+        callTime: '08:00',
+        needed: 2,
+        dayRateCents: 25000,
+        details: '',
+        replyBy: null,
+      })
+      await colly.send('offer.send', { id: 'o1', callId: 'c1', personId: 'p1', override: false })
+      const { linkToken } = await colly.record<Person>('person', 'p1')
+      await onLink(app, `/f/${linkToken}/offers/o1`, { answer: 'accept' })
+
+      const start = await app.inject({ url: '/api/calendar/connect?client=phonec0ffee', cookies: colly.cookies })
+      const { code, state } = google.consent(start.headers.location as string)
+      const attempt = start.cookies.find((c) => c.name === 'sh_calendar')!.value
+      const back = await app.inject({ url: `/api/calendar/callback?code=${code}&state=${state}`, cookies: { ...colly.cookies, sh_calendar: attempt } })
+      expect(back.headers.location).toBe('/?calendar=connected#account')
+      const cal = 'test-cal@group.calendar.google.com'
+      expect((await app.inject({ method: 'POST', url: '/api/calendar/use?client=phonec0ffee', cookies: colly.cookies, payload: { calendarId: cal } })).statusCode).toBe(200)
+
+      // Yesterday is left alone; today and tomorrow go on.
+      expect(await app.calendar!.run()).toEqual({ written: 2, removed: 0, failed: 0 })
+      expect(google.visible(cal).map((e) => [e.start.date, e.summary])).toEqual([
+        ['2030-03-02', 'Nissan - Build 2/3'],
+        ['2030-03-03', 'Nissan - Build 3/3'],
+      ])
+      expect(google.visible(cal)[0]!.description).toContain('Audio tech, call 08:00: Seán Ó Briain (to confirm) and 1 still to find')
+      const day = await colly.record<{ day: string; state: string; title: string }>('calendarDay', 'build/2030-03-02')
+      expect(day).toMatchObject({ day: '2030-03-02', state: 'on', title: 'Nissan - Build 2/3' })
+      expect(await colly.record('calendarLink', 'main')).toMatchObject({ state: 'on', calendarName: 'Test calendar', connectedAt: expect.stringMatching(/Z$/) })
+
+      // Nothing changed: the check finds the calendar as the app left it.
+      expect(await app.calendar!.run(true)).toEqual({ written: 0, removed: 0, failed: 0 })
+      expect((await colly.history('?limit=2')).entries.map((e) => e.what)).toEqual([
+        'Chose Test calendar as the calendar for jobs',
+        'Connected Google Calendar as ops@sessionhire.com',
+      ])
     } finally {
       await app.close()
       await db.close()

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
-import { assertSignInKept, authFromEnv } from './auth/config.ts'
+import { assertSignInKept, authFromEnv, googleClientFromEnv } from './auth/config.ts'
 import { restoreFrom } from './backup/service.ts'
 import { storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
@@ -23,6 +23,7 @@ try {
 async function main() {
   const webDist = process.env.WEB_ROOT ?? fileURLToPath(new URL('../../web/dist', import.meta.url))
   const auth = authFromEnv()
+  const google = googleClientFromEnv()
   const backupStore = storeFromEnv()
   const commit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12)
   const db = await dbFromEnv()
@@ -40,6 +41,7 @@ async function main() {
     commit,
     errorReporting,
     backupWatch: errorReporting ? backupWatch() : undefined,
+    calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, '') } : undefined,
   })
   await assertSignInKept(db, auth)
   const port = Number(process.env.PORT ?? 3030)
@@ -55,6 +57,10 @@ async function main() {
   } else app.log.warn('Backups are off: set the BACKUP_S3_ settings to switch them on (docs/backups.md).')
   if (errorReporting) app.log.info({ environment: errorReporting.environment }, 'Errors: reported to Sentry, with no personal details')
   else app.log.warn('Error reporting is off: set SENTRY_DSN to switch it on (docs/monitoring.md).')
+  if (app.calendar) {
+    await app.calendar.start()
+    app.log.info('Google Calendar: available; connect a calendar on the Account tab')
+  } else app.log.info('Google Calendar: needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, like sign-in.')
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, async () => {

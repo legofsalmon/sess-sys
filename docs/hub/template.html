@@ -299,7 +299,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 started · jobs built</div>
+      <div class="status">Phase 1 · jobs and calendar built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -337,6 +337,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <div class="phones">
           <figure><img src="img/jobs-list.png" alt="Jobs tab on a phone: a search box, filters for coming up, past and not going ahead, a confirmed job with 0 of 2 crew booked, and the new job form" width="390" height="844" loading="lazy"><figcaption><b>The list.</b> What's coming up, and how much crew is booked.</figcaption></figure>
           <figure><img src="img/jobs-job.png" alt="A job's page on a phone: Nissan launch, confirmed, with its client, venue, dates and crew, and the Build phase with its calendar titles and a call for two audio techs" width="390" height="844" loading="lazy"><figcaption><b>A job.</b> Its phases as the calendar will show them, with their crew.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots crewshots jobshots">
+        <h3>Confirmed jobs onto Google Calendar</h3>
+        <p class="small">Connect a Google account on the Account tab and pick its calendar. Every day of every confirmed job, from today on, goes on it in the format crew know, with the venue, the day's crew by name and a link back, and follows the job within seconds. Anything changed by hand in Google is put back each night. (Decision 0008)</p>
+        <div class="phones">
+          <figure><img src="img/account-calendar.png" alt="Account tab on a phone: the Google Calendar card says confirmed jobs go on Test calendar, written by ops@sessionhire.com, with Check now, Change calendar and Disconnect" width="390" height="844" loading="lazy"><figcaption><b>Connected.</b> Which calendar, which account, and Check now.</figcaption></figure>
+          <figure><img src="img/jobs-calendar.png" alt="A job's page on a phone: the Build phase is on Test calendar with a link to open it, and the Show day couldn't be written, with Google's reason" width="390" height="844" loading="lazy"><figcaption><b>Each phase.</b> On the calendar, on its way, or why not.</figcaption></figure>
         </div>
       </div>
       <div class="panel shots crewshots">
@@ -533,6 +541,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Error alerts</th><td>Sentry, EU data, from the server and every phone; uptime and backup checks</td><td>Built (Decision 0005)</td></tr>
             <tr><th>History and export</th><td>Every change kept with who, when and on what device; one file with everything as spreadsheets and JSON</td><td>Built (Decision 0006)</td></tr>
             <tr><th>Jobs</th><td>Clients, venues, jobs and their phases, changed field by field so two people's edits both stand</td><td>Built (Decision 0007)</td></tr>
+            <tr><th>Google Calendar</th><td>The app writes confirmed jobs to one calendar, as one connected account, on each change and in a nightly check</td><td>Built (Decision 0008)</td></tr>
           </tbody>
         </table>
       </div>
@@ -543,6 +552,10 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <div class="eyebrow"><b>06</b>Google Calendar</div>
       <h2>Keep the calendar, change nothing on day one</h2>
       <p>The system writes to the shared <b>Session Hire Gigs</b> calendar in today's format and listens for changes in seconds. Each project runs in one of two modes, and new projects switch to app-led once Phase 1 is live.</p>
+      <div class="panel">
+        <h3>Built so far: app-led writing (Decision 0008)</h3>
+        <p class="small">A member of staff connects one Google account on the Account tab and picks one of its calendars: Colly's test calendar first, Session Hire Gigs later. The app then keeps every day of every confirmed job from today on there, in today's format, and takes a job off when it is cancelled. Event ids are worked out from the job, so a retry never makes a double, and a hidden mark keeps the app to its own events. It runs when something changes and checks the calendar once a night, so the database can sleep. Past days are never changed. Next: crew as attendees and their RSVPs, behind a switch that starts off, then edits flowing back for calendar-led jobs.</p>
+      </div>
       <div class="btns" role="group" aria-label="Sync mode">
         <button class="btn" type="button" data-mode="cal" aria-pressed="true">Calendar-led (during the move)</button>
         <button class="btn" type="button" data-mode="app" aria-pressed="false">App-led (after)</button>
@@ -751,7 +764,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const PHASES = [
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Started: jobs built'],
+    ['1', 'Projects and calendar', 'now', 'Jobs and calendar built'],
     ['2', 'Warehouse', 'todo', 'Planned'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
@@ -847,7 +860,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Finance', 'Bookkeeping is fairly offline, so finance is a dashboard and exports first; accounting integration only if it grows.', 'decided'],
     ['Why not Rentman or TeamTrack', 'Closed and rigid, and cumbersome for freelancers. Became the first two principles.', 'decided'],
     ['Google Workspace', 'sessionhire.com is on Workspace. A test calendar is available now.', 'decided'],
-    ['Calendar admin access', 'To be granted later for the import and live sync.', 'waiting'],
+    ['Calendar admin access', 'Not needed to write jobs to a calendar: one account connected by a person does that (Decision 0008). Wanted later for the import, and to write as a service account.', 'waiting'],
     ['Sync engine', 'Our own, on the Crewbox pattern. Proven by tests; field test on phones still to do (Decision 0001).', 'decided'],
     ['Existing stock list', 'Is there a spreadsheet or old list of stock to import?', 'open'],
     ['Crewbox code sharing', 'Can Crewbox\'s sync code become a shared package both use?', 'open'],
@@ -861,7 +874,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Backups', 'Every night into a Railway bucket in Amsterdam, each proved by a test restore; kept 35 days, then monthly for a year (Decision 0004). Built; switches on once the bucket is added in Railway.', 'waiting'],
     ['Error alerts', 'Sentry, chosen over Better Stack: its free plan keeps data in Frankfurt and emails about errors, downtime and a missed backup; reports are built to leave out anyone\'s details (Decision 0005). Built; switches on once the Sentry key is added in Railway.', 'waiting'],
     ['History and export', 'Every change is kept with who made it, when, on what device and whether it was made offline, and shows in a History tab. Download everything gives one file that opens without the app; it leaves out private link codes and sign-in sessions, and each download shows in the history (Decision 0006). Built and on.', 'decided'],
-    ['Jobs', 'A job has a client, a main venue, a status (enquiry, quoted, confirmed, cancelled or lost) and phases of whole days; each phase-day becomes a calendar event in today\'s format. Crew are asked for from the job and follow its renames; cancelling a job cancels its crew. Nothing is deleted (Decision 0007). Built and on.', 'decided']
+    ['Jobs', 'A job has a client, a main venue, a status (enquiry, quoted, confirmed, cancelled or lost) and phases of whole days; each phase-day becomes a calendar event in today\'s format. Crew are asked for from the job and follow its renames; cancelling a job cancels its crew. Nothing is deleted (Decision 0007). Built and on.', 'decided'],
+    ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only, and invites come later behind a switch (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

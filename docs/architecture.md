@@ -283,6 +283,16 @@ tab ([ADR 0006](adr/0006-audit-trail-and-export.md)).
 Goal: nobody has to change how they work on day one, and the calendar stays
 right after the switch.
 
+**Built so far** ([ADR 0008](adr/0008-calendar-sync.md)): the app writes
+every day of every confirmed job, from today on, to one calendar picked on
+the Account tab, as one Google account connected by a member of staff. The
+app leads. Event ids are worked out from the job, so a retried write never
+doubles an event, and the app's hidden mark keeps it to its own events. It
+runs when something changes and checks the calendar once a night, rather
+than watching it, so the database can sleep. Watching the calendar with
+push notifications comes with RSVPs and calendar-led jobs, when changes in
+Google have to flow back in quickly. What follows is the full plan.
+
 **Where events live.** The system writes to the existing shared **Session
 Hire Gigs** calendar, so there is one place everyone subscribes to. Each
 phase-day becomes one all-day event, in today's format:
