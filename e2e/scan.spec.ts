@@ -8,8 +8,9 @@ import { encode } from 'uqr'
  * label opens it; a label on nothing yet asks what it's on while the camera
  * stays on for the next one; a label held still is read once; a maker's
  * serial in a QR code finds its item; and a blocked camera says what to do.
- * Numbers are never used twice, so each run has its own. To refresh the
- * blueprint screenshots, run this file on its own with SHOTS=1.
+ * The test server is shared with the other browser tests, so numbers are
+ * read off the screen rather than assumed. To refresh the blueprint
+ * screenshots, run this file on its own with SHOTS=1.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -93,7 +94,6 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   const id = tag()
   const speaker = named('d&b Y10P', id)
   const bay = named('Bay A3', id)
-  const first = process.env.SHOTS ? 201 : 100_000 + Math.floor(Math.random() * 800_000)
   const serial = `Y10P-${id}-0042`
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await fakeCamera(page)
@@ -103,10 +103,20 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   await newProduct(page, speaker)
   const add = part(page, 'Add an item')
   await add.getByLabel("Where it's kept").fill(bay)
-  await add.getByLabel('Number', { exact: true }).fill(sh(first))
   await add.getByLabel('Serial').fill(serial)
   await add.getByRole('button', { name: 'Add item' }).click()
-  await expect(add.locator('.added')).toHaveText(`Added ${sh(first)}.`)
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  const item = (await add.locator('.added').textContent())!.slice(6, -1)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+
+  // Two labels from a new roll, not on anything yet.
+  await page.goto('/#stock/labels')
+  const aside = page.getByRole('form', { name: 'Set numbers aside' })
+  await aside.getByLabel('How many labels').fill('2')
+  await aside.getByRole('button', { name: 'Set numbers aside' }).click()
+  await expect(aside.locator('.added')).toHaveText(/^Set aside SH-\d{6} to SH-\d{6}\.$/)
+  const one = (await aside.locator('.added a').textContent())!.split(' to ')[0]!
+  const two = sh(Number(one.slice(3)) + 1)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // Scan, then hold the camera over its label: its page opens.
@@ -115,8 +125,8 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   const camera = page.getByLabel('Camera')
   await expect(camera.getByRole('status')).toHaveText('Point the camera at a label.')
   await expect(camera.getByRole('button', { name: 'Sound', pressed: true })).toBeVisible()
-  await hold(page, sh(first))
-  await expect(page.getByRole('heading', { level: 1, name: sh(first) })).toBeVisible()
+  await hold(page, item)
+  await expect(page.getByRole('heading', { level: 1, name: item })).toBeVisible()
   await expect(page).toHaveURL(/#stock\/item\//)
   // Leaving the Stock search turns the camera off.
   await expect.poll(() => page.evaluate(() => (window as unknown as { camera: FakeCamera }).camera.tracks.map((t) => t.readyState))).toEqual(['ended'])
@@ -126,24 +136,24 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Scan' }).click()
   await hold(page, serial)
-  await expect(page.getByRole('heading', { level: 1, name: sh(first) })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: item })).toBeVisible()
 
   // Labelling a shelf: a label on nothing yet asks what it's on, and the camera stays on for the next.
   await hold(page, null)
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Scan' }).click()
-  await hold(page, sh(first + 1))
-  const claim = page.getByRole('form', { name: `Put ${sh(first + 1)} on an item` })
-  await expect(claim.getByRole('heading')).toHaveText(`${sh(first + 1)} isn't on anything yet`)
-  await expect(camera.getByRole('status')).toHaveText(`Read ${sh(first + 1)}`)
+  await hold(page, one)
+  const claim = page.getByRole('form', { name: `Put ${one} on an item` })
+  await expect(claim.getByRole('heading')).toHaveText(`${one} isn't on anything yet`)
+  await expect(camera.getByRole('status')).toHaveText(`Read ${one}`)
   await claim.getByLabel('Product').fill(speaker)
   await claim.getByLabel("Where it's kept").fill(bay)
   await expect(page.getByRole('button', { name: 'Scan', pressed: true })).toBeVisible()
-  await expect(claim.getByRole('button', { name: `Put ${sh(first + 1)} on it` })).toBeInViewport()
+  await expect(claim.getByRole('button', { name: `Put ${one} on it` })).toBeInViewport()
   await page.screenshot(shot('scan-claim'))
-  await claim.getByRole('button', { name: `Put ${sh(first + 1)} on it` }).click()
+  await claim.getByRole('button', { name: `Put ${one} on it` }).click()
   const added = page.locator('p.added')
-  await expect(added).toHaveText(`Added ${sh(first + 1)} (${speaker}) at ${bay}. Scan the next label.`)
+  await expect(added).toHaveText(`Added ${one} (${speaker}) at ${bay}. Scan the next label.`)
   await expect(camera).toBeVisible()
 
   // Still in front of the camera, the same label isn't read again.
@@ -154,19 +164,19 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   // The next label: the product and place are still there, so it's one tap.
   await hold(page, null)
   await page.waitForTimeout(1500)
-  await hold(page, sh(first + 2))
-  const next = page.getByRole('form', { name: `Put ${sh(first + 2)} on an item` })
+  await hold(page, two)
+  const next = page.getByRole('form', { name: `Put ${two} on an item` })
   await expect(next.getByLabel('Product')).toHaveValue(speaker)
   await expect(next.getByLabel("Where it's kept")).toHaveValue(bay)
-  await next.getByRole('button', { name: `Put ${sh(first + 2)} on it` }).click()
-  await expect(added).toHaveText(`Added ${sh(first + 2)} (${speaker}) at ${bay}. Scan the next label.`)
+  await next.getByRole('button', { name: `Put ${two} on it` }).click()
+  await expect(added).toHaveText(`Added ${two} (${speaker}) at ${bay}. Scan the next label.`)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // Back to a label already on: out of sight a moment, then read again, and it opens.
   await hold(page, null)
   await page.waitForTimeout(1500)
-  await hold(page, sh(first + 1))
-  await expect(page.getByRole('heading', { level: 1, name: sh(first + 1) })).toBeVisible()
+  await hold(page, one)
+  await expect(page.getByRole('heading', { level: 1, name: one })).toBeVisible()
   await expect(page.locator('.facts')).toContainText(bay)
 
   // Stop camera turns it off.
