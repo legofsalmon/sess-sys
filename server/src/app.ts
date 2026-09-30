@@ -1,7 +1,7 @@
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { pushRequest, type Change, type ClientConfig, type EntityName, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
@@ -13,7 +13,9 @@ import { Google } from './calendar/google.ts'
 import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
-import { applyMutation, currentSeq } from './commands.ts'
+import { applyMutationIn, currentSeq } from './commands.ts'
+import { clearedSince, startedFresh } from './data/fresh.ts'
+import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
@@ -155,13 +157,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
-    const { clientId, mutations, sentAt } = parsed.data
+    const { clientId, mutations, sentAt, generation } = parsed.data
     const from = { userId: req.user?.id, sentAt, device: describeDevice(req.headers['user-agent']) }
-    const results = []
+    const results: MutationResult[] = []
+    let stale = false
     // In order: a device's later request may depend on an earlier one.
-    for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, from))
+    for (const m of mutations) {
+      const result = await db.transaction(async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(7331)')
+        // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
+        if (generation && (await clearedSince(tx, generation))) return undefined
+        return applyMutationIn(tx, clientId, m as never, from)
+      })
+      if (!result) {
+        stale = true
+        break
+      }
+      results.push(result)
+    }
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
-    return { results }
+    return stale ? { results: [], stale } : { results }
   })
 
   app.get<{ Querystring: { after?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
@@ -177,13 +192,16 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // Where the feed ends, and which copy of the data this is: a device ahead of the
     // head, or holding another generation, has seen data this server no longer has.
     // Read each time, so a new generation counts at once, without a restart.
-    const { rows: meta } = await db.query<{ head: string | null; generation: string | null }>(
-      `SELECT (SELECT max(seq) FROM changes) AS head, (SELECT value FROM server_meta WHERE key = 'generation') AS generation`
+    const { rows: meta } = await db.query<{ head: string | null; generation: string | null; made_up: boolean }>(
+      `SELECT (SELECT max(seq) FROM changes) AS head, (SELECT value FROM server_meta WHERE key = 'generation') AS generation,
+              EXISTS (SELECT 1 FROM server_meta WHERE key = 'made_up') AS made_up`
     )
     const head = Number(meta[0]?.head ?? 0)
     const generation = meta[0]?.generation ?? undefined
     const cursor = changes.length ? changes[changes.length - 1]!.seq : Math.max(after, head)
-    return { changes, cursor, more, generation, head }
+    // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
+    const cleared = generation !== undefined && (await startedFresh(db, generation))
+    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {
@@ -195,6 +213,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // Freelancers' private links: no app or login needed to answer an offer.
   registerCrewLinks(app, db, changed, feeds)
   registerBackupRoutes(app, backups)
+  registerDataRoutes(app, { db, backups, onChange: changed })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 

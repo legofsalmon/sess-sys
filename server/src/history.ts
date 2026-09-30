@@ -404,6 +404,10 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       return `Turned on crew invites on Google Calendar${typeof a.invites === 'number' && typeof a.people === 'number' ? ` (${invitesLabel(a.invites, a.people)})` : ''}`
     case 'calendar.disconnect':
       return `Disconnected Google Calendar${typeof a.account === 'string' ? ` (${a.account})` : ''}${typeof a.calendar === 'string' ? `, taking the app's days off ${a.calendar}` : ''}`
+    case 'data.made-up':
+      return 'Put in made-up data to try the app with, all of it shown in the history as from "Made-up data"'
+    case 'data.fresh':
+      return `Started fresh: deleted everything${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''} except the staff accounts`
     case 'calendar.import': {
       const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
       const some = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined)

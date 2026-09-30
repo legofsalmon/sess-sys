@@ -317,6 +317,46 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await db.close()
     }
   })
+
+  it('starts fresh while phones are sending, and leaves nothing from before (ADR 0019)', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db })
+    try {
+      expect((await app.inject({ method: 'POST', url: '/api/data/made-up' })).statusCode).toBe(200)
+      const { generation } = (await app.inject({ url: '/api/sync/pull?after=0' })).json()
+      const send = (i: number) =>
+        app.inject({
+          method: 'POST',
+          url: '/api/sync/push',
+          payload: {
+            clientId: `phone${i}`,
+            generation,
+            mutations: [{ id: newId(), name: 'product.upsert', args: { id: `p${i}`, name: `Product ${i}`, quantity: 1 }, createdAt: new Date().toISOString() }],
+          },
+        })
+
+      // Twenty phones, on the copy from before, send while the office starts fresh.
+      const fresh = app.inject({ method: 'POST', url: '/api/data/start-fresh', payload: { confirm: 'delete everything' } })
+      const [done, ...answers] = await Promise.all([fresh, ...Array.from({ length: 20 }, (_, i) => send(i))])
+      expect(done.statusCode).toBe(200)
+      // Each went in before and was deleted with the rest, or was turned away after.
+      for (const a of answers) expect(a.json().stale === true || a.json().results[0].status === 'applied').toBe(true)
+      expect((await send(20)).json()).toEqual({ results: [], stale: true })
+      const { rows } = await db.query<{ products: number; changes: number; mutations: number }>(
+        `SELECT (SELECT count(*)::int FROM products) AS products, (SELECT count(*)::int FROM changes) AS changes, (SELECT count(*)::int FROM mutations) AS mutations`
+      )
+      expect(rows[0]).toEqual({ products: 0, changes: 0, mutations: 1 })
+
+      // Made-up data goes in again, numbered from the start.
+      expect((await app.inject({ method: 'POST', url: '/api/data/made-up' })).statusCode).toBe(200)
+      const { rows: numbers } = await db.query<{ first: string }>(`SELECT min(value) AS first FROM identifiers WHERE kind = 'sh'`)
+      expect(numbers[0]!.first).toBe('SH-000001')
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
 })
 
 function contents(db: Db, table: string) {
