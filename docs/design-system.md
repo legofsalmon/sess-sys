@@ -29,8 +29,9 @@ and Figma gets updated. Every colour token carries its CSS name (for example
 
 - **Primitives**: the raw hex values from `app.css`, hidden from pickers.
 - **Color** (Light and Dark modes): `bg`, `panel`, `ink`, `muted`, `line`,
-  `accent`, `accent-ink`, `on-accent`, and `good`, `warn`, `bad` with a
-  `-soft` background each. Dark follows the phone's setting, as the app does.
+  `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`, `warn`,
+  `bad` with a `-soft` background each. Dark follows the phone's setting, as
+  the app does.
 - **Spacing**: 2, 4, 6, 8, 10, 12, 14, 16, 20, 40 px.
 - **Radius**: control 8, tab 10, card 12, full (pills).
 - **Type**: 13 text styles (page title, brand, section heading, body, small,
