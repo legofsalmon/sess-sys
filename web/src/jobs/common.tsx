@@ -30,7 +30,10 @@ export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
         <span className="mark">SH</span>
         <span>
           <b>Session Hire</b>
-          <small>{title}</small>
+          <small>
+            {title}
+            <MadeUp view={view} />
+          </small>
         </span>
       </div>
       <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
@@ -38,6 +41,11 @@ export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
       </span>
     </header>
   )
+}
+
+/** Beside each screen's name while the app holds made-up data (ADR 0018), so nobody mistakes it for real work. */
+export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
+  return view.madeUp ? <span className="made-up"> · made-up data</span> : null
 }
 
 /** Changes the server turned down, with its reason, until dismissed: to jobs, or to what `names` matches. */

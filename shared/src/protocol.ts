@@ -26,6 +26,13 @@ export const pushRequest = z.object({
    * waited on the device (ADR 0006). Absent from older versions of the app.
    */
   sentAt: z.string().datetime({ offset: true }).optional(),
+  /**
+   * The copy of the data the device last pulled from. If the app has
+   * started fresh since (ADR 0018), what the device sends belongs to what
+   * was cleared, so none of it is applied. Absent from older versions of
+   * the app, and from a device that hasn't pulled yet.
+   */
+  generation: z.string().max(100).optional(),
 })
 export type PushRequest = z.infer<typeof pushRequest>
 
@@ -35,6 +42,8 @@ export type MutationResult =
 
 export interface PushResponse {
   results: MutationResult[]
+  /** Nothing applied: the app started fresh after the device's copy (see `generation`). Its next pull starts it afresh too. */
+  stale?: boolean
 }
 
 export interface Change {
@@ -55,9 +64,34 @@ export interface PullResponse {
    * its own copy afresh (ADR 0004). Absent from servers older than that.
    */
   generation?: string
+  /**
+   * This copy of the data began empty on purpose: someone started fresh
+   * (ADR 0018). A device starting its copy afresh then drops what it was
+   * going to send again, which would bring back what was cleared.
+   */
+  cleared?: boolean
+  /** The server holds made-up data to try the app with (ADR 0018), which every screen says, so nobody mistakes it for real work. */
+  madeUp?: boolean
   /** The server's latest change number. Lower than a device's cursor means the server has lost changes. */
   head?: number
 }
+
+/** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0018). */
+export interface DataStatus {
+  /** Nothing has been done in the app since it began or started fresh, so made-up data can go in. */
+  empty: boolean
+  /** When made-up data was put in, and by whom; null when there's none. */
+  madeUp: { at: string; by: string | null } | null
+  /** When the app last started fresh, and by whom; null if it never has. */
+  fresh: { at: string; by: string | null } | null
+  /** Google Calendar is connected, which has to be undone before starting fresh. */
+  calendarConnected: boolean
+  /** Backups are set up, so one is made before starting fresh. */
+  backups: boolean
+}
+
+/** POST /api/data/start-fresh: typed, so it can't be done by a slip. */
+export const START_FRESH_WORDS = 'delete everything'
 
 export interface Poke {
   type: 'poke'
@@ -85,7 +119,7 @@ export interface BackupRun {
   startedAt: string
   finishedAt?: string
   status: 'running' | 'ok' | 'failed'
-  trigger: 'nightly' | 'catch-up' | 'retry' | 'manual'
+  trigger: 'nightly' | 'catch-up' | 'retry' | 'manual' | 'fresh'
   /** The file's name in the backup storage. */
   key?: string
   bytes?: number
