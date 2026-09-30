@@ -8,12 +8,13 @@ on site.
 
 Phase 0 is built, with the phone field test left: the offline sync
 engine, crew booking, staff sign-in, nightly backups, error alerts, and a
-history of every change with a download of everything. Phase 1 has
-started with jobs: clients, venues and each job's phases, with crew asked
-for from the job, confirmed jobs written to Google Calendar, crew
-invited to their days there, with their answers read back (behind a
-switch that starts off), a week and month planner by job or by person
-that flags clashes, and bringing in the jobs already on Google Calendar.
+history of every change with a download of everything. Everything on
+the Phase 1 list is built too: clients, venues and each job's phases,
+with crew asked for from the job, confirmed jobs written to Google
+Calendar, crew invited to their days there, with their answers read back
+(behind a switch that starts off), a week and month planner by job or by
+person that flags clashes, bringing in the jobs already on Google
+Calendar, and a read-only calendar feed of each person's own bookings.
 The app runs on Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the

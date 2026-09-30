@@ -46,8 +46,12 @@ switch that starts off ([ADR 0009](adr/0009-crew-invites.md)). The week and
 month planner shows every job and person, with clashes flagged
 ([ADR 0010](adr/0010-planner.md)). The jobs already on the organisers'
 calendars can be brought in, after a look at everything that would come
-in ([ADR 0011](adr/0011-calendar-import.md)). Personal calendar feeds are
-next. See [progress.md](progress.md).
+in ([ADR 0011](adr/0011-calendar-import.md)). Everyone has a read-only
+feed of their own bookings for any calendar app
+([ADR 0012](adr/0012-personal-calendar-feeds.md)). **Everything on the
+Phase 1 list is built (30 September 2026)**; what's left is the office
+using it for real, which needs the Google key. See
+[progress.md](progress.md).
 
 - Clients, venues, projects, phases, crew requirements and assignments
   (built).
@@ -63,7 +67,9 @@ next. See [progress.md](progress.md).
 - A planner view: the week and month by project and by person, with
   clashes flagged (the same freelancer on two jobs) (built; looking only
   for now, with dragging phases to wait until the office has used it).
-- Personal iCal feeds.
+- Personal iCal feeds (built: a read-only address for each person, safe
+  in a shared calendar, found on their page, the Crew tab and the Account
+  tab).
 
 **Done when:** ops create every new job in the system, crew still receive
 the same Google invites, and nobody has to type a job twice.

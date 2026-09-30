@@ -15,6 +15,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { client, syncSoon } from '../sync.ts'
+import { useFeedAddress } from './feed.ts'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
@@ -383,6 +384,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   )
   const off = crew.unavailability.filter((u) => u.personId === person.id && u.end >= today)
   const link = linkFor(person)
+  const feed = useFeedAddress(open ? person.linkToken : undefined)
   return (
     <div className="row person">
       <button type="button" className="who" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -435,6 +437,11 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
                   Copy link
                 </button>
               </>
+            )}
+            {feed && (
+              <button type="button" onClick={() => navigator.clipboard?.writeText(feed)}>
+                Copy calendar address
+              </button>
             )}
             <button
               type="button"

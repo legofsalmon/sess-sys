@@ -352,8 +352,16 @@ equipment lines waits for the warehouse (Phase 2). A job brought in stays
 with the calendar it came from, which keeps its events, so the app doesn't
 write it to the jobs calendar.
 
-**Personal feeds.** Every person also gets a private iCal feed of their own
-bookings, which works for freelancers on any calendar app.
+**Personal feeds** (built, [ADR 0012](adr/0012-personal-calendar-feeds.md)).
+Every person also gets a feed of their own bookings for any calendar app
+(Google, Apple, Outlook), at a read-only address worked out from their
+private link: it can go in a calendar they share without letting anyone
+answer for them, and a new link retires it. Freelancers find it on their
+page, the office copies it from the Crew tab, and staff who also work jobs
+find theirs on the Account tab. The server keeps every feed in memory and
+builds them again only after a change, so calendar apps looking every
+hour don't keep the database awake. The server's log masks private link
+and feed addresses.
 
 ## Crewbox
 

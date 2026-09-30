@@ -22,11 +22,11 @@ export default defineConfig({
         display: 'standalone',
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
-      // Freelancer links are server pages, never the app shell.
-      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/f\//] },
+      // Freelancer links and calendar feeds come from the server, never the app shell.
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//] },
     }),
   ],
   server: {
-    proxy: { '/api': { target: 'http://localhost:3030', ws: true }, '/f': 'http://localhost:3030' },
+    proxy: { '/api': { target: 'http://localhost:3030', ws: true }, '/f': 'http://localhost:3030', '/cal': 'http://localhost:3030' },
   },
 })

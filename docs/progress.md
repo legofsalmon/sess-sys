@@ -3,6 +3,64 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: everyone's own bookings in their own calendar
+
+**Done**
+
+- Everyone has a calendar feed of the jobs they're booked on, for Google,
+  Apple or Outlook Calendar, at an address of its own that can only show
+  bookings. It used to be the private link with `/calendar.ics` on the
+  end, so anyone who could see a shared calendar's settings could answer
+  offers as that person; now it's safe in a calendar they share.
+  [Decision 0012](adr/0012-personal-calendar-feeds.md) has the reasons.
+  This is the last part of Phase 1, so everything on the Phase 1 list is
+  now built.
+- The address is worked out from the private link, so nothing new is
+  stored, backed up or downloaded, and **New link** retires the feed with
+  the link. The events no longer carry the link to the person's page;
+  they say the details and changes are on it.
+- Where people find it: freelancers on their page, under Your bookings
+  (subscribe on an iPhone, Mac or in Outlook, or add the address in
+  Google Calendar); the office with **Copy calendar address** beside Copy
+  link in the Crew tab, to send on; and staff who also work jobs, with
+  the same email address in Crew, on the Account tab. Each says that
+  anyone getting our Google Calendar invites doesn't need it as well.
+- The server keeps every feed in memory and builds them again only after
+  something changes, or every 6 hours, so calendar apps looking every
+  hour don't keep the database awake. A feed that hasn't changed answers
+  "nothing new" without being sent again. The old address still works
+  for anyone already subscribed.
+- The server's log now writes each request as its method and path only,
+  with private link and feed codes masked and no query string. Before,
+  it wrote whole addresses, private links and Google sign-in codes
+  included.
+- Checked: 8 new server tests (the read-only address and what's in it;
+  answered from memory without touching the database, and rebuilt after
+  an answer on a link, a change from the office and a withdrawn job;
+  "nothing new" still true after someone else's booking; New link
+  retiring both addresses; the 6-hour rebuild; the log), all 188 server
+  tests, and 2 new browser tests (on a phone: the office copies a
+  freelancer's calendar address and their page gives the same one; a
+  signed-in staff member finds theirs on the Account tab), with all 25
+  browser tests passing.
+
+**Next**
+
+- Colly, to try it: in the Crew tab, open a made-up person with a
+  booking, tap **Copy calendar address**, and add it to your phone's
+  calendar or to Google Calendar (From URL). Once sign-in is on, your own
+  shows on the Account tab if you're in Crew with your sessionhire.com
+  address.
+- Phase 1 is built. What's left is the office using it for real, which
+  needs the Google key ([the steps](sign-in-setup.md)): jobs onto the test
+  calendar, bringing in the organisers' calendars, then Session Hire Gigs.
+- Colly, still open: should crew invites go out when crew are offered (as
+  built) or only once they're booked?
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 30 September 2026: bringing in the jobs already on Google Calendar
 
 **Done**

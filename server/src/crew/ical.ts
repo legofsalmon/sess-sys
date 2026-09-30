@@ -5,6 +5,9 @@ import { eachDay, euro, type CrewCall, type Offer, type Person } from '@sh/share
  * in the same "<Project> - <Phase>" shape as the Session Hire Gigs calendar.
  * Works in Google, Apple and Outlook calendars, so a freelancer sees our
  * bookings next to everyone else's without another app.
+ *
+ * Read-only by design (ADR 0012): people add feeds to calendars they share,
+ * so nothing in it opens their private link.
  */
 
 const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
@@ -45,7 +48,7 @@ export function runs(days: string[]): string[][] {
   return out
 }
 
-export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCall }[], pageUrl: string, now = new Date()): string {
+export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCall }[], now = new Date()): string {
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
   const lines = [
     'BEGIN:VCALENDAR',
@@ -69,7 +72,7 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
         `${euro(offer.dayRateCents)}${offer.dayRateCents !== null ? ' a day' : ''}`,
         block.length < all.length || blocks.length > 1 ? `Your days: ${block.join(', ')}` : '',
         call.details,
-        `Details and changes: ${pageUrl}`,
+        'Full details and any changes are on your Session Hire page, from the link the office sent you.',
       ]
         .filter(Boolean)
         .join('\n')
@@ -84,7 +87,6 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
         `DESCRIPTION:${esc(desc)}`,
         `STATUS:${offer.status === 'confirmed' ? 'CONFIRMED' : 'TENTATIVE'}`,
         'TRANSP:OPAQUE',
-        `URL:${pageUrl}`,
         'END:VEVENT'
       )
     })

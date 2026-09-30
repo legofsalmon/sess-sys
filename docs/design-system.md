@@ -62,6 +62,11 @@ follow-up that lets the two stay in step.
   one button in a bar stuck just above the tabs, so it's in reach however
   far down the list, and says what it will do ("Bring in 2 jobs"). Unticked
   items fade but stay, to tick again. Not in Figma yet either.
+- An address a person copies into another app, such as their calendar
+  feed ([ADR 0012](adr/0012-personal-calendar-feeds.md)), is shown in full
+  in a read-only field that selects itself when tapped, with its buttons
+  under it (Subscribe, Copy address), so it can still be copied by hand
+  where a browser won't copy. Not in Figma yet.
 
 ## Accessibility
 

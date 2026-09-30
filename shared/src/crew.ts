@@ -252,3 +252,21 @@ export function whatsappNumber(phone: string): string {
   else if (digits.startsWith('0')) digits = `353${digits.slice(1)}`
   return digits
 }
+
+/**
+ * The code in a person's calendar feed address, /cal/<code>.ics (ADR 0012).
+ * Worked out from their private link, so nothing more is stored: whoever
+ * holds the link can find the feed, the feed can't be turned back into the
+ * link, and a new link gives a new feed address. The server and the app
+ * work it out the same way. 24 characters, like the link itself, so error
+ * reports take it out as a secret (privacy.ts).
+ */
+export async function feedCodeFor(linkToken: string): Promise<string> {
+  const hash = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`sh-feed:${linkToken}`)))
+  return btoa(String.fromCharCode(...hash))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .slice(0, 24)
+}
+
+export const feedPath = (code: string) => `/cal/${code}.ics`

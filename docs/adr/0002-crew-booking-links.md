@@ -2,6 +2,7 @@
 
 - **Status:** Accepted, 29 September 2026. Built early, in parallel with Phase 0 and 1, so crew booking can be tried alongside the calendar.
 - **Decides:** how the "meet freelancers in the middle" principle in [architecture.md](../architecture.md) works for offers and bookings.
+- **Amended:** 30 September 2026 by [ADR 0012](0012-personal-calendar-feeds.md): the calendar feed has a read-only address of its own, and its events no longer carry the private link.
 
 ## Context
 

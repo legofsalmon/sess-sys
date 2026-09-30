@@ -299,7 +299,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 · jobs, calendar, invites, planner and import built</div>
+      <div class="status">Phase 1 · everything on the list built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -370,6 +370,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <div class="phones">
           <figure><img src="img/import-choose.png" alt="Bringing jobs in on a phone: the calendars the connected account can see, its own chosen, then Aoife Byrne's and Session Hire Gigs shared with it, and the first day to bring in from" width="390" height="844" loading="lazy"><figcaption><b>Choose a calendar.</b> Its own first, then any shared with it.</figcaption></figure>
           <figure><img src="img/import-look.png" alt="What would come in, on a phone: Nissan with its Build, Show and Load out days, a new venue and its crew; more days for Aviva, brought in before; Web Summit unticked; and a button to bring in 2 jobs and more days for 1 job" width="390" height="844" loading="lazy"><figcaption><b>Look before bringing in.</b> Untick, rename, then bring in.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots crewshots jobshots">
+        <h3>Everyone's own bookings in their own calendar</h3>
+        <p class="small">Each person has a feed of the jobs they're booked on for Google, Apple or Outlook Calendar, at an address of its own that can only show bookings: it's safe in a calendar they share, and New link retires it. Freelancers find it on their page, the office copies it from the Crew tab, and staff who also work jobs have it on the Account tab. The server answers calendar apps from memory, so their hourly looks don't wake the database. The last part of Phase 1. (Decision 0012)</p>
+        <div class="phones">
+          <figure><img src="img/feed-freelancer.png" alt="A freelancer's private page on a phone: under Your bookings, a subscribe link for iPhone, Mac and Outlook, the address to add in Google Calendar, and a note that it only shows bookings so it's fine in a shared calendar" width="390" height="844" loading="lazy"><figcaption><b>Freelancer.</b> Subscribe, or add the address in Google.</figcaption></figure>
+          <figure><img src="img/feed-account.png" alt="Account tab on a phone, signed in as Ciara Walsh: the card Your bookings in your own calendar, with the feed address, Subscribe and Copy address" width="390" height="844" loading="lazy"><figcaption><b>Staff.</b> Their own feed, on the Account tab.</figcaption></figure>
         </div>
       </div>
       <div class="panel shots crewshots">
@@ -570,6 +578,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Crew invites</th><td>Crew are guests on their days' events; their answers are read back every two minutes by asking Google what changed, so the database sleeps</td><td>Built, switch off (Decision 0009)</td></tr>
             <tr><th>Planner</th><td>The week and month by job or by person, with clashes flagged, worked out on each device from what it already holds</td><td>Built (Decision 0010)</td></tr>
             <tr><th>Calendar import</th><td>The jobs on an organiser's calendar come in after a look at everything first; each event-day is remembered, so looking again shows only what's new</td><td>Built (Decision 0011)</td></tr>
+            <tr><th>Personal feeds</th><td>A read-only calendar feed for each person, at an address worked out from their private link; every feed kept in memory and rebuilt only after a change</td><td>Built (Decision 0012)</td></tr>
           </tbody>
         </table>
       </div>
@@ -624,7 +633,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
       <div class="grid2">
         <div class="panel"><h3>Importing history</h3><p class="small">Built: the jobs on an organiser's calendar come in grouped by the text before the last " - ", phases in order, guests matched to people, and job sheets kept in the notes as written. Kit lists become draft kit lines once the warehouse arrives (Phase 2). (Decision 0011)</p></div>
-        <div class="panel"><h3>Personal feeds</h3><p class="small">Every person also gets a private calendar feed of their own bookings that works in any calendar app. Workspace is confirmed; admin access will follow, and a test calendar is ready.</p></div>
+        <div class="panel"><h3>Personal feeds</h3><p class="small">Built: every person has a feed of their own bookings that works in any calendar app, at a read-only address that's safe in a shared calendar, on their page, the Crew tab and, for staff, the Account tab. The server answers from memory, so calendar apps don't keep the database awake. (Decision 0012)</p></div>
       </div>
     </section>
 
@@ -800,7 +809,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const PHASES = [
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites, planner, import built'],
+    ['1', 'Projects and calendar', 'now', 'Built; office trial left'],
     ['2', 'Warehouse', 'todo', 'Planned'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
@@ -881,7 +890,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const road = [
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
-    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Bring in the jobs already on the organisers\' calendars (built)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds (next)'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
+    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Bring in the jobs already on the organisers\' calendars (built)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds, read-only and safe to share (built)'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
     ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
@@ -914,7 +923,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting'],
     ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting'],
     ['Planner', 'Week and Month sit beside the jobs list, by job or by person. Booked twice, or booked while unavailable, is a clash; an offer that would clash if they said yes is a check. Worked out on each device, so it works with no signal. Looking only for now: dragging phases waits until the office has used it (Decision 0010). Built and on.', 'decided'],
-    ['Calendar import', 'The jobs on a calendar the connected account can see come in after a look at everything first; titles give job and phase, guests\' answers give crew booked, offered or declined, and TBC or hold means pencilled in. The organiser\'s calendar keeps these jobs\' events, so the app doesn\'t add them to the jobs calendar (Decision 0011). Built; works once the Google key is in and a calendar connected.', 'waiting']
+    ['Calendar import', 'The jobs on a calendar the connected account can see come in after a look at everything first; titles give job and phase, guests\' answers give crew booked, offered or declined, and TBC or hold means pencilled in. The organiser\'s calendar keeps these jobs\' events, so the app doesn\'t add them to the jobs calendar (Decision 0011). Built; works once the Google key is in and a calendar connected.', 'waiting'],
+    ['Personal feeds', 'Each person\'s feed has a read-only address of its own, worked out from their private link, so it\'s safe in a shared calendar and New link retires it; its events no longer carry the private link. Feeds are answered from memory and rebuilt only after a change, and private addresses are masked in the server\'s log (Decision 0012). Built and on.', 'decided']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

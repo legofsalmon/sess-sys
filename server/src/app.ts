@@ -14,11 +14,13 @@ import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
 import { applyMutation, currentSeq } from './commands.ts'
+import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { everythingJson, everythingZip, readEverything, rowCount, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
+import { requestForLog } from './http.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 
@@ -26,7 +28,10 @@ const PULL_LIMIT = 500
 
 export interface AppOptions {
   db: Db
+  /** Log each request, with private addresses masked (ADR 0012). */
   logger?: boolean
+  /** Where the log goes instead of standard output, for tests. */
+  logTo?: { write(line: string): void }
   /** Built web app to serve alongside the API (web/dist), if any. */
   webRoot?: string
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
@@ -44,6 +49,8 @@ export interface AppOptions {
    * it the Account tab says the calendar needs the Google key first.
    */
   calendar?: CalendarSetup
+  /** How long calendar feeds are kept in memory at most (ADR 0012), and the clock, for tests. */
+  feeds?: FeedsOptions
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs'> {
@@ -67,16 +74,24 @@ declare module 'fastify' {
  * `export` keep the principles' promises of an audit trail on everything and
  * "your data, always reachable" (ADR 0006).
  */
-export async function buildApp({ db, logger = false, webRoot, auth, backupStore, commit, errorReporting, backupWatch, calendar }: AppOptions): Promise<FastifyInstance> {
+export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
+  const { db, logger = false, logTo, webRoot, auth, backupStore, commit, errorReporting, backupWatch, calendar } = options
   await migrateAll(db)
-  const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024 })
+  const app = Fastify({
+    // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
+    logger: logger && { serializers: { req: requestForLog }, ...(logTo && { stream: logTo }) },
+    bodyLimit: 5 * 1024 * 1024,
+  })
   const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch }).load()
   app.decorate('backups', backups)
   await app.register(cors, { origin: true })
   await app.register(websocket)
 
   const sockets = new Set<WebSocket>()
+  const feeds = new Feeds(db, options.feeds)
+  /** Something changed: calendar feeds are built again when next asked for, and devices are told to pull. */
   const poke = async () => {
+    feeds.stale()
     if (sockets.size === 0) return
     const msg: Poke = { type: 'poke', cursor: await currentSeq(db) }
     const text = JSON.stringify(msg)
@@ -178,7 +193,7 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
-  registerCrewLinks(app, db, changed)
+  registerCrewLinks(app, db, changed, feeds)
   registerBackupRoutes(app, backups)
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
@@ -226,11 +241,12 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
 
   if (webRoot) {
     await app.register(fastifyStatic, { root: webRoot })
-    // Anything that is not an API call or a file is the app; the app routes it.
+    // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') || req.url.startsWith('/f/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
+      /^\/(api|f|cal)\//.test(req.url) ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
     )
-  }
+    // Fastify's own answer would write the whole address in the log.
+  } else app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found' }))
 
   app.addHook('onClose', async () => {
     backups.stop()
