@@ -1,9 +1,11 @@
 import {
+  dayLabel,
   daysLabel,
   DEPARTMENT_LABELS,
   eachDay,
   euro,
   invitesLabel,
+  irishToday,
   newId,
   normaliseNumber,
   numberText,
@@ -269,6 +271,8 @@ async function lookup(q: Queryable, rows: Row[]): Promise<Look> {
 const text = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v : fallback)
 const dates = (start: unknown, end: unknown) =>
   typeof start === 'string' && typeof end === 'string' ? daysLabel(eachDay(start, end)) : 'on dates since removed'
+/** "12 months", "a month". */
+const monthsText = (n: number) => (n === 1 ? 'month' : `${n} months`)
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 /** "SH-000101 to SH-000600", or "SH-000101" for one, once the server has set them aside. */
 const runRange = (r: Data | undefined) =>
@@ -432,6 +436,9 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       if (a.isCase !== undefined) parts.push(a.isCase ? 'holds other kit' : "doesn't hold other kit")
       if (a.valueCents !== undefined) parts.push(typeof a.valueCents === 'number' ? `value to ${valueLabel(a.valueCents)}` : 'no value')
       if (a.notes !== undefined) parts.push('the notes')
+      if (a.patMonths !== undefined) parts.push(typeof a.patMonths === 'number' ? `a PAT every ${monthsText(a.patMonths)}` : 'no PAT')
+      if (a.liftingMonths !== undefined)
+        parts.push(typeof a.liftingMonths === 'number' ? `a thorough examination every ${monthsText(a.liftingMonths)}` : 'no thorough examination')
       return `Changed the product ${model(a.id)}: ${inWords(parts)}`
     }
     case 'model.remove':
@@ -520,6 +527,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       if (a.outcome === 'found') return `Found ${on}`
       if (a.outcome === 'not-faulty') return `Marked ${on} as not faulty`
       return `Marked ${on} as fixed`
+    }
+    case 'inspection.record': {
+      const what = a.kind === 'lifting' ? 'thorough examination' : 'PAT'
+      const by = typeof a.by === 'string' && a.by.trim() ? ` by ${clip(a.by.trim())}` : ''
+      const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
+      const day = typeof a.at === 'string' ? ` on ${dayLabel(irishToday(new Date(a.at)))}` : ''
+      return `Recorded ${item(a.assetId)} ${a.passed ? 'passing' : 'failing'} its ${what}${day}${by}${note}`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

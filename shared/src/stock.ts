@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { months } from './inspections.ts'
 
 /**
  * The warehouse catalogue (ADR 0013): products, the numbered items of them,
@@ -67,6 +68,9 @@ export const model = z.object({
   /** What one would cost to replace. */
   valueCents: cents.nullable(),
   notes: z.string().max(2000),
+  /** How often its items need an electrical test (PAT), and a thorough examination, in months; null for never (ADR 0020). */
+  patMonths: months.default(null),
+  liftingMonths: months.default(null),
 })
 export type Model = z.infer<typeof model>
 
@@ -177,6 +181,8 @@ export const stockCommandSchemas = {
       isCase: model.shape.isCase.optional(),
       valueCents: model.shape.valueCents.optional(),
       notes: model.shape.notes.optional(),
+      patMonths: months.optional(),
+      liftingMonths: months.optional(),
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered),

@@ -67,6 +67,8 @@ const MODEL_COLUMNS = {
   isCase: 'is_case',
   valueCents: 'value_cents',
   notes: 'notes',
+  patMonths: 'pat_months',
+  liftingMonths: 'lifting_months',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -197,16 +199,11 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (await getModel(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This product already exists.' })
     const taken = await nameTaken(ctx.tx, 'models', a.name.trim(), a.id)
     if (taken) throw new Refused({ code: 'conflict', message: `There's already a product called ${taken}.` })
-    await ctx.tx.query(`INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [
-      a.id,
-      a.name.trim(),
-      a.department,
-      a.category.trim(),
-      a.tracking,
-      a.isCase,
-      a.valueCents,
-      a.notes,
-    ])
+    await ctx.tx.query(
+      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [a.id, a.name.trim(), a.department, a.category.trim(), a.tracking, a.isCase, a.valueCents, a.notes, a.patMonths, a.liftingMonths]
+    )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },
 
