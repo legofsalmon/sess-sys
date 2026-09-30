@@ -84,6 +84,9 @@ waiting on someone.
   marked on every tab, then deleted with the words typed while another
   phone empties by itself). All 36 browser tests and all 236 server
   tests pass, on real Postgres too.
+- Merged into `main` at 14:16 UTC once GitHub's checks passed, and live
+  by 14:22: Railway deployed it on its own. The live app is empty, so
+  made-up data can go straight in.
 
 **Next**
 
