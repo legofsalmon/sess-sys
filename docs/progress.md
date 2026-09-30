@@ -52,6 +52,9 @@ waiting on someone.
   test now brings jobs in too, all 180 server tests, and 2 new browser
   tests (on a phone: look, untick, rename and bring in; on a laptop: a
   calendar that can't be read), with all 23 browser tests passing.
+- Merged into `main` at 04:06 UTC and live by 04:13: the live app has the
+  import screen, and the live server answers its address saying it needs
+  the Google key first, as it should until the key is added.
 
 **Next**
 
