@@ -61,7 +61,8 @@ test('the office sends a call sheet, and the freelancer reads it on their link',
   await office.getByRole('button', { name: 'Print' }).click()
   const printed = office.locator('.print-sheet.call-sheet')
   await expect(printed).toContainText('Ring Aoife Brennan on +44 7700 900')
-  expect(await office.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1)
+  // Asked for on the next frame, once the sheet is on the page.
+  await expect.poll(() => office.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1)
   await office.emulateMedia({ media: 'print' })
   await expect(office.locator('.tabs')).toBeHidden()
   await expect(printed).toBeVisible()
