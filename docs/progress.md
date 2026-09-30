@@ -43,6 +43,10 @@ waiting on someone.
   freelancer's calendar address and their page gives the same one; a
   signed-in staff member finds theirs on the Account tab), with all 25
   browser tests passing.
+- Merged into `main` at 04:52 UTC and live by 04:58: the live app has the
+  new buttons, and the live server answers a feed address that doesn't
+  exist with "Not found", marked private and not for search engines,
+  without asking the database.
 
 **Next**
 
