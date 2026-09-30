@@ -3,6 +3,48 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: call sheets
+
+**Done**
+
+- The first part of Phase 3 since crew booking: each phase of a job has a
+  call sheet, worked out from what the app already holds.
+  [Decision 0021](adr/0021-call-sheets.md) has the reasons.
+- A phase on a job's page has **Call sheet**, with who crew ring on the
+  day. The sheet has the phase's days, where (with the map and the
+  venue's notes on access and parking), the running order from the
+  phase's notes, and who's on for each crew call, by call time.
+- The office picks the **contact on the day** for each phase, from
+  anyone in the app. Their name and number go on everyone's sheet.
+- The office's sheet shows everyone asked, with their numbers and
+  whether they're booked, still to confirm or only offered, places still
+  to find, the kit, and the client's contacts. It works with no signal,
+  **prints** on one A4 page, and **copies for a crew's WhatsApp group**
+  with no number but the contact's.
+- **Send** beside each person who has said yes gives them a link to
+  their own sheet by WhatsApp, text or email, and it's on their private
+  page too, with no app. Theirs shows their call first, who to ring,
+  where, the running order, and who else is on by name only. The contact
+  on the day sees the crew's numbers and the kit on theirs.
+- The made-up data has contacts on the day, running orders and a crew
+  chief booked for the festival. Its phone numbers are from the range
+  kept for TV and radio drama, which never ring anyone.
+- Checked: 5 new tests of what each reader sees, 4 new server tests (the
+  sheet on a private link for someone booked, the contact on the day
+  with the crew's numbers and the kit, no sheet for a call only offered,
+  someone else's or cancelled, and the contact kept to people in the
+  app and in the history), and a new browser test (the office's sheet,
+  the contact changed, copied for a group, printed, sent, and opened on
+  the freelancer's phone). All 38 browser tests and all 244 server tests
+  pass, on real Postgres too.
+
+**Next**
+
+- Colly, to try it: put in the made-up data, open Harbour Lights
+  Festival, and **Call sheet** under Show.
+- Next in Phase 3: timesheets from the bookings, then ready-made
+  freelancer invoices.
+
 ## 30 September 2026: PAT tests and thorough examinations
 
 **Done**

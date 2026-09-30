@@ -6,11 +6,13 @@ import { describeDevice } from '../devices.ts'
 import { publicOrigin } from '../http.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
+import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
 import { awayFor, getAway, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
 
 /**
  * A freelancer's private link, /f/<token>: their page, the answers they
- * post from it, their calendar feed and their data. The token is the only
+ * post from it, their bookings' call sheets, their calendar feed and their
+ * data. The token is the only
  * credential, so every action checks the thing it touches belongs to the
  * link's person. Answers go through the same command handlers as the app,
  * so the same rules (first to accept, no double booking) hold.
@@ -66,6 +68,16 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     return reply
       .type('text/html')
       .send(renderPage({ person, jobs, away: await awayFor(db, person.id), base: base(req, person.linkToken), feed, flash, today: today() }))
+  })
+
+  // A booking's call sheet (ADR 0021): only the person's own, while it's going ahead.
+  app.get('/f/:token/sheet/:id', async (req: Req, reply) => {
+    noStore(reply)
+    const person = await personByToken(db, req.params.token)
+    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    const sheet = await sheetFor(db, person.id, req.params.id ?? '')
+    if (!sheet) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken)))
+    return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken)))
   })
 
   app.post('/f/:token/offers/:id', async (req: Req, reply) => {

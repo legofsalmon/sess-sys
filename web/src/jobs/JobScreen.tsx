@@ -283,6 +283,7 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
   const [editing, setEditing] = useState(false)
   const outside = phase.calls.filter((c) => c.status === 'open' && (c.start < phase.start || c.end > phase.end))
   const ownVenue = phase.venueId && phase.venueId !== job.venueId ? phase.venue : undefined
+  const contact = phase.contactId ? view.crew.people.find((p) => p.id === phase.contactId) : undefined
   return (
     <article className="phase" aria-label={phase.name}>
       <header>
@@ -300,6 +301,12 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
         )}
       </header>
       <CalendarLine job={job} phase={phase} view={view} />
+      <div className="pick-link">
+        <a className="button" href={`#jobs/${job.id}/sheet/${phase.id}`}>
+          Call sheet
+        </a>
+        <span>{contact ? `Contact on the day: ${contact.name}` : 'No contact on the day yet'}</span>
+      </div>
       {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} />}
       {outside.map((c) => (
         <p className="warn-line" key={c.id}>

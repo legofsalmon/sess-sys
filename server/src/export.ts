@@ -199,7 +199,7 @@ const ABOUT: Record<string, string> = {
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
   people: 'Staff and freelancers on the crew list: contact details, skills and rates.',
-  phases: "The parts of each job, such as Build and Show, and their days.",
+  phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   products: 'Stock items (sync test).',
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',

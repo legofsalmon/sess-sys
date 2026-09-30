@@ -1,6 +1,6 @@
 import { MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
 import { cancelCall } from '../crew/handlers.ts'
-import { getCall, openCallsFor } from '../crew/store.ts'
+import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { kitOnPhase } from '../stock/kit.ts'
 import { getClient, getPhase, getProject, getVenue, namesForCall } from './store.ts'
@@ -21,7 +21,7 @@ type Handler<N extends JobCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise
 
 /** The columns each field of a job or phase is kept in. */
 const PROJECT_COLUMNS = { name: 'name', clientId: 'client_id', venueId: 'venue_id', status: 'status', notes: 'notes' } as const
-const PHASE_COLUMNS = { name: 'name', start: 'start_day', end: 'end_day', venueId: 'venue_id', notes: 'notes' } as const
+const PHASE_COLUMNS = { name: 'name', start: 'start_day', end: 'end_day', venueId: 'venue_id', notes: 'notes', contactId: 'contact_id' } as const
 
 /** Set only the fields given; the rest stay as they are. */
 async function setFields(ctx: Ctx, table: 'projects' | 'phases', columns: Record<string, string>, a: { id: string } & Record<string, unknown>) {
@@ -37,6 +37,9 @@ async function checkClient(ctx: Ctx, id: string | null | undefined) {
 }
 async function checkVenue(ctx: Ctx, id: string | null | undefined) {
   if (id && !(await getVenue(ctx.tx, id))) throw new Refused({ code: 'not-found', message: 'That venue no longer exists.' })
+}
+async function checkContact(ctx: Ctx, id: string | null | undefined) {
+  if (id && !(await getPerson(ctx.tx, id))) throw new Refused({ code: 'not-found', message: "That person isn't in the app any more." })
 }
 
 /**
@@ -124,9 +127,10 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     if (await getPhase(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This phase already exists.' })
     if (!(await getProject(ctx.tx, a.projectId))) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
     await checkVenue(ctx, a.venueId)
+    await checkContact(ctx, a.contactId)
     await ctx.tx.query(
-      'INSERT INTO phases (id, project_id, name, start_day, end_day, venue_id, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [a.id, a.projectId, a.name, a.start, a.end, a.venueId, a.notes]
+      'INSERT INTO phases (id, project_id, name, start_day, end_day, venue_id, notes, contact_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [a.id, a.projectId, a.name, a.start, a.end, a.venueId, a.notes, a.contactId ?? null]
     )
     await emit(ctx, 'phase', a.id, await getPhase(ctx.tx, a.id))
   },
@@ -140,6 +144,7 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     if (start > end) throw new Refused({ code: 'invalid', message: `${before.name} would end before it starts.` })
     if (tooLong(start, end)) throw new Refused({ code: 'invalid', message: `A phase can be at most ${MAX_PHASE_DAYS} days.` })
     await checkVenue(ctx, a.venueId)
+    await checkContact(ctx, a.contactId)
     await setFields(ctx, 'phases', PHASE_COLUMNS, a)
     await emit(ctx, 'phase', a.id, await getPhase(ctx.tx, a.id))
     if (a.name !== undefined || a.venueId !== undefined) await renameCalls(ctx, { phaseId: a.id })

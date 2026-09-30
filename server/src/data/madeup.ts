@@ -6,9 +6,11 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  * all ordinary commands, so the server's rules check it as they would a
  * phone's, the history shows it, and phones get it by syncing.
  *
- * Every name is invented. Emails are at example.com and nobody has a phone
- * number, so nothing here can reach a real person. Dates are counted from
- * the day it goes in, so the jobs are always in the coming weeks.
+ * Every name is invented. Emails are at example.com, and phone numbers are
+ * from the range Ofcom keeps for TV and radio drama (07700 900000 to
+ * 900999), which never ring anyone, so nothing here can reach a real
+ * person. Dates are counted from the day it goes in, so the jobs are
+ * always in the coming weeks.
  *
  * What it shows:
  * - two confirmed jobs on the same days, with 4 d&b Y10P short between them;
@@ -21,7 +23,9 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   holding their amps, counted cables and mics, and a roll of label
  *   numbers set aside;
  * - pick lists for the jobs going out soon, and a job that's over with two
- *   speakers still not back, and one back with a rattle, on the repair list.
+ *   speakers still not back, and one back with a rattle, on the repair list;
+ * - call sheets (ADR 0021): a contact on the day and a running order for
+ *   the festival's days, and a crew chief booked who sees everyone's number.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -30,13 +34,15 @@ export function madeUpData(today: string): Mutation[] {
     return args
   }
   const day = (n: number) => addDays(today, n)
+  let drama = 100
+  const phone = () => `+44 7700 900${String(drama++).padStart(3, '0')}`
 
   // Clients and venues.
   const client = (name: string, contact: string, role: string) =>
     add('client.upsert', {
       id: newId(),
       name,
-      contacts: [{ name: contact, role, email: `${contact.split(' ')[0]!.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '')}@example.com`, phone: null }],
+      contacts: [{ name: contact, role, email: `${contact.split(' ')[0]!.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '')}@example.com`, phone: phone() }],
       notes: '',
     }).id
   const shannonside = client('Shannonside Festivals', 'Niamh Walsh', 'Producer')
@@ -55,16 +61,16 @@ export function madeUpData(today: string): Mutation[] {
   // Jobs and their phases.
   const job = (name: string, clientId: string, venueId: string, status: CommandInput<'project.create'>['status'], notes = '') =>
     add('project.create', { id: newId(), name, clientId, venueId, status, notes }).id
-  const phase = (projectId: string, name: string, from: number, to: number) =>
-    add('phase.add', { id: newId(), projectId, name, start: day(from), end: day(to), venueId: null, notes: '' })
+  const phase = (projectId: string, name: string, from: number, to: number, notes = '') =>
+    add('phase.add', { id: newId(), projectId, name, start: day(from), end: day(to), venueId: null, notes })
 
   const harbour = job('Harbour Lights Festival', shannonside, riverside.id, 'confirmed', 'Two stages; the main stage is ours.')
-  const harbourIn = phase(harbour, 'Load in', 3, 4)
-  const harbourShow = phase(harbour, 'Show', 5, 6)
-  const harbourOut = phase(harbour, 'Load out', 7, 7)
+  const harbourIn = phase(harbour, 'Load in', 3, 4, '07:00 Crew call at the north gate\n08:00 Rigging\n13:00 Lunch\n18:00 Stage handed over')
+  const harbourShow = phase(harbour, 'Show', 5, 6, '11:00 Crew chief on site\n12:00 Crew call\n14:00 Line check\n17:30 Doors\n18:00 First act\n22:45 Headliner\n23:00 Curfew')
+  const harbourOut = phase(harbour, 'Load out', 7, 7, '09:00 Crew call\n09:30 De-rig\n14:00 Trucks leave')
   const summit = job('Brightwater Tech Summit', brightwater, northbank.id, 'confirmed')
   phase(summit, 'Build', 5, 5)
-  const summitShow = phase(summit, 'Conference', 6, 7)
+  const summitShow = phase(summit, 'Conference', 6, 7, '08:00 Crew call\n08:45 Doors\n09:00 Keynote\n17:30 Close')
   const arts = job('Corrib Arts Week', corrib, granary.id, 'quoted', 'Waiting on their funding.')
   phase(arts, 'Load in', 12, 12)
   phase(arts, 'Show', 13, 15)
@@ -85,13 +91,13 @@ export function madeUpData(today: string): Mutation[] {
       name,
       kind,
       email: `${name.split(' ')[0]!.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '')}@example.com`,
-      phone: null,
+      phone: phone(),
       skills,
       dayRateCents: euroADay === null ? null : euroADay * 100,
       notes: '',
     }).id
-  person('Aoife Brennan', 'staff', ['Crew chief', 'Audio'], null)
-  person('Cian Murphy', 'staff', ['Warehouse', 'Driver'], null)
+  const aoife = person('Aoife Brennan', 'staff', ['Crew chief', 'Audio'], null)
+  const cian = person('Cian Murphy', 'staff', ['Warehouse', 'Driver'], null)
   const orla = person('Orla Hayes', 'staff', ['Lighting'], null)
   const dara = person('Dara Quinn', 'freelancer', ['Sound No.1', 'Audio'], 320)
   const eimear = person('Eimear Nolan', 'freelancer', ['Monitors', 'Audio'], 300)
@@ -105,7 +111,7 @@ export function madeUpData(today: string): Mutation[] {
 
   // Crew asked for from the jobs, and what each person said.
   const venues = new Map([riverside, northbank, granary, pier3, clonmore].map((v) => [v.id, venueLabel(v)]))
-  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number, callTime = '08:00') =>
+  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number | null, callTime = '08:00') =>
     add('call.create', {
       id: newId(),
       projectId: p.projectId,
@@ -118,7 +124,7 @@ export function madeUpData(today: string): Mutation[] {
       end: p.end,
       callTime,
       needed,
-      dayRateCents: euroADay * 100,
+      dayRateCents: euroADay === null ? null : euroADay * 100,
       details: 'Food on site. Blacks, please.',
       replyBy: null,
     }).id
@@ -143,6 +149,11 @@ export function madeUpData(today: string): Mutation[] {
   // Dara is booked at Harbour Lights then: offered anyway, so the planner shows it as a check.
   offer(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Sound No.1', 1, 320), dara, true)
   booked(call(launchShow, 'Liffey Brands Launch', pier3.id, 'LX op', 1, 280, '10:00'), orla)
+  // Who crew ring on the day, on the call sheets; Aoife is booked as crew chief for the show, so hers has everyone's number.
+  booked(call(harbourShow, 'Harbour Lights Festival', riverside.id, 'Crew chief', 1, null, '11:00'), aoife)
+  for (const p of [harbourIn, harbourShow, harbourOut]) add('phase.update', { id: p.id, contactId: aoife })
+  add('phase.update', { id: summitShow.id, contactId: cian })
+  add('phase.update', { id: launchShow.id, contactId: orla })
 
   // The warehouse: places, products, counts and labelled items.
   const place = (name: string) => add('place.upsert', { id: newId(), name, notes: '' }).id

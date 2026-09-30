@@ -43,8 +43,10 @@ is what's wanted before the real data goes in.
 - **It's all ordinary commands**, checked by the server's rules as a
   phone's would be, all at once or not at all. Its dates count from the
   day it goes in, so the jobs are always in the coming weeks. Every name
-  is invented, emails are at example.com and nobody has a phone number,
-  so nothing can reach a real person.
+  is invented, emails are at example.com, and phone numbers (added for
+  call sheets, [ADR 0021](0021-call-sheets.md)) are from the range Ofcom
+  keeps for TV and radio drama, which never ring anyone, so nothing can
+  reach a real person.
 - **Every screen says "made-up data"** beside its name while it's in, on
   every phone, with no signal too: the server says so with every sync.
 - **In the history**, each made-up change is shown as from "Made-up

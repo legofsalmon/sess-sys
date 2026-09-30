@@ -6,7 +6,7 @@ import type { Queryable } from '../db.ts'
 const CLIENT = `id, name, contacts, notes`
 const VENUE = `id, name, address, notes`
 const PROJECT = `id, name, client_id, venue_id, status, notes, source_calendar`
-const PHASE = `id, project_id, name, start_day::text, end_day::text, venue_id, notes`
+const PHASE = `id, project_id, name, start_day::text, end_day::text, venue_id, notes, contact_id`
 
 type Row = Record<string, any>
 
@@ -29,6 +29,7 @@ export const toPhase = (r: Row): Phase => ({
   end: r.end_day,
   venueId: r.venue_id,
   notes: r.notes,
+  contactId: r.contact_id ?? null,
 })
 
 export async function getClient(q: Queryable, id: string) {

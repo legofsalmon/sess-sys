@@ -49,6 +49,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS source_calendar text;
   `,
+  // Who crew ring on the day, on each phase's call sheet (ADR 0021): a person in the crew module.
+  `
+  ALTER TABLE phases ADD COLUMN IF NOT EXISTS contact_id text;
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }

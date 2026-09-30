@@ -91,6 +91,12 @@ export const phase = z.object({
   /** Null: the job's venue. */
   venueId: id.nullable(),
   notes: z.string().max(2000),
+  /**
+   * Who crew ring on the day (ADR 0021): a person, whose name and number go
+   * on the phase's call sheet for everyone on it. Missing on phases saved
+   * before call sheets, and from older versions of the app.
+   */
+  contactId: id.nullable().optional(),
 })
 export type Phase = z.infer<typeof phase>
 
@@ -143,6 +149,7 @@ export const jobCommandSchemas = {
       end: day.optional(),
       venueId: phase.shape.venueId.optional(),
       notes: phase.shape.notes.optional(),
+      contactId: phase.shape.contactId,
     })
     .refine(...somethingToChange)
     .refine(...phaseFits)
