@@ -68,7 +68,13 @@ export const project = z.object({
   status: z.enum(PROJECT_STATUSES),
   notes: z.string().max(4000),
 })
-export type Project = z.infer<typeof project>
+export type Project = z.infer<typeof project> & {
+  /**
+   * Brought in from this Google calendar (ADR 0011), which keeps its events,
+   * so the app doesn't write it to the jobs calendar. Only the server sets it.
+   */
+  sourceCalendar?: string
+}
 
 /** The usual phases, in the order they happen. Any other name can be typed. */
 export const PHASE_NAMES = ['Prep', 'Load in', 'Build', 'Rehearsal', 'Show', 'Babysit', 'Load out'] as const

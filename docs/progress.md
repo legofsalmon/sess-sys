@@ -3,6 +3,69 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: bringing in the jobs already on Google Calendar
+
+**Done**
+
+- The jobs already on the organisers' Google calendars can now be brought
+  into the app, so nobody types them again. **Bring them in**, on the Jobs
+  tab (and on the Account tab once a calendar is connected), lists the
+  calendars the connected account can see; pick one and a first day (by
+  default three months back) and tap **Look at the calendar**.
+  [Decision 0011](adr/0011-calendar-import.md) has the reasons.
+- Nothing is saved until the office has looked. The app reads the
+  calendar's all-day events from that day to two years ahead and shows
+  each job it found: its phases and days, its venue (new, or already in
+  the app), its crew (booked, not answered, said no, not in the app yet),
+  and whether it's confirmed or pencilled in. Any job can be unticked or
+  renamed, and giving two the same name brings them in as one. People on
+  the invites who aren't in the app yet are listed, ticked when the
+  address looks like a person's own and unticked for suppliers and
+  clients. What was left out (meetings, repeating events, out of office)
+  is listed with why.
+- Titles are read the way they're typed today: "Tik Tok - Ploughing - Load
+  In 2/3" is the job "Tik Tok - Ploughing" and its Load in, "Show Day 2/
+  Load Out" is a day of both, and "Dublin Horse Show" stays whole. A title
+  with no phase comes in as a Show, and says so. A job whose titles all say
+  TBC, hold or pencil, or end in a question mark, comes in pencilled in.
+- **Bring in** reads the calendar again and saves the ticked jobs in one
+  go: the jobs and their phases, new venues and people, and a crew call
+  per phase, with a guest who said Yes booked, one who hasn't answered
+  offered, and a No kept as declined. The job sheet in an event's
+  description goes into the notes. The History tab says who brought in
+  what, and Download everything lists each event-day and the job it went
+  into.
+- Looking again, or at the other organiser's calendar, shows only what's
+  new, adds new days to jobs brought in before, and lists events deleted
+  or moved in Google since, to change the job to match. Days a job typed
+  into the app already has are left out.
+- Nothing is written to Google and nobody is emailed. The organiser's
+  calendar keeps these jobs' events, so the app doesn't add them to the
+  jobs calendar as well, and the job page says where their days are.
+  Everything else works as for any other job: the planner, crew, private
+  links and the history.
+- Checked: 22 new server tests against the pretend Google (titles, job
+  sheets and names; grouping into jobs and phases, venues, people and
+  crew; looking saves nothing; bringing in, and the history and download;
+  looking again; a calendar shared with the account; what goes wrong; a
+  job gone from the calendar before it was brought in), the real-Postgres
+  test now brings jobs in too, all 180 server tests, and 2 new browser
+  tests (on a phone: look, untick, rename and bring in; on a laptop: a
+  calendar that can't be read), with all 23 browser tests passing.
+
+**Next**
+
+- Colly: once the Google key is in and a calendar connected, bring in the
+  jobs on your test calendar, then the organisers' calendars
+  ([the steps](sign-in-setup.md), step 6), and say what it got wrong.
+- Next in Phase 1: personal calendar feeds, the last part of Phase 1.
+- Colly, still open: should crew invites go out when crew are offered (as
+  built) or only once they're booked?
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 30 September 2026: the week and month planner
 
 **Done**

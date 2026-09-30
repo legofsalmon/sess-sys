@@ -8,7 +8,9 @@ import { createHash } from 'node:crypto'
  * refusing a replace when the event has changed since it was read. It
  * keeps a log of the emails Google would send guests. Tests can make it
  * busy, revoke the app's key, switch the API off, or edit events and
- * answer invites as people would.
+ * answer invites as people would. For bringing jobs in (ADR 0011), it can
+ * also hold events as people make them: with a start time, repeating,
+ * out of office, with guests who have names, or in a meeting room.
  */
 
 export type GuestAnswer = 'needsAction' | 'accepted' | 'declined' | 'tentative'
@@ -16,8 +18,10 @@ export type GuestAnswer = 'needsAction' | 'accepted' | 'declined' | 'tentative'
 export interface FakeAttendee {
   email: string
   responseStatus: GuestAnswer
+  displayName?: string
   organizer?: boolean
   self?: boolean
+  resource?: boolean
   comment?: string
 }
 
@@ -28,10 +32,14 @@ export interface FakeEvent {
   summary: string
   location: string
   description: string
-  start: { date: string }
-  end: { date: string }
+  /** `date` for an all-day event, `dateTime` for one with a start time. */
+  start: { date?: string; dateTime?: string }
+  end: { date?: string; dateTime?: string }
   extendedProperties?: { private?: Record<string, string> }
   htmlLink: string
+  iCalUID?: string
+  recurringEventId?: string
+  eventType?: string
   attendees?: FakeAttendee[]
   guestsCanSeeOtherGuests?: false
   guestsCanInviteOthers?: false
@@ -53,6 +61,11 @@ interface Account {
   /** Calendars on the account's list, with the account's access to each. */
   calendars: Map<string, { summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary?: boolean }>
 }
+
+/** The day an event starts, and the day after it ends, whether all-day or with a start time. */
+const firstDay = (e: FakeEvent) => e.start.date ?? e.start.dateTime?.slice(0, 10) ?? ''
+const lastDayAfter = (e: FakeEvent) => e.end.date ?? dayAfter(e.end.dateTime?.slice(0, 10) ?? '')
+const dayAfter = (day: string) => (day ? new Date(Date.parse(`${day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10) : '')
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const apiError = (status: number, reason: string) => json(status, { error: { code: status, message: reason, errors: [{ reason, message: reason }] } })
@@ -129,7 +142,56 @@ export class FakeGoogle {
 
   /** The events a person looking at the calendar sees. */
   visible(calendarId: string): FakeEvent[] {
-    return [...(this.events.get(calendarId)?.values() ?? [])].filter((e) => e.status !== 'cancelled').sort((a, b) => a.start.date.localeCompare(b.start.date) || a.summary.localeCompare(b.summary))
+    return [...(this.events.get(calendarId)?.values() ?? [])]
+      .filter((e) => e.status !== 'cancelled')
+      .sort((a, b) => firstDay(a).localeCompare(firstDay(b)) || a.summary.localeCompare(b.summary))
+  }
+
+  /** Share a calendar with an account, as its owner would, and the account adds it to its list. */
+  share(email: string, calendarId: string, summary: string, accessRole: 'owner' | 'writer' | 'reader' = 'reader') {
+    this.accounts.get(email)!.calendars.set(calendarId, { summary, accessRole })
+  }
+
+  /**
+   * A person adds an event in Google Calendar, as the organiser: all-day
+   * over `days` (first and last, or one), or with a start time. Google
+   * lists the organiser as a guest too, once there are any.
+   */
+  add(
+    calendarId: string,
+    ev: { summary: string; days?: string | [string, string]; at?: string; location?: string; description?: string; guests?: (Partial<FakeAttendee> & { email: string })[] },
+    more: Partial<Pick<FakeEvent, 'iCalUID' | 'recurringEventId' | 'eventType' | 'extendedProperties'>> = {}
+  ): FakeEvent {
+    const id = `ev${++this.n}x`
+    const [first, last] = typeof ev.days === 'string' ? [ev.days, ev.days] : (ev.days ?? ['', ''])
+    const organiser = [...this.accounts.values()].find((a) => a.calendars.get(calendarId)?.accessRole === 'owner')?.email ?? calendarId
+    const guests = (ev.guests ?? []).map((g) => ({ responseStatus: 'needsAction' as const, ...g }))
+    const next: FakeEvent = {
+      id,
+      etag: `"${++this.n}"`,
+      status: 'confirmed',
+      summary: ev.summary,
+      location: ev.location ?? '',
+      description: ev.description ?? '',
+      start: ev.at ? { dateTime: ev.at } : { date: first },
+      end: ev.at ? { dateTime: new Date(Date.parse(ev.at) + 3_600_000).toISOString() } : { date: dayAfter(last) },
+      htmlLink: `https://www.google.com/calendar/event?eid=${id}`,
+      iCalUID: `${id}@google.com`,
+      ...(guests.length ? { attendees: [{ email: organiser, responseStatus: 'accepted' as const, organizer: true }, ...guests] } : {}),
+      updated: this.clock().toISOString(),
+      ...more,
+    }
+    const store = this.events.get(calendarId) ?? new Map<string, FakeEvent>()
+    this.events.set(calendarId, store)
+    store.set(id, next)
+    return next
+  }
+
+  /** A person moves an all-day event to other days. */
+  move(calendarId: string, eventId: string, days: string | [string, string]) {
+    const [first, last] = typeof days === 'string' ? [days, days] : days
+    const ev = this.events.get(calendarId)!.get(eventId)!
+    Object.assign(ev, { start: { date: first }, end: { date: dayAfter(last) }, etag: `"${++this.n}"`, updated: this.clock().toISOString() })
   }
 
   /** A person edits an event in Google Calendar. */
@@ -227,13 +289,15 @@ export class FakeGoogle {
         this.lists.push(url.searchParams)
         const [key, value] = (url.searchParams.get('privateExtendedProperty') ?? '').split('=')
         const timeMin = url.searchParams.get('timeMin')?.slice(0, 10) ?? ''
+        const timeMax = url.searchParams.get('timeMax')?.slice(0, 10) ?? '9999'
         const updatedMin = url.searchParams.get('updatedMin') ?? ''
         // Changes since a time also list deleted events, as Google does.
         const showDeleted = url.searchParams.get('showDeleted') === 'true' || updatedMin !== ''
         const items = [...store.values()].filter(
           (e) =>
             (!key || e.extendedProperties?.private?.[key] === value) &&
-            e.end.date > timeMin &&
+            lastDayAfter(e) > timeMin &&
+            firstDay(e) < timeMax &&
             e.updated >= updatedMin &&
             (showDeleted || e.status !== 'cancelled')
         )

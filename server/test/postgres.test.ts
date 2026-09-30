@@ -269,6 +269,54 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await db.close()
     }
   })
+
+  it('brings jobs in from Google Calendar (ADR 0011), as on PGlite', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const google = new FakeGoogle()
+    const now = () => new Date('2031-03-05T10:00:00Z')
+    google.clock = now
+    const app = await buildApp({
+      db,
+      auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
+      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now },
+    })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const start = await app.inject({ url: '/api/calendar/connect?client=phonec0ffee', cookies: colly.cookies })
+      const { code, state } = google.consent(start.headers.location as string)
+      const attempt = start.cookies.find((c) => c.name === 'sh_calendar')!.value
+      await app.inject({ url: `/api/calendar/callback?code=${code}&state=${state}`, cookies: { ...colly.cookies, sh_calendar: attempt } })
+      const ops = 'ops@sessionhire.com'
+      const guests = [{ email: 'aoife.byrne@gmail.com', displayName: 'Aoife Byrne', responseStatus: 'accepted' as const }]
+      google.add(ops, { summary: 'Nissan - Build 1/2', days: '2031-03-10', location: 'Convention Centre Dublin, Spencer Dock', guests })
+      google.add(ops, { summary: 'Nissan - Build 2/2', days: '2031-03-11', location: 'Convention Centre Dublin, Spencer Dock', guests })
+      const post = (url: string, payload: object) => app.inject({ method: 'POST', url, cookies: colly.cookies, payload })
+
+      const preview = (await post('/api/calendar/import/look', { calendarId: ops, from: '2031-01-01' })).json()
+      expect(preview.jobs.map((j: { name: string; phases: unknown[] }) => [j.name, j.phases.length])).toEqual([['Nissan', 1]])
+      const choices = {
+        calendarId: ops,
+        from: '2031-01-01',
+        jobs: preview.jobs.map((j: { key: string; name: string }) => ({ key: j.key, name: j.name, include: true })),
+        people: preview.people.map((p: { email: string }) => ({ email: p.email, include: true })),
+      }
+      const brought = await post('/api/calendar/import/bring', choices)
+      expect(brought.json()).toEqual({ jobs: 1, added: 0, days: 2, venues: 1, people: 1, crew: 1, missing: [] })
+      const { rows } = await db.query<{ name: string; source_calendar: string; phases: number; imported: number }>(
+        `SELECT p.name, p.source_calendar, (SELECT count(*)::int FROM phases WHERE project_id = p.id) AS phases,
+                (SELECT count(*)::int FROM calendar_imports WHERE project_id = p.id) AS imported
+           FROM projects p`
+      )
+      expect(rows).toEqual([{ name: 'Nissan', source_calendar: ops, phases: 1, imported: 2 }])
+      const again = (await post('/api/calendar/import/look', { calendarId: ops, from: '2031-01-01' })).json()
+      expect(again.jobs).toEqual([])
+      expect(again.leftOut).toEqual([{ reason: 'before', count: 2, examples: ['Nissan - Build 1/2', 'Nissan - Build 2/2'] }])
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
 })
 
 function contents(db: Db, table: string) {

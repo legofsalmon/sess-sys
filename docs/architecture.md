@@ -336,12 +336,21 @@ and the kit list for staff (not for external crew).
 - New projects start app-led once Phase 1 is live; old ones stay
   calendar-led until they finish.
 
-**Import.** A one-off importer reads the organisers' calendars
-(with a Google Workspace domain-wide delegation grant, or each organiser
-connecting their account) and turns events into draft projects: groups by
-the text before the first " - ", orders phases, maps attendees to people,
-and parses kit list descriptions into draft equipment lines marked for
-review.
+**Import** (built, [ADR 0011](adr/0011-calendar-import.md)). The office
+brings in the jobs on any calendar the connected account can see: its own,
+or an organiser's once they share it (both directly, with a Google
+Workspace domain-wide delegation grant, later). The server reads the
+all-day events, splits each title at its last " - " into job and phase,
+puts a job's days in a row into phases (more than 14 days apart is another
+job), and matches locations to venues and guests to people, then shows all
+of it before anything is saved. Bringing in saves the ticked jobs in one
+change, with a crew call per phase and offers from the guests' answers,
+and remembers each event-day by the id Google gives it on every calendar,
+so looking again shows only what is new and lists what changed in Google.
+Job sheets go into the notes as written; turning kit lists into draft
+equipment lines waits for the warehouse (Phase 2). A job brought in stays
+with the calendar it came from, which keeps its events, so the app doesn't
+write it to the jobs calendar.
 
 **Personal feeds.** Every person also gets a private iCal feed of their own
 bookings, which works for freelancers on any calendar app.

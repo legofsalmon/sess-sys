@@ -44,6 +44,11 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS phases_project ON phases (project_id, start_day);
   CREATE INDEX IF NOT EXISTS phases_days ON phases (start_day, end_day);
   `,
+  // Jobs brought in from Google Calendar (ADR 0011) keep their events on the
+  // organiser's calendar, named here, so the calendar sync leaves them out.
+  `
+  ALTER TABLE projects ADD COLUMN IF NOT EXISTS source_calendar text;
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }

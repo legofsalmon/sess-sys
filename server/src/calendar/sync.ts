@@ -9,6 +9,7 @@ import {
   type CalendarInvites,
   type DayAnswer,
   type GuestResponse,
+  type ImportCalendar,
 } from '@sh/shared'
 import { applyMutationIn } from '../commands.ts'
 import { getCall, getOffer } from '../crew/store.ts'
@@ -86,6 +87,9 @@ const problems = {
   notTaken: (answer: 'accept' | 'decline', reason: string) =>
     `Said ${answer === 'accept' ? 'yes' : 'no'} on Google Calendar, but the app couldn't take it: ${reason.replace(/^Sorry, (\w)/, (_, c: string) => c.toUpperCase())}`,
 }
+
+/** The Calendar API is switched off in the app's Google Cloud project. */
+const apiOff = (err: GoogleError) => err.reason === 'accessNotConfigured' || err.reason === 'SERVICE_DISABLED'
 
 /** Stops a run, or a request from the Account tab: the calendar or the account needs a person, or Google needs time. */
 export class Halt extends Error {
@@ -280,6 +284,38 @@ export class CalendarSync {
   /** That calendar, if the connected account can change it. */
   writable(calendarId: string): Promise<CalendarChoice | undefined> {
     return this.withLink((link) => this.call(link, (t) => this.options.google.calendar(t, calendarId)))
+  }
+
+  /** Today in Ireland, by the sync's clock. */
+  today(): string {
+    return irishToday(this.now())
+  }
+
+  /** The calendars the connected account can see the events of, to bring jobs in from (ADR 0011). */
+  readableCalendars(): Promise<ImportCalendar[]> {
+    return this.withLink((link) => this.call(link, (t) => this.options.google.readableCalendars(t)))
+  }
+
+  /**
+   * A calendar's events between two times, to bring jobs in from (ADR
+   * 0011), with the account reading them; undefined when that account
+   * can't see the calendar.
+   */
+  readCalendar(calendarId: string, window: { timeMin: string; timeMax: string }) {
+    return this.withLink((link) =>
+      this.call(link, async (t) => {
+        const calendar = await this.options.google.readableCalendar(t, calendarId)
+        if (!calendar) return undefined
+        try {
+          const events = await this.options.google.readEvents(t, calendarId, window)
+          return { calendar, events, account: link.accountEmail ?? '' }
+        } catch (err) {
+          // Its sharing changed in the moment between the two.
+          if (err instanceof GoogleError && (err.problem === 'gone' || (err.problem === 'access' && !apiOff(err)))) return undefined
+          throw err
+        }
+      })
+    )
   }
 
   private async withLink<T>(fn: (link: Link) => Promise<T>): Promise<T> {
@@ -723,8 +759,7 @@ export class CalendarSync {
   }
 
   private blockedBy(link: Link, err: GoogleError): Halt {
-    const apiOff = err.reason === 'accessNotConfigured' || err.reason === 'SERVICE_DISABLED'
-    return new Halt('blocked', apiOff ? problems.apiOff : problems.noAccess(link.calendarName ?? 'the calendar', link.accountEmail))
+    return new Halt('blocked', apiOff(err) ? problems.apiOff : problems.noAccess(link.calendarName ?? 'the calendar', link.accountEmail))
   }
 
   private async accessToken(link: Link): Promise<string> {

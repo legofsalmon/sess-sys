@@ -299,7 +299,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 · jobs, calendar, invites and planner built</div>
+      <div class="status">Phase 1 · jobs, calendar, invites, planner and import built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -363,6 +363,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           <figure><img src="img/plan-week-people.png" alt="The planner's week by person on a phone: Aoife booked on Web Summit, with Tuesday marked as a clash because she is also unavailable; Conor offered the build days; Niamh booked on them" width="390" height="844" loading="lazy"><figcaption><b>A week by person.</b> Booked, offered, away, and the clash.</figcaption></figure>
         </div>
         <figure style="margin:12px 0 0"><img src="img/plan-month.png" alt="The planner's month on a laptop: March 2031 with a row per job and a column per day, each phase-day as a short code such as Bu for Build, green or amber for its crew, and the quote and the enquiry dashed" width="1440" height="900" loading="lazy" style="max-width:100%;height:auto;border-radius:14px;border:1px solid var(--line)"><figcaption class="small"><b>A month on a laptop.</b> Every day at a glance; a date opens its week.</figcaption></figure>
+      </div>
+      <div class="panel shots crewshots jobshots">
+        <h3>Bringing in the jobs already on Google Calendar</h3>
+        <p class="small">The office picks a calendar the connected account can see, its own or an organiser's shared with it, and a first day, and the app shows every job it would bring in before anything is saved: phases and days read from titles as they're typed today ("Nissan - Build 1/2"), the venue from the location, and the crew from the guests, booked, offered or declined by their answer. Jobs can be unticked or renamed, and people on the invites chosen for the crew list. Bringing in saves it all in one go; looking again shows only what's new and lists events changed in Google since. Nothing is written to Google and nobody is emailed. (Decision 0011)</p>
+        <div class="phones">
+          <figure><img src="img/import-choose.png" alt="Bringing jobs in on a phone: the calendars the connected account can see, its own chosen, then Aoife Byrne's and Session Hire Gigs shared with it, and the first day to bring in from" width="390" height="844" loading="lazy"><figcaption><b>Choose a calendar.</b> Its own first, then any shared with it.</figcaption></figure>
+          <figure><img src="img/import-look.png" alt="What would come in, on a phone: Nissan with its Build, Show and Load out days, a new venue and its crew; more days for Aviva, brought in before; Web Summit unticked; and a button to bring in 2 jobs and more days for 1 job" width="390" height="844" loading="lazy"><figcaption><b>Look before bringing in.</b> Untick, rename, then bring in.</figcaption></figure>
+        </div>
       </div>
       <div class="panel shots crewshots">
         <h3>Crew booking, started early</h3>
@@ -561,6 +569,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Google Calendar</th><td>The app writes confirmed jobs to one calendar, as one connected account, on each change and in a nightly check</td><td>Built (Decision 0008)</td></tr>
             <tr><th>Crew invites</th><td>Crew are guests on their days' events; their answers are read back every two minutes by asking Google what changed, so the database sleeps</td><td>Built, switch off (Decision 0009)</td></tr>
             <tr><th>Planner</th><td>The week and month by job or by person, with clashes flagged, worked out on each device from what it already holds</td><td>Built (Decision 0010)</td></tr>
+            <tr><th>Calendar import</th><td>The jobs on an organiser's calendar come in after a look at everything first; each event-day is remembered, so looking again shows only what's new</td><td>Built (Decision 0011)</td></tr>
           </tbody>
         </table>
       </div>
@@ -578,6 +587,10 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <div class="panel">
         <h3>Built so far: crew invites and their answers (Decision 0009)</h3>
         <p class="small">A switch on the Account tab, off to start with. When on, everyone offered a place on a confirmed job, or booked on it, with an email address in the app, is a guest on its events on their days, invited by the connected account; crew can't see each other's addresses. Their Yes or No counts as their answer through the same rules as their link: the first to say yes gets the place, a No to every day declines, Maybe waits, and a No from someone already confirmed is flagged for the office instead. Google emails guests only when they are added or taken off, or the title, date or place changes. Every change reads the event first, so guests added by hand and answers given in the meantime are kept. The server asks Google every two minutes which events changed and only touches the database for a new answer. Next: edits flowing back for calendar-led jobs.</p>
+      </div>
+      <div class="panel">
+        <h3>Built so far: bringing jobs in (Decision 0011)</h3>
+        <p class="small">The jobs already on the organisers' calendars come into the app from the Jobs tab: all-day events are read from a chosen day to two years ahead, the title split at its last " - " into job and phase, a job's days in a row made into phases, locations matched to venues and guests to people. Everything is shown before it's saved; TBC or hold brings a job in pencilled in. Each event-day is remembered by Google's own id, so the other organiser's calendar or a second look brings in only what's new. The organiser's calendar keeps these jobs' events, so the app doesn't write them to the jobs calendar too.</p>
       </div>
       <div class="btns" role="group" aria-label="Sync mode">
         <button class="btn" type="button" data-mode="cal" aria-pressed="true">Calendar-led (during the move)</button>
@@ -610,7 +623,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <p class="small" id="modeText">Calendar-led: ops can keep working in Google. Moving an event moves the phase; RSVPs update crew status.</p>
       </div>
       <div class="grid2">
-        <div class="panel"><h3>Importing history</h3><p class="small">A one-off import reads the organisers' calendars and turns events into draft projects: grouped by the text before the first " - ", phases in order, attendees matched to people, kit lists parsed into draft lines marked for review.</p></div>
+        <div class="panel"><h3>Importing history</h3><p class="small">Built: the jobs on an organiser's calendar come in grouped by the text before the last " - ", phases in order, guests matched to people, and job sheets kept in the notes as written. Kit lists become draft kit lines once the warehouse arrives (Phase 2). (Decision 0011)</p></div>
         <div class="panel"><h3>Personal feeds</h3><p class="small">Every person also gets a private calendar feed of their own bookings that works in any calendar app. Workspace is confirmed; admin access will follow, and a test calendar is ready.</p></div>
       </div>
     </section>
@@ -787,7 +800,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const PHASES = [
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites, planner built'],
+    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites, planner, import built'],
     ['2', 'Warehouse', 'todo', 'Planned'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
@@ -868,7 +881,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const road = [
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
-    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Import past calendar events as draft projects (next)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
+    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Bring in the jobs already on the organisers\' calendars (built)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds (next)'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
     ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
@@ -900,7 +913,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Jobs', 'A job has a client, a main venue, a status (enquiry, quoted, confirmed, cancelled or lost) and phases of whole days; each phase-day becomes a calendar event in today\'s format. Crew are asked for from the job and follow its renames; cancelling a job cancels its crew. Nothing is deleted (Decision 0007). Built and on.', 'decided'],
     ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting'],
     ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting'],
-    ['Planner', 'Week and Month sit beside the jobs list, by job or by person. Booked twice, or booked while unavailable, is a clash; an offer that would clash if they said yes is a check. Worked out on each device, so it works with no signal. Looking only for now: dragging phases waits until the office has used it (Decision 0010). Built and on.', 'decided']
+    ['Planner', 'Week and Month sit beside the jobs list, by job or by person. Booked twice, or booked while unavailable, is a clash; an offer that would clash if they said yes is a check. Worked out on each device, so it works with no signal. Looking only for now: dragging phases waits until the office has used it (Decision 0010). Built and on.', 'decided'],
+    ['Calendar import', 'The jobs on a calendar the connected account can see come in after a look at everything first; titles give job and phase, guests\' answers give crew booked, offered or declined, and TBC or hold means pencilled in. The organiser\'s calendar keeps these jobs\' events, so the app doesn\'t add them to the jobs calendar (Decision 0011). Built; works once the Google key is in and a calendar connected.', 'waiting']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

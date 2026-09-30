@@ -44,8 +44,10 @@ and a calendar connected on the Account tab. Crew can be invited to their
 days, with their Yes or No in Google counting as their answer, behind a
 switch that starts off ([ADR 0009](adr/0009-crew-invites.md)). The week and
 month planner shows every job and person, with clashes flagged
-([ADR 0010](adr/0010-planner.md)). Bringing the jobs already on the
-calendar in as drafts is next. See [progress.md](progress.md).
+([ADR 0010](adr/0010-planner.md)). The jobs already on the organisers'
+calendars can be brought in, after a look at everything that would come
+in ([ADR 0011](adr/0011-calendar-import.md)). Personal calendar feeds are
+next. See [progress.md](progress.md).
 
 - Clients, venues, projects, phases, crew requirements and assignments
   (built).
@@ -55,8 +57,9 @@ calendar in as drafts is next. See [progress.md](progress.md).
 - Crew as attendees on the events, with RSVPs updating assignments (built,
   behind a switch on the Account tab that starts off; tried first on the
   test calendar with staff's own addresses).
-- Importer for the organisers' existing calendars into draft projects
-  (next).
+- Importer for the organisers' existing calendars (built: jobs come in
+  confirmed or pencilled in, with their crew, after a look at everything
+  first).
 - A planner view: the week and month by project and by person, with
   clashes flagged (the same freelancer on two jobs) (built; looking only
   for now, with dragging phases to wait until the office has used it).

@@ -6,7 +6,9 @@ built, and both switch on as soon as the app server has a Google key. Making
 the key takes about ten minutes in Google Cloud, once. Connecting the
 calendar then takes a minute in the app (step 4). Crew invites on the
 calendar ([Decision 0009](adr/0009-crew-invites.md)) are built too, behind a
-switch that starts off (step 5).
+switch that starts off (step 5), and so is bringing in the jobs already on
+the organisers' calendars ([Decision 0011](adr/0011-calendar-import.md),
+step 6).
 
 **Before you start:** the secret you create is a password for the app.
 Paste it only into Railway, never into a chat or an email.
@@ -124,6 +126,36 @@ before using it for real:
 5. Tap **Turn off crew invites** when done. Nothing more is sent; the
    people invited keep their invites as they are.
 
+## 6. Bring in the jobs already on the calendar
+
+The app reads the jobs on any calendar the connected account can see and
+brings them in, after showing everything that would come in. It never
+writes to that calendar and never emails anyone, so it is safe to try on
+the organisers' own calendars.
+
+1. With a calendar connected (step 4), open the **Jobs** tab and tap
+   **Bring them in** (it is on the Account tab too).
+2. Pick the calendar. The connected account's own is first. For another
+   organiser's, they share theirs with that account first: in Google
+   Calendar, the calendar's **Settings and sharing**, **Share with specific
+   people or groups**, the connected account's address, **See all event
+   details**.
+   It is listed once it shows under **Other calendars** in that account.
+3. Pick the first day (by default three months back; days gone come in
+   too, as the record of who worked what) and tap **Look at the
+   calendar**. Nothing is saved yet.
+4. Check what was found: untick anything that isn't a job, rename a job,
+   or give two the same name to bring them in as one, and choose which
+   people on the invites to add to the crew list. **What was left out, and
+   why** lists meetings, repeating events and the like.
+5. Tap **Bring in**. The History tab says who brought in what. Looking
+   again later shows only what is new, and lists events deleted or moved
+   in Google since.
+
+Jobs brought in stay on the calendar they came from, so the app doesn't
+put them on the jobs calendar as well; change them in Google as today, and
+in the app to match.
+
 Worth knowing before turning it on for **Session Hire Gigs**:
 
 - Invites come from the connected account, so it should be the one crew
@@ -150,6 +182,8 @@ Worth knowing before turning it on for **Session Hire Gigs**:
 - Once anyone has signed in, the server won't start without the two Google
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
+- Bringing jobs in (step 6) only reads the calendar: nothing is written
+  to Google and nobody is emailed.
 - The calendar gets crew by name only: rates and phone numbers stay in
   the app. Emails are used only for crew invites (step 5), which start
   off, and crew can't see each other's addresses.

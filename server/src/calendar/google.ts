@@ -1,4 +1,4 @@
-import type { CalendarChoice, GuestResponse } from '@sh/shared'
+import type { CalendarChoice, GuestResponse, ImportCalendar } from '@sh/shared'
 import { identityFromIdToken, type Identity } from '../auth/google.ts'
 
 /**
@@ -75,6 +75,8 @@ export interface Attendee {
   responseStatus?: GuestResponse
   organizer?: boolean
   self?: boolean
+  /** A meeting room or other bookable thing, not a person. */
+  resource?: boolean
   optional?: boolean
   comment?: string
   additionalGuests?: number
@@ -94,6 +96,13 @@ export interface GoogleEvent {
   /** When anything but its reminders last changed, a guest's answer included. */
   updated?: string
   extendedProperties?: { private?: Record<string, string> }
+  /** The same on every calendar the event is on, unlike `id` for events from outside Google. */
+  iCalUID?: string
+  /** Set on each day of a repeating event. */
+  recurringEventId?: string
+  /** `default` for an ordinary event; otherwise out of office, focus time, a birthday and the like. */
+  eventType?: string
+  organizer?: { email?: string; displayName?: string; self?: boolean }
 }
 
 /** What the app writes for one phase-day. */
@@ -188,16 +197,42 @@ export class Google {
 
   /** The calendars the account can change, the account's own first. */
   async calendars(accessToken: string): Promise<CalendarChoice[]> {
-    const out: CalendarChoice[] = []
+    const out = (await this.calendarList(accessToken, 'writer')).filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer').map(choice)
+    return out.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name))
+  }
+
+  /**
+   * The calendars the account can see the events of, to bring jobs in from
+   * (ADR 0011), the account's own first. Not Google's own holiday and
+   * birthday calendars, and not those shared as free or busy only.
+   */
+  async readableCalendars(accessToken: string): Promise<ImportCalendar[]> {
+    const out = (await this.calendarList(accessToken, 'reader')).filter(readable).map(seen)
+    return out.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name))
+  }
+
+  /** One calendar, if the account can still see its events. */
+  async readableCalendar(accessToken: string, calendarId: string): Promise<ImportCalendar | undefined> {
+    try {
+      const c = await this.api<CalendarListEntry>(accessToken, 'GET', `/users/me/calendarList/${encodeURIComponent(calendarId)}`)
+      return readable(c) ? seen(c) : undefined
+    } catch (err) {
+      if (err instanceof GoogleError && err.problem === 'gone') return undefined
+      throw err
+    }
+  }
+
+  private async calendarList(accessToken: string, minAccessRole: 'reader' | 'writer'): Promise<CalendarListEntry[]> {
+    const out: CalendarListEntry[] = []
     let pageToken: string | undefined
     do {
-      const q = new URLSearchParams({ minAccessRole: 'writer', maxResults: '250' })
+      const q = new URLSearchParams({ minAccessRole, maxResults: '250' })
       if (pageToken) q.set('pageToken', pageToken)
       const page = await this.api<{ items?: CalendarListEntry[]; nextPageToken?: string }>(accessToken, 'GET', `/users/me/calendarList?${q}`)
-      for (const c of page.items ?? []) if (c.accessRole === 'owner' || c.accessRole === 'writer') out.push(choice(c))
+      out.push(...(page.items ?? []))
       pageToken = page.nextPageToken
     } while (pageToken)
-    return out.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name))
+    return out
   }
 
   /** One calendar, if the account can still change it. */
@@ -265,6 +300,24 @@ export class Google {
     return out
   }
 
+  /**
+   * Every event on a calendar between two times, each day of a repeating
+   * one on its own and deleted ones included, to bring jobs in from (ADR
+   * 0011). Only what that needs of each.
+   */
+  async readEvents(accessToken: string, calendarId: string, { timeMin, timeMax }: { timeMin: string; timeMax: string }): Promise<GoogleEvent[]> {
+    const out: GoogleEvent[] = []
+    let pageToken: string | undefined
+    do {
+      const q = new URLSearchParams({ singleEvents: 'true', showDeleted: 'true', maxResults: '2500', timeMin, timeMax, fields: READ_FIELDS })
+      if (pageToken) q.set('pageToken', pageToken)
+      const page = await this.api<{ items?: GoogleEvent[]; nextPageToken?: string }>(accessToken, 'GET', `${events(calendarId)}?${q}`)
+      out.push(...(page.items ?? []))
+      pageToken = page.nextPageToken
+    } while (pageToken)
+    return out
+  }
+
   private async token(params: Record<string, string>) {
     let res: Response
     try {
@@ -320,5 +373,15 @@ const choice = (c: CalendarListEntry): CalendarChoice => ({
   primary: c.primary === true,
   access: c.accessRole === 'owner' ? 'owner' : 'writer',
 })
+
+/** Its events can be read, and it isn't one of Google's own (holidays, birthdays, week numbers), whose ids end like this. */
+const readable = (c: CalendarListEntry) =>
+  (c.accessRole === 'owner' || c.accessRole === 'writer' || c.accessRole === 'reader') && !c.id.endsWith('@group.v.calendar.google.com')
+
+const seen = (c: CalendarListEntry): ImportCalendar => ({ id: c.id, name: c.summaryOverride || c.summary || c.id, primary: c.primary === true })
+
+/** What bringing jobs in reads of each event: never its reminders, attachments or conference links. */
+const READ_FIELDS =
+  'nextPageToken,items(id,iCalUID,status,summary,location,description,start,end,attendees(email,displayName,responseStatus,organizer,self,resource),recurringEventId,eventType,extendedProperties)'
 
 const events = (calendarId: string) => `/calendars/${encodeURIComponent(calendarId)}/events`
