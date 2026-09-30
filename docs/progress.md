@@ -54,6 +54,9 @@ waiting on someone.
   calendar; disconnecting; the key never in the export or on devices), one
   more on a real Postgres like the live one, all 137 server tests, and 2
   new browser tests for the Account card and the job page.
+- Merged into `main` at 00:36 UTC and live by 00:42: the live server
+  answers the new calendar addresses, and says it needs the Google key
+  first, as it should until the key is added.
 
 **Next**
 

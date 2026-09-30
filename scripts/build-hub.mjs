@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS = [
   ['Build progress', 'docs/progress.md'],
   ['Phone field test', 'docs/field-test.md'],
-  ['Switching on sign-in', 'docs/sign-in-setup.md'],
+  ['Switching on sign-in and Google Calendar', 'docs/sign-in-setup.md'],
   ['Design system', 'docs/design-system.md'],
   ['Backups', 'docs/backups.md'],
   ['Error alerts', 'docs/monitoring.md'],
