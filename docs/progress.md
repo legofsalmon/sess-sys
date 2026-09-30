@@ -43,6 +43,11 @@ waiting on someone.
   aside, printed in each layout with the printed page sizes checked,
   downloaded, claimed by scanning, an item's own label; set aside with no
   signal), with all 31 browser tests passing.
+- Merged into `main` at 07:48 UTC, together with kit on jobs, and live by
+  11:33 once Railway was asked to deploy it (it hadn't picked the merge up
+  on its own): the live app has the Labels screen, claim on scan and
+  **Print label**, and the live server adds the new table before it
+  starts.
 
 **Next**
 
@@ -99,6 +104,9 @@ waiting on someone.
   new browser tests on a phone (short, subhired, a quote pencilled in,
   the Stock tab and a product's page; kit added with no signal), with all
   29 browser tests passing.
+- Merged into `main` at 07:48 UTC, together with printing labels, and live
+  by 11:33: the live app has the Kit card, **Subhire the 2 short** and
+  **Kit short**, and the live database has the new table.
 
 **Next**
 
