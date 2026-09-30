@@ -9,8 +9,8 @@ import { SignIn } from './SignIn.tsx'
 
 /**
  * Switches between the app's areas. The address keeps the area, and within
- * it the record open (#jobs/<id>), so a reload or a shared link lands in the
- * same place.
+ * it the record open (#jobs/<id>) or the planner's days (#plan/week/<day>),
+ * so a reload or a shared link lands in the same place.
  */
 const AREAS = [
   { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
@@ -30,7 +30,9 @@ export function Shell() {
   }, [])
   // Only once the server has said so: offline, the device carries on.
   if (auth.status === 'signed-out') return <SignIn />
-  const area = AREAS.find((a) => hash === a.hash || hash.startsWith(`${a.hash}/`)) ?? AREAS[0]
+  const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
+  // The planner is a way of looking at jobs (ADR 0010), so it keeps the Jobs tab.
+  const area = within('#plan') ? AREAS[0] : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
   return (
     <>
       <area.Screen />

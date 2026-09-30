@@ -299,7 +299,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 · jobs, calendar and crew invites built</div>
+      <div class="status">Phase 1 · jobs, calendar, invites and planner built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -335,7 +335,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <h3>Jobs, the start of Phase 1</h3>
         <p class="small">Each job has its client, venue, status and phases, and each phase shows how its days will read on the calendar. Crew are asked for from the job, and a rename reaches the crew too. Cancelling a job cancels its crew. (Decision 0007)</p>
         <div class="phones">
-          <figure><img src="img/jobs-list.png" alt="Jobs tab on a phone: a search box, filters for coming up, past and not going ahead, a confirmed job with 0 of 2 crew booked, and the new job form" width="390" height="844" loading="lazy"><figcaption><b>The list.</b> What's coming up, and how much crew is booked.</figcaption></figure>
+          <figure><img src="img/jobs-list.png" alt="Jobs tab on a phone: List, Week and Month at the top, a search box, filters for coming up, past and not going ahead, a confirmed job with 0 of 2 crew booked, and the new job form" width="390" height="844" loading="lazy"><figcaption><b>The list.</b> What's coming up, and how much crew is booked.</figcaption></figure>
           <figure><img src="img/jobs-job.png" alt="A job's page on a phone: Nissan launch, confirmed, with its client, venue, dates and crew, and the Build phase with its calendar titles and a call for two audio techs" width="390" height="844" loading="lazy"><figcaption><b>A job.</b> Its phases as the calendar will show them, with their crew.</figcaption></figure>
         </div>
       </div>
@@ -354,6 +354,15 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           <figure><img src="img/account-invites.png" alt="Account tab on a phone: the Google Calendar card says crew invites are on, with 4 invites to 2 people on their way, and a button to turn them off" width="390" height="844" loading="lazy"><figcaption><b>The switch.</b> Says what goes out before it does.</figcaption></figure>
           <figure><img src="img/jobs-invites.png" alt="A job's page on a phone: Niamh is confirmed but said no to the second day on Google Calendar, with a warning to call her; Conor is invited with no answer yet; Seán has no email address, so no invite" width="390" height="844" loading="lazy"><figcaption><b>The answers.</b> Under each person, with what needs a call.</figcaption></figure>
         </div>
+      </div>
+      <div class="panel shots crewshots jobshots">
+        <h3>The week and month planner</h3>
+        <p class="small">Week and Month, beside the jobs list, lay out every job with anything on, or every person, a row each. Each day says which phase it is, as the calendar titles it, and how many of its crew are booked. Confirmed jobs are solid and quotes dashed; a day is green once its crew are booked and amber while some are still to find. Clashes are listed above, in words, with the job to open: booked while unavailable, or booked twice, and offers that would clash if they said yes. Worked out on each device, so it needs no signal. (Decision 0010)</p>
+        <div class="phones">
+          <figure><img src="img/plan-week-jobs.png" alt="The planner's week by job on a phone: two things to sort out, Aoife booked on a day she's unavailable and Dara offered a job on a day she's away; below, Web Summit's Show days with 0 of 2 crew in amber and Nissan launch's Show with 1 of 1 crew in green, the job names kept on the left" width="390" height="844" loading="lazy"><figcaption><b>A week by job.</b> Scrolls sideways, names kept in view.</figcaption></figure>
+          <figure><img src="img/plan-week-people.png" alt="The planner's week by person on a phone: Aoife booked on Web Summit, with Tuesday marked as a clash because she is also unavailable; Conor offered the build days; Niamh booked on them" width="390" height="844" loading="lazy"><figcaption><b>A week by person.</b> Booked, offered, away, and the clash.</figcaption></figure>
+        </div>
+        <figure style="margin:12px 0 0"><img src="img/plan-month.png" alt="The planner's month on a laptop: March 2031 with a row per job and a column per day, each phase-day as a short code such as Bu for Build, green or amber for its crew, and the quote and the enquiry dashed" width="1440" height="900" loading="lazy" style="max-width:100%;height:auto;border-radius:14px;border:1px solid var(--line)"><figcaption class="small"><b>A month on a laptop.</b> Every day at a glance; a date opens its week.</figcaption></figure>
       </div>
       <div class="panel shots crewshots">
         <h3>Crew booking, started early</h3>
@@ -551,6 +560,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Jobs</th><td>Clients, venues, jobs and their phases, changed field by field so two people's edits both stand</td><td>Built (Decision 0007)</td></tr>
             <tr><th>Google Calendar</th><td>The app writes confirmed jobs to one calendar, as one connected account, on each change and in a nightly check</td><td>Built (Decision 0008)</td></tr>
             <tr><th>Crew invites</th><td>Crew are guests on their days' events; their answers are read back every two minutes by asking Google what changed, so the database sleeps</td><td>Built, switch off (Decision 0009)</td></tr>
+            <tr><th>Planner</th><td>The week and month by job or by person, with clashes flagged, worked out on each device from what it already holds</td><td>Built (Decision 0010)</td></tr>
           </tbody>
         </table>
       </div>
@@ -777,7 +787,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const PHASES = [
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites built'],
+    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites, planner built'],
     ['2', 'Warehouse', 'todo', 'Planned'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
@@ -858,7 +868,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const road = [
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
-    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Import past calendar events as draft projects', 'Week and month planner with clashes flagged', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
+    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Import past calendar events as draft projects (next)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
     ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
@@ -889,7 +899,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['History and export', 'Every change is kept with who made it, when, on what device and whether it was made offline, and shows in a History tab. Download everything gives one file that opens without the app; it leaves out private link codes and sign-in sessions, and each download shows in the history (Decision 0006). Built and on.', 'decided'],
     ['Jobs', 'A job has a client, a main venue, a status (enquiry, quoted, confirmed, cancelled or lost) and phases of whole days; each phase-day becomes a calendar event in today\'s format. Crew are asked for from the job and follow its renames; cancelling a job cancels its crew. Nothing is deleted (Decision 0007). Built and on.', 'decided'],
     ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting'],
-    ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting']
+    ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting'],
+    ['Planner', 'Week and Month sit beside the jobs list, by job or by person. Booked twice, or booked while unavailable, is a clash; an offer that would clash if they said yes is a check. Worked out on each device, so it works with no signal. Looking only for now: dragging phases waits until the office has used it (Decision 0010). Built and on.', 'decided']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

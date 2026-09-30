@@ -32,6 +32,84 @@
 .jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
 .jobs .warn-line { margin: 0; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: 6px 10px; border-radius: 8px; }
 .jobs .add-phase { padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* List, Week and Month: the same jobs three ways (ADR 0010). */
+.jobs .views { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.jobs .views a { flex: 1; display: grid; place-items: center; min-height: 44px; border-radius: 8px; font-weight: 700; color: var(--muted); text-decoration: none; }
+.jobs .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
+.jobs .views a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The planner: the one screen that uses a laptop's full width. */
+.app.plan { max-width: 1400px; }
+.plan .views { max-width: 480px; width: 100%; }
+.plan .plan-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan .actions .button { flex: 1 1 auto; max-width: 180px; }
+.plan .checks { border-color: var(--warn); }
+.plan .checks h2 { color: var(--warn); }
+.plan .pill.clash { background: var(--bad-soft); color: var(--bad); }
+.plan .pill.check { background: var(--warn-soft); color: var(--warn); }
+.plan .problem > div { flex: 1; min-width: 60%; }
+.plan .problem p { color: var(--ink); }
+/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. */
+.plan .scroller { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plan .timeline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
+.plan .timeline.week { min-width: calc(8rem + 7 * 6.5rem); }
+.plan .timeline.month { min-width: calc(8rem + var(--days) * 2.2rem); }
+.plan .timeline col.names { width: 8rem; }
+.plan .timeline th, .plan .timeline td { padding: 4px; text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.plan .timeline thead th { border-top: 0; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.plan .timeline tr > :first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); border-left: 0; border-right: 1px solid var(--line); }
+.plan .timeline tr > :nth-child(2) { border-left: 0; }
+.plan .timeline th[scope='row'] { font-weight: 700; overflow-wrap: anywhere; }
+.plan .timeline th[scope='row'] a { color: inherit; text-decoration: none; }
+.plan .timeline th[scope='row'] a:hover { text-decoration: underline; }
+.plan .timeline th[scope='row'] small { display: block; color: var(--muted); font-weight: 500; }
+.plan .timeline .weekend { background: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
+.plan .timeline th.today { color: var(--ink); box-shadow: inset 0 -3px 0 var(--ink); }
+.plan .timeline.month th, .plan .timeline.month td { padding: 2px; text-align: center; }
+.plan .timeline.month tr > :first-child { text-align: left; padding: 4px 6px; }
+.plan .timeline.month thead a { display: grid; min-height: 44px; place-content: center; color: inherit; text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.plan .timeline.month thead a:hover { background: var(--bg); }
+.plan .timeline.month thead small { font-size: .7rem; font-weight: 500; }
+/* A job's day: solid when confirmed, dashed when pencilled in; green when its crew are booked, amber while some are still to find. */
+.plan .blk { display: grid; gap: 1px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--panel); }
+.plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; }
+.plan .blk.full { background: var(--good-soft); }
+.plan .blk.short { background: var(--warn-soft); }
+.plan .blk.stray { border: 2px solid var(--warn); box-shadow: none; }
+.plan .blk.pending { opacity: .75; }
+.plan .blk small { color: var(--muted); }
+.plan .blk.full small { color: var(--good); }
+.plan .blk.short small, .plan .blk.stray small { color: var(--warn); }
+.plan .month .blk { padding: 3px 0; place-items: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
+.plan .month .blk.solid:not(.stray) { border-width: 1px 1px 1px 3px; }
+/* A person's day: green where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
+.plan .item { display: grid; padding: 3px 6px; border-radius: 6px; }
+.plan .item + .item { margin-top: 3px; }
+.plan .item a { color: inherit; font-weight: 700; text-decoration: none; }
+.plan .item a:hover { text-decoration: underline; }
+.plan .item small { color: var(--muted); }
+.plan .item.booked, .plan .code.booked { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
+.plan .item.offered, .plan .code.offered { border: 1px dashed var(--muted); }
+.plan .item.away, .plan .code.away { background: var(--line); color: var(--muted); }
+.plan .timeline td.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
+.plan .timeline td.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
+.plan .tag { display: block; margin-bottom: 3px; font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.plan td.clash .tag { color: var(--bad); }
+.plan td.check .tag { color: var(--warn); }
+.plan .code { position: relative; display: grid; place-items: center; min-height: 1.9rem; border-radius: 4px; font-size: .72rem; font-weight: 700; }
+.plan td.clash .code::after, .plan td.check .code::after { position: absolute; top: -3px; right: -1px; font-size: .7rem; font-weight: 800; }
+.plan td.clash .code::after { content: '!'; color: var(--bad); }
+.plan td.check .code::after { content: '?'; color: var(--warn); }
+.plan .everyone { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .9rem; cursor: pointer; }
+.plan .everyone input { width: 20px; height: 20px; accent-color: var(--accent); }
+.plan .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--muted); }
+.plan .legend li { display: flex; align-items: center; gap: 6px; }
+.plan .legend i { display: inline-block; width: 22px; height: 14px; padding: 0; border-radius: 4px; }
+.plan .legend .swatch.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
+.plan .legend .swatch.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
+
 @media (max-width: 480px) {
   .jobs .phase-row { grid-template-columns: 1fr 1fr; }
   .jobs .phase-row input:first-child { grid-column: 1 / -1; }

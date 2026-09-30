@@ -69,6 +69,7 @@ input, select { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1p
 .book .hint, .book button { grid-column: 1 / -1; }
 .hint, .empty, .scans { margin: 0; color: var(--muted); font-size: .85rem; }
 .foot { color: var(--muted); font-size: .75rem; text-align: center; font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @media (max-width: 480px) { .book { grid-template-columns: 1fr 1fr; } .book label:first-child { grid-column: 1 / -1; } }
 
 /* Sign-in and account. */
