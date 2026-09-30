@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CALENDAR_ENTITY_NAMES, type CalendarEntities } from './calendar.ts'
 import { CREW_ENTITY_NAMES, type CrewEntities } from './crew.ts'
 import { FAULT_ENTITY_NAMES, type FaultEntities } from './faults.ts'
+import { INSPECTION_ENTITY_NAMES, type InspectionEntities } from './inspections.ts'
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
 import { KIT_ENTITY_NAMES, type KitEntities } from './kit.ts'
 import { LABEL_ENTITY_NAMES, type LabelEntities } from './labels.ts'
@@ -60,7 +61,7 @@ export const issue = z.object({
 })
 export type Issue = z.infer<typeof issue>
 
-export interface Entities extends CrewEntities, JobEntities, CalendarEntities, StockEntities, KitEntities, LabelEntities, MoveEntities, FaultEntities {
+export interface Entities extends CrewEntities, JobEntities, CalendarEntities, StockEntities, KitEntities, LabelEntities, MoveEntities, FaultEntities, InspectionEntities {
   product: Product
   booking: Booking
   scan: Scan
@@ -80,6 +81,7 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...LABEL_ENTITY_NAMES,
   ...MOVE_ENTITY_NAMES,
   ...FAULT_ENTITY_NAMES,
+  ...INSPECTION_ENTITY_NAMES,
 ]
 
 /** Do two whole-day ranges share at least one day? */

@@ -127,3 +127,16 @@
 .warehouse .facts dd.bad, .warehouse .flag.bad { color: var(--bad); font-weight: 600; }
 .warehouse .numbers.missing-items a { border-style: dashed; border-color: var(--bad); color: var(--bad); }
 .warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: .85rem; font-weight: 600; }
+
+/* Inspections (ADR 0020): where an item stands on each test, the same stripes as faults. */
+.warehouse .due-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
+.warehouse .due { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 8px; }
+.warehouse .due span { color: var(--muted); font-size: .9rem; }
+.warehouse .due.soon, .warehouse .due.unrecorded { border-left-color: var(--warn); }
+.warehouse .due.failed, .warehouse .due.overdue { border-left-color: var(--bad); }
+.warehouse .due.failed b, .warehouse .due.overdue b { color: var(--bad); }
+.warehouse .inspections details { margin-top: 10px; }
+.warehouse .inspections .inspection { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px dashed var(--line); }
+.warehouse .inspections .inspection p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .inspections-due h3 { margin: 12px 0 6px; }
+.warehouse .numbers a.failed { border-color: var(--bad); color: var(--bad); }

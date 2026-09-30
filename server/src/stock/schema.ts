@@ -6,7 +6,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * (assets) and the labels on them (identifiers), places, and counted stock;
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
  * the numbers set aside for printing labels (ADR 0015); kit scanned out
- * to jobs and back in (ADR 0017); and faults and missing kit (ADR 0018).
+ * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
+ * inspections (ADR 0020).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -148,6 +149,24 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS faults_asset ON faults (asset_id);
   CREATE INDEX IF NOT EXISTS faults_model ON faults (model_id);
   CREATE INDEX IF NOT EXISTS faults_project ON faults (project_id);
+  `,
+  // Inspections (ADR 0020): how often a product's items need an electrical
+  // test and a thorough examination, and each one done. Kept for good, as
+  // the register the law asks for.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS pat_months integer CHECK (pat_months BETWEEN 1 AND 60);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS lifting_months integer CHECK (lifting_months BETWEEN 1 AND 60);
+  CREATE TABLE IF NOT EXISTS inspections (
+    id           text PRIMARY KEY,
+    asset_id     text NOT NULL REFERENCES assets(id),
+    kind         text NOT NULL CHECK (kind IN ('pat', 'lifting')),
+    passed       boolean NOT NULL,
+    at           timestamptz NOT NULL,
+    by           text NOT NULL DEFAULT '',
+    note         text NOT NULL DEFAULT '',
+    recorded_at  timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS inspections_asset ON inspections (asset_id);
   `,
 ]
 

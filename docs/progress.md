@@ -3,6 +3,46 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: PAT tests and thorough examinations
+
+**Done**
+
+- The seventh part of Phase 2: electrical tests (PAT) and thorough
+  examinations of lifting gear are recorded on each item, the app works
+  out when each is next due, and kit that failed or is overdue can't go
+  out. [Decision 0020](adr/0020-inspections.md) has the reasons.
+- A numbered product's **Change details** has **PAT every, in months**
+  and **Thorough examination every, in months** (blank for never). Its
+  page says "Testing: PAT every 12 months", how many of its items can't
+  go out, and flags each one.
+- An item's page has an **Inspections** card: where it stands on each
+  ("PAT due 30 Sept 2027", due soon, overdue, failed, or not recorded
+  yet), **Record a test** (passed or failed, the day, who did it, a
+  note), and every one recorded. A failed or overdue item says so at the
+  top.
+- **Test a batch**, from the Stock tab: pick PAT or thorough examination
+  and who's testing, then scan or type each item that passes. Each scan
+  says "SH-000123 d&b Y10P: passed, next due 30 Sept 2027.", and **It
+  failed** records a fail for the one just scanned. Works with no
+  signal.
+- The Stock tab's new **Inspections due** card lists what can't go out,
+  what's due in the next 30 days, and how many aren't recorded yet.
+- Failed or overdue kit isn't counted as owned, so a job's kit says
+  "2 owned and fit to go out (1 damaged, missing or due a test)"; the
+  pick list leaves it out of where to find kit, and warns when it's
+  scanned out: "PAT failed on 30 Sept 2026. Test it before it goes."
+- Every record is kept for good, is in the History tab and the export
+  (new table `inspections`), and is turned down only for an item never
+  saved or retired.
+- Checked: 4 new server tests (the next due day, month ends included;
+  records kept, sent twice, and turned down; the history; due, soon,
+  overdue, failed and not recorded, what can't go out, a job short, and
+  a retest with no signal) and a new browser test at phone size (the
+  interval set, a test on paper recorded and overdue, the Stock tab's
+  list, a batch tested with one fail and one with no signal, the failed
+  item's page, the job short, and the scan out warned). All 37 browser
+  tests and all 240 server tests pass, with the made-up data work merged in.
+
 ## 30 September 2026: made-up data to try the app with, and starting fresh
 
 **Done**

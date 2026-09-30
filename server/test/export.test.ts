@@ -106,6 +106,7 @@ describe('download everything', () => {
       'crew_calls',
       'faults',
       'identifiers',
+      'inspections',
       'issues',
       'kit_lines',
       'label_runs',

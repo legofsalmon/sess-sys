@@ -172,7 +172,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await page.goto('/#jobs')
   await page.getByRole('link', { name: job }).first().click()
   await expect(page.getByRole('region', { name: 'Kit' })).toContainText('Short 1')
-  await expect(page.getByRole('region', { name: 'Kit' })).toContainText('2 owned and fit to go out (1 damaged or missing)')
+  await expect(page.getByRole('region', { name: 'Kit' })).toContainText('2 owned and fit to go out (1 damaged, missing or due a test)')
 
   // The Stock tab's repair list.
   await page.goto('/#stock')
