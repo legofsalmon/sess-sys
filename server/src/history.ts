@@ -303,6 +303,12 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
     const found = look('asset', id)
     return found ? `${text(found.number, 'an item')} (${model(found.modelId)})` : 'an item'
   }
+  /** "SH-000123 (d&b Y10P)", or "3 × XLR 10m", as the fault names it. */
+  const faultOn = (id: unknown) => {
+    const f = look('fault', id)
+    if (!f) return 'some kit'
+    return f.assetId ? item(f.assetId) : `${typeof f.qty === 'number' ? f.qty : 'some'} × ${model(f.modelId)}`
+  }
   const placeName = (id: unknown) => text(look('place', id)?.name, 'a place')
   /** "Bay A3", or a case: "SH-000512 (Cable bag)". */
   const spot = (placeId: unknown, caseId: unknown) => (placeId ? placeName(placeId) : item(caseId))
@@ -489,6 +495,27 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       const way = a.direction === 'in' ? 'back in from' : 'out to'
       if (a.assetId) return `Scanned ${item(a.assetId)} ${way} ${job(a.projectId)}`
       return `Counted ${typeof a.qty === 'number' ? a.qty : 'some'} × ${model(a.modelId)} ${way} ${job(a.projectId)}`
+    }
+    case 'fault.report': {
+      const what = a.assetId ? item(a.assetId) : `${typeof a.qty === 'number' ? a.qty : 'some'} × ${model(a.modelId)}`
+      const from = a.projectId ? ` ${a.kind === 'missing' ? 'from' : 'back from'} ${job(a.projectId)}` : ''
+      const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
+      if (a.kind === 'missing') return `Reported ${what} missing${from}${note}`
+      return `Reported ${what} damaged${from}${a.usable ? ', fit to go out' : ", can't go out"}${note}`
+    }
+    case 'fault.update': {
+      const parts: string[] = []
+      if (a.usable !== undefined) parts.push(a.usable ? 'fit to go out' : "can't go out")
+      if (a.note !== undefined) parts.push("what's wrong")
+      if (a.repair !== undefined) parts.push('the repair notes')
+      return `Changed the fault on ${faultOn(a.id)}: ${inWords(parts)}`
+    }
+    case 'fault.close': {
+      const on = faultOn(a.id)
+      if (a.outcome === 'written-off') return `Wrote off ${on}`
+      if (a.outcome === 'found') return `Found ${on}`
+      if (a.outcome === 'not-faulty') return `Marked ${on} as not faulty`
+      return `Marked ${on} as fixed`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

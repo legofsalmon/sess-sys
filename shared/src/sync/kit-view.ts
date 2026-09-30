@@ -3,6 +3,7 @@ import { eachDay } from '../crew.ts'
 import { STOPPED, type ProjectStatus } from '../jobs.ts'
 import type { KitEntities, KitLine } from '../kit.ts'
 import { DEPARTMENTS } from '../stock.ts'
+import type { FaultsView } from './faults-view.ts'
 import type { JobsView, JobView, PhaseView } from './jobs-view.ts'
 import type { ModelView, WarehouseView } from './stock-view.ts'
 
@@ -45,8 +46,10 @@ export interface KitLineView extends KitLine {
   span: { start: string; end: string } | undefined
   /** How many come out of Session Hire's own stock: all but those subhired. */
   own: number
-  /** How many Session Hire has: items in stock and what's counted. */
+  /** How many Session Hire has that can go out: items in stock and what's counted, less those missing or not fit to use (ADR 0018). */
   owned: number
+  /** How many of it are missing or not fit to use. */
+  unusable: number
   /** The most it's short on any day from today on; 0 when there are enough. */
   short: number
   /** The first day it's that short. */
@@ -96,7 +99,8 @@ export function kitView(
   cursor: number,
   jobs: JobsView,
   warehouse: WarehouseView,
-  today: string
+  today: string,
+  faults?: FaultsView
 ): KitView {
   const lines = new Map<string, KitLine & { pending: boolean }>()
   for (const l of Object.values(entities.kitLine ?? {})) lines.set(l.id, { ...l, pending: false })
@@ -126,6 +130,7 @@ export function kitView(
     const job = jobById.get(l.projectId)
     const phase = l.phaseId ? job?.phases.find((p) => p.id === l.phaseId) : undefined
     const model = modelById.get(l.modelId)
+    const unusable = faults?.unusable(l.modelId) ?? 0
     return {
       ...l,
       job,
@@ -134,7 +139,8 @@ export function kitView(
       hold: job ? holdOf(job.status) : 'none',
       span: l.phaseId ? phase && { start: phase.start, end: phase.end } : job?.span,
       own: Math.max(0, l.qty - l.subhireQty),
-      owned: model?.total ?? 0,
+      owned: Math.max(0, (model?.total ?? 0) - unusable),
+      unusable,
       short: 0,
       shortDay: undefined,
       shortDays: 0,

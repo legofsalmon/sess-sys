@@ -2,6 +2,7 @@ import type { CommandArgs, Mutation } from '../commands.ts'
 import { STOPPED } from '../jobs.ts'
 import type { MoveEntities, Movement } from '../moves.ts'
 import { DEPARTMENTS } from '../stock.ts'
+import type { FaultsView } from './faults-view.ts'
 import type { JobsView, JobView } from './jobs-view.ts'
 import { holdOf, type KitLineView, type KitView } from './kit-view.ts'
 import { addDays } from './plan.ts'
@@ -14,6 +15,8 @@ import type { AssetView, ModelView, WarehouseView } from './stock-view.ts'
  * in the order they happened on the phones, not the order they synced, so
  * every device ends up agreeing. A case takes what's in it along: the
  * latest scan of an item, or of any case it's in, says where it is.
+ * Reporting an item missing (ADR 0018) ends its time out with a job, as a
+ * scan back would, but it counts as missing, not back, until it's found.
  */
 
 /** How far ahead the Stock tab looks for kit going out. */
@@ -57,7 +60,13 @@ export interface PickRow {
   backItems: AssetView[]
   countedBack: number
   back: number
-  /** Where to find the ones that aren't out, by place. */
+  /** Items that went out with the job and were reported missing, and not found since (ADR 0018). */
+  missingItems: AssetView[]
+  countedMissing: number
+  missing: number
+  /** How many of the product are missing or not fit to use, anywhere. */
+  unusable: number
+  /** Where to find the ones that aren't out, by place: items missing or not fit to use left out. */
   from: PickFrom[]
 }
 
@@ -72,6 +81,8 @@ export interface PickList {
   stillOut: number
   /** Everything that went out and came back. */
   back: number
+  /** Everything that went out and was reported missing, and not found since. */
+  missing: number
 }
 
 export interface MovesView {
@@ -101,7 +112,8 @@ export function movesView(
   jobs: JobsView,
   warehouse: WarehouseView,
   kit: KitView,
-  today: string
+  today: string,
+  faults?: FaultsView
 ): MovesView {
   const moves = new Map<string, MovementView>()
   for (const m of Object.values(entities.movement ?? {})) moves.set(m.id, { ...m, pending: false })
@@ -114,7 +126,14 @@ export function movesView(
     const modelId = (a.assetId && warehouse.assets.get(a.assetId)?.modelId) || a.modelId
     moves.set(a.id, { ...a, modelId, at: new Date(a.at).toISOString(), pending: true })
   }
-  const sorted = [...moves.values()].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+  // A report of an item missing ends its time out, as a scan back would. Found, it counts as back.
+  type Event = MovementView & { missing?: boolean }
+  const events: Event[] = [...moves.values()]
+  for (const f of faults?.all ?? []) {
+    if (f.kind !== 'missing' || !f.assetId || !f.projectId) continue
+    events.push({ id: f.id, projectId: f.projectId, direction: 'in', assetId: f.assetId, modelId: f.modelId, qty: 1, at: f.at, pending: f.pending, missing: f.outcome !== 'found' })
+  }
+  const sorted = events.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
 
   /** Everything in a case, however deep. */
   const contents = (a: AssetView | undefined, into: Set<string>) => {
@@ -125,11 +144,18 @@ export function movesView(
     }
   }
 
-  const last = new Map<string, MovementView>()
+  const last = new Map<string, Event>()
   /** Each job's items that have been out with it: scanned, or in a case scanned. */
   const sent = new Map<string, Set<string>>()
   /** Each job's counted kit, by product. */
-  const counted = new Map<string, Map<string, { out: number; back: number }>>()
+  const counted = new Map<string, Map<string, { out: number; back: number; missing: number }>>()
+  const tally = (projectId: string, modelId: string) => {
+    let byModel = counted.get(projectId)
+    if (!byModel) counted.set(projectId, (byModel = new Map()))
+    let c = byModel.get(modelId)
+    if (!c) byModel.set(modelId, (c = { out: 0, back: 0, missing: 0 }))
+    return c
+  }
   for (const m of sorted) {
     if (m.assetId) {
       last.set(m.assetId, m)
@@ -140,17 +166,23 @@ export function movesView(
         contents(warehouse.assets.get(m.assetId), ids)
       }
     } else {
-      let byModel = counted.get(m.projectId)
-      if (!byModel) counted.set(m.projectId, (byModel = new Map()))
-      const c = byModel.get(m.modelId) ?? { out: 0, back: 0 }
+      const c = tally(m.projectId, m.modelId)
       if (m.direction === 'out') c.out += m.qty
       else c.back += m.qty
-      byModel.set(m.modelId, c)
     }
+  }
+  // Counted kit reported missing from a job: missing until found, then back.
+  for (const f of faults?.all ?? []) {
+    if (f.kind !== 'missing' || f.assetId || !f.projectId) continue
+    const c = tally(f.projectId, f.modelId)
+    if (f.outcome === 'found') c.back += f.qty
+    else c.missing += f.qty
   }
 
   // Each item's latest scan, or its case's, or that case's case's.
   const outState = new Map<string, OutState>()
+  /** Items whose latest scan, or their case's, is a report of them missing. */
+  const missingNow = new Set<string>()
   const outByJob = new Map<string, AssetView[]>()
   for (const a of warehouse.assets.values()) {
     let best = last.get(a.id)
@@ -161,6 +193,7 @@ export function movesView(
       const m = last.get(c.id)
       if (m && (!best || later(m, best))) [best, via] = [m, c]
     }
+    if (best?.missing) missingNow.add(a.id)
     if (best?.direction !== 'out') continue
     outState.set(a.id, { projectId: best.projectId, since: best.at, inCase: via })
     const list = outByJob.get(best.projectId) ?? []
@@ -188,7 +221,23 @@ export function movesView(
     const row = (modelId: string) => {
       let r = rows.get(modelId)
       if (!r) {
-        r = { modelId, model: modelById.get(modelId), lines: [], need: 0, items: [], counted: 0, out: 0, backItems: [], countedBack: 0, back: 0, from: [] }
+        r = {
+          modelId,
+          model: modelById.get(modelId),
+          lines: [],
+          need: 0,
+          items: [],
+          counted: 0,
+          out: 0,
+          backItems: [],
+          countedBack: 0,
+          back: 0,
+          missingItems: [],
+          countedMissing: 0,
+          missing: 0,
+          unusable: faults?.unusable(modelId) ?? 0,
+          from: [],
+        }
         rows.set(modelId, r)
       }
       return r
@@ -201,22 +250,27 @@ export function movesView(
     for (const a of outByJob.get(jobId) ?? []) row(a.modelId).items.push(a)
     for (const [modelId, c] of counted.get(jobId) ?? []) {
       const r = row(modelId)
-      r.counted = Math.max(0, c.out - c.back)
       r.countedBack = Math.min(c.out, c.back)
+      r.countedMissing = Math.min(c.out - r.countedBack, c.missing)
+      r.counted = c.out - r.countedBack - r.countedMissing
     }
     for (const id of sent.get(jobId) ?? []) {
       const a = warehouse.assets.get(id)
-      if (a && outState.get(id)?.projectId !== jobId) row(a.modelId).backItems.push(a)
+      if (!a || outState.get(id)?.projectId === jobId) continue
+      if (missingNow.has(id)) row(a.modelId).missingItems.push(a)
+      else row(a.modelId).backItems.push(a)
     }
     for (const r of rows.values()) {
       r.items.sort(byNumber)
       r.backItems.sort(byNumber)
+      r.missingItems.sort(byNumber)
       r.out = r.items.length + r.counted
       r.back = r.backItems.length + r.countedBack
+      r.missing = r.missingItems.length + r.countedMissing
       // Where to find the rest: items not out with any job, and what's counted, place by place.
       const from = new Map<string, PickFrom>()
       const at = (where: string) => from.get(where) ?? (from.set(where, { where, items: [], counted: 0 }), from.get(where)!)
-      for (const a of r.model?.items ?? []) if (!outState.has(a.id)) at(whereKept(a)).items.push(a)
+      for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.stopping(a.id)) at(whereKept(a)).items.push(a)
       for (const s of r.model?.counted ?? []) at(whereKept(s)).counted += s.qty
       r.from = [...from.values()].sort((a, b) => a.where.localeCompare(b.where, 'en-IE', { numeric: true }))
     }
@@ -232,6 +286,7 @@ export function movesView(
       out: onKit.reduce((n, r) => n + Math.min(r.out, r.need), 0),
       stillOut: [...rows.values()].reduce((n, r) => n + r.out, 0),
       back: [...rows.values()].reduce((n, r) => n + r.back, 0),
+      missing: [...rows.values()].reduce((n, r) => n + r.missing, 0),
     }
     lists.set(jobId, list)
     return list
@@ -244,7 +299,7 @@ export function movesView(
     .filter((p) => p.need > 0)
     .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name))
 
-  const withKitOut = new Set([...outByJob.keys(), ...[...counted].filter(([, byModel]) => [...byModel.values()].some((c) => c.out > c.back)).map(([id]) => id)])
+  const withKitOut = new Set([...outByJob.keys(), ...[...counted].filter(([, byModel]) => [...byModel.values()].some((c) => c.out > c.back + c.missing)).map(([id]) => id)])
   const over = (j: JobView) => STOPPED.includes(j.status) || !j.span || j.span.end < today
   const stillOut = [...withKitOut]
     .map((id) => pickList(id))

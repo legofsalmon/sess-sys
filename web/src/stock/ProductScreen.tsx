@@ -12,6 +12,7 @@ import {
   valueLabel,
   type CommandInput,
   type Department,
+  type FaultsView,
   type KitLineView,
   type ModelView,
   type View,
@@ -37,10 +38,11 @@ import {
   whereProblem,
   whereText,
 } from './common.tsx'
+import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
- * and where it's counted. Items are added one after another while
+ * and where it's counted, and faults in what's counted (ADR 0018). Items are added one after another while
  * labelling: the number field is ready for the next label as soon as one is
  * added, and where stays put.
  */
@@ -66,18 +68,26 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
         ‹ All stock
       </a>
       <NotDone view={view} names={STOCK_COMMANDS} />
-      <Summary m={m} w={w} onKit={view.kit.lines.some((l) => l.modelId === m.id)} />
+      <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
-      {m.tracking === 'serialised' && <Items m={m} w={w} />}
+      {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} />}
       <Counted m={m} w={w} />
+      {(m.tracking === 'bulk' || m.countedTotal > 0 || view.faults.ofModel(m.id).length > 0) && (
+        <FaultsCard faults={view.faults.ofModel(m.id)} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
+          {m.countedTotal > 0 && <ReportButtons model={m} most={m.countedTotal} />}
+        </FaultsCard>
+      )}
       <WhereChoices w={w} />
     </div>
   )
 }
 
-function Summary({ m, w, onKit }: { m: ModelView; w: WarehouseView; onKit: boolean }) {
+function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View }) {
   const [editing, setEditing] = useState(false)
-  const removable = m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0 && !onKit
+  const onKit = view.kit.lines.some((l) => l.modelId === m.id)
+  const unusable = view.faults.unusable(m.id)
+  const removable =
+    m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0 && !onKit && !view.faults.all.some((f) => f.modelId === m.id)
   const remove = () => {
     if (!confirm(`Remove ${m.name} from the stock list?`)) return
     void act(() => client.mutate('model.remove', { id: m.id })).then(
@@ -117,6 +127,7 @@ function Summary({ m, w, onKit }: { m: ModelView; w: WarehouseView; onKit: boole
             {m.tracking === 'serialised' &&
               m.countedTotal > 0 &&
               `: ${m.items.length.toLocaleString('en-IE')} labelled, ${m.countedTotal.toLocaleString('en-IE')} not yet`}
+            {unusable > 0 && <span className="flag bad"> {unusable.toLocaleString('en-IE')} can't go out</span>}
           </dd>
         </div>
       </dl>
@@ -252,7 +263,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
   )
 }
 
-function Items({ m, w }: { m: ModelView; w: WarehouseView }) {
+function Items({ m, w, faults }: { m: ModelView; w: WarehouseView; faults: FaultsView }) {
   return (
     <section className="card" aria-label="Items">
       <h2>Items</h2>
@@ -266,6 +277,7 @@ function Items({ m, w }: { m: ModelView; w: WarehouseView }) {
                 <p>
                   {whereLabel(a, w)}
                   {a.serial && ` · Serial ${a.serial}`}
+                  {faults.stopping(a.id) && <span className="flag bad"> {faultState(faults.stopping(a.id)!)}</span>}
                 </p>
               </div>
               <Pending pending={a.pending} />

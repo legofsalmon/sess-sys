@@ -3,6 +3,48 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: faults, missing kit and repairs
+
+**Done**
+
+- The sixth part of Phase 2: kit that comes back damaged, or doesn't come
+  back, is reported, repaired or written off, and it's taken off what's
+  free for jobs until then.
+  [Decision 0018](adr/0018-faults-missing-kit-and-repairs.md) has the
+  reasons.
+- **Coming back** on a job's pick list: after an item is scanned back,
+  **Report damage to SH-…** takes what's wrong and whether it can still
+  go out. Each item still out has **Missing** beside **Back**, and
+  counted kit has **Missing** in its count and **Report damage to
+  counted …**. The page says "18 back, 1 still out, 4 missing".
+- Kit reported missing isn't out with the job any more, nor back. A
+  missing item that's scanned anywhere is marked found at once, and the
+  answer says so.
+- An item's page, and a counted product's page, have **Report damage**
+  and **Report missing** at any time, and list their faults. The item's
+  page says its fault at the top.
+- The Stock tab's new **Faults and repairs** card is the repair list:
+  every open fault, each with **Repair notes** and how it ends (**Fixed**,
+  **Not faulty**, **Found**, or **Write off**). Writing off retires an
+  item (scrapped, or lost) or takes counted kit off the count, biggest
+  count first. Nothing is deleted.
+- Kit missing, or damaged and not fit to use, isn't counted as owned, so
+  a job's kit says "Short 1: 2 owned and fit to go out (1 damaged or
+  missing)". The pick list leaves it out of where to find kit, and warns
+  if it's scanned out anyway. A missing case takes what's in it along.
+- Every report works with no signal, is kept whatever the plan says, and
+  is in the History tab and the export (new table `faults`).
+- Checked: 6 new server tests (reports kept once each whatever the
+  plan, turned down only for what was never saved or an item already
+  retired, updated and closed once in a way that fits, writing off an
+  item and counted kit, kit that can't go out taken off availability and
+  the pick list, and kit missing from a job neither out nor back until
+  found) and a new browser test at phone size (damage, missing items and
+  counted kit reported with no signal, a missing speaker scanned and
+  found, the job short, the Stock tab's repair list, a repair note and
+  Fixed, and missing cables written off the count). All 35 browser tests
+  and all 225 server tests pass.
+
 ## 30 September 2026: pick lists, and scanning kit out and back in
 
 **Done**

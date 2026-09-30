@@ -5,8 +5,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * The warehouse catalogue (ADR 0013): products (models), numbered items
  * (assets) and the labels on them (identifiers), places, and counted stock;
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
- * the numbers set aside for printing labels (ADR 0015); and kit scanned out
- * to jobs and back in (ADR 0017).
+ * the numbers set aside for printing labels (ADR 0015); kit scanned out
+ * to jobs and back in (ADR 0017); and faults and missing kit (ADR 0018).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -122,6 +122,32 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS movements_project ON movements (project_id);
   CREATE INDEX IF NOT EXISTS movements_asset ON movements (asset_id);
   CREATE INDEX IF NOT EXISTS movements_model ON movements (model_id);
+  `,
+  // Faults and missing kit (ADR 0018): a numbered item, or some counted
+  // kit, reported damaged or missing, and how it ended. Kept for good, as
+  // an item's history.
+  `
+  CREATE TABLE IF NOT EXISTS faults (
+    id           text PRIMARY KEY,
+    kind         text NOT NULL CHECK (kind IN ('damaged', 'missing')),
+    asset_id     text REFERENCES assets(id),
+    model_id     text NOT NULL REFERENCES models(id),
+    qty          integer NOT NULL CHECK (qty > 0),
+    project_id   text REFERENCES projects(id),
+    usable       boolean NOT NULL DEFAULT false,
+    note         text NOT NULL DEFAULT '',
+    repair       text NOT NULL DEFAULT '',
+    at           timestamptz NOT NULL,
+    outcome      text CHECK (outcome IN ('fixed', 'not-faulty', 'found', 'written-off')),
+    closed_at    timestamptz,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    CHECK (asset_id IS NULL OR qty = 1),
+    CHECK (kind = 'damaged' OR NOT usable),
+    CHECK ((outcome IS NULL) = (closed_at IS NULL))
+  );
+  CREATE INDEX IF NOT EXISTS faults_asset ON faults (asset_id);
+  CREATE INDEX IF NOT EXISTS faults_model ON faults (model_id);
+  CREATE INDEX IF NOT EXISTS faults_project ON faults (project_id);
   `,
 ]
 

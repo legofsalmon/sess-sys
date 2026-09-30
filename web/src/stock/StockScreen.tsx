@@ -21,6 +21,7 @@ import { productName } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
 import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
+import { RepairList } from './Faults.tsx'
 import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
@@ -31,7 +32,8 @@ import './stock.css'
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
  * where everything is kept, and what's counted; the kit on jobs that's
  * short (ADR 0014); labels (ADR 0015); the camera, to scan them (ADR 0016);
- * and the pick lists going out and still out (ADR 0017). A product, item or place opens
+ * the pick lists going out and still out (ADR 0017); and faults and
+ * missing kit waiting to be sorted out (ADR 0018). A product, item or place opens
  * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
  * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
@@ -196,6 +198,8 @@ function Catalogue({ view }: { view: View }) {
       </section>
 
       <PickLists view={view} />
+
+      <RepairList view={view} />
 
       <ShortKit view={view} />
 

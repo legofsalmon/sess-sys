@@ -4,6 +4,7 @@ import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
 import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
+import { faultsView, type FaultsView } from './faults-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
@@ -98,6 +99,8 @@ export interface View {
   labels: LabelsView
   /** Kit out with jobs and back, and each job's pick list (ADR 0017). */
   moves: MovesView
+  /** Faults and missing kit, and the repair list (ADR 0018). */
+  faults: FaultsView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -235,7 +238,8 @@ export class SyncClient {
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
     const today = irishToday(this.now())
-    const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today)
+    const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse)
+    const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults)
     return {
       products: Object.values(entities.product).sort(byName),
       bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
@@ -247,7 +251,8 @@ export class SyncClient {
       warehouse,
       kit,
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
-      moves: movesView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
+      moves: movesView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today, faults),
+      faults,
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

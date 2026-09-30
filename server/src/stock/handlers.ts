@@ -1,5 +1,17 @@
-import { MAX_CASE_DEPTH, MAX_NUMBER, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
+import {
+  MAX_CASE_DEPTH,
+  MAX_NUMBER,
+  MAX_QTY,
+  newId,
+  normaliseNumber,
+  plural,
+  stockId,
+  type CommandArgs,
+  type RetiredReason,
+  type Where,
+} from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
+import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
 import { movementsOf } from './moves.ts'
 import {
@@ -141,7 +153,7 @@ async function whereName(ctx: Ctx, w: Where) {
 }
 
 /** Change a count by `by`, or to `to`. None left takes the count away. */
-async function adjust(ctx: Ctx, modelId: string, w: Where, change: { by: number } | { to: number }) {
+export async function adjust(ctx: Ctx, modelId: string, w: Where, change: { by: number } | { to: number }) {
   const id = stockId(modelId, w)
   const now = (await getStock(ctx.tx, id))?.qty ?? 0
   const qty = 'to' in change ? change.to : now + change.by
@@ -162,6 +174,22 @@ async function adjust(ctx: Ctx, modelId: string, w: Where, change: { by: number 
 
 async function emitAsset(ctx: Ctx, id: string) {
   await emit(ctx, 'asset', id, await getAsset(ctx.tx, id))
+}
+
+/** Take an item out of stock, keeping it and its number. A case is emptied first. */
+export async function retireItem(ctx: Ctx, id: string, reason: RetiredReason, note: string) {
+  const asset = await mustActive(ctx, id)
+  const inside = await contentsOf(ctx.tx, id)
+  if (inside.items > 0 || inside.counted > 0) {
+    const what = [inside.items > 0 && plural(inside.items, 'item'), inside.counted > 0 && `${inside.counted} counted`].filter(Boolean).join(' and ')
+    throw new Refused({ code: 'conflict', message: `${asset.number} still holds ${what}. Empty it first.` })
+  }
+  await ctx.tx.query(`UPDATE assets SET status = 'retired', retired_reason = $2, retired_note = $3, place_id = NULL, case_id = NULL WHERE id = $1`, [
+    id,
+    reason,
+    note.trim().slice(0, 500) || null,
+  ])
+  await emitAsset(ctx, id)
 }
 
 export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
@@ -226,6 +254,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       })
     if ((await movementsOf(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has been out on jobs, which is kept for the record, so it can't be removed.` })
+    if ((await faultsOf(ctx.tx, a.id)) > 0)
+      throw new Refused({ code: 'conflict', message: `${m.name} has had faults reported, which are kept for the record, so it can't be removed.` })
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },
@@ -311,18 +341,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
   },
 
   async 'asset.retire'(ctx, a) {
-    const asset = await mustActive(ctx, a.id)
-    const inside = await contentsOf(ctx.tx, a.id)
-    if (inside.items > 0 || inside.counted > 0) {
-      const what = [inside.items > 0 && plural(inside.items, 'item'), inside.counted > 0 && `${inside.counted} counted`].filter(Boolean).join(' and ')
-      throw new Refused({ code: 'conflict', message: `${asset.number} still holds ${what}. Empty it first.` })
-    }
-    await ctx.tx.query(`UPDATE assets SET status = 'retired', retired_reason = $2, retired_note = $3, place_id = NULL, case_id = NULL WHERE id = $1`, [
-      a.id,
-      a.reason,
-      a.note.trim() || null,
-    ])
-    await emitAsset(ctx, a.id)
+    await retireItem(ctx, a.id, a.reason, a.note)
   },
 
   async 'asset.reinstate'(ctx, a) {

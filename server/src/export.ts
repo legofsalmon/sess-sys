@@ -188,6 +188,7 @@ const ABOUT: Record<string, string> = {
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show.',
+  faults: 'Faults and missing kit: the item, or the product and how many, damaged or missing, the job it came back from, what was wrong, the repair notes, and how it ended.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   issues: 'Things someone has to sort out, such as more scanned out than booked (sync test).',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
