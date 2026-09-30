@@ -275,16 +275,20 @@ test("a maker's barcode finds its item by serial, never as a Session Hire number
   const two = await addItem(page, bay, digits)
   expect(two).not.toBe(one)
 
+  const [serialSticker, digitsSticker] = await Promise.all([sticker(serial), sticker(digits)])
+
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Scan' }).click()
-  await cam.show(await sticker(serial))
+  await cam.show(serialSticker)
   await expect(page.getByRole('heading', { level: 1, name: one })).toBeVisible()
   await expect(page.locator('.facts')).toContainText(serial)
+  // That sticker is put down before the camera opens again, as a person would.
+  await cam.clear()
 
   // The digits find the desk with that serial, not the label with that number.
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Scan' }).click()
-  await cam.show(await sticker(digits))
+  await cam.show(digitsSticker)
   await expect(page.getByRole('heading', { level: 1, name: two })).toBeVisible()
   await expect(page.getByRole('form', { name: /^Put / })).toHaveCount(0)
   expect(cdn).toEqual([])

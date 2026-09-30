@@ -57,11 +57,11 @@ waiting on someone.
 **Done**
 
 - Kit on jobs and printing labels were merged at 07:48 UTC but didn't go
-  live on their own. GitHub has run none of its checks since 06:10 UTC:
-  each run stops within seconds without starting, the usual sign that the
-  account's GitHub Actions minutes for the month are used up or its
-  spending limit is reached (this repo is private, so its runs count
-  against them). Railway waits for those checks before deploying, so it
+  live on their own. GitHub ran none of its checks from 06:10 to about
+  12:00 UTC: each run stopped within seconds without starting, the usual
+  sign that the account's GitHub Actions minutes or spending limit had run
+  out (this repo is private, so its runs count against them). They've run
+  again since. Railway waits for those checks before deploying, so it
   skipped the deploy. The checks were run here on the merged code instead,
   all passing (all 218 unit and sync tests, on PGlite and a real Postgres,
   and all 31 browser tests), and it was deployed from Railway by hand at
@@ -82,10 +82,9 @@ waiting on someone.
 
 **Next**
 
-- Colly: on GitHub, check the Actions minutes and spending limit in the
-  account's billing settings. Until the checks run again, Railway skips
-  every merge, and each needs **Deploy Latest Commit** on `@sh/server`
-  (or ask Claude, who now has access to Railway).
+- If GitHub stops running the checks again, Railway will skip each merge
+  until they do; **Deploy Latest Commit** on `@sh/server` (or asking
+  Claude, who now has access to Railway) puts it live meanwhile.
 - Colly, if you agree: delete `@sh/web` in Railway, so it stops using the
   project's resources.
 
