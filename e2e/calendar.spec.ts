@@ -62,6 +62,20 @@ function eachDay(start: string, end: string) {
 }
 
 /**
+ * Pages signed in here read every pull through a route of their own. Each
+ * is closed after its test, its routes first, so a pull still under way
+ * then (the later tests' changes keep them syncing) is dropped quietly
+ * rather than failing once the test is over.
+ */
+const signedInPages: Page[] = []
+test.afterEach(async () => {
+  for (const page of signedInPages.splice(0)) {
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.context().close()
+  }
+})
+
+/**
  * Colly, signed in, on a server whose calendar connection is `server.link`.
  * For the job named `server.job`, each day of each phase is on the calendar
  * as `server.day` says, with the people in `server.answers` as guests,
@@ -69,6 +83,7 @@ function eachDay(start: string, end: string) {
  * answers, by person.
  */
 async function signedIn(page: Page) {
+  signedInPages.push(page)
   const server = {
     link: undefined as Link | undefined,
     job: '',

@@ -107,8 +107,23 @@ const preview = () => ({
   changed: [{ jobId: 'j-aviva', job: 'Aviva', title: 'Aviva - Build', was: [day(-3)], now: [] }],
 })
 
+/**
+ * Pages signed in here read every pull through a route of their own. Each
+ * is closed after its test, its routes first, so a pull still under way
+ * then (the later tests' changes keep them syncing) is dropped quietly
+ * rather than failing once the test is over.
+ */
+const signedInPages: Page[] = []
+test.afterEach(async () => {
+  for (const page of signedInPages.splice(0)) {
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.context().close()
+  }
+})
+
 /** Colly, signed in, on a server with Google Calendar connected, and one job brought in before. */
 async function signedIn(page: Page) {
+  signedInPages.push(page)
   const calls = { looked: [] as unknown[], brought: [] as unknown[] }
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'google', user: { id: 'u1', email: 'colly@sessionhire.com', name: 'Colly Hewson' } } }))
   await page.route(/\/api\/sync\/pull/, async (route) => {
