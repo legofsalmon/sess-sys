@@ -3,6 +3,38 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: audit
+
+**Done**
+
+- A full audit of the app before freelancer invoices: reliability,
+  security, every screen and the freelancer pages, the flows for each
+  kind of person, bugs, and how it holds up as the data grows.
+  [The audit](audit-2026-09-30.md) has every finding with its evidence,
+  in priority order, and the order to fix them.
+- The foundations checked out: sign-in, the command log and change feed,
+  retries, backups, the export, escaping, the Google flows. Nothing lets
+  an outsider in or leaks one person's details to another.
+- What it found, in short: things that can be created but not corrected
+  (a person's number, a crew call's time, a phase's crew when it moves);
+  answers and changes nobody is told about; four ways a phone can be
+  left stuck or blank (one bad change, a big backlog, a deploy, a full
+  disk); two traps on the freelancer's page (Enter accepts the job at the
+  offered rate; the message lands off-screen); and a data model rebuilt
+  and re-saved in full every 30 seconds, which will slow down as the
+  years' jobs accumulate. Timesheets, merged earlier, went live by
+  themselves.
+- Checked by hand: the bad-date 500, the missing-file answer after a
+  deploy, the Enter-accepts trap, the off-screen message, and the timings
+  (2.7 ms on the made-up data, 38 ms at 31×, 6 s at 51×).
+
+**Next**
+
+- Round one of the fixes (the P0 list), then round two, then invoices
+  alongside round three.
+- Colly: the Google key and the backups bucket are the first two items
+  on the list.
+
 ## 30 September 2026: timesheets
 
 **Done**
