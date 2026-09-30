@@ -5,53 +5,53 @@
 .warehouse .facts .wide { grid-column: 1 / -1; }
 .warehouse input[type='number'] { width: 100%; }
 /* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
-.warehouse .card > form:has(> h3) { padding-top: 12px; border-top: 1px solid var(--line); }
+.warehouse .card > form:has(> h3) { padding-top: var(--space-12); border-top: 1px solid var(--line); }
 .warehouse .card > h2 + form:has(> h3) { padding-top: 0; border-top: 0; }
 
 /* Items, by number. */
 .warehouse .item-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-height: 44px; padding: 10px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-12); min-height: 44px; padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .warehouse .item-list li:first-child .item-row { border-top: 0; padding-top: 0; }
-.warehouse .item-row p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.warehouse .item-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
 .warehouse .item-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-.warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 10px 0; }
+.warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: var(--space-10) 0; }
 
 /* On a place: items grouped by product, each number a link. */
-.warehouse .group { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.warehouse .group { display: grid; gap: var(--space-6); padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .warehouse .card > h2 + .group { padding-top: 0; border-top: 0; }
 .warehouse .group-name { margin: 0; }
 .warehouse .group-name a, .warehouse .count .what a { color: var(--accent-ink); font-weight: 600; }
-.warehouse .group-name small { color: var(--muted); margin-left: 4px; }
-.warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
+.warehouse .group-name small { color: var(--muted); margin-left: var(--space-4); }
+.warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) var(--space-12); border: 1px solid var(--line); border-radius: var(--radius-full); color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
 .warehouse .numbers a.is-pending { border-style: dashed; color: var(--warn); }
 .warehouse .numbers a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Counts. */
 .warehouse .count { align-items: center; }
-.warehouse .item-list + .row, .warehouse .group + .row { padding-top: 10px; border-top: 1px solid var(--line); }
+.warehouse .item-list + .row, .warehouse .group + .row { padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .warehouse .count small { color: var(--muted); }
 .warehouse .count .what { flex: 1; min-width: 45%; }
-.warehouse .count .n { font-size: 1.1rem; margin-right: 2px; }
+.warehouse .count .n { font-size: 1.1rem; margin-right: var(--space-2); }
 
 /* Numbered or counted, when adding or changing a product; ticks and reasons. */
-.warehouse .tracking { display: grid; gap: 6px; }
+.warehouse .tracking { display: grid; gap: var(--space-6); }
 /* Also inside the shared forms, whose labels stack their text over the field. */
-.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
-.warehouse .choice { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: var(--space-10); align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
+.warehouse .choice { padding: var(--space-8) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); }
 .warehouse .choice:has(input:checked) { border-color: var(--ink); }
 .warehouse .choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
 .warehouse .choice b, .warehouse .choice small { display: block; }
 .warehouse .choice small { color: var(--muted); font-size: .8rem; }
-.warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
-.warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: var(--space-2) 0 0; accent-color: var(--accent); }
+.warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 var(--space-16); }
 .warehouse .reasons legend { width: 100%; }
 .warehouse .reasons .tick { min-height: 44px; align-items: center; }
 .warehouse .reasons .tick input { margin: 0; }
-.warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
 
 /* The Phase 0 sync test, now under Stock. */
-.sync-test .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: 4px 0; }
+.sync-test .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
 
 /* Labels (ADR 0015). Black on white whatever the screen's theme, at their real size in millimetres. */
 .label { box-sizing: border-box; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm; background: #fff; color: #000; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.15; }
@@ -70,15 +70,15 @@
 .label.sheet small { font-size: 2mm; }
 
 .warehouse .nowrap { white-space: nowrap; }
-.warehouse .print-labels { display: grid; gap: 10px; }
+.warehouse .print-labels { display: grid; gap: var(--space-10); }
 .warehouse .print-labels > button { justify-self: start; }
 .warehouse .layouts { display: grid; gap: 0; }
 .warehouse .layouts .tick { min-height: 44px; align-items: center; }
 .warehouse .layouts .tick input { margin: 0; }
 /* The first few at their real size, on white as they'll print. */
-.warehouse .preview { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-radius: 8px; background: var(--bg); }
+.warehouse .preview { display: flex; flex-wrap: wrap; gap: var(--space-8); padding: var(--space-10); border-radius: var(--radius-control); background: var(--bg); }
 .warehouse .preview .label { box-shadow: 0 0 0 1px var(--line); border-radius: 1.5mm; }
-.warehouse .claim { padding: 12px; border: 1px solid var(--accent); border-radius: 10px; }
+.warehouse .claim { padding: var(--space-12); border: 1px solid var(--accent); border-radius: 10px; }
 
 /* Printing: only the labels, a label to a page on a label printer or 65 to an A4 sheet. */
 .print-sheet { display: none; }
@@ -93,9 +93,9 @@
 }
 
 /* Scanning with the camera (ADR 0016): a square picture, as the reader looks at its middle square. */
-.warehouse .scan-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-.warehouse .scanner { display: grid; gap: 8px; }
-.warehouse .viewfinder { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; justify-self: center; overflow: hidden; border-radius: 12px; background: #000; }
+.warehouse .scan-row { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
+.warehouse .scanner { display: grid; gap: var(--space-8); }
+.warehouse .viewfinder { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; justify-self: center; overflow: hidden; border-radius: var(--radius-card); background: #000; }
 .warehouse .scanner.small .viewfinder { max-width: 180px; }
 .warehouse .scan-row button[aria-pressed='true'], .warehouse .scan-controls button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .warehouse .viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -104,26 +104,26 @@
 @keyframes scan-read { from { border-color: var(--good); background: #1d7a4c40; } to { border-color: #fff8; background: transparent; } }
 .warehouse .viewfinder .starting { position: absolute; inset: auto 0 12px; margin: 0; text-align: center; color: #fff; font-size: .9rem; }
 .warehouse .scan-status { margin: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 1.4em; }
-.warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.warehouse .scanner .alert { display: grid; gap: 8px; justify-items: start; }
+.warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: var(--space-6); justify-content: center; }
+.warehouse .scanner .alert { display: grid; gap: var(--space-8); justify-items: start; }
 .warehouse .scanner .alert p { margin: 0; }
 
 /* Faults and missing kit (ADR 0018): a stripe down the side says whether it stops the kit going out. */
-.warehouse .fault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.warehouse .fault { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; }
+.warehouse .fault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
+.warehouse .fault { display: grid; gap: var(--space-6); padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius-control); }
 .warehouse .fault.stops { border-left-color: var(--bad); }
 .warehouse .fault.usable { border-left-color: var(--warn); }
 .warehouse .fault.closed { color: var(--muted); }
-.warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
-.warehouse .fault header p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: var(--space-8); }
+.warehouse .fault header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .85rem; }
 .warehouse .fault a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .fault header > div > a { color: inherit; }
 .warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: .9rem; }
 .warehouse .fault .repair { color: var(--muted); }
 .warehouse .fault .actions { margin: 0; }
-.warehouse .faults h3 { margin: 12px 0 6px; }
-.warehouse .faults details { margin-top: 10px; }
-.warehouse .faults details .fault-list { margin-top: 8px; }
+.warehouse .faults h3 { margin: var(--space-12) 0 var(--space-6); }
+.warehouse .faults details { margin-top: var(--space-10); }
+.warehouse .faults details .fault-list { margin-top: var(--space-8); }
 .warehouse .facts dd.bad, .warehouse .flag.bad { color: var(--bad); font-weight: 600; }
 .warehouse .numbers.missing-items a { border-style: dashed; border-color: var(--bad); color: var(--bad); }
 .warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: .85rem; font-weight: 600; }

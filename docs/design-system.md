@@ -40,10 +40,11 @@ and Figma gets updated. Every colour token carries its CSS name (for example
 
 Spacing and radius carry their CSS names the same way: `space/8` is
 `var(--space-8)` and `radius/card` is `var(--radius-card)`, set on `:root` in
-`app.css` next to the colours. `app.css` and `crew.css` use them wherever a
+`app.css` next to the colours. The web app's stylesheets use them wherever a
 value is on the scale, and anything off it, such as a 1px line or a 3px
-nudge, stays in px. The stylesheets for screens not in Figma yet, `jobs.css`
-and `stock.css`, still have plain px values.
+nudge, stays in px. A radius is named for what it's on, so a 10px corner
+that isn't on a tab, such as the box round a crew call on a job's page, stays
+in px too.
 
 ## Rules the components encode
 
