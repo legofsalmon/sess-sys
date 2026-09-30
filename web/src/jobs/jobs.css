@@ -32,6 +32,34 @@
 .jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
 .jobs .warn-line { margin: 0; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: 6px 10px; border-radius: 8px; }
 .jobs .add-phase { padding-top: 12px; border-top: 1px solid var(--line); }
+/* Something just added: kit here, items and counts on Stock. */
+.jobs .added { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
+.jobs .added a { color: inherit; font-weight: 700; }
+
+/* Kit on jobs (ADR 0014): lines by department, each saying whether there's enough; red when short on a confirmed job, amber when pencilled in. */
+.jobs .kit-group { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.jobs .kit .kit-group:first-of-type { padding-top: 0; border-top: 0; }
+.jobs .kit-group h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .kit-line { display: grid; gap: 6px; }
+.jobs .kit-line + .kit-line { padding-top: 8px; border-top: 1px dashed var(--line); }
+.jobs .kit-line > header { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.jobs .kit-line > header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.jobs .kit-line > button { justify-self: start; }
+.jobs .kit-state { margin: 0; font-size: .85rem; }
+.jobs .kit-state.bad { background: var(--bad-soft); color: var(--bad); padding: 6px 10px; border-radius: 8px; }
+.jobs .kit-state.warn { background: var(--warn-soft); color: var(--warn); padding: 6px 10px; border-radius: 8px; }
+.jobs .kit-state.ok { color: var(--good); }
+.jobs .kit-state.quiet { color: var(--muted); }
+.jobs .add-kit { padding-top: 12px; border-top: 1px solid var(--line); }
+.jobs .kit > h2 + .add-kit, .jobs .kit > .empty + .add-kit { padding-top: 0; border-top: 0; }
+.jobs .add-kit h3 { margin: 0; font-size: .95rem; }
+.jobs .job-row .kit-note { font-size: .85rem; }
+.jobs .job-row .kit-note.bad, .jobs .job-row small.flag.bad { color: var(--bad); }
+.jobs .job-row .kit-note.warn, .jobs .job-row small.flag.warn { color: var(--warn); }
+.jobs .job-row .kit-note.ok { color: var(--good); }
+.jobs .job-row small.flag { font-weight: 700; }
+.jobs .kit-short { border-color: var(--warn); }
+.jobs .kit-short h2 { color: var(--warn); }
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
 .jobs .views { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }

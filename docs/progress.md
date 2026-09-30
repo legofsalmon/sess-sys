@@ -3,6 +3,61 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: kit on jobs, with shortages
+
+**Done**
+
+- The second part of Phase 2: each job says what kit it needs, and the
+  app says whether there's enough.
+  [Decision 0014](adr/0014-kit-on-jobs.md) has the reasons. There was no
+  word yet on a stock list to bring in, so this came next, as planned.
+- A job's page has a **Kit** card: products from the stock list and how
+  many, for the whole job or one phase, grouped by department. A line
+  for the whole job covers every day from its first phase to its last,
+  the days between included. Adding a product already on the job for the
+  same days adds to that line.
+- Each line says whether there's enough on its days once the other
+  confirmed jobs have theirs: "Short 2 on Wed 4 Sep: 10 owned, 8 on
+  Electric Picnic", in red. Enquiries and quotes are pencilled in: they're
+  checked as if they went ahead ("Would be short 2 on Fri 6 Sep if it goes
+  ahead"), and a confirmed job whose spare kit they'd use says "Enough,
+  unless Longitude goes ahead", in amber. Cancelled and lost jobs hold
+  nothing. Only days from today on are checked.
+- Being short never stops a line being saved: the count may be
+  unfinished, or someone is about to subhire. A short line has
+  **Subhire the 2 short**, which fills in how many and asks who from,
+  suggesting suppliers already used. Subhired ones don't come out of
+  Session Hire's own stock.
+- The jobs list flags **Kit short**, the Stock tab lists every line short
+  from today on, and a product's page lists the jobs it's on, with
+  whether there's enough for each. A product on a job's kit can't be
+  taken out of the stock list, and a phase with kit on it can't be
+  removed.
+- It's worked out on each device from what it already has, so it works
+  with no signal: kit added offline counts at once and goes through once
+  the signal is back.
+- The History tab describes kit changes ("Added 8 × d&b Y10P to the kit
+  for Nissan, whole job"), and backups and **Download everything**
+  include the new table.
+- Until the warehouse has counted everything, lines will show short that
+  aren't; a product with nothing counted yet says so.
+- Checked: 7 new server tests (the rules; the history lines; and what a
+  device shows: a shortage in the gap between a job's phases, sorted by
+  subhire, a quote pencilled in, cancelled jobs, days gone by, jobs with
+  no dates, and kit added with no signal), all 208 server tests, and 2
+  new browser tests on a phone (short, subhired, a quote pencilled in,
+  the Stock tab and a product's page; kit added with no signal), with all
+  29 browser tests passing.
+
+**Next**
+
+- Colly, to try it: in **Stock**, count a few of a made-up product; in
+  **Jobs**, put more of it on two made-up jobs on the same day than are
+  counted, see both say they're short, then subhire the rest on one.
+- Still open: is there a stock list or spreadsheet to bring in? If so,
+  bringing it in comes next. If not, label printing, then pick lists and
+  scanning out and in.
+
 ## 30 September 2026: the warehouse catalogue
 
 **Done**

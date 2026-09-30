@@ -10,6 +10,7 @@ import {
   type ClientView,
   type Contact,
   type JobView,
+  type KitLineView,
   type ProjectStatus,
   type VenueView,
   type View,
@@ -20,11 +21,12 @@ import { client } from '../sync.ts'
 import { Choices, clientNamed, NotDone, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
 import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
+import { kitShort } from './Kit.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
- * A job opens on its own page (#jobs/<id>) with its phases and crew, the
+ * A job opens on its own page (#jobs/<id>) with its phases, kit and crew, the
  * planner (#plan, ADR 0010) shows them by week or month, and jobs already
  * on Google Calendar can be brought in (#import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
@@ -87,7 +89,7 @@ function JobList({ view }: { view: View }) {
         <ul className="job-list">
           {shown.map((j) => (
             <li key={j.id}>
-              <JobRow job={j} />
+              <JobRow job={j} kit={view.kit.byJob.get(j.id)} />
             </li>
           ))}
         </ul>
@@ -122,8 +124,9 @@ function JobList({ view }: { view: View }) {
   )
 }
 
-function JobRow({ job }: { job: JobView }) {
+function JobRow({ job, kit }: { job: JobView; kit: readonly KitLineView[] | undefined }) {
   const crew = crewFill(job.calls)
+  const short = kitShort(kit)
   return (
     <a className="job-row" href={`#jobs/${job.id}`}>
       <div>
@@ -141,6 +144,7 @@ function JobRow({ job }: { job: JobView }) {
             Crew {crew.held} of {crew.needed}
           </small>
         )}
+        {short && <small className={`flag ${short}`}>Kit short</small>}
       </div>
     </a>
   )

@@ -76,6 +76,14 @@ follow-up that lets the two stay in step.
   ("Added SH-000102"). A choice between kinds (Numbered or Counted) is a
   bordered row per option, each with a line saying when to pick it. Not
   in Figma yet.
+- Kit on a job ([ADR 0014](adr/0014-kit-on-jobs.md)) is listed by
+  department under small grey headings, each line saying in words under
+  it whether there's enough: the **bad** tone on a tinted panel when a
+  confirmed job is short, amber when an enquiry or quote would be short
+  or would use the spare, and plain green text when there's enough. A
+  short line has one button, "Subhire the 2 short", which opens the
+  line's form with the number filled in and the cursor in From. The jobs
+  list says "Kit short" in the same red or amber. Not in Figma yet.
 
 ## Accessibility
 

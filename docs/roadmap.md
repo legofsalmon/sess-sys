@@ -80,7 +80,10 @@ the same Google invites, and nobody has to type a job twice.
 ([ADR 0013](adr/0013-warehouse-catalogue.md)): products numbered or
 counted, items with Session Hire numbers that are never used twice,
 places, cases up to five deep, and counts, in the Stock tab and working
-with no signal. See [progress.md](progress.md).
+with no signal. Kit on jobs is built too
+([ADR 0014](adr/0014-kit-on-jobs.md)): each job's products and how many,
+for the whole job or a phase, with shortages worked out on each device
+and subhire. See [progress.md](progress.md).
 
 - Catalogue, products, assets, containers, bulk stock, locations (built:
   products, numbered items with their labels, cases, counted stock and
@@ -92,7 +95,9 @@ with no signal. See [progress.md](progress.md).
   labelled as it comes back from jobs, then cases, then cables as bundles,
   then a baseline stocktake and rolling cycle counts.
 - Equipment lines on projects, with live availability and shortage
-  warnings, including subhire lines.
+  warnings, including subhire lines (built: kit lines for the whole job
+  or a phase; confirmed jobs hold kit and enquiries and quotes are
+  pencilled in; short is warned about, never refused).
 - Pick lists per project, **scan out and scan in on a phone, offline**,
   missing and damaged items on return, and a conflict queue for scans that
   did not match the plan.

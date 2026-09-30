@@ -1,5 +1,6 @@
 import {
   CATEGORY_IDEAS,
+  dayLabel,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
   newId,
@@ -13,7 +14,8 @@ import {
 import { useState, type FormEvent } from 'react'
 import { App } from '../App.tsx'
 import { act, euroToCents } from '../crew/CrewScreen.tsx'
-import { NotDone, Top, useHash, useView } from '../jobs/common.tsx'
+import { NotDone, StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
+import { productName } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
 import { amountLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
@@ -23,10 +25,10 @@ import './stock.css'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
- * where everything is kept, and what's counted. A product, item or place
- * opens on its own page (#stock/product/<id>, #stock/item/<id>,
- * #stock/place/<id>). The Phase 0 sync test lives at #stock/sync-test
- * until equipment lines on jobs replace it.
+ * where everything is kept, and what's counted; and the kit on jobs that's
+ * short (ADR 0014). A product, item or place opens on its own page
+ * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>). The Phase 0
+ * sync test lives at #stock/sync-test until the phone field test is done.
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 export function StockScreen() {
@@ -142,6 +144,8 @@ function Catalogue({ view }: { view: View }) {
         </ul>
       </section>
 
+      <ShortKit view={view} />
+
       <section className="card">
         <h2>New product</h2>
         <NewProduct view={view} department={department === 'all' ? 'audio' : department} />
@@ -157,6 +161,43 @@ function Catalogue({ view }: { view: View }) {
         </a>
       </section>
     </div>
+  )
+}
+
+/** Every line of kit short on a day from today on, soonest first; the first few, then the rest on request. */
+function ShortKit({ view }: { view: View }) {
+  const short = view.kit.short
+  if (short.length === 0) return null
+  const row = (l: (typeof short)[number]) => (
+    <li key={l.id}>
+      <a className="job-row" href={`#jobs/${l.projectId}`}>
+        <div>
+          <b>
+            {productName(l)}: short {l.short}
+          </b>
+          <p>
+            {l.job?.name ?? 'A job'} · {dayLabel(l.shortDay!)}
+            {l.shortDays > 1 && ` and ${plural(l.shortDays - 1, 'more day')}`}
+          </p>
+        </div>
+        <div className="side">{l.job && <StatusPill status={l.job.status} pending={l.pending} />}</div>
+      </a>
+    </li>
+  )
+  return (
+    <section className="card kit-short" aria-label="Kit short">
+      <h2>Kit short</h2>
+      <p className="hint">
+        On jobs from today on, once the confirmed jobs on the same days have theirs. Quotes and enquiries show what they'd need if they go ahead.
+      </p>
+      <ul className="job-list">{short.slice(0, 5).map(row)}</ul>
+      {short.length > 5 && (
+        <details>
+          <summary>{short.length - 5} more</summary>
+          <ul className="job-list">{short.slice(5).map(row)}</ul>
+        </details>
+      )}
+    </section>
   )
 }
 

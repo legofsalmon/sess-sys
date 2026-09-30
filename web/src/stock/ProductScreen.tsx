@@ -2,6 +2,7 @@ import {
   CATEGORY_IDEAS,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
+  irishToday,
   MAX_QTY,
   newId,
   normaliseNumber,
@@ -11,13 +12,15 @@ import {
   valueLabel,
   type CommandInput,
   type Department,
+  type KitLineView,
   type ModelView,
   type View,
   type WarehouseView,
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { act, euroToCents } from '../crew/CrewScreen.tsx'
-import { NotDone, Top } from '../jobs/common.tsx'
+import { NotDone, StatusPill, Top } from '../jobs/common.tsx'
+import { forLabel, kitState } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
 import {
   amountLabel,
@@ -36,9 +39,10 @@ import {
 } from './common.tsx'
 
 /**
- * One product: what it is, its numbered items, and where it's counted.
- * Items are added one after another while labelling: the number field is
- * ready for the next label as soon as one is added, and where stays put.
+ * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
+ * and where it's counted. Items are added one after another while
+ * labelling: the number field is ready for the next label as soon as one is
+ * added, and where stays put.
  */
 export function ProductScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse
@@ -62,7 +66,8 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
         ‹ All stock
       </a>
       <NotDone view={view} names={STOCK_COMMANDS} />
-      <Summary m={m} w={w} />
+      <Summary m={m} w={w} onKit={view.kit.lines.some((l) => l.modelId === m.id)} />
+      <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} />}
       <Counted m={m} w={w} />
       <WhereChoices w={w} />
@@ -70,9 +75,9 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
   )
 }
 
-function Summary({ m, w }: { m: ModelView; w: WarehouseView }) {
+function Summary({ m, w, onKit }: { m: ModelView; w: WarehouseView; onKit: boolean }) {
   const [editing, setEditing] = useState(false)
-  const removable = m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0
+  const removable = m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0 && !onKit
   const remove = () => {
     if (!confirm(`Remove ${m.name} from the stock list?`)) return
     void act(() => client.mutate('model.remove', { id: m.id })).then(
@@ -129,6 +134,43 @@ function Summary({ m, w }: { m: ModelView; w: WarehouseView }) {
             </button>
           )}
         </div>
+      )}
+    </section>
+  )
+}
+
+/** The jobs it's on from today on, soonest first, each with whether there's enough; the first few, then the rest on request. */
+function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
+  const today = irishToday()
+  const row = (l: KitLineView) => {
+    const state = kitState(l, today)
+    return (
+      <li key={l.id}>
+        <a className="job-row" href={`#jobs/${l.projectId}`}>
+          <div>
+            <b>{l.job?.name ?? 'A job'}</b>
+            <p>{forLabel(l)}</p>
+            {state && <p className={`kit-note ${state.tone}`}>{state.text}</p>}
+          </div>
+          <div className="side">
+            {l.job && <StatusPill status={l.job.status} pending={l.pending} />}
+            <small>{l.qty.toLocaleString('en-IE')} needed</small>
+          </div>
+        </a>
+      </li>
+    )
+  }
+  return (
+    <section className="card" aria-label="On jobs">
+      <h2>On jobs</h2>
+      <p className="hint">{m.total.toLocaleString('en-IE')} owned. Confirmed jobs hold them; enquiries and quotes are pencilled in.</p>
+      {lines.length === 0 && <p className="empty">Not on any job coming up.</p>}
+      <ul className="job-list">{lines.slice(0, 5).map(row)}</ul>
+      {lines.length > 5 && (
+        <details>
+          <summary>{lines.length - 5} more</summary>
+          <ul className="job-list">{lines.slice(5).map(row)}</ul>
+        </details>
       )}
     </section>
   )

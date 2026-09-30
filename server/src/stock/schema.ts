@@ -3,7 +3,8 @@ import { runMigrations, type Module } from '../migrations.ts'
 
 /**
  * The warehouse catalogue (ADR 0013): products (models), numbered items
- * (assets) and the labels on them (identifiers), places, and counted stock.
+ * (assets) and the labels on them (identifiers), places, and counted stock;
+ * and the kit on jobs (ADR 0014), which refers to jobs and their phases.
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -69,6 +70,23 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS stock_model ON stock (model_id);
   CREATE INDEX IF NOT EXISTS stock_place ON stock (place_id);
   CREATE INDEX IF NOT EXISTS stock_case ON stock (case_id);
+  `,
+  // Kit on jobs (ADR 0014): how many of a product a job needs, for the whole
+  // job (no phase) or one phase, and how many of those are subhired.
+  `
+  CREATE TABLE IF NOT EXISTS kit_lines (
+    id           text PRIMARY KEY,
+    project_id   text NOT NULL REFERENCES projects(id),
+    phase_id     text REFERENCES phases(id),
+    model_id     text NOT NULL REFERENCES models(id),
+    qty          integer NOT NULL CHECK (qty > 0),
+    subhire_qty  integer NOT NULL DEFAULT 0 CHECK (subhire_qty >= 0 AND subhire_qty <= qty),
+    supplier     text NOT NULL DEFAULT '',
+    notes        text NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS kit_lines_project ON kit_lines (project_id);
+  CREATE INDEX IF NOT EXISTS kit_lines_phase ON kit_lines (phase_id);
+  CREATE INDEX IF NOT EXISTS kit_lines_model ON kit_lines (model_id);
   `,
 ]
 

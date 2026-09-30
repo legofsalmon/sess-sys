@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
 import { jobCommandSchemas } from './jobs.ts'
+import { kitCommandSchemas } from './kit.ts'
 import { day } from './model.ts'
 import { stockCommandSchemas } from './stock.ts'
 
@@ -35,6 +36,7 @@ export const commandSchemas = {
   ...crewCommandSchemas,
   ...jobCommandSchemas,
   ...stockCommandSchemas,
+  ...kitCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

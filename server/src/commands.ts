@@ -11,6 +11,7 @@ import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
+import { kitHandlers } from './stock/kit.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -118,6 +119,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...crewHandlers,
   ...projectHandlers,
   ...stockHandlers,
+  ...kitHandlers,
 }
 
 /**
