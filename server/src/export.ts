@@ -178,6 +178,7 @@ function historyCsv(history: HistoryEntry[]): string {
 
 /** What each table holds, for the README. A table not described here is still exported. */
 const ABOUT: Record<string, string> = {
+  assets: 'Numbered items of stock: their product, serial, where they are kept, and whether they are retired.',
   backup_runs: 'The nightly backups: when each ran and how it went.',
   bookings: 'Stock booked for jobs (sync test).',
   calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
@@ -187,14 +188,18 @@ const ABOUT: Record<string, string> = {
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show.',
+  identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   issues: 'Things someone has to sort out, such as more scanned out than booked (sync test).',
+  models: 'Products in the stock list: department, category, numbered or counted, and replacement value.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
   people: 'Staff and freelancers on the crew list: contact details, skills and rates.',
   phases: "The parts of each job, such as Build and Show, and their days.",
+  places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   products: 'Stock items (sync test).',
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   scans: 'Stock scanned out and back in (sync test).',
+  stock: 'Counted stock: how many of a product are at a place or in a case.',
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
   venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',

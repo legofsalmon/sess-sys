@@ -15,7 +15,9 @@ Calendar, crew invited to their days there, with their answers read back
 (behind a switch that starts off), a week and month planner by job or by
 person that flags clashes, bringing in the jobs already on Google
 Calendar, and a read-only calendar feed of each person's own bookings.
-The app runs on Railway. Start with the
+Phase 2, the warehouse, has started with the catalogue in the Stock tab:
+products numbered or counted, items with Session Hire numbers, places,
+cases and counts. The app runs on Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the
 research, principles, architecture, stock tracking, roadmap and decisions,

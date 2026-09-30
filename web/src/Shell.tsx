@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
 import { AccountScreen } from './AccountScreen.tsx'
-import { App } from './App.tsx'
 import { useAuth } from './auth.ts'
 import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
+import { StockScreen } from './stock/StockScreen.tsx'
 
 /**
  * Switches between the app's areas. The address keeps the area, and within
- * it the record open (#jobs/<id>), the planner's days (#plan/week/<day>)
- * or bringing jobs in (#import), so a reload or a shared link lands in the
- * same place.
+ * it the record open (#jobs/<id>, #stock/item/<id>), the planner's days
+ * (#plan/week/<day>) or bringing jobs in (#import), so a reload or a shared
+ * link lands in the same place.
  */
 const AREAS = [
   { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
-  { hash: '#stock', label: 'Stock', Screen: App },
+  { hash: '#stock', label: 'Stock', Screen: StockScreen },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
   { hash: '#history', label: 'History', Screen: HistoryScreen },
   { hash: '#account', label: 'Account', Screen: AccountScreen },

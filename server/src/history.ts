@@ -1,14 +1,20 @@
 import {
   daysLabel,
+  DEPARTMENT_LABELS,
   eachDay,
   euro,
   invitesLabel,
   newId,
+  normaliseNumber,
   OFFLINE_AFTER_SECONDS,
+  RETIRED_LABELS,
   STATUS_LABELS,
+  valueLabel,
+  type Department,
   type HistoryEntry,
   type HistoryPage,
   type ProjectStatus,
+  type RetiredReason,
 } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -163,6 +169,7 @@ function readCursor(text: string): { at: string; id: string } {
 
 async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
   const look = await lookup(q, rows)
+  const left = await itemsAsLeft(q, rows)
   return rows.map((r) => {
     const args = r.args ?? {}
     const link = r.client_id.startsWith('link:')
@@ -170,7 +177,7 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look),
+      what: describe(r.name, args, look, left.get(r.id)),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -195,7 +202,40 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
 type Data = Record<string, unknown>
 type Look = (entity: string, id: unknown) => Data | undefined
 
-const REFERENCES = ['id', 'productId', 'bookingId', 'personId', 'callId', 'projectId', 'phaseId', 'clientId', 'venueId'] as const
+const REFERENCES = [
+  'id',
+  'productId',
+  'bookingId',
+  'personId',
+  'callId',
+  'projectId',
+  'phaseId',
+  'clientId',
+  'venueId',
+  'modelId',
+  'placeId',
+  'caseId',
+  'fromPlaceId',
+  'fromCaseId',
+  'toPlaceId',
+  'toCaseId',
+] as const
+
+/**
+ * An item as the command that numbered it left it (ADR 0013): the number
+ * the server gave, which a later new label would otherwise hide.
+ */
+async function itemsAsLeft(q: Queryable, rows: Row[]): Promise<Map<string, Data>> {
+  const ids = rows.filter((r) => r.status === 'applied' && (r.name === 'asset.add' || r.name === 'asset.relabel')).map((r) => r.id)
+  if (ids.length === 0) return new Map()
+  const { rows: found } = await q.query<{ mutation_id: string; data: Data }>(
+    `SELECT DISTINCT ON (mutation_id) mutation_id, data FROM changes
+      WHERE entity = 'asset' AND op = 'put' AND mutation_id = ANY($1::text[])
+      ORDER BY mutation_id, seq DESC`,
+    [ids]
+  )
+  return new Map(found.map((f) => [f.mutation_id, f.data]))
+}
 
 /**
  * The latest known state of every record the entries mention, and of the
@@ -231,8 +271,12 @@ const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : 
 /** "a", "a and b", "a, b and c". */
 const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
 
-/** What an entry did, in words, as the History tab and the exported history show it. */
-export function describe(command: string, a: Data, look: Look): string {
+/**
+ * What an entry did, in words, as the History tab and the exported history
+ * show it. `left` is the item as the command left it, for the ones that
+ * give an item its number.
+ */
+export function describe(command: string, a: Data, look: Look, left?: Data): string {
   const product = (id: unknown) => text(look('product', id)?.name, 'an item')
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
@@ -247,6 +291,19 @@ export function describe(command: string, a: Data, look: Look): string {
   const client = (id: unknown) => text(look('client', id)?.name, 'a client')
   const venue = (id: unknown) => text(look('venue', id)?.name, 'a venue')
   const status = (s: unknown) => (typeof s === 'string' && s in STATUS_LABELS ? STATUS_LABELS[s as ProjectStatus].toLowerCase() : 'another status')
+  const model = (id: unknown) => text(look('model', id)?.name, 'a product')
+  const item = (id: unknown) => {
+    const found = look('asset', id)
+    return found ? `${text(found.number, 'an item')} (${model(found.modelId)})` : 'an item'
+  }
+  const placeName = (id: unknown) => text(look('place', id)?.name, 'a place')
+  /** "Bay A3", or a case: "SH-000512 (Cable bag)". */
+  const spot = (placeId: unknown, caseId: unknown) => (placeId ? placeName(placeId) : item(caseId))
+  const where = (placeId: unknown, caseId: unknown) => (placeId ? ` at ${placeName(placeId)}` : caseId ? ` in ${item(caseId)}` : '')
+  const tracking = (t: unknown) => (t === 'bulk' ? 'counted' : 'numbered')
+  const retired = (r: unknown) => (typeof r === 'string' && r in RETIRED_LABELS ? RETIRED_LABELS[r as RetiredReason].toLowerCase() : 'retired')
+  const department = (d: unknown) => (typeof d === 'string' && d in DEPARTMENT_LABELS ? DEPARTMENT_LABELS[d as Department] : 'another department')
+  const numberGiven = (typed: unknown) => (typeof typed === 'string' && normaliseNumber(typed)) || text(left?.number, 'a number')
 
   switch (command) {
     case 'product.upsert':
@@ -343,6 +400,51 @@ export function describe(command: string, a: Data, look: Look): string {
       ])
       return `Brought in ${what.length ? inWords(what) : 'jobs'} from ${text(a.calendar, 'a calendar')} on Google Calendar${details.length ? `: ${inWords(details)}` : ''}`
     }
+    case 'model.create':
+      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isCase ? ', holds other kit' : ''})`
+    case 'model.update': {
+      const parts: string[] = []
+      if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a product')}`)
+      if (a.department !== undefined) parts.push(`department to ${department(a.department)}`)
+      if (a.category !== undefined) parts.push(typeof a.category === 'string' && a.category.trim() ? `category to ${a.category.trim()}` : 'no category')
+      if (a.tracking !== undefined) parts.push(`${tracking(a.tracking)}`)
+      if (a.isCase !== undefined) parts.push(a.isCase ? 'holds other kit' : "doesn't hold other kit")
+      if (a.valueCents !== undefined) parts.push(typeof a.valueCents === 'number' ? `value to ${valueLabel(a.valueCents)}` : 'no value')
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed the product ${model(a.id)}: ${inWords(parts)}`
+    }
+    case 'model.remove':
+      return `Removed the product ${model(a.id)}`
+    case 'place.upsert':
+      return `Saved the place ${text(a.name, 'a place')}`
+    case 'place.remove':
+      return `Removed the place ${placeName(a.id)}`
+    case 'asset.add':
+      return `Added ${numberGiven(a.number)} (${model(a.modelId)})${where(a.placeId, a.caseId)}${a.fromCount ? ', one of those counted there' : ''}`
+    case 'asset.update': {
+      const parts: string[] = []
+      if (a.modelId !== undefined) parts.push(`product to ${model(a.modelId)}`)
+      if (a.serial !== undefined) parts.push(typeof a.serial === 'string' && a.serial.trim() ? `serial to ${clip(a.serial.trim())}` : 'no serial')
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed ${item(a.id)}: ${inWords(parts)}`
+    }
+    case 'asset.move':
+      if (a.placeId) return `Moved ${item(a.id)} to ${placeName(a.placeId)}`
+      if (a.caseId) return `Put ${item(a.id)} in ${item(a.caseId)}`
+      return `Cleared where ${item(a.id)} is kept`
+    case 'asset.relabel': {
+      const found = look('asset', a.id)
+      const before = Array.isArray(left?.formerNumbers) ? left.formerNumbers.at(-1) : undefined
+      return `Put a new label on ${model(found?.modelId)}: ${numberGiven(a.number)}${typeof before === 'string' ? `, replacing ${before}` : ''}`
+    }
+    case 'asset.retire':
+      return `Retired ${item(a.id)}: ${retired(a.reason)}${typeof a.note === 'string' && a.note.trim() ? ` (${clip(a.note.trim())})` : ''}`
+    case 'asset.reinstate':
+      return `Brought back ${item(a.id)}`
+    case 'stock.set':
+      return `Counted ${a.qty === 0 ? 'no' : `${a.qty} ×`} ${model(a.modelId)}${where(a.placeId, a.caseId)}`
+    case 'stock.move':
+      return `Moved ${a.qty} × ${model(a.modelId)} from ${spot(a.fromPlaceId, a.fromCaseId)} to ${spot(a.toPlaceId, a.toCaseId)}`
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

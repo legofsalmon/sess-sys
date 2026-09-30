@@ -121,6 +121,8 @@ section { display: grid; gap: 22px; scroll-margin-top: 24px; min-width: 0; }
 .crewshots { margin-top: 16px; }
 .crewshots .phones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .jobshots .phones { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 560px; }
+.stockshots .phones { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .stockshots .phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .crewshots .phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .state.progress { background: var(--accent-soft); color: var(--accent-ink); }
 @media (max-width: 980px) { .tracker { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -299,7 +301,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 · everything on the list built</div>
+      <div class="status">Phase 2 · the warehouse catalogue built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -378,6 +380,16 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <div class="phones">
           <figure><img src="img/feed-freelancer.png" alt="A freelancer's private page on a phone: under Your bookings, a subscribe link for iPhone, Mac and Outlook, the address to add in Google Calendar, and a note that it only shows bookings so it's fine in a shared calendar" width="390" height="844" loading="lazy"><figcaption><b>Freelancer.</b> Subscribe, or add the address in Google.</figcaption></figure>
           <figure><img src="img/feed-account.png" alt="Account tab on a phone, signed in as Ciara Walsh: the card Your bookings in your own calendar, with the feed address, Subscribe and Copy address" width="390" height="844" loading="lazy"><figcaption><b>Staff.</b> Their own feed, on the Account tab.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots crewshots stockshots">
+        <h3>The warehouse catalogue, the start of Phase 2</h3>
+        <p class="small">The Stock tab lists products by department, with a search that finds a product, an item's number or a serial; a scanner that types a label's number and Enter opens the item. A product is numbered, each one labelled SH- and six digits, or counted, like cables. Numbered kit can be counted until it's labelled, and each item added takes one off the count, so the total is right from the first day. A number is never used twice, cases hold items and counted stock, and each place shows everything kept there. It all works with no signal. (Decision 0013)</p>
+        <div class="phones">
+          <figure><img src="img/stock-list.png" alt="Stock tab on a phone: a search box for a product, number or serial, department filters, and three products: Amp rack with 1 item, d&amp;b Y10P with 2 items and 4 not labelled yet, and XLR 10 m with 8 counted; below, the new product form" width="390" height="844" loading="lazy"><figcaption><b>The catalogue.</b> Products by department, and how many.</figcaption></figure>
+          <figure><img src="img/stock-product.png" alt="A product's page on a phone: d&amp;b Y10P, Audio, numbered, 6 in all with 2 labelled and 4 not yet; its items SH-000101 and SH-000102 at Bay A3, and the form to add the next one" width="390" height="844" loading="lazy"><figcaption><b>A product.</b> Labelled one after another.</figcaption></figure>
+          <figure><img src="img/stock-item.png" alt="A case's page on a phone: SH-000151, an Amp rack kept at Bay A3, with Move, Change details, New label and Retire; in it, SH-000101 d&amp;b Y10P and 8 × XLR 10 m, and a form to put an item in" width="390" height="844" loading="lazy"><figcaption><b>A case.</b> Where it's kept and what's in it.</figcaption></figure>
+          <figure><img src="img/stock-place.png" alt="A place's page on a phone: Bay A3 with 3 items and 12 counted; here, the case SH-000151 with 1 item and 8 counted in it, d&amp;b Y10P SH-000102, and 4 d&amp;b Y10P not labelled yet" width="390" height="844" loading="lazy"><figcaption><b>A place.</b> Everything kept there.</figcaption></figure>
         </div>
       </div>
       <div class="panel shots crewshots">
@@ -554,7 +566,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <h3>The data at a glance</h3>
       <div class="model">
         <div class="ent"><b>Projects</b><ul><li><b>Job</b> for a client, with a status (built)</li><li><b>Phase</b>: prep, build, show, load out… (built)</li><li><b>Equipment line</b> by department</li><li><b>Crew requirement</b> per phase (built)</li><li><b>Quote</b>, versioned</li><li>Client, contact, venue (built)</li></ul></div>
-        <div class="ent stock"><b>Stock</b><ul><li><b>Product</b>: the model</li><li><b>Asset</b>: one item, hidden id</li><li><b>Identifier</b>: QR, serial, RFID…</li><li><b>Container</b>: case, rack, bundle</li><li><b>Movement</b>: every scan</li><li><b>Maintenance</b>: faults, tests</li></ul></div>
+        <div class="ent stock"><b>Stock</b><ul><li><b>Product</b>: the model (built)</li><li><b>Asset</b>: one item, hidden id (built)</li><li><b>Identifier</b>: QR, serial, RFID… (SH numbers built)</li><li><b>Container</b>: case, rack, bundle (built)</li><li><b>Movement</b>: every scan</li><li><b>Maintenance</b>: faults, tests</li></ul></div>
         <div class="ent people"><b>People</b><ul><li><b>Person</b>: staff, freelancer, supplier</li><li><b>Documents</b> with expiry</li><li><b>Availability</b></li><li><b>Assignment</b>: offered → confirmed</li><li><b>Timesheet</b></li></ul></div>
         <div class="ent money"><b>Money</b><ul><li>Price lists and rates</li><li>Quotes and invoices in EUR</li><li>VAT 23% and 13.5% per line</li><li>Freelancer costs</li><li>Dashboard and exports</li></ul></div>
       </div>
@@ -579,6 +591,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Planner</th><td>The week and month by job or by person, with clashes flagged, worked out on each device from what it already holds</td><td>Built (Decision 0010)</td></tr>
             <tr><th>Calendar import</th><td>The jobs on an organiser's calendar come in after a look at everything first; each event-day is remembered, so looking again shows only what's new</td><td>Built (Decision 0011)</td></tr>
             <tr><th>Personal feeds</th><td>A read-only calendar feed for each person, at an address worked out from their private link; every feed kept in memory and rebuilt only after a change</td><td>Built (Decision 0012)</td></tr>
+            <tr><th>Warehouse catalogue</th><td>Products numbered or counted; items with a hidden id and a Session Hire number never used twice; places; cases up to five deep; numbered kit counted until it's labelled</td><td>Built (Decision 0013)</td></tr>
           </tbody>
         </table>
       </div>
@@ -681,10 +694,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           </div>
           <div class="asset-label metal" aria-label="Example riveted metal tag for a road case">
             <svg viewBox="0 0 21 21" width="64" height="64" id="qr2" aria-hidden="true"></svg>
-            <div><div class="co">Session Hire</div><div class="id">SH-C00318</div><div class="what">Amp rack · riveted metal tag</div></div>
+            <div><div class="co">Session Hire</div><div class="id">SH-000318</div><div class="what">Amp rack · riveted metal tag</div></div>
           </div>
           <p class="small" style="flex:1 1 220px">The number is what people read out; the QR is what phones scan. The item's real id is hidden, so a worn label can be replaced without losing its history.</p>
         </div>
+      </div>
+      <div class="panel">
+        <h3>Built so far: the catalogue (Decision 0013)</h3>
+        <p class="small">The Stock tab holds every product, numbered or counted, each numbered item with its Session Hire number, the places kit is kept and the cases it lives in. Numbered kit can be counted until it's labelled, so the app knows everything owned from the first day and shows how far the labelling has got. Labels can go on over weeks: an item takes the number on its label, typed or scanned, or the next free one. A number is never used twice, even after a new label. Next: equipment lines on jobs, then label printing and scanning.</p>
       </div>
       <div class="scroll panel" style="padding:0">
         <table>
@@ -713,7 +730,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           <h3>Cases hold things; scanning the case moves them</h3>
           <div class="nest" aria-label="Example of nested containers">
             <div class="c"><div class="h"><span>Truck pack · Nissan</span><span class="tag">temporary</span></div>
-              <div class="c"><div class="h"><span>Amp rack SH-C00318</span><span class="tag">sealed</span></div><span class="small">3 × d&amp;b D20 · power distro · network switch</span></div>
+              <div class="c"><div class="h"><span>Amp rack SH-000318</span><span class="tag">sealed</span></div><span class="small">3 × d&amp;b D20 · power distro · network switch</span></div>
               <div class="c"><div class="h"><span>Cable bundle: 20 × XLR 10 m</span><span class="tag">bundle</span></div></div>
             </div>
           </div>
@@ -810,7 +827,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'now', 'Built; office trial left'],
-    ['2', 'Warehouse', 'todo', 'Planned'],
+    ['2', 'Warehouse', 'now', 'Started: catalogue built'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
@@ -891,13 +908,13 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
     ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Bring in the jobs already on the organisers\' calendars (built)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds, read-only and safe to share (built)'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
-    ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
+    ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations (built and on)', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
     ['5', '', 'Crewbox link and on-site mode', ['Crewbox additions: keyed import, show log by key, asset tags on faults', 'Push job to the box; pull faults back as repair tickets', 'Crew chief view: kit check by scan, crew present, notes, offline'], 'the box is set up from the job in one step and faults from site are waiting in the repair queue.'],
     ['6', '', 'Grow', ['Utilisation and revenue per product', 'Multi-warehouse, vehicles and drivers', 'Client portal', 'RFID, app store builds if needed', 'Retire calendar-led mode'], '']
   ];
-  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span>${n === '0' ? '<span class="state progress">In progress</span>' : n === '1' ? '<span class="state progress">Started</span>' : n === '3' ? '<span class="state progress">Started early</span>' : ''}</div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
+  $('#road').innerHTML = road.map(([n, cls, t, items, done]) => `<div class="ph"><div class="when"><span class="num ${cls}">${n}</span><span class="tag" style="justify-self:start">${n === '+' ? 'parallel' : 'phase ' + n}</span>${n === '0' ? '<span class="state progress">In progress</span>' : n === '1' ? '<span class="state progress">Built</span>' : n === '2' ? '<span class="state progress">Started</span>' : n === '3' ? '<span class="state progress">Started early</span>' : ''}</div><div class="body"><h3>${t}</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>${done ? `<div class="done-when"><b>Done when</b> ${done}</div>` : ''}</div></div>`).join('');
 
   // decisions
   const dec = [
@@ -924,7 +941,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting'],
     ['Planner', 'Week and Month sit beside the jobs list, by job or by person. Booked twice, or booked while unavailable, is a clash; an offer that would clash if they said yes is a check. Worked out on each device, so it works with no signal. Looking only for now: dragging phases waits until the office has used it (Decision 0010). Built and on.', 'decided'],
     ['Calendar import', 'The jobs on a calendar the connected account can see come in after a look at everything first; titles give job and phase, guests\' answers give crew booked, offered or declined, and TBC or hold means pencilled in. The organiser\'s calendar keeps these jobs\' events, so the app doesn\'t add them to the jobs calendar (Decision 0011). Built; works once the Google key is in and a calendar connected.', 'waiting'],
-    ['Personal feeds', 'Each person\'s feed has a read-only address of its own, worked out from their private link, so it\'s safe in a shared calendar and New link retires it; its events no longer carry the private link. Feeds are answered from memory and rebuilt only after a change, and private addresses are masked in the server\'s log (Decision 0012). Built and on.', 'decided']
+    ['Personal feeds', 'Each person\'s feed has a read-only address of its own, worked out from their private link, so it\'s safe in a shared calendar and New link retires it; its events no longer carry the private link. Feeds are answered from memory and rebuilt only after a change, and private addresses are masked in the server\'s log (Decision 0012). Built and on.', 'decided'],
+    ['Warehouse catalogue', 'Products are numbered, each item labelled SH- and six digits, or counted; numbered kit can be counted until it\'s labelled, so the total is right from the first day. A number is used only once, items are never deleted but retired, places are a flat list, and cases hold kit up to five deep (Decision 0013). Built and on.', 'decided']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

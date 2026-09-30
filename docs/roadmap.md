@@ -76,7 +76,15 @@ the same Google invites, and nobody has to type a job twice.
 
 ## Phase 2: Warehouse and stock
 
-- Catalogue, products, assets, containers, bulk stock, locations.
+**Started 30 September 2026.** The catalogue is built
+([ADR 0013](adr/0013-warehouse-catalogue.md)): products numbered or
+counted, items with Session Hire numbers that are never used twice,
+places, cases up to five deep, and counts, in the Stock tab and working
+with no signal. See [progress.md](progress.md).
+
+- Catalogue, products, assets, containers, bulk stock, locations (built:
+  products, numbered items with their labels, cases, counted stock and
+  places).
 - Label printing: QR plus a readable number on polyester labels, riveted
   metal tags for cases and rigging, heat-shrink or flag labels for cables.
 - The labelling rollout from [research/stock-tracking.md](research/stock-tracking.md):

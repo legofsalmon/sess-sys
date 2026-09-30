@@ -1,0 +1,56 @@
+/* Stock (ADR 0013). The screens also carry the jobs and crew classes, so lists, facts and forms look the same here. */
+.warehouse h1.number, .warehouse .item-row b, .warehouse .numbers a, .warehouse .count .n { font-variant-numeric: tabular-nums; }
+.warehouse h1.number { letter-spacing: .02em; }
+.warehouse h3 { margin: 0; font-size: .95rem; }
+.warehouse .facts .wide { grid-column: 1 / -1; }
+.warehouse input[type='number'] { width: 100%; }
+/* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
+.warehouse .card > form:has(> h3) { padding-top: 12px; border-top: 1px solid var(--line); }
+.warehouse .card > h2 + form:has(> h3) { padding-top: 0; border-top: 0; }
+
+/* Items, by number. */
+.warehouse .item-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-height: 44px; padding: 10px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.warehouse .item-list li:first-child .item-row { border-top: 0; padding-top: 0; }
+.warehouse .item-row p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.warehouse .item-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 10px 0; }
+.warehouse .added { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
+.warehouse .added a { color: inherit; font-weight: 700; }
+
+/* On a place: items grouped by product, each number a link. */
+.warehouse .group { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.warehouse .card > h2 + .group { padding-top: 0; border-top: 0; }
+.warehouse .group-name { margin: 0; }
+.warehouse .group-name a, .warehouse .count .what a { color: var(--accent-ink); font-weight: 600; }
+.warehouse .group-name small { color: var(--muted); margin-left: 4px; }
+.warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
+.warehouse .numbers a.is-pending { border-style: dashed; color: var(--warn); }
+.warehouse .numbers a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Counts. */
+.warehouse .count { align-items: center; }
+.warehouse .item-list + .row, .warehouse .group + .row { padding-top: 10px; border-top: 1px solid var(--line); }
+.warehouse .count small { color: var(--muted); }
+.warehouse .count .what { flex: 1; min-width: 45%; }
+.warehouse .count .n { font-size: 1.1rem; margin-right: 2px; }
+
+/* Numbered or counted, when adding or changing a product; ticks and reasons. */
+.warehouse .tracking { display: grid; gap: 6px; }
+/* Also inside the shared forms, whose labels stack their text over the field. */
+.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
+.warehouse .choice { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.warehouse .choice:has(input:checked) { border-color: var(--ink); }
+.warehouse .choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.warehouse .choice b, .warehouse .choice small { display: block; }
+.warehouse .choice small { color: var(--muted); font-size: .8rem; }
+.warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
+.warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.warehouse .reasons legend { width: 100%; }
+.warehouse .reasons .tick { min-height: 44px; align-items: center; }
+.warehouse .reasons .tick input { margin: 0; }
+.warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+
+/* The Phase 0 sync test, now under Stock. */
+.sync-test .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: 4px 0; }

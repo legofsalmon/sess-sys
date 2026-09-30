@@ -3,6 +3,57 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: the warehouse catalogue
+
+**Done**
+
+- Phase 2 has started, with what the rest of the warehouse builds on:
+  what Session Hire owns, how many of each, and where it's kept.
+  [Decision 0013](adr/0013-warehouse-catalogue.md) has the reasons.
+- The **Stock** tab is now the catalogue: products by department, and a
+  search that finds a product, an item's number or a serial. A scanner
+  that types a label's number and Enter opens the item.
+- A product is **numbered** (each one gets its own label, `SH-` and six
+  digits) or **counted** (cables, clamps, adaptors). A numbered product
+  can be counted until it's labelled: 6 × d&b Y10P counted at Bay A3 are
+  6 not labelled yet, and adding an item there takes one off the count,
+  so the total is right from the first day and labelling can take weeks.
+- An item gets the next free number, or the one on a label already stuck
+  on, typed as `SH-000123`, `sh 123` or `123`. A number is used only
+  once: a new label for a worn one keeps the old number with the item,
+  and search still finds it by the old one. Retiring an item (sold,
+  scrapped, lost or stolen) keeps it and its number, and it can be
+  brought back.
+- Places are added by typing a new name wherever one is asked for.
+  Cases (road cases, racks, bags, cable bundles) hold items and counted
+  stock, up to five deep; moving a case moves what's in it, and nothing
+  can go inside itself. Each product, item, case and place has its own
+  page, with its own address to share.
+- The server keeps the rules whichever device a change comes from, and
+  it all works with no signal: an item added offline says "Number when
+  synced" until it gets one.
+- The History tab describes every stock change ("Put a new label on d&b
+  Y10P: SH-000202, replacing SH-000201"), and backups and **Download
+  everything** include the five new tables.
+- The Phase 0 sync test moved to the bottom of the Stock tab, behind
+  **Open the sync test**.
+- Checked: 13 new server tests (numbers given, typed and never reused;
+  counts and moves; cases and their limits; the product and place rules;
+  labelling with no signal on a device; the history lines; a backup of
+  600 items in cases put back), all 201 server tests, and 2 new browser
+  tests on a phone (count, label, find by number, fill a case, the place,
+  a new label, retire and bring back; labelling with no signal), with all
+  27 browser tests passing.
+
+**Next**
+
+- Colly, to try it: in **Stock**, add a made-up product, count a few at
+  a made-up place, then add items one after another on its page, leaving
+  the number empty for the next free one.
+- Waiting on Colly: is there a stock list or spreadsheet to bring in? If
+  so, bringing it in comes next. If not, equipment lines on jobs, with
+  shortages flagged.
+
 ## 30 September 2026: everyone's own bookings in their own calendar
 
 **Done**

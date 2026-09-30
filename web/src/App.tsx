@@ -56,7 +56,7 @@ export function App() {
           : 'Up to date'
 
   return (
-    <div className="app">
+    <div className="app sync-test">
       <header className="top">
         <div className="brand">
           <span className="mark">SH</span>
@@ -69,6 +69,9 @@ export function App() {
           {statusText}
         </span>
       </header>
+      <a className="back" href="#stock">
+        ‹ Stock
+      </a>
 
       <label className="signal">
         <input type="checkbox" id="no-signal" checked={noSignal} onChange={toggleSignal} />

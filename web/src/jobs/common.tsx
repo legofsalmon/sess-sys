@@ -2,7 +2,7 @@ import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueVi
 import { useEffect, useState } from 'react'
 import { client } from '../sync.ts'
 
-/** What the Jobs screens share: the device's view, the header, and picking or adding a client or venue by name. */
+/** What the Jobs screens share, and Stock too: the device's view, the header, and picking or adding a client or venue by name. */
 
 export const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -22,7 +22,7 @@ export function useHash(): string {
   return hash
 }
 
-export function Top({ view }: { view: View }) {
+export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
   const waiting = view.pendingCount
   return (
     <header className="top">
@@ -30,7 +30,7 @@ export function Top({ view }: { view: View }) {
         <span className="mark">SH</span>
         <span>
           <b>Session Hire</b>
-          <small>Jobs</small>
+          <small>{title}</small>
         </span>
       </div>
       <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
@@ -40,9 +40,9 @@ export function Top({ view }: { view: View }) {
   )
 }
 
-/** Changes to jobs the server turned down, with its reason, until dismissed. */
-export function NotDone({ view }: { view: View }) {
-  const problems = view.problems.filter((p) => /^(client|venue|project|phase|call)\./.test(p.mutation.name))
+/** Changes the server turned down, with its reason, until dismissed: to jobs, or to what `names` matches. */
+export function NotDone({ view, names = /^(client|venue|project|phase|call)\./ }: { view: View; names?: RegExp }) {
+  const problems = view.problems.filter((p) => names.test(p.mutation.name))
   if (problems.length === 0) return null
   return (
     <section className="card attention">

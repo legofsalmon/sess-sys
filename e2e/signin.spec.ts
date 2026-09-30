@@ -25,7 +25,7 @@ const notSignedIn = async (page: Page) => {
 }
 
 test('a device that is signed out sees only the way in, and keeps what it has waiting', async ({ page }) => {
-  await page.goto('/#stock')
+  await page.goto('/#stock/sync-test')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
   // Sign-in gets switched on while this device holds a change. The test
@@ -39,7 +39,7 @@ test('a device that is signed out sees only the way in, and keeps what it has wa
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await expect(page.getByText(kit)).toHaveCount(0)
   await expect(page.getByText('1 change made on this device is waiting')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toHaveAttribute('href', '/api/auth/google/start?next=%23stock')
+  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toHaveAttribute('href', '/api/auth/google/start?next=%23stock%2Fsync-test')
 
   // Once the device is let in again, the waiting change goes through.
   await page.unrouteAll()

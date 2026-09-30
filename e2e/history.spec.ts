@@ -24,7 +24,7 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   const kit = `Shure SM58 ${unique()}`
   const job = `Galway Races ${unique()}`
 
-  await page.goto('/#stock')
+  await page.goto('/#stock/sync-test')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await page.locator('#product-name').fill(kit)
   await page.locator('#product-qty').fill('12')
