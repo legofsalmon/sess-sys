@@ -86,7 +86,7 @@ section { display: grid; gap: 22px; scroll-margin-top: 24px; min-width: 0; }
 .fact.alert b { color: var(--bad); }
 
 /* generic */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .list { display: grid; gap: 8px; margin: 0; padding-left: 1.1em; }
@@ -234,7 +234,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
 /* library */
 .lib { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; }
-.lib nav { display: grid; gap: 4px; align-content: start; }
+.lib nav { display: grid; gap: 4px; align-content: start; max-height: 80vh; overflow-y: auto; }
 .lib nav button { text-align: left; font: 600 .92rem var(--body); padding: 9px 12px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; }
 .lib nav button[aria-selected="true"] { background: var(--panel); border-color: var(--line); color: var(--accent-ink); }
 .lib nav button small { display: block; font: 500 .72rem var(--mono); color: var(--muted); }
@@ -242,7 +242,10 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 .doc h1 { font-size: 1.7rem; font-stretch: 112%; margin: 0 0 14px; }
 .doc h2 { font-size: 1.3rem; margin: 28px 0 10px; }
 .doc h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+.doc { overflow-wrap: break-word; }
+.doc a, .doc code { overflow-wrap: anywhere; }
 .doc p, .doc li { max-width: 72ch; }
+.doc ul, .doc ol { padding-left: 1.4em; }
 .doc p { margin: 0 0 12px; }
 .doc table { display: block; overflow-x: auto; margin: 12px 0; font-size: .85rem; }
 .doc pre { background: var(--panel-2); border: 1px solid var(--line); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: .8rem; line-height: 1.35; }
@@ -261,7 +264,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   .grid3 { grid-template-columns: minmax(0, 1fr); }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lib { grid-template-columns: minmax(0, 1fr); }
-  .lib nav { display: flex; overflow-x: auto; }
+  .lib nav { display: flex; overflow-x: auto; max-height: none; }
   .lib nav button { white-space: nowrap; }
 }
 @media (max-width: 640px) {
@@ -272,6 +275,15 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   .ph { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .ph .when { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 12px; }
   .dec .row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .tracker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+  tbody th { min-width: 7.5em; }
+  .diagram { min-width: 720px; }
+  table.stack thead { display: none; }
+  table.stack, table.stack tbody, table.stack tr, table.stack th, table.stack td { display: block; }
+  table.stack tr { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  table.stack tr:last-child { border-bottom: 0; }
+  table.stack th, table.stack td { padding: 0; border: 0; min-width: 0; }
+  table.stack td:last-child { font-size: .84rem; color: var(--muted); margin-top: 2px; }
 }
 </style>
 
@@ -434,6 +446,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <div class="phones">
           <figure><img src="img/faults-back.png" alt="A pick list coming back with no signal and 6 changes waiting: 18 back, 1 still out, 4 missing; the last scan, SH-000001 d&amp;b Y10P back: 1 of 3 back, with Report damage to SH-000001 under it; d&amp;b Y10P 1 still out, 1 missing, SH-000003 with Back and Missing beside it and Missing: SH-000002 in a dashed orange pill; XLR 10 m 17 back, 3 missing, with Report damage to counted XLR 10 m" width="390" height="844" loading="lazy"><figcaption><b>Coming back.</b> Damaged and missing, reported as it's scanned.</figcaption></figure>
           <figure><img src="img/faults-item.png" alt="An item's page: Fault, damaged, can't go out: Blown driver, in orange; under Faults, a card with an orange stripe saying Damaged, can't go out, back from Nissan launch, reported today at 13:39, Blown driver, Repair notes: New driver fitted, €180, and buttons Fixed, Not faulty, Write off and Repair notes; then Report damage and Report missing" width="390" height="844" loading="lazy"><figcaption><b>On the bench.</b> Repair notes, then fixed.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots jobshots">
         <h3>Made-up data, and starting fresh</h3>
         <p class="small">Until the real stock and crew lists are in, the Account tab puts a few weeks of made-up jobs, crew and stock into an empty app, to try every part of it: speakers short between two jobs, offers to chase, items to label, a pick list. Every screen says "made-up data" beside its name while it's in. Start fresh deletes everything but the staff accounts, after a backup, once "delete everything" is typed; every phone empties itself and drops what it had waiting, so nothing made up comes back. (Decision 0019)</p>
         <div class="phones">
@@ -556,7 +571,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <rect class="box-accent" x="40" y="66" width="210" height="52" rx="8"/><text class="lbl" x="56" y="90">App (PWA)</text><text class="cap" x="56" y="107">works with or without signal</text>
             <rect class="box-accent" x="40" y="134" width="210" height="52" rx="8"/><text class="lbl" x="56" y="158">Local copy</text><text class="cap" x="56" y="175">only this person's jobs and stock</text>
             <rect class="box-accent" x="40" y="202" width="210" height="52" rx="8"/><text class="lbl" x="56" y="226">Outbox</text><text class="cap" x="56" y="243">changes wait here until confirmed</text>
-            <text class="cap" x="40" y="286">Free text (notes, run of show) uses</text><text class="cap" x="40" y="300">shared documents that merge, as in Crewbox</text>
+            <text class="cap" x="40" y="274">Free text (notes, run of show)</text><text class="cap" x="40" y="288">uses shared documents that</text><text class="cap" x="40" y="302">merge, as in Crewbox</text>
             <path class="wire" d="M270 228 C 335 228, 335 212, 400 212" id="upPath"/>
             <path class="wire" d="M400 118 C 335 118, 335 160, 270 160" id="downPath"/>
             <text class="cap" x="290" y="252">requests up</text><text class="cap" x="288" y="96">changes down,</text><text class="cap" x="288" y="110">by sequence number</text>
@@ -615,13 +630,13 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <h3>The data at a glance</h3>
       <div class="model">
         <div class="ent"><b>Projects</b><ul><li><b>Job</b> for a client, with a status (built)</li><li><b>Phase</b>: prep, build, show, load out… (built)</li><li><b>Equipment line</b> by department (built)</li><li><b>Crew requirement</b> per phase (built)</li><li><b>Quote</b>, versioned</li><li>Client, contact, venue (built)</li></ul></div>
-        <div class="ent stock"><b>Stock</b><ul><li><b>Product</b>: the model (built)</li><li><b>Asset</b>: one item, hidden id (built)</li><li><b>Identifier</b>: QR, serial, RFID… (SH numbers built)</li><li><b>Container</b>: case, rack, bundle (built)</li><li><b>Movement</b>: every scan</li><li><b>Maintenance</b>: faults, tests</li></ul></div>
-        <div class="ent people"><b>People</b><ul><li><b>Person</b>: staff, freelancer, supplier</li><li><b>Documents</b> with expiry</li><li><b>Availability</b></li><li><b>Assignment</b>: offered → confirmed</li><li><b>Timesheet</b></li></ul></div>
+        <div class="ent stock"><b>Stock</b><ul><li><b>Product</b>: the model (built)</li><li><b>Asset</b>: one item, hidden id (built)</li><li><b>Identifier</b>: QR, serial, RFID… (SH numbers built)</li><li><b>Container</b>: case, rack, bundle (built)</li><li><b>Movement</b>: every scan (built)</li><li><b>Maintenance</b>: faults (built), tests</li></ul></div>
+        <div class="ent people"><b>People</b><ul><li><b>Person</b>: staff, freelancer (built), supplier</li><li><b>Documents</b> with expiry</li><li><b>Availability</b>: days off (built)</li><li><b>Assignment</b>: offered → confirmed (built)</li><li><b>Timesheet</b></li></ul></div>
         <div class="ent money"><b>Money</b><ul><li>Price lists and rates</li><li>Quotes and invoices in EUR</li><li>VAT 23% and 13.5% per line</li><li>Freelancer costs</li><li>Dashboard and exports</li></ul></div>
       </div>
 
       <div class="scroll panel" style="padding:0">
-        <table>
+        <table class="stack">
           <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
           <tbody>
             <tr><th>Language</th><td>TypeScript throughout</td><td>Same as Crewbox; shared types</td></tr>
