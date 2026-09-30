@@ -1,12 +1,25 @@
 import { createHash } from 'node:crypto'
 
 /**
- * A pretend Google for the calendar sync tests (ADR 0008): the OAuth token
- * endpoint and the Calendar API calls the app makes, answering as Google
- * does, down to event ids (base32hex only), deleted events keeping their id,
- * and etags changing on every edit. Tests can make it busy, revoke the
- * app's key, switch the API off, or edit events as a person would.
+ * A pretend Google for the calendar sync tests (ADR 0008, 0009): the OAuth
+ * token endpoint and the Calendar API calls the app makes, answering as
+ * Google does, down to event ids (base32hex only), deleted events keeping
+ * their id, etags changing on every edit (a guest answering included), and
+ * refusing a replace when the event has changed since it was read. It
+ * keeps a log of the emails Google would send guests. Tests can make it
+ * busy, revoke the app's key, switch the API off, or edit events and
+ * answer invites as people would.
  */
+
+export type GuestAnswer = 'needsAction' | 'accepted' | 'declined' | 'tentative'
+
+export interface FakeAttendee {
+  email: string
+  responseStatus: GuestAnswer
+  organizer?: boolean
+  self?: boolean
+  comment?: string
+}
 
 export interface FakeEvent {
   id: string
@@ -19,6 +32,19 @@ export interface FakeEvent {
   end: { date: string }
   extendedProperties?: { private?: Record<string, string> }
   htmlLink: string
+  attendees?: FakeAttendee[]
+  guestsCanSeeOtherGuests?: false
+  guestsCanInviteOthers?: false
+  /** When it last changed. */
+  updated: string
+}
+
+/** An email Google sent a guest about an event. */
+export interface SentEmail {
+  to: string
+  what: 'invited' | 'updated' | 'cancelled'
+  /** The event's title and day, as the email would say. */
+  event: string
 }
 
 interface Account {
@@ -49,6 +75,16 @@ export class FakeGoogle {
   refuse = new Set<string>()
   /** Carry out this many Calendar API writes, then lose the answer on the way back, as a dropped connection would. */
   loseReplies = 0
+  /** Google's clock, for when events changed. */
+  clock: () => Date = () => new Date()
+  /** Every email Google sent a guest, in order. */
+  readonly sent: SentEmail[] = []
+  /** Every Calendar API write, as `METHOD sendUpdates`, in order. */
+  readonly writes: string[] = []
+  /** What each listing of events asked for, in order. */
+  readonly lists: URLSearchParams[] = []
+  /** Happens just before the next replace reaches Google, as a guest answering at that moment would. */
+  beforeNextReplace: (() => void) | undefined
   private accounts = new Map<string, Account>()
   private codes = new Map<string, { account: string; challenge: string; redirectUri: string }>()
   private refreshTokens = new Map<string, { account: string; revoked: boolean }>()
@@ -99,7 +135,30 @@ export class FakeGoogle {
   /** A person edits an event in Google Calendar. */
   edit(calendarId: string, eventId: string, changes: Partial<Pick<FakeEvent, 'summary' | 'status' | 'description'>>) {
     const ev = this.events.get(calendarId)!.get(eventId)!
-    Object.assign(ev, changes, { etag: `"${++this.n}"` })
+    Object.assign(ev, changes, { etag: `"${++this.n}"`, updated: this.clock().toISOString() })
+  }
+
+  /** A guest answers an invite, in their own calendar or from the email. */
+  respond(calendarId: string, eventId: string, email: string, responseStatus: GuestAnswer, comment?: string) {
+    const ev = this.events.get(calendarId)!.get(eventId)!
+    const guest = ev.attendees?.find((a) => a.email.toLowerCase() === email.toLowerCase())
+    if (!guest) throw new Error(`${email} isn't a guest on ${ev.summary}`)
+    Object.assign(guest, { responseStatus }, comment === undefined ? {} : { comment })
+    Object.assign(ev, { etag: `"${++this.n}"`, updated: this.clock().toISOString() })
+  }
+
+  /** Someone adds a guest to an event by hand in Google Calendar, or takes one off. */
+  setGuest(calendarId: string, eventId: string, email: string, on: boolean) {
+    const ev = this.events.get(calendarId)!.get(eventId)!
+    const others = (ev.attendees ?? []).filter((a) => a.email.toLowerCase() !== email.toLowerCase())
+    ev.attendees = on ? [...others, { email, responseStatus: 'needsAction' }] : others
+    Object.assign(ev, { etag: `"${++this.n}"`, updated: this.clock().toISOString() })
+  }
+
+  /** The guests on an event, and their answers, as `email answer`. */
+  guests(calendarId: string, eventId: string): string[] {
+    const ev = this.events.get(calendarId)!.get(eventId)!
+    return (ev.attendees ?? []).filter((a) => !a.organizer).map((a) => `${a.email} ${a.responseStatus}`)
   }
 
   /** Expire every short-lived access key, as an hour passing would. */
@@ -165,43 +224,81 @@ export class FakeGoogle {
       this.events.set(calendarId, store)
       const eventId = path[4]
       if (method === 'GET' && !eventId) {
+        this.lists.push(url.searchParams)
         const [key, value] = (url.searchParams.get('privateExtendedProperty') ?? '').split('=')
         const timeMin = url.searchParams.get('timeMin')?.slice(0, 10) ?? ''
-        const showDeleted = url.searchParams.get('showDeleted') === 'true'
+        const updatedMin = url.searchParams.get('updatedMin') ?? ''
+        // Changes since a time also list deleted events, as Google does.
+        const showDeleted = url.searchParams.get('showDeleted') === 'true' || updatedMin !== ''
         const items = [...store.values()].filter(
-          (e) => (!key || e.extendedProperties?.private?.[key] === value) && e.end.date > timeMin && (showDeleted || e.status !== 'cancelled')
+          (e) =>
+            (!key || e.extendedProperties?.private?.[key] === value) &&
+            e.end.date > timeMin &&
+            e.updated >= updatedMin &&
+            (showDeleted || e.status !== 'cancelled')
         )
         return json(200, { items })
+      }
+      const sendUpdates = url.searchParams.get('sendUpdates') ?? 'false'
+      const ev = eventId ? store.get(eventId) : undefined
+      if (method === 'GET') {
+        if (eventId && this.purged.has(eventId)) return apiError(410, 'deleted')
+        return ev ? json(200, ev) : apiError(404, 'notFound')
       }
       if (cal.accessRole === 'reader') return apiError(403, 'requiredAccessLevel')
       const body = init?.body ? (JSON.parse(String(init.body)) as Partial<FakeEvent> & { id?: string }) : {}
       if (body.summary && this.refuse.has(body.summary)) return apiError(400, 'badRequest')
+      this.writes.push(`${method} ${sendUpdates}`)
       if (method === 'POST' && !eventId) {
         const id = body.id ?? `auto${++this.n}`
         if (!/^[a-v0-9]{5,1024}$/.test(id)) return apiError(400, 'invalid')
         if (store.has(id) || this.purged.has(id)) return apiError(409, 'duplicate')
-        const ev = this.stored(calendarId, id, body)
-        store.set(id, ev)
-        return json(200, ev)
+        const next = this.stored(account, calendarId, id, body)
+        store.set(id, next)
+        if (sendUpdates === 'all') this.email(next.attendees, 'invited', next)
+        return json(200, next)
       }
-      const ev = eventId ? store.get(eventId) : undefined
       if (eventId && this.purged.has(eventId)) return apiError(410, 'deleted')
       if (!ev) return apiError(404, 'notFound')
       if (method === 'PUT') {
-        const next = this.stored(calendarId, ev.id, body)
+        const meanwhile = this.beforeNextReplace
+        this.beforeNextReplace = undefined
+        meanwhile?.()
+        const ifMatch = (init?.headers as Record<string, string>)?.['if-match']
+        if (ifMatch && ifMatch !== ev.etag) return apiError(412, 'conditionNotMet')
+        const next = this.stored(account, calendarId, ev.id, body)
         store.set(ev.id, next)
+        if (sendUpdates === 'all') {
+          const had = (e: string, list?: FakeAttendee[]) => list?.some((a) => a.email.toLowerCase() === e.toLowerCase()) ?? false
+          const changed = (['summary', 'location', 'description'] as const).some((k) => ev[k] !== next[k]) || ev.status !== next.status
+          this.email(next.attendees?.filter((a) => !had(a.email, ev.attendees)), 'invited', next)
+          if (changed) this.email(next.attendees?.filter((a) => had(a.email, ev.attendees)), 'updated', next)
+          this.email(ev.attendees?.filter((a) => !had(a.email, next.attendees)), 'cancelled', next)
+        }
         return json(200, next)
       }
       if (method === 'DELETE') {
         if (ev.status === 'cancelled') return apiError(410, 'deleted')
-        Object.assign(ev, { status: 'cancelled', etag: `"${++this.n}"` })
+        Object.assign(ev, { status: 'cancelled', etag: `"${++this.n}"`, updated: this.clock().toISOString() })
+        if (sendUpdates === 'all') this.email(ev.attendees, 'cancelled', ev)
         return new Response(null, { status: 204 })
       }
     }
     return apiError(404, 'notFound')
   }
 
-  private stored(calendarId: string, id: string, body: Partial<FakeEvent>): FakeEvent {
+  private email(to: FakeAttendee[] | undefined, what: SentEmail['what'], ev: FakeEvent) {
+    for (const a of to ?? []) if (!a.organizer) this.sent.push({ to: a.email, what, event: `${ev.start.date} ${ev.summary}` })
+  }
+
+  /**
+   * An event as Google keeps it. Guests who haven't answered are waiting on
+   * them; the organizer is listed as a guest too, once there are any.
+   */
+  private stored(account: Account, calendarId: string, id: string, body: Partial<FakeEvent>): FakeEvent {
+    const guests = (body.attendees ?? []).map((a) => ({ ...a, responseStatus: a.responseStatus ?? 'needsAction' }))
+    const attendees =
+      guests.length && !guests.some((a) => a.organizer) ? [{ email: account.email, responseStatus: 'accepted' as const, organizer: true, self: true }, ...guests] : guests
     return {
       id,
       etag: `"${++this.n}"`,
@@ -213,6 +310,10 @@ export class FakeGoogle {
       end: body.end ?? { date: '' },
       ...(body.extendedProperties ? { extendedProperties: body.extendedProperties } : {}),
       htmlLink: `https://www.google.com/calendar/event?eid=${Buffer.from(`${id} ${calendarId}`).toString('base64url')}`,
+      ...(attendees.length ? { attendees } : {}),
+      ...(body.guestsCanSeeOtherGuests === false ? { guestsCanSeeOtherGuests: false as const } : {}),
+      ...(body.guestsCanInviteOthers === false ? { guestsCanInviteOthers: false as const } : {}),
+      updated: this.clock().toISOString(),
     }
   }
 

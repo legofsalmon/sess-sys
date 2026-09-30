@@ -129,7 +129,8 @@ export interface HistoryEntry {
   /** Why the server turned it down. */
   reason?: string
   who: {
-    kind: 'staff' | 'link' | 'unknown'
+    /** A member of staff; a freelancer on their private link, or answering in Google Calendar (ADR 0009); or nobody known. */
+    kind: 'staff' | 'link' | 'calendar' | 'unknown'
     /** The person's name; "Someone" when sign-in was off. */
     name: string
     /** The filter value for this person, as in `HistoryPage.people`. */

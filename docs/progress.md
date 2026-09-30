@@ -3,6 +3,69 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: crew invites on the calendar, and their answers
+
+**Done**
+
+- Crew can now be invited to the days they're offered on Google Calendar,
+  as ops do by hand today, and their Yes or No there counts as their answer
+  to the offer, as if they'd answered on their private link. It sits behind
+  a switch on the **Account** tab that starts off, since each invite is an
+  email to a freelancer. [Decision 0009](adr/0009-crew-invites.md) has the
+  reasons.
+- With it on, everyone offered a place on a confirmed job, or booked on it,
+  who has an email address in the app, is a guest on the job's events on
+  their days, from today on. Invites come from the account connected on
+  the Account tab. Crew can't see each other's addresses, or invite anyone.
+- An answer in Google works as it does on the link: a Yes to any day is a
+  yes to the offer, for all its days bar any they said No to; a No to every
+  day declines; Maybe waits. The first to say yes gets the place, and the
+  rest of the shortlist come off the events, with a cancellation from
+  Google. Each answer is in the History tab as the freelancer's own, "on
+  Google Calendar", and in Download everything.
+- Once the office has confirmed someone, Google can't undo it: a No to a
+  booked day shows on the job page and under **Answers to check** on the
+  Crew tab, for the office to phone them.
+- Google emails guests only when it matters: being invited or taken off,
+  and a new title, date or place. The crew list and notes change quietly.
+  Guests added by hand in Google, such as a client, stay on, and an answer
+  given while the app is changing an event is never lost.
+- Answers arrive within a couple of minutes: the server asks Google every
+  two minutes which of the app's events have changed, and touches the
+  database only when an answer has, so it still sleeps when nobody is
+  working. The nightly check takes in anything missed.
+- The job page shows, under each person offered, how they stand on Google
+  Calendar ("Said yes on Google Calendar.", "Invited on Google Calendar; no
+  answer yet."), and says when someone has no email address, so gets no
+  invite.
+- Turning it on first says what goes out ("6 invites to 3 people") and who
+  has no email address. Turning it off stops everything at once; people
+  already invited keep their invites. Disconnecting the calendar turns it
+  off and tells invited crew their days are cancelled.
+- Checked: 15 new server tests against the pretend Google (who is invited
+  and who isn't; a Yes, a partial Yes, a Maybe, a No to every day, a No
+  from someone booked; looking for answers without waking the database,
+  and by itself every couple of minutes; guests added by hand kept, and
+  emails only when they matter; an answer given while the app is writing;
+  an email address changed; switched off; the nightly check; disconnecting;
+  two servers taking each answer once), the real-Postgres test now takes an
+  answer in too, all 151 server tests, and a new browser test for the switch
+  and the job page.
+
+**Next**
+
+- Colly: once the Google key is in and the test calendar connected, try
+  crew invites on it with the office's own addresses as the crew, to see
+  the emails as a freelancer would ([the steps](sign-in-setup.md), step 5).
+  It stays off on Session Hire Gigs until you choose.
+- Colly, still open: should invites go out when crew are offered (as
+  built, like today) or only once they're booked?
+- Next in Phase 1: the week and month planner.
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 30 September 2026: confirmed jobs onto Google Calendar
 
 **Done**

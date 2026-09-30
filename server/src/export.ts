@@ -161,7 +161,7 @@ function historyCsv(history: HistoryEntry[]): string {
     history.map((h) => [
       irishTime(h.madeAt),
       h.who.name,
-      h.who.kind === 'link' ? 'Private link' : h.deviceCode ? `App, device ${h.deviceCode}` : '',
+      h.who.kind === 'link' ? 'Private link' : h.who.kind === 'calendar' ? 'Google Calendar' : h.deviceCode ? `App, device ${h.deviceCode}` : '',
       h.device ?? '',
       h.what,
       h.outcome === 'done' ? 'Done' : 'Turned down',
@@ -181,6 +181,7 @@ const ABOUT: Record<string, string> = {
   backup_runs: 'The nightly backups: when each ran and how it went.',
   bookings: 'Stock booked for jobs (sync test).',
   calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
+  calendar_guests: 'Crew the app has invited to those days in Google Calendar because of their offers, with the address used and their answer.',
   calendar_link: 'The Google calendar confirmed jobs are written to, the account that writes them, and who connected it.',
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',

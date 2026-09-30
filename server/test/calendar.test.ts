@@ -1,12 +1,14 @@
 import {
   calendarDayId,
   newId,
+  offerOnCalendar,
   phaseOnCalendar,
   type CalendarDay,
   type CalendarLink,
   type CommandInput,
   type CommandName,
   type HistoryEntry,
+  type Offer,
   type Phase,
   type Project,
 } from '@sh/shared'
@@ -39,12 +41,20 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function setup(opts: { settleMs?: number; calendar?: boolean } = {}) {
+async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean } = {}) {
   const db = await pgliteDb()
   const google = new FakeGoogle()
   let now = new Date(`${TODAY}T10:00:00Z`)
+  google.clock = () => now
+  // Counts what reaches the database, to show looking for answers leaves it asleep.
+  const queries = { count: 0 }
+  const counted: Db = {
+    ...db,
+    query: (sql, params) => (queries.count++, db.query(sql, params)),
+    transaction: (fn) => (queries.count++, db.transaction(fn)),
+  }
   const app = await buildApp({
-    db,
+    db: counted,
     auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
     ...(opts.calendar === false
       ? {}
@@ -54,8 +64,9 @@ async function setup(opts: { settleMs?: number; calendar?: boolean } = {}) {
             clientSecret: google.clientSecret,
             fetch: google.fetch,
             gapMs: 0,
-            // Runs happen when a test asks, unless it is testing the automatic ones.
+            // Runs and looks for answers happen when a test asks, unless it is testing the automatic ones.
             settleMs: opts.settleMs ?? 3_600_000,
+            pollMs: opts.pollMs ?? 0,
             now: () => now,
           },
         }),
@@ -70,9 +81,14 @@ async function setup(opts: { settleMs?: number; calendar?: boolean } = {}) {
     db,
     google,
     colly,
+    queries,
     sync: () => app.calendar!.run(),
     check: () => app.calendar!.run(true),
+    poll: () => app.calendar!.poll(),
+    clock: () => now,
     setToday: (day: string) => (now = new Date(`${day}T10:00:00Z`)),
+    /** Time passes, as between two looks for answers. */
+    later: (minutes: number) => (now = new Date(now.getTime() + minutes * 60_000)),
   }
 }
 
@@ -121,6 +137,8 @@ async function feed(s: Setup) {
 }
 
 const titles = (google: FakeGoogle, calendarId = TEST_CAL) => google.visible(calendarId).map((e) => `${e.start.date} ${e.summary}`)
+/** The calls that changed events: adding, replacing and deleting, not reading. */
+const eventWrites = (calls: string[]) => calls.filter((c) => c.includes('/events') && !c.startsWith('GET'))
 
 async function send<N extends CommandName>(s: Setup, name: N, args: CommandInput<N>) {
   const r = await s.colly.send(name, args)
@@ -352,11 +370,12 @@ describe('what goes on the calendar', () => {
     expect(titles(s.google)).toEqual(['2030-03-02 Nissan Leaf - Build 1/2', '2030-03-03 Nissan Leaf - Build 2/2', '2030-03-04 Nissan Leaf - Show'])
     expect(s.google.visible(TEST_CAL).map((e) => e.id)).toEqual(ids)
 
-    // A note on Show changes Show's event only.
+    // A note on Show changes Show's event only, read first so nothing added in Google is lost.
     let before = s.google.calls.length
     await send(s, 'phase.update', { id: job.phases.show, notes: 'Doors 19:30.' })
     await s.sync()
-    expect(s.google.calls.slice(before).filter((c) => c.includes('/events'))).toEqual([`PUT /calendar/v3/calendars/${encodeURIComponent(TEST_CAL)}/events/${ids[2]}`])
+    const show = `/calendar/v3/calendars/${encodeURIComponent(TEST_CAL)}/events/${ids[2]}`
+    expect(s.google.calls.slice(before).filter((c) => c.includes('/events'))).toEqual([`GET ${show}`, `PUT ${show}`])
 
     // Show moves a day later; Build grows to three days.
     await send(s, 'phase.update', { id: job.phases.show, start: '2030-03-05', end: '2030-03-05' })
@@ -374,7 +393,7 @@ describe('what goes on the calendar', () => {
     await send(s, 'offer.confirm', { id: job.offers.sean })
     await s.sync()
     expect(s.google.visible(TEST_CAL)[0]!.description).toContain('Audio tech, call 08:00: Aoife Byrne, Seán Murphy and 1 still to find')
-    expect(s.google.calls.slice(before).filter((c) => c.includes('/events'))).toHaveLength(2)
+    expect(eventWrites(s.google.calls.slice(before))).toHaveLength(2)
 
     // Cancelled: off the calendar, and off the devices' list.
     await send(s, 'project.update', { id: job.jobId, status: 'cancelled' })
@@ -482,7 +501,7 @@ describe('when the calendar and the app disagree', () => {
     const before = s.google.calls.length
     await send(s, 'phase.update', { id: job.phases.build, notes: 'Bring the long ladder.' })
     await s.sync()
-    expect(s.google.calls.slice(before).filter((c) => c.includes('/events'))).toHaveLength(2)
+    expect(eventWrites(s.google.calls.slice(before))).toHaveLength(2)
     s.google.refuse.clear()
     await s.check()
     expect(titles(s.google)).toHaveLength(3)
@@ -615,6 +634,464 @@ describe('running by itself', () => {
     await send(s, 'project.update', { id: job.jobId, name: 'Nissan Leaf' })
     for (let i = 0; i < 100 && !titles(s.google)[0]?.includes('Leaf'); i++) await new Promise((r) => setTimeout(r, 20))
     expect(titles(s.google)[0]).toBe('2030-03-02 Nissan Leaf - Build 1/2')
+  })
+})
+
+describe('crew invites (ADR 0009)', () => {
+  /** Nissan, with two more audio techs who have email addresses, Niamh and Conor, offered the last place on Build as a shortlist. */
+  async function withCrew(s: Setup) {
+    const job = await nissan(s)
+    const niamh = newId()
+    const conor = newId()
+    await send(s, 'person.upsert', { id: niamh, name: 'Niamh Kelly', kind: 'freelancer', email: 'niamh@example.com', phone: null, skills: ['audio'], dayRateCents: 25000, notes: '' })
+    await send(s, 'person.upsert', { id: conor, name: 'Conor Walsh', kind: 'freelancer', email: 'Conor.Walsh@example.ie', phone: null, skills: ['audio'], dayRateCents: 25000, notes: '' })
+    const offers = { ...job.offers, niamh: newId(), conor: newId() }
+    await send(s, 'offer.send', { id: offers.niamh, callId: job.callId, personId: niamh, override: false })
+    await send(s, 'offer.send', { id: offers.conor, callId: job.callId, personId: conor, override: false })
+    return { ...job, people: { niamh, conor }, offers }
+  }
+
+  async function invites(s: Setup, on: boolean) {
+    const res = await s.app.inject({ method: 'POST', url: '/api/calendar/invites?client=collylaptop', cookies: s.colly.cookies, payload: { on } })
+    expect(res.statusCode, res.body).toBe(200)
+    return res.json() as CalendarLink
+  }
+
+  /** Connected, invites on and sent, and the app has had its first look for answers. */
+  async function invited(s: Setup) {
+    const job = await withCrew(s)
+    await connectTo(s)
+    await invites(s, true)
+    await s.sync()
+    await s.poll()
+    const [build1, build2, show] = s.google.visible(TEST_CAL)
+    return { ...job, events: { build1: build1!.id, build2: build2!.id, show: show!.id } }
+  }
+
+  const emails = (s: Setup, from = 0) => s.google.sent.slice(from).map((m) => `${m.what} ${m.to} ${m.event}`)
+  const offer = async (s: Setup, id: string) => (await feed(s)).get<Offer>('offer', id)
+  const onCalendar = async (s: Setup, id: string) => {
+    const f = await feed(s)
+    return offerOnCalendar(f.get<Offer>('offer', id), f.days, TODAY)
+  }
+
+  it('starts off, says what it would send, then invites everyone offered or booked, once', async () => {
+    const s = await setup()
+    const job = await withCrew(s)
+    // A job not confirmed yet has no events, so its crew wait too.
+    const pencilled = newId()
+    const pencilledCall = newId()
+    await send(s, 'project.create', { id: pencilled, name: 'Pencilled', clientId: null, venueId: null, status: 'enquiry', notes: '' })
+    const phase = newId()
+    await send(s, 'phase.add', { id: phase, projectId: pencilled, name: 'Show', start: '2030-03-05', end: '2030-03-05', venueId: null, notes: '' })
+    await send(s, 'call.create', {
+      id: pencilledCall,
+      projectId: pencilled,
+      phaseId: phase,
+      project: 'Pencilled',
+      phase: 'Show',
+      venue: '',
+      role: 'LX',
+      start: '2030-03-05',
+      end: '2030-03-05',
+      callTime: null,
+      needed: 1,
+      dayRateCents: null,
+      details: '',
+      replyBy: null,
+    })
+    await send(s, 'offer.send', { id: newId(), callId: pencilledCall, personId: job.people.niamh, override: false })
+    await connectTo(s)
+
+    // Off until someone turns it on: nobody is a guest, and nobody has heard from Google.
+    expect((await feed(s)).link!.invites).toBe(false)
+    expect(s.google.visible(TEST_CAL).flatMap((e) => e.attendees ?? [])).toEqual([])
+    const preview = await s.app.inject({ url: '/api/calendar/invites', cookies: s.colly.cookies })
+    expect(preview.json()).toEqual({ on: false, invites: 6, people: 3, noEmail: ['Seán Murphy'] })
+
+    expect(await invites(s, true)).toMatchObject({ invites: true })
+    await s.sync()
+    const [build1, build2, show] = s.google.visible(TEST_CAL)
+    const everyone = ['Conor.Walsh@example.ie needsAction', 'aoife@example.com needsAction', 'niamh@example.com needsAction']
+    expect(s.google.guests(TEST_CAL, build1!.id).sort()).toEqual(everyone)
+    expect(s.google.guests(TEST_CAL, build2!.id).sort()).toEqual(everyone)
+    expect(s.google.guests(TEST_CAL, show!.id)).toEqual([])
+    // Crew can't see each other's addresses, or invite anyone.
+    expect(build1).toMatchObject({ guestsCanSeeOtherGuests: false, guestsCanInviteOthers: false })
+    expect(emails(s).sort()).toEqual([
+      'invited Conor.Walsh@example.ie 2030-03-02 Nissan - Build 1/2',
+      'invited Conor.Walsh@example.ie 2030-03-03 Nissan - Build 2/2',
+      'invited aoife@example.com 2030-03-02 Nissan - Build 1/2',
+      'invited aoife@example.com 2030-03-03 Nissan - Build 2/2',
+      'invited niamh@example.com 2030-03-02 Nissan - Build 1/2',
+      'invited niamh@example.com 2030-03-03 Nissan - Build 2/2',
+    ])
+
+    // Devices see who is invited and their answers, never their addresses.
+    const f = await feed(s)
+    const day = f.days[calendarDayId(job.phases.build, '2030-03-02')]!
+    expect(day.guests!.map((g) => g.offerId).sort()).toEqual([job.offers.aoife, job.offers.conor, job.offers.niamh].sort())
+    expect(day.guests!.every((g) => g.response === 'needsAction' && g.problem === null)).toBe(true)
+    expect(JSON.stringify(Object.values(f.days))).not.toMatch(/niamh@|aoife@|conor\.walsh@/i)
+    expect(offerOnCalendar(f.get<Offer>('offer', job.offers.niamh), f.days, TODAY)).toEqual({
+      answers: { '2030-03-02': 'none', '2030-03-03': 'none' },
+      line: 'Invited on Google Calendar; no answer yet.',
+      warning: null,
+    })
+    // Seán has no email address, so nothing on Google Calendar for him.
+    expect(offerOnCalendar(f.get<Offer>('offer', job.offers.sean), f.days, TODAY)).toBeUndefined()
+
+    // All sent, once: running again sends nothing more.
+    expect((await s.app.inject({ url: '/api/calendar/invites', cookies: s.colly.cookies })).json()).toEqual({ on: true, invites: 0, people: 0, noEmail: ['Seán Murphy'] })
+    const sent = s.google.sent.length
+    expect(await s.sync()).toEqual({ written: 0, removed: 0, failed: 0 })
+    expect(await s.check()).toEqual({ written: 0, removed: 0, failed: 0 })
+    expect(s.google.sent.length).toBe(sent)
+
+    const entry = (await s.colly.history()).entries.find((e: HistoryEntry) => e.command === 'calendar.invites')!
+    expect([entry.who.name, entry.what, entry.deviceCode]).toEqual(['Colly Hewson', 'Turned on crew invites on Google Calendar (6 invites to 3 people)', 'laptop'])
+  })
+
+  it('needs a calendar to turn on, and a plain yes or no', async () => {
+    const s = await setup()
+    const early = await s.app.inject({ method: 'POST', url: '/api/calendar/invites', cookies: s.colly.cookies, payload: { on: true } })
+    expect(early.statusCode).toBe(409)
+    expect(early.json().error).toBe('Choose a calendar for jobs first.')
+    await connectTo(s)
+    const vague = await s.app.inject({ method: 'POST', url: '/api/calendar/invites', cookies: s.colly.cookies, payload: { on: 'yes' } })
+    expect(vague.statusCode).toBe(400)
+    for (const method of ['GET', 'POST'] as const) expect((await s.app.inject({ method, url: '/api/calendar/invites' })).statusCode).toBe(401)
+  })
+
+  it('a Yes in Google takes the place, as on their link, and the rest of the shortlist come off', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build1, 'niamh@example.com', 'accepted', 'Can bring the van.')
+    expect(await s.poll()).toBe(1)
+
+    // A Yes to one day is a yes to all of them, with what they wrote in Google as their note.
+    expect(await offer(s, job.offers.niamh)).toMatchObject({
+      status: 'accepted',
+      days: ['2030-03-02', '2030-03-03'],
+      respondedVia: 'calendar',
+      note: 'Can bring the van.',
+    })
+    // The first to say yes gets the place, as on the links.
+    expect(await offer(s, job.offers.conor)).toMatchObject({ status: 'filled' })
+    expect(await onCalendar(s, job.offers.niamh)).toMatchObject({ line: 'On Google Calendar: yes to Sat 2 Mar; no answer yet for Sun 3 Mar.', warning: null })
+
+    // In the history as Niamh's own answer, on Google Calendar.
+    const entry = (await s.colly.history()).entries[0]!
+    expect(entry).toMatchObject({ who: { kind: 'calendar', name: 'Niamh Kelly', key: `link:${job.people.niamh}` }, outcome: 'done' })
+    expect(entry.what).toBe('Niamh Kelly accepted Audio tech on Nissan, Sat 2 Mar to Sun 3 Mar')
+    expect(entry.deviceCode).toBeUndefined()
+    const hers = await s.colly.history(`?who=link:${job.people.niamh}`)
+    expect(hers.entries.map((e: HistoryEntry) => e.what)).toEqual(['Niamh Kelly accepted Audio tech on Nissan, Sat 2 Mar to Sun 3 Mar'])
+    expect((await s.colly.history()).people).toContainEqual({ key: `link:${job.people.niamh}`, name: 'Niamh Kelly' })
+
+    // Next run: the crew list goes on quietly, and Conor is told he's off.
+    const before = s.google.sent.length
+    await s.sync()
+    expect(s.google.visible(TEST_CAL)[0]!.description).toContain('Audio tech, call 08:00: Aoife Byrne, Niamh Kelly (to confirm) and Seán Murphy (to confirm)')
+    expect(s.google.guests(TEST_CAL, job.events.build1).sort()).toEqual(['aoife@example.com needsAction', 'niamh@example.com accepted'])
+    expect(emails(s, before)).toEqual([
+      'cancelled Conor.Walsh@example.ie 2030-03-02 Nissan - Build 1/2',
+      'cancelled Conor.Walsh@example.ie 2030-03-03 Nissan - Build 2/2',
+    ])
+  })
+
+  it('a No to some days leaves them out, and they stay on those days as a No', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build1, 'Conor.Walsh@example.ie', 'accepted')
+    s.google.respond(TEST_CAL, job.events.build2, 'conor.walsh@example.ie', 'declined')
+    expect(await s.poll()).toBe(2)
+    expect(await offer(s, job.offers.conor)).toMatchObject({ status: 'accepted', days: ['2030-03-02'] })
+    expect(await onCalendar(s, job.offers.conor)).toMatchObject({ line: 'On Google Calendar: yes to Sat 2 Mar; no to Sun 3 Mar.', warning: null })
+
+    // Sunday's place is still open, so Niamh's offer stands; nobody is told anything, Conor included.
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'offered' })
+    const before = s.google.sent.length
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, job.events.build2).sort()).toEqual(['Conor.Walsh@example.ie declined', 'aoife@example.com needsAction', 'niamh@example.com needsAction'])
+    expect(emails(s, before)).toEqual([])
+
+    // Niamh takes Sunday on her link, saying no to Saturday there: she comes off Saturday.
+    await send(s, 'offer.respond', { id: job.offers.niamh, answer: 'accept', days: ['2030-03-03'], note: '' })
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, job.events.build1).sort()).toEqual(['Conor.Walsh@example.ie accepted', 'aoife@example.com needsAction'])
+    expect(emails(s, before)).toEqual(['cancelled niamh@example.com 2030-03-02 Nissan - Build 1/2'])
+
+    // Conor changes his mind about Sunday, but it has gone: the job page says why, and his offer is as it was.
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build2, 'Conor.Walsh@example.ie', 'accepted')
+    expect(await s.poll()).toBe(1)
+    expect(await offer(s, job.offers.conor)).toMatchObject({ status: 'accepted', days: ['2030-03-02'] })
+    expect(await onCalendar(s, job.offers.conor)).toEqual({
+      answers: { '2030-03-02': 'yes', '2030-03-03': 'yes' },
+      line: 'Said yes on Google Calendar.',
+      warning: "Said yes on Google Calendar, but the app couldn't take it: Sun 3 Mar has just been filled. Still open: Sat 2 Mar.",
+    })
+    const entry = (await s.colly.history()).entries[0]!
+    expect(entry).toMatchObject({ who: { kind: 'calendar', name: 'Conor Walsh' }, outcome: 'turned-down' })
+  })
+
+  it("Maybe isn't an answer yet, and a No to every day declines", async () => {
+    const s = await setup()
+    const job = await invited(s)
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build1, 'niamh@example.com', 'tentative')
+    s.google.respond(TEST_CAL, job.events.build1, 'Conor.Walsh@example.ie', 'declined')
+    s.google.respond(TEST_CAL, job.events.build2, 'Conor.Walsh@example.ie', 'declined')
+    expect(await s.poll()).toBe(3)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'offered', respondedVia: null })
+    expect(await onCalendar(s, job.offers.niamh)).toMatchObject({ line: 'On Google Calendar: maybe to Sat 2 Mar; no answer yet for Sun 3 Mar.' })
+    expect(await offer(s, job.offers.conor)).toMatchObject({ status: 'declined', respondedVia: 'calendar' })
+    expect(await onCalendar(s, job.offers.conor)).toMatchObject({ line: 'Said no on Google Calendar.', warning: null })
+    expect((await s.colly.history()).entries[0]!.what).toBe('Conor Walsh declined Audio tech on Nissan')
+
+    // Conor stays on as a No: no cancellation for something he turned down.
+    const before = s.google.sent.length
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, job.events.build1)).toContain('Conor.Walsh@example.ie declined')
+    expect(emails(s, before)).toEqual([])
+  })
+
+  it("a No from someone booked doesn't unbook them, but the job page says so", async () => {
+    const s = await setup()
+    const job = await invited(s)
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build2, 'aoife@example.com', 'declined')
+    expect(await s.poll()).toBe(1)
+    expect(await offer(s, job.offers.aoife)).toMatchObject({ status: 'confirmed', days: ['2030-03-02', '2030-03-03'] })
+    expect(await onCalendar(s, job.offers.aoife)).toMatchObject({
+      warning: 'Said no to Sun 3 Mar on Google Calendar, but is booked for it. Call them to sort it out.',
+    })
+    // Nothing done for her: the office decides.
+    expect((await s.colly.history()).entries.filter((e: HistoryEntry) => e.who.kind === 'calendar')).toEqual([])
+  })
+
+  it('looks for answers without waking the database until one has changed', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    const quiet = async () => {
+      const before = s.queries.count
+      s.later(2)
+      expect(await s.poll()).toBe(0)
+      return s.queries.count - before
+    }
+    expect(await quiet()).toBe(0)
+    // Changes in Google that aren't answers from the app's guests.
+    s.google.edit(TEST_CAL, job.events.show, { description: 'Edited by hand.' })
+    s.google.setGuest(TEST_CAL, job.events.build1, 'mary@nissan.example', true)
+    s.google.respond(TEST_CAL, job.events.build1, 'mary@nissan.example', 'accepted')
+    expect(await quiet()).toBe(0)
+    // An answer does.
+    s.google.respond(TEST_CAL, job.events.build2, 'niamh@example.com', 'tentative')
+    const before = s.queries.count
+    expect(await s.poll()).toBe(1)
+    expect(s.queries.count).toBeGreaterThan(before)
+    expect(await quiet()).toBe(0)
+
+    // After the first look, Google is asked only about events changed since the last, with a few minutes to spare.
+    const [first, ...rest] = s.google.lists
+    expect(first!.get('timeMin')).toBe('2030-03-01T00:00:00.000Z')
+    expect(rest.map((q) => [q.get('timeMin'), q.get('updatedMin')])).toEqual([
+      [null, '2030-03-02T09:55:00.000Z'],
+      [null, '2030-03-02T09:57:00.000Z'],
+      [null, '2030-03-02T09:59:00.000Z'],
+      [null, '2030-03-02T09:59:00.000Z'],
+    ])
+  })
+
+  it('looks for answers on its own while invites are on, and stops looking when they go off', async () => {
+    const s = await setup({ pollMs: 20 })
+    const job = await withCrew(s)
+    await connectTo(s)
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    await pause(100)
+    expect(s.google.lists).toEqual([])
+
+    await invites(s, true)
+    for (let i = 0; i < 100 && s.google.sent.length === 0; i++) await pause(20)
+    const [build1, build2] = s.google.visible(TEST_CAL)
+    s.google.respond(TEST_CAL, build1!.id, 'niamh@example.com', 'accepted')
+    // Nobody in the app does anything: the next look finds her answer.
+    for (let i = 0; i < 100 && (await offer(s, job.offers.niamh)).status !== 'accepted'; i++) await pause(20)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'accepted', respondedVia: 'calendar' })
+
+    await invites(s, false)
+    await pause(60)
+    const looks = s.google.lists.length
+    s.google.respond(TEST_CAL, build2!.id, 'niamh@example.com', 'declined')
+    await pause(100)
+    expect(s.google.lists.length).toBe(looks)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'accepted', days: ['2030-03-02', '2030-03-03'] })
+  })
+
+  it('takes each answer once when two servers look at the same time, as during a deploy', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    // The next version of the server starting up alongside, on the same database and calendar.
+    const next = await buildApp({
+      db: s.db,
+      auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
+      calendar: { clientId: s.google.clientId, clientSecret: s.google.clientSecret, fetch: s.google.fetch, gapMs: 0, settleMs: 3_600_000, pollMs: 0, now: s.clock },
+    })
+    cleanup.push(() => next.close())
+    await next.calendar!.start()
+    expect(await next.calendar!.poll()).toBe(0)
+
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build1, 'niamh@example.com', 'accepted')
+    s.google.respond(TEST_CAL, job.events.build2, 'Conor.Walsh@example.ie', 'declined')
+    const [here, there] = await Promise.all([s.poll(), next.calendar!.poll()])
+    expect(here + there).toBe(2)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'accepted' })
+    expect(await offer(s, job.offers.conor)).toMatchObject({ status: 'filled' })
+    const answers = (await s.colly.history()).entries.filter((e: HistoryEntry) => e.who.kind === 'calendar')
+    expect(answers.map((e: HistoryEntry) => e.what)).toEqual(['Niamh Kelly accepted Audio tech on Nissan, Sat 2 Mar to Sun 3 Mar'])
+  })
+
+  it('keeps guests added by hand in Google, with invites on or off, and tells guests only what matters', async () => {
+    const s = await setup()
+    const job = await withCrew(s)
+    await connectTo(s)
+    const [build1] = s.google.visible(TEST_CAL)
+    s.google.setGuest(TEST_CAL, build1!.id, 'mary@nissan.example', true)
+
+    // Off: the app's changes keep Mary on, and tell nobody.
+    await send(s, 'project.update', { id: job.jobId, notes: 'Launch of the new Leaf. Press at 11.' })
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, build1!.id)).toEqual(['mary@nissan.example needsAction'])
+    expect(emails(s)).toEqual([])
+
+    // On: crew join her, and only crew are invited.
+    await invites(s, true)
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, build1!.id).sort()).toEqual([
+      'Conor.Walsh@example.ie needsAction',
+      'aoife@example.com needsAction',
+      'mary@nissan.example needsAction',
+      'niamh@example.com needsAction',
+    ])
+    expect(emails(s).filter((m) => m.includes('mary'))).toEqual([])
+
+    // Notes change often: nobody hears about them.
+    let before = s.google.sent.length
+    await send(s, 'phase.update', { id: job.phases.build, notes: 'Bring the long ladder.' })
+    await s.sync()
+    expect(emails(s, before)).toEqual([])
+
+    // A new name is news for everyone on the event, Mary too.
+    before = s.google.sent.length
+    await send(s, 'project.update', { id: job.jobId, name: 'Nissan Leaf' })
+    await s.sync()
+    expect(emails(s, before).filter((m) => m.includes('Build 1/2')).sort()).toEqual([
+      'updated Conor.Walsh@example.ie 2030-03-02 Nissan Leaf - Build 1/2',
+      'updated aoife@example.com 2030-03-02 Nissan Leaf - Build 1/2',
+      'updated mary@nissan.example 2030-03-02 Nissan Leaf - Build 1/2',
+      'updated niamh@example.com 2030-03-02 Nissan Leaf - Build 1/2',
+    ])
+
+    // Cancelled: everyone is told.
+    before = s.google.sent.length
+    await send(s, 'project.update', { id: job.jobId, status: 'cancelled' })
+    await s.sync()
+    expect(emails(s, before).filter((m) => m.includes('Build 1/2')).sort()).toEqual([
+      'cancelled Conor.Walsh@example.ie 2030-03-02 Nissan Leaf - Build 1/2',
+      'cancelled aoife@example.com 2030-03-02 Nissan Leaf - Build 1/2',
+      'cancelled mary@nissan.example 2030-03-02 Nissan Leaf - Build 1/2',
+      'cancelled niamh@example.com 2030-03-02 Nissan Leaf - Build 1/2',
+    ])
+  })
+
+  it('never loses an answer given while the app is changing the event', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    s.google.beforeNextReplace = () => s.google.respond(TEST_CAL, job.events.build1, 'niamh@example.com', 'accepted')
+    const before = s.google.calls.length
+    await send(s, 'phase.update', { id: job.phases.build, notes: 'Bring the long ladder.' })
+    await s.sync()
+    // Google turned the first replace down, as the event had changed since it was read: read again, and replace that.
+    const build1 = `/calendar/v3/calendars/${encodeURIComponent(TEST_CAL)}/events/${job.events.build1}`
+    expect(s.google.calls.slice(before).filter((c) => c.endsWith(build1))).toEqual([`GET ${build1}`, `PUT ${build1}`, `GET ${build1}`, `PUT ${build1}`])
+    expect(s.google.visible(TEST_CAL)[0]!.description).toContain('Bring the long ladder.')
+    expect(s.google.guests(TEST_CAL, job.events.build1)).toContain('niamh@example.com accepted')
+    s.later(2)
+    expect(await s.poll()).toBe(1)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'accepted' })
+  })
+
+  it('an address changed in the app moves the invite to it', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    const before = s.google.sent.length
+    await send(s, 'person.upsert', { id: job.people.niamh, name: 'Niamh Kelly', kind: 'freelancer', email: 'niamh.kelly@example.com', phone: null, skills: ['audio'], dayRateCents: 25000, notes: '' })
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, job.events.build1).sort()).toEqual([
+      'Conor.Walsh@example.ie needsAction',
+      'aoife@example.com needsAction',
+      'niamh.kelly@example.com needsAction',
+    ])
+    expect(emails(s, before).sort()).toEqual([
+      'cancelled niamh@example.com 2030-03-02 Nissan - Build 1/2',
+      'cancelled niamh@example.com 2030-03-03 Nissan - Build 2/2',
+      'invited niamh.kelly@example.com 2030-03-02 Nissan - Build 1/2',
+      'invited niamh.kelly@example.com 2030-03-03 Nissan - Build 2/2',
+    ])
+  })
+
+  it('switched off, sends nothing and reads no answers; the guests already invited stay', async () => {
+    const s = await setup()
+    const job = await invited(s)
+    expect(await invites(s, false)).toMatchObject({ invites: false })
+    const before = s.google.sent.length
+    s.later(2)
+    s.google.respond(TEST_CAL, job.events.build1, 'niamh@example.com', 'accepted')
+    const calls = s.google.calls.length
+    expect(await s.poll()).toBe(0)
+    expect(s.google.calls.length).toBe(calls)
+    expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'offered' })
+
+    // Conor's offer is withdrawn: with invites off he stays on, and hears nothing.
+    await send(s, 'offer.cancel', { id: job.offers.conor })
+    await send(s, 'phase.update', { id: job.phases.build, notes: 'Bring the long ladder.' })
+    await s.sync()
+    expect(s.google.guests(TEST_CAL, job.events.build1)).toContain('Conor.Walsh@example.ie needsAction')
+    expect(emails(s, before)).toEqual([])
+    expect((await s.colly.history()).entries.find((e: HistoryEntry) => e.command === 'calendar.invites')!.what).toBe('Turned off crew invites on Google Calendar')
+  })
+
+  it('the nightly check takes in answers it missed, without rewriting the events for them', async () => {
+    const s = await setup()
+    const job = await withCrew(s)
+    await connectTo(s)
+    await invites(s, true)
+    await s.sync()
+    s.google.respond(TEST_CAL, s.google.visible(TEST_CAL)[0]!.id, 'niamh@example.com', 'tentative')
+    const before = s.google.calls.length
+    expect(await s.check()).toEqual({ written: 0, removed: 0, failed: 0 })
+    expect(eventWrites(s.google.calls.slice(before))).toEqual([])
+    expect(await onCalendar(s, job.offers.niamh)).toMatchObject({ answers: { '2030-03-02': 'maybe', '2030-03-03': 'none' } })
+    // The answer's new version of the event is noted, so the next check has nothing to do either.
+    const [build1] = s.google.visible(TEST_CAL)
+    const { rows } = await s.db.query<{ etag: string }>('SELECT etag FROM calendar_days WHERE event_id = $1', [build1!.id])
+    expect(rows[0]!.etag).toBe(build1!.etag)
+    expect(await s.check()).toEqual({ written: 0, removed: 0, failed: 0 })
+  })
+
+  it('disconnecting tells guests the days are off, and turns invites off', async () => {
+    const s = await setup()
+    await invited(s)
+    const before = s.google.sent.length
+    await s.app.inject({ method: 'POST', url: '/api/calendar/disconnect', cookies: s.colly.cookies })
+    await s.sync()
+    expect(emails(s, before).filter((m) => m.startsWith('cancelled'))).toHaveLength(6)
+    expect((await feed(s)).link).toMatchObject({ state: 'off', invites: false })
+    expect(await s.poll()).toBe(0)
   })
 })
 

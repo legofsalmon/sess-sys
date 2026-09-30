@@ -153,8 +153,9 @@ function bookingFromRow(r: BookingRow) {
 /** Where a command came from, kept on it for the history (ADR 0006). */
 export interface From {
   /**
-   * 'link' only when the server itself runs a command for a person using
-   * their private link; a device can't claim it.
+   * 'link' or 'calendar' only when the server itself runs a command for a
+   * person using their private link, or answering in Google Calendar; a
+   * device can't claim either.
    */
   via?: Ctx['via']
   /** The signed-in member of staff whose device sent it: the history's "who". */
@@ -166,42 +167,49 @@ export interface From {
 }
 
 export async function applyMutation(db: Db, clientId: string, m: Mutation, from: From = {}): Promise<MutationResult> {
-  return db.transaction(async (tx) => {
-    // One writer at a time; see `emit`. At Session Hire's volume (a few
-    // people, hundreds of jobs a year) this costs nothing.
-    await tx.query('SELECT pg_advisory_xact_lock(7331)')
+  return db.transaction((tx) => applyMutationIn(tx, clientId, m, from))
+}
 
-    const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
-    if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
+/**
+ * The same, as part of a transaction the caller already has, so the
+ * command stands or falls with the caller's other changes: the calendar
+ * sync records a crew member's answer and acts on it together.
+ */
+export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutation, from: From = {}): Promise<MutationResult> {
+  // One writer at a time; see `emit`. At Session Hire's volume (a few
+  // people, hundreds of jobs a year) this costs nothing.
+  await tx.query('SELECT pg_advisory_xact_lock(7331)')
 
-    const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app' }
-    let result: MutationResult
-    // Record the mutation first so the changes it writes can point at it.
-    // Arrival is read after taking the lock, so the history's order is the order changes were made in.
-    await tx.query(
-      `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp(), 'applied', '{}')`,
-      [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), m.createdAt, from.sentAt ?? null, from.device ?? null]
-    )
-    const parsed = commandSchemas[m.name].safeParse(m.args)
-    if (!parsed.success) {
-      result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
-    } else {
-      try {
-        await tx.query('SAVEPOINT cmd')
-        await (handlers[m.name] as Handler<CommandName>)(ctx, parsed.data as never)
-        await tx.query('RELEASE SAVEPOINT cmd')
-        if (ctx.seq === 0) ctx.seq = await currentSeq(tx)
-        result = { id: m.id, status: 'applied', seq: ctx.seq }
-      } catch (err) {
-        if (!(err instanceof Refused)) throw err
-        await tx.query('ROLLBACK TO SAVEPOINT cmd')
-        result = { id: m.id, status: 'rejected', reason: err.reason }
-      }
+  const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
+  if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
+
+  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app' }
+  let result: MutationResult
+  // Record the mutation first so the changes it writes can point at it.
+  // Arrival is read after taking the lock, so the history's order is the order changes were made in.
+  await tx.query(
+    `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp(), 'applied', '{}')`,
+    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), m.createdAt, from.sentAt ?? null, from.device ?? null]
+  )
+  const parsed = commandSchemas[m.name].safeParse(m.args)
+  if (!parsed.success) {
+    result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
+  } else {
+    try {
+      await tx.query('SAVEPOINT cmd')
+      await (handlers[m.name] as Handler<CommandName>)(ctx, parsed.data as never)
+      await tx.query('RELEASE SAVEPOINT cmd')
+      if (ctx.seq === 0) ctx.seq = await currentSeq(tx)
+      result = { id: m.id, status: 'applied', seq: ctx.seq }
+    } catch (err) {
+      if (!(err instanceof Refused)) throw err
+      await tx.query('ROLLBACK TO SAVEPOINT cmd')
+      result = { id: m.id, status: 'rejected', reason: err.reason }
     }
-    await tx.query('UPDATE mutations SET status = $2, result = $3 WHERE id = $1', [m.id, result.status, JSON.stringify(result)])
-    return result
-  })
+  }
+  await tx.query('UPDATE mutations SET status = $2, result = $3 WHERE id = $1', [m.id, result.status, JSON.stringify(result)])
+  return result
 }
 
 export async function currentSeq(q: Queryable): Promise<number> {

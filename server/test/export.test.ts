@@ -93,7 +93,7 @@ describe('download everything', () => {
     expect(res.headers['content-disposition']).toBe(`attachment; filename="session-hire-${irishTime(new Date()).slice(0, 10)}.zip"`)
     expect(res.headers['cache-control']).toBe('no-store')
 
-    const tables = ['backup_runs', 'bookings', 'calendar_days', 'calendar_link', 'changes', 'clients', 'crew_calls', 'issues', 'mutations', 'offers', 'people', 'phases', 'products', 'projects', 'scans', 'unavailability', 'users', 'venues']
+    const tables = ['backup_runs', 'bookings', 'calendar_days', 'calendar_guests', 'calendar_link', 'changes', 'clients', 'crew_calls', 'issues', 'mutations', 'offers', 'people', 'phases', 'products', 'projects', 'scans', 'unavailability', 'users', 'venues']
     expect(Object.keys(files).sort()).toEqual(['README.txt', 'everything.json', 'history.csv', ...tables.map((t) => `tables/${t}.csv`)].sort())
 
     const json = JSON.parse(files['everything.json']!)

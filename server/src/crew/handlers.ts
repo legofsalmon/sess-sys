@@ -216,7 +216,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     if (offer.status === 'confirmed')
       throw new Refused({ code: 'conflict', message: 'You are confirmed for this job. Please contact the office to change it.' })
 
-    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via === 'link' ? 'link' : 'app', note: a.note }
+    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via, note: a.note }
     if (a.answer === 'decline') {
       await setOffer(ctx, offer.id, { ...answered, status: 'declined' })
       return

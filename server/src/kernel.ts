@@ -20,8 +20,11 @@ export interface Ctx {
   mutationId: string | null
   /** Last sequence number written in this transaction. */
   seq: number
-  /** Where the command came from: a device running the app, or a person's private link. */
-  via: 'app' | 'link'
+  /**
+   * Where the command came from: a device running the app, a person's
+   * private link, or a person's answer in Google Calendar (ADR 0009).
+   */
+  via: 'app' | 'link' | 'calendar'
 }
 
 /**

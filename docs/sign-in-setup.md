@@ -4,7 +4,9 @@ Sign-in ([Decision 0003](adr/0003-staff-sign-in.md)) and putting confirmed
 jobs on Google Calendar ([Decision 0008](adr/0008-calendar-sync.md)) are
 built, and both switch on as soon as the app server has a Google key. Making
 the key takes about ten minutes in Google Cloud, once. Connecting the
-calendar then takes a minute in the app (step 4).
+calendar then takes a minute in the app (step 4). Crew invites on the
+calendar ([Decision 0009](adr/0009-crew-invites.md)) are built too, behind a
+switch that starts off (step 5).
 
 **Before you start:** the secret you create is a password for the app.
 Paste it only into Railway, never into a chat or an email.
@@ -98,6 +100,48 @@ access back to Google. Days before today stay where they are in both cases.
 If the Account tab says the Google Calendar API is switched off, do step
 1.5, then tap **Check now**.
 
+## 5. Crew invites: try them on the test calendar first
+
+With crew invites on, everyone offered a place on a confirmed job, or
+booked on it, who has an email address in the app, gets a Google Calendar
+invite to its days from the connected account, and their Yes or No there
+counts as their answer, as on their private link. Each invite is an email
+to a freelancer, so the switch starts off. To see it as a freelancer would
+before using it for real:
+
+1. With the test calendar connected (step 4), add a confirmed job for next
+   week and ask for crew for it.
+2. In the **Crew** tab, add two or three people from the office as
+   freelancers, with their own email addresses, and offer them the job.
+3. On the **Account** tab, under **Crew invites**, tap **Turn on crew
+   invites**. It first says how many invites go out and who has no email
+   address; tap OK.
+4. Each person gets Google's invite email, and the days appear in their
+   calendar. Answer Yes on one and No on another. Within a couple of
+   minutes the job page shows each answer, the **Crew** tab lists the Yes
+   under **Answers to check**, and the **History** tab shows them as their
+   own answers, on Google Calendar.
+5. Tap **Turn off crew invites** when done. Nothing more is sent; the
+   people invited keep their invites as they are.
+
+Worth knowing before turning it on for **Session Hire Gigs**:
+
+- Invites come from the connected account, so it should be the one crew
+  already get invites from. Google can hold back invites from a sender
+  someone hasn't heard from before until they answer the email.
+- The connected account gets Google's own emails when someone answers, as
+  the ops staff do today. They can be turned off in that account's Google
+  Calendar settings: under the calendar, **Other notifications**, **Event
+  responses**.
+- A No in Google from someone the office has already confirmed doesn't
+  unbook them: the job page and the Crew tab say so, for the office to
+  phone them.
+- To take someone off a job, withdraw their offer in the app. A guest
+  removed by hand in Google is put back at the next check while their offer
+  stands.
+- Disconnecting the calendar turns invites off, and the crew invited are
+  told their days are cancelled.
+
 ## Good to know
 
 - Anyone signed in can do everything for now; roles come later.
@@ -106,9 +150,9 @@ If the Account tab says the Google Calendar API is switched off, do step
 - Once anyone has signed in, the server won't start without the two Google
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
-- The calendar gets crew by name only: rates, phone numbers and emails
-  stay in the app. Nobody is invited to anything yet; crew invites come
-  next, behind a switch that starts off.
+- The calendar gets crew by name only: rates and phone numbers stay in
+  the app. Emails are used only for crew invites (step 5), which start
+  off, and crew can't see each other's addresses.
 - The app's access to the calendar is kept locked with the Client secret.
   If the secret is ever replaced in Railway, the Account tab asks for the
   calendar to be connected again; nothing is lost.

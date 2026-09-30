@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto'
-import { CALENDAR_LINK_ID, type CalendarDay, type CalendarLink, type CalendarState } from '@sh/shared'
+import { CALENDAR_LINK_ID, type CalendarDay, type CalendarLink, type CalendarState, type GuestResponse } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { emit, emitRemoved, type Ctx } from '../kernel.ts'
 
-/** Reading and writing the calendar connection and the days written, and telling devices (ADR 0008). */
+/** Reading and writing the calendar connection, the days written and their guests, and telling devices (ADR 0008, 0009). */
 
 export interface Link {
   state: CalendarState
@@ -19,6 +19,17 @@ export interface Link {
   connectedBy: string | null
   connectedByName: string | null
   connectedAt: string | null
+  /** Crew are invited to their days (ADR 0009). */
+  invites: boolean
+}
+
+/** Someone the app put on a day's event because of an offer, the address it used, and their last answer. */
+export interface GuestRow {
+  personId: string
+  offerId: string
+  email: string
+  response: GuestResponse
+  problem: string | null
 }
 
 export interface DayRow {
@@ -35,12 +46,14 @@ export interface DayRow {
   etag: string | null
   htmlLink: string | null
   problem: string | null
+  /** The app's guests on the event, as last written or read. */
+  guests: GuestRow[]
 }
 
 type Row = Record<string, any>
 
 const LINK = `l.state, l.app_key, l.account_email, l.account_sub, l.refresh_token, l.calendar_id, l.calendar_name, l.problem, l.app_url,
-  l.connected_by, u.name AS connected_by_name, to_char(l.connected_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS connected_at`
+  l.connected_by, u.name AS connected_by_name, to_char(l.connected_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS connected_at, l.invites`
 
 const toLink = (r: Row): Link => ({
   state: r.state,
@@ -55,6 +68,7 @@ const toLink = (r: Row): Link => ({
   connectedBy: r.connected_by,
   connectedByName: r.connected_by_name,
   connectedAt: r.connected_at,
+  invites: r.invites === true,
 })
 
 export async function readLink(q: Queryable): Promise<Link | undefined> {
@@ -73,6 +87,7 @@ export function linkEntity(l: Link): CalendarLink {
     problem: l.problem,
     connectedBy: l.connectedByName,
     connectedAt: l.connectedAt,
+    invites: l.invites,
   }
 }
 
@@ -89,6 +104,7 @@ const LINK_COLUMNS: Record<keyof LinkFields, string> = {
   appUrl: 'app_url',
   connectedBy: 'connected_by',
   connectedAt: 'connected_at',
+  invites: 'invites',
 }
 
 /**
@@ -116,7 +132,7 @@ export async function saveLink(ctx: Ctx, fields: LinkFields): Promise<Link> {
 
 const DAY = `id, phase_id, project_id, day::text, calendar_id, event_id, generation, state, title, content_hash, etag, html_link, problem`
 
-const toDay = (r: Row): DayRow => ({
+const toDay = (r: Row, guests: GuestRow[] = []): DayRow => ({
   id: r.id,
   phaseId: r.phase_id,
   projectId: r.project_id,
@@ -130,12 +146,51 @@ const toDay = (r: Row): DayRow => ({
   etag: r.etag,
   htmlLink: r.html_link,
   problem: r.problem,
+  guests,
 })
 
-/** Every day from `today` on that the app has written or tried to, removed ones included. */
+/** Every day from `today` on that the app has written or tried to, removed ones included, with their guests. */
 export async function readDays(q: Queryable, today: string): Promise<DayRow[]> {
-  const { rows } = await q.query(`SELECT ${DAY} FROM calendar_days WHERE day >= $1::date ORDER BY day, id`, [today])
-  return rows.map(toDay)
+  const { rows } = await q.query<Row>(`SELECT ${DAY} FROM calendar_days WHERE day >= $1::date ORDER BY day, id`, [today])
+  const guests = await readGuests(q, 'd.day >= $1::date', [today])
+  return rows.map((r) => toDay(r, guests.get(r.id)))
+}
+
+/** Some days, by id, with their guests. */
+export async function readDaysById(q: Queryable, ids: string[]): Promise<DayRow[]> {
+  const { rows } = await q.query<Row>(`SELECT ${DAY} FROM calendar_days WHERE id = ANY($1::text[]) ORDER BY day, id`, [ids])
+  const guests = await readGuests(q, 'd.id = ANY($1::text[])', [ids])
+  return rows.map((r) => toDay(r, guests.get(r.id)))
+}
+
+/** The app's guests on the days matching `where`, by day id, each day's in person order. */
+async function readGuests(q: Queryable, where: string, params: unknown[]): Promise<Map<string, GuestRow[]>> {
+  const { rows } = await q.query<Row>(
+    `SELECT g.day_id, g.person_id, g.offer_id, g.email, g.response, g.problem
+       FROM calendar_guests g JOIN calendar_days d ON d.id = g.day_id
+      WHERE ${where}
+      ORDER BY g.day_id, g.person_id`,
+    params
+  )
+  const out = new Map<string, GuestRow[]>()
+  for (const r of rows) {
+    const list = out.get(r.day_id) ?? []
+    list.push({ personId: r.person_id, offerId: r.offer_id, email: r.email, response: r.response, problem: r.problem })
+    out.set(r.day_id, list)
+  }
+  return out
+}
+
+/** Where an offer's person is a guest from `today` on: each day's event they are on, and their answer there. */
+export async function guestPlaces(q: Queryable, offerId: string, today: string): Promise<{ dayId: string; day: string; response: GuestResponse }[]> {
+  const { rows } = await q.query<{ dayId: string; day: string; response: GuestResponse }>(
+    `SELECT g.day_id AS "dayId", d.day::text AS day, g.response
+       FROM calendar_guests g JOIN calendar_days d ON d.id = g.day_id
+      WHERE g.offer_id = $1 AND d.day >= $2::date AND d.state <> 'removed'
+      ORDER BY d.day, g.day_id`,
+    [offerId, today]
+  )
+  return rows
 }
 
 /** How many days from `today` on are on a calendar. */
@@ -155,6 +210,8 @@ export function dayEntity(d: DayRow): CalendarDay {
     state: d.state === 'failed' ? 'failed' : 'on',
     problem: d.problem,
     link: d.htmlLink,
+    // Names come from the people the devices already have; addresses stay on the server.
+    guests: d.guests.map((g) => ({ personId: g.personId, offerId: g.offerId, response: g.response, problem: g.problem })),
   }
 }
 
@@ -168,10 +225,24 @@ export async function saveDay(ctx: Ctx, d: DayRow, before: DayRow | undefined) {
        content_hash = EXCLUDED.content_hash, etag = EXCLUDED.etag, html_link = EXCLUDED.html_link, problem = EXCLUDED.problem, updated_at = now()`,
     [d.id, d.phaseId, d.projectId, d.day, d.calendarId, d.eventId, d.generation, d.state, d.title, d.contentHash, d.etag, d.htmlLink, d.problem]
   )
+  if (JSON.stringify(before?.guests ?? []) !== JSON.stringify(d.guests)) await saveGuests(ctx.tx, d.id, d.guests)
   const wasSeen = before && before.state !== 'removed'
   if (d.state === 'removed') {
     if (wasSeen) await emitRemoved(ctx, 'calendarDay', d.id)
     return
   }
   if (!wasSeen || JSON.stringify(dayEntity(before)) !== JSON.stringify(dayEntity(d))) await emit(ctx, 'calendarDay', d.id, dayEntity(d))
+}
+
+/** Replace a day's guests with these. */
+async function saveGuests(q: Queryable, dayId: string, guests: GuestRow[]) {
+  await q.query('DELETE FROM calendar_guests WHERE day_id = $1', [dayId])
+  for (const g of guests) {
+    await q.query(
+      `INSERT INTO calendar_guests (day_id, person_id, offer_id, email, response, problem) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (day_id, person_id) DO UPDATE SET offer_id = EXCLUDED.offer_id, email = EXCLUDED.email, response = EXCLUDED.response,
+         problem = EXCLUDED.problem, updated_at = now()`,
+      [dayId, g.personId, g.offerId, g.email, g.response, g.problem]
+    )
+  }
 }

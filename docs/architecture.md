@@ -289,9 +289,22 @@ the Account tab, as one Google account connected by a member of staff. The
 app leads. Event ids are worked out from the job, so a retried write never
 doubles an event, and the app's hidden mark keeps it to its own events. It
 runs when something changes and checks the calendar once a night, rather
-than watching it, so the database can sleep. Watching the calendar with
-push notifications comes with RSVPs and calendar-led jobs, when changes in
-Google have to flow back in quickly. What follows is the full plan.
+than watching it, so the database can sleep.
+
+With crew invites on ([ADR 0009](adr/0009-crew-invites.md), a switch on the
+Account tab that starts off), crew offered or booked are guests on their
+days' events, and their Yes or No in Google counts as their answer to the
+offer, through the same rules as their private link. The server asks Google
+every two minutes which of its events changed since the last look (with a
+few minutes to spare), compares the answers with the ones it holds in
+memory, and only touches the database when one has changed; each answer is
+taken in once, even with two servers running during a deploy. Every change
+to an event reads it first and is written only if it is unchanged since, so
+guests added by hand and answers given in between are kept. Guests hear
+from Google only when they are added or taken off, or the title, date or
+place changes. Push notifications from Google would bring answers in
+seconds rather than minutes; they come with calendar-led jobs, when edits
+in Google have to flow back in quickly. What follows is the full plan.
 
 **Where events live.** The system writes to the existing shared **Session
 Hire Gigs** calendar, so there is one place everyone subscribes to. Each
@@ -306,8 +319,9 @@ and the kit list for staff (not for external crew).
   so it never confuses its events with anyone's personal ones.
 - It watches the calendar with Google's push notifications and incremental
   sync tokens, so changes arrive in seconds.
-- **RSVPs flow in:** a freelancer accepting the invite marks their
-  assignment accepted; declining frees the slot and alerts ops.
+- **RSVPs flow in** (built): a freelancer accepting the invite accepts
+  the offer; declining every day declines it; a No from someone already
+  confirmed is shown to ops rather than unbooking them.
 - **Edits flow in** while a project is in *calendar-led* mode: an ops
   person moving an event in Google moves the phase. Once a project is
   switched to *app-led*, the system owns date, title and attendees, and an

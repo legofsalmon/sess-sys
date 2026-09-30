@@ -93,7 +93,7 @@ export function HistoryScreen() {
               </optgroup>
             )}
             {onLinks.length > 0 && (
-              <optgroup label="Freelancers, on their links">
+              <optgroup label="Freelancers">
                 {onLinks.map((p) => (
                   <option key={p.key} value={p.key}>
                     {p.name}
@@ -146,7 +146,7 @@ function Entry({ entry: e }: { entry: HistoryEntry }) {
       <p className="what">{e.what}</p>
       <p className="meta">
         {e.who.name}
-        {e.who.kind === 'link' ? ', on their private link' : ''}
+        {e.who.kind === 'link' ? ', on their private link' : e.who.kind === 'calendar' ? ', on Google Calendar' : ''}
         {device ? ` · ${device}` : ''} · {when(e.madeAt)}
       </p>
       {e.madeOffline && e.waitedSeconds !== undefined && (
