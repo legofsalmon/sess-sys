@@ -210,20 +210,34 @@ a job ([ADR 0007](adr/0007-jobs.md)).
 
 **Warehouse and stock**
 
-- **Product**: a model (d&b Y10P). Serialised or bulk.
-- **Asset**: one serialised item; has a status and a location. Its id is
-  internal and never printed, so a label can be replaced without touching
-  history.
+The catalogue is built: products, items and their labels, places, cases
+and counted stock ([ADR 0013](adr/0013-warehouse-catalogue.md)). The app
+says product and item; the code says model and asset.
+
+- **Product**: a model (d&b Y10P). Numbered (serialised) or counted
+  (bulk); a numbered product can also be counted until its items are
+  labelled.
+- **Asset**: one numbered item; in stock or retired (sold, scrapped,
+  lost, stolen), and kept at a place or in a case. Its id is internal
+  and never printed, so a label can be replaced without touching
+  history. Where it is right now, out on a job or back, comes from
+  scans later.
 - **Identifier**: a tag on an asset or case. One asset can carry several
   (the Session Hire QR label with its readable number such as `SH-004217`,
   the manufacturer's serial barcode, and later an NFC or UHF RFID tag).
-  See [research/stock-tracking.md](research/stock-tracking.md).
-- **Bulk stock**: quantities per location (cables, clamps).
+  Built with the Session Hire number: each is used only once, and an old
+  label stays with its item. See
+  [research/stock-tracking.md](research/stock-tracking.md).
+- **Place**: where kit lives: the warehouse, a bay or shelf, a van, the
+  repair bench. A flat list, added by typing a new name.
+- **Bulk stock**: quantities per place or case (cables, clamps).
 - **Container**: a case, rack, bag or cable bundle that holds assets or
   quantities, and can sit inside another container (a rack in a truck
-  pack). Permanent containers (an amp rack) are sealed: scanning the case
-  moves everything in it. Temporary ones (a job's mixed case) are packed
-  per job. Checked on return against what went out.
+  pack). Built as numbered products that hold other kit, up to five deep;
+  moving one moves everything in it. Permanent containers (an amp rack)
+  are sealed: scanning the case moves everything in it. Temporary ones (a
+  job's mixed case) are packed per job, with pick lists. Checked on
+  return against what went out.
 - **Movement**: every scan out, scan in, transfer between warehouses, or
   write-off, with who, when, where and the device's offline time.
 - **Maintenance record**: fault reports, repairs, electrical inspection and

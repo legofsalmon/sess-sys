@@ -5,12 +5,14 @@ import type { Db, Queryable } from './db.ts'
 import { runMigrations, runMigrationsIn, type Module } from './migrations.ts'
 import { PROJECTS } from './projects/schema.ts'
 import { CORE } from './schema.ts'
+import { STOCK } from './stock/schema.ts'
 
 /**
  * Every module's tables, in the order they are set up: crew calls refer to
  * jobs, so jobs come first, and the calendar connection names staff accounts.
+ * The warehouse (ADR 0013) refers to nothing else yet.
  */
-export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR]
+export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK]
 
 /** Set up or upgrade the whole database. */
 export async function migrateAll(db: Db) {

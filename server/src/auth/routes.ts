@@ -22,8 +22,11 @@ const SESSION_COOKIE = 'sh_session'
 const ATTEMPT_COOKIE = 'sh_signin'
 const ATTEMPT_PATH = '/api/auth'
 
-/** Where to land after signing in: one of the app's own areas, or a record in one (#jobs/<id>), never another site. */
-const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\/[a-z0-9]{1,64})?$/.test(next) ? next : '')
+/**
+ * Where to land after signing in: one of the app's own areas, or a place in
+ * one (#jobs/<id>, #stock/item/<id>, #plan/week/<day>), never another site.
+ */
+const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\/[a-z0-9-]{1,64}){0,2}$/.test(next) ? next : '')
 
 /**
  * Staff sign-in. When it is on, every /api route needs a signed-in person

@@ -5,6 +5,7 @@ import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan }
 import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
+import { warehouseView, type WarehouseView } from './stock-view.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -86,6 +87,8 @@ export interface View {
   problems: Problem[]
   crew: CrewView
   jobs: JobsView
+  /** The warehouse catalogue (ADR 0013). */
+  warehouse: WarehouseView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -228,6 +231,7 @@ export class SyncClient {
       problems: [...this.state.problems],
       crew,
       jobs: jobsView(entities, outbox, this.state.cursor, crew.calls),
+      warehouse: warehouseView(entities, outbox, this.state.cursor),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

@@ -189,6 +189,8 @@ describe('staff sign-in', () => {
     expect(back.headers.location).toBe('/')
     const job = await signIn(app, google, aoife, '#jobs/mg4x2k1q0abcdefghij12')
     expect(job.back.headers.location).toBe('/#jobs/mg4x2k1q0abcdefghij12')
+    const item = await signIn(app, google, aoife, '#stock/item/mg4x2k1q0abcdefghij12')
+    expect(item.back.headers.location).toBe('/#stock/item/mg4x2k1q0abcdefghij12')
     const odd = await signIn(app, google, aoife, '#jobs/../evil.example')
     expect(odd.back.headers.location).toBe('/')
   })

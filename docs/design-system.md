@@ -67,6 +67,15 @@ follow-up that lets the two stay in step.
   in a read-only field that selects itself when tapped, with its buttons
   under it (Subscribe, Copy address), so it can still be copied by hand
   where a browser won't copy. Not in Figma yet.
+- Stock ([ADR 0013](adr/0013-warehouse-catalogue.md)) shows an item's
+  number in bold with even-width digits. On a place's page each number is
+  a round chip that opens the item, dashed and amber while it waits to
+  sync. A form used over and over, such as adding items while labelling
+  or putting kit in a case, keeps where it's at, clears the number, puts
+  the cursor back in it, and says in a green line what was just done
+  ("Added SH-000102"). A choice between kinds (Numbered or Counted) is a
+  bordered row per option, each with a line saying when to pick it. Not
+  in Figma yet.
 
 ## Accessibility
 

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { day } from './model.ts'
+import { stockCommandSchemas } from './stock.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -33,6 +34,7 @@ export const commandSchemas = {
   }),
   ...crewCommandSchemas,
   ...jobCommandSchemas,
+  ...stockCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

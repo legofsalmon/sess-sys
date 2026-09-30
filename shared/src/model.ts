@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CALENDAR_ENTITY_NAMES, type CalendarEntities } from './calendar.ts'
 import { CREW_ENTITY_NAMES, type CrewEntities } from './crew.ts'
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
+import { STOCK_ENTITY_NAMES, type StockEntities } from './stock.ts'
 
 /**
  * The records the sync spike moves around. They are deliberately a thin
@@ -55,14 +56,23 @@ export const issue = z.object({
 })
 export type Issue = z.infer<typeof issue>
 
-export interface Entities extends CrewEntities, JobEntities, CalendarEntities {
+export interface Entities extends CrewEntities, JobEntities, CalendarEntities, StockEntities {
   product: Product
   booking: Booking
   scan: Scan
   issue: Issue
 }
 export type EntityName = keyof Entities
-export const ENTITY_NAMES: readonly EntityName[] = ['product', 'booking', 'scan', 'issue', ...CREW_ENTITY_NAMES, ...JOB_ENTITY_NAMES, ...CALENDAR_ENTITY_NAMES]
+export const ENTITY_NAMES: readonly EntityName[] = [
+  'product',
+  'booking',
+  'scan',
+  'issue',
+  ...CREW_ENTITY_NAMES,
+  ...JOB_ENTITY_NAMES,
+  ...CALENDAR_ENTITY_NAMES,
+  ...STOCK_ENTITY_NAMES,
+]
 
 /** Do two whole-day ranges share at least one day? */
 export function overlaps(a: { start: string; end: string }, b: { start: string; end: string }): boolean {
