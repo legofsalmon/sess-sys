@@ -91,6 +91,8 @@ waiting on someone.
   found, the job short, the Stock tab's repair list, a repair note and
   Fixed, and missing cables written off the count). All 35 browser tests
   and all 225 server tests pass.
+- Merged into `main` at 13:50 UTC once GitHub's checks passed, and live
+  by 13:56: Railway deployed it on its own.
 
 ## 30 September 2026: pick lists, and scanning kit out and back in
 
