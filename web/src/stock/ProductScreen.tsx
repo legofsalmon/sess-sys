@@ -2,7 +2,9 @@ import {
   CATEGORY_IDEAS,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
+  INSPECTION_MONTHS,
   irishToday,
+  MAX_MONTHS,
   MAX_QTY,
   newId,
   normaliseNumber,
@@ -13,6 +15,7 @@ import {
   type CommandInput,
   type Department,
   type FaultsView,
+  type InspectionsView,
   type KitLineView,
   type ModelView,
   type View,
@@ -39,10 +42,12 @@ import {
   whereText,
 } from './common.tsx'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
+import { dueText } from './Inspections.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
- * and where it's counted, and faults in what's counted (ADR 0018). Items are added one after another while
+ * and where it's counted, faults in what's counted (ADR 0018), and how
+ * often its items need testing (ADR 0020). Items are added one after another while
  * labelling: the number field is ready for the next label as soon as one is
  * added, and where stays put.
  */
@@ -70,7 +75,7 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
       <NotDone view={view} names={STOCK_COMMANDS} />
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
-      {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} />}
+      {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
       <Counted m={m} w={w} />
       {(m.tracking === 'bulk' || m.countedTotal > 0 || view.faults.ofModel(m.id).length > 0) && (
         <FaultsCard faults={view.faults.ofModel(m.id)} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
@@ -130,6 +135,12 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
             {unusable > 0 && <span className="flag bad"> {unusable.toLocaleString('en-IE')} can't go out</span>}
           </dd>
         </div>
+        {m.tracking === 'serialised' && (
+          <div className="wide">
+            <dt>Testing</dt>
+            <dd>{checksLabel(m)}</dd>
+          </div>
+        )}
       </dl>
       {m.notes && <p className="notes">{m.notes}</p>}
       {editing ? (
@@ -187,6 +198,24 @@ function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
   )
 }
 
+const every = (n: number) => (n === 1 ? 'every month' : `every ${n} months`)
+
+/** "PAT every 12 months; thorough examination every 6 months", or "None". */
+function checksLabel(m: ModelView): string {
+  const parts = [m.patMonths && `PAT ${every(m.patMonths)}`, m.liftingMonths && `thorough examination ${every(m.liftingMonths)}`].filter(Boolean) as string[]
+  if (parts.length === 0) return 'None'
+  const text = parts.join('; ')
+  return text[0]!.toUpperCase() + text.slice(1)
+}
+
+/** A number of months typed in: null for blank (never), NaN when it isn't one. */
+function monthsTyped(text: string): number | null {
+  const t = text.trim()
+  if (!t) return null
+  const n = Number(t)
+  return Number.isInteger(n) && n >= 1 && n <= MAX_MONTHS ? n : NaN
+}
+
 function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone: () => void }) {
   const [f, setF] = useState({
     name: m.name,
@@ -196,6 +225,8 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     isCase: m.isCase,
     value: m.valueCents === null ? '' : String(m.valueCents / 100),
     notes: m.notes,
+    pat: m.patMonths === null ? '' : String(m.patMonths),
+    lifting: m.liftingMonths === null ? '' : String(m.liftingMonths),
   })
   const [error, setError] = useState('')
   const save = (e: FormEvent) => {
@@ -212,8 +243,22 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     const holding = m.items.filter((a) => a.items.length > 0 || a.counted.length > 0).length
     if (!f.isCase && m.isCase && holding > 0)
       return setError(`${plural(holding, 'case')} of ${m.name} ${holding === 1 ? 'has' : 'have'} kit in ${holding === 1 ? 'it' : 'them'}. Empty them first.`)
+    const numbered = f.tracking === 'serialised'
+    const patMonths = numbered ? monthsTyped(f.pat) : m.patMonths
+    const liftingMonths = numbered ? monthsTyped(f.lifting) : m.liftingMonths
+    if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return setError(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
     // Only what changed, so two people changing different things both keep theirs.
-    const next = { name, department: f.department, category: f.category.trim(), tracking: f.tracking, isCase: f.isCase, valueCents, notes: f.notes.trim() }
+    const next = {
+      name,
+      department: f.department,
+      category: f.category.trim(),
+      tracking: f.tracking,
+      isCase: f.isCase,
+      valueCents,
+      notes: f.notes.trim(),
+      patMonths,
+      liftingMonths,
+    }
     const changes: Partial<CommandInput<'model.update'>> = {}
     for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== m[k]) (changes as Record<string, unknown>)[k] = next[k]
     if (Object.keys(changes).length === 0) return onDone()
@@ -239,6 +284,29 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
         Category <input list="edit-category-names" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} />
       </label>
       <TrackingChoice tracking={f.tracking} isCase={f.isCase} onChange={(t) => setF({ ...f, ...t })} />
+      {f.tracking === 'serialised' && (
+        <>
+          <label>
+            PAT every, in months
+            <input
+              inputMode="numeric"
+              value={f.pat}
+              placeholder={`Never, or e.g. ${INSPECTION_MONTHS.pat}`}
+              onChange={(e) => setF({ ...f, pat: e.target.value })}
+            />
+          </label>
+          <label>
+            Thorough examination every, in months
+            <input
+              inputMode="numeric"
+              value={f.lifting}
+              placeholder={`Never, or e.g. ${INSPECTION_MONTHS.lifting}`}
+              onChange={(e) => setF({ ...f, lifting: e.target.value })}
+            />
+          </label>
+          <p className="hint wide">Blank for never. PAT for anything that plugs in; a thorough examination for lifting gear such as hoists, chain and truss.</p>
+        </>
+      )}
       <label className="wide">
         Value of one, in euro <input inputMode="decimal" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} />
       </label>
@@ -263,7 +331,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
   )
 }
 
-function Items({ m, w, faults }: { m: ModelView; w: WarehouseView; faults: FaultsView }) {
+function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; faults: FaultsView; inspections: InspectionsView }) {
   return (
     <section className="card" aria-label="Items">
       <h2>Items</h2>
@@ -278,6 +346,7 @@ function Items({ m, w, faults }: { m: ModelView; w: WarehouseView; faults: Fault
                   {whereLabel(a, w)}
                   {a.serial && ` · Serial ${a.serial}`}
                   {faults.stopping(a.id) && <span className="flag bad"> {faultState(faults.stopping(a.id)!)}</span>}
+                  {inspections.blocks(a.id) && <span className="flag bad"> {dueText(inspections.blocks(a.id)!)}</span>}
                 </p>
               </div>
               <Pending pending={a.pending} />

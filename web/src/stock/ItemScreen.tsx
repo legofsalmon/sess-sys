@@ -15,6 +15,7 @@ import { NotDone, Top } from '../jobs/common.tsx'
 import { when } from '../format.ts'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
+import { dueText, InspectionsCard } from './Inspections.tsx'
 import { PrintLabels } from './Labels.tsx'
 import {
   contentsLabel,
@@ -35,7 +36,8 @@ import {
  * it had before, and for a case, what's in it. Its label can be printed
  * here (ADR 0015). Retiring keeps it and its number for the record; it can
  * be brought back. Damage, or its going missing, is reported here, and
- * each fault is fixed, found or written off here too (ADR 0018).
+ * each fault is fixed, found or written off here too (ADR 0018), and its
+ * electrical tests and thorough examinations are recorded (ADR 0020).
  */
 export function ItemScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse
@@ -63,6 +65,7 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
       <FaultsCard faults={view.faults.ofAsset(a.id)}>
         {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
       </FaultsCard>
+      <InspectionsCard view={view} a={a} />
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       <WhereChoices w={w} />
     </div>
@@ -75,6 +78,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
   const out = view.moves.outOf(a.id)
   const outWith = out && view.jobs.jobs.find((j) => j.id === out.projectId)
   const fault = view.faults.stopping(a.id)
+  const check = view.inspections.blocks(a.id)
   const [mode, setMode] = useState<Mode | undefined>()
   const retired = a.status === 'retired'
   const toggle = (m: Mode) => setMode(mode === m ? undefined : m)
@@ -125,6 +129,12 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
               {faultState(fault)}
               {fault.note && `: ${fault.note}`}
             </dd>
+          </div>
+        )}
+        {check && (
+          <div className="wide">
+            <dt>Testing</dt>
+            <dd className="bad">{dueText(check)}: it can't go out until it passes</dd>
           </div>
         )}
         {a.formerNumbers.length > 0 && (

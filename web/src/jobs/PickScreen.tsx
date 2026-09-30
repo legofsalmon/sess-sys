@@ -19,6 +19,7 @@ import {
 import { useRef, useState, type FormEvent } from 'react'
 import { act } from '../crew/CrewScreen.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
+import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
 import { client } from '../sync.ts'
 import { NotDone, StatusPill, today, Top } from './common.tsx'
@@ -107,6 +108,9 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     if (found) await act(() => client.mutate('fault.close', { id: fault.id, outcome: 'found', at: new Date().toISOString() }))
     if (found) notes.push("It was reported missing, so it's marked found.")
     else if (fault && mode === 'out') notes.push(`It's reported ${faultState(fault).toLowerCase()}${fault.note ? `: ${fault.note}` : ''}. Check it before it goes.`)
+    // Failed or overdue its PAT or examination (ADR 0020): it shouldn't go.
+    const check = mode === 'out' ? client.view().inspections.blocks(a.id) : undefined
+    if (check) notes.push(`${dueText(check)}. Test it before it goes.`)
 
     if (mode === 'out') {
       if (was && !other) return say('quiet', `${name} is already out with ${job.name}${was.inCase ? `, in ${was.inCase.number}` : ''}.`)

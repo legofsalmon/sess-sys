@@ -137,6 +137,15 @@ in px too.
   number pills with a dashed burnt-orange border after "Missing:", and
   the report form opens under the scan answer. An item's fault is a fact
   in burnt orange at the top of its page. Not in Figma yet.
+- Inspections ([ADR 0020](adr/0020-inspections.md)) use the same stripe:
+  green when it's in date, amber when it's due in the next 30 days or
+  not recorded yet, burnt orange when it failed or is overdue, with the
+  state in bold ("PAT overdue since 2 Oct 2026") and what it means in
+  muted text under it. What's recorded sits under "N recorded", each
+  with the day, who did it and the note. Testing a batch is the pick
+  list's scan field and answer box, with the kind as two filter buttons
+  and the items tested as number pills, burnt orange for a fail. Not in
+  Figma yet.
 
 ## Accessibility
 
