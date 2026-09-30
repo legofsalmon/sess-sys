@@ -124,6 +124,7 @@ export function irishToday(now = new Date()): string {
 /**
  * Where a phase stands with the calendar, for the job page:
  *
+ * - `theirs`: the job was brought in from a calendar that keeps its events (ADR 0011);
  * - `waiting`: not going on yet, because the job isn't confirmed;
  * - `stopped`: the job is cancelled or lost, so it is off the calendar;
  * - `past`: every day has gone, and the calendar is left as it was;
@@ -135,16 +136,18 @@ export function irishToday(now = new Date()): string {
  */
 export type PhaseOnCalendar =
   | { state: 'waiting' | 'stopped' | 'past' | 'unconnected' | 'paused' }
+  | { state: 'theirs'; calendar: string }
   | { state: 'on' | 'going'; calendar: string; days: number; link: string | null }
   | { state: 'failed'; calendar: string; problem: string; failed: number; days: number }
 
 export function phaseOnCalendar(
-  job: Pick<Project, 'name' | 'status'>,
+  job: Pick<Project, 'name' | 'status' | 'sourceCalendar'>,
   phase: Pick<Phase, 'id' | 'name' | 'start' | 'end'>,
   link: CalendarLink | undefined,
   days: Readonly<Record<string, CalendarDay>>,
   today: string
 ): PhaseOnCalendar {
+  if (job.sourceCalendar) return { state: 'theirs', calendar: job.sourceCalendar }
   if (job.status === 'cancelled' || job.status === 'lost') return { state: 'stopped' }
   if (job.status !== 'confirmed') return { state: 'waiting' }
   const all = eachDay(phase.start, phase.end)

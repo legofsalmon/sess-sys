@@ -110,6 +110,32 @@
 .plan .legend .swatch.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .legend .swatch.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
 
+/* Bringing jobs in from Google Calendar (ADR 0011): what was found, to tick, rename and bring in. */
+.import .field input { width: 100%; }
+.import .card > p { margin: 0; }
+.import .card > button.link { justify-self: start; }
+.import .found { list-style: none; margin: 0; padding: 0; display: grid; }
+.import .found > li { display: grid; gap: 4px; padding: 12px 0; border-top: 1px solid var(--line); }
+.import .found > li:first-child { border-top: 0; padding-top: 0; }
+.import .found p { margin: 0; color: var(--muted); font-size: .9rem; }
+.import .found a { color: var(--accent-ink); font-weight: 700; }
+.import .found .head { display: flex; gap: 8px; align-items: center; }
+.import .found .head b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.import .found .head .name { flex: 1; width: 0; min-width: 0; font-weight: 700; }
+.import .found .head input[type='checkbox'], .import .tick input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.import .found li.is-off > :not(.head) { opacity: .5; }
+.import .found .guess { color: var(--warn); }
+.import .tick { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; cursor: pointer; }
+.import .tick input { margin-top: 2px; }
+.import .tick b, .import .tick small { display: block; overflow-wrap: anywhere; }
+.import .tick small { color: var(--muted); font-size: .8rem; }
+.import details summary { display: flex; align-items: center; min-height: 44px; font-weight: 700; cursor: pointer; }
+.import .left-out { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: .9rem; }
+.import .left-out small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+/* Kept in reach above the area tabs while scrolling through what was found. */
+.import .bring { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); display: grid; gap: 8px; padding: 10px 0; background: var(--bg); }
+.import .bring button { width: 100%; }
+
 @media (max-width: 480px) {
   .jobs .phase-row { grid-template-columns: 1fr 1fr; }
   .jobs .phase-row input:first-child { grid-column: 1 / -1; }

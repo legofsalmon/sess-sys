@@ -20,6 +20,9 @@ import type { Module } from '../migrations.ts'
  * an offer (ADR 0009), the address it used, and their last answer in
  * Google, so an answer is taken in once and a changed address moves the
  * invite. `calendar_link.invites` switches invites on; it starts off.
+ *
+ * `calendar_imports` is every event-day brought in from a calendar the
+ * account can see (ADR 0011), and the job and phase it went into.
  */
 const MIGRATIONS: string[] = [
   `
@@ -73,6 +76,23 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (day_id, person_id)
   );
   CREATE INDEX IF NOT EXISTS calendar_guests_offer ON calendar_guests (offer_id);
+  `,
+  // Jobs brought in from Google Calendar (ADR 0011): each event-day brought
+  // in, by the id Google gives the event on every calendar it is on, so
+  // looking again shows only what is new, and what has since moved.
+  `
+  CREATE TABLE IF NOT EXISTS calendar_imports (
+    uid          text NOT NULL,
+    day          date NOT NULL,
+    calendar_id  text NOT NULL,
+    event_id     text NOT NULL,
+    title        text NOT NULL,
+    project_id   text NOT NULL REFERENCES projects(id),
+    phase_id     text REFERENCES phases(id) ON DELETE SET NULL,
+    imported_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (uid, day)
+  );
+  CREATE INDEX IF NOT EXISTS calendar_imports_project ON calendar_imports (project_id);
   `,
 ]
 

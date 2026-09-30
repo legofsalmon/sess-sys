@@ -224,6 +224,8 @@ function CalendarLine({ job, phase, view }: { job: JobView; phase: PhaseView; vi
   const today = irishToday()
   const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
   switch (on.state) {
+    case 'theirs':
+      return <p className="cal">Brought in from {on.calendar}, which keeps its days, so the app doesn't add them to the jobs calendar.</p>
     case 'waiting':
       return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase)} once the job is confirmed.</p>
     case 'stopped':

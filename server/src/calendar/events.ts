@@ -170,7 +170,7 @@ export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { to
        JOIN projects p ON p.id = ph.project_id
        LEFT JOIN clients c ON c.id = p.client_id
        LEFT JOIN venues v ON v.id = coalesce(ph.venue_id, p.venue_id)
-      WHERE p.status = 'confirmed' AND ph.end_day >= $1::date
+      WHERE p.status = 'confirmed' AND p.source_calendar IS NULL AND ph.end_day >= $1::date
       ORDER BY ph.start_day, ph.id`,
     [today]
   )

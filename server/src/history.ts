@@ -330,6 +330,19 @@ export function describe(command: string, a: Data, look: Look): string {
       return `Turned on crew invites on Google Calendar${typeof a.invites === 'number' && typeof a.people === 'number' ? ` (${invitesLabel(a.invites, a.people)})` : ''}`
     case 'calendar.disconnect':
       return `Disconnected Google Calendar${typeof a.account === 'string' ? ` (${a.account})` : ''}${typeof a.calendar === 'string' ? `, taking the app's days off ${a.calendar}` : ''}`
+    case 'calendar.import': {
+      const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
+      const some = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined)
+      const added = count(a.added, 'job', 'jobs')
+      const what = some([count(a.jobs, 'job', 'jobs'), added && `more days for ${added}`])
+      const details = some([
+        count(a.days, 'day', 'days'),
+        count(a.crew, 'crew booking or offer', 'crew bookings and offers'),
+        count(a.people, 'new person', 'new people'),
+        count(a.venues, 'new venue', 'new venues'),
+      ])
+      return `Brought in ${what.length ? inWords(what) : 'jobs'} from ${text(a.calendar, 'a calendar')} on Google Calendar${details.length ? `: ${inWords(details)}` : ''}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

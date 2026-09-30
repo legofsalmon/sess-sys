@@ -57,6 +57,11 @@ follow-up that lets the two stay in step.
   once its crew are booked and amber while some are still to find; a
   clash is the **bad** tone and a check is amber. The planner isn't in the
   Figma file yet; until it is, the code is the reference.
+- A long list checked before anything is saved, such as bringing jobs in
+  from Google Calendar ([ADR 0011](adr/0011-calendar-import.md)), keeps its
+  one button in a bar stuck just above the tabs, so it's in reach however
+  far down the list, and says what it will do ("Bring in 2 jobs"). Unticked
+  items fade but stay, to tick again. Not in Figma yet either.
 
 ## Accessibility
 

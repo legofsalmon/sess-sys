@@ -10,6 +10,7 @@ import { registerBackupRoutes } from './backup/routes.ts'
 import { Backups, type BackupWatch } from './backup/service.ts'
 import type { BackupStore } from './backup/store.ts'
 import { Google } from './calendar/google.ts'
+import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
 import { applyMutation, currentSeq } from './commands.ts'
@@ -180,6 +181,7 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
   registerCrewLinks(app, db, changed)
   registerBackupRoutes(app, backups)
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
+  registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {

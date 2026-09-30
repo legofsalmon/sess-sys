@@ -1,7 +1,7 @@
 import { invitesLabel, irishToday, type CalendarCheck, type CalendarChoice, type CalendarInvites, type CalendarLink, type View } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
-import { markSignedOut } from './auth.ts'
 import { when } from './format.ts'
+import { ask, post, serverUrl } from './server.ts'
 import { client, syncSoon } from './sync.ts'
 
 /**
@@ -11,8 +11,6 @@ import { client, syncSoon } from './sync.ts'
  * every device through the sync like everything else, so all of them show
  * the same.
  */
-
-const base = import.meta.env.VITE_API_BASE ?? ''
 
 type Note = { ok: boolean; text: string }
 
@@ -41,32 +39,7 @@ const outcome = (() => {
   return OUTCOMES[got] ?? OUTCOMES.failed
 })()
 
-const connectUrl = () => `${base}/api/calendar/connect?client=${encodeURIComponent(client.clientId)}`
-
-/** Ask the server to do something with the calendar, and say what went wrong in words if it didn't. */
-async function ask<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response
-  try {
-    res = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(60_000), ...init })
-  } catch {
-    throw new Error("Couldn't reach the server. Try again when you have signal.")
-  }
-  if (res.status === 401) {
-    markSignedOut()
-    throw new Error('Signed out.')
-  }
-  if (!res.ok) {
-    const { error } = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new Error(error ?? `The server answered ${res.status}. Try again in a minute.`)
-  }
-  return (await res.json()) as T
-}
-
-const post = <T,>(path: string, body?: unknown) =>
-  ask<T>(`${path}?client=${encodeURIComponent(client.clientId)}`, {
-    method: 'POST',
-    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-  })
+const connectUrl = () => serverUrl(`/api/calendar/connect?client=${encodeURIComponent(client.clientId)}`)
 
 /** "Aoife Byrne", "Aoife Byrne and Seán Murphy", "Aoife Byrne, Conor Walsh and Seán Murphy". */
 const names = (list: string[]) => (list.length < 2 ? (list[0] ?? '') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`)
@@ -266,6 +239,9 @@ export function CalendarCard({ view, available }: { view: View; available: boole
           Disconnect
         </button>
       </div>
+      <p className="hint">
+        Jobs already on a calendar {link.account} can see? <a href="#import">Bring them in</a>.
+      </p>
       <p className="hint">
         {onIt === 0 ? 'Nothing' : onIt === 1 ? '1 day' : `${onIt} days`} on it from today.
         {link.connectedBy && link.connectedAt ? ` Connected by ${link.connectedBy} ${when(link.connectedAt)}.` : ''} Changes in the app reach

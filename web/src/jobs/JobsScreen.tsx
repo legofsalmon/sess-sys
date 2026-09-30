@@ -18,13 +18,15 @@ import { useState, type FormEvent } from 'react'
 import { act } from '../crew/CrewScreen.tsx'
 import { client } from '../sync.ts'
 import { Choices, clientNamed, NotDone, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
+import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
- * A job opens on its own page (#jobs/<id>) with its phases and crew, and the
- * planner (#plan, ADR 0010) shows them by week or month.
+ * A job opens on its own page (#jobs/<id>) with its phases and crew, the
+ * planner (#plan, ADR 0010) shows them by week or month, and jobs already
+ * on Google Calendar can be brought in (#import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 
@@ -44,6 +46,7 @@ export function JobsScreen() {
   const view = useView()
   const hash = useHash()
   if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
+  if (hash === '#import') return <ImportScreen view={view} />
   const open = hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
   if (open) return <JobScreen view={view} id={open} />
   return <JobList view={view} />
@@ -93,6 +96,11 @@ function JobList({ view }: { view: View }) {
       <section className="card">
         <h2>New job</h2>
         <NewJob view={view} />
+        {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
+          <p className="hint">
+            Jobs already on a Google calendar? <a href="#import">Bring them in</a> rather than typing them again.
+          </p>
+        )}
       </section>
 
       <section className="card">
