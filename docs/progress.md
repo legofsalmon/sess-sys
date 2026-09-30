@@ -42,6 +42,8 @@ waiting on someone.
   order; weeks and months across a new year and a leap year), all 157
   server tests, and 2 new browser tests of a week on a phone and a month
   on a laptop, with all 21 browser tests passing.
+- Merged into `main` at 02:55 UTC and live by 03:00: the live app's Jobs
+  tab has List, Week and Month.
 
 **Next**
 
