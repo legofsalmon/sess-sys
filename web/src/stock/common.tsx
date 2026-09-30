@@ -18,7 +18,7 @@ import { client } from '../sync.ts'
 /** What the Stock screens share: names for where things are, and picking a place or case by typing (ADR 0013). */
 
 /** The commands whose refusals the Stock screens show. */
-export const STOCK_COMMANDS = /^(model|place|asset|stock)\./
+export const STOCK_COMMANDS = /^(model|place|asset|stock|labels)\./
 
 /** An item's number, or what it will have. */
 export const numberLabel = (a: { number: string }) => a.number || 'Number when synced'

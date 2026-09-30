@@ -235,6 +235,12 @@ says product and item; the code says model and asset.
   Built with the Session Hire number: each is used only once, and an old
   label stays with its item. See
   [research/stock-tracking.md](research/stock-tracking.md).
+- **Label run**: numbers set aside for printing, from a first number, as
+  many as asked for ([ADR 0015](adr/0015-printing-labels.md)). The next
+  free number skips every run, a run is kept for good since its labels
+  may be printed, and a label from a run becomes an item's identifier
+  when it's scanned and put on the item. The QR code on a label holds
+  just the number.
 - **Place**: where kit lives: the warehouse, a bay or shelf, a van, the
   repair bench. A flat list, added by typing a new name.
 - **Bulk stock**: quantities per place or case (cables, clamps).

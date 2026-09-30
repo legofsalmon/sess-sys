@@ -1,4 +1,4 @@
-import { MAX_CASE_DEPTH, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
+import { MAX_CASE_DEPTH, MAX_NUMBER, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { jobsWithKit } from './kit.ts'
 import {
@@ -80,11 +80,12 @@ async function mustActive(ctx: Ctx, id: string) {
   return a
 }
 
-/** A number as a person typed or scanned it, checked, or the next free one. */
+/** A number as a person typed or scanned it, checked, or the next free one, which is never one set aside for printing (ADR 0015). */
 async function numberFor(ctx: Ctx, typed: string | null): Promise<string> {
   if (typed === null) {
     const n = await nextNumber(ctx.tx)
-    if (n > 999_999) throw new Refused({ code: 'conflict', message: 'Every six-digit number has been used.' })
+    if (n > MAX_NUMBER)
+      throw new Refused({ code: 'conflict', message: 'Every six-digit number has been used or set aside for printing. Use the number on a printed label.' })
     return `SH-${String(n).padStart(6, '0')}`
   }
   const number = normaliseNumber(typed)

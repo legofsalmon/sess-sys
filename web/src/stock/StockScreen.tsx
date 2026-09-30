@@ -11,23 +11,25 @@ import {
   type Tracking,
   type View,
 } from '@sh/shared'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { App } from '../App.tsx'
 import { act, euroToCents } from '../crew/CrewScreen.tsx'
 import { NotDone, StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
-import { amountLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
+import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
+import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
- * where everything is kept, and what's counted; and the kit on jobs that's
- * short (ADR 0014). A product, item or place opens on its own page
- * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>). The Phase 0
+ * where everything is kept, and what's counted; the kit on jobs that's
+ * short (ADR 0014); and labels (ADR 0015). A product, item or place opens
+ * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
+ * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -35,6 +37,9 @@ export function StockScreen() {
   const view = useView()
   const hash = useHash()
   if (hash === '#stock/sync-test') return <App />
+  if (hash === '#stock/labels') return <LabelsScreen view={view} />
+  const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
+  if (run) return <RunScreen key={run} view={view} id={decodeURIComponent(run)} />
   const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
   const open = id ? decodeURIComponent(id) : ''
   // Keyed by the record, so a form left open on one page isn't still open on the next.
@@ -52,6 +57,13 @@ function Catalogue({ view }: { view: View }) {
   const words = q.split(/\s+/).filter(Boolean)
   const number = normaliseNumber(search)
   const exact = number ? w.byNumber.get(number) : undefined
+  // A label that isn't on anything yet (ADR 0015): one from a run, or anything typed as a label rather than a bare number.
+  const unclaimed = number && !exact && (view.labels.runOf(number) || /^\s*sh|\/a\//i.test(search)) ? number : undefined
+  const searchField = useRef<HTMLInputElement>(null)
+  const claimField = useRef<HTMLInputElement>(null)
+  const memory = useRef<ClaimMemory>({ product: '', where: '' })
+  const [claimed, setClaimed] = useState('')
+  const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
   // Items by number or serial, once there's enough typed to mean something.
   const items =
     q.length >= 3
@@ -68,12 +80,19 @@ function Catalogue({ view }: { view: View }) {
   const shown = w.models.filter((m) => inDepartment(m) && matches(m))
   const count = (d: Department) => w.models.filter((m) => m.department === d).length
 
-  // A scanner types a label's number and Enter: straight to the item.
+  // A scanner types a label's number and Enter: straight to the item, or to saying what a new label is on.
   const go = (e: FormEvent) => {
     e.preventDefault()
     if (exact) location.hash = `#stock/item/${exact.id}`
+    else if (unclaimed) claimField.current?.focus()
     else if (items.length === 1) location.hash = `#stock/item/${items[0]!.id}`
     else if (shown.length === 1) location.hash = `#stock/product/${shown[0]!.id}`
+  }
+  // Ready for the next label.
+  const onClaimed = (id: string) => {
+    setClaimed(id)
+    setSearch('')
+    searchField.current?.focus()
   }
 
   return (
@@ -85,6 +104,7 @@ function Catalogue({ view }: { view: View }) {
         <h2>Stock</h2>
         <form role="search" onSubmit={go}>
           <input
+            ref={searchField}
             className="search"
             type="search"
             enterKeyHint="go"
@@ -94,6 +114,13 @@ function Catalogue({ view }: { view: View }) {
             aria-label="Find"
           />
         </form>
+        {justClaimed && (
+          <p className="added" role="status">
+            Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
+            {(justClaimed.placeId || justClaimed.caseId) && ` ${atLabel(justClaimed, w)}`}. Scan the next label.
+          </p>
+        )}
+        {unclaimed && <ClaimLabel key={unclaimed} number={unclaimed} view={view} memory={memory} productField={claimField} onClaimed={onClaimed} />}
         <div className="filters" role="group" aria-label="Department">
           <button type="button" aria-pressed={department === 'all'} onClick={() => setDepartment('all')}>
             All ({w.models.length})
@@ -123,7 +150,7 @@ function Catalogue({ view }: { view: View }) {
             ))}
           </ul>
         )}
-        {shown.length === 0 && !exact && items.length === 0 && (
+        {shown.length === 0 && !exact && !unclaimed && items.length === 0 && (
           <p className="empty">{w.models.length === 0 ? 'No products yet. Add the first one below.' : 'Nothing here.'}</p>
         )}
         <ul className="job-list">
@@ -145,6 +172,8 @@ function Catalogue({ view }: { view: View }) {
       </section>
 
       <ShortKit view={view} />
+
+      <LabelsCard labels={view.labels} />
 
       <section className="card">
         <h2>New product</h2>

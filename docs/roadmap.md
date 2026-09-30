@@ -83,13 +83,19 @@ places, cases up to five deep, and counts, in the Stock tab and working
 with no signal. Kit on jobs is built too
 ([ADR 0014](adr/0014-kit-on-jobs.md)): each job's products and how many,
 for the whole job or a phase, with shortages worked out on each device
-and subhire. See [progress.md](progress.md).
+and subhire. So is printing labels ([ADR 0015](adr/0015-printing-labels.md)):
+numbers set aside a run at a time, printed here or by a label maker, and
+put on items by scanning them. See [progress.md](progress.md).
 
 - Catalogue, products, assets, containers, bulk stock, locations (built:
   products, numbered items with their labels, cases, counted stock and
   places).
 - Label printing: QR plus a readable number on polyester labels, riveted
-  metal tags for cases and rigging, heat-shrink or flag labels for cables.
+  metal tags for cases and rigging, heat-shrink or flag labels for cables
+  (built: numbers set aside for a run, the next free number skipping
+  them; printed from the browser on a label printer or A4 sheets, or a
+  spreadsheet for a label maker; claimed by scanning in the Stock search;
+  an item's own label from its page).
 - The labelling rollout from [research/stock-tracking.md](research/stock-tracking.md):
   pilot the label materials, then compliance items, then high-value gear
   labelled as it comes back from jobs, then cases, then cables as bundles,

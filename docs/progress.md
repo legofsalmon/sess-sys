@@ -3,6 +3,59 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: printing labels
+
+**Done**
+
+- The third part of Phase 2: labels, so the warehouse can start sticking
+  numbers on gear. [Decision 0015](adr/0015-printing-labels.md) has the
+  reasons. There was still no word on a stock list to bring in, so this
+  came next, as planned.
+- **Stock**, **Print labels** sets numbers aside before their labels are
+  printed: say how many (up to 10,000 at a time) and what they're for,
+  such as a roll from a label maker. The next free number skips them, so
+  no item in the office gets a number that's waiting on a printed label.
+  Numbers set aside with no signal come once it's back.
+- Each run can be **printed here**, from the browser: on a label printer,
+  one to a page at 50 × 25 mm or 25 × 25 mm, or on A4 sheets of 65
+  labels in an office printer, up to 500 at a time from any number in the
+  run. Or **Download the spreadsheet** for a label maker, a row a label,
+  which a label printer's own software can print from too.
+- A label has a QR code, the number in large type and "Session Hire". The
+  QR code holds just the number, so it never goes out of date and it's the
+  smallest code there is, readable with up to 30% scuffed off.
+- **Claim on scan:** scan or type a label that isn't on anything yet in
+  the Stock search, and it asks which product it's on and where that's
+  kept, then adds the item with that number, one of those counted there if
+  some are. The product and place stay for the next label, so each one
+  after the first is a scan and Enter.
+- An item's page has **Print label**, with the product's name on it, for
+  a new item or a replacement. Each run shows how many of its labels are
+  on items so far.
+- The History tab describes numbers set aside ("Set aside SH-000101 to
+  SH-000600 for printing labels (Label World roll)"), and backups and
+  **Download everything** include the new table.
+- Checked: 5 new tests of what's printed (every QR code read back by a
+  decoder, from the first number to the last), 5 new server tests (the
+  next free number skipping runs, claiming labels, the last six-digit
+  number, two devices setting numbers aside with no signal, and the
+  history), all 213 server tests, and 2 new browser tests on a phone (set
+  aside, printed in each layout with the printed page sizes checked,
+  downloaded, claimed by scanning, an item's own label; set aside with no
+  signal), with all 31 browser tests passing.
+
+**Next**
+
+- Colly: before ordering a roll, the QR code could hold a Session Hire
+  web address instead of just the number, so a phone's own camera opens
+  the item. That needs a subdomain pointed at the app, and printed labels
+  keep it for life. Just the number is the default.
+- Colly, to try it: in **Stock**, **Print labels**, set aside a few
+  numbers, print them on A4 or download the spreadsheet, then type one in
+  the Stock search and put it on a made-up product.
+- Next in Phase 2: scanning with the phone's camera in the app, then pick
+  lists and scanning out and in.
+
 ## 30 September 2026: kit on jobs, with shortages
 
 **Done**

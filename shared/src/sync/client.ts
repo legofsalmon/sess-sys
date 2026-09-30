@@ -6,6 +6,7 @@ import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } 
 import { crewView, type CrewView } from './crew-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
+import { labelsView, type LabelsView } from './labels-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 
 /**
@@ -92,6 +93,8 @@ export interface View {
   warehouse: WarehouseView
   /** Kit on jobs, and what's short (ADR 0014). */
   kit: KitView
+  /** Numbers set aside for printing labels (ADR 0015). */
+  labels: LabelsView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -238,6 +241,7 @@ export class SyncClient {
       jobs,
       warehouse,
       kit: kitView(entities, outbox, this.state.cursor, jobs, warehouse, irishToday(this.now())),
+      labels: labelsView(entities, outbox, this.state.cursor, warehouse),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

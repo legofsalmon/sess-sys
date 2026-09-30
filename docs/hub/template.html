@@ -301,7 +301,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 2 · catalogue and kit on jobs built</div>
+      <div class="status">Phase 2 · catalogue, kit on jobs and labels built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -400,6 +400,16 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
           <figure><img src="img/kit-job.png" alt="Electric Picnic's Kit card on a phone: 8 × d&amp;b Y10P for the whole job, in amber: enough, unless Longitude goes ahead, then short 2 on Fri 6 Sep; 30 × XLR 10 m for the show, enough with 10 to spare" width="390" height="844" loading="lazy"><figcaption><b>Pencilled in.</b> Enough, unless a quote goes ahead.</figcaption></figure>
           <figure><img src="img/kit-stock.png" alt="Stock tab on a phone: the Kit short card lists d&amp;b Y10P short 2 on Longitude, Fri 6 Sep, marked Quoted" width="390" height="844" loading="lazy"><figcaption><b>On Stock.</b> Every line short from today on.</figcaption></figure>
           <figure><img src="img/kit-product.png" alt="A product's page on a phone: d&amp;b Y10P, 10 owned, on Electric Picnic (8 needed, enough unless Longitude goes ahead), Fuel launch (4 needed, 2 subhired from PRG, enough with none to spare) and Longitude, quoted" width="390" height="844" loading="lazy"><figcaption><b>A product.</b> The jobs it's on, and what's free.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots crewshots stockshots">
+        <h3>Printing labels</h3>
+        <p class="small">Numbers are set aside a run at a time before their labels are printed, so an item given the next free number never takes one waiting on a roll. A label is black on white: a QR code holding just the number, the number in large type and "Session Hire", and the product's name on an item's own label. They print here from the browser, one to a page on a label printer or 65 to an A4 sheet, or from a spreadsheet a label maker prints rolls and metal tags from. Scanning a label that isn't on anything yet offers to put it on an item; the product and place stay for the next one, so labelling a shelf is a scan and Enter each. (Decision 0015)</p>
+        <div class="phones">
+          <figure><img src="img/labels-list.png" alt="The Labels screen on a phone: how many labels and what for, a note that SH-000001 to SH-000012 are set aside, and under Set aside the run SH-000001 to SH-000012, Roll from Label World, set aside today, 0 of 12 on items" width="390" height="844" loading="lazy"><figcaption><b>Set aside.</b> The numbers for a roll, before it's printed.</figcaption></figure>
+          <figure><img src="img/labels-run.png" alt="A run's page on a phone: the printer, a label printer 50 × 25 mm, 25 × 25 mm or A4 sheets of 65; a preview of SH-000001 to SH-000003, each a QR code, the number and Session Hire; Print 12 labels; and For a label maker, a spreadsheet of all 12" width="390" height="844" loading="lazy"><figcaption><b>Printed.</b> Here, or by a label maker.</figcaption></figure>
+          <figure><img src="img/labels-claim.png" alt="The Stock search on a phone with sh5 typed: SH-000005 isn't on anything yet, one of the labels set aside today for Roll from Label World; product d&amp;b Y10P, kept at Bay A3, one of the 3 counted there, and Put SH-000005 on it; below, the Labels card with the next free number, SH-000013" width="390" height="844" loading="lazy"><figcaption><b>Claimed on scan.</b> Which product, and where it's kept.</figcaption></figure>
+          <figure><img src="img/labels-item.png" alt="An item's page on a phone: SH-000005, a d&amp;b Y10P at Bay A3, with Print label open: the printer, then its label with the QR code, SH-000005, Session Hire and d&amp;b Y10P, and Print the label" width="390" height="844" loading="lazy"><figcaption><b>An item's own.</b> A new one, from its page.</figcaption></figure>
         </div>
       </div>
       <div class="panel shots crewshots">
@@ -603,6 +613,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>Personal feeds</th><td>A read-only calendar feed for each person, at an address worked out from their private link; every feed kept in memory and rebuilt only after a change</td><td>Built (Decision 0012)</td></tr>
             <tr><th>Warehouse catalogue</th><td>Products numbered or counted; items with a hidden id and a Session Hire number never used twice; places; cases up to five deep; numbered kit counted until it's labelled</td><td>Built (Decision 0013)</td></tr>
             <tr><th>Kit on jobs</th><td>Each job's products and how many, for the whole job or a phase; shortages per day worked out on each device, with confirmed jobs holding kit and enquiries and quotes pencilled in; subhire on the line</td><td>Built (Decision 0014)</td></tr>
+            <tr><th>Labels</th><td>Numbers set aside a run at a time by the server, so none is given out twice; labels printed from the browser or by a label maker from a spreadsheet; a label not on anything yet put on an item by scanning it</td><td>Built (Decision 0015)</td></tr>
           </tbody>
         </table>
       </div>
@@ -700,19 +711,19 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <div class="panel">
         <div class="label-demo">
           <div class="asset-label" aria-label="Example polyester asset label">
-            <svg viewBox="0 0 21 21" width="64" height="64" id="qr1" aria-hidden="true"></svg>
+            <svg viewBox="-2 -2 25 25" width="64" height="64" id="qr1" aria-hidden="true"><rect x="-2" y="-2" width="25" height="25" fill="#fdfdfb"/><path fill="#111" d="M0 0h7v1h-7zM8 0h2v1h-2zM14 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM9 1h1v1h-1zM11 1h2v1h-2zM14 1h1v1h-1zM20 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM10 2h3v1h-3zM14 2h1v1h-1zM16 2h3v1h-3zM20 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h3v1h-3zM12 3h1v1h-1zM14 3h1v1h-1zM16 3h3v1h-3zM20 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM16 4h3v1h-3zM20 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM11 5h1v1h-1zM14 5h1v1h-1zM20 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h7v1h-7zM9 7h2v1h-2zM12 7h1v1h-1zM2 8h1v1h-1zM4 8h3v1h-3zM8 8h1v1h-1zM10 8h1v1h-1zM12 8h2v1h-2zM17 8h1v1h-1zM20 8h1v1h-1zM1 9h2v1h-2zM9 9h3v1h-3zM15 9h1v1h-1zM18 9h1v1h-1zM0 10h1v1h-1zM3 10h1v1h-1zM6 10h1v1h-1zM8 10h1v1h-1zM11 10h1v1h-1zM14 10h1v1h-1zM16 10h1v1h-1zM19 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM10 11h2v1h-2zM15 11h1v1h-1zM20 11h1v1h-1zM0 12h1v1h-1zM3 12h4v1h-4zM10 12h1v1h-1zM12 12h1v1h-1zM16 12h1v1h-1zM19 12h1v1h-1zM8 13h5v1h-5zM15 13h5v1h-5zM0 14h7v1h-7zM11 14h1v1h-1zM14 14h2v1h-2zM19 14h1v1h-1zM0 15h1v1h-1zM6 15h1v1h-1zM8 15h1v1h-1zM11 15h1v1h-1zM14 15h2v1h-2zM17 15h1v1h-1zM19 15h1v1h-1zM0 16h1v1h-1zM2 16h3v1h-3zM6 16h1v1h-1zM8 16h1v1h-1zM11 16h4v1h-4zM18 16h3v1h-3zM0 17h1v1h-1zM2 17h3v1h-3zM6 17h1v1h-1zM9 17h2v1h-2zM12 17h1v1h-1zM17 17h1v1h-1zM19 17h1v1h-1zM0 18h1v1h-1zM2 18h3v1h-3zM6 18h1v1h-1zM8 18h1v1h-1zM10 18h1v1h-1zM14 18h2v1h-2zM17 18h2v1h-2zM20 18h1v1h-1zM0 19h1v1h-1zM6 19h1v1h-1zM9 19h1v1h-1zM12 19h1v1h-1zM15 19h3v1h-3zM19 19h2v1h-2zM0 20h7v1h-7zM12 20h1v1h-1zM16 20h1v1h-1zM18 20h1v1h-1zM20 20h1v1h-1z"/></svg>
             <div><div class="co">Session Hire</div><div class="id">SH-004217</div><div class="what">d&amp;b Y10P · polyester label</div></div>
           </div>
           <div class="asset-label metal" aria-label="Example riveted metal tag for a road case">
-            <svg viewBox="0 0 21 21" width="64" height="64" id="qr2" aria-hidden="true"></svg>
+            <svg viewBox="-2 -2 25 25" width="64" height="64" id="qr2" aria-hidden="true"><rect x="-2" y="-2" width="25" height="25" fill="#fdfdfb"/><path fill="#111" d="M0 0h7v1h-7zM9 0h1v1h-1zM12 0h1v1h-1zM14 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM14 1h1v1h-1zM20 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h2v1h-2zM14 2h1v1h-1zM16 2h3v1h-3zM20 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h3v1h-3zM14 3h1v1h-1zM16 3h3v1h-3zM20 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM9 4h1v1h-1zM11 4h1v1h-1zM14 4h1v1h-1zM16 4h3v1h-3zM20 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM11 5h2v1h-2zM14 5h1v1h-1zM20 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h7v1h-7zM10 7h1v1h-1zM12 7h1v1h-1zM3 8h2v1h-2zM6 8h2v1h-2zM9 8h1v1h-1zM11 8h2v1h-2zM17 8h2v1h-2zM0 9h2v1h-2zM5 9h1v1h-1zM7 9h1v1h-1zM9 9h3v1h-3zM16 9h2v1h-2zM19 9h2v1h-2zM0 10h2v1h-2zM4 10h3v1h-3zM10 10h1v1h-1zM13 10h3v1h-3zM17 10h1v1h-1zM19 10h1v1h-1zM0 11h5v1h-5zM8 11h2v1h-2zM12 11h1v1h-1zM14 11h1v1h-1zM16 11h1v1h-1zM18 11h3v1h-3zM0 12h2v1h-2zM3 12h4v1h-4zM10 12h1v1h-1zM13 12h1v1h-1zM15 12h3v1h-3zM8 13h2v1h-2zM11 13h4v1h-4zM19 13h2v1h-2zM0 14h7v1h-7zM8 14h3v1h-3zM15 14h2v1h-2zM20 14h1v1h-1zM0 15h1v1h-1zM6 15h1v1h-1zM9 15h2v1h-2zM12 15h5v1h-5zM18 15h1v1h-1zM20 15h1v1h-1zM0 16h1v1h-1zM2 16h3v1h-3zM6 16h1v1h-1zM8 16h1v1h-1zM10 16h1v1h-1zM12 16h1v1h-1zM14 16h2v1h-2zM17 16h4v1h-4zM0 17h1v1h-1zM2 17h3v1h-3zM6 17h1v1h-1zM8 17h1v1h-1zM11 17h2v1h-2zM14 17h1v1h-1zM16 17h3v1h-3zM0 18h1v1h-1zM2 18h3v1h-3zM6 18h1v1h-1zM9 18h2v1h-2zM13 18h2v1h-2zM16 18h5v1h-5zM0 19h1v1h-1zM6 19h1v1h-1zM9 19h4v1h-4zM18 19h2v1h-2zM0 20h7v1h-7zM9 20h1v1h-1zM12 20h1v1h-1zM16 20h1v1h-1zM18 20h2v1h-2z"/></svg>
             <div><div class="co">Session Hire</div><div class="id">SH-000318</div><div class="what">Amp rack · riveted metal tag</div></div>
           </div>
-          <p class="small" style="flex:1 1 220px">The number is what people read out; the QR is what phones scan. The item's real id is hidden, so a worn label can be replaced without losing its history.</p>
+          <p class="small" style="flex:1 1 220px">The number is what people read out; the QR code, which holds just the number, is what phones and scanners read. The item's real id is hidden, so a worn label can be replaced without losing its history.</p>
         </div>
       </div>
       <div class="panel">
-        <h3>Built so far: the catalogue and kit on jobs (Decisions 0013 and 0014)</h3>
-        <p class="small">The Stock tab holds every product, numbered or counted, each numbered item with its Session Hire number, the places kit is kept and the cases it lives in. Numbered kit can be counted until it's labelled, so the app knows everything owned from the first day and shows how far the labelling has got. Labels can go on over weeks: an item takes the number on its label, typed or scanned, or the next free one. A number is never used twice, even after a new label. Jobs now list the kit they need, and each line says whether there's enough on its days, so shortages show before the day; until the counting is done, some will be counts not finished yet. Next: label printing, then pick lists and scanning out and in.</p>
+        <h3>Built so far: the catalogue, kit on jobs and labels (Decisions 0013 to 0015)</h3>
+        <p class="small">The Stock tab holds every product, numbered or counted, each numbered item with its Session Hire number, the places kit is kept and the cases it lives in. Numbered kit can be counted until it's labelled, so the app knows everything owned from the first day and shows how far the labelling has got. Labels can go on over weeks: an item takes the number on its label, typed or scanned, or the next free one. A number is never used twice, even after a new label. Jobs now list the kit they need, and each line says whether there's enough on its days, so shortages show before the day; until the counting is done, some will be counts not finished yet. Labels print here or from a spreadsheet a label maker works from, on numbers set aside so none is given out twice, and scanning a new label puts it on an item: the product and place are picked once, then each label on the shelf is a scan and Enter. Next: scanning with the phone's camera in the app, then pick lists and scanning out and in.</p>
       </div>
       <div class="scroll panel" style="padding:0">
         <table>
@@ -838,7 +849,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'now', 'Built; office trial left'],
-    ['2', 'Warehouse', 'now', 'Started: catalogue and kit on jobs built'],
+    ['2', 'Warehouse', 'now', 'Started: catalogue, kit on jobs and labels built'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
@@ -901,25 +912,12 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       : 'Calendar-led: ops can keep working in Google. Moving an event moves the phase; RSVPs update crew status.';
   }));
 
-  // fake QR-like marks (decorative)
-  const qr = (el, seed) => {
-    let s = seed, out = '';
-    const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
-    const finder = (x, y) => `<rect x="${x}" y="${y}" width="7" height="7" fill="#111"/><rect x="${x + 1}" y="${y + 1}" width="5" height="5" fill="#fdfdfb"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" fill="#111"/>`;
-    for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) {
-      const inF = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
-      if (!inF && rnd() > .52) out += `<rect x="${x}" y="${y}" width="1" height="1" fill="#111"/>`;
-    }
-    el.innerHTML = `<rect width="21" height="21" fill="#fdfdfb"/>` + out + finder(0, 0) + finder(14, 0) + finder(0, 14);
-  };
-  qr($('#qr1'), 4217); qr($('#qr2'), 318);
-
   // roadmap
   const road = [
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
     ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Bring in the jobs already on the organisers\' calendars (built)', 'Week and month planner with clashes flagged (built)', 'Personal calendar feeds, read-only and safe to share (built)'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
-    ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations (built and on)', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings (built and on)', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
+    ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations (built and on)', 'Label printing (built and on) and the labelling rollout', 'Kit on jobs with live availability and shortage warnings (built and on)', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
     ['5', '', 'Crewbox link and on-site mode', ['Crewbox additions: keyed import, show log by key, asset tags on faults', 'Push job to the box; pull faults back as repair tickets', 'Crew chief view: kit check by scan, crew present, notes, offline'], 'the box is set up from the job in one step and faults from site are waiting in the repair queue.'],
@@ -954,7 +952,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Calendar import', 'The jobs on a calendar the connected account can see come in after a look at everything first; titles give job and phase, guests\' answers give crew booked, offered or declined, and TBC or hold means pencilled in. The organiser\'s calendar keeps these jobs\' events, so the app doesn\'t add them to the jobs calendar (Decision 0011). Built; works once the Google key is in and a calendar connected.', 'waiting'],
     ['Personal feeds', 'Each person\'s feed has a read-only address of its own, worked out from their private link, so it\'s safe in a shared calendar and New link retires it; its events no longer carry the private link. Feeds are answered from memory and rebuilt only after a change, and private addresses are masked in the server\'s log (Decision 0012). Built and on.', 'decided'],
     ['Warehouse catalogue', 'Products are numbered, each item labelled SH- and six digits, or counted; numbered kit can be counted until it\'s labelled, so the total is right from the first day. A number is used only once, items are never deleted but retired, places are a flat list, and cases hold kit up to five deep (Decision 0013). Built and on.', 'decided'],
-    ['Kit on jobs', 'A job\'s kit is products and how many, for the whole job or one phase, a whole-job line covering the days between phases too. Confirmed jobs hold kit, enquiries and quotes are pencilled in, and cancelled or lost ones hold none. A line short on its days says by how many, when and who has the rest; it\'s never refused for being short, and it can be subhired, with the supplier on the line (Decision 0014). Built and on.', 'decided']
+    ['Kit on jobs', 'A job\'s kit is products and how many, for the whole job or one phase, a whole-job line covering the days between phases too. Confirmed jobs hold kit, enquiries and quotes are pencilled in, and cancelled or lost ones hold none. A line short on its days says by how many, when and who has the rest; it\'s never refused for being short, and it can be subhired, with the supplier on the line (Decision 0014). Built and on.', 'decided'],
+    ['Labels', 'Numbers are set aside a run at a time, picked by the server so none is given out twice, and kept for good. A label is black on white: a QR code, the number in large type and "Session Hire". It prints here from the browser, or from a spreadsheet a label maker works from; a label not on anything yet goes on an item by scanning it (Decision 0015). Built and on. The QR code holds just the number for now, which never goes out of date and any scanner reads. Colly to choose before a roll is ordered: keep that, or a Session Hire web address so a phone\'s own camera opens the item?', 'waiting']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

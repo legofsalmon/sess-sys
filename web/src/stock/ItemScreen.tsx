@@ -13,6 +13,7 @@ import { useState, type FormEvent } from 'react'
 import { act } from '../crew/CrewScreen.tsx'
 import { NotDone, Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
+import { PrintLabels } from './Labels.tsx'
 import {
   contentsLabel,
   CountHere,
@@ -29,8 +30,9 @@ import {
 
 /**
  * One numbered item: its label, its product, where it's kept, the labels
- * it had before, and for a case, what's in it. Retiring keeps it and its
- * number for the record; it can be brought back.
+ * it had before, and for a case, what's in it. Its label can be printed
+ * here (ADR 0015). Retiring keeps it and its number for the record; it can
+ * be brought back.
  */
 export function ItemScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse
@@ -61,7 +63,7 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
   )
 }
 
-type Mode = 'move' | 'details' | 'label' | 'retire'
+type Mode = 'move' | 'details' | 'label' | 'print' | 'retire'
 
 function Summary({ a, w }: { a: AssetView; w: WarehouseView }) {
   const [mode, setMode] = useState<Mode | undefined>()
@@ -114,9 +116,9 @@ function Summary({ a, w }: { a: AssetView; w: WarehouseView }) {
         </div>
       ) : (
         <div className="actions">
-          {(['move', 'details', 'label', 'retire'] as const).map((m) => (
+          {(['move', 'details', 'label', 'print', 'retire'] as const).map((m) => (
             <button key={m} type="button" aria-pressed={mode === m} onClick={() => toggle(m)}>
-              {{ move: 'Move', details: 'Change details', label: 'New label', retire: 'Retire' }[m]}
+              {{ move: 'Move', details: 'Change details', label: 'New label', print: 'Print label', retire: 'Retire' }[m]}
             </button>
           ))}
         </div>
@@ -124,6 +126,13 @@ function Summary({ a, w }: { a: AssetView; w: WarehouseView }) {
       {!retired && mode === 'move' && <Move a={a} w={w} onDone={done} />}
       {!retired && mode === 'details' && <Details a={a} w={w} onDone={done} />}
       {!retired && mode === 'label' && <Relabel a={a} w={w} onDone={done} />}
+      {!retired &&
+        mode === 'print' &&
+        (a.number ? (
+          <PrintLabels numbers={[a.number]} caption={a.model?.name} />
+        ) : (
+          <p className="hint">It gets its number when it syncs, and its label can be printed then.</p>
+        ))}
       {!retired && mode === 'retire' && <Retire a={a} onDone={done} />}
     </section>
   )

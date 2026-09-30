@@ -84,6 +84,16 @@ follow-up that lets the two stay in step.
   short line has one button, "Subhire the 2 short", which opens the
   line's form with the number filled in and the cursor in From. The jobs
   list says "Kit short" in the same red or amber. Not in Figma yet.
+- A label ([ADR 0015](adr/0015-printing-labels.md)) is black on white in
+  any theme, sized in millimetres: the QR code on the left (on top for a
+  25 mm square) with two modules of white round it, the number in heavy
+  type with even-width digits, then "Session Hire" and the product's name
+  small. The print screen shows the first three at their real size on a
+  grey panel, above one button that says how many it prints. A range of
+  numbers wraps only between the numbers, never inside one. A label
+  scanned in the search that isn't on anything yet opens a red-bordered
+  form right under the search, with the cursor in its first field. Not in
+  Figma yet.
 
 ## Accessibility
 

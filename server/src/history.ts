@@ -6,6 +6,7 @@ import {
   invitesLabel,
   newId,
   normaliseNumber,
+  numberText,
   OFFLINE_AFTER_SECONDS,
   RETIRED_LABELS,
   STATUS_LABELS,
@@ -268,6 +269,11 @@ const text = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v :
 const dates = (start: unknown, end: unknown) =>
   typeof start === 'string' && typeof end === 'string' ? daysLabel(eachDay(start, end)) : 'on dates since removed'
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+/** "SH-000101 to SH-000600", or "SH-000101" for one, once the server has set them aside. */
+const runRange = (r: Data | undefined) =>
+  typeof r?.first === 'number' && typeof r.count === 'number'
+    ? `${numberText(r.first)}${r.count > 1 ? ` to ${numberText(r.first + r.count - 1)}` : ''}`
+    : undefined
 /** "a", "a and b", "a, b and c". */
 const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
 
@@ -465,6 +471,18 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
     case 'kit.remove': {
       const k = look('kitLine', a.id)
       return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
+    }
+    case 'labels.reserve': {
+      const r = look('labelRun', a.id)
+      const what = typeof a.name === 'string' && a.name.trim() ? ` (${clip(a.name.trim())})` : ''
+      const count = typeof a.count === 'number' ? a.count : 0
+      return `Set aside ${runRange(r) ?? `${count.toLocaleString('en-IE')} ${count === 1 ? 'number' : 'numbers'}`} for printing labels${what}`
+    }
+    case 'labels.update': {
+      const parts: string[] = []
+      if (a.name !== undefined) parts.push(typeof a.name === 'string' && a.name.trim() ? `what they're for to ${clip(a.name.trim())}` : "what they're for")
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed the labels ${runRange(look('labelRun', a.id)) ?? 'set aside'}: ${inWords(parts)}`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

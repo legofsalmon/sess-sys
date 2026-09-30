@@ -4,7 +4,8 @@ import { runMigrations, type Module } from '../migrations.ts'
 /**
  * The warehouse catalogue (ADR 0013): products (models), numbered items
  * (assets) and the labels on them (identifiers), places, and counted stock;
- * and the kit on jobs (ADR 0014), which refers to jobs and their phases.
+ * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
+ * the numbers set aside for printing labels (ADR 0015).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -87,6 +88,20 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS kit_lines_project ON kit_lines (project_id);
   CREATE INDEX IF NOT EXISTS kit_lines_phase ON kit_lines (phase_id);
   CREATE INDEX IF NOT EXISTS kit_lines_model ON kit_lines (model_id);
+  `,
+  // Labels (ADR 0015): numbers set aside a run at a time for printing, so the
+  // next free number is never one on a label that isn't stuck on yet. Kept
+  // for good: a run's labels may be printed already.
+  `
+  CREATE TABLE IF NOT EXISTS label_runs (
+    id            text PRIMARY KEY,
+    first_number  integer NOT NULL CHECK (first_number >= 1),
+    count         integer NOT NULL CHECK (count >= 1 AND count <= 10000),
+    name          text NOT NULL DEFAULT '',
+    notes         text NOT NULL DEFAULT '',
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    CHECK (first_number + count - 1 <= 999999)
+  );
   `,
 ]
 
