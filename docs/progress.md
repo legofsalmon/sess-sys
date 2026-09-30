@@ -42,6 +42,8 @@ waiting on someone.
   list, a batch tested with one fail and one with no signal, the failed
   item's page, the job short, and the scan out warned). All 37 browser
   tests and all 240 server tests pass, with the made-up data work merged in.
+- Merged into `main` at 14:30 UTC once GitHub's checks passed, and live
+  by 14:40: Railway deployed it on its own.
 
 ## 30 September 2026: made-up data to try the app with, and starting fresh
 
