@@ -7,7 +7,7 @@ import { ident, tablesInOrder } from '../tables.ts'
 import { madeUpData } from './madeup.ts'
 
 /**
- * Made-up data and starting fresh (ADR 0018). Made-up data goes into an
+ * Made-up data and starting fresh (ADR 0019). Made-up data goes into an
  * empty app, to try it out; starting fresh deletes everything, made-up or
  * not, before the real jobs, crew and stock go in. Both are records in
  * `server_meta`, which isn't backed up or exported, so they belong to this

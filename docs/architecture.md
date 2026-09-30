@@ -264,14 +264,20 @@ says product and item; the code says model and asset.
   asset under repair, or overdue an inspection, cannot be scanned out
   without an override. Lifting accessories need a thorough examination
   every 6 months under S.I. 299/2007 and a register with a lasting mark on
-  each item, which the asset label provides.
+  each item, which the asset label provides. Faults are built
+  ([ADR 0018](adr/0018-faults-missing-kit-and-repairs.md)): an item, or
+  some counted kit, reported damaged or missing, with repair notes, and
+  closed as fixed, not faulty, found or written off. Since a scan records
+  what already happened, scanning out faulty kit is warned about and
+  kept, not refused. Inspections come next.
 - **Availability** is computed from equipment lines, movements and
   maintenance, per product per hour, including prep and return buffers.
   Built for now from kit lines and what's owned, per product per whole
   day, on each device ([ADR 0014](adr/0014-kit-on-jobs.md)): confirmed
   jobs hold kit, enquiries and quotes are pencilled in. Movements are
   recorded now (ADR 0017), but kit out past its job isn't yet taken off
-  what's free; that, repairs, hours and buffers come with maintenance.
+  what's free. Kit missing, or damaged and not fit to use, is
+  (ADR 0018); inspections, hours and buffers come next.
 
 **People**
 
@@ -449,7 +455,7 @@ Crewbox.
   restore, devices reload their copy and send again what the backup missed.
 - Start fresh on the Account tab deletes everything but the staff
   accounts, after a backup, to clear made-up data before the real data
-  goes in ([ADR 0018](adr/0018-made-up-data-and-starting-fresh.md)).
+  goes in ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)).
   Devices reload their copy as after a restore, but drop what they had
   waiting instead of sending it again, and the server turns down changes
   made on the copy from before.

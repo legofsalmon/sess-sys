@@ -43,7 +43,7 @@ export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
   )
 }
 
-/** Beside each screen's name while the app holds made-up data (ADR 0018), so nobody mistakes it for real work. */
+/** Beside each screen's name while the app holds made-up data (ADR 0019), so nobody mistakes it for real work. */
 export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
   return view.madeUp ? <span className="made-up"> · made-up data</span> : null
 }

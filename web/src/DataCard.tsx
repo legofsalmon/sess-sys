@@ -5,7 +5,7 @@ import { ask, post } from './server.ts'
 import { syncSoon } from './sync.ts'
 
 /**
- * Made-up data and starting fresh (ADR 0018): trying every part of the app
+ * Made-up data and starting fresh (ADR 0019): trying every part of the app
  * before the real jobs, crew and stock go in, then clearing it all, on the
  * server and on every phone. Deleting everything needs the words typed, and
  * a backup is made first where backups are set up.

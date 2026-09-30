@@ -47,7 +47,7 @@ export type Tone = 'bad' | 'warn' | 'ok' | 'quiet'
 
 /**
  * Whether a line has enough, in words: "Short 2 on Wed 8 Oct: 10 owned, 4
- * on Fuel". Short on a confirmed job is bad; on an enquiry or a quote it's
+ * on Fuel". Kit damaged or missing isn't counted as owned (ADR 0018). Short on a confirmed job is bad; on an enquiry or a quote it's
  * a warning, as is enough that the pencilled jobs would use up. Undefined
  * when there's nothing to say: a stopped job, or days gone by.
  */
@@ -60,12 +60,14 @@ export function kitState(l: KitLineView, today: string): { tone: Tone; text: str
   const pencilled = l.hold === 'pencilled'
   if (l.short > 0) {
     const tone = pencilled ? 'warn' : 'bad'
+    if (l.owned === 0 && l.unusable > 0)
+      return say(tone, `None fit to go out: ${l.unusable} damaged or missing, so ${pencilled ? 'it would be' : "it's"} short ${l.short} until they're fixed or found.`)
     if (l.owned === 0) return say(tone, `None counted in stock yet, so ${pencilled ? 'it would be' : "it's"} short ${l.short} until they are.`)
     const held = l.others.filter((o) => o.hold === 'held')
     const more = l.shortDays > 1 ? ` Short on ${plural(l.shortDays - 1, 'other day')} too.` : ''
     return say(
       tone,
-      `${pencilled ? 'Would be short' : 'Short'} ${l.short} on ${dayLabel(l.shortDay!)}${pencilled ? ' if it goes ahead' : ''}: ${l.owned} owned${held.length ? `, ${whoHas(held)}` : ''}.${more}`
+      `${pencilled ? 'Would be short' : 'Short'} ${l.short} on ${dayLabel(l.shortDay!)}${pencilled ? ' if it goes ahead' : ''}: ${l.owned} owned${l.unusable ? ` and fit to go out (${l.unusable} damaged or missing)` : ''}${held.length ? `, ${whoHas(held)}` : ''}.${more}`
     )
   }
   if (l.ifPencilled > 0) {

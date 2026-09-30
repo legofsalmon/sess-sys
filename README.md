@@ -20,8 +20,9 @@ products numbered or counted, items with Session Hire numbers, places,
 cases and counts; kit on jobs, with shortages flagged and subhire; and
 printing labels, with numbers set aside for each run and labels put on
 items by scanning them; scanning labels with the phone's camera in
-the app; and a pick list for each job, with kit scanned out and back in
-on a phone, with no signal too. Until the real stock and crew lists
+the app; a pick list for each job, with kit scanned out and back in
+on a phone, with no signal too; and damaged and missing kit reported as
+it comes back, with a repair list. Until the real stock and crew lists
 are in, the Account tab puts in made-up data to try every part of the
 app with, and Start fresh clears it all before the real data goes in.
 The app runs on Railway. Start with the

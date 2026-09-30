@@ -23,7 +23,7 @@ import { tablesInOrder } from '../src/tables.ts'
 import { IPHONE, server as signedInServer, staff } from './people.ts'
 
 /**
- * Made-up data and starting fresh (ADR 0018): trying the app before the real
+ * Made-up data and starting fresh (ADR 0019): trying the app before the real
  * jobs, crew and stock go in, then clearing it all, on the server and on
  * every phone, without anything coming back.
  */
@@ -176,6 +176,7 @@ describe('made-up data', () => {
     // Pick lists: the jobs going out soon, and the gala over with two speakers not back.
     expect(view.moves.soon.map((p) => p.job.name)).toEqual(['Harbour Lights Festival', 'Brightwater Tech Summit', 'Liffey Brands Launch'])
     expect(view.moves.stillOut.map((p) => [p.job.name, p.stillOut, p.back])).toEqual([['Autumn Gala', 2, 6]])
+    expect(view.faults.open.map((f) => [f.kind, f.usable, f.note])).toEqual([['damaged', true, 'Rattles at high level. Fine for speech meanwhile.']])
     expect(view.problems).toEqual([])
 
     // In the history as Aoife's, from "Made-up data", and one entry saying she put it in.

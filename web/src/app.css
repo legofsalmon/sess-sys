@@ -70,7 +70,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .pill.cancelled { background: var(--line); color: var(--muted); }
 button { font: 600 .9rem system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
-/* Deleting everything (ADR 0018): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
+/* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; }

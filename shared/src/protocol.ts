@@ -28,7 +28,7 @@ export const pushRequest = z.object({
   sentAt: z.string().datetime({ offset: true }).optional(),
   /**
    * The copy of the data the device last pulled from. If the app has
-   * started fresh since (ADR 0018), what the device sends belongs to what
+   * started fresh since (ADR 0019), what the device sends belongs to what
    * was cleared, so none of it is applied. Absent from older versions of
    * the app, and from a device that hasn't pulled yet.
    */
@@ -66,17 +66,17 @@ export interface PullResponse {
   generation?: string
   /**
    * This copy of the data began empty on purpose: someone started fresh
-   * (ADR 0018). A device starting its copy afresh then drops what it was
+   * (ADR 0019). A device starting its copy afresh then drops what it was
    * going to send again, which would bring back what was cleared.
    */
   cleared?: boolean
-  /** The server holds made-up data to try the app with (ADR 0018), which every screen says, so nobody mistakes it for real work. */
+  /** The server holds made-up data to try the app with (ADR 0019), which every screen says, so nobody mistakes it for real work. */
   madeUp?: boolean
   /** The server's latest change number. Lower than a device's cursor means the server has lost changes. */
   head?: number
 }
 
-/** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0018). */
+/** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0019). */
 export interface DataStatus {
   /** Nothing has been done in the app since it began or started fresh, so made-up data can go in. */
   empty: boolean

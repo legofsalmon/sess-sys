@@ -1,7 +1,7 @@
 import { addDays, newId, venueLabel, type CommandInput, type CommandName, type Mutation } from '@sh/shared'
 
 /**
- * Made-up data (ADR 0018): enough of a small A/V company's weeks to try
+ * Made-up data (ADR 0019): enough of a small A/V company's weeks to try
  * every part of the app before the real jobs, crew and stock go in. It's
  * all ordinary commands, so the server's rules check it as they would a
  * phone's, the history shows it, and phones get it by syncing.
@@ -21,7 +21,7 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   holding their amps, counted cables and mics, and a roll of label
  *   numbers set aside;
  * - pick lists for the jobs going out soon, and a job that's over with two
- *   speakers still not back.
+ *   speakers still not back, and one back with a rattle, on the repair list.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -206,5 +206,16 @@ export function madeUpData(today: string): Mutation[] {
     add('move.record', { id: newId(), projectId: gala, direction, assetId, modelId: y10p, qty: 1, at: `${day(on)}T${time}:00.000Z` })
   for (const s of speakers.slice(0, 8)) scan('out', s, -11, '09:00')
   for (const s of speakers.slice(0, 6)) scan('in', s, -8, '11:00')
+  add('fault.report', {
+    id: newId(),
+    kind: 'damaged',
+    assetId: speakers[0]!,
+    modelId: y10p,
+    qty: 1,
+    projectId: gala,
+    usable: true,
+    note: 'Rattles at high level. Fine for speech meanwhile.',
+    at: `${day(-8)}T11:05:00.000Z`,
+  })
   return out
 }

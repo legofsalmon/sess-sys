@@ -165,7 +165,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     for (const m of mutations) {
       const result = await db.transaction(async (tx) => {
         await tx.query('SELECT pg_advisory_xact_lock(7331)')
-        // Made on a copy of the data from before someone started fresh (ADR 0018): none of it belongs any more.
+        // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
         if (generation && (await clearedSince(tx, generation))) return undefined
         return applyMutationIn(tx, clientId, m as never, from)
       })
@@ -199,7 +199,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const head = Number(meta[0]?.head ?? 0)
     const generation = meta[0]?.generation ?? undefined
     const cursor = changes.length ? changes[changes.length - 1]!.seq : Math.max(after, head)
-    // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0018).
+    // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
     return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head }
   })

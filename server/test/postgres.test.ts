@@ -318,7 +318,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     }
   })
 
-  it('starts fresh while phones are sending, and leaves nothing from before (ADR 0018)', async () => {
+  it('starts fresh while phones are sending, and leaves nothing from before (ADR 0019)', async () => {
     const db = postgresDb(url!)
     await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
     const app = await buildApp({ db })

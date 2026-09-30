@@ -107,3 +107,23 @@
 .warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .warehouse .scanner .alert { display: grid; gap: 8px; justify-items: start; }
 .warehouse .scanner .alert p { margin: 0; }
+
+/* Faults and missing kit (ADR 0018): a stripe down the side says whether it stops the kit going out. */
+.warehouse .fault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.warehouse .fault { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; }
+.warehouse .fault.stops { border-left-color: var(--bad); }
+.warehouse .fault.usable { border-left-color: var(--warn); }
+.warehouse .fault.closed { color: var(--muted); }
+.warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+.warehouse .fault header p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .fault a { color: var(--accent-ink); font-weight: 600; }
+.warehouse .fault header > div > a { color: inherit; }
+.warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: .9rem; }
+.warehouse .fault .repair { color: var(--muted); }
+.warehouse .fault .actions { margin: 0; }
+.warehouse .faults h3 { margin: 12px 0 6px; }
+.warehouse .faults details { margin-top: 10px; }
+.warehouse .faults details .fault-list { margin-top: 8px; }
+.warehouse .facts dd.bad, .warehouse .flag.bad { color: var(--bad); font-weight: 600; }
+.warehouse .numbers.missing-items a { border-style: dashed; border-color: var(--bad); color: var(--bad); }
+.warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: .85rem; font-weight: 600; }

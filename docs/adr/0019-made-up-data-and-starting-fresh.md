@@ -1,4 +1,4 @@
-# ADR 0018: Made-up data, and starting fresh
+# ADR 0019: Made-up data, and starting fresh
 
 - **Status:** Accepted, 30 September 2026.
 - **Decides:** how the app can be tried with made-up data before the real
@@ -38,7 +38,8 @@ is what's wanted before the real data goes in.
   declined, a freelancer offered a second job on days they're booked (a check
   in the planner) and one on holidays; labelled items, amps in racks, kit
   still counted and a roll of label numbers set aside; pick lists for the
-  jobs going out soon, and a job that's over with two speakers not back.
+  jobs going out soon, and a job that's over with two speakers not back
+  and one on the repair list.
 - **It's all ordinary commands**, checked by the server's rules as a
   phone's would be, all at once or not at all. Its dates count from the
   day it goes in, so the jobs are always in the coming weeks. Every name
