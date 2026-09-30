@@ -3,6 +3,42 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: deploys unstuck
+
+**Done**
+
+- Kit on jobs and printing labels were merged at 07:48 UTC but didn't go
+  live on their own. GitHub has run none of its checks since 06:10 UTC:
+  each run stops within seconds without starting, the usual sign that the
+  account's GitHub Actions minutes for the month are used up or its
+  spending limit is reached (this repo is private, so its runs count
+  against them). Railway waits for those checks before deploying, so it
+  skipped the deploy. The checks were run here on the merged code instead,
+  all passing, and it was deployed from Railway by hand at 11:32 UTC, live
+  by 11:34.
+- Why Railway skipped merges (the question from 29 September): the app
+  server only deployed when something under `server/` changed, so merges
+  of only the docs, the web app or the shared code were skipped. It now
+  also deploys on changes to `web/`, `shared/` and the files at the top of
+  the repo that the build uses. That's set on the Railway service and in
+  `railway.json`, so it's kept with the code.
+- The checks run once for each change rather than twice: on pull requests
+  and on `main`, not also on every push to a branch with a pull request
+  open. That halves the minutes they use.
+- The second service in the Railway project, `@sh/web`, was made by
+  Railway from the repo's layout. It runs a development copy of the web
+  app with no address, so nobody uses it, and it doesn't touch the
+  database. It can be deleted.
+
+**Next**
+
+- Colly: on GitHub, check the Actions minutes and spending limit in the
+  account's billing settings. Until the checks run again, Railway skips
+  every merge, and each needs **Deploy Latest Commit** on `@sh/server`
+  (or ask Claude, who now has access to Railway).
+- Colly, if you agree: delete `@sh/web` in Railway, so it stops using the
+  project's resources.
+
 ## 30 September 2026: printing labels
 
 **Done**
@@ -43,6 +79,14 @@ waiting on someone.
   aside, printed in each layout with the printed page sizes checked,
   downloaded, claimed by scanning, an item's own label; set aside with no
   signal), with all 31 browser tests passing.
+- Merged into `main` with kit on jobs at 07:48 UTC and live by 11:34: the
+  live app has **Print labels**, and the live server adds the new table
+  before it starts, so the live database has it too. GitHub didn't run its
+  checks on the merge and Railway waits for them, so it skipped the
+  deploy; the checks were run here on the merged code instead (all 218
+  unit and sync tests, on PGlite and a real Postgres, and all 31 browser
+  tests) before it was deployed by hand. The entry above, on deploys, has
+  why and what changed.
 
 **Next**
 
@@ -99,6 +143,9 @@ waiting on someone.
   new browser tests on a phone (short, subhired, a quote pencilled in,
   the Stock tab and a product's page; kit added with no signal), with all
   29 browser tests passing.
+- Merged into `main` with printing labels at 07:48 UTC and live by 11:34:
+  the live app has the **Kit** card, and the live database has the new
+  table. It went live by hand, as the entry for printing labels says.
 
 **Next**
 
