@@ -14,6 +14,8 @@ export interface PageData {
   jobs: { offer: Offer; call: CrewCall; openDays: string[] }[]
   away: Unavailability[]
   base: string
+  /** The read-only calendar feed address (ADR 0012), safe to add to a shared calendar. */
+  feed: string
   flash?: { ok: boolean; text: string }
   today: string
 }
@@ -85,7 +87,6 @@ export function renderPage(d: PageData): string {
   const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
   const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
   const first = d.person.name.split(' ')[0]
-  const feed = `${d.base}/calendar.ics`
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -111,7 +112,7 @@ export function renderPage(d: PageData): string {
   <section>
     <h2>Your bookings</h2>
     ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
-    <p class="small">See these in your own calendar: <a href="${h(feed.replace(/^https?:/, 'webcal:'))}">subscribe</a> (Apple, Outlook) or add <code>${h(feed)}</code> in Google Calendar under “From URL”.</p>
+    <p class="small">Your bookings in your own calendar: <a href="${h(d.feed.replace(/^https?:/, 'webcal:'))}">subscribe</a> (iPhone, Mac, Outlook), or in Google Calendar add <code>${h(d.feed)}</code> under “From URL”. It only shows your bookings, so it's fine in a calendar you share. If our Google Calendar invites already reach you, you don't need it as well.</p>
   </section>
 
   <section>

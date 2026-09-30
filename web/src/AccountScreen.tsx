@@ -4,9 +4,10 @@ import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
+import { FeedCard } from './FeedCard.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, Google Calendar, the company's backups and data, and the device's own sync state. */
+/** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -70,6 +71,8 @@ export function AccountScreen() {
           <p className="hint">Signing out also clears this device's copy of the data. It comes back when you sign in again.</p>
         </section>
       )}
+
+      {auth.status === 'signed-in' && <FeedCard view={view} email={auth.user.email} />}
 
       {auth.status === 'open' && (
         <section className="card attention">

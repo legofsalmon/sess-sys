@@ -1,3 +1,4 @@
+import { redact } from '@sh/shared'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
 /** PUBLIC_URL when set (behind Railway's proxy), otherwise what the request came in on. */
@@ -34,4 +35,20 @@ export function setCookie(req: FastifyRequest, reply: FastifyReply, name: string
 
 export function clearCookie(req: FastifyRequest, reply: FastifyReply, name: string, path = '/') {
   setCookie(req, reply, name, '', { maxAge: 0, path })
+}
+
+/**
+ * How a request is written in the server's log, which Railway keeps: the
+ * method and the path. The code in a private link or feed address is
+ * masked, anything else that looks like a secret or an email address is
+ * taken out, and the query string is left off, as it can hold a Google
+ * sign-in code (ADR 0012).
+ */
+export function requestForLog(req: { method?: string; url?: string }) {
+  return { method: req.method, url: pathForLog(req.url ?? '') }
+}
+
+export function pathForLog(url: string): string {
+  const path = url.split(/[?#]/)[0]!
+  return redact(path.replace(/(^|\/)(f|cal)\/[^/]+/g, '$1$2/:token'))
 }

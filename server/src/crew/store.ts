@@ -90,26 +90,43 @@ export async function awayFor(q: Queryable, personId: string) {
   return rows.map(toAway)
 }
 
-/** A person's offers with their calls, newest call first. */
-export async function offersFor(q: Queryable, personId: string) {
-  const { rows } = await q.query(
-    `SELECT o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
+const OFFER_WITH_CALL = `o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
             o.responded_at, o.responded_via, o.override,
             c.id AS c_id, c.project_id AS c_project_id, c.phase_id AS c_phase_id,
             c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
             c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,
             c.needed AS c_needed, c.day_rate_cents AS c_day_rate_cents, c.details AS c_details,
-            c.reply_by::text AS c_reply_by, c.status AS c_status
+            c.reply_by::text AS c_reply_by, c.status AS c_status`
+
+const withCalls = (rows: Row[]) =>
+  rows.map((r) => {
+    const c: Row = {}
+    for (const [k, v] of Object.entries(r)) if (k.startsWith('c_')) c[k.slice(2)] = v
+    return { offer: toOffer(r), call: toCall(c) }
+  })
+
+/** A person's offers with their calls, newest call first. */
+export async function offersFor(q: Queryable, personId: string) {
+  const { rows } = await q.query(
+    `SELECT ${OFFER_WITH_CALL}
        FROM offers o JOIN crew_calls c ON c.id = o.call_id
       WHERE o.person_id = $1
       ORDER BY c.start_day, c.project`,
     [personId]
   )
-  return rows.map((r) => {
-    const c: Row = {}
-    for (const [k, v] of Object.entries(r)) if (k.startsWith('c_')) c[k.slice(2)] = v
-    return { offer: toOffer(r), call: toCall(c) }
-  })
+  return withCalls(rows)
+}
+
+/** Everyone, and every job anyone holds, for building all the calendar feeds at once (ADR 0012). */
+export async function everyonesBookings(q: Queryable) {
+  const people = await q.query(`SELECT ${PERSON} FROM people ORDER BY id`)
+  const { rows } = await q.query(
+    `SELECT ${OFFER_WITH_CALL}
+       FROM offers o JOIN crew_calls c ON c.id = o.call_id
+      WHERE o.status IN ('accepted', 'confirmed') AND c.status = 'open'
+      ORDER BY c.start_day, c.project, o.id`
+  )
+  return { people: people.rows.map(toPerson), bookings: withCalls(rows) }
 }
 
 /** A job's calls still open, for stopping the job or removing a phase. */

@@ -1,10 +1,10 @@
-import { eachDay, newId, type CommandArgs, type CommandName, type MutationResult } from '@sh/shared'
+import { eachDay, feedCodeFor, feedPath, newId, type CommandArgs, type CommandName, type MutationResult } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { publicOrigin } from '../http.ts'
-import { calendarFeed } from './ical.ts'
+import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
 import { awayFor, getAway, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
 
@@ -14,6 +14,9 @@ import { awayFor, getAway, getOffer, offersFor, offersForCall, personByToken } f
  * credential, so every action checks the thing it touches belongs to the
  * link's person. Answers go through the same command handlers as the app,
  * so the same rules (first to accept, no double booking) hold.
+ *
+ * The calendar feed also has a read-only address of its own,
+ * /cal/<code>.ics, safe to add to a shared calendar (ADR 0012).
  */
 
 type Form = URLSearchParams
@@ -21,7 +24,7 @@ type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring:
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
-export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void) {
+export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void, feeds: Feeds) {
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) =>
     done(null, new URLSearchParams(String(body)))
   )
@@ -59,7 +62,10 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       jobs.push({ offer, call, openDays: Object.keys(held).filter((d) => held[d]! < call.needed) })
     }
     const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300) } : undefined
-    return reply.type('text/html').send(renderPage({ person, jobs, away: await awayFor(db, person.id), base: base(req, person.linkToken), flash, today: today() }))
+    const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
+    return reply
+      .type('text/html')
+      .send(renderPage({ person, jobs, away: await awayFor(db, person.id), base: base(req, person.linkToken), feed, flash, today: today() }))
   })
 
   app.post('/f/:token/offers/:id', async (req: Req, reply) => {
@@ -121,15 +127,16 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     return back(reply, person.linkToken, 'Removed. You can be offered work on those days again.', true)
   })
 
+  // Both feed addresses answer from memory, so calendar apps looking every hour don't wake the database.
+  app.get('/cal/:token', async (req: Req, reply) => {
+    const code = req.params.token.replace(/\.ics$/, '')
+    return sendFeed(req, reply, /^[\w-]{24}$/.test(code) ? await feeds.byCode(code) : undefined)
+  })
+
+  /** The first address, at the private link (ADR 0002): kept so no one already subscribed is cut off. */
   app.get('/f/:token/calendar.ics', async (req: Req, reply) => {
-    noStore(reply)
-    const person = await personByToken(db, req.params.token.replace(/\.ics$/, ''))
-    if (!person) return reply.code(404).send('Not found')
-    const jobs = await offersFor(db, person.id)
-    return reply
-      .type('text/calendar; charset=utf-8')
-      .header('content-disposition', 'inline; filename="session-hire.ics"')
-      .send(calendarFeed(person, jobs, base(req, person.linkToken)))
+    const token = req.params.token
+    return sendFeed(req, reply, token.length >= 16 ? await feeds.byLink(token) : undefined)
   })
 
   /** Everything held on this person, as the "download your data" promise says. */
