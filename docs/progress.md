@@ -3,6 +3,52 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: pick lists, and scanning kit out and back in
+
+**Done**
+
+- The fifth part of Phase 2: each job has a pick list, and kit is scanned
+  out to the job and back in on a phone, with no signal too.
+  [Decision 0017](adr/0017-pick-lists-and-scanning-out-and-in.md) has the
+  reasons.
+- A job's **Kit** card has **Pick list**, with how much is out. The pick
+  list has a row for each product on the kit: how many the job needs from
+  Session Hire's own (subhired ones left out), how many are out, and
+  where to find the rest, place by place with the item numbers there and
+  what's counted.
+- **Going out**, each label scanned with the camera, or typed by a
+  scanner, is recorded as out with the job, and the answer comes at once:
+  "SH-000123 d&b Y10P: 3 of 8 out". Counted kit, like cables, is counted
+  out on its row. Scanning a case takes everything in it.
+- A scan is never refused. When it doesn't match the plan, it says so and
+  keeps it: not on the kit, more than the job needs, still out with
+  another job, or retired. **Not going** on an item takes it off again.
+- **Coming back**, the same page records each scan as back in, and says
+  what's still out. An item that went out with another job comes back
+  from that one, and says so.
+- An item's page says which job it's out with and since when. The Stock
+  tab lists jobs going out in the next two weeks or on now, with how much
+  is out, and jobs over with kit still out.
+- Every phone works out what's out from the scans in the order they
+  happened, not the order they synced, so they all agree once they
+  catch up. Every scan is in the History tab and the export.
+- Checked: 6 new server tests (scans kept whatever the plan says and
+  once each, turned down only for a job or item never saved, the history
+  in words, a pick list with a case and counted kit out and back, scans
+  put in the order they happened across two phones, and the Stock tab's
+  lists) and a new browser test on a phone with a stand-in camera (kit
+  found, scanned and counted out, a scan read once, a mic not on the kit
+  warned about and taken off, the item's page and the Stock tab, then
+  everything back with no signal and synced after). All 34 browser tests
+  and all 219 server tests pass.
+
+**Next**
+
+- Colly, to try it: add kit to a job, open **Pick list** from its Kit
+  card, and scan a labelled item with **Scan**.
+- Next in Phase 2: missing and damaged items on return, with faults and
+  repairs, and the Stock tab's list becoming the place scans that didn't
+  match get sorted out.
 ## 30 September 2026: deploys unstuck
 
 **Done**
@@ -78,7 +124,7 @@ waiting on someone.
   camera, then point it at a label printed from **Print labels**. It's
   worth trying on an iPhone and an Android phone in the phone field test.
 - Next in Phase 2: pick lists for each job, then scanning out and in with
-  the same camera.
+  the same camera (done: see the entry above).
 
 ## 30 September 2026: printing labels
 

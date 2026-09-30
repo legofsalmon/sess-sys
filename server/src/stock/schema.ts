@@ -5,7 +5,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * The warehouse catalogue (ADR 0013): products (models), numbered items
  * (assets) and the labels on them (identifiers), places, and counted stock;
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
- * the numbers set aside for printing labels (ADR 0015).
+ * the numbers set aside for printing labels (ADR 0015); and kit scanned out
+ * to jobs and back in (ADR 0017).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -102,6 +103,25 @@ const MIGRATIONS: string[] = [
     created_at    timestamptz NOT NULL DEFAULT now(),
     CHECK (first_number + count - 1 <= 999999)
   );
+  `,
+  // Kit out and back (ADR 0017): every scan out to a job and back in, of an
+  // item (a case takes what's in it along) or of counted kit. Kept for good,
+  // and never refused for not matching the plan: the scan already happened.
+  `
+  CREATE TABLE IF NOT EXISTS movements (
+    id           text PRIMARY KEY,
+    project_id   text NOT NULL REFERENCES projects(id),
+    direction    text NOT NULL CHECK (direction IN ('out', 'in')),
+    asset_id     text REFERENCES assets(id),
+    model_id     text NOT NULL REFERENCES models(id),
+    qty          integer NOT NULL CHECK (qty > 0),
+    at           timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    CHECK (asset_id IS NULL OR qty = 1)
+  );
+  CREATE INDEX IF NOT EXISTS movements_project ON movements (project_id);
+  CREATE INDEX IF NOT EXISTS movements_asset ON movements (asset_id);
+  CREATE INDEX IF NOT EXISTS movements_model ON movements (model_id);
   `,
 ]
 

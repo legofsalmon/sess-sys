@@ -6,8 +6,10 @@ import {
   newId,
   normaliseNumber,
   plural,
+  spanLabel,
   type Department,
   type ModelView,
+  type PickList,
   type Tracking,
   type View,
 } from '@sh/shared'
@@ -28,7 +30,8 @@ import './stock.css'
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
  * where everything is kept, and what's counted; the kit on jobs that's
- * short (ADR 0014); labels (ADR 0015); and the camera, to scan them (ADR 0016). A product, item or place opens
+ * short (ADR 0014); labels (ADR 0015); the camera, to scan them (ADR 0016);
+ * and the pick lists going out and still out (ADR 0017). A product, item or place opens
  * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
  * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
@@ -192,6 +195,8 @@ function Catalogue({ view }: { view: View }) {
         </ul>
       </section>
 
+      <PickLists view={view} />
+
       <ShortKit view={view} />
 
       <LabelsCard labels={view.labels} />
@@ -246,6 +251,42 @@ function ShortKit({ view }: { view: View }) {
           <summary>{short.length - 5} more</summary>
           <ul className="job-list">{short.slice(5).map(row)}</ul>
         </details>
+      )}
+    </section>
+  )
+}
+
+/** Jobs over with kit still out, and jobs going out in the next two weeks or on now, each opening its pick list (ADR 0017). */
+function PickLists({ view }: { view: View }) {
+  const { soon, stillOut } = view.moves
+  if (soon.length === 0 && stillOut.length === 0) return null
+  const row = (p: PickList, said: string, tone: string) => (
+    <li key={p.job.id}>
+      <a className="job-row" href={`#jobs/${p.job.id}/pick`}>
+        <div>
+          <b>{p.job.name}</b>
+          <p>{p.job.span ? spanLabel(p.job.span) : 'No dates yet'}</p>
+        </div>
+        <div className="side">
+          <small className={`flag ${tone}`}>{said}</small>
+        </div>
+      </a>
+    </li>
+  )
+  return (
+    <section className="card pick-lists" aria-label="Pick lists">
+      <h2>Pick lists</h2>
+      {stillOut.length > 0 && (
+        <>
+          <h3>Still out after the job</h3>
+          <ul className="job-list">{stillOut.map((p) => row(p, `${p.stillOut} still out`, 'bad'))}</ul>
+        </>
+      )}
+      {soon.length > 0 && (
+        <>
+          <h3>Going out in the next two weeks</h3>
+          <ul className="job-list">{soon.map((p) => row(p, `${p.out} of ${p.need} out`, p.out >= p.need ? 'ok' : ''))}</ul>
+        </>
       )}
     </section>
   )

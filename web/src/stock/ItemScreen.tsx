@@ -12,6 +12,7 @@ import {
 import { useState, type FormEvent } from 'react'
 import { act } from '../crew/CrewScreen.tsx'
 import { NotDone, Top } from '../jobs/common.tsx'
+import { when } from '../format.ts'
 import { client } from '../sync.ts'
 import { PrintLabels } from './Labels.tsx'
 import {
@@ -56,7 +57,7 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
         ‹ {a.model?.name ?? 'All stock'}
       </a>
       <NotDone view={view} names={STOCK_COMMANDS} />
-      <Summary a={a} w={w} />
+      <Summary a={a} w={w} view={view} />
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       <WhereChoices w={w} />
     </div>
@@ -65,7 +66,9 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
 
 type Mode = 'move' | 'details' | 'label' | 'print' | 'retire'
 
-function Summary({ a, w }: { a: AssetView; w: WarehouseView }) {
+function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View }) {
+  const out = view.moves.outOf(a.id)
+  const outWith = out && view.jobs.jobs.find((j) => j.id === out.projectId)
   const [mode, setMode] = useState<Mode | undefined>()
   const retired = a.status === 'retired'
   const toggle = (m: Mode) => setMode(mode === m ? undefined : m)
@@ -98,6 +101,15 @@ function Summary({ a, w }: { a: AssetView; w: WarehouseView }) {
           <div className="wide">
             <dt>Where</dt>
             <dd>{a.inCase ? <WhereLink a={a} /> : a.at ? <a href={`#stock/place/${a.at.id}`}>{a.at.name}</a> : whereLabel(a, w)}</dd>
+          </div>
+        )}
+        {out && (
+          <div className="wide">
+            <dt>Out</dt>
+            <dd>
+              With <a href={`#jobs/${out.projectId}/pick`}>{outWith?.name ?? 'a job'}</a> since {when(out.since)}
+              {out.inCase && `, in ${out.inCase.number || 'a case'}`}
+            </dd>
           </div>
         )}
         {a.formerNumbers.length > 0 && (

@@ -13,6 +13,7 @@ import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
 import { labelHandlers } from './stock/labels.ts'
+import { moveHandlers } from './stock/moves.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -122,6 +123,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...stockHandlers,
   ...kitHandlers,
   ...labelHandlers,
+  ...moveHandlers,
 }
 
 /**

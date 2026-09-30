@@ -106,6 +106,18 @@ and `stock.css`, still have plain px values.
   under it, the picture shrinks to 180 px so the form's button stays on
   screen. A camera that can't start shows why, in words that say what to
   do, and Try again. Not in Figma yet.
+- A pick list ([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md))
+  has **Going out** and **Coming back** as two buttons, the pressed one
+  ink, over the total in bold ("12 of 40 out"), the scan field with
+  **Scan** beside it, and the answer to the last scan in a rounded box:
+  green when it matched the plan, amber when it didn't (saying why), grey
+  when there was nothing to do. Each product is a row: its name, and how
+  many are out in bold on the right, green once there are enough; the
+  places to find the rest as a short list with the numbers there; the
+  items out as number pills, each with Not going (or Back) beside it as a
+  link; and, for counted kit, a How many field with Out or Back. Kit
+  not on the job's list goes under "Not on the kit", with an amber note.
+  Not in Figma yet.
 
 ## Accessibility
 

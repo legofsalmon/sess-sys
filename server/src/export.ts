@@ -193,6 +193,7 @@ const ABOUT: Record<string, string> = {
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
   label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, and what they were for.',
   models: 'Products in the stock list: department, category, numbered or counted, and replacement value.',
+  movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
   people: 'Staff and freelancers on the crew list: contact details, skills and rates.',

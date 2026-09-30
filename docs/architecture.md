@@ -252,7 +252,13 @@ says product and item; the code says model and asset.
   job's mixed case) are packed per job, with pick lists. Checked on
   return against what went out.
 - **Movement**: every scan out, scan in, transfer between warehouses, or
-  write-off, with who, when, where and the device's offline time.
+  write-off, with who, when, where and the device's offline time. Built
+  for scanning out to jobs and back in
+  ([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md)): the job,
+  the item or the product and how many, and when it happened on the
+  phone, never refused; what's out where is worked out on each device
+  from the movements in the order they happened, and a case takes what's
+  in it along.
 - **Maintenance record**: fault reports, repairs, electrical inspection and
   testing, and thorough examination of lifting gear, with due dates. An
   asset under repair, or overdue an inspection, cannot be scanned out
@@ -263,8 +269,9 @@ says product and item; the code says model and asset.
   maintenance, per product per hour, including prep and return buffers.
   Built for now from kit lines and what's owned, per product per whole
   day, on each device ([ADR 0014](adr/0014-kit-on-jobs.md)): confirmed
-  jobs hold kit, enquiries and quotes are pencilled in. Movements,
-  repairs, hours and buffers come with scanning and maintenance.
+  jobs hold kit, enquiries and quotes are pencilled in. Movements are
+  recorded now (ADR 0017), but kit out past its job isn't yet taken off
+  what's free; that, repairs, hours and buffers come with maintenance.
 
 **People**
 

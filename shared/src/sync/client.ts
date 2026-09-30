@@ -7,6 +7,7 @@ import { crewView, type CrewView } from './crew-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 
 /**
@@ -95,6 +96,8 @@ export interface View {
   kit: KitView
   /** Numbers set aside for printing labels (ADR 0015). */
   labels: LabelsView
+  /** Kit out with jobs and back, and each job's pick list (ADR 0017). */
+  moves: MovesView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -231,6 +234,8 @@ export class SyncClient {
     const crew = crewView(entities, outbox, this.state.cursor)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
+    const today = irishToday(this.now())
+    const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today)
     return {
       products: Object.values(entities.product).sort(byName),
       bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
@@ -240,8 +245,9 @@ export class SyncClient {
       crew,
       jobs,
       warehouse,
-      kit: kitView(entities, outbox, this.state.cursor, jobs, warehouse, irishToday(this.now())),
+      kit,
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
+      moves: movesView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
