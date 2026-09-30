@@ -49,6 +49,44 @@ waiting on someone.
 - Next in Phase 2: missing and damaged items on return, with faults and
   repairs, and the Stock tab's list becoming the place scans that didn't
   match get sorted out.
+## 30 September 2026: deploys unstuck
+
+**Done**
+
+- Kit on jobs and printing labels were merged at 07:48 UTC but didn't go
+  live on their own. GitHub ran none of its checks from 06:10 to about
+  12:00 UTC: each run stopped within seconds without starting, the usual
+  sign that the account's GitHub Actions minutes or spending limit had run
+  out (this repo is private, so its runs count against them). They've run
+  again since. Railway waits for those checks before deploying, so it
+  skipped the deploy. The checks were run here on the merged code instead,
+  all passing (all 218 unit and sync tests, on PGlite and a real Postgres,
+  and all 31 browser tests), and it was deployed from Railway by hand at
+  11:32 UTC; the entries for kit and labels say when it was live.
+- Why Railway skipped merges (the question from 29 September): the app
+  server only deployed when something under `server/` changed, so merges
+  of only the docs, the web app or the shared code were skipped. It now
+  also deploys on changes to `web/`, `shared/` and the files at the top of
+  the repo that the build uses. That's set on the Railway service and in
+  `railway.json`, so it's kept with the code. It worked on the next merge:
+  scanning with the camera, which changed only the web app and the docs,
+  went live by itself at 12:38 once its checks had passed, while a merge
+  of only the docs is still skipped, as it should be.
+- The checks run once for each change rather than twice: on pull requests
+  and on `main`, not also on every push to a branch with a pull request
+  open. That halves the minutes they use.
+- The second service in the Railway project, `@sh/web`, was made by
+  Railway from the repo's layout. It runs a development copy of the web
+  app with no address, so nobody uses it, and it doesn't touch the
+  database. It can be deleted.
+
+**Next**
+
+- If GitHub stops running the checks again, Railway will skip each merge
+  until they do; **Deploy Latest Commit** on `@sh/server` (or asking
+  Claude, who now has access to Railway) puts it live meanwhile.
+- Colly, if you agree: delete `@sh/web` in Railway, so it stops using the
+  project's resources.
 
 ## 30 September 2026: scanning with the camera
 
