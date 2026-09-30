@@ -304,6 +304,12 @@ export function describe(command: string, a: Data, look: Look): string {
       const p = look('phase', a.id)
       return p ? `Removed ${text(p.name, 'a phase')} from ${job(p.projectId)}` : 'Removed a phase'
     }
+    case 'calendar.connect':
+      return `Connected Google Calendar as ${text(a.account, 'a Google account')}`
+    case 'calendar.use':
+      return `Chose ${text(a.calendar, 'a calendar')} as the calendar for jobs`
+    case 'calendar.disconnect':
+      return `Disconnected Google Calendar${typeof a.account === 'string' ? ` (${a.account})` : ''}${typeof a.calendar === 'string' ? `, taking the app's days off ${a.calendar}` : ''}`
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

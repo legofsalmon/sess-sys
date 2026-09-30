@@ -29,6 +29,7 @@
 .jobs .phase > header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
 .jobs .phase .job { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 .jobs .cal { margin: 0; font-size: .82rem; color: var(--muted); }
+.jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
 .jobs .warn-line { margin: 0; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: 6px 10px; border-radius: 8px; }
 .jobs .add-phase { padding-top: 12px; border-top: 1px solid var(--line); }
 @media (max-width: 480px) {

@@ -9,6 +9,9 @@ import { registerAuth } from './auth/routes.ts'
 import { registerBackupRoutes } from './backup/routes.ts'
 import { Backups, type BackupWatch } from './backup/service.ts'
 import type { BackupStore } from './backup/store.ts'
+import { Google } from './calendar/google.ts'
+import { registerCalendarRoutes } from './calendar/routes.ts'
+import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
 import { applyMutation, currentSeq } from './commands.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
@@ -35,12 +38,26 @@ export interface AppOptions {
   errorReporting?: ErrorReporting
   /** Watches the nightly backup from outside, such as Sentry (ADR 0005). */
   backupWatch?: BackupWatch
+  /**
+   * Google Calendar (ADR 0008): the same Google client as sign-in. Without
+   * it the Account tab says the calendar needs the Google key first.
+   */
+  calendar?: CalendarSetup
+}
+
+export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly'> {
+  clientId: string
+  clientSecret: string
+  /** Stands in for the network in tests. */
+  fetch?: typeof fetch
 }
 
 declare module 'fastify' {
   interface FastifyInstance {
     /** The nightly backup; the caller starts its schedule once the server is listening. */
     backups: Backups
+    /** The calendar sync, when the Google key is set; the caller starts it once the server is listening. */
+    calendar: CalendarSync | undefined
   }
 }
 
@@ -49,7 +66,7 @@ declare module 'fastify' {
  * `export` keep the principles' promises of an audit trail on everything and
  * "your data, always reachable" (ADR 0006).
  */
-export async function buildApp({ db, logger = false, webRoot, auth, backupStore, commit, errorReporting, backupWatch }: AppOptions): Promise<FastifyInstance> {
+export async function buildApp({ db, logger = false, webRoot, auth, backupStore, commit, errorReporting, backupWatch, calendar }: AppOptions): Promise<FastifyInstance> {
   await migrateAll(db)
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024 })
   const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch }).load()
@@ -63,6 +80,26 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
     const msg: Poke = { type: 'poke', cursor: await currentSeq(db) }
     const text = JSON.stringify(msg)
     for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
+  }
+
+  const google = calendar ? new Google({ clientId: calendar.clientId, clientSecret: calendar.clientSecret, fetch: calendar.fetch }) : undefined
+  const calendarSync =
+    calendar && google
+      ? new CalendarSync({
+          ...calendar,
+          db,
+          google,
+          secret: calendar.clientSecret,
+          log: app.log,
+          onChange: () => void poke(),
+          report: (err) => reportError(err, { area: 'calendar' }),
+        })
+      : undefined
+  app.decorate('calendar', calendarSync)
+  /** Something changed in the app: devices pull it, and the calendar catches up. */
+  const changed = () => {
+    void poke()
+    calendarSync?.kick()
   }
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
@@ -107,7 +144,7 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
     const results = []
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) results.push(await applyMutation(db, clientId, m as never, from))
-    if (results.some((r) => r.status === 'applied' && !r.duplicate)) void poke()
+    if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
     return { results }
   })
 
@@ -140,8 +177,9 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
-  registerCrewLinks(app, db, () => void poke())
+  registerCrewLinks(app, db, changed)
   registerBackupRoutes(app, backups)
+  registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
@@ -194,6 +232,7 @@ export async function buildApp({ db, logger = false, webRoot, auth, backupStore,
 
   app.addHook('onClose', async () => {
     backups.stop()
+    calendarSync?.stop()
     for (const ws of sockets) ws.close()
   })
   return app

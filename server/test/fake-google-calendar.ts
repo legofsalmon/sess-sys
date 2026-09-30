@@ -1,0 +1,253 @@
+import { createHash } from 'node:crypto'
+
+/**
+ * A pretend Google for the calendar sync tests (ADR 0008): the OAuth token
+ * endpoint and the Calendar API calls the app makes, answering as Google
+ * does, down to event ids (base32hex only), deleted events keeping their id,
+ * and etags changing on every edit. Tests can make it busy, revoke the
+ * app's key, switch the API off, or edit events as a person would.
+ */
+
+export interface FakeEvent {
+  id: string
+  etag: string
+  status: 'confirmed' | 'cancelled'
+  summary: string
+  location: string
+  description: string
+  start: { date: string }
+  end: { date: string }
+  extendedProperties?: { private?: Record<string, string> }
+  htmlLink: string
+}
+
+interface Account {
+  sub: string
+  email: string
+  /** Calendars on the account's list, with the account's access to each. */
+  calendars: Map<string, { summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary?: boolean }>
+}
+
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+const apiError = (status: number, reason: string) => json(status, { error: { code: status, message: reason, errors: [{ reason, message: reason }] } })
+
+export class FakeGoogle {
+  readonly clientId = 'client-123.apps.googleusercontent.com'
+  readonly clientSecret = 'client-secret-for-tests'
+  /** Every calendar's events, by calendar id then event id. */
+  readonly events = new Map<string, Map<string, FakeEvent>>()
+  /** Events deleted long enough ago that Google has forgotten them: their ids answer 410. */
+  readonly purged = new Set<string>()
+  /** Every call the app made, as `METHOD path`. */
+  readonly calls: string[] = []
+  /** What the next person to connect grants. */
+  grant = { account: 'ops@sessionhire.com', scopes: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly', refresh: true }
+  apiEnabled = true
+  /** Answer this many Calendar API calls with "rate limit exceeded". */
+  busyFor = 0
+  /** Answer these event writes with 400, by title. */
+  refuse = new Set<string>()
+  /** Carry out this many Calendar API writes, then lose the answer on the way back, as a dropped connection would. */
+  loseReplies = 0
+  private accounts = new Map<string, Account>()
+  private codes = new Map<string, { account: string; challenge: string; redirectUri: string }>()
+  private refreshTokens = new Map<string, { account: string; revoked: boolean }>()
+  private accessTokens = new Map<string, { account: string; expires: number }>()
+  private n = 0
+
+  constructor() {
+    this.addAccount('ops@sessionhire.com', [
+      ['ops@sessionhire.com', { summary: 'ops@sessionhire.com', accessRole: 'owner', primary: true }],
+      ['test-cal@group.calendar.google.com', { summary: 'Test calendar', accessRole: 'owner' }],
+      ['gigs@group.calendar.google.com', { summary: 'Session Hire Gigs', accessRole: 'writer' }],
+      ['holidays@group.v.calendar.google.com', { summary: 'Holidays in Ireland', accessRole: 'reader' }],
+    ])
+    this.addAccount('colly@sessionhire.com', [
+      ['colly@sessionhire.com', { summary: 'colly@sessionhire.com', accessRole: 'owner', primary: true }],
+      ['gigs@group.calendar.google.com', { summary: 'Session Hire Gigs', accessRole: 'writer' }],
+    ])
+  }
+
+  addAccount(email: string, calendars: [string, Account['calendars'] extends Map<string, infer V> ? V : never][]) {
+    this.accounts.set(email, { sub: `sub-${email}`, email, calendars: new Map(calendars) })
+  }
+
+  /** Take away an account's access to a calendar, as unsharing it would. */
+  unshare(email: string, calendarId: string) {
+    this.accounts.get(email)!.calendars.delete(calendarId)
+  }
+
+  /** The person picks their account and allows access; Google sends the browser back with this. */
+  consent(authorizeUrl: string): { code: string; state: string } {
+    const url = new URL(authorizeUrl)
+    const code = `code-${++this.n}`
+    this.codes.set(code, { account: this.grant.account, challenge: url.searchParams.get('code_challenge')!, redirectUri: url.searchParams.get('redirect_uri')! })
+    return { code, state: url.searchParams.get('state')! }
+  }
+
+  /** Someone removes the app's access in their Google account. */
+  revokeAll() {
+    for (const t of this.refreshTokens.values()) t.revoked = true
+    this.accessTokens.clear()
+  }
+
+  /** The events a person looking at the calendar sees. */
+  visible(calendarId: string): FakeEvent[] {
+    return [...(this.events.get(calendarId)?.values() ?? [])].filter((e) => e.status !== 'cancelled').sort((a, b) => a.start.date.localeCompare(b.start.date) || a.summary.localeCompare(b.summary))
+  }
+
+  /** A person edits an event in Google Calendar. */
+  edit(calendarId: string, eventId: string, changes: Partial<Pick<FakeEvent, 'summary' | 'status' | 'description'>>) {
+    const ev = this.events.get(calendarId)!.get(eventId)!
+    Object.assign(ev, changes, { etag: `"${++this.n}"` })
+  }
+
+  /** Expire every short-lived access key, as an hour passing would. */
+  expireAccess() {
+    this.accessTokens.clear()
+  }
+
+  /** Whether every key Google gave the app for this account has been handed back or revoked. */
+  revokedFor(email: string): boolean {
+    const keys = [...this.refreshTokens.values()].filter((t) => t.account === email)
+    return keys.length > 0 && keys.every((t) => t.revoked)
+  }
+
+  readonly fetch: typeof fetch = async (input, init) => {
+    const res = await this.answer(input, init)
+    const method = init?.method ?? 'GET'
+    if (this.loseReplies > 0 && method !== 'GET' && String(input).startsWith('https://www.googleapis.com/calendar/v3/')) {
+      this.loseReplies--
+      throw new TypeError('fetch failed')
+    }
+    return res
+  }
+
+  private async answer(input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]): Promise<Response> {
+    const url = new URL(String(input))
+    const method = init?.method ?? 'GET'
+    this.calls.push(`${method} ${url.pathname}`)
+    const form = () => new URLSearchParams(String(init?.body ?? ''))
+    if (url.host === 'oauth2.googleapis.com' && url.pathname === '/token') return this.token(form())
+    if (url.host === 'oauth2.googleapis.com' && url.pathname === '/revoke') {
+      const t = this.refreshTokens.get(form().get('token') ?? '')
+      if (t) t.revoked = true
+      return json(200, {})
+    }
+    if (url.host !== 'www.googleapis.com' || !url.pathname.startsWith('/calendar/v3/')) return json(404, {})
+
+    const bearer = String((init?.headers as Record<string, string>)?.authorization ?? '').replace(/^Bearer /, '')
+    const access = this.accessTokens.get(bearer)
+    if (!access || access.expires < Date.now()) return apiError(401, 'authError')
+    if (!this.apiEnabled) return apiError(403, 'accessNotConfigured')
+    if (this.busyFor > 0) {
+      this.busyFor--
+      return apiError(403, 'rateLimitExceeded')
+    }
+    const account = this.accounts.get(access.account)!
+    const path = url.pathname.slice('/calendar/v3'.length).split('/').map(decodeURIComponent)
+
+    if (path[1] === 'users' && path[3] === 'calendarList') {
+      const items = [...account.calendars].map(([id, c]) => ({ id, ...c }))
+      if (path[4]) {
+        const found = items.find((c) => c.id === path[4])
+        return found ? json(200, found) : apiError(404, 'notFound')
+      }
+      const min = url.searchParams.get('minAccessRole')
+      return json(200, { items: items.filter((c) => min !== 'writer' || c.accessRole !== 'reader') })
+    }
+
+    if (path[1] === 'calendars' && path[3] === 'events') {
+      const calendarId = path[2]!
+      const cal = account.calendars.get(calendarId)
+      if (!cal) return apiError(404, 'notFound')
+      const store = this.events.get(calendarId) ?? new Map<string, FakeEvent>()
+      this.events.set(calendarId, store)
+      const eventId = path[4]
+      if (method === 'GET' && !eventId) {
+        const [key, value] = (url.searchParams.get('privateExtendedProperty') ?? '').split('=')
+        const timeMin = url.searchParams.get('timeMin')?.slice(0, 10) ?? ''
+        const showDeleted = url.searchParams.get('showDeleted') === 'true'
+        const items = [...store.values()].filter(
+          (e) => (!key || e.extendedProperties?.private?.[key] === value) && e.end.date > timeMin && (showDeleted || e.status !== 'cancelled')
+        )
+        return json(200, { items })
+      }
+      if (cal.accessRole === 'reader') return apiError(403, 'requiredAccessLevel')
+      const body = init?.body ? (JSON.parse(String(init.body)) as Partial<FakeEvent> & { id?: string }) : {}
+      if (body.summary && this.refuse.has(body.summary)) return apiError(400, 'badRequest')
+      if (method === 'POST' && !eventId) {
+        const id = body.id ?? `auto${++this.n}`
+        if (!/^[a-v0-9]{5,1024}$/.test(id)) return apiError(400, 'invalid')
+        if (store.has(id) || this.purged.has(id)) return apiError(409, 'duplicate')
+        const ev = this.stored(calendarId, id, body)
+        store.set(id, ev)
+        return json(200, ev)
+      }
+      const ev = eventId ? store.get(eventId) : undefined
+      if (eventId && this.purged.has(eventId)) return apiError(410, 'deleted')
+      if (!ev) return apiError(404, 'notFound')
+      if (method === 'PUT') {
+        const next = this.stored(calendarId, ev.id, body)
+        store.set(ev.id, next)
+        return json(200, next)
+      }
+      if (method === 'DELETE') {
+        if (ev.status === 'cancelled') return apiError(410, 'deleted')
+        Object.assign(ev, { status: 'cancelled', etag: `"${++this.n}"` })
+        return new Response(null, { status: 204 })
+      }
+    }
+    return apiError(404, 'notFound')
+  }
+
+  private stored(calendarId: string, id: string, body: Partial<FakeEvent>): FakeEvent {
+    return {
+      id,
+      etag: `"${++this.n}"`,
+      status: body.status === 'cancelled' ? 'cancelled' : 'confirmed',
+      summary: body.summary ?? '',
+      location: body.location ?? '',
+      description: body.description ?? '',
+      start: body.start ?? { date: '' },
+      end: body.end ?? { date: '' },
+      ...(body.extendedProperties ? { extendedProperties: body.extendedProperties } : {}),
+      htmlLink: `https://www.google.com/calendar/event?eid=${Buffer.from(`${id} ${calendarId}`).toString('base64url')}`,
+    }
+  }
+
+  private token(form: URLSearchParams): Response {
+    if (form.get('client_id') !== this.clientId || form.get('client_secret') !== this.clientSecret) return json(401, { error: 'invalid_client' })
+    const grant = form.get('grant_type')
+    let account: string
+    let refresh: string | undefined
+    if (grant === 'authorization_code') {
+      const c = this.codes.get(form.get('code') ?? '')
+      this.codes.delete(form.get('code') ?? '')
+      if (!c || c.redirectUri !== form.get('redirect_uri')) return json(400, { error: 'invalid_grant' })
+      if (createHash('sha256').update(form.get('code_verifier') ?? '').digest('base64url') !== c.challenge) return json(400, { error: 'invalid_grant' })
+      account = c.account
+      if (this.grant.refresh) {
+        refresh = `refresh-${++this.n}-${account}`
+        this.refreshTokens.set(refresh, { account, revoked: false })
+      }
+    } else if (grant === 'refresh_token') {
+      const t = this.refreshTokens.get(form.get('refresh_token') ?? '')
+      if (!t || t.revoked) return json(400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' })
+      account = t.account
+    } else return json(400, { error: 'unsupported_grant_type' })
+    const accessToken = `access-${++this.n}`
+    this.accessTokens.set(accessToken, { account, expires: Date.now() + 3_600_000 })
+    const a = this.accounts.get(account)!
+    const claims = { iss: 'https://accounts.google.com', aud: this.clientId, sub: a.sub, email: a.email, email_verified: true, exp: Math.floor(Date.now() / 1000) + 3600, hd: 'sessionhire.com' }
+    const idToken = `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.sig`
+    return json(200, {
+      access_token: accessToken,
+      expires_in: 3599,
+      token_type: 'Bearer',
+      scope: this.grant.scopes,
+      ...(refresh ? { refresh_token: refresh } : {}),
+      ...(grant === 'authorization_code' ? { id_token: idToken } : {}),
+    })
+  }
+}

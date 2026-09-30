@@ -1,0 +1,177 @@
+import { randomBytes } from 'node:crypto'
+import { CALENDAR_LINK_ID, type CalendarDay, type CalendarLink, type CalendarState } from '@sh/shared'
+import type { Queryable } from '../db.ts'
+import { emit, emitRemoved, type Ctx } from '../kernel.ts'
+
+/** Reading and writing the calendar connection and the days written, and telling devices (ADR 0008). */
+
+export interface Link {
+  state: CalendarState
+  appKey: string
+  accountEmail: string | null
+  accountSub: string | null
+  /** Locked; see crypto.ts. */
+  refreshToken: string | null
+  calendarId: string | null
+  calendarName: string | null
+  problem: string | null
+  appUrl: string | null
+  connectedBy: string | null
+  connectedByName: string | null
+  connectedAt: string | null
+}
+
+export interface DayRow {
+  id: string
+  phaseId: string
+  projectId: string
+  day: string
+  calendarId: string
+  eventId: string
+  generation: number
+  state: 'on' | 'failed' | 'removed'
+  title: string
+  contentHash: string | null
+  etag: string | null
+  htmlLink: string | null
+  problem: string | null
+}
+
+type Row = Record<string, any>
+
+const LINK = `l.state, l.app_key, l.account_email, l.account_sub, l.refresh_token, l.calendar_id, l.calendar_name, l.problem, l.app_url,
+  l.connected_by, u.name AS connected_by_name, to_char(l.connected_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS connected_at`
+
+const toLink = (r: Row): Link => ({
+  state: r.state,
+  appKey: r.app_key,
+  accountEmail: r.account_email,
+  accountSub: r.account_sub,
+  refreshToken: r.refresh_token,
+  calendarId: r.calendar_id,
+  calendarName: r.calendar_name,
+  problem: r.problem,
+  appUrl: r.app_url,
+  connectedBy: r.connected_by,
+  connectedByName: r.connected_by_name,
+  connectedAt: r.connected_at,
+})
+
+export async function readLink(q: Queryable): Promise<Link | undefined> {
+  const { rows } = await q.query(`SELECT ${LINK} FROM calendar_link l LEFT JOIN users u ON u.id = l.connected_by WHERE l.id = 'main'`)
+  return rows[0] ? toLink(rows[0]) : undefined
+}
+
+/** The connection as devices see it: never the key. */
+export function linkEntity(l: Link): CalendarLink {
+  return {
+    id: CALENDAR_LINK_ID,
+    state: l.state,
+    account: l.accountEmail,
+    calendarId: l.calendarId,
+    calendarName: l.calendarName,
+    problem: l.problem,
+    connectedBy: l.connectedByName,
+    connectedAt: l.connectedAt,
+  }
+}
+
+type LinkFields = Partial<Omit<Link, 'appKey' | 'connectedByName'>>
+
+const LINK_COLUMNS: Record<keyof LinkFields, string> = {
+  state: 'state',
+  accountEmail: 'account_email',
+  accountSub: 'account_sub',
+  refreshToken: 'refresh_token',
+  calendarId: 'calendar_id',
+  calendarName: 'calendar_name',
+  problem: 'problem',
+  appUrl: 'app_url',
+  connectedBy: 'connected_by',
+  connectedAt: 'connected_at',
+}
+
+/**
+ * Change the connection, making it first if there isn't one yet, and tell
+ * devices when what they see of it has changed. Needs the change-feed lock
+ * (`serverChange`).
+ */
+export async function saveLink(ctx: Ctx, fields: LinkFields): Promise<Link> {
+  const before = await readLink(ctx.tx)
+  if (!before) {
+    await ctx.tx.query(`INSERT INTO calendar_link (id, state, app_key) VALUES ('main', 'off', $1)`, [randomBytes(8).toString('hex')])
+  }
+  const keys = (Object.keys(fields) as (keyof LinkFields)[]).filter((k) => fields[k] !== undefined)
+  if (keys.length) {
+    await ctx.tx.query(
+      `UPDATE calendar_link SET ${keys.map((k, i) => `${LINK_COLUMNS[k]} = $${i + 1}`).join(', ')}, updated_at = now() WHERE id = 'main'`,
+      keys.map((k) => fields[k])
+    )
+  }
+  const after = (await readLink(ctx.tx))!
+  const seen = linkEntity(after)
+  if (!before || JSON.stringify(linkEntity(before)) !== JSON.stringify(seen)) await emit(ctx, 'calendarLink', CALENDAR_LINK_ID, seen)
+  return after
+}
+
+const DAY = `id, phase_id, project_id, day::text, calendar_id, event_id, generation, state, title, content_hash, etag, html_link, problem`
+
+const toDay = (r: Row): DayRow => ({
+  id: r.id,
+  phaseId: r.phase_id,
+  projectId: r.project_id,
+  day: r.day,
+  calendarId: r.calendar_id,
+  eventId: r.event_id,
+  generation: r.generation,
+  state: r.state,
+  title: r.title,
+  contentHash: r.content_hash,
+  etag: r.etag,
+  htmlLink: r.html_link,
+  problem: r.problem,
+})
+
+/** Every day from `today` on that the app has written or tried to, removed ones included. */
+export async function readDays(q: Queryable, today: string): Promise<DayRow[]> {
+  const { rows } = await q.query(`SELECT ${DAY} FROM calendar_days WHERE day >= $1::date ORDER BY day, id`, [today])
+  return rows.map(toDay)
+}
+
+/** How many days from `today` on are on a calendar. */
+export async function countOn(q: Queryable, today: string): Promise<number> {
+  const { rows } = await q.query<{ n: string }>(`SELECT count(*) AS n FROM calendar_days WHERE day >= $1::date AND state <> 'removed'`, [today])
+  return Number(rows[0]?.n ?? 0)
+}
+
+export function dayEntity(d: DayRow): CalendarDay {
+  return {
+    id: d.id,
+    phaseId: d.phaseId,
+    projectId: d.projectId,
+    day: d.day,
+    calendarId: d.calendarId,
+    title: d.title,
+    state: d.state === 'failed' ? 'failed' : 'on',
+    problem: d.problem,
+    link: d.htmlLink,
+  }
+}
+
+/** Record what happened to one day, telling devices when what they see of it has changed. */
+export async function saveDay(ctx: Ctx, d: DayRow, before: DayRow | undefined) {
+  await ctx.tx.query(
+    `INSERT INTO calendar_days (id, phase_id, project_id, day, calendar_id, event_id, generation, state, title, content_hash, etag, html_link, problem)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (id) DO UPDATE SET phase_id = EXCLUDED.phase_id, project_id = EXCLUDED.project_id, calendar_id = EXCLUDED.calendar_id,
+       event_id = EXCLUDED.event_id, generation = EXCLUDED.generation, state = EXCLUDED.state, title = EXCLUDED.title,
+       content_hash = EXCLUDED.content_hash, etag = EXCLUDED.etag, html_link = EXCLUDED.html_link, problem = EXCLUDED.problem, updated_at = now()`,
+    [d.id, d.phaseId, d.projectId, d.day, d.calendarId, d.eventId, d.generation, d.state, d.title, d.contentHash, d.etag, d.htmlLink, d.problem]
+  )
+  const wasSeen = before && before.state !== 'removed'
+  if (d.state === 'removed') {
+    if (wasSeen) await emitRemoved(ctx, 'calendarDay', d.id)
+    return
+  }
+  if (!wasSeen || JSON.stringify(dayEntity(before)) !== JSON.stringify(dayEntity(d))) await emit(ctx, 'calendarDay', d.id, dayEntity(d))
+}
