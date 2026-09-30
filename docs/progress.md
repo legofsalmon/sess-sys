@@ -51,6 +51,9 @@ waiting on someone.
   two servers taking each answer once), the real-Postgres test now takes an
   answer in too, all 151 server tests, and a new browser test for the switch
   and the job page.
+- Merged into `main` at 02:08 UTC and live by 02:13: the live server
+  answers the new crew invites address, and says it needs the Google key
+  first, as it should until the key is added.
 
 **Next**
 
