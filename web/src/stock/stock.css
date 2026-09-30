@@ -15,8 +15,6 @@
 .warehouse .item-row p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
 .warehouse .item-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 10px 0; }
-.warehouse .added { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
-.warehouse .added a { color: inherit; font-weight: 700; }
 
 /* On a place: items grouped by product, each number a link. */
 .warehouse .group { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -54,3 +52,42 @@
 
 /* The Phase 0 sync test, now under Stock. */
 .sync-test .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: 4px 0; }
+
+/* Labels (ADR 0015). Black on white whatever the screen's theme, at their real size in millimetres. */
+.label { box-sizing: border-box; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm; background: #fff; color: #000; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.15; }
+.label .qr { flex: none; display: block; }
+.label .words { display: grid; min-width: 0; }
+.label b { font-size: 3.8mm; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.label small { font-size: 2.4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label.wide { width: 50mm; height: 25mm; }
+.label.wide .qr { width: 21mm; height: 21mm; }
+.label.square { width: 25mm; height: 25mm; flex-direction: column; justify-content: center; gap: .4mm; padding: 1mm; }
+.label.square .qr { width: 19mm; height: 19mm; }
+.label.square b { font-size: 3mm; }
+.label.sheet { width: 38.1mm; height: 21.2mm; gap: .8mm; padding: 1mm 1.5mm; }
+.label.sheet .qr { width: 17mm; height: 17mm; }
+.label.sheet b { font-size: 3mm; }
+.label.sheet small { font-size: 2mm; }
+
+.warehouse .nowrap { white-space: nowrap; }
+.warehouse .print-labels { display: grid; gap: 10px; }
+.warehouse .print-labels > button { justify-self: start; }
+.warehouse .layouts { display: grid; gap: 0; }
+.warehouse .layouts .tick { min-height: 44px; align-items: center; }
+.warehouse .layouts .tick input { margin: 0; }
+/* The first few at their real size, on white as they'll print. */
+.warehouse .preview { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-radius: 8px; background: var(--bg); }
+.warehouse .preview .label { box-shadow: 0 0 0 1px var(--line); border-radius: 1.5mm; }
+.warehouse .claim { padding: 12px; border: 1px solid var(--accent); border-radius: 10px; }
+
+/* Printing: only the labels, a label to a page on a label printer or 65 to an A4 sheet. */
+.print-sheet { display: none; }
+@media print {
+  body > :not(.print-sheet) { display: none !important; }
+  /* Not the room the tab bar leaves at the bottom, which would print a blank page after the last label. */
+  body { background: #fff; padding: 0 !important; }
+  .print-sheet { display: block; }
+  .print-sheet .page { break-after: page; }
+  .print-sheet .page:last-child { break-after: auto; }
+  .print-sheet.sheet .page { width: 210mm; height: 297mm; padding: 10.7mm 4.75mm 0; display: grid; grid-template-columns: repeat(5, 38.1mm); grid-auto-rows: 21.2mm; column-gap: 2.5mm; align-content: start; }
+}

@@ -6,6 +6,7 @@ import {
   invitesLabel,
   newId,
   normaliseNumber,
+  numberText,
   OFFLINE_AFTER_SECONDS,
   RETIRED_LABELS,
   STATUS_LABELS,
@@ -268,6 +269,11 @@ const text = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v :
 const dates = (start: unknown, end: unknown) =>
   typeof start === 'string' && typeof end === 'string' ? daysLabel(eachDay(start, end)) : 'on dates since removed'
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+/** "SH-000101 to SH-000600", or "SH-000101" for one, once the server has set them aside. */
+const runRange = (r: Data | undefined) =>
+  typeof r?.first === 'number' && typeof r.count === 'number'
+    ? `${numberText(r.first)}${r.count > 1 ? ` to ${numberText(r.first + r.count - 1)}` : ''}`
+    : undefined
 /** "a", "a and b", "a, b and c". */
 const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
 
@@ -304,6 +310,10 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
   const retired = (r: unknown) => (typeof r === 'string' && r in RETIRED_LABELS ? RETIRED_LABELS[r as RetiredReason].toLowerCase() : 'retired')
   const department = (d: unknown) => (typeof d === 'string' && d in DEPARTMENT_LABELS ? DEPARTMENT_LABELS[d as Department] : 'another department')
   const numberGiven = (typed: unknown) => (typeof typed === 'string' && normaliseNumber(typed)) || text(left?.number, 'a number')
+  const phaseName = (id: unknown) => text(look('phase', id)?.name, 'a phase')
+  /** ", 2 subhired from PRG". */
+  const subhired = (n: unknown, from: unknown) =>
+    typeof n === 'number' && n > 0 ? `, ${n} subhired${typeof from === 'string' && from.trim() ? ` from ${clip(from.trim())}` : ''}` : ''
 
   switch (command) {
     case 'product.upsert':
@@ -445,6 +455,35 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       return `Counted ${a.qty === 0 ? 'no' : `${a.qty} ×`} ${model(a.modelId)}${where(a.placeId, a.caseId)}`
     case 'stock.move':
       return `Moved ${a.qty} × ${model(a.modelId)} from ${spot(a.fromPlaceId, a.fromCaseId)} to ${spot(a.toPlaceId, a.toCaseId)}`
+    case 'kit.add':
+      return `Added ${a.qty} × ${model(a.modelId)} to the kit for ${job(a.projectId)}, ${a.phaseId ? `for ${phaseName(a.phaseId)}` : 'whole job'}${subhired(a.subhireQty, a.supplier)}`
+    case 'kit.update': {
+      const k = look('kitLine', a.id)
+      const parts: string[] = []
+      if (a.modelId !== undefined) parts.push(`product to ${model(a.modelId)}`)
+      if (a.qty !== undefined) parts.push(`how many to ${a.qty}`)
+      if (a.phaseId !== undefined) parts.push(a.phaseId ? `for ${phaseName(a.phaseId)}` : 'for the whole job')
+      if (a.subhireQty !== undefined) parts.push(typeof a.subhireQty === 'number' && a.subhireQty > 0 ? `${a.subhireQty} subhired` : 'none subhired')
+      if (a.supplier !== undefined) parts.push(typeof a.supplier === 'string' && a.supplier.trim() ? `subhired from ${clip(a.supplier.trim())}` : 'no supplier')
+      if (a.notes !== undefined) parts.push('the note')
+      return `Changed ${model(k?.modelId)} on the kit for ${job(k?.projectId)}: ${inWords(parts)}`
+    }
+    case 'kit.remove': {
+      const k = look('kitLine', a.id)
+      return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
+    }
+    case 'labels.reserve': {
+      const r = look('labelRun', a.id)
+      const what = typeof a.name === 'string' && a.name.trim() ? ` (${clip(a.name.trim())})` : ''
+      const count = typeof a.count === 'number' ? a.count : 0
+      return `Set aside ${runRange(r) ?? `${count.toLocaleString('en-IE')} ${count === 1 ? 'number' : 'numbers'}`} for printing labels${what}`
+    }
+    case 'labels.update': {
+      const parts: string[] = []
+      if (a.name !== undefined) parts.push(typeof a.name === 'string' && a.name.trim() ? `what they're for to ${clip(a.name.trim())}` : "what they're for")
+      if (a.notes !== undefined) parts.push('the notes')
+      return `Changed the labels ${runRange(look('labelRun', a.id)) ?? 'set aside'}: ${inWords(parts)}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

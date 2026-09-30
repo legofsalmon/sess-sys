@@ -1,4 +1,4 @@
-import { MAX_CASE_DEPTH, type Asset, type Model, type Place, type Stock, type Where } from '@sh/shared'
+import { MAX_CASE_DEPTH, type Asset, type LabelRun, type Model, type Place, type Stock, type Where } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading warehouse rows back as the records devices see (ADR 0013). */
@@ -72,10 +72,27 @@ export async function numberUse(q: Queryable, number: string) {
   return rows[0] ? { assetId: rows[0].asset_id, current: rows[0].current } : undefined
 }
 
-/** One more than the highest number ever used, so none is given out twice. */
+/**
+ * One more than the highest number ever used or set aside for printing
+ * (ADR 0015), so none is given out twice and none lands on a label that
+ * isn't stuck on yet.
+ */
 export async function nextNumber(q: Queryable): Promise<number> {
-  const { rows } = await q.query<{ n: number }>(`SELECT coalesce(max(substr(value, 4)::int), 0)::int + 1 AS n FROM identifiers WHERE kind = 'sh'`)
+  const { rows } = await q.query<{ n: number }>(
+    `SELECT greatest((SELECT max(substr(value, 4)::int) FROM identifiers WHERE kind = 'sh'),
+                     (SELECT max(first_number + count - 1) FROM label_runs),
+                     0)::int + 1 AS n`
+  )
   return rows[0]!.n
+}
+
+const LABEL_RUN = `id, first_number, count, name, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
+
+export const toLabelRun = (r: Row): LabelRun => ({ id: r.id, first: r.first_number, count: r.count, name: r.name, notes: r.notes, createdAt: r.created_at })
+
+export async function getLabelRun(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${LABEL_RUN} FROM label_runs WHERE id = $1`, [id])
+  return rows[0] ? toLabelRun(rows[0]) : undefined
 }
 
 /** The cases a case is in, starting with itself and working outwards. */

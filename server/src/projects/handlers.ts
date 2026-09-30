@@ -2,6 +2,7 @@ import { MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
 import { cancelCall } from '../crew/handlers.ts'
 import { getCall, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
+import { kitOnPhase } from '../stock/kit.ts'
 import { getClient, getPhase, getProject, getVenue, namesForCall } from './store.ts'
 
 /**
@@ -12,7 +13,7 @@ import { getClient, getPhase, getProject, getVenue, namesForCall } from './store
  *   different things both keep theirs;
  * - crew calls carry today's names for their job, phase and venue;
  * - stopping a job (cancelled, lost) cancels its crew calls with it;
- * - a phase with crew still on it can't be removed.
+ * - a phase with crew or kit still on it can't be removed.
  */
 
 type JobCommand = 'client.upsert' | 'venue.upsert' | 'project.create' | 'project.update' | 'phase.add' | 'phase.update' | 'phase.remove'
@@ -152,6 +153,12 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
       throw new Refused({
         code: 'conflict',
         message: `${phase.name} still has crew: ${open.map((c) => `${c.needed} × ${c.role}`).join(', ')}. Cancel ${open.length === 1 ? 'that' : 'those'} first.`,
+      })
+    const kit = await kitOnPhase(ctx.tx, a.id)
+    if (kit.length)
+      throw new Refused({
+        code: 'conflict',
+        message: `${phase.name} still has kit: ${kit.join(', ')}. Put ${kit.length === 1 ? 'it' : 'them'} on the whole job or take ${kit.length === 1 ? 'it' : 'them'} off first.`,
       })
     // Its cancelled calls stay with the job, without the phase.
     const { rows: kept } = await ctx.tx.query<{ id: string }>('UPDATE crew_calls SET phase_id = NULL WHERE phase_id = $1 RETURNING id', [a.id])

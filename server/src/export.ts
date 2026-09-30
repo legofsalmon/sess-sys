@@ -190,6 +190,8 @@ const ABOUT: Record<string, string> = {
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   issues: 'Things someone has to sort out, such as more scanned out than booked (sync test).',
+  kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
+  label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, and what they were for.',
   models: 'Products in the stock list: department, category, numbered or counted, and replacement value.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',

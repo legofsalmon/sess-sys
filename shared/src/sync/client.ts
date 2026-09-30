@@ -1,10 +1,12 @@
-import { CALENDAR_LINK_ID, type CalendarDay, type CalendarLink } from '../calendar.ts'
+import { CALENDAR_LINK_ID, irishToday, type CalendarDay, type CalendarLink } from '../calendar.ts'
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
 import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
+import { kitView, type KitView } from './kit-view.ts'
+import { labelsView, type LabelsView } from './labels-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 
 /**
@@ -89,6 +91,10 @@ export interface View {
   jobs: JobsView
   /** The warehouse catalogue (ADR 0013). */
   warehouse: WarehouseView
+  /** Kit on jobs, and what's short (ADR 0014). */
+  kit: KitView
+  /** Numbers set aside for printing labels (ADR 0015). */
+  labels: LabelsView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -223,6 +229,8 @@ export class SyncClient {
 
     const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id)
     const crew = crewView(entities, outbox, this.state.cursor)
+    const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
+    const warehouse = warehouseView(entities, outbox, this.state.cursor)
     return {
       products: Object.values(entities.product).sort(byName),
       bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
@@ -230,8 +238,10 @@ export class SyncClient {
       issues: Object.values(entities.issue).filter((i) => !i.resolved),
       problems: [...this.state.problems],
       crew,
-      jobs: jobsView(entities, outbox, this.state.cursor, crew.calls),
-      warehouse: warehouseView(entities, outbox, this.state.cursor),
+      jobs,
+      warehouse,
+      kit: kitView(entities, outbox, this.state.cursor, jobs, warehouse, irishToday(this.now())),
+      labels: labelsView(entities, outbox, this.state.cursor, warehouse),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

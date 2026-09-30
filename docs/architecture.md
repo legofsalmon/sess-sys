@@ -136,9 +136,13 @@ So the client sends **intentions** ("add 4 x Y10P to Nissan, 4 to 7 Oct",
 "scan asset 00123 out to Nissan"), not raw row edits. The server is the only
 thing that decides whether they succeed. Offline, the client applies the
 command optimistically to its local copy and shows it as pending. When it
-syncs, the server either confirms it or rejects it with a reason ("only 2
-available; 2 more would need a subhire"), and the UI turns that into a task
-for a person rather than silently undoing it.
+syncs, the server either confirms it or rejects it with a reason ("Show
+still has kit: 4 × d&b Y10P. Put it on the whole job or take it off
+first"), and the UI turns that into a task for a person rather than
+silently undoing it. Running short of kit is a warning rather than a
+refusal: the job's kit is kept as asked and every device shows the
+shortage until someone sorts it, since the count may be unfinished or the
+rest about to be subhired ([ADR 0014](adr/0014-kit-on-jobs.md)).
 
 Some commands can never be rejected, because they record something that
 already happened in the physical world: a scan, a fault report, a checklist
@@ -200,7 +204,10 @@ a job ([ADR 0007](adr/0007-jobs.md)).
 - **Equipment line**: product and quantity against a project, optionally
   against specific phases, grouped by department (Audio, Lighting, Video,
   Staging, Power, Transport and labour). Includes subhire lines from
-  another company.
+  another company. Built as kit lines
+  ([ADR 0014](adr/0014-kit-on-jobs.md)): a product and how many, for the
+  whole job or one phase, with how many of those are subhired and from
+  whom.
 - **Crew requirement**: a role needed on a phase ("2 x audio tech, Build and
   Show"), filled by **Crew assignments**. Built as crew calls, asked for from
   the job ([ADR 0002](adr/0002-crew-booking-links.md),
@@ -228,6 +235,12 @@ says product and item; the code says model and asset.
   Built with the Session Hire number: each is used only once, and an old
   label stays with its item. See
   [research/stock-tracking.md](research/stock-tracking.md).
+- **Label run**: numbers set aside for printing, from a first number, as
+  many as asked for ([ADR 0015](adr/0015-printing-labels.md)). The next
+  free number skips every run, a run is kept for good since its labels
+  may be printed, and a label from a run becomes an item's identifier
+  when it's scanned and put on the item. The QR code on a label holds
+  just the number.
 - **Place**: where kit lives: the warehouse, a bay or shelf, a van, the
   repair bench. A flat list, added by typing a new name.
 - **Bulk stock**: quantities per place or case (cables, clamps).
@@ -248,6 +261,10 @@ says product and item; the code says model and asset.
   each item, which the asset label provides.
 - **Availability** is computed from equipment lines, movements and
   maintenance, per product per hour, including prep and return buffers.
+  Built for now from kit lines and what's owned, per product per whole
+  day, on each device ([ADR 0014](adr/0014-kit-on-jobs.md)): confirmed
+  jobs hold kit, enquiries and quotes are pencilled in. Movements,
+  repairs, hours and buffers come with scanning and maintenance.
 
 **People**
 
@@ -361,8 +378,9 @@ of it before anything is saved. Bringing in saves the ticked jobs in one
 change, with a crew call per phase and offers from the guests' answers,
 and remembers each event-day by the id Google gives it on every calendar,
 so looking again shows only what is new and lists what changed in Google.
-Job sheets go into the notes as written; turning kit lists into draft
-equipment lines waits for the warehouse (Phase 2). A job brought in stays
+Job sheets go into the notes as written; turning kit lists into kit lines
+can come once the stock list has the products to match them against
+([ADR 0014](adr/0014-kit-on-jobs.md)). A job brought in stays
 with the calendar it came from, which keeps its events, so the app doesn't
 write it to the jobs calendar.
 

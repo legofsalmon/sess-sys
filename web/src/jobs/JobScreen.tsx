@@ -25,11 +25,13 @@ import { useState, type FormEvent } from 'react'
 import { act, CallCard, euroToCents, SharePanel } from '../crew/CrewScreen.tsx'
 import { client } from '../sync.ts'
 import { Choices, clientNamed, NotDone, StatusPill, Top, venueNamed } from './common.tsx'
+import { KitCard, kitSummary } from './Kit.tsx'
 
 /**
  * One job: what it is, its phases and how each will read on the calendar,
- * and its crew. Crew calls made here belong to the job and its phase, so
- * freelancers always see the job's current name, dates and venue.
+ * its kit (ADR 0014) and its crew. Crew calls made here belong to the job
+ * and its phase, so freelancers always see the job's current name, dates
+ * and venue.
  */
 
 export function JobScreen({ view, id }: { view: View; id: string }) {
@@ -49,6 +51,9 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
     )
   const onShare = (call: CallView) => (person: PersonView) => setShare({ person, call })
   const stopped = STOPPED.includes(job.status)
+  // Sending an offer opens beside the call it's for: under the phases, or over the crew across phases.
+  const sharing = share && <SharePanel {...share} onClose={() => setShare(undefined)} />
+  const inPhase = !!share && job.phases.some((p) => p.id === share.call.phaseId)
 
   return (
     <div className="app crew jobs">
@@ -68,7 +73,9 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
         <AddPhase job={job} />
       </section>
 
-      {share && <SharePanel {...share} onClose={() => setShare(undefined)} />}
+      {inPhase && sharing}
+      <KitCard job={job} view={view} />
+      {!inPhase && sharing}
 
       <section className="card" aria-label="Crew">
         <h2>Crew</h2>
@@ -85,6 +92,7 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
 function Summary({ job, view }: { job: JobView; view: View }) {
   const [editing, setEditing] = useState(false)
   const crew = crewFill(job.calls)
+  const kit = kitSummary(job, view.kit.byJob.get(job.id) ?? [])
   return (
     <section className="card">
       <header className="title">
@@ -121,6 +129,12 @@ function Summary({ job, view }: { job: JobView; view: View }) {
             <dd>
               {crew.held} of {crew.needed} booked
             </dd>
+          </div>
+        )}
+        {kit && (
+          <div>
+            <dt>Kit</dt>
+            <dd>{kit}</dd>
           </div>
         )}
       </dl>
@@ -318,6 +332,8 @@ function EditPhase({ phase, view, onDone }: { phase: PhaseView; view: View; onDo
   }
   const remove = () => {
     if (phase.calls.some((c) => c.status === 'open')) return alert(`${phase.name} still has crew. Cancel its crew calls first.`)
+    const kit = view.kit.lines.filter((l) => l.phaseId === phase.id)
+    if (kit.length) return alert(`${phase.name} still has kit. Put it on the whole job or take it off first.`)
     if (confirm(`Remove ${phase.name}?`)) void act(() => client.mutate('phase.remove', { id: phase.id })).then(onDone)
   }
   return (

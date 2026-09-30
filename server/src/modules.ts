@@ -10,7 +10,7 @@ import { STOCK } from './stock/schema.ts'
 /**
  * Every module's tables, in the order they are set up: crew calls refer to
  * jobs, so jobs come first, and the calendar connection names staff accounts.
- * The warehouse (ADR 0013) refers to nothing else yet.
+ * The warehouse comes last: kit on jobs (ADR 0014) refers to jobs and their phases.
  */
 export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK]
 

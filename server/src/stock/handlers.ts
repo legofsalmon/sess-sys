@@ -1,5 +1,6 @@
-import { MAX_CASE_DEPTH, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
+import { MAX_CASE_DEPTH, MAX_NUMBER, MAX_QTY, newId, normaliseNumber, plural, stockId, type CommandArgs, type Where } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
+import { jobsWithKit } from './kit.ts'
 import {
   atPlace,
   caseChain,
@@ -25,7 +26,8 @@ import {
  * - a case can't go inside itself or anything it holds, or more than five deep;
  * - no moving more of a count than is there;
  * - a product with items or counts, a place with anything at it, and a
- *   case with anything in it can't be removed or retired.
+ *   case with anything in it can't be removed or retired, nor a product
+ *   on a job's kit (ADR 0014).
  */
 
 type StockCommand =
@@ -78,11 +80,12 @@ async function mustActive(ctx: Ctx, id: string) {
   return a
 }
 
-/** A number as a person typed or scanned it, checked, or the next free one. */
+/** A number as a person typed or scanned it, checked, or the next free one, which is never one set aside for printing (ADR 0015). */
 async function numberFor(ctx: Ctx, typed: string | null): Promise<string> {
   if (typed === null) {
     const n = await nextNumber(ctx.tx)
-    if (n > 999_999) throw new Refused({ code: 'conflict', message: 'Every six-digit number has been used.' })
+    if (n > MAX_NUMBER)
+      throw new Refused({ code: 'conflict', message: 'Every six-digit number has been used or set aside for printing. Use the number on a printed label.' })
     return `SH-${String(n).padStart(6, '0')}`
   }
   const number = normaliseNumber(typed)
@@ -214,6 +217,12 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (uses.items > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has numbered items, which are kept for their history, so it can't be removed.` })
     if (uses.counted > 0) throw new Refused({ code: 'conflict', message: `${m.name} still has ${uses.counted} counted. Count them as none first.` })
+    const jobs = await jobsWithKit(ctx.tx, a.id)
+    if (jobs.length)
+      throw new Refused({
+        code: 'conflict',
+        message: `${m.name} is on the kit for ${jobs.length === 1 ? jobs[0] : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`}. Take it off ${jobs.length === 1 ? 'that job' : 'those'} first.`,
+      })
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },

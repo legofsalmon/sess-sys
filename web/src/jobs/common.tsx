@@ -41,7 +41,7 @@ export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
 }
 
 /** Changes the server turned down, with its reason, until dismissed: to jobs, or to what `names` matches. */
-export function NotDone({ view, names = /^(client|venue|project|phase|call)\./ }: { view: View; names?: RegExp }) {
+export function NotDone({ view, names = /^(client|venue|project|phase|call|kit)\./ }: { view: View; names?: RegExp }) {
   const problems = view.problems.filter((p) => names.test(p.mutation.name))
   if (problems.length === 0) return null
   return (
