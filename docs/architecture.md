@@ -408,6 +408,8 @@ Crewbox.
 - **PWA first.** Installable, offline shell, works on iOS and Android.
   Bluetooth barcode scanners work as keyboards, and camera scanning works in
   the browser (the `BarcodeDetector` API on Android, a WASM decoder on iOS).
+  Built for the Stock search ([ADR 0016](adr/0016-camera-scanning.md)): QR
+  labels and makers' Code 128 serials, read on the phone with no signal.
 - **Capacitor wrapper** for the warehouse app when we need what the browser
   cannot do reliably: faster native camera scanning, background sync on
   iOS, NFC tags, and staying signed in for months. Crewbox already has a

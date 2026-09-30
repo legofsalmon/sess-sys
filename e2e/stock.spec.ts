@@ -138,11 +138,16 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(page.locator('.alert')).toHaveText(`${sh(first)} is already in use (${speaker}).`)
   await page.getByLabel('New number').fill('')
   await page.getByRole('button', { name: 'Save new label' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: sh(first + 51) })).toBeVisible()
+  // The next free number: past every number this test typed, and past any another test takes meanwhile on the shared server.
+  const heading = page.getByRole('heading', { level: 1 })
+  await expect(heading).not.toHaveText(sh(first + 1))
+  await expect(heading).toHaveText(/^SH-\d{6}$/)
+  const relabelled = (await heading.textContent())!
+  expect(Number(relabelled.slice(3))).toBeGreaterThan(first + 50)
   await expect(page.locator('.facts')).toContainText(`Labels before${sh(first + 1)}`)
   await page.goto('/#stock')
   await page.getByLabel('Find').fill(sh(first + 1))
-  await expect(page.getByRole('list', { name: 'Items found' })).toContainText(`${sh(first + 51)} ${speaker}`)
+  await expect(page.getByRole('list', { name: 'Items found' })).toContainText(`${relabelled} ${speaker}`)
   await expect(page.getByRole('list', { name: 'Items found' })).toContainText(`Had ${sh(first + 1)} before`)
 
   // Retired as lost, then found again.
@@ -150,7 +155,7 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await page.getByRole('button', { name: 'Retire' }).click()
   await page.getByRole('radio', { name: 'Lost' }).check()
   await page.getByLabel('Note').fill('Not back from the Point')
-  await page.getByRole('button', { name: `Retire ${sh(first + 51)}` }).click()
+  await page.getByRole('button', { name: `Retire ${relabelled}` }).click()
   await expect(page.locator('.title .pill')).toHaveText('Retired')
   await expect(page.locator('.facts')).toContainText('RetiredLost: Not back from the Point')
   await page.getByRole('button', { name: 'Bring back' }).click()

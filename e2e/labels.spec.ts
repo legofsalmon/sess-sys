@@ -221,7 +221,9 @@ test('set aside, printed, sent to a label maker, and put on items by scanning', 
   await expect(page.locator('.facts')).toContainText('3: 2 labelled, 1 not yet')
   const add = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Add an item', exact: true }) })
   await add.getByRole('button', { name: 'Add item' }).click()
-  await expect(add.locator('.added')).toHaveText(`Added ${sh(first + 12)}.`)
+  // Past the run, and past any number another test takes meanwhile on the shared server.
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  expect(Number((await add.locator('.added').textContent())!.slice(9, 15))).toBeGreaterThan(first + 11)
   await page.goto('/#stock/labels')
   await expect(page.getByRole('region', { name: 'Set aside' }).locator('.job-row', { hasText: roll })).toContainText('2 of 12 on items')
 })

@@ -3,6 +3,11 @@
 .warehouse h1.number { letter-spacing: .02em; }
 .warehouse h3 { margin: 0; font-size: .95rem; }
 .warehouse .facts .wide { grid-column: 1 / -1; }
+/* The search, with the camera's button beside it where the phone has one (ADR 0016). */
+.warehouse form.with-scan { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.warehouse form.with-scan button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+/* Scrolled to after the camera reads a new label, clear of the tabs. */
+.warehouse .claim button[type='submit'] { scroll-margin-bottom: 84px; }
 .warehouse input[type='number'] { width: 100%; }
 /* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
 .warehouse .card > form:has(> h3) { padding-top: 12px; border-top: 1px solid var(--line); }

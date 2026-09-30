@@ -94,6 +94,14 @@ follow-up that lets the two stay in step.
   scanned in the search that isn't on anything yet opens a red-bordered
   form right under the search, with the cursor in its first field. Not in
   Figma yet.
+- The camera ([ADR 0016](adr/0016-camera-scanning.md)) opens under the
+  search from a **Scan** button beside it, dark while the camera is on: a
+  4 : 3 picture at most a third of the screen high, darkened round a
+  white frame to aim with, a grey line saying what it read, and its
+  buttons under that (Light, where the phone has one; Close camera).
+  While something is done with what it read, it shrinks to a strip, its
+  frame dashed, so the form under it fits with its button in reach of a
+  thumb. Not in Figma yet.
 
 ## Accessibility
 

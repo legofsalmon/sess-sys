@@ -3,6 +3,55 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: scanning with the phone's camera
+
+**Done**
+
+- The fourth part of Phase 2: the app reads labels with the phone's
+  camera, so nobody needs a scanner to label a shelf or find an item.
+  [Decision 0016](adr/0016-camera-scanning.md) has the reasons.
+- **Stock** has a **Scan** button beside the search. The camera opens
+  under it, and what it reads goes into the search as if a scanner had
+  typed it: a label on an item opens the item, and a label that isn't on
+  anything yet opens the form to put it on one.
+- Labelling a shelf is point, tap, point: while the form is open the
+  camera waits, smaller, with the form's button in reach. With the
+  product and place still there from the last label, it's one tap, and
+  the camera carries on to the next. Each label is read once, so one
+  still in view isn't read again. **Scan another** puts a label read by
+  mistake aside.
+- It also reads the barcode makers print serial numbers in (Code 128),
+  and finds the item with that serial: a serial of only digits is never
+  taken for a Session Hire number.
+- It works with no signal. Android phones use their own reader; iPhones
+  use one built into the app, kept on the phone with the rest of it, and
+  nothing is fetched from anywhere else. What the camera sees stays on the
+  phone. The phone's light has a button where the phone allows it.
+- A blocked camera says how to allow it; the camera stops when it's
+  closed, the page is left or the app goes into the background.
+- Checked: 4 new browser tests on a phone, with a camera the test holds
+  labels and makers' stickers up to, drawn by the same code that prints
+  the labels (labels put on items one after another, each read once, the
+  form's button in reach on a small phone too, a label read by mistake
+  put aside, a label on an item opening it; a serial found by its barcode
+  and a serial of digits never read as a number; a blocked camera, and
+  the camera stopping; scanning with no signal from the reader kept on
+  the phone, and nothing fetched from the reader's usual CDN). All 218
+  unit and sync tests, and all 35 browser tests passing. Two older
+  browser tests assumed no other test took a number while they ran; they
+  now check the number is new rather than exactly which.
+
+**Next**
+
+- Colly, to try it: on your phone, open the app from the home screen, go
+  to **Stock**, tap **Scan** and allow the camera. Point it at a label
+  printed from **Print labels** (on A4 is fine), or at the serial number
+  barcode on the back of a piece of kit.
+- Worth trying on an iPhone and an Android phone in the warehouse's
+  darkest bay, to see how quickly each reads.
+- Next in Phase 2: pick lists for jobs, then scanning kit out and back in,
+  with the same camera.
+
 ## 30 September 2026: deploys unstuck
 
 **Done**
