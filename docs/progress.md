@@ -44,6 +44,9 @@ waiting on someone.
   tests on a phone (count, label, find by number, fill a case, the place,
   a new label, retire and bring back; labelling with no signal), with all
   27 browser tests passing.
+- Merged into `main` at 05:57 UTC and live by 06:04: the live app has the
+  new Stock pages, and the live server adds the five new tables before it
+  starts, so the live database has them too.
 
 **Next**
 
