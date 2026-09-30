@@ -1,4 +1,15 @@
-import { daysLabel, eachDay, euro, newId, OFFLINE_AFTER_SECONDS, STATUS_LABELS, type HistoryEntry, type HistoryPage, type ProjectStatus } from '@sh/shared'
+import {
+  daysLabel,
+  eachDay,
+  euro,
+  invitesLabel,
+  newId,
+  OFFLINE_AFTER_SECONDS,
+  STATUS_LABELS,
+  type HistoryEntry,
+  type HistoryPage,
+  type ProjectStatus,
+} from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -65,7 +76,8 @@ const SELECT = `
       SELECT CASE WHEN m.sent_at IS NULL THEN NULL ELSE greatest(m.sent_at - m.created_at, interval '0') END AS waited
     ) w
     LEFT JOIN users u ON u.id = m.user_id
-    LEFT JOIN people p ON m.client_id LIKE 'link:%' AND p.id = substr(m.client_id, 6)`
+    LEFT JOIN people p ON (m.client_id LIKE 'link:%' AND p.id = substr(m.client_id, 6))
+                       OR (m.client_id LIKE 'calendar:%' AND p.id = substr(m.client_id, 10))`
 
 /** One page of the history, newest first. */
 export async function readHistory(q: Queryable, query: HistoryQuery = {}): Promise<HistoryPage> {
@@ -79,7 +91,8 @@ export async function readHistory(q: Queryable, query: HistoryQuery = {}): Promi
     where.push(`(m.received_at, m.id) < (${param(cursor.at)}::timestamptz, ${param(cursor.id)}::text)`)
   }
   if (query.who?.startsWith('user:')) where.push(`m.user_id = ${param(query.who.slice(5))}`)
-  else if (query.who?.startsWith('link:')) where.push(`m.client_id = ${param(query.who)}`)
+  // A freelancer answers on their link or in Google Calendar (ADR 0009): both are theirs.
+  else if (query.who?.startsWith('link:')) where.push(`m.client_id IN (${param(query.who)}, ${param(`calendar:${query.who.slice(5)}`)})`)
   else if (query.who) where.push('false')
   if (query.id) {
     const id = param(query.id)
@@ -108,14 +121,15 @@ export async function readAllHistory(q: Queryable): Promise<HistoryEntry[]> {
 
 /**
  * Staff who have signed in, and freelancers who have answered on their
- * private link: everyone the History tab can be narrowed to.
+ * private link or in Google Calendar: everyone the History tab can be
+ * narrowed to.
  */
 async function historyPeople(q: Queryable): Promise<{ key: string; name: string }[]> {
   const { rows } = await q.query<{ key: string; name: string }>(
     `SELECT 'user:' || id AS key, name FROM users
      UNION ALL
      SELECT 'link:' || p.id AS key, p.name FROM people p
-      WHERE EXISTS (SELECT 1 FROM mutations m WHERE m.client_id = 'link:' || p.id)
+      WHERE EXISTS (SELECT 1 FROM mutations m WHERE m.client_id IN ('link:' || p.id, 'calendar:' || p.id))
      ORDER BY name, key`
   )
   return rows
@@ -152,6 +166,7 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
   return rows.map((r) => {
     const args = r.args ?? {}
     const link = r.client_id.startsWith('link:')
+    const calendar = r.client_id.startsWith('calendar:')
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
@@ -161,11 +176,13 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
       who: link
         ? { kind: 'link', name: r.link_name ?? 'A freelancer', key: r.client_id }
-        : r.user_id
-          ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
-          : { kind: 'unknown', name: 'Someone' },
+        : calendar
+          ? { kind: 'calendar', name: r.link_name ?? 'A freelancer', key: `link:${r.client_id.slice(9)}` }
+          : r.user_id
+            ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
+            : { kind: 'unknown', name: 'Someone' },
       ...(r.device ? { device: r.device } : {}),
-      ...(link || r.client_id === 'server' ? {} : { deviceCode: r.client_id.slice(-6) }),
+      ...(link || calendar || r.client_id === 'server' ? {} : { deviceCode: r.client_id.slice(-6) }),
       madeAt: r.made,
       arrivedAt: r.received,
       ...(waited === undefined ? {} : { waitedSeconds: waited }),
@@ -308,6 +325,9 @@ export function describe(command: string, a: Data, look: Look): string {
       return `Connected Google Calendar as ${text(a.account, 'a Google account')}`
     case 'calendar.use':
       return `Chose ${text(a.calendar, 'a calendar')} as the calendar for jobs`
+    case 'calendar.invites':
+      if (a.on !== true) return 'Turned off crew invites on Google Calendar'
+      return `Turned on crew invites on Google Calendar${typeof a.invites === 'number' && typeof a.people === 'number' ? ` (${invitesLabel(a.invites, a.people)})` : ''}`
     case 'calendar.disconnect':
       return `Disconnected Google Calendar${typeof a.account === 'string' ? ` (${a.account})` : ''}${typeof a.calendar === 'string' ? `, taking the app's days off ${a.calendar}` : ''}`
     case EXPORT_COMMAND:

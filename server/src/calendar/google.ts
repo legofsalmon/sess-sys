@@ -1,4 +1,4 @@
-import type { CalendarChoice } from '@sh/shared'
+import type { CalendarChoice, GuestResponse } from '@sh/shared'
 import { identityFromIdToken, type Identity } from '../auth/google.ts'
 
 /**
@@ -30,11 +30,12 @@ export const CALENDAR_SCOPES = [
  * - `revoked`: Google no longer accepts the app's key; someone must connect again;
  * - `exists`: an event with that id is already there;
  * - `gone`: no such event (or it was deleted and forgotten);
+ * - `changed`: the event changed in Google since the app read it; read it again;
  * - `busy`: Google is busy, limiting the app, or couldn't be reached; wait and try again;
  * - `access`: the account can't change that calendar, or the Calendar API is off;
  * - `refused`: Google turned down what was sent.
  */
-export type GoogleProblem = 'expired' | 'revoked' | 'exists' | 'gone' | 'busy' | 'access' | 'refused'
+export type GoogleProblem = 'expired' | 'revoked' | 'exists' | 'gone' | 'changed' | 'busy' | 'access' | 'refused'
 
 export class GoogleError extends Error {
   constructor(
@@ -54,6 +55,7 @@ function problemFor(status: number, reason: string): GoogleProblem {
   if (status === 401) return 'expired'
   if (status === 409) return 'exists'
   if (status === 404 || status === 410) return 'gone'
+  if (status === 412) return 'changed'
   if (status === 429 || status >= 500 || (status === 403 && LIMITS.has(reason))) return 'busy'
   if (status === 403) return 'access'
   return 'refused'
@@ -66,12 +68,31 @@ async function failure(res: Response): Promise<GoogleError> {
   return new GoogleError(problemFor(res.status, reason), res.status, reason, `Google answered ${res.status}${reason ? ` (${reason})` : ''}`)
 }
 
+/** A guest on an event, as Google has it. */
+export interface Attendee {
+  email: string
+  displayName?: string
+  responseStatus?: GuestResponse
+  organizer?: boolean
+  self?: boolean
+  optional?: boolean
+  comment?: string
+  additionalGuests?: number
+}
+
 export interface GoogleEvent {
   id: string
   etag: string
   status: 'confirmed' | 'tentative' | 'cancelled'
   htmlLink?: string
   summary?: string
+  location?: string
+  description?: string
+  start?: { date?: string; dateTime?: string }
+  end?: { date?: string; dateTime?: string }
+  attendees?: Attendee[]
+  /** When anything but its reminders last changed, a guest's answer included. */
+  updated?: string
   extendedProperties?: { private?: Record<string, string> }
 }
 
@@ -84,7 +105,17 @@ export interface EventBody {
   end: { date: string }
   status: 'confirmed'
   extendedProperties: { private: Record<string, string> }
+  /** Guests can't see each other's addresses, or add anyone (ADR 0009). */
+  guestsCanSeeOtherGuests: false
+  guestsCanInviteOthers: false
+  attendees?: Attendee[]
 }
+
+/**
+ * Who Google emails about a write: `all` guests, or `none`. The app sends
+ * only what guests need to know (ADR 0009).
+ */
+export type SendUpdates = 'all' | 'none'
 
 export interface Connected {
   identity: Identity
@@ -180,25 +211,52 @@ export class Google {
     }
   }
 
-  insertEvent(accessToken: string, calendarId: string, id: string, body: EventBody) {
-    return this.api<GoogleEvent>(accessToken, 'POST', `${events(calendarId)}?sendUpdates=none`, { id, ...body })
+  insertEvent(accessToken: string, calendarId: string, id: string, body: EventBody, sendUpdates: SendUpdates = 'none') {
+    return this.api<GoogleEvent>(accessToken, 'POST', `${events(calendarId)}?sendUpdates=${sendUpdates}`, { id, ...body })
   }
 
-  /** Replace the event with what the app says it should be; this also brings back one deleted in Google. */
-  updateEvent(accessToken: string, calendarId: string, eventId: string, body: EventBody) {
-    return this.api<GoogleEvent>(accessToken, 'PUT', `${events(calendarId)}/${encodeURIComponent(eventId)}?sendUpdates=none`, body)
+  /** The event as it is now, guests and their answers included. */
+  getEvent(accessToken: string, calendarId: string, eventId: string) {
+    return this.api<GoogleEvent>(accessToken, 'GET', `${events(calendarId)}/${encodeURIComponent(eventId)}`)
   }
 
-  async deleteEvent(accessToken: string, calendarId: string, eventId: string): Promise<void> {
-    await this.api(accessToken, 'DELETE', `${events(calendarId)}/${encodeURIComponent(eventId)}?sendUpdates=none`)
+  /**
+   * Replace the event with what the app says it should be; this also brings
+   * back one deleted in Google. Google prefers reading an event and then
+   * replacing it to patching it, and the read is what keeps guests added
+   * by hand. With `etag`, only if the event is still as it was read, so a
+   * guest answering in between isn't lost.
+   */
+  updateEvent(accessToken: string, calendarId: string, eventId: string, body: EventBody, sendUpdates: SendUpdates = 'none', etag?: string) {
+    return this.api<GoogleEvent>(
+      accessToken,
+      'PUT',
+      `${events(calendarId)}/${encodeURIComponent(eventId)}?sendUpdates=${sendUpdates}`,
+      body,
+      etag ? { 'if-match': etag } : {}
+    )
   }
 
-  /** The app's own events ending after `timeMin`, deleted ones included, found by the app's hidden mark. */
-  async listEvents(accessToken: string, calendarId: string, { mark, timeMin }: { mark: string; timeMin: string }): Promise<GoogleEvent[]> {
+  async deleteEvent(accessToken: string, calendarId: string, eventId: string, sendUpdates: SendUpdates = 'none'): Promise<void> {
+    await this.api(accessToken, 'DELETE', `${events(calendarId)}/${encodeURIComponent(eventId)}?sendUpdates=${sendUpdates}`)
+  }
+
+  /**
+   * The app's own events, deleted ones included, found by the app's hidden
+   * mark: those ending after `timeMin`, or those changed since `updatedMin`,
+   * a guest answering included.
+   */
+  async listEvents(
+    accessToken: string,
+    calendarId: string,
+    { mark, timeMin, updatedMin }: { mark: string; timeMin?: string; updatedMin?: string }
+  ): Promise<GoogleEvent[]> {
     const out: GoogleEvent[] = []
     let pageToken: string | undefined
     do {
-      const q = new URLSearchParams({ privateExtendedProperty: mark, timeMin, showDeleted: 'true', singleEvents: 'true', maxResults: '2500' })
+      const q = new URLSearchParams({ privateExtendedProperty: mark, showDeleted: 'true', singleEvents: 'true', maxResults: '2500' })
+      if (timeMin) q.set('timeMin', timeMin)
+      if (updatedMin) q.set('updatedMin', updatedMin)
       if (pageToken) q.set('pageToken', pageToken)
       const page = await this.api<{ items?: GoogleEvent[]; nextPageToken?: string }>(accessToken, 'GET', `${events(calendarId)}?${q}`)
       out.push(...(page.items ?? []))
@@ -230,12 +288,12 @@ export class Google {
     return (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number; scope?: string; id_token?: string }
   }
 
-  private async api<T>(accessToken: string, method: string, path: string, body?: unknown): Promise<T> {
+  private async api<T>(accessToken: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
     let res: Response
     try {
       res = await this.fetch(`${API}${path}`, {
         method,
-        headers: { authorization: `Bearer ${accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        headers: { authorization: `Bearer ${accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(20_000),
       })

@@ -4,6 +4,7 @@ import {
   euro,
   newId,
   offerMessage,
+  offerOnCalendar,
   personConflicts,
   whatsappNumber,
   type CallView,
@@ -18,8 +19,9 @@ import { client, syncSoon } from '../sync.ts'
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
  * the people who can be offered work. Answers arrive from freelancers'
- * private links and show up here live; everything also works with no
- * signal and syncs later, like the rest of the app.
+ * private links, and from Google Calendar when crew invites are on (ADR
+ * 0009), and show up here live; everything also works with no signal and
+ * syncs later, like the rest of the app.
  */
 
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
@@ -53,7 +55,19 @@ export function CrewScreen() {
   const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
   const people = new Map(crew.people.map((p) => [p.id, p]))
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
-  const toCheck = upcoming.flatMap((c) => c.offers.filter((o) => o.status === 'accepted' || o.status === 'countered').map((o) => ({ c, o })))
+  const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
+  const toCheck = upcoming.flatMap((c) =>
+    c.offers.filter((o) => o.status === 'accepted' || o.status === 'countered').map((o) => ({ c, o, warning: onCalendar(o)?.warning }))
+  )
+  // Answers in Google the app couldn't act on, such as a No to a booked day: for the office to sort out.
+  const toSortOut = upcoming.flatMap((c) =>
+    c.offers
+      .filter((o) => o.status === 'offered' || o.status === 'confirmed')
+      .flatMap((o) => {
+        const cal = onCalendar(o)
+        return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
+      })
+  )
   const problems = view.problems.filter((p) => /^(person|call|offer|unavailability)\./.test(p.mutation.name))
 
   return (
@@ -85,16 +99,39 @@ export function CrewScreen() {
         </section>
       )}
 
-      {toCheck.length > 0 && (
+      {(toCheck.length > 0 || toSortOut.length > 0) && (
         <section className="card">
           <h2>Answers to check</h2>
-          {toCheck.map(({ c, o }) => (
+          {toSortOut.map(({ c, o, text }) => (
             <div className="row" key={o.id}>
               <div>
-                <b>{o.person?.name ?? 'Someone'}</b> {o.status === 'accepted' ? 'accepted' : `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`}
+                <b>{o.person?.name ?? 'Someone'}</b> answered on Google Calendar
+                <p>
+                  {c.project} · {c.role} · {o.status === 'confirmed' ? 'booked' : 'offered'} {daysLabel(o.days)}
+                  <br />
+                  {text}
+                </p>
+              </div>
+              {c.projectId && (
+                <div className="actions">
+                  <a className="link" href={`#jobs/${c.projectId}`}>
+                    Open job
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
+          {toCheck.map(({ c, o, warning }) => (
+            <div className="row" key={o.id}>
+              <div>
+                <b>{o.person?.name ?? 'Someone'}</b>{' '}
+                {o.status === 'accepted'
+                  ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
+                  : `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`}
                 <p>
                   {c.project} · {c.role} · {daysLabel(o.days)}
                   {o.note && <><br />“{o.note}”</>}
+                  {warning && <><br />{warning}</>}
                 </p>
               </div>
               <div className="actions">
@@ -114,7 +151,7 @@ export function CrewScreen() {
         <h2>Crew needed</h2>
         {upcoming.length === 0 && <p className="empty">No crew needed yet. Ask for crew from a job in Jobs, or below.</p>}
         {upcoming.map((c) => (
-          <CallCard key={c.id} call={c} crew={crew} onShare={(person) => setShare({ person, call: c })} />
+          <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ person, call: c })} />
         ))}
       </section>
 
@@ -143,8 +180,20 @@ export function CrewScreen() {
   )
 }
 
-/** One crew call: who's been offered it and how they answered, and offering it to someone else. */
-export function CallCard({ call, crew, onShare, inJob = false }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void; inJob?: boolean }) {
+/** One crew call: who's been offered it and how they answered, on their link or on Google Calendar, and offering it to someone else. */
+export function CallCard({
+  call,
+  crew,
+  calendar,
+  onShare,
+  inJob = false,
+}: {
+  call: CallView
+  crew: CrewView
+  calendar: View['calendar']
+  onShare: (p: PersonView) => void
+  inJob?: boolean
+}) {
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
@@ -152,6 +201,7 @@ export function CallCard({ call, crew, onShare, inJob = false }: { call: CallVie
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
   const filled = call.openDays.length === 0
+  const invites = calendar.link?.state === 'on' && calendar.link.invites === true
 
   const send = (e: FormEvent) => {
     e.preventDefault()
@@ -196,6 +246,8 @@ export function CallCard({ call, crew, onShare, inJob = false }: { call: CallVie
           {call.offers.map((o) => {
             const [label, tone] = STATUS[o.status]
             const partial = o.days.length < call.days.length && (o.status === 'accepted' || o.status === 'confirmed' || o.status === 'countered')
+            const cal = offerOnCalendar(o, calendar.days, today)
+            const live = o.status === 'offered' || o.status === 'countered' || o.status === 'accepted' || o.status === 'confirmed'
             return (
               <li key={o.id}>
                 <span>
@@ -216,6 +268,9 @@ export function CallCard({ call, crew, onShare, inJob = false }: { call: CallVie
                     </button>
                   )}
                 </span>
+                {cal && <small className="on-cal">{cal.line}</small>}
+                {cal?.warning && <small className="warn-line">{cal.warning}</small>}
+                {!cal && invites && live && o.person && !o.person.email?.trim() && <small className="on-cal">No email address, so no calendar invite.</small>}
               </li>
             )
           })}

@@ -299,7 +299,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 1 · jobs and calendar built</div>
+      <div class="status">Phase 1 · jobs, calendar and crew invites built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -345,6 +345,14 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         <div class="phones">
           <figure><img src="img/account-calendar.png" alt="Account tab on a phone: the Google Calendar card says confirmed jobs go on Test calendar, written by ops@sessionhire.com, with Check now, Change calendar and Disconnect" width="390" height="844" loading="lazy"><figcaption><b>Connected.</b> Which calendar, which account, and Check now.</figcaption></figure>
           <figure><img src="img/jobs-calendar.png" alt="A job's page on a phone: the Build phase is on Test calendar with a link to open it, and the Show day couldn't be written, with Google's reason" width="390" height="844" loading="lazy"><figcaption><b>Each phase.</b> On the calendar, on its way, or why not.</figcaption></figure>
+        </div>
+      </div>
+      <div class="panel shots crewshots jobshots">
+        <h3>Crew invites and their answers</h3>
+        <p class="small">With the switch on the Account tab on, crew offered or booked on a confirmed job are invited to its days on Google Calendar, as ops do by hand today, and their Yes or No there counts as their answer, as on their link. Guests hear from Google only when it matters. A No from someone already booked is shown to the office rather than unbooking them. The switch starts off. (Decision 0009)</p>
+        <div class="phones">
+          <figure><img src="img/account-invites.png" alt="Account tab on a phone: the Google Calendar card says crew invites are on, with 4 invites to 2 people on their way, and a button to turn them off" width="390" height="844" loading="lazy"><figcaption><b>The switch.</b> Says what goes out before it does.</figcaption></figure>
+          <figure><img src="img/jobs-invites.png" alt="A job's page on a phone: Niamh is confirmed but said no to the second day on Google Calendar, with a warning to call her; Conor is invited with no answer yet; Seán has no email address, so no invite" width="390" height="844" loading="lazy"><figcaption><b>The answers.</b> Under each person, with what needs a call.</figcaption></figure>
         </div>
       </div>
       <div class="panel shots crewshots">
@@ -542,6 +550,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <tr><th>History and export</th><td>Every change kept with who, when and on what device; one file with everything as spreadsheets and JSON</td><td>Built (Decision 0006)</td></tr>
             <tr><th>Jobs</th><td>Clients, venues, jobs and their phases, changed field by field so two people's edits both stand</td><td>Built (Decision 0007)</td></tr>
             <tr><th>Google Calendar</th><td>The app writes confirmed jobs to one calendar, as one connected account, on each change and in a nightly check</td><td>Built (Decision 0008)</td></tr>
+            <tr><th>Crew invites</th><td>Crew are guests on their days' events; their answers are read back every two minutes by asking Google what changed, so the database sleeps</td><td>Built, switch off (Decision 0009)</td></tr>
           </tbody>
         </table>
       </div>
@@ -554,7 +563,11 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <p>The system writes to the shared <b>Session Hire Gigs</b> calendar in today's format and listens for changes in seconds. Each project runs in one of two modes, and new projects switch to app-led once Phase 1 is live.</p>
       <div class="panel">
         <h3>Built so far: app-led writing (Decision 0008)</h3>
-        <p class="small">A member of staff connects one Google account on the Account tab and picks one of its calendars: Colly's test calendar first, Session Hire Gigs later. The app then keeps every day of every confirmed job from today on there, in today's format, and takes a job off when it is cancelled. Event ids are worked out from the job, so a retry never makes a double, and a hidden mark keeps the app to its own events. It runs when something changes and checks the calendar once a night, so the database can sleep. Past days are never changed. Next: crew as attendees and their RSVPs, behind a switch that starts off, then edits flowing back for calendar-led jobs.</p>
+        <p class="small">A member of staff connects one Google account on the Account tab and picks one of its calendars: Colly's test calendar first, Session Hire Gigs later. The app then keeps every day of every confirmed job from today on there, in today's format, and takes a job off when it is cancelled. Event ids are worked out from the job, so a retry never makes a double, and a hidden mark keeps the app to its own events. It runs when something changes and checks the calendar once a night, so the database can sleep. Past days are never changed.</p>
+      </div>
+      <div class="panel">
+        <h3>Built so far: crew invites and their answers (Decision 0009)</h3>
+        <p class="small">A switch on the Account tab, off to start with. When on, everyone offered a place on a confirmed job, or booked on it, with an email address in the app, is a guest on its events on their days, invited by the connected account; crew can't see each other's addresses. Their Yes or No counts as their answer through the same rules as their link: the first to say yes gets the place, a No to every day declines, Maybe waits, and a No from someone already confirmed is flagged for the office instead. Google emails guests only when they are added or taken off, or the title, date or place changes. Every change reads the event first, so guests added by hand and answers given in the meantime are kept. The server asks Google every two minutes which events changed and only touches the database for a new answer. Next: edits flowing back for calendar-led jobs.</p>
       </div>
       <div class="btns" role="group" aria-label="Sync mode">
         <button class="btn" type="button" data-mode="cal" aria-pressed="true">Calendar-led (during the move)</button>
@@ -764,7 +777,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const PHASES = [
     ['0', 'Foundations', 'now', 'Built; field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Jobs and calendar built'],
+    ['1', 'Projects and calendar', 'now', 'Jobs, calendar, invites built'],
     ['2', 'Warehouse', 'todo', 'Planned'],
     ['3', 'Crew', 'now', 'Started early'],
     ['4', 'Finance', 'todo', 'Planned'],
@@ -845,7 +858,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   const road = [
     ['0', '', 'Foundations', ['Repo, CI, EU hosting', 'Nightly backups, each proved by a test restore (built; on once the bucket is added)', 'Error alerts and uptime checks with Sentry, with no personal details in reports (built; on once the Sentry key is added)', 'Staff sign-in with Google (built; on once the Google key is added); freelancers use private links', 'Sync test on real phones in a dead spot, then decide the sync engine', 'A history of every change, and Download everything (built and on)'], 'a change made in flight mode shows on a laptop within a second of reconnecting, and survives a server restart mid-sync.'],
     ['+', 'side', 'Label trial (alongside)', ['Sample QR labels, metal tags and cable labels on a few cases', 'See what survives real jobs', 'Choose materials and order starter hardware'], 'label materials are chosen from real wear, not a catalogue.'],
-    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Two-way sync with the Session Hire Gigs calendar; RSVPs update crew', 'Import past calendar events as draft projects', 'Week and month planner with clashes flagged', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
+    ['1', '', 'Projects and the calendar', ['Clients, venues, jobs and their phases, with crew asked for from the job (built and on)', 'Confirmed jobs on the Session Hire Gigs calendar (built); crew invited, with their RSVPs updating offers (built, switch off)', 'Import past calendar events as draft projects', 'Week and month planner with clashes flagged', 'Personal calendar feeds'], 'ops create every new job in the system, crew still get the same invites, and nothing is typed twice.'],
     ['2', '', 'Warehouse and stock', ['Catalogue, assets, containers, bulk stock, locations', 'Label printing and the labelling rollout', 'Kit on jobs with live availability and shortage warnings', 'Pick lists; scan out and in offline; conflicts queue', 'Faults, repairs, inspections; overdue items blocked'], 'a job is picked and returned by scanning, and next week\'s availability is trusted without walking the shelves.'],
     ['3', '', 'Crew', ['Profiles, skills, rates, documents with expiry reminders', 'Availability from their own calendar or by link', 'Offers by SMS, WhatsApp, email; accept in one tap; partial days; counter-offers', 'Call sheets offline; timesheets; ready-made freelancer invoices', 'Crewbox show pack as files'], 'crew are booked, briefed and paid from the system, and the invite is a courtesy rather than the record.'],
     ['4', '', 'Light finance', ['Price lists, rate rules, discounts', 'Quotes with versions and PDFs; invoices and credit notes with Irish VAT', 'Finance dashboard: revenue, outstanding, freelancer costs, margin per job', 'Exports for the accountant: invoice register, VAT summary, payments', 'Accounting connector later, only if needed'], 'a VAT period\'s figures come out of one export without re-keying.'],
@@ -875,7 +888,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['Error alerts', 'Sentry, chosen over Better Stack: its free plan keeps data in Frankfurt and emails about errors, downtime and a missed backup; reports are built to leave out anyone\'s details (Decision 0005). Built; switches on once the Sentry key is added in Railway.', 'waiting'],
     ['History and export', 'Every change is kept with who made it, when, on what device and whether it was made offline, and shows in a History tab. Download everything gives one file that opens without the app; it leaves out private link codes and sign-in sessions, and each download shows in the history (Decision 0006). Built and on.', 'decided'],
     ['Jobs', 'A job has a client, a main venue, a status (enquiry, quoted, confirmed, cancelled or lost) and phases of whole days; each phase-day becomes a calendar event in today\'s format. Crew are asked for from the job and follow its renames; cancelling a job cancels its crew. Nothing is deleted (Decision 0007). Built and on.', 'decided'],
-    ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only, and invites come later behind a switch (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting']
+    ['Google Calendar', 'Confirmed jobs go onto one calendar from today on, written by one Google account a person connects; the app leads and puts back edits made in Google each night; past days are left alone; crew show by name only (Decision 0008). Built; switches on with the Google key, the Calendar API on, and a calendar connected on the Account tab.', 'waiting'],
+    ['Crew invites', 'Invites go out when crew are offered, as today, and their Yes or No in Google counts as their answer; a No from someone already booked is flagged, not acted on (Decision 0009). Built behind a switch that starts off. Colly to choose: invite when offered, or only once booked? Try it on the test calendar with staff addresses first.', 'waiting']
   ];
   const label = { decided: 'Decided', open: 'Open', waiting: 'Waiting' };
   $('#dec').innerHTML = dec.map(([q, a, s]) => `<div class="row"><span class="q">${q}</span><span>${a}</span><span class="state ${s}">${label[s]}</span></div>`).join('');

@@ -40,19 +40,22 @@ venues built and on, with crew asked for from the job
 ([ADR 0007](adr/0007-jobs.md)). Confirmed jobs go onto Google Calendar in
 today's event format, kept up to date by the app
 ([ADR 0008](adr/0008-calendar-sync.md)); it switches on with the Google key
-and a calendar connected on the Account tab. Crew invites and RSVPs are
-next. See [progress.md](progress.md).
+and a calendar connected on the Account tab. Crew can be invited to their
+days, with their Yes or No in Google counting as their answer, behind a
+switch that starts off ([ADR 0009](adr/0009-crew-invites.md)). The week and
+month planner is next. See [progress.md](progress.md).
 
 - Clients, venues, projects, phases, crew requirements and assignments
   (built).
 - Confirmed jobs written to a Google calendar in today's event format, app
   leading (built; tried first on Colly's test calendar, then **Session
   Hire Gigs**).
-- Crew as attendees on the events, with RSVPs updating assignments (next,
-  behind a switch that starts off).
+- Crew as attendees on the events, with RSVPs updating assignments (built,
+  behind a switch on the Account tab that starts off; tried first on the
+  test calendar with staff's own addresses).
 - Importer for the organisers' existing calendars into draft projects.
 - A planner view: the week and month by project and by person, with
-  clashes flagged (the same freelancer on two jobs).
+  clashes flagged (the same freelancer on two jobs) (next).
 - Personal iCal feeds.
 
 **Done when:** ops create every new job in the system, crew still receive

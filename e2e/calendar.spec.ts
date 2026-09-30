@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Google Calendar in the browser (ADR 0008). The test server runs without
- * Google, so a server with the calendar available is played here: Colly is
- * signed in, the connection and each day's state arrive in the normal pull
- * like any other record, and the calendar's own calls are answered here.
- * What the server itself does with Google is tested against a pretend
- * Google in server/test/calendar.test.ts. To refresh the blueprint
- * screenshots, run this file on its own with SHOTS=1.
+ * Google Calendar in the browser (ADR 0008, 0009). The test server runs
+ * without Google, so a server with the calendar available is played here:
+ * Colly is signed in, the connection and each day's state (with the crew
+ * invited to it and their answers) arrive in the normal pull like any other
+ * record, and the calendar's own calls are answered here. What the server
+ * itself does with Google is tested against a pretend Google in
+ * server/test/calendar.test.ts. To refresh the blueprint screenshots, run
+ * this file on its own with SHOTS=1.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -26,6 +27,7 @@ interface Link {
   problem: string | null
   connectedBy: string | null
   connectedAt: string | null
+  invites?: boolean
 }
 
 const connected = (changes: Partial<Link> = {}): Link => ({
@@ -50,6 +52,9 @@ interface PhaseData {
 
 type DayState = { state: 'on' | 'failed'; title: string; problem: string | null; link: string | null }
 
+type Response = 'needsAction' | 'accepted' | 'declined' | 'tentative'
+type OfferData = { id: string; personId: string; status: string; days: string[] } & Record<string, unknown>
+
 function eachDay(start: string, end: string) {
   const out: string[] = []
   for (const d = new Date(`${start}T00:00:00Z`); d <= new Date(`${end}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) out.push(d.toISOString().slice(0, 10))
@@ -59,7 +64,9 @@ function eachDay(start: string, end: string) {
 /**
  * Colly, signed in, on a server whose calendar connection is `server.link`.
  * For the job named `server.job`, each day of each phase is on the calendar
- * as `server.day` says.
+ * as `server.day` says, with the people in `server.answers` as guests,
+ * answering as it says. `server.offers` is what the server made of their
+ * answers, by person.
  */
 async function signedIn(page: Page) {
   const server = {
@@ -70,6 +77,12 @@ async function signedIn(page: Page) {
     day: (_phase: string, _i: number, _n: number): DayState | undefined => undefined,
     /** Days of other jobs on the calendar, by day. */
     otherDays: [] as string[],
+    /** Each guest's answer on Google Calendar, by person name and then day. */
+    answers: new Map<string, Record<string, Response>>(),
+    /** Offers as the server has changed them since, by person name. */
+    offers: new Map<string, Partial<OfferData>>(),
+    people: new Map<string, string>(),
+    offerOf: new Map<string, OfferData>(),
   }
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'google', user: { id: 'u1', email: 'colly@sessionhire.com', name: 'Colly Hewson' } } }))
   await page.route(/\/api\/sync\/pull/, async (route) => {
@@ -78,9 +91,20 @@ async function signedIn(page: Page) {
     for (const c of body.changes) {
       if (c.entity === 'project' && c.op === 'put' && (c.data as { name: string }).name === server.job) server.jobId = c.id
       if (c.entity === 'phase' && c.op === 'put') server.phases.set(c.id, c.data as PhaseData)
+      if (c.entity === 'person' && c.op === 'put') server.people.set((c.data as { name: string }).name, c.id)
+      if (c.entity === 'offer' && c.op === 'put') server.offerOf.set((c.data as OfferData).personId, c.data as OfferData)
     }
     const put = (entity: string, id: string, data: unknown) => body.changes.push({ seq: body.cursor, entity, id, op: 'put', data })
     if (server.link) put('calendarLink', 'main', server.link)
+    for (const [name, changes] of server.offers) {
+      const offer = server.offerOf.get(server.people.get(name) ?? '')
+      if (offer) put('offer', offer.id, { ...offer, ...changes })
+    }
+    const guests = (day: string) =>
+      [...server.answers].flatMap(([name, byDay]) => {
+        const offer = server.offerOf.get(server.people.get(name) ?? '')
+        return offer && byDay[day] ? [{ personId: offer.personId, offerId: offer.id, response: byDay[day], problem: null }] : []
+      })
     for (const day of server.otherDays)
       put('calendarDay', `other/${day}`, { id: `other/${day}`, phaseId: 'other', projectId: 'other', day, calendarId: TEST_CAL, state: 'on', title: 'Another job', problem: null, link: null })
     for (const p of server.phases.values()) {
@@ -88,7 +112,7 @@ async function signedIn(page: Page) {
       const days = eachDay(p.start, p.end)
       days.forEach((day, i) => {
         const d = server.day(p.name, i, days.length)
-        if (d) put('calendarDay', `${p.id}/${day}`, { id: `${p.id}/${day}`, phaseId: p.id, projectId: p.projectId, day, calendarId: TEST_CAL, ...d })
+        if (d) put('calendarDay', `${p.id}/${day}`, { id: `${p.id}/${day}`, phaseId: p.id, projectId: p.projectId, day, calendarId: TEST_CAL, guests: guests(day), ...d })
       })
     }
     return route.fulfill({ response: res, json: body })
@@ -237,4 +261,106 @@ test('each phase of a job says how it stands on the calendar', async ({ browser 
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
   await expect(build.locator('.cal')).toHaveText(`Going on Test calendar as “${renamed} - Build 1/2” and “${renamed} - Build 2/2”…`)
+})
+
+test('crew invites: turned on from the Account tab, with answers from Google on the job page', async ({ browser }) => {
+  const id = tag()
+  const job = named('Web Summit', id)
+  const [niamh, conor, sean] = [named('Niamh Kelly', id), named('Conor Walsh', id), named('Seán Murphy', id)]
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  const server = await signedIn(page)
+  server.link = connected()
+  server.job = job
+  server.day = (phase, i, n) => ({ state: 'on', title: `${job} - ${phase} ${i + 1}/${n}`, problem: null, link: 'https://www.google.com/calendar/event?eid=abc' })
+
+  // Three freelancers, one with no email address, offered the build.
+  await page.goto('/#crew')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
+  for (const [name, email] of [[niamh, 'niamh@example.com'], [conor, 'conor@example.ie'], [sean, '']] as const) {
+    await person.getByLabel('Name').fill(name)
+    await person.getByLabel('Email').fill(email)
+    await person.getByRole('button', { name: 'Add person' }).click()
+    await expect(page.getByRole('button', { name })).toBeVisible()
+  }
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
+  const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
+  await form.getByLabel('Job').fill(job)
+  await form.getByLabel('Phase 1', { exact: true }).fill('Build')
+  await form.getByLabel('Phase 1 from').fill('2030-10-14')
+  await form.getByLabel('Phase 1 to').fill('2030-10-15')
+  await form.getByRole('button', { name: 'Add job' }).click()
+  await expect(page.getByRole('heading', { name: job })).toBeVisible()
+  const ask = page.getByRole('form', { name: 'Ask for crew' })
+  await ask.getByLabel('Role').fill('Audio tech')
+  await ask.getByLabel('How many').fill('2')
+  await ask.getByLabel('Day rate €').fill('250')
+  await ask.getByRole('button', { name: 'Ask for crew' }).click()
+  const build = page.getByRole('article', { name: 'Build' })
+  for (const name of [niamh, conor, sean]) {
+    await build.getByLabel('Offer to').selectOption({ label: name })
+    await build.getByRole('button', { name: 'Offer', exact: true }).click()
+    await expect(build.locator('.offers')).toContainText(name)
+  }
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const jobPage = page.url()
+  // Off: nobody has heard from Google, and the job page says nothing about it.
+  await expect(build.locator('.on-cal')).toHaveCount(0)
+
+  // Turning invites on says first what goes out.
+  await page.route(/\/api\/calendar\/invites/, (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { on: false, invites: 4, people: 2, noEmail: [sean] } })
+    server.link = connected({ invites: route.request().postDataJSON().on })
+    return route.fulfill({ json: server.link })
+  })
+  await page.goto('/#account')
+  const card = page.getByRole('region', { name: 'Google Calendar' })
+  const invites = card.getByRole('group', { name: 'Crew invites' })
+  await expect(invites.getByRole('heading')).toHaveText('Crew invites: off')
+  // The counts come from the server first, so the question comes a moment after the press.
+  const question = page.waitForEvent('dialog')
+  await invites.getByRole('button', { name: 'Turn on crew invites' }).click()
+  const dialog = await question
+  expect(dialog.message()).toBe(
+    `Turn on crew invites? 4 invites to 2 people go out straight away, by email from ops@sessionhire.com, and more as crew are offered work. ${sean} has no email address in the app, so won't be invited.`
+  )
+  await dialog.accept()
+  await expect(card.getByRole('status')).toHaveText('Crew invites are on: 4 invites to 2 people on their way.')
+  await expect(invites.getByRole('heading')).toHaveText('Crew invites: on')
+  await card.evaluate((el) => scrollTo(0, el.getBoundingClientRect().top + scrollY - 70))
+  await page.screenshot(shot('account-invites'))
+
+  // With invites on, disconnecting says what crew are sent.
+  let asked = ''
+  page.once('dialog', (d) => {
+    asked = d.message()
+    void d.dismiss()
+  })
+  await card.getByRole('button', { name: 'Disconnect' }).click()
+  expect(asked).toBe(
+    'Disconnect Google Calendar? The app takes its days off Test calendar from today on, and hands back its access. Days before today stay. Crew invited to those days get an email saying they are cancelled, and crew invites turn off.'
+  )
+
+  // Niamh said yes, and the office confirmed her; then she said no to the second day in Google. Conor hasn't answered.
+  server.answers.set(niamh, { '2030-10-14': 'accepted', '2030-10-15': 'declined' })
+  server.answers.set(conor, { '2030-10-14': 'needsAction', '2030-10-15': 'needsAction' })
+  server.offers.set(niamh, { status: 'confirmed', days: ['2030-10-14', '2030-10-15'], respondedVia: 'calendar' })
+  await page.goto(jobPage)
+  await page.reload()
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const row = (name: string) => build.locator('.offers li', { hasText: name })
+  await expect(row(niamh).locator('.on-cal')).toHaveText('On Google Calendar: yes to Mon 14 Oct; no to Tue 15 Oct.')
+  await expect(row(niamh).locator('.warn-line')).toHaveText('Said no to Tue 15 Oct on Google Calendar, but is booked for it. Call them to sort it out.')
+  await expect(row(conor).locator('.on-cal')).toHaveText('Invited on Google Calendar; no answer yet.')
+  await expect(row(sean).locator('.on-cal')).toHaveText('No email address, so no calendar invite.')
+  await build.scrollIntoViewIfNeeded()
+  await page.screenshot(shot('jobs-invites'))
+
+  // The crew screen puts it with the answers to check.
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
+  const answers = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Answers to check' }) })
+  await expect(answers.locator('.row', { hasText: niamh })).toContainText(
+    `${niamh} answered on Google Calendar${job} · Audio tech · booked Mon 14 Oct to Tue 15 Oct` +
+      'Said no to Tue 15 Oct on Google Calendar, but is booked for it. Call them to sort it out.'
+  )
 })

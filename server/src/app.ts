@@ -45,7 +45,7 @@ export interface AppOptions {
   calendar?: CalendarSetup
 }
 
-export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly'> {
+export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs'> {
   clientId: string
   clientSecret: string
   /** Stands in for the network in tests. */

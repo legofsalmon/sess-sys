@@ -74,7 +74,7 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
         <h2>Crew</h2>
         {job.otherCalls.length > 0 && <p className="hint">Across phases:</p>}
         {job.otherCalls.map((c) => (
-          <CallCard key={c.id} call={c} crew={view.crew} onShare={onShare(c)} inJob />
+          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} inJob />
         ))}
         {stopped ? <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p> : <AskForCrew job={job} />}
       </section>
@@ -291,7 +291,7 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
         </p>
       ))}
       {phase.calls.map((c) => (
-        <CallCard key={c.id} call={c} crew={view.crew} onShare={onShare(c)} inJob />
+        <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} inJob />
       ))}
     </article>
   )

@@ -15,6 +15,11 @@ import type { Module } from '../migrations.ts'
  * calendar, or tried to. Rows outlive their phase, since a removed phase's
  * events still have to come off the calendar, and are kept after their
  * event is removed, so writing the same day again reuses its event.
+ *
+ * `calendar_guests` is who the app invited to each day's event because of
+ * an offer (ADR 0009), the address it used, and their last answer in
+ * Google, so an answer is taken in once and a changed address moves the
+ * invite. `calendar_link.invites` switches invites on; it starts off.
  */
 const MIGRATIONS: string[] = [
   `
@@ -50,6 +55,24 @@ const MIGRATIONS: string[] = [
     updated_at    timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS calendar_days_day ON calendar_days (day);
+  `,
+  // Crew invites (ADR 0009). `invites` is the switch on the Account tab.
+  // `calendar_guests` is everyone the app has put on an event because of an
+  // offer, with the address it used and their last answer; guests added by
+  // hand in Google are not here, and are left alone.
+  `
+  ALTER TABLE calendar_link ADD COLUMN IF NOT EXISTS invites boolean NOT NULL DEFAULT false;
+  CREATE TABLE IF NOT EXISTS calendar_guests (
+    day_id      text NOT NULL,
+    person_id   text NOT NULL,
+    offer_id    text NOT NULL,
+    email       text NOT NULL,
+    response    text NOT NULL CHECK (response IN ('needsAction', 'accepted', 'declined', 'tentative')),
+    problem     text,
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (day_id, person_id)
+  );
+  CREATE INDEX IF NOT EXISTS calendar_guests_offer ON calendar_guests (offer_id);
   `,
 ]
 

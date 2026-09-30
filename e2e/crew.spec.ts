@@ -20,7 +20,8 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await person.getByLabel('Mobile').fill('+353 87 123 4567')
   await person.getByLabel('Skills').fill('audio, monitors')
   await person.getByRole('button', { name: 'Add person' }).click()
-  await expect(office.getByText('Aoife Byrne')).toBeVisible()
+  // The other tests share this server, so the screen can also list their people and crew calls.
+  await expect(office.getByRole('button', { name: 'Aoife Byrne' })).toBeVisible()
 
   // A one-off, not in Jobs: the crew screen still takes the job's details as typed.
   const job = office.locator('form').filter({ has: office.getByRole('button', { name: 'Ask for crew' }) })
@@ -37,8 +38,9 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await expect(office.getByText('Electric Picnic').first()).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  await office.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne (audio, monitors)' })
-  await office.getByRole('button', { name: 'Offer', exact: true }).click()
+  const call = office.getByRole('article').filter({ hasText: 'Electric Picnic' })
+  await call.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne (audio, monitors)' })
+  await call.getByRole('button', { name: 'Offer', exact: true }).click()
   const share = office.getByRole('region', { name: 'Send offer to Aoife Byrne' })
   await expect(share.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\/353871234567\?text=/)
   await expect(office.getByRole('status')).toHaveText('Up to date')
@@ -60,8 +62,8 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   const answers = office.locator('section').filter({ has: office.getByRole('heading', { name: 'Answers to check' }) })
   await expect(answers.getByText('Aoife Byrne accepted')).toBeVisible()
   await expect(answers.getByText('Thu 29 Aug to Fri 30 Aug', { exact: false })).toBeVisible()
-  await answers.getByRole('button', { name: 'Confirm' }).click()
-  await expect(office.getByText('Confirmed')).toBeVisible()
+  await answers.locator('.row', { hasText: 'Aoife Byrne' }).getByRole('button', { name: 'Confirm' }).click()
+  await expect(call.getByText('Confirmed')).toBeVisible()
   await office.getByRole('link', { name: 'Done' }).or(office.getByRole('button', { name: 'Done' })).click()
   await office.evaluate(() => scrollTo(0, 0))
   await office.screenshot(shot('crew-office-confirmed'))

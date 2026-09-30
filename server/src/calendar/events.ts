@@ -6,8 +6,17 @@ import type { EventBody } from './google.ts'
 /**
  * What the calendar should hold (ADR 0008): one all-day event for every day
  * of every phase of a confirmed job, from today on, in the shape crew know
- * from today's calendar, worked out afresh from the jobs each time.
+ * from today's calendar, worked out afresh from the jobs each time. And who
+ * would be invited to each (ADR 0009): everyone offered the day or booked on
+ * it, who has an email address in the app.
  */
+
+/** Someone to invite to a day's event, because of an offer. */
+export interface WantedGuest {
+  personId: string
+  offerId: string
+  email: string
+}
 
 export interface Wanted {
   /** `calendarDayId(phaseId, day)`. */
@@ -17,8 +26,12 @@ export interface Wanted {
   day: string
   title: string
   body: EventBody
-  /** Changes whenever anything in the event would. */
+  /** Changes whenever anything in the event would, but its guests. */
   hash: string
+  /** People offered the day or booked on it, with an address to invite, by person id. */
+  guests: WantedGuest[]
+  /** People offered the day or booked on it with no email address in the app, so never invited, by name. */
+  noEmail: string[]
 }
 
 export interface CrewLine {
@@ -141,8 +154,11 @@ interface CallRow {
   needed: number
   start_day: string
   end_day: string
-  offers: { status: string; days: string[]; name: string }[]
+  offers: { id: string; status: string; days: string[]; personId: string; name: string; email: string | null }[]
 }
+
+/** Which offer a person is invited by when two cover the same day: the one that holds it, then the one furthest on. */
+const RANK: Record<string, number> = { confirmed: 0, accepted: 1, countered: 2, offered: 3 }
 
 /** Everything that should be on the calendar from `today` on, by `calendarDayId`. */
 export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { today: string; appKey: string; appUrl: string | null }): Promise<Map<string, Wanted>> {
@@ -162,10 +178,11 @@ export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { to
   const { rows: calls } = projectIds.length
     ? await q.query<CallRow>(
         `SELECT cc.id, cc.project_id, cc.phase_id, cc.role, cc.call_time, cc.needed, cc.start_day::text, cc.end_day::text,
-                coalesce(json_agg(json_build_object('status', o.status, 'days', o.days, 'name', pe.name) ORDER BY pe.name, o.id)
+                coalesce(json_agg(json_build_object('id', o.id, 'status', o.status, 'days', o.days, 'personId', pe.id, 'name', pe.name, 'email', pe.email)
+                                  ORDER BY pe.name, o.id)
                          FILTER (WHERE o.id IS NOT NULL), '[]') AS offers
            FROM crew_calls cc
-           LEFT JOIN offers o ON o.call_id = cc.id AND o.status IN ('accepted', 'confirmed')
+           LEFT JOIN offers o ON o.call_id = cc.id AND o.status IN ('offered', 'countered', 'accepted', 'confirmed')
            LEFT JOIN people pe ON pe.id = o.person_id
           WHERE cc.status = 'open' AND cc.project_id = ANY($1::text[]) AND cc.end_day >= $2::date
           GROUP BY cc.id
@@ -180,18 +197,35 @@ export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { to
     const titles = calendarTitles(p.job, { name: p.phase, start: p.start_day, end: p.end_day })
     days.forEach((day, i) => {
       if (day < today) return
-      const crew = calls
-        .filter((c) => c.project_id === p.project_id && (c.phase_id === p.phase_id || c.phase_id === null) && c.start_day <= day && day <= c.end_day)
-        .map((c): CrewLine => {
-          const on = c.offers.filter((o) => o.days.includes(day))
-          return {
-            role: c.role,
-            callTime: c.call_time,
-            confirmed: on.filter((o) => o.status === 'confirmed').map((o) => o.name),
-            toConfirm: on.filter((o) => o.status === 'accepted').map((o) => o.name),
-            missing: Math.max(0, c.needed - on.length),
-          }
-        })
+      const covering = calls.filter(
+        (c) => c.project_id === p.project_id && (c.phase_id === p.phase_id || c.phase_id === null) && c.start_day <= day && day <= c.end_day
+      )
+      const crew = covering.map((c): CrewLine => {
+        const on = c.offers.filter((o) => (o.status === 'accepted' || o.status === 'confirmed') && o.days.includes(day))
+        return {
+          role: c.role,
+          callTime: c.call_time,
+          confirmed: on.filter((o) => o.status === 'confirmed').map((o) => o.name),
+          toConfirm: on.filter((o) => o.status === 'accepted').map((o) => o.name),
+          missing: Math.max(0, c.needed - on.length),
+        }
+      })
+      const invited = new Map<string, WantedGuest & { rank: number }>()
+      const noEmail = new Set<string>()
+      for (const o of covering.flatMap((c) => c.offers)) {
+        if (!o.days.includes(day)) continue
+        const email = o.email?.trim()
+        if (!email) {
+          noEmail.add(o.name)
+          continue
+        }
+        const had = invited.get(o.personId)
+        const rank = RANK[o.status] ?? 9
+        if (!had || rank < had.rank || (rank === had.rank && o.id < had.offerId)) invited.set(o.personId, { personId: o.personId, offerId: o.id, email, rank })
+      }
+      const guests = [...invited.values()]
+        .map(({ personId, offerId, email }) => ({ personId, offerId, email }))
+        .sort((a, b) => a.personId.localeCompare(b.personId))
       const facts: DayFacts = {
         job: p.job,
         client: p.client,
@@ -215,6 +249,8 @@ export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { to
         end: { date: next.toISOString().slice(0, 10) },
         status: 'confirmed',
         extendedProperties: { private: { sh: appKey, shJob: p.project_id, shPhase: p.phase_id, shDay: day } },
+        guestsCanSeeOtherGuests: false,
+        guestsCanInviteOthers: false,
       }
       const key = calendarDayId(p.phase_id, day)
       out.set(key, {
@@ -225,6 +261,8 @@ export async function wantedEvents(q: Queryable, { today, appKey, appUrl }: { to
         title: titles[i]!,
         body,
         hash: createHash('sha256').update(JSON.stringify(body)).digest('base64url').slice(0, 32),
+        guests,
+        noEmail: [...noEmail].sort(),
       })
     })
   }

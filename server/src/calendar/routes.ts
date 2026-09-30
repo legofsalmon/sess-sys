@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import type { CalendarChoice, CalendarCheck, CalendarLink } from '@sh/shared'
+import type { CalendarChoice, CalendarCheck, CalendarInvites, CalendarLink } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
@@ -12,13 +12,19 @@ import { Halt, type CalendarSync } from './sync.ts'
 
 /**
  * Connecting Google Calendar from the Account tab (ADR 0008): off to Google
- * to connect an account, back again, pick a calendar, check now, and
- * disconnect. All of it needs a signed-in member of staff, like the rest of
- * the API; the app only has the Google key when sign-in is on.
+ * to connect an account, back again, pick a calendar, check now, switch
+ * crew invites on or off (ADR 0009), and disconnect. All of it needs a
+ * signed-in member of staff, like the rest of the API; the app only has
+ * the Google key when sign-in is on.
  */
 
 /** What the server records these as in the history. Not commands, so no device can send them. */
-export const CALENDAR_ACTIONS = { connect: 'calendar.connect', use: 'calendar.use', disconnect: 'calendar.disconnect' } as const
+export const CALENDAR_ACTIONS = {
+  connect: 'calendar.connect',
+  use: 'calendar.use',
+  invites: 'calendar.invites',
+  disconnect: 'calendar.disconnect',
+} as const
 
 /** Holds the attempt (state, PKCE verifier, the device's code) between leaving for Google and coming back. */
 const ATTEMPT_COOKIE = 'sh_calendar'
@@ -108,7 +114,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
         connectedAt: new Date().toISOString(),
       })
     )
-    sync.connectionChanged(link.state)
+    sync.connectionChanged(link)
     onChange()
     return back(reply, 'connected')
   })
@@ -144,7 +150,31 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     const after = await serverChange(db, action(req, CALENDAR_ACTIONS.use, { calendar: choice.name }, deviceCode(req.query.client)), (ctx) =>
       saveLink(ctx, { state: 'on', calendarId: choice.id, calendarName: choice.name, problem: null })
     )
-    sync.connectionChanged(after.state)
+    sync.connectionChanged(after)
+    onChange()
+    return linkEntity(after)
+  })
+
+  /** What turning crew invites on would send straight away, for the Account tab to ask first. */
+  app.get('/api/calendar/invites', async (_req, reply): Promise<CalendarInvites | void> => {
+    reply.header('cache-control', 'no-store')
+    if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
+    return sync.invites()
+  })
+
+  /** Crew invites on or off (ADR 0009). Each invite is an email to a freelancer, so it starts off and someone has to turn it on. */
+  app.post<{ Querystring: { client?: string }; Body: { on?: unknown } }>('/api/calendar/invites', async (req, reply): Promise<CalendarLink | void> => {
+    if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
+    if (typeof req.body?.on !== 'boolean') return reply.code(400).send({ error: 'Say whether crew invites should be on or off.' })
+    const on = req.body.on
+    const link = await readLink(db)
+    if (on && (link?.state !== 'on' || !link.calendarId)) return reply.code(409).send({ error: 'Choose a calendar for jobs first.' })
+    if (!link) return reply.code(409).send({ error: 'Google Calendar is not connected.' })
+    if (link.invites === on) return linkEntity(link)
+    const counts = on ? await sync.invites() : undefined
+    const args = counts ? { on, invites: counts.invites, people: counts.people } : { on }
+    const after = await serverChange(db, action(req, CALENDAR_ACTIONS.invites, args, deviceCode(req.query.client)), (ctx) => saveLink(ctx, { invites: on }))
+    sync.connectionChanged(after)
     onChange()
     return linkEntity(after)
   })
@@ -165,7 +195,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
       action(req, CALENDAR_ACTIONS.disconnect, { account: link.accountEmail, calendar: link.calendarName }, deviceCode(req.query.client)),
       (ctx) => saveLink(ctx, { state: 'stopping', problem: null })
     )
-    sync.connectionChanged(after.state)
+    sync.connectionChanged(after)
     onChange()
     return linkEntity(after)
   })

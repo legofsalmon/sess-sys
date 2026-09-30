@@ -177,14 +177,16 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     }
   })
 
-  it('puts confirmed jobs on Google Calendar, as on PGlite', async () => {
+  it('puts confirmed jobs on Google Calendar, and takes crew answers from it, as on PGlite', async () => {
     const db = postgresDb(url!)
     await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
     const google = new FakeGoogle()
+    const now = () => new Date('2030-03-02T10:00:00Z')
+    google.clock = now
     const app = await buildApp({
       db,
       auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
-      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now: () => new Date('2030-03-02T10:00:00Z') },
+      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now },
     })
     try {
       const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
@@ -237,6 +239,30 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       expect((await colly.history('?limit=2')).entries.map((e) => e.what)).toEqual([
         'Chose Test calendar as the calendar for jobs',
         'Connected Google Calendar as ops@sessionhire.com',
+      ])
+
+      // Crew invites (ADR 0009): Niamh is offered the other place, says yes on Google Calendar, and the app takes it as her answer.
+      await colly.send('person.upsert', { id: 'p2', name: 'Niamh Kelly', kind: 'freelancer', email: 'niamh@example.com', phone: null, skills: [], dayRateCents: 25000, notes: '' })
+      await colly.send('offer.send', { id: 'o2', callId: 'c1', personId: 'p2', override: false })
+      const on = await app.inject({ method: 'POST', url: '/api/calendar/invites?client=phonec0ffee', cookies: colly.cookies, payload: { on: true } })
+      expect(on.statusCode, on.body).toBe(200)
+      expect(await app.calendar!.run()).toEqual({ written: 2, removed: 0, failed: 0 })
+      const [today, tomorrow] = google.visible(cal)
+      expect(google.guests(cal, today!.id)).toEqual(['niamh@example.com needsAction'])
+      expect(google.sent.map((m) => `${m.what} ${m.to} ${m.event}`)).toEqual([
+        'invited niamh@example.com 2030-03-02 Nissan - Build 2/3',
+        'invited niamh@example.com 2030-03-03 Nissan - Build 3/3',
+      ])
+      expect(await app.calendar!.poll()).toBe(0)
+      google.respond(cal, today!.id, 'niamh@example.com', 'accepted')
+      google.respond(cal, tomorrow!.id, 'niamh@example.com', 'accepted', 'See you there')
+      // Two answers, one for each day, put to the offer together as one Yes.
+      expect(await app.calendar!.poll()).toBe(2)
+      expect(await app.calendar!.poll()).toBe(0)
+      expect(await colly.record('offer', 'o2')).toMatchObject({ status: 'accepted', respondedVia: 'calendar', note: 'See you there' })
+      expect((await colly.history('?limit=2')).entries.map((e) => [e.who.name, e.what])).toEqual([
+        ['Niamh Kelly', expect.stringMatching(/^Niamh Kelly accepted /)],
+        ['Colly Hewson', 'Turned on crew invites on Google Calendar (2 invites to 1 person)'],
       ])
     } finally {
       await app.close()
