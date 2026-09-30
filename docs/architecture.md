@@ -304,7 +304,14 @@ guests added by hand and answers given in between are kept. Guests hear
 from Google only when they are added or taken off, or the title, date or
 place changes. Push notifications from Google would bring answers in
 seconds rather than minutes; they come with calendar-led jobs, when edits
-in Google have to flow back in quickly. What follows is the full plan.
+in Google have to flow back in quickly.
+
+The week and month view the office opens Google Calendar for today is in
+the app too ([ADR 0010](adr/0010-planner.md)): the planner lays out every
+job, or every person, by day, with the crew still to find and clashes
+flagged, worked out on each device from what it holds, so it needs no
+signal. Google Calendar stays as the crew's view of their own work. What
+follows is the full plan.
 
 **Where events live.** The system writes to the existing shared **Session
 Hire Gigs** calendar, so there is one place everyone subscribes to. Each

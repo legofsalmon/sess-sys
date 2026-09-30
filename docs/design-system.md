@@ -50,6 +50,13 @@ follow-up that lets the two stay in step.
 - Red marks the one thing to do next and the current tab. Errors use the
   burnt-orange **bad** tone, never the brand red, so red never means "broken".
 - Areas live in a tab bar at the bottom, where a thumb reaches.
+- The planner ([ADR 0010](adr/0010-planner.md)) is the one screen wider
+  than 640px: it uses a laptop's full width, and on a phone its days scroll
+  sideways with the names kept in view. It keeps the same colour language:
+  a job's day is solid when confirmed and dashed when pencilled in, green
+  once its crew are booked and amber while some are still to find; a
+  clash is the **bad** tone and a check is amber. The planner isn't in the
+  Figma file yet; until it is, the code is the reference.
 
 ## Accessibility
 

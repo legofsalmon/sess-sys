@@ -3,6 +3,59 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: the week and month planner
+
+**Done**
+
+- The Jobs tab has **List · Week · Month** at the top. Week and Month lay
+  out every job with anything on, a row each, and each day says which
+  phase it is, as the calendar titles it ("Build 1/2"), and how many of its
+  crew are booked ("2 of 3 crew, 1 asked"). Confirmed jobs are solid, and
+  enquiries and quotes dashed, as pencilled in. A day is green once its
+  crew are all booked and amber while some are still to find. Crew asked
+  for on the Crew tab, outside a job, get a row of their own.
+  [Decision 0010](adr/0010-planner.md) has the reasons.
+- **People** shows the same days by person: where each is booked, where
+  they've been offered work and haven't answered, and the days they can't
+  work. Everyone else can be shown too, to see who is free.
+- Clashes are listed above the planner, in words, with the job to open.
+  Someone booked on a day they're marked unavailable, or booked twice, is a
+  **clash**. An offer still waiting on an answer for a day they're booked
+  or unavailable is a **check**: it would be a clash if they said yes. The
+  server already stops most clashes, so these are the ones a day off marked
+  after the booking, or an offer sent anyway, can still make.
+- A phase moved to other days without its crew shows their old days in
+  amber, "No phase this day", so it's seen before the day comes.
+- A week reads in words and, on a phone, scrolls sideways from today with
+  the names kept in view. A month shows each day as a short code ("Bu" for
+  Build, "WS" for Web Summit) and a colour, with the words on hover and for
+  screen readers, and a tap on a date opens its week. It's the one screen
+  that uses a laptop's full width. The address keeps the week or month and
+  the view, so a reload or a shared link lands in the same place.
+- It's worked out on each device from what it already holds, so it works
+  with no signal and shows a change as soon as it syncs. Nothing changed on
+  the server. For now it only shows: changes are made on the job's page or
+  the Crew tab, a tap away.
+- Checked: 6 new server tests (phase-days and crew counts; pencilled-in and
+  cancelled jobs; crew outside Jobs; a phase moved without its crew;
+  booked, offered and unavailable by person; clashes and checks, and their
+  order; weeks and months across a new year and a leap year), all 157
+  server tests, and 2 new browser tests of a week on a phone and a month
+  on a laptop, with all 21 browser tests passing.
+
+**Next**
+
+- Colly: once there are real jobs in, open the week and month and say what
+  the office would change, such as dragging a phase to other days.
+- Next in Phase 1: bringing the jobs already on Google Calendar into the
+  app as drafts.
+- Colly, still open: should crew invites go out when crew are offered (as
+  built) or only once they're booked?
+- Colly, still waiting: the Sentry key ([the steps](monitoring.md)), the
+  Railway bucket for backups ([the steps](backups.md)), the Google key
+  ([the steps](sign-in-setup.md)) and the phone field test
+  ([the steps](field-test.md)).
+
 ## 30 September 2026: crew invites on the calendar, and their answers
 
 **Done**

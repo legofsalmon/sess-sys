@@ -19,10 +19,12 @@ import { act } from '../crew/CrewScreen.tsx'
 import { client } from '../sync.ts'
 import { Choices, clientNamed, NotDone, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
 import { JobScreen } from './JobScreen.tsx'
+import { JobViews, PlanScreen } from './PlanScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
- * A job opens on its own page (#jobs/<id>) with its phases and crew.
+ * A job opens on its own page (#jobs/<id>) with its phases and crew, and the
+ * planner (#plan, ADR 0010) shows them by week or month.
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 
@@ -41,6 +43,7 @@ function filterOf(j: JobView, day: string): Filter {
 export function JobsScreen() {
   const view = useView()
   const hash = useHash()
+  if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
   const open = hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
   if (open) return <JobScreen view={view} id={open} />
   return <JobList view={view} />
@@ -64,6 +67,7 @@ function JobList({ view }: { view: View }) {
   return (
     <div className="app crew jobs">
       <Top view={view} />
+      <JobViews />
       <NotDone view={view} />
 
       <section className="card">
