@@ -21,13 +21,14 @@ import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingCho
 import { ItemScreen } from './ItemScreen.tsx'
 import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
+import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
  * where everything is kept, and what's counted; the kit on jobs that's
- * short (ADR 0014); and labels (ADR 0015). A product, item or place opens
+ * short (ADR 0014); labels (ADR 0015); and the camera, to scan them (ADR 0016). A product, item or place opens
  * on its own page (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>),
  * and labels on theirs (#stock/labels, #stock/labels/<id>). The Phase 0
  * sync test lives at #stock/sync-test until the phone field test is done.
@@ -63,6 +64,7 @@ function Catalogue({ view }: { view: View }) {
   const claimField = useRef<HTMLInputElement>(null)
   const memory = useRef<ClaimMemory>({ product: '', where: '' })
   const [claimed, setClaimed] = useState('')
+  const [camera, setCamera] = useState(false)
   const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
   // Items by number or serial, once there's enough typed to mean something.
   const items =
@@ -88,11 +90,19 @@ function Catalogue({ view }: { view: View }) {
     else if (items.length === 1) location.hash = `#stock/item/${items[0]!.id}`
     else if (shown.length === 1) location.hash = `#stock/product/${shown[0]!.id}`
   }
-  // Ready for the next label.
+  // Ready for the next label: the camera's still on, or the search is, for a scanner that types.
   const onClaimed = (id: string) => {
     setClaimed(id)
     setSearch('')
-    searchField.current?.focus()
+    if (!camera) searchField.current?.focus()
+  }
+  // Read by the camera: an item's label or its maker's serial opens it; a label on nothing yet asks what it's on.
+  const onRead = (code: string) => {
+    const n = normaliseNumber(code)
+    const serial = code.toLowerCase()
+    const found = (n && w.byNumber.get(n)) || only([...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial))
+    if (found) location.hash = `#stock/item/${found.id}`
+    else setSearch(code)
   }
 
   return (
@@ -102,7 +112,7 @@ function Catalogue({ view }: { view: View }) {
 
       <section className="card">
         <h2>Stock</h2>
-        <form role="search" onSubmit={go}>
+        <form role="search" className="scan-row" onSubmit={go}>
           <input
             ref={searchField}
             className="search"
@@ -113,7 +123,18 @@ function Catalogue({ view }: { view: View }) {
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Find"
           />
+          <button
+            type="button"
+            aria-pressed={camera}
+            onClick={() => {
+              if (!camera) primeSound()
+              setCamera(!camera)
+            }}
+          >
+            Scan
+          </button>
         </form>
+        {camera && <CameraScanner onRead={onRead} onStop={() => setCamera(false)} small={!!unclaimed} />}
         {justClaimed && (
           <p className="added" role="status">
             Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
@@ -352,3 +373,6 @@ function Places({ view }: { view: View }) {
     </section>
   )
 }
+
+/** The one thing in a list, if there's exactly one. */
+const only = <T,>(list: T[]) => (list.length === 1 ? list[0] : undefined)

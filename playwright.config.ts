@@ -8,6 +8,8 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: 'e2e',
+  // One at a time: the tests share one server, and some check the next free number it gives out.
+  workers: 1,
   timeout: 60_000,
   use: {
     baseURL: 'http://localhost:3099',

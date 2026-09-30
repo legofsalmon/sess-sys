@@ -85,7 +85,9 @@ with no signal. Kit on jobs is built too
 for the whole job or a phase, with shortages worked out on each device
 and subhire. So is printing labels ([ADR 0015](adr/0015-printing-labels.md)):
 numbers set aside a run at a time, printed here or by a label maker, and
-put on items by scanning them. See [progress.md](progress.md).
+put on items by scanning them. And so is scanning with the phone's camera
+in the app ([ADR 0016](adr/0016-camera-scanning.md)). See
+[progress.md](progress.md).
 
 - Catalogue, products, assets, containers, bulk stock, locations (built:
   products, numbered items with their labels, cases, counted stock and
@@ -104,6 +106,8 @@ put on items by scanning them. See [progress.md](progress.md).
   warnings, including subhire lines (built: kit lines for the whole job
   or a phase; confirmed jobs hold kit and enquiries and quotes are
   pencilled in; short is warned about, never refused).
+- Scanning with the phone's camera in the app, offline (built: labels and
+  makers' barcodes in the Stock search, one after another).
 - Pick lists per project, **scan out and scan in on a phone, offline**,
   missing and damaged items on return, and a conflict queue for scans that
   did not match the plan.
