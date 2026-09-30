@@ -88,7 +88,9 @@ numbers set aside a run at a time, printed here or by a label maker, and
 put on items by scanning them. And so is scanning with the phone's camera
 in the app ([ADR 0016](adr/0016-camera-scanning.md)), and so are pick
 lists with scanning kit out to jobs and back in
-([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md)). See
+([ADR 0017](adr/0017-pick-lists-and-scanning-out-and-in.md)), and so are
+faults, missing kit and repairs
+([ADR 0018](adr/0018-faults-missing-kit-and-repairs.md)). See
 [progress.md](progress.md).
 
 - Catalogue, products, assets, containers, bulk stock, locations (built:
@@ -115,9 +117,15 @@ lists with scanning kit out to jobs and back in
   did not match the plan (built: each job's pick list with where to find
   its kit, scanned or counted out and back with no signal, a case taking
   what's in it along; a scan that doesn't match the plan is kept and
-  said; the Stock tab lists jobs going out soon and kit still out. To
-  come: missing and damaged on return, and sorting out what didn't match).
-- Faults, repairs, PAT and inspection records; unavailable while in repair.
+  said; the Stock tab lists jobs going out soon and kit still out;
+  damaged and missing kit reported as it comes back, and a missing item
+  scanned is marked found. A separate queue for scans that didn't match
+  isn't needed yet: each is said as it happens and fixed by scanning).
+- Faults, repairs, PAT and inspection records; unavailable while in repair
+  (built: faults and missing kit on items and counted kit, the Stock
+  tab's repair list with repair notes, fixed, found or written off, and
+  kit that can't go out taken off what's free for jobs. To come: PAT
+  tests and inspections, with kit overdue blocked).
 
 **Done when:** a job's kit is picked and returned by scanning, and
 availability for next week is trusted without walking the shelves.

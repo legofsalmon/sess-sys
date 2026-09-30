@@ -118,6 +118,17 @@ and `stock.css`, still have plain px values.
   link; and, for counted kit, a How many field with Out or Back. Kit
   not on the job's list goes under "Not on the kit", with an amber note.
   Not in Figma yet.
+- Faults ([ADR 0018](adr/0018-faults-missing-kit-and-repairs.md)) are
+  cards in a list with a 4 px stripe down the left: burnt orange when the
+  kit can't go out, amber when it's damaged but fit to use, the line
+  colour once closed. Each has its state in bold ("Damaged, can't go
+  out"), the job and when in muted small text, what's wrong, the repair
+  notes, and the ways it can end as buttons (Fixed, Not faulty, Write
+  off; Found, Write off), with Repair notes last. Closed ones sit under
+  "N before". On a pick list coming back, items reported missing are
+  number pills with a dashed burnt-orange border after "Missing:", and
+  the report form opens under the scan answer. An item's fault is a fact
+  in burnt orange at the top of its page. Not in Figma yet.
 
 ## Accessibility
 

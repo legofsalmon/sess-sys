@@ -20,8 +20,9 @@ products numbered or counted, items with Session Hire numbers, places,
 cases and counts; kit on jobs, with shortages flagged and subhire; and
 printing labels, with numbers set aside for each run and labels put on
 items by scanning them; scanning labels with the phone's camera in
-the app; and a pick list for each job, with kit scanned out and back in
-on a phone, with no signal too. The app runs on Railway. Start with the
+the app; a pick list for each job, with kit scanned out and back in
+on a phone, with no signal too; and damaged and missing kit reported as
+it comes back, with a repair list. The app runs on Railway. Start with the
 **Session Hire Blueprint**,
 [docs/hub/index.html](docs/hub/index.html): one page that pulls together the
 research, principles, architecture, stock tracking, roadmap and decisions,

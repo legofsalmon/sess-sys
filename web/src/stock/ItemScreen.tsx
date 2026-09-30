@@ -14,6 +14,7 @@ import { act } from '../crew/CrewScreen.tsx'
 import { NotDone, Top } from '../jobs/common.tsx'
 import { when } from '../format.ts'
 import { client } from '../sync.ts'
+import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { PrintLabels } from './Labels.tsx'
 import {
   contentsLabel,
@@ -33,7 +34,8 @@ import {
  * One numbered item: its label, its product, where it's kept, the labels
  * it had before, and for a case, what's in it. Its label can be printed
  * here (ADR 0015). Retiring keeps it and its number for the record; it can
- * be brought back.
+ * be brought back. Damage, or its going missing, is reported here, and
+ * each fault is fixed, found or written off here too (ADR 0018).
  */
 export function ItemScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse
@@ -58,6 +60,9 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
       </a>
       <NotDone view={view} names={STOCK_COMMANDS} />
       <Summary a={a} w={w} view={view} />
+      <FaultsCard faults={view.faults.ofAsset(a.id)}>
+        {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
+      </FaultsCard>
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       <WhereChoices w={w} />
     </div>
@@ -69,6 +74,7 @@ type Mode = 'move' | 'details' | 'label' | 'print' | 'retire'
 function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View }) {
   const out = view.moves.outOf(a.id)
   const outWith = out && view.jobs.jobs.find((j) => j.id === out.projectId)
+  const fault = view.faults.stopping(a.id)
   const [mode, setMode] = useState<Mode | undefined>()
   const retired = a.status === 'retired'
   const toggle = (m: Mode) => setMode(mode === m ? undefined : m)
@@ -109,6 +115,15 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
             <dd>
               With <a href={`#jobs/${out.projectId}/pick`}>{outWith?.name ?? 'a job'}</a> since {when(out.since)}
               {out.inCase && `, in ${out.inCase.number || 'a case'}`}
+            </dd>
+          </div>
+        )}
+        {fault && (
+          <div className="wide">
+            <dt>Fault</dt>
+            <dd className="bad">
+              {faultState(fault)}
+              {fault.note && `: ${fault.note}`}
             </dd>
           </div>
         )}
