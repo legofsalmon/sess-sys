@@ -41,6 +41,8 @@ waiting on someone.
   warned about and taken off, the item's page and the Stock tab, then
   everything back with no signal and synced after). All 34 browser tests
   and all 219 server tests pass.
+- Merged into `main` at 13:19 UTC once GitHub's checks passed, and live
+  by 13:24: Railway deployed it on its own.
 
 **Next**
 
