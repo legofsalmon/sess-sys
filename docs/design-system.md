@@ -94,6 +94,15 @@ follow-up that lets the two stay in step.
   scanned in the search that isn't on anything yet opens a red-bordered
   form right under the search, with the cursor in its first field. Not in
   Figma yet.
+- The camera ([ADR 0016](adr/0016-camera-scanning.md)) opens under the
+  search from **Scan**, which stays pressed while it's on: a square
+  picture with rounded corners, the outside dimmed round a white frame,
+  which flashes green on each read. Under it, "Read SH-000123" (or "Point
+  the camera at a label.") in bold, then Light, Sound and Stop camera as
+  small buttons, Light and Sound pressed when on. With a form to fill in
+  under it, the picture shrinks to 180 px so the form's button stays on
+  screen. A camera that can't start shows why, in words that say what to
+  do, and Try again. Not in Figma yet.
 
 ## Accessibility
 

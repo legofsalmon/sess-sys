@@ -3,6 +3,40 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 September 2026: scanning with the camera
+
+**Done**
+
+- The fourth part of Phase 2: phones read labels with their camera, in
+  the app. [Decision 0016](adr/0016-camera-scanning.md) has the reasons.
+- In **Stock**, **Scan** beside the search turns the camera on: point it
+  at a label and its item opens. A maker's serial in a barcode finds its
+  item too, on Android.
+- A label that isn't on anything yet asks which product it's on, with the
+  camera still on and made small so the form fits under it. The product
+  and place stay, so labelling a shelf is a scan and a tap each.
+- The camera stays on until **Stop camera**, reading one label after
+  another. A label held still is read once. Each read flashes the frame,
+  shows the number, beeps (**Sound** turns that off) and buzzes on
+  Android. **Light** turns on the torch where the phone allows it.
+- It works with no signal: the reading happens on the phone, and the
+  pictures never leave it and aren't kept. The camera turns off when the
+  app is out of sight, and says what to do if it's blocked or missing.
+- Checked: 2 new browser tests on a phone with a stand-in camera that
+  shows the app a label's QR code (an item opened, a maker's serial, two
+  labels put on items one after another with the camera on, a label held
+  still read once, the camera turned off on leaving; a blocked camera and
+  Try again), and the real camera path once with Chromium's test camera.
+  All 33 browser tests and all 213 server tests pass.
+
+**Next**
+
+- Colly, to try it: on a phone, open **Stock**, tap **Scan** and allow the
+  camera, then point it at a label printed from **Print labels**. It's
+  worth trying on an iPhone and an Android phone in the phone field test.
+- Next in Phase 2: pick lists for each job, then scanning out and in with
+  the same camera.
+
 ## 30 September 2026: printing labels
 
 **Done**
