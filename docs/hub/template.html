@@ -285,6 +285,144 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   table.stack th, table.stack td { padding: 0; border: 0; min-width: 0; }
   table.stack td:last-child { font-size: .84rem; color: var(--muted); margin-top: 2px; }
 }
+/* 01 the map: six road cases on a floor plan, every part drawn from MAP in the script.
+   The plan is 1000 units wide; at the laptop width (a 942px board) one unit is .942px, so no text is under 12.75 units. */
+#map { container-type: inline-size; }
+#map .board-fig { margin: 0; }
+#map .board { position: relative; display: grid; grid-template-columns: 26.5cqw 10cqw 27cqw 10cqw 26.5cqw; grid-template-rows: 3.6cqw 33cqw 2.4cqw 16.6cqw 4.4cqw 12cqw;
+  background-image: radial-gradient(var(--line) 1px, transparent 1.2px); background-size: 20px 20px; background-position: 10px 10px; }
+#map .case { display: block; width: 100%; height: 100%; overflow: visible; }
+#map .c-office { grid-area: 2 / 1 / 3 / 2; } #map .c-ware { grid-area: 4 / 1 / 7 / 2; }
+#map .c-cloud { grid-area: 2 / 3 / 5 / 4; } #map .c-later { grid-area: 6 / 3 / 7 / 4; }
+#map .c-free { grid-area: 2 / 5 / 3 / 6; } #map .c-van { grid-area: 4 / 5 / 7 / 6; }
+#map .cables { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+#map .spine { display: none; }
+
+#map svg text { font-family: var(--body); fill: var(--ink); }
+#map .stencil { font-family: var(--display); font-weight: 800; font-stretch: 125%; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; }
+#map .sub { font-family: var(--mono); font-weight: 500; font-size: 12.75px; letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+#map .name { font-size: 14px; font-weight: 600; }
+#map svg .cap { font-size: 13px; fill: var(--muted); }
+#map .cap.it { font-style: italic; }
+#map .mid { text-anchor: middle; } #map .end { text-anchor: end; }
+#map .pct { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 22px; font-variant-numeric: tabular-nums; text-anchor: middle; }
+#map .st { font-family: var(--mono); font-weight: 500; font-size: 12.75px; letter-spacing: .06em; text-transform: uppercase; fill: var(--muted); text-anchor: middle; }
+#map .clbl { font-family: var(--mono); font-weight: 500; font-size: 12.75px; letter-spacing: .06em; text-transform: uppercase; fill: var(--muted); }
+#map .csent { font-size: 13px; fill: var(--muted); }
+#map .tape-t { font-family: var(--mono); font-weight: 500; font-size: 12.75px; letter-spacing: .08em; fill: var(--tape-ink); }
+#map .badge { font-size: 13px; font-weight: 600; fill: var(--accent-ink); } #map .badge.sent-t { fill: var(--good); }
+
+#map .lid { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+#map .brace { fill: none; stroke: var(--muted); stroke-width: 2.5; stroke-linecap: round; opacity: .8; }
+#map .rivet { fill: var(--muted); opacity: .8; }
+#map .hic { color: var(--ink); } #map .hic.lite { color: var(--muted); opacity: .45; }
+#map .sic { color: var(--good); }
+#map .plan .sic { color: var(--muted); }
+
+#map .bub-bg { fill: var(--panel-2); }
+#map .bub-ring { fill: none; stroke: var(--ink); stroke-width: 1.5; opacity: .45; }
+#map .surf { fill: none; stroke-width: 2; stroke-linecap: round; }
+#map .built .liq-fill { fill: var(--good-soft); } #map .built .surf { stroke: var(--good); }
+#map .now .liq-fill { fill: var(--accent-soft); } #map .now .surf { stroke: var(--accent); }
+#map .liq { transform-box: fill-box; transform-origin: 50% 100%; animation: map-rise 1s cubic-bezier(.2,.7,.2,1) both; }
+#map .hub { fill: none; stroke: var(--good); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; animation: map-hub 5s ease-out infinite; }
+#map .sat-bg { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+#map .plan .sat-bg { fill: none; stroke: var(--muted); stroke-dasharray: 3.5 3; }
+#map .plan .name { fill: var(--muted); }
+#map svg [data-part] { pointer-events: all; cursor: default; }
+#map .ext-box { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+#map .tape path { fill: var(--tape); }
+#map .ph { fill: var(--panel-2); stroke: var(--ink); stroke-width: 1.5; }
+#map .ph-bar { fill: var(--ink); } #map .ph-ln { fill: var(--line); }
+#map .ph-yes { fill: var(--good-soft); stroke: var(--good); stroke-width: 1; } #map .ph-no { fill: none; stroke: var(--line); stroke-width: 1; }
+#map .ph-t { font-size: 12.75px; font-weight: 600; fill: var(--good); } #map .ph-t2 { font-size: 12.75px; font-weight: 600; fill: var(--muted); }
+#map .pop { transform-box: fill-box; transform-origin: 0% 100%; animation: map-pop 14s ease-out infinite; }
+#map .pop-bg { fill: var(--panel); stroke: var(--accent); stroke-width: 1.25; } #map .pop-ic { color: var(--accent); }
+#map .hl .bub-ring { stroke: var(--accent); stroke-width: 2.5; opacity: 1; }
+#map .hl .sat-bg, #map .hl .ext-box, #map .hl .ph { stroke: var(--accent); }
+
+#map .cab, #map .stub { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+#map .cab.whats { stroke-dasharray: 5 5; }
+#map .road { fill: none; stroke: var(--line); stroke-width: 5; } #map .road-mid { fill: none; stroke: var(--panel); stroke-width: 1; stroke-dasharray: 6 5; }
+#map .sock circle { fill: var(--panel); stroke: var(--ink); stroke-width: 1.5; } #map .sock .pin { fill: var(--ink); stroke: none; }
+#map .mv { fill: var(--accent); stroke: var(--bg); stroke-width: 1.5; color: var(--accent); transform-box: view-box; }
+#map .mv .mv-bg { fill: var(--panel); stroke: var(--accent); stroke-width: 1.25; }
+#map .mv-van { color: var(--ink); transform-box: view-box; animation: map-drive 12s ease-in-out infinite; }
+#map .mv-a { animation: map-a 5s ease-in-out infinite; }
+#map .mv-b1 { animation: map-b1 6s linear infinite; } #map .mv-b2 { animation: map-b2 6s linear infinite 3s both; }
+#map .mv-c { animation: map-c 7s ease-in-out infinite; }
+#map .wait-t { animation: map-wait 7s linear infinite; } #map .sent-t { animation: map-sent 7s linear infinite; }
+#map .mv-d { animation: map-d 14s ease-in-out infinite; }
+#map .mv-e1 { animation: map-e1 8s ease-in-out infinite; } #map .mv-e2 { animation: map-e2 8s ease-in-out infinite; }
+#map .mv-f { animation: map-f 14s linear infinite; }
+#map .mv-g { animation: map-g 8s ease-in-out infinite 2s both; }
+@keyframes map-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes map-hub { 0%, 38% { opacity: 0; transform: scale(1); } 42% { opacity: .7; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes map-a { 0% { transform: translate(265px,146px); } 40% { transform: translate(365px,146px); } 55% { transform: translate(365px,146px); } 95%, 100% { transform: translate(265px,146px); } }
+@keyframes map-b1 { 0% { transform: translate(265px,334px); opacity: 0; } 8% { opacity: 1; } 42% { opacity: 1; } 50%, 100% { transform: translate(365px,334px); opacity: 0; } }
+@keyframes map-b2 { 0% { transform: translate(365px,334px); opacity: 0; } 8% { opacity: 1; } 42% { opacity: 1; } 50%, 100% { transform: translate(265px,334px); opacity: 0; } }
+@keyframes map-c { 0% { transform: translate(265px,490px) scale(1); opacity: 0; } 4%, 50% { transform: translate(265px,490px) scale(1); opacity: 1; } 10% { transform: translate(265px,490px) scale(1.6); opacity: .5; } 17% { transform: translate(265px,490px) scale(1); opacity: 1; } 24% { transform: translate(265px,490px) scale(1.6); opacity: .5; } 31% { transform: translate(265px,490px) scale(1); opacity: 1; } 38% { transform: translate(265px,490px) scale(1.6); opacity: .5; } 45% { transform: translate(265px,490px) scale(1); opacity: 1; } 78% { transform: translate(365px,490px) scale(1); opacity: 1; } 84%, 100% { transform: translate(365px,490px) scale(1); opacity: 0; } }
+@keyframes map-wait { 0% { opacity: 0; } 4%, 48% { opacity: 1; } 52%, 100% { opacity: 0; } }
+@keyframes map-sent { 0%, 52% { opacity: 0; } 56%, 92% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes map-f { 0% { transform: translate(190px,36px); opacity: 0; } 3% { transform: translate(190px,20px); opacity: 1; } 40% { transform: translate(829px,20px); opacity: 1; } 43%, 100% { transform: translate(829px,36px); opacity: 0; } }
+@keyframes map-pop { 0%, 44% { opacity: 0; transform: scale(.5); } 48% { opacity: 1; transform: scale(1.08); } 51% { transform: scale(1); } 64% { opacity: 1; } 68%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes map-d { 0%, 66% { transform: translate(735px,289px); opacity: 0; } 69% { opacity: 1; } 86% { transform: translate(635px,289px); opacity: 1; } 90%, 100% { transform: translate(635px,289px); opacity: 0; } }
+@keyframes map-e1 { 0% { transform: translate(635px,475px); opacity: 0; } 5% { opacity: 1; } 40% { transform: translate(735px,475px); opacity: 1; } 46%, 100% { transform: translate(735px,475px); opacity: 0; } }
+@keyframes map-e2 { 0%, 52% { transform: translate(735px,475px); opacity: 0; } 56% { opacity: 1; } 92% { transform: translate(635px,475px); opacity: 1; } 96%, 100% { transform: translate(635px,475px); opacity: 0; } }
+@keyframes map-g { 0% { transform: translate(29px,320px); opacity: 0; } 8% { opacity: 1; } 50% { transform: translate(29px,478px); opacity: 1; } 56%, 100% { transform: translate(29px,478px); opacity: 0; } }
+/* the van turns in one step at each end of the road, so it never squashes through zero width */
+@keyframes map-drive { 0% { transform: translate(280px,584px) scale(1,1); } 42% { transform: translate(720px,584px) scale(1,1); } 42.1% { transform: translate(720px,584px) scale(-1,1); } 50% { transform: translate(720px,584px) scale(-1,1); } 92% { transform: translate(280px,584px) scale(-1,1); } 92.1%, 100% { transform: translate(280px,584px) scale(1,1); } }
+@keyframes map-spine { 0% { transform: translateY(0); opacity: 0; } 5% { opacity: 1; } 95% { opacity: 1; } 100% { transform: translateY(var(--spine-h, 600px)); opacity: 0; } }
+
+#map .board-tip { font-size: .95rem; color: var(--muted); min-height: 1.5em; max-width: none; }
+#map .board-tip b { color: var(--ink); }
+#map .board-key { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 0; padding: 0; list-style: none; font-size: .88rem; color: var(--muted); }
+#map .board-key li { display: inline-flex; align-items: center; gap: 8px; }
+#map .k { display: inline-block; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--muted); background: var(--panel-2); position: relative; overflow: hidden; }
+#map .k::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-top: 2px solid; }
+#map .k-built::after { height: 60%; background: var(--good-soft); border-color: var(--good); }
+#map .k-now::after { height: 40%; background: var(--accent-soft); border-color: var(--accent); }
+#map .k-plan { border-style: dashed; } #map .k-plan::after { display: none; }
+#map .k-dot { width: 9px; height: 9px; border: 0; background: var(--accent); margin-inline: 4px; } #map .k-dot::after { display: none; }
+#map .k-tape { width: auto; height: auto; border: 0; border-radius: 2px; background: var(--tape); color: var(--tape-ink); font: 500 .76rem var(--mono); letter-spacing: .08em; padding: 1px 6px; transform: rotate(-3deg); overflow: visible; } #map .k-tape::after { display: none; }
+#map .k-size { flex: none; width: 4.2cqw; height: 4.2cqw; overflow: visible; } #map .k-size circle { fill: var(--panel-2); stroke: var(--ink); stroke-width: 1.5; opacity: .8; }
+#map .board-stats { font: 500 .78rem/1.6 var(--mono); letter-spacing: .02em; color: var(--muted); max-width: none; }
+#map .board-text { display: block; }
+#map .board-text summary { display: none; cursor: pointer; font: 600 .95rem var(--body); color: var(--accent-ink); }
+#map .board-text h3 { font-size: 1rem; margin-bottom: 6px; }
+#map .board-text ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: .9rem; }
+#map .board-text li { padding: 3px 6px; margin: 0 -6px; border-radius: 6px; cursor: default; line-height: 1.45; }
+#map .board-text li.hl { background: var(--accent-soft); }
+#map .board-text .what { color: var(--muted); }
+#map .bstate { font: 600 .76rem var(--body); padding: 1px 7px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; margin-right: 2px; }
+#map .bstate.built { background: var(--good-soft); color: var(--good); }
+#map .bstate.now { background: var(--accent-soft); color: var(--accent-ink); }
+#map .bstate.plan { background: var(--none-soft); color: var(--muted); }
+#map .bstate.wait { background: var(--tape); color: var(--tape-ink); }
+
+/* Under 900px of board the floor plan can't keep its smallest text at 12px, so the cases stack instead: two columns on a
+   tablet (office, warehouse and van down the left; cloud, freelancers and later down the right), one column on a phone.
+   The row heights come from the cases' own proportions, so every case renders at the same scale: one column width = 270 units. */
+@container (max-width: 899px) {
+  #map .board, #map .board-key { --col: calc((min(100cqw, 760px) - 32px) / 2); }
+  #map .board { width: min(100%, 760px); grid-template-columns: var(--col) var(--col); column-gap: 14px; background-image: none; padding-left: 18px;
+    grid-template-rows: calc(var(--col) * 1.22222) 14px calc(var(--col) * .70371 - 14px) 14px calc(var(--col) * .51851) 14px calc(var(--col) * .70371 - 14px) 14px calc(var(--col) * .44444) calc(var(--col) * .07408); }
+  #map .c-office { grid-area: 1 / 1 / 2 / 2; } #map .c-ware { grid-area: 3 / 1 / 6 / 2; } #map .c-van { grid-area: 7 / 1 / 11 / 2; }
+  #map .c-cloud { grid-area: 1 / 2 / 4 / 3; } #map .c-free { grid-area: 5 / 2 / 8 / 3; } #map .c-later { grid-area: 9 / 2 / 10 / 3; }
+  #map .c-office, #map .c-ware, #map .c-free, #map .c-van { width: calc(100% * 265 / 270); }
+  #map .cables, #map .stub { display: none; }
+  #map .spine { display: block; position: absolute; left: 5px; top: 8px; bottom: 8px; border-left: 2px dashed var(--muted); opacity: .8; }
+  #map .spine i { position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: map-spine 9s linear infinite; }
+  #map .k-size { width: calc(var(--col) * 42 / 270); height: calc(var(--col) * 42 / 270); }
+}
+@container (max-width: 607px) {
+  #map .board, #map .board-key { --col: calc(100cqw - 18px); }
+  #map .board { width: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; gap: 14px; }
+  #map .case { grid-area: auto; height: auto; }
+  #map .c-office { order: 1; } #map .c-ware { order: 2; } #map .c-cloud { order: 3; } #map .c-free { order: 4; } #map .c-van { order: 5; } #map .c-later { order: 6; }
+  #map .board-text summary { display: list-item; }
+  #map .board-text .grid3 { margin-top: 14px; }
+}
 </style>
 
 <div class="shell">
@@ -295,17 +433,18 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     </div>
     <nav class="toc" id="toc" aria-label="Sections">
       <a href="#overview"><span>00</span>Overview</a>
-      <a href="#progress"><span>01</span>Progress</a>
-      <a href="#principles"><span>02</span>Principles</a>
-      <a href="#today"><span>03</span>How it works today</a>
-      <a href="#market"><span>04</span>The market</a>
-      <a href="#architecture"><span>05</span>Architecture</a>
-      <a href="#calendar"><span>06</span>Google Calendar</a>
-      <a href="#crewbox"><span>07</span>Crewbox</a>
-      <a href="#stock"><span>08</span>Stock tracking</a>
-      <a href="#roadmap"><span>09</span>Roadmap</a>
-      <a href="#decisions"><span>10</span>Decisions</a>
-      <a href="#library"><span>11</span>Full documents</a>
+      <a href="#map"><span>01</span>The map</a>
+      <a href="#progress"><span>02</span>Progress</a>
+      <a href="#principles"><span>03</span>Principles</a>
+      <a href="#today"><span>04</span>How it works today</a>
+      <a href="#market"><span>05</span>The market</a>
+      <a href="#architecture"><span>06</span>Architecture</a>
+      <a href="#calendar"><span>07</span>Google Calendar</a>
+      <a href="#crewbox"><span>08</span>Crewbox</a>
+      <a href="#stock"><span>09</span>Stock tracking</a>
+      <a href="#roadmap"><span>10</span>Roadmap</a>
+      <a href="#decisions"><span>11</span>Decisions</a>
+      <a href="#library"><span>12</span>Full documents</a>
     </nav>
     <button class="theme-btn" id="themeBtn" type="button">Switch theme</button>
   </aside>
@@ -313,7 +452,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   <main>
     <!-- 00 OVERVIEW -->
     <section id="overview" class="hero">
-      <div class="status">Phase 2 · catalogue, kit on jobs, labels, scanning, pick lists, repairs and inspections built</div>
+      <div class="status">Live since 30 Sept · jobs, calendar, stock, scanning, offers, call sheets and timesheets built</div>
       <h1>One system for the whole job</h1>
       <p class="lede">Quote, book, prep, crew, deliver, return, invoice. A web app for Session Hire that works on a phone in a field as well as on a laptop in the office, keeps Google Calendar working during the move, and hands off to Crewbox on site.</p>
       <div class="facts">
@@ -330,9 +469,126 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     </section>
 
 
-    <!-- 01 PROGRESS -->
+    <!-- 01 THE MAP: every part is drawn from MAP in the script below -->
+    <section id="map">
+      <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="i-laptop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="11" rx="2"/><path d="M1.5 19h21"/></symbol><symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></symbol><symbol id="i-warehouse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8.5L12 4l9 4.5V21"/><path d="M7 21v-8h10v8"/><path d="M7 16.5h10"/><path d="M2 21h20"/></symbol><symbol id="i-case" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12.5h18"/><path d="M9 7V4.5h6V7"/><path d="M8 15.5v2M16 15.5v2"/></symbol><symbol id="i-van" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16V8a1 1 0 0 1 1-1h11l5 5h2a1 1 0 0 1 1 1v3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M9 17h6M2 16h3M19 16h3"/><path d="M14 7v5h5"/></symbol><symbol id="i-stage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5"/><path d="M5 9v11M19 9v11"/><path d="M3 20h18"/><path d="M9 13h6"/><path d="M12 4v2"/></symbol><symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.1 3.5 3.5 0 0 0 7 18z"/></symbol><symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol><symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></symbol><symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol><symbol id="i-envelope" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol><symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><rect x="7" y="14" width="10" height="6"/></symbol><symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 7.7-8 9-4.6-1.3-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol><symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol><symbol id="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol><symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L20 3M16 7l3 3M13 10l3 3"/></symbol><symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol><symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4h8l10 10-8 8z"/><path d="M7 8h.01"/></symbol><symbol id="i-bucket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16l-1.5 13h-13z"/><ellipse cx="12" cy="7" rx="8" ry="2.5"/></symbol><symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol><symbol id="i-feed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h.01"/><path d="M5 12a7 7 0 0 1 7 7"/><path d="M5 5a14 14 0 0 1 14 14"/></symbol><symbol id="i-nosignal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5a13 13 0 0 1 18 0"/><path d="M6.5 15a8 8 0 0 1 11 0"/><path d="M12 19h.01"/><path d="M4 3l16 18"/></symbol><symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3"/><path d="M7 12h10"/></symbol><symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol><symbol id="i-euro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5A4.5 4.5 0 0 0 8 12a4.5 4.5 0 0 0 7.5 3.5M6 10.5h7M6 13.5h7"/></symbol><symbol id="i-grow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol><symbol id="i-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="14" rx="2"/><path d="M11 7V3M10 11h4M10 15h4"/></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol><symbol id="i-account" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5a6 6 0 0 1 11 0"/></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></symbol></defs></svg>
+      <div class="eyebrow"><b>01</b>The map</div>
+      <h2>The whole system, where it lives</h2>
+      <p class="lede">Six places, drawn as the road cases they'd ship in. Each part of the app is a bubble: the bigger it is, the more has been written for it, and it fills up as it's built. The cables are what travels between the places; the gaffer tape is what's built but waiting on someone else.</p>
+      <figure class="board-fig" role="img" aria-label="A floor plan of six road cases, one for each place the system lives: the office, the warehouse, the cloud in Frankfurt, the freelancers' own phones, the van and the venue, and a shelf of later work. Each case holds the parts that run there as bubbles sized by how much has been written and filled to how far along they are, and cables between the cases show what travels: sync, calendar events, scans, offers and answers, call sheets, the van's trips and the nightly backup.">
+        <div class="board" id="board">
+<svg class="case c-office" viewBox="0 0 265 330" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="263" height="328" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M248 6 H254 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M259 313 V319 a5 5 0 0 1 -5 5 H248"/><path class="brace" d="M17 324 H11 a5 5 0 0 1 -5-5 V313"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="317" r="1.4"/><circle class="rivet" cx="13" cy="317" r="1.4"/>
+  <use href="#i-laptop" x="16" y="14" width="22" height="22" class="hic"/><use href="#i-phone" x="44" y="16" width="18" height="18" class="hic"/><text x="74" y="29" class="stencil">The office</text><text x="16" y="50" class="sub">Dublin · laptops and phones</text>
+  <g class="slot" data-part="jobs" transform="translate(76 136)"></g>
+  <g class="slot" data-part="crew" transform="translate(180 108)"></g>
+  <use href="#i-phone" x="226" y="101" width="18" height="18" class="hic"/><path class="stub" d="M244 110 H265"/>
+  <g class="slot" data-part="account" transform="translate(26 250)"></g>
+  <g class="slot" data-part="history" transform="translate(150 250)"></g>
+  <g class="slot" data-part="gcal" transform="translate(134 268)"></g><path class="stub" d="M254 296 H265"/>
+</svg>
+<svg class="case c-ware" viewBox="0 0 265 330" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="263" height="328" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M248 6 H254 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M259 313 V319 a5 5 0 0 1 -5 5 H248"/><path class="brace" d="M17 324 H11 a5 5 0 0 1 -5-5 V313"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="317" r="1.4"/><circle class="rivet" cx="13" cy="317" r="1.4"/>
+  <use href="#i-warehouse" x="16" y="14" width="22" height="22" class="hic"/><text x="50" y="29" class="stencil">The warehouse</text><text x="16" y="50" class="sub">Same site · bays and cases</text>
+  <g class="slot" data-part="stock" transform="translate(62 142)"></g>
+  <text x="130" y="142" class="cap">catalogue, labels,</text><text x="130" y="155" class="cap">scanning, pick lists,</text><text x="130" y="168" class="cap">faults and PAT tests</text><text x="130" y="181" class="cap it">cycle counts and</text><text x="130" y="194" class="cap it">RFID later</text>
+  <g class="note"><use href="#i-nosignal" x="247" y="72" width="14" height="14" class="hic"/><use href="#i-phone" x="244" y="91" width="18" height="18" class="hic"/><path class="stub" d="M262 100 H265"/>
+    <text x="236" y="97" class="name end">No signal? Grand.</text>
+    <text x="236" y="112" class="badge wait-t end">3 scans waiting…</text><text x="236" y="112" class="badge sent-t end" opacity="0">signal back · sent</text></g>
+  <g class="slot" data-part="trial" transform="translate(36 264)"></g>
+  <g class="devices"><use href="#i-scan" x="160" y="284" width="20" height="20" class="hic"/><use href="#i-printer" x="188" y="284" width="20" height="20" class="hic"/><use href="#i-case" x="216" y="284" width="20" height="20" class="hic"/><text x="198" y="318" class="cap mid">scan · print · pack</text></g>
+</svg>
+<svg class="case c-cloud" viewBox="0 0 270 520" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="268" height="518" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M253 6 H259 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M264 503 V509 a5 5 0 0 1 -5 5 H253"/><path class="brace" d="M17 514 H11 a5 5 0 0 1 -5-5 V503"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="257" cy="13" r="1.4"/><circle class="rivet" cx="257" cy="507" r="1.4"/><circle class="rivet" cx="13" cy="507" r="1.4"/>
+  <use href="#i-cloud" x="16" y="13" width="24" height="24" class="hic"/><text x="52" y="29" class="stencil">The cloud</text><text x="16" y="50" class="sub">EU · Frankfurt</text>
+  <g class="row"><use href="#i-server" x="18" y="60" width="22" height="22" class="hic"/><text x="48" y="70" class="name">The server</text><text x="48" y="83" class="cap">takes every request,</text><text x="48" y="96" class="cap">live since 30 Sept 2026</text></g>
+  <circle class="hub" cx="135" cy="159" r="56"/>
+  <g class="slot" data-part="found" transform="translate(135 159)"></g>
+  <g class="row"><use href="#i-database" x="18" y="294" width="22" height="22" class="hic"/><text x="48" y="304" class="name">The database</text><text x="48" y="317" class="cap">one copy of it all, in the EU</text></g>
+  <g class="bk"><path class="cab" d="M29 320 V478"/><text x="48" y="399" class="sub mid" transform="rotate(-90 48 399)">every night</text>
+    <g class="mv mv-g" transform="translate(29 462)"><circle r="8" class="mv-bg"/><use href="#i-shield" x="-6" y="-6" width="12" height="12" class=""/></g></g>
+  <g class="slot" data-part="gsign" transform="translate(70 350)"></g>
+  <g class="slot" data-part="alerts" transform="translate(70 386)"></g>
+  <g class="slot" data-part="backup" transform="translate(70 422)"></g>
+  <g class="slot" data-part="export" transform="translate(70 458)"></g>
+  <g class="row"><use href="#i-bucket" x="18" y="484" width="22" height="22" class="hic"/><text x="48" y="494" class="name">The backup bucket</text><text x="48" y="507" class="cap">a separate store · not set up yet</text></g>
+</svg>
+<svg class="case c-later" viewBox="0 0 270 120" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="268" height="118" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M253 6 H259 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M264 103 V109 a5 5 0 0 1 -5 5 H253"/><path class="brace" d="M17 114 H11 a5 5 0 0 1 -5-5 V103"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="257" cy="13" r="1.4"/><circle class="rivet" cx="257" cy="107" r="1.4"/><circle class="rivet" cx="13" cy="107" r="1.4"/>
+  <text x="16" y="27" class="stencil">Later</text><text x="100" y="27" class="sub">On the shelf</text>
+  <g class="slot" data-part="finance" transform="translate(47 56)" data-label="below" data-r="14"></g><g class="slot" data-part="crewbox" transform="translate(135 56)" data-label="below" data-r="14"></g><g class="slot" data-part="grow" transform="translate(223 56)" data-label="below" data-r="14"></g>
+</svg>
+<svg class="case c-free" viewBox="0 0 265 330" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="263" height="328" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M248 6 H254 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M259 313 V319 a5 5 0 0 1 -5 5 H248"/><path class="brace" d="M17 324 H11 a5 5 0 0 1 -5-5 V313"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="317" r="1.4"/><circle class="rivet" cx="13" cy="317" r="1.4"/>
+  <use href="#i-person" x="16" y="14" width="22" height="22" class="hic"/><use href="#i-phone" x="44" y="16" width="18" height="18" class="hic"/><text x="74" y="29" class="stencil">Freelancers</text><text x="16" y="50" class="sub">Wherever they are · no app</text>
+  <g class="slot" data-part="link" transform="translate(26 80)"></g>
+  <g class="slot" data-part="feed" transform="translate(26 126)"></g>
+  <g class="slot" data-part="msgs" transform="translate(26 166)"></g>
+  <path class="stub" d="M2 253 H22"/>
+  <g class="phone-ill" data-part="link">
+    <rect class="ph" x="22" y="200" width="60" height="106" rx="9"/>
+    <rect class="ph-bar" x="30" y="210" width="44" height="6" rx="2"/>
+    <rect class="ph-ln" x="30" y="224" width="38" height="3" rx="1.5"/><rect class="ph-ln" x="30" y="232" width="44" height="3" rx="1.5"/><rect class="ph-ln" x="30" y="240" width="30" height="3" rx="1.5"/>
+    <rect class="ph-ln" x="30" y="252" width="44" height="3" rx="1.5"/><rect class="ph-ln" x="30" y="260" width="36" height="3" rx="1.5"/>
+    <rect class="ph-yes" x="30" y="270" width="44" height="14" rx="3"/><text x="52" y="280.5" class="ph-t mid">Yes</text>
+    <rect class="ph-no" x="30" y="288" width="44" height="14" rx="3"/><text x="52" y="298.5" class="ph-t2 mid">No</text>
+    <g transform="translate(32 220)"><g class="pop"><path class="pop-bg" d="M5 0 H35 a5 5 0 0 1 5 5 V13 a5 5 0 0 1 -5 5 H8 l-6 5 1 -5 a5 5 0 0 1 -3 -5 V5 a5 5 0 0 1 5 -5 z"/><use href="#i-envelope" x="14" y="3" width="12" height="12" class="pop-ic"/></g></g>
+  </g>
+  <text x="96" y="224" class="cap">Their private link:</text><text x="96" y="237" class="cap">no app, no login.</text>
+  <text x="96" y="254" class="cap">A tap on Yes or No</text><text x="96" y="267" class="cap">and the office sees it</text><text x="96" y="280" class="cap">straight away;</text><text x="96" y="293" class="cap">a clash is flagged.</text>
+</svg>
+<svg class="case c-van" viewBox="0 0 265 330" aria-hidden="true" focusable="false">
+  <rect class="lid" x="1" y="1" width="263" height="328" rx="12"/><path class="brace" d="M6 17 V11 a5 5 0 0 1 5-5 H17"/><path class="brace" d="M248 6 H254 a5 5 0 0 1 5 5 V17"/><path class="brace" d="M259 313 V319 a5 5 0 0 1 -5 5 H248"/><path class="brace" d="M17 324 H11 a5 5 0 0 1 -5-5 V313"/><circle class="rivet" cx="13" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="13" r="1.4"/><circle class="rivet" cx="252" cy="317" r="1.4"/><circle class="rivet" cx="13" cy="317" r="1.4"/>
+  <use href="#i-van" x="16" y="16" width="18" height="18" class="hic"/><use href="#i-stage" x="40" y="16" width="18" height="18" class="hic"/><text x="66" y="29" class="stencil">Van and venue</text><text x="16" y="50" class="sub">On the road and on site</text>
+  <g class="slot" data-part="sheet" transform="translate(34 84)"></g>
+  <g class="slot" data-part="kit" transform="translate(34 150)"></g>
+  <g class="slot" data-part="gps" transform="translate(34 216)"></g>
+  <g class="slot" data-part="site" transform="translate(34 272)"></g>
+  <g class="devices"><use href="#i-case" x="232" y="100" width="24" height="24" class="hic lite"/><use href="#i-case" x="232" y="126" width="24" height="24" class="hic lite"/><use href="#i-case" x="232" y="152" width="24" height="24" class="hic lite"/></g>
+</svg>
+<svg class="cables" viewBox="0 0 1000 720" aria-hidden="true" focusable="false">
+  <path class="cab whats" d="M190 36 V28 a8 8 0 0 1 8-8 H821 a8 8 0 0 1 8 8 V36"/>
+  <text x="509" y="11" class="clbl mid">Offers, call sheets and messages · WhatsApp, text or email</text>
+  <path class="cab" d="M265 146 H365"/><text x="315" y="135" class="clbl mid">sync</text><text x="315" y="161" class="csent mid">changes go up,</text><text x="315" y="175" class="csent mid">and come back</text>
+  <path class="cab" d="M265 334 H365"/><text x="315" y="323" class="clbl mid">calendar</text><text x="315" y="349" class="csent mid">both ways,</text><text x="315" y="363" class="csent mid">once the</text><text x="315" y="377" class="csent mid">key is in</text>
+  <path class="cab" d="M265 490 H365"/><text x="315" y="479" class="clbl mid">scans</text><text x="315" y="505" class="csent mid">wait for signal,</text><text x="315" y="519" class="csent mid">then catch up</text>
+  <path class="cab" d="M635 289 H735"/><text x="685" y="278" class="clbl mid">answer</text><text x="685" y="304" class="csent mid">yes or no,</text><text x="685" y="318" class="csent mid">by their link</text>
+  <path class="cab" d="M635 475 H735"/><text x="685" y="464" class="clbl mid">call sheet</text><text x="685" y="491" class="clbl mid">kit scans</text><text x="685" y="506" class="csent mid">out on the job,</text><text x="685" y="520" class="csent mid">back on return</text>
+  <path class="road" d="M265 584 H735"/><path class="road-mid" d="M273 584 H727"/>
+  <text x="500" y="570" class="clbl mid">The van · to the venue and back</text>
+  <text x="132.5" y="381" class="clbl mid">Same site · a few steps apart</text>
+  <g class="sock" transform="translate(265 146)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(365 146)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(265 334)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(365 334)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(265 490)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(365 490)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(635 289)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(735 289)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(635 475)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(735 475)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(190 36)"><circle r="5.5"/><circle r="1.8" class="pin"/></g><g class="sock" transform="translate(829 36)"><circle r="5.5"/><circle r="1.8" class="pin"/></g>
+  <circle class="mv mv-a" r="4.5" transform="translate(315 146)"/>
+  <circle class="mv mv-b1" r="4.5" transform="translate(300 334)"/>
+  <circle class="mv mv-b2" r="4.5" transform="translate(332 334)"/>
+  <circle class="mv mv-c" r="4.5" transform="translate(280 490)"/>
+  <circle class="mv mv-d" r="4.5" transform="translate(690 289)"/>
+  <g class="mv mv-e1" transform="translate(680 475)"><circle r="8" class="mv-bg"/><use href="#i-doc" x="-6" y="-6" width="12" height="12" class=""/></g>
+  <circle class="mv mv-e2" r="4.5" transform="translate(700 475)"/>
+  <g class="mv mv-f" transform="translate(509 20)"><circle r="8" class="mv-bg"/><use href="#i-envelope" x="-6" y="-6" width="12" height="12" class=""/></g>
+  <g class="mv-van" transform="translate(500 584)"><use href="#i-van" x="-9" y="-9" width="18" height="18" class=""/></g>
+</svg><div class="spine" aria-hidden="true"><i></i></div></div>
+      </figure>
+      <p class="board-tip" id="boardTip" aria-live="polite">Hover or tap any part for what's in it and what's left.</p>
+      <ul class="board-key" aria-label="Key">
+        <li><i class="k k-built"></i>Built (a key or a trial may be left)</li>
+        <li><i class="k k-now"></i>In progress · the level is how far</li>
+        <li><i class="k k-plan"></i>Planned · nothing written yet</li>
+        <li><i class="k k-dot"></i>Something on its way</li>
+        <li><i class="k k-tape">KEY</i>Built, waiting on a key or a bucket</li>
+        <li><svg class="k-size" viewBox="0 0 42 42" aria-hidden="true" focusable="false"><circle cx="21" cy="21" r="19.57"/></svg>A bubble this size = 1,000 lines written</li>
+      </ul>
+      <p class="board-stats" id="boardStats"></p>
+      <details class="board-text" id="boardText" open>
+        <summary>Every place and part, as a list</summary>
+        <div class="grid3" id="boardList"></div>
+      </details>
+      <p class="small" id="boardFoot"></p>
+    </section>
+
+    <!-- 02 PROGRESS -->
     <section id="progress">
-      <div class="eyebrow"><b>01</b>Progress</div>
+      <div class="eyebrow"><b>02</b>Progress</div>
       <h2>Where the build is</h2>
       <div class="tracker" id="tracker" aria-label="Phase status"></div>
       <div class="grid2 now">
@@ -496,9 +752,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 02 PRINCIPLES -->
+    <!-- 03 PRINCIPLES -->
     <section id="principles">
-      <div class="eyebrow"><b>02</b>Principles</div>
+      <div class="eyebrow"><b>03</b>Principles</div>
       <h2>Three rules everything else follows</h2>
       <div class="grid3">
         <div class="panel principle">
@@ -533,9 +789,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 02 TODAY -->
+    <!-- 04 TODAY -->
     <section id="today">
-      <div class="eyebrow"><b>03</b>How it works today</div>
+      <div class="eyebrow"><b>04</b>How it works today</div>
       <h2>A gig is a row of all-day calendar events</h2>
       <p>Read from the calendars on 29 September 2026: 58 events from June to October. Each phase of each day is its own event, titled <code>Project - Phase n/m</code>, with the venue as location and the crew invited as attendees. Accepting the invite is the crew's confirmation.</p>
       <div class="panel">
@@ -565,9 +821,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 03 MARKET -->
+    <!-- 05 MARKET -->
     <section id="market">
-      <div class="eyebrow"><b>04</b>The market</div>
+      <div class="eyebrow"><b>05</b>The market</div>
       <h2>Six tools, the same five blind spots</h2>
       <p>Rentman, TeamTrack, Current RMS (being renamed OnRent Events), Flex, HireHop and easyjob, compared from vendor sites and reviews in September 2026. The last column is what Session Hire's system aims for.</p>
       <div class="btns" role="group" aria-label="Filter rows">
@@ -581,9 +837,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <p class="small">Where not to compete: Rentman's quoting and invoicing breadth and HireHop's core stock handling. Matching them is enough. Full detail and sources in the competitor audit under <a href="#library">Full documents</a>.</p>
     </section>
 
-    <!-- 04 ARCHITECTURE -->
+    <!-- 06 ARCHITECTURE -->
     <section id="architecture">
-      <div class="eyebrow"><b>05</b>Architecture</div>
+      <div class="eyebrow"><b>06</b>Architecture</div>
       <h2>Phones send requests; the server decides</h2>
       <p>Each device keeps a local copy of what its user needs and an outbox of changes. Changes are sent as requests ("add 4 × Y10P to Nissan") that the server confirms or turns down with a reason, so the rules hold whichever device a change comes from. When two people offline both book the last four speakers, both bookings stand and both show short until someone sorts it, rather than one silently vanishing. Things that already happened in the real world, like a scan, are always accepted and reconciled afterwards.</p>
       <div class="panel">
@@ -694,9 +950,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 05 CALENDAR -->
+    <!-- 07 CALENDAR -->
     <section id="calendar">
-      <div class="eyebrow"><b>06</b>Google Calendar</div>
+      <div class="eyebrow"><b>07</b>Google Calendar</div>
       <h2>Keep the calendar, change nothing on day one</h2>
       <p>The system writes to the shared <b>Session Hire Gigs</b> calendar in today's format and listens for changes in seconds. Each project runs in one of two modes, and new projects switch to app-led once Phase 1 is live.</p>
       <div class="panel">
@@ -747,9 +1003,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 06 CREWBOX -->
+    <!-- 08 CREWBOX -->
     <section id="crewbox">
-      <div class="eyebrow"><b>07</b>Crewbox</div>
+      <div class="eyebrow"><b>08</b>Crewbox</div>
       <h2>Office to site, and back again</h2>
       <p>Crewbox runs on site with no internet: chat, push-to-talk, running order, patch, lighting and the show log. Session Hire's system covers everything before and after. They meet twice per event.</p>
       <div class="panel">
@@ -778,9 +1034,9 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 07 STOCK -->
+    <!-- 09 STOCK -->
     <section id="stock">
-      <div class="eyebrow"><b>08</b>Stock tracking</div>
+      <div class="eyebrow"><b>09</b>Stock tracking</div>
       <h2>From zero labels to trusted availability</h2>
       <p>No stock is barcoded yet. The recommendation is a QR code plus a readable number on every item, scanned with phone cameras first, with RFID kept for later where it pays off most: cables.</p>
       <div class="panel">
@@ -858,24 +1114,24 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       </div>
     </section>
 
-    <!-- 08 ROADMAP -->
+    <!-- 10 ROADMAP -->
     <section id="roadmap">
-      <div class="eyebrow"><b>09</b>Roadmap</div>
+      <div class="eyebrow"><b>10</b>Roadmap</div>
       <h2>Build order</h2>
       <p>Each phase replaces something people do today and is useful on its own. The riskiest piece, offline sync, is proven first.</p>
       <div class="road" id="road"></div>
     </section>
 
-    <!-- 09 DECISIONS -->
+    <!-- 11 DECISIONS -->
     <section id="decisions">
-      <div class="eyebrow"><b>10</b>Decisions</div>
+      <div class="eyebrow"><b>11</b>Decisions</div>
       <h2>What's settled and what's open</h2>
       <div class="dec" id="dec"></div>
     </section>
 
-    <!-- 10 LIBRARY -->
+    <!-- 12 LIBRARY -->
     <section id="library">
-      <div class="eyebrow"><b>11</b>Full documents</div>
+      <div class="eyebrow"><b>12</b>Full documents</div>
       <h2>The source documents</h2>
       <p>Everything above is drawn from these files in the repo's <code>docs/</code> folder. They are rebuilt into this page whenever they change.</p>
       <div class="lib">
@@ -903,6 +1159,116 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     root.dataset.theme = dark ? 'light' : 'dark';
   });
 
+  // 01 THE MAP. Every place and part of the system, with how much has been written for it,
+  // how far along it is and what is left. The board, the list, the key's totals and the footnote
+  // are all drawn from here, so the next update is a number change. Sizes: a bubble's radius is
+  // MAP_K × √lines, so its area is in proportion to the lines written.
+  const MAP = {
+    counted: '1 October 2026', live: '30 September 2026', tests: 14200, testFiles: 50, decisions: 23,
+    places: [
+      { id: 'office', name: 'The office, Dublin', note: 'Stock is seen from here too.', parts: [
+        { id: 'jobs', name: 'Jobs and calendar', state: 'built', lines: 7600, pct: 95, what: 'Jobs, phases, the planner by week and month, kit on jobs, call sheets, and the link to Google Calendar.', left: "the office's trial on the real calendar." },
+        { id: 'crew', name: 'Crew', state: 'now', lines: 4300, pct: 75, what: 'People, crew calls, offers and answers, timesheets, and the messages the office sends.', left: 'invoices, and documents with expiry dates.' },
+        { id: 'account', name: 'Account', state: 'built', icon: 'account', caps: ['sign-in, settings'], what: 'Sign-in, backups, the Google Calendar link and office details.', left: 'nothing to write; it switches on with the keys.' },
+        { id: 'history', name: 'History', state: 'built', icon: 'history', caps: ['who did what'], what: 'Every change, who made it, when, and from which device.', left: 'nothing.' },
+        { id: 'gcal', name: 'Google Calendar', state: 'wait', waiting: 'the Google key', caps: ['jobs and invites'], what: 'The jobs calendar with crew invited to their days. Not ours: the app writes to it and reads the answers.', left: 'the Google key, then the office tries it on the real calendar.' }
+      ] },
+      { id: 'ware', name: 'The warehouse, same site', parts: [
+        { id: 'stock', name: 'Stock', state: 'now', lines: 6400, pct: 80, what: 'The catalogue, items with Session Hire numbers, places and cases, labels printed and claimed by scanning, pick lists and scanning kit out and back, faults and repairs, PAT testing. Works with no signal and catches up later.', left: 'cycle counts; RFID later.' },
+        { id: 'trial', name: 'Label trial', state: 'plan', label: 'Not started', icon: 'tag', caps: ['a real pilot · not started'], what: 'A real-world pilot of labels, metal tags and cable markers on a few cases.', left: "all of it; it hasn't started." }
+      ] },
+      { id: 'cloud', name: 'The cloud, EU (Frankfurt)', note: 'The server runs on Railway and the database on Neon, both in the EU. Live since 30 September 2026.', parts: [
+        { id: 'found', name: 'Foundations', state: 'built', lines: 7100, pct: 90, caps: ['the engine under everything:', 'sync, sign-in, alerts, history, export'], what: 'The engine under everything: sync, sign-in, backups, alerts, history, Download everything and the made-up data.', left: 'three keys and a phone field test.' },
+        { id: 'gsign', name: 'Google sign-in', state: 'wait', waiting: 'the Google key', icon: 'key', tape: 'GOOGLE KEY', what: 'Staff sign in with Google; the same key runs the Google Calendar sync and import.', left: 'the Google key, added in Railway.' },
+        { id: 'alerts', name: 'Error alerts', state: 'wait', waiting: 'the Sentry key', icon: 'bell', tape: 'SENTRY KEY', what: "Errors from the server and every phone, with uptime checks, and nobody's details in the reports.", left: 'the Sentry key, added in Railway.' },
+        { id: 'backup', name: 'Nightly backups', state: 'wait', waiting: 'the bucket', icon: 'shield', tape: 'THE BUCKET', what: 'Every night into a separate bucket, each one proved by a test restore.', left: 'the bucket, added in Railway.' },
+        { id: 'export', name: 'Download everything', state: 'built', icon: 'download', caps: ['spreadsheets and a data file'], what: 'One file with everything in it, as spreadsheets and a plain data file, that opens without the app.', left: 'nothing.' }
+      ] },
+      { id: 'free', name: 'Freelancers, wherever they are', parts: [
+        { id: 'link', name: 'Their link page', state: 'built', icon: 'link', caps: ['offers, days off, call sheet,', "timesheet, can't make it"], what: "Offers (accept, decline or ask for a rate), days off, their own details, the call sheet, the timesheet, and can't make it. No app, no login.", left: 'nothing.' },
+        { id: 'feed', name: 'Their own calendar feed', state: 'built', icon: 'feed', caps: ['in Google, Apple or Outlook'], what: 'Their bookings in whatever calendar they use, at a private address.', left: 'nothing.' },
+        { id: 'msgs', name: 'Messages from the office', state: 'built', icon: 'envelope', caps: ['WhatsApp, text or email'], what: 'Offers, call sheets and changes, sent by WhatsApp, text or email with a one-tap link.', left: "sending them automatically, if that's wanted; an open decision." }
+      ] },
+      { id: 'van', name: 'The van and the venue', parts: [
+        { id: 'sheet', name: 'The call sheet', state: 'built', icon: 'doc', caps: ["on the crew chief's phone,", 'no signal needed'], what: "On the crew chief's phone with no signal: the days, where, the running order, who's on and who to ring.", left: 'nothing.' },
+        { id: 'kit', name: 'Kit out and back', state: 'built', icon: 'scan', caps: ['scanned out with the job,', 'scanned back in on return'], what: "Scanned out with the job and scanned back in on return, with no signal; what's still out is listed.", left: 'nothing.' },
+        { id: 'gps', name: 'GPS in the vans', state: 'plan', phase: 5, icon: 'pin', caps: ['phase 5 · planned'], what: 'Trackers in the vans.', left: 'all of it.' },
+        { id: 'site', name: 'On-site mode', state: 'plan', phase: 5, icon: 'radio', caps: ['with the Crewbox · phase 5'], what: 'The show pack goes to the Crewbox on site; faults come back as repair tickets.', left: 'all of it.' }
+      ] },
+      { id: 'later', name: 'Later, on the shelf', parts: [
+        { id: 'finance', name: 'Finance', state: 'plan', phase: 4, lines: 0, icon: 'euro', caps: ['phase 4', 'invoicing'], what: 'Quotes, invoices, VAT, exports for the accountant.', left: 'all of it.' },
+        { id: 'crewbox', name: 'Crewbox link', state: 'plan', phase: 5, lines: 0, icon: 'radio', caps: ['phase 5', 'the site link'], what: 'The Crewbox link and an on-site mode.', left: 'all of it.' },
+        { id: 'grow', name: 'Grow', state: 'plan', phase: 6, lines: 0, icon: 'grow', caps: ['phase 6', 'portal, RFID'], what: 'Client portal, RFID, more warehouses.', left: 'all of it.' }
+      ] }
+    ]
+  };
+  const MAP_K = 0.619;
+  (function drawMap() {
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const num = n => n.toLocaleString('en-IE');
+    const stText = s => ({ built: 'built', now: 'in progress', plan: 'planned', wait: 'waiting' })[s];
+    const chip = p => p.label || (p.state === 'wait' ? 'Waiting on ' + p.waiting : p.state === 'plan' ? 'Planned' + (p.phase ? ' · phase ' + p.phase : '') : (p.state === 'built' ? 'Built' : 'In progress') + (p.pct != null ? ' · ' + p.pct + '%' : ''));
+    const detail = p => (p.state === 'wait' ? 'built, waiting on ' + p.waiting : p.label ? p.label.toLowerCase() : stText(p.state)) + (p.pct != null ? ', about ' + p.pct + '%' : '') + (p.lines ? ' (' + num(p.lines) + ' lines)' : '') + '. ' + p.what + ' Left: ' + p.left;
+    const t = (x, y, cls, s) => '<text x="' + x + '" y="' + y + '" class="' + cls + '">' + esc(s) + '</text>';
+    // the level gauge: a rippled surface at the part's percentage, bubble-local coordinates
+    const liquid = (r, pct) => {
+      const y = Math.round((r - 2 * r * pct) * 100) / 100, x0 = -r - 8, seg = 14, count = Math.ceil((2 * r + 16) / seg) + 1;
+      let d = 'M' + x0 + ' ' + y + ' q7 -2.6 14 0';
+      for (let i = 1; i < count; i++) d += ' t14 0';
+      return { fill: d + ' V' + (r + 4) + ' H' + x0 + ' Z', surf: d };
+    };
+    // a strip of gaffer tape with the name of what's waited on, centred on y
+    const tape = (x, y, s) => { const w = Math.round(s.length * 8.7 + 14); return '<g class="tape" transform="translate(' + x + ' ' + (y - 8) + ') rotate(-2)"><path d="M1.5 0 H' + (w - 1) + ' l1 3.2 -1.5 3.2 1.5 3.2 -1 3.2 1 3.2 H1.5 l-1-3.2 1.5-3.2 -1.5-3.2 1-3.2 z"/>' + t(w / 2, 12.3, 'tape-t mid', s) + '</g>'; };
+    // a bubble: the percentage inside, then the name, the state word and the lines under it
+    const gauge = p => {
+      const r = Math.round(MAP_K * Math.sqrt(p.lines) * 100) / 100, liq = liquid(r, p.pct / 100), id = 'map-clip-' + p.id;
+      const caps = (p.caps || []).concat(num(p.lines) + ' lines');
+      return '<clipPath id="' + id + '"><circle r="' + (r - .5) + '"/></clipPath><circle class="bub-bg" r="' + r + '"/>' +
+        '<g clip-path="url(#' + id + ')"><g class="liq"><path class="liq-fill" d="' + liq.fill + '"/><path class="surf" d="' + liq.surf + '"/></g></g>' +
+        '<circle class="bub-ring" r="' + r + '"/>' + t(0, 8, 'pct', p.pct + '%') +
+        t(0, r + 18, 'name mid', p.name) + t(0, r + 32, 'st', stText(p.state)) + caps.map((c, i) => t(0, r + 46 + i * 13, 'cap mid', c)).join('');
+    };
+    // a small built thing: a green circle with an icon, the name beside or below it; a tape instead of a caption when it waits
+    const sat = (p, el) => {
+      const r = +(el.dataset.r || 12.5), s = r > 13 ? 15 : 14, caps = p.caps || [];
+      let out = '<circle class="sat-bg" r="' + r + '"/>' + (p.icon ? '<use href="#i-' + p.icon + '" x="' + (-s / 2) + '" y="' + (-s / 2) + '" width="' + s + '" height="' + s + '" class="sic"/>' : '');
+      if (el.dataset.label === 'below') out += t(0, r + 14, 'name mid', p.name) + caps.map((c, i) => t(0, r + 27 + i * 13, 'cap mid', c)).join('');
+      else out += t(r + 8, 1, 'name', p.name) + caps.map((c, i) => t(r + 8, 14 + i * 13, 'cap', c)).join('');
+      if (p.tape) out += tape(r + 8, 16.5, p.tape);
+      return out;
+    };
+    const ext = p => '<rect class="ext-box" width="120" height="56" rx="8"/><use href="#i-calendar" x="8" y="5" width="20" height="20" class="hic"/>' + t(34, 19, 'cap', 'not ours, but') + t(8, 37, 'name', p.name) + t(8, 51, 'cap', (p.caps || [''])[0]);
+    const byId = {};
+    MAP.places.forEach(pl => pl.parts.forEach(p => { byId[p.id] = p; }));
+    $$('#map .slot').forEach(el => {
+      const p = byId[el.dataset.part]; if (!p) return;
+      el.classList.add(p.state === 'wait' ? 'built' : p.state);
+      el.innerHTML = p.lines ? gauge(p) : p.id === 'gcal' ? ext(p) : sat(p, el);
+    });
+    $('#boardList').innerHTML = MAP.places.map(pl => '<div class="panel"><h3>' + esc(pl.name) + '</h3><ul>' + pl.parts.map(p =>
+      '<li data-part="' + p.id + '"><span class="bstate ' + p.state + '">' + esc(chip(p)) + '</span> <b>' + esc(p.name) + '</b> <span class="what">' + (p.lines ? 'about ' + num(p.lines) + ' lines. ' : '') + esc(p.what) + ' Left: ' + esc(p.left) + '</span></li>').join('') +
+      '</ul>' + (pl.note ? '<p class="small">' + esc(pl.note) + '</p>' : '') + '</div>').join('');
+    const total = MAP.places.reduce((n, pl) => n + pl.parts.reduce((m, p) => m + (p.lines || 0), 0), 0);
+    $('#boardStats').textContent = num(total) + ' lines of app written · ' + num(MAP.tests) + ' lines of tests in ' + MAP.testFiles + ' files · ' + MAP.decisions + ' decisions written down · live on Railway since ' + MAP.live;
+    $('#boardFoot').textContent = 'Size is how much has been written for each part: the lines of code across the app, the server and what they share, counted on ' + MAP.counted + ". A bubble's area is in proportion to that. The level is a judgement of what's built against what the phase lists, not a measure of code. Not drawn: about " + num(MAP.tests) + ' lines of tests in ' + MAP.testFiles + ' files that check all of it, and ' + MAP.decisions + ' written decisions. The app has been live since ' + MAP.live + '.';
+    // hover, tap or click a part on the board or a row in the list: the strip says what is in it and what is left
+    const tip = $('#boardTip'), idle = tip.textContent, els = $$('#map [data-part]');
+    let pinned = null;
+    const show = id => { const p = byId[id]; if (!p) return; tip.innerHTML = '<b>' + esc(p.name) + ':</b> ' + esc(detail(p)); els.forEach(e => e.classList.toggle('hl', e.dataset.part === id)); };
+    const clear = () => { if (pinned) return show(pinned); tip.textContent = idle; els.forEach(e => e.classList.remove('hl')); };
+    els.forEach(e => {
+      e.addEventListener('pointerenter', ev => { if (ev.pointerType === 'mouse') show(e.dataset.part); });
+      e.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') clear(); });
+      e.addEventListener('click', () => { pinned = pinned === e.dataset.part ? null : e.dataset.part; pinned ? show(pinned) : clear(); });
+    });
+    // on a phone the cases stack and carry every fact, so the list folds away; a spine dot stands in for the cables
+    const small = matchMedia('(max-width: 639px)'), list = $('#boardText');
+    const fit = () => { list.open = !small.matches; };
+    fit(); small.addEventListener('change', fit);
+    const board = $('#board');
+    new ResizeObserver(() => board.style.setProperty('--spine-h', (board.clientHeight - 26) + 'px')).observe(board);
+  })();
+
   // calendar strip
   const cal = [
     ['Tue 9 Jun', 'Google Summer Party - Prep', 'Warehouse', 4, 1, ''],
@@ -921,11 +1287,11 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
 
   // progress tracker (update states as phases move)
   const PHASES = [
-    ['0', 'Foundations', 'now', 'Built; field test left'],
+    ['0', 'Foundations', 'now', 'Built and live; three keys and a phone field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
-    ['1', 'Projects and calendar', 'now', 'Built; office trial left'],
-    ['2', 'Warehouse', 'now', 'Started: catalogue, kit on jobs, labels, scanning, pick lists and repairs built'],
-    ['3', 'Crew', 'now', 'Started early: offers, call sheets and timesheets built'],
+    ['1', 'Projects and calendar', 'now', 'Built; office trial on the real calendar left'],
+    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, labels, scanning, pick lists, repairs and inspections built; cycle counts and RFID later'],
+    ['3', 'Crew', 'now', 'Started early: offers, links, call sheets, timesheets and messages built, two audit rounds done; invoices and documents later'],
     ['4', 'Finance', 'todo', 'Planned'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
     ['6', 'Grow', 'todo', 'Planned']
