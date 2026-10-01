@@ -61,6 +61,10 @@ waiting on someone.
   days, the approver's badge counts it at once, the approver approves,
   a blanked allowance is turned down in place, the planner shows the
   days off, an offer warns).
+- Merged into `main` at 14:14 UTC once GitHub's checks passed, and live
+  by 14:21: Railway waited for main's checks, then deployed it on its
+  own. The three leave tables are in the live database at version 1,
+  and the health check answers on the new build.
 
 **Next**
 
