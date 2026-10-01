@@ -3,6 +3,52 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 1 October 2026: audit round two
+
+**Done**
+
+- The P1 loops from [the audit](audit-2026-09-30.md), findings 7 to 15,
+  decided in [ADR 0023](adr/0023-audit-round-two-the-loops.md). Five
+  streams, each built in its own worktree, read by a separate reviewer,
+  corrected, and merged by hand.
+- People can be edited and archived (never deleted), and freelancers fix
+  their own phone and email on their link. A crew call can be changed
+  after it's made; a phase that moves asks whether its crew move too;
+  nobody is ever un-booked silently. Booked means confirmed everywhere.
+- The office is prompted to tell people after Confirm, Withdraw, a
+  cancelled job, a changed call, a moved phase and an approved
+  timesheet; the Crew tab counts answers to check, declines and
+  pull-outs wait there until Noted; office details sit on every
+  freelancer page; a booked freelancer can say "can't make it".
+- The device rebuilds and saves only when something changed (at 31× the
+  made-up data the rebuild went from 44 ms to 18 ms and the idle tick
+  from 137 ms to 3 ms); storage fails safely, two tabs never fight, and
+  a start-up that fails shows a card, never a white page.
+- Every refusal is shown where it happened, the top bar counts what
+  wasn't done with one list, every browser alert and confirm is gone,
+  and prices read as typed ("€1,250").
+- Round one went live on 1 October at 08:54 UTC (merged as 1b189c4; the
+  live server answers 404 for a missing asset, which proves the build).
+- Checked: typecheck; 56 shared tests; the server suite on PGlite and on
+  real Postgres; the web build; the full browser suite (42 tests, two new
+  ones for refusals). The reviewers' must-fixes went
+  in before each merge: an empty contact change, a misleading notes
+  placeholder, a reformatted import, screens not told when a round ended
+  or the day turned, the link's inputs blocking "€300", the not-done
+  list covering the top bar on a phone, spaces in a price, and forms
+  wiping what was typed.
+
+**Next**
+
+- Round three alongside invoices (P2): grouped and collapsed screens, a
+  person picker with search, batch-test undo, camera in the put-away
+  flows, "added by mistake", server hardening, accessibility, the laptop
+  layout, the home-screen icon.
+- Left for later and written down: the right to erasure, "running late"
+  on the day, a per-item log on the stock item page, GPS trackers.
+- Colly: the Google key, the backups bucket and the Sentry key are still
+  the first three items on the list.
+
 ## 1 October 2026: audit round one
 
 **Done**

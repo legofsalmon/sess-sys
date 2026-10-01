@@ -3,9 +3,9 @@ import type { Queryable } from '../db.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token`
+const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
-const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override`
+const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
 
 type Row = Record<string, any>
@@ -20,6 +20,7 @@ export const toPerson = (r: Row): Person => ({
   dayRateCents: r.day_rate_cents,
   notes: r.notes,
   linkToken: r.link_token,
+  archived: r.archived ?? false,
 })
 export const toCall = (r: Row): CrewCall => ({
   id: r.id,
@@ -50,6 +51,7 @@ export const toOffer = (r: Row): Offer => ({
   respondedAt: r.responded_at ? new Date(r.responded_at).toISOString() : null,
   respondedVia: r.responded_via,
   override: r.override,
+  seenAt: r.seen_at ? new Date(r.seen_at).toISOString() : null,
 })
 export const toAway = (r: Row): Unavailability => ({
   id: r.id,
@@ -64,9 +66,10 @@ export async function getPerson(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE id = $1`, [id])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
+/** The person a private link belongs to. An archived person's link is gone with them. */
 export async function personByToken(q: Queryable, token: string) {
   if (!token || token.length < 16) return undefined
-  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE link_token = $1`, [token])
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE link_token = $1 AND NOT archived`, [token])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
 export async function getCall(q: Queryable, id: string, lock = false) {
@@ -91,7 +94,7 @@ export async function awayFor(q: Queryable, personId: string) {
 }
 
 const OFFER_WITH_CALL = `o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
-            o.responded_at, o.responded_via, o.override,
+            o.responded_at, o.responded_via, o.override, o.seen_at,
             c.id AS c_id, c.project_id AS c_project_id, c.phase_id AS c_phase_id,
             c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
             c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,
@@ -149,6 +152,27 @@ export async function heldElsewhere(q: Queryable, personId: string, days: string
     if (hit.length) out.push({ project: r.phase ? `${r.project} (${r.phase})` : r.project, days: hit })
   }
   return out
+}
+
+/**
+ * What would be left hanging if a person were archived: an offer still
+ * waiting on someone, or days they hold, from today on. The first by date.
+ */
+export async function holdsFrom(q: Queryable, personId: string, today: string) {
+  const { rows } = await q.query<Row>(
+    `SELECT o.status, o.days, c.project, c.phase, c.end_day::text AS end_day
+       FROM offers o JOIN crew_calls c ON c.id = o.call_id
+      WHERE o.person_id = $1 AND c.status = 'open' AND c.end_day >= $2::date
+        AND o.status IN ('offered', 'countered', 'accepted', 'confirmed')
+      ORDER BY c.start_day, c.project`,
+    [personId, today]
+  )
+  for (const r of rows) {
+    const holding = r.status === 'accepted' || r.status === 'confirmed'
+    if (holding && !(r.days as string[]).some((d) => d >= today)) continue
+    return { status: r.status as Offer['status'], project: r.phase ? `${r.project} (${r.phase})` : (r.project as string) }
+  }
+  return undefined
 }
 
 export async function awayOn(q: Queryable, personId: string, days: string[]) {

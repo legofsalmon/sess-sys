@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { months } from './inspections.ts'
+import { euroCents, needed, text, whole } from './plain.ts'
 
 /**
  * The warehouse catalogue (ADR 0013): products, the numbered items of them,
@@ -16,7 +17,7 @@ import { months } from './inspections.ts'
 
 const id = z.string().min(1).max(64)
 /** Money in euro cents, so sums never drift. */
-const cents = z.number().int().min(0).max(1_000_000_00)
+const cents = euroCents(1_000_000_00, 'A value')
 
 export const DEPARTMENTS = ['audio', 'lighting', 'video', 'staging', 'rigging', 'power', 'other'] as const
 export type Department = (typeof DEPARTMENTS)[number]
@@ -58,16 +59,16 @@ export type Tracking = (typeof TRACKING)[number]
 
 export const model = z.object({
   id,
-  name: z.string().min(1).max(200),
+  name: needed(200, "The product's name", "The product's name"),
   department: z.enum(DEPARTMENTS),
   /** Typed, such as Speakers or Cables; the app suggests the ones in use. */
-  category: z.string().max(100),
+  category: text(100, 'The category'),
   tracking: z.enum(TRACKING),
   /** Holds other kit: a road case, rack, bag or cable bundle. Always numbered. */
   isCase: z.boolean(),
   /** What one would cost to replace. */
   valueCents: cents.nullable(),
-  notes: z.string().max(2000),
+  notes: text(2000, 'The notes'),
   /** How often its items need an electrical test (PAT), and a thorough examination, in months; null for never (ADR 0020). */
   patMonths: months.default(null),
   liftingMonths: months.default(null),
@@ -103,8 +104,8 @@ export interface Asset {
 /** Where kit lives: the warehouse, a bay or shelf, a van, the repair bench. */
 export const place = z.object({
   id,
-  name: z.string().min(1).max(200),
-  notes: z.string().max(2000),
+  name: needed(200, "The place's name", "The place's name"),
+  notes: text(2000, 'The notes'),
 })
 export type Place = z.infer<typeof place>
 
@@ -166,7 +167,7 @@ const somethingToChange = [
 
 const where = { placeId: id.nullable(), caseId: id.nullable() }
 /** As typed or scanned; the server reads it as `normaliseNumber` does. Null: the next free number. */
-const typedNumber = z.string().max(100).nullable()
+const typedNumber = text(100, 'The number').nullable()
 
 export const stockCommandSchemas = {
   'model.create': model.refine(...caseIsNumbered),
@@ -196,27 +197,27 @@ export const stockCommandSchemas = {
       id,
       modelId: id,
       number: typedNumber,
-      serial: z.string().max(100),
+      serial: text(100, 'The serial'),
       ...where,
-      notes: z.string().max(2000),
+      notes: text(2000, 'The notes'),
       /** One of those counted where it's going, not labelled until now: take one off the count. */
       fromCount: z.boolean(),
     })
     .refine(...oneOrNone),
   /** Field by field. A new product must be numbered, and a case if this holds anything. */
   'asset.update': z
-    .object({ id, modelId: id.optional(), serial: z.string().max(100).optional(), notes: z.string().max(2000).optional() })
+    .object({ id, modelId: id.optional(), serial: text(100, 'The serial').optional(), notes: text(2000, 'The notes').optional() })
     .refine(...somethingToChange),
   /** Where it lives. A case takes everything in it along. */
   'asset.move': z.object({ id, ...where }).refine(...oneOrNone),
   /** A new label: the old number becomes a former one, never used again. */
   'asset.relabel': z.object({ id, number: typedNumber }),
   /** Kept, with its number, but no longer stock. A case is emptied first. */
-  'asset.retire': z.object({ id, reason: z.enum(RETIRED_REASONS), note: z.string().max(500) }),
+  'asset.retire': z.object({ id, reason: z.enum(RETIRED_REASONS), note: text(500, 'The note') }),
   /** A retired item back in stock, such as a lost one that turned up. */
   'asset.reinstate': z.object({ id }),
   /** How many are there now, after counting. None takes the count away. */
-  'stock.set': z.object({ modelId: id, ...where, qty: z.number().int().min(0).max(MAX_QTY) }).refine(...exactlyOne),
+  'stock.set': z.object({ modelId: id, ...where, qty: whole(0, MAX_QTY, 'How many') }).refine(...exactlyOne),
   /** Some of a count moved elsewhere; refused if fewer are there. */
   'stock.move': z
     .object({
@@ -225,7 +226,7 @@ export const stockCommandSchemas = {
       fromCaseId: id.nullable(),
       toPlaceId: id.nullable(),
       toCaseId: id.nullable(),
-      qty: z.number().int().min(1).max(MAX_QTY),
+      qty: whole(1, MAX_QTY, 'How many'),
     })
     .refine((m) => !!m.fromPlaceId !== !!m.fromCaseId && !!m.toPlaceId !== !!m.toCaseId, { message: 'Say where from and where to.' })
     .refine((m) => (m.fromPlaceId ?? m.fromCaseId) !== (m.toPlaceId ?? m.toCaseId), { message: "That's where they are already." }),

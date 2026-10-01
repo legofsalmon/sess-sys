@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { text, whole } from './plain.ts'
 import { MAX_QTY } from './stock.ts'
 
 /**
@@ -13,8 +14,8 @@ import { MAX_QTY } from './stock.ts'
  */
 
 const id = z.string().min(1).max(64)
-const qty = z.number().int().min(1).max(MAX_QTY)
-const subhireQty = z.number().int().min(0).max(MAX_QTY)
+const qty = whole(1, MAX_QTY, 'How many')
+const subhireQty = whole(0, MAX_QTY, 'How many are subhired')
 
 export const kitLine = z.object({
   id,
@@ -26,9 +27,9 @@ export const kitLine = z.object({
   /** How many of them are hired in from another company rather than taken from Session Hire's own. */
   subhireQty,
   /** Who they're hired from, as typed. */
-  supplier: z.string().max(200),
+  supplier: text(200, 'The supplier'),
   /** Such as "spares" or "for the side stage". */
-  notes: z.string().max(500),
+  notes: text(500, 'The note'),
 })
 export type KitLine = z.infer<typeof kitLine>
 

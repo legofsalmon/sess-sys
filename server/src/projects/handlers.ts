@@ -1,5 +1,5 @@
 import { MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
-import { cancelCall } from '../crew/handlers.ts'
+import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
 import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { kitOnPhase } from '../stock/kit.ts'
@@ -39,7 +39,11 @@ async function checkVenue(ctx: Ctx, id: string | null | undefined) {
   if (id && !(await getVenue(ctx.tx, id))) throw new Refused({ code: 'not-found', message: 'That venue no longer exists.' })
 }
 async function checkContact(ctx: Ctx, id: string | null | undefined) {
-  if (id && !(await getPerson(ctx.tx, id))) throw new Refused({ code: 'not-found', message: "That person isn't in the app any more." })
+  if (!id) return
+  const person = await getPerson(ctx.tx, id)
+  if (!person) throw new Refused({ code: 'not-found', message: "That person isn't in the app any more." })
+  // Someone who has left can't be the contact on the day; a phase that already names them keeps them until it's changed.
+  if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived; pick someone else as the contact.` })
 }
 
 /**
@@ -148,6 +152,8 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     await setFields(ctx, 'phases', PHASE_COLUMNS, a)
     await emit(ctx, 'phase', a.id, await getPhase(ctx.tx, a.id))
     if (a.name !== undefined || a.venueId !== undefined) await renameCalls(ctx, { phaseId: a.id })
+    // Asked to, the phase takes its crew with it: its open calls move by the same shift, and their offers' days too.
+    if (a.moveCrew && (start !== before.start || end !== before.end)) await moveCallsWithPhase(ctx, a.id, before, { start, end })
   },
 
   async 'phase.remove'(ctx, a) {

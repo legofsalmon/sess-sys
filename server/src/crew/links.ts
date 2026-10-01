@@ -1,9 +1,10 @@
-import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
+import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, parseEuro, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { publicOrigin } from '../http.ts'
+import { officeFor } from '../office/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
 import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
@@ -24,7 +25,7 @@ import { getTimesheet, timesheetsFor } from './timesheets.ts'
  */
 
 type Form = URLSearchParams
-type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string; o?: string } }>
+type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string; o?: string; s?: string } }>
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -69,7 +70,9 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         if (o.status === 'accepted' || o.status === 'confirmed') for (const d of o.days) if (d in held) held[d]!++
       jobs.push({ offer, call, openDays: Object.keys(held).filter((d) => held[d]! < call.needed) })
     }
-    const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o } : undefined
+    const flash = req.query.m
+      ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o, ...(req.query.s === 'details' ? { section: 'details' as const } : {}) }
+      : undefined
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
     return reply
       .type('text/html')
@@ -83,6 +86,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
           flash,
           today: today(),
           timesheets: await timesheetsFor(db, person.id),
+          office: await officeFor(db),
         })
       )
   })
@@ -94,7 +98,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (!person) return reply.code(404).type('text/html').send(renderGone())
     const sheet = await sheetFor(db, person.id, req.params.id ?? '')
     if (!sheet) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken)))
-    return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken)))
+    return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken), await officeFor(db)))
   })
 
   // A booking's timesheet (ADR 0022): the person's own, from its first day.
@@ -114,6 +118,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         why: noTimesheetReason(offer, call, person, today()),
         base: base(req, person.linkToken),
         flash,
+        office: await officeFor(db),
       })
     )
   })
@@ -133,12 +138,13 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const extras: TimesheetExtra[] = []
     for (let i = 0; i < Math.max(whats.length, euros.length); i++) {
       const what = (whats[i] ?? '').trim().slice(0, 100)
-      const amount = (euros[i] ?? '').replace(/[€\s]/g, '').replace(',', '.')
-      if (!what && !amount) continue
+      const typed = (euros[i] ?? '').trim()
+      if (!what && !typed) continue
       if (!what) return again('Say what each extra is for.', false)
-      const n = Number(amount)
-      if (!amount || !Number.isFinite(n) || n <= 0) return again(`Put in the amount for ${what}, in euro.`, false)
-      extras.push({ what, cents: Math.round(n * 100) })
+      // As typed on a phone: "€12.50", "12,50" or "1,250" all read as a person means them (audit finding 15).
+      const amount = parseEuro(typed)
+      if (amount.reason !== undefined || !amount.cents) return again(`Put in the amount for ${what}, in euro.`, false)
+      extras.push({ what, cents: amount.cents })
     }
     if (extras.length > MAX_EXTRAS) return again(`There's room for ${MAX_EXTRAS} extras: put the rest together, or in the note.`, false)
     const note = (form.get('note') ?? '').slice(0, 1000)
@@ -168,10 +174,14 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     let result: MutationResult
     if (answer === 'accept') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'accept', days, note })
     else if (answer === 'decline') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'decline', note })
+    // "Can't make it any more" (audit finding 10): a job they had said yes to, given back.
+    else if (answer === 'pullOut') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'pullOut', note })
     else if (answer === 'counter') {
-      const euros = Number((form.get('rate') ?? '').replace(',', '.'))
-      if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
-      result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: Math.round(euros * 100), days, note })
+      // "€300", "1,250" or "1 250,50" read as the person means them (audit finding 15); anything else says what to put in.
+      const rate = parseEuro(form.get('rate') ?? '')
+      if (rate.reason !== undefined) return back(reply, person.linkToken, rate.reason, false, offer.id)
+      if (!rate.cents) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
+      result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: rate.cents, days, note })
     } else return back(reply, person.linkToken, 'Something went wrong; please try again.', false)
 
     if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false, offer.id)
@@ -180,8 +190,31 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         ? "Thanks, you're down for it. The office will confirm."
         : answer === 'decline'
           ? "Thanks for letting us know. You're off this one."
-          : 'Thanks, your rate has gone to the office.'
-    return back(reply, person.linkToken, text, true, offer.id)
+          : answer === 'pullOut'
+            ? "Thanks for telling us. You're off this one, and the office will find cover."
+            : 'Thanks, your rate has gone to the office.'
+    // A pull-out leaves the card for "Earlier", so its message goes at the top.
+    return back(reply, person.linkToken, text, true, answer === 'pullOut' ? undefined : offer.id)
+  })
+
+  // Their own email and phone (audit finding 7). Only what differs is sent, so the history can say which changed.
+  app.post('/f/:token/details', async (req: Req, reply) => {
+    const person = await personByToken(db, req.params.token)
+    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    const inSection = (text: string, ok: boolean) =>
+      reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ m: text, ok: ok ? '1' : '0', s: 'details' })}#details`, 303)
+    const form = (req.body ?? new URLSearchParams()) as Form
+    // A field the form didn't send is left alone; one sent empty is cleared.
+    const typed = (name: string) => (form.has(name) ? form.get(name)!.trim().slice(0, 200) || null : undefined)
+    const changes: CommandArgs<'person.contact'> = { id: person.id }
+    const email = typed('email')
+    const phone = typed('phone')
+    if (email !== undefined && email !== person.email) changes.email = email
+    if (phone !== undefined && phone !== person.phone) changes.phone = phone
+    if (changes.email === undefined && changes.phone === undefined) return inSection('Nothing to change: those are the details we have.', true)
+    const result = await run(req, person.id, 'person.contact', changes)
+    if (result.status === 'rejected') return inSection(result.reason.message, false)
+    return inSection('Saved. The office has your new details.', true)
   })
 
   app.post('/f/:token/away', async (req: Req, reply) => {

@@ -166,8 +166,10 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   // The quote's kit taken off: nothing's short any more.
   await jobRow(quote).click()
   await pencilled.getByRole('button', { name: 'Change' }).click()
-  page.once('dialog', (d) => void d.accept())
   await pencilled.getByRole('button', { name: 'Take off the kit' }).click()
+  // Asked first, in the form, with what will happen.
+  await expect(pencilled.getByRole('group', { name: /^Take 4 × .* off the kit for .*\? It's no longer held for the job, so it's free for others\.$/ })).toBeVisible()
+  await pencilled.getByRole('button', { name: 'Take it off' }).click()
   await expect(pencilled).toHaveCount(0)
   await expect(kit.locator('.empty')).toBeVisible()
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Stock' }).click()

@@ -1,8 +1,9 @@
 import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueView, type View } from '@sh/shared'
 import { useEffect, useState } from 'react'
+import { useNotDone } from '../problems.tsx'
 import { client } from '../sync.ts'
 
-/** What the Jobs screens share, and Stock too: the device's view, the header, and picking or adding a client or venue by name. */
+/** What the Jobs screens share, and Stock and Crew too: the device's view, the header, and picking or adding a client or venue by name. */
 
 export const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -22,49 +23,43 @@ export function useHash(): string {
   return hash
 }
 
+/**
+ * The top bar: the screen's name, what's waiting to sync, and what wasn't
+ * done (audit finding 11), which counts every area's refusals and opens
+ * the one list of them under the bar. The list is inside the header, so
+ * the two stick to the top as one block and the list never covers the bar.
+ */
 export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
   const waiting = view.pendingCount
+  const notDone = useNotDone(view)
   return (
-    <header className="top">
-      <div className="brand">
-        <span className="mark">SH</span>
-        <span>
-          <b>Session Hire</b>
-          <small>
-            {title}
-            <MadeUp view={view} />
-          </small>
-        </span>
-      </div>
-      <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
-        {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}
-      </span>
-    </header>
+    <>
+      <header className="top">
+        <div className="brand">
+          <span className="mark">SH</span>
+          <span>
+            <b>Session Hire</b>
+            <small>
+              {title}
+              <MadeUp view={view} />
+            </small>
+          </span>
+        </div>
+        <div className="state">
+          {notDone.count}
+          <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
+            {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}
+          </span>
+        </div>
+        {notDone.list}
+      </header>
+    </>
   )
 }
 
 /** Beside each screen's name while the app holds made-up data (ADR 0019), so nobody mistakes it for real work. */
 export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
   return view.madeUp ? <span className="made-up"> · made-up data</span> : null
-}
-
-/** Changes the server turned down, with its reason, until dismissed: to jobs, or to what `names` matches. */
-export function NotDone({ view, names = /^(client|venue|project|phase|call|kit)\./ }: { view: View; names?: RegExp }) {
-  const problems = view.problems.filter((p) => names.test(p.mutation.name))
-  if (problems.length === 0) return null
-  return (
-    <section className="card attention">
-      <h2>Not done</h2>
-      {problems.map((p) => (
-        <div className="row" key={p.mutation.id}>
-          <p>{p.reason.message}</p>
-          <button type="button" onClick={() => client.dismissProblem(p.mutation.id)}>
-            Dismiss
-          </button>
-        </div>
-      ))}
-    </section>
-  )
 }
 
 export const STATUS_TONE: Record<ProjectStatus, string> = {

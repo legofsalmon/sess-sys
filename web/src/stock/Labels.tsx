@@ -16,11 +16,11 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { act } from '../crew/CrewScreen.tsx'
+import { Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
-import { NotDone, Top } from '../jobs/common.tsx'
+import { Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { atLabel, findWhere, Pending, ProductChoices, STOCK_COMMANDS, WhereChoices, whereNamed, whereProblem } from './common.tsx'
+import { atLabel, findWhere, Pending, ProductChoices, WhereChoices, whereNamed, whereProblem } from './common.tsx'
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels)
@@ -203,7 +203,6 @@ export function LabelsScreen({ view }: { view: View }) {
       <a className="back" href="#stock">
         ‹ All stock
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <section className="card">
         <h1>Labels</h1>
         <p className="hint">
@@ -242,20 +241,21 @@ export function LabelsScreen({ view }: { view: View }) {
 
 function SetAside({ labels }: { labels: LabelsView }) {
   const [f, setF] = useState({ count: '', name: '' })
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const [lastId, setLastId] = useState('')
   const last = labels.runs.find((r) => r.id === lastId)
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const count = Number(f.count)
-    if (!Number.isInteger(count) || count < 1 || count > MAX_RUN) return setError(`How many labels? From 1 to ${MAX_RUN.toLocaleString('en-IE')} at a time.`)
+    if (!Number.isInteger(count) || count < 1 || count > MAX_RUN) return refuse(`How many labels? From 1 to ${MAX_RUN.toLocaleString('en-IE')} at a time.`)
     const id = newId()
-    void act(() => client.mutate('labels.reserve', { id, count, name: f.name.trim(), notes: '' })).then(
-      () => setLastId(id),
-      (err: Error) => setError(err.message)
-    )
-    setF({ count: '', name: '' })
+    // A refusal brings what was typed back, unless the next run has been typed since.
+    const cleared = { count: '', name: '' }
+    setF(cleared)
+    void run(() => client.mutate('labels.reserve', { id, count, name: f.name.trim(), notes: '' })).then((ok) => {
+      if (ok) setLastId(id)
+      else setF((now) => (now === cleared ? f : now))
+    })
   }
   return (
     <form className="grid-form" onSubmit={submit} aria-label="Set numbers aside">
@@ -267,7 +267,7 @@ function SetAside({ labels }: { labels: LabelsView }) {
         What for{' '}
         <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Label World roll" maxLength={200} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       {last && !error && (
         <p className="added wide" role="status">
           {last.firstNumber ? (
@@ -311,7 +311,6 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
       <a className="back" href="#stock/labels">
         ‹ Labels
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <RunSummary r={r} />
       {r.firstNumber ? (
         <>
@@ -371,14 +370,14 @@ function RunSummary({ r }: { r: LabelRunView }) {
 
 function EditRun({ r, onDone }: { r: LabelRunView; onDone: () => void }) {
   const [f, setF] = useState({ name: r.name, notes: r.notes })
-  const [error, setError] = useState('')
+  const { run, error } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
     const name = f.name.trim()
     const notes = f.notes.trim()
     const changes = { ...(name !== r.name ? { name } : {}), ...(notes !== r.notes ? { notes } : {}) }
     if (Object.keys(changes).length === 0) return onDone()
-    void act(() => client.mutate('labels.update', { id: r.id, ...changes })).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('labels.update', { id: r.id, ...changes })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={save}>
@@ -388,7 +387,7 @@ function EditRun({ r, onDone }: { r: LabelRunView; onDone: () => void }) {
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} maxLength={2000} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save
@@ -488,7 +487,7 @@ export function ClaimLabel({
   const w = view.warehouse
   const [f, setF] = useState(memory.current)
   const [fromCount, setFromCount] = useState(true)
-  const [error, setError] = useState('')
+  const { run: tryTo, error, refuse } = useAct()
   const run = view.labels.runOf(number)
   const m = findProduct(f.product, w)
   const known = findWhere(f.where, w)
@@ -497,21 +496,17 @@ export function ClaimLabel({
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
-    if (!m) return setError(f.product.trim() ? `No product is called ${f.product.trim()}. Add it on the Stock tab first.` : 'Which product is it on?')
-    if (m.tracking !== 'serialised') return setError(`${m.name} is counted, not numbered. Change it to numbered to label them one by one.`)
+    if (!m) return refuse(f.product.trim() ? `No product is called ${f.product.trim()}. Add it on the Stock tab first.` : 'Which product is it on?')
+    if (m.tracking !== 'serialised') return refuse(`${m.name} is counted, not numbered. Change it to numbered to label them one by one.`)
     const problem = whereProblem(f.where, w)
-    if (problem) return setError(problem)
+    if (problem) return refuse(problem)
     const id = newId()
     const one = countedThere > 0 && fromCount
     memory.current = { product: m.name, where: f.where }
-    void act(async () => {
+    void tryTo(async () => {
       const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
       await client.mutate('asset.add', { id, modelId: m.id, number, serial: '', ...where, notes: '', fromCount: one })
-    }).then(
-      () => onClaimed(id),
-      (err: Error) => setError(err.message)
-    )
+    }).then((ok) => ok && onClaimed(id))
   }
 
   return (
@@ -549,7 +544,7 @@ export function ClaimLabel({
           </span>
         </label>
       )}
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Put {number} on it
       </button>

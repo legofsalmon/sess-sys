@@ -15,6 +15,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Confirm } from '../act.tsx'
 import { ask, post } from '../server.ts'
 import { syncSoon } from '../sync.ts'
 import { today, Top } from './common.tsx'
@@ -66,8 +67,7 @@ export function ImportScreen({ view }: { view: View }) {
     }
   }
 
-  const bring = async (preview: ImportPreview, choices: ImportChoices, told: string) => {
-    if (!confirm(`${told} They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.`)) return
+  const bring = async (preview: ImportPreview, choices: ImportChoices) => {
     setStep({ at: 'bringing', preview })
     try {
       const result = await post<ImportResult>('/api/calendar/import/bring', choices)
@@ -211,13 +211,15 @@ function Look(p: {
   offline: boolean
   problem: string | undefined
   onBack: () => void
-  onBring: (preview: ImportPreview, choices: ImportChoices, told: string) => void
+  onBring: (preview: ImportPreview, choices: ImportChoices) => void
 }) {
   const { preview } = p
   const year = today().slice(0, 4)
   const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(preview.jobs.map((j) => [j.key, j.name])))
   const [skip, setSkip] = useState<ReadonlySet<string>>(new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
+  // The question before anything is saved, in the bar the button is in.
+  const [asking, setAsking] = useState(false)
   const toggle = <T,>(set: ReadonlySet<T>, item: T) => {
     const next = new Set(set)
     if (next.has(item)) next.delete(item)
@@ -327,14 +329,22 @@ function Look(p: {
           )}
           {blank && <p className="alert">Give {blank.name} a name, or untick it.</p>}
           {p.offline && <p className="hint">This needs signal.</p>}
-          <button
-            type="button"
-            className="primary"
-            disabled={p.bringing || p.offline || ticked.length === 0 || blank !== undefined}
-            onClick={() => p.onBring(preview, choices, told)}
-          >
-            {p.bringing ? 'Bringing in…' : ticked.length === 0 ? 'Nothing ticked' : `Bring in ${what}`}
-          </button>
+          {asking ? (
+            <Confirm
+              question={`${told} They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.`}
+              yes="Bring them in"
+              no="Not yet"
+              onYes={() => {
+                setAsking(false)
+                p.onBring(preview, choices)
+              }}
+              onNo={() => setAsking(false)}
+            />
+          ) : (
+            <button type="button" className="primary" disabled={p.bringing || p.offline || ticked.length === 0 || blank !== undefined} onClick={() => setAsking(true)}>
+              {p.bringing ? 'Bringing in…' : ticked.length === 0 ? 'Nothing ticked' : `Bring in ${what}`}
+            </button>
+          )}
         </div>
       )}
     </>

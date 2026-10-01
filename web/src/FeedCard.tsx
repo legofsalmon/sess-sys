@@ -8,7 +8,7 @@ import { useFeedAddress, webcal } from './crew/feed.ts'
  * address as the account they are signed in with.
  */
 export function FeedCard({ view, email }: { view: View; email: string }) {
-  const me = view.crew.people.find((p) => p.email?.trim().toLowerCase() === email.trim().toLowerCase())
+  const me = view.crew.people.find((p) => !p.archived && p.email?.trim().toLowerCase() === email.trim().toLowerCase())
   const address = useFeedAddress(me?.linkToken)
   const [copied, setCopied] = useState('')
   if (!me || !address) return null

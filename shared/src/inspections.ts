@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { text } from './plain.ts'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -50,8 +51,8 @@ export const inspectionCommandSchemas = {
     kind: z.enum(INSPECTION_KINDS),
     passed: z.boolean(),
     at: z.string().datetime({ offset: true }),
-    by: z.string().max(200),
-    note: z.string().max(2000),
+    by: text(200, 'Who did it'),
+    note: text(2000, 'The note'),
   }),
 } as const
 

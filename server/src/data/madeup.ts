@@ -27,7 +27,10 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  * - call sheets (ADR 0021): a contact on the day and a running order for
  *   the festival's days, and a crew chief booked who sees everyone's number;
  * - timesheets (ADR 0022) for the gala that's over: one sent with extras,
- *   waiting on the office; one approved with a change; and one not in yet.
+ *   waiting on the office; one approved with a change; and one not in yet;
+ * - the office's own details, on every freelancer page, and a freelancer
+ *   who was booked and can't make it any more, waiting in "Answers to
+ *   check" beside the decline.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -38,6 +41,9 @@ export function madeUpData(today: string): Mutation[] {
   const day = (n: number) => addDays(today, n)
   let drama = 100
   const phone = () => `+44 7700 900${String(drama++).padStart(3, '0')}`
+
+  // The office, as freelancers reach it from their pages: a number from the range Ofcom keeps for drama too.
+  add('office.update', { name: 'Session Hire office', phone: '+44 20 7946 0999', email: 'office@example.com' })
 
   // Clients and venues.
   const client = (name: string, contact: string, role: string) =>
@@ -147,7 +153,8 @@ export function madeUpData(today: string): Mutation[] {
   booked(call(harbourShow, 'Harbour Lights Festival', riverside.id, 'Monitors', 1, 300, '12:00'), eimear)
   const lx = call(harbourShow, 'Harbour Lights Festival', riverside.id, 'LX op', 1, 280, '12:00')
   add('offer.respond', { id: offer(lx, fionn), answer: 'counter', counterRateCents: 32000, days: null, note: 'Two long days; can you do 320?' })
-  booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00'), tadhg)
+  // Tadhg was booked for the load out, then rang to say he can't: the call is short again, for the office to see.
+  add('offer.respond', { id: booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00'), tadhg), answer: 'pullOut', note: 'Away that Monday now, sorry.' })
   booked(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Video', 1, 300), grainne)
   // Dara is booked at Harbour Lights then: offered anyway, so the planner shows it as a check.
   offer(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Sound No.1', 1, 320), dara, true)

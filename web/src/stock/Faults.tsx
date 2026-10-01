@@ -12,7 +12,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
 import { client } from '../sync.ts'
 import { numberLabel, Pending } from './common.tsx'
@@ -37,8 +37,9 @@ export function faultState(f: FaultView): string {
   return f.usable ? 'Damaged, fit to go out' : "Damaged, can't go out"
 }
 
+/** One report as a change; whoever asks for it runs it through act(). */
 export const reportFault = (args: Omit<CommandInput<'fault.report'>, 'id' | 'at'>) =>
-  act(() => client.mutate('fault.report', { id: newId(), at: new Date().toISOString(), ...args }))
+  client.mutate('fault.report', { id: newId(), at: new Date().toISOString(), ...args })
 
 /** Report an item, or some counted kit, damaged or missing. */
 export function ReportFault({
@@ -60,19 +61,17 @@ export function ReportFault({
   const [qty, setQty] = useState(most === 1 ? '1' : '')
   const [note, setNote] = useState('')
   const [usable, setUsable] = useState(false)
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const name = asset ? numberLabel(asset) : (model?.name ?? 'It')
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const n = asset ? 1 : Number(qty)
-    if (!asset && (!Number.isInteger(n) || n < 1 || n > MAX_QTY)) return setError('How many? A whole number, please.')
-    if (kind === 'damaged' && !note.trim()) return setError("Say what's wrong, for whoever repairs it.")
+    if (!asset && (!Number.isInteger(n) || n < 1 || n > MAX_QTY)) return refuse('How many? A whole number, please.')
+    if (kind === 'damaged' && !note.trim()) return refuse("Say what's wrong, for whoever repairs it.")
     const modelId = asset?.modelId ?? model?.id
-    if (!modelId) return setError('That product is no longer in the stock list.')
-    void reportFault({ kind, assetId: asset?.id ?? null, modelId, qty: n, projectId, usable: kind === 'damaged' && usable, note: note.trim() }).then(
-      onDone,
-      (err: Error) => setError(err.message)
+    if (!modelId) return refuse('That product is no longer in the stock list.')
+    void run(() => reportFault({ kind, assetId: asset?.id ?? null, modelId, qty: n, projectId, usable: kind === 'damaged' && usable, note: note.trim() })).then(
+      (ok) => ok && onDone()
     )
   }
   return (
@@ -105,7 +104,7 @@ export function ReportFault({
           <span>It can still go out</span>
         </label>
       )}
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           {kind === 'missing' ? 'Report missing' : 'Report damage'}
@@ -167,16 +166,13 @@ export function FaultsCard({ faults, children, title = 'Faults' }: { faults: Fau
 
 function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   const [editing, setEditing] = useState(false)
-  const [error, setError] = useState('')
+  const [writingOff, setWritingOff] = useState(false)
+  const { run, error } = useAct()
   const closeAs = (outcome: FaultOutcome) => {
-    setError('')
-    if (outcome === 'written-off') {
-      const what = faultWhat(f)
-      const effect = f.assetId ? `It's retired as ${f.kind === 'missing' ? 'lost' : 'scrapped'}` : "They're taken off the count"
-      if (!confirm(`Write off ${what}? ${effect}, and it's kept in the history.`)) return
-    }
-    void act(() => client.mutate('fault.close', { id: f.id, outcome, at: new Date().toISOString() })).catch((err: Error) => setError(err.message))
+    setWritingOff(false)
+    void run(() => client.mutate('fault.close', { id: f.id, outcome, at: new Date().toISOString() }))
   }
+  const effect = f.assetId ? `It's retired as ${f.kind === 'missing' ? 'lost' : 'scrapped'}` : "They're taken off the count"
   const href = f.assetId ? `#stock/item/${f.assetId}` : `#stock/product/${f.modelId}`
   return (
     <li className={`fault ${f.open ? (f.stops ? 'stops' : 'usable') : 'closed'}`} aria-label={faultWhat(f)}>
@@ -213,11 +209,18 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
       )}
       {editing ? (
         <EditFault f={f} onDone={() => setEditing(false)} />
+      ) : writingOff ? (
+        <Confirm
+          question={`Write off ${faultWhat(f)}? ${effect}, and it's kept in the history.`}
+          yes="Write it off"
+          onYes={() => closeAs('written-off')}
+          onNo={() => setWritingOff(false)}
+        />
       ) : (
         f.open && (
           <div className="actions">
             {OUTCOMES_FOR[f.kind].map((o) => (
-              <button key={o} type="button" onClick={() => closeAs(o)}>
+              <button key={o} type="button" onClick={() => (o === 'written-off' ? setWritingOff(true) : closeAs(o))}>
                 {o === 'written-off' ? 'Write off' : OUTCOME_LABELS[o]}
               </button>
             ))}
@@ -227,7 +230,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
           </div>
         )
       )}
-      {error && <p className="alert">{error}</p>}
+      <Refusal error={error} />
     </li>
   )
 }
@@ -236,14 +239,14 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
 function EditFault({ f, onDone }: { f: FaultView; onDone: () => void }) {
   const [repair, setRepair] = useState(f.repair)
   const [usable, setUsable] = useState(f.usable)
-  const [error, setError] = useState('')
+  const { run, error } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const changes: CommandInput<'fault.update'> = { id: f.id }
     if (repair.trim() !== f.repair) changes.repair = repair.trim()
     if (usable !== f.usable) changes.usable = usable
     if (Object.keys(changes).length === 1) return onDone()
-    void act(() => client.mutate('fault.update', changes)).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('fault.update', changes)).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -257,7 +260,7 @@ function EditFault({ f, onDone }: { f: FaultView; onDone: () => void }) {
           <span>It can still go out</span>
         </label>
       )}
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save

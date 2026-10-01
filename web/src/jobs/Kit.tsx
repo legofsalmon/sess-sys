@@ -16,7 +16,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Pending, ProductChoices } from '../stock/common.tsx'
 import { client } from '../sync.ts'
 
@@ -205,7 +205,8 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
     supplier: line.supplier,
     notes: line.notes,
   })
-  const [error, setError] = useState('')
+  const [removing, setRemoving] = useState(false)
+  const { run, error, refuse } = useAct()
   const supplierField = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (subhire !== undefined) supplierField.current?.focus()
@@ -214,12 +215,11 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
 
   const save = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const qty = Number(f.qty)
     const subhired = Number(f.subhired || 0)
-    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) return setError('How many does the job need? A whole number, please.')
-    if (!Number.isInteger(subhired) || subhired < 0) return setError('How many are subhired? A whole number, please.')
-    if (subhired > qty) return setError(`The job needs ${qty}, so no more than ${qty} can be subhired.`)
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) return refuse('How many does the job need? A whole number, please.')
+    if (!Number.isInteger(subhired) || subhired < 0) return refuse('How many are subhired? A whole number, please.')
+    if (subhired > qty) return refuse(`The job needs ${qty}, so no more than ${qty} can be subhired.`)
     const changes: CommandInput<'kit.update'> = { id: line.id }
     if (qty !== line.qty) changes.qty = qty
     if ((f.phaseId || null) !== line.phaseId) changes.phaseId = f.phaseId || null
@@ -227,11 +227,11 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
     if (f.supplier.trim() !== line.supplier) changes.supplier = f.supplier.trim()
     if (f.notes.trim() !== line.notes) changes.notes = f.notes.trim()
     if (Object.keys(changes).length === 1) return onDone()
-    void act(() => client.mutate('kit.update', changes)).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('kit.update', changes)).then((ok) => ok && onDone())
   }
   const remove = () => {
-    if (!confirm(`Take ${line.qty} × ${name} off the kit for ${job.name}?`)) return
-    void act(() => client.mutate('kit.remove', { id: line.id })).then(onDone, (err: Error) => setError(err.message))
+    setRemoving(false)
+    void run(() => client.mutate('kit.remove', { id: line.id })).then((ok) => ok && onDone())
   }
 
   return (
@@ -258,18 +258,28 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
       <label className="wide">
         Note <input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="e.g. spares, side stage" />
       </label>
-      {error && <p className="alert wide">{error}</p>}
-      <div className="actions wide">
-        <button type="submit" className="primary">
-          Save
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-        <button type="button" className="link" onClick={remove}>
-          Take off the kit
-        </button>
-      </div>
+      <Refusal error={error} className="wide" />
+      {removing ? (
+        <Confirm
+          className="wide"
+          question={`Take ${line.qty} × ${name} off the kit for ${job.name}? It's no longer held for the job, so it's free for others.`}
+          yes="Take it off"
+          onYes={remove}
+          onNo={() => setRemoving(false)}
+        />
+      ) : (
+        <div className="actions wide">
+          <button type="submit" className="primary">
+            Save
+          </button>
+          <button type="button" onClick={onDone}>
+            Cancel
+          </button>
+          <button type="button" className="link" onClick={() => setRemoving(true)}>
+            Take off the kit
+          </button>
+        </div>
+      )}
     </form>
   )
 }
@@ -278,32 +288,33 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
 function AddKit({ job, view, lines }: { job: JobView; view: View; lines: readonly KitLineView[] }) {
   const w = view.warehouse
   const [f, setF] = useState({ product: '', qty: '1', phaseId: '' })
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const [added, setAdded] = useState('')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     setAdded('')
     const typed = f.product.trim()
     if (!typed) return
     const m = w.models.find((x) => x.name.trim().toLowerCase() === typed.toLowerCase())
-    if (!m) return setError(`No product is called ${typed}. Add it to the stock list on the Stock tab first.`)
+    if (!m) return refuse(`No product is called ${typed}. Add it to the stock list on the Stock tab first.`)
     const n = Number(f.qty)
-    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return setError('How many? A whole number, please.')
+    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many? A whole number, please.')
     const phaseId = f.phaseId || null
     const days = phaseId ? `for ${job.phases.find((p) => p.id === phaseId)?.name ?? 'that phase'}` : 'for the whole job'
     const already = lines.find((l) => l.modelId === m.id && l.phaseId === phaseId)
-    if (already && already.qty + n > MAX_QTY) return setError(`That would make ${(already.qty + n).toLocaleString('en-IE')}, more than a line can hold.`)
-    void act(() =>
+    if (already && already.qty + n > MAX_QTY) return refuse(`That would make ${(already.qty + n).toLocaleString('en-IE')}, more than a line can hold.`)
+    // Ready for the next product; a refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { ...f, product: '', qty: '1' }
+    setF(cleared)
+    void run(() =>
       already
         ? client.mutate('kit.update', { id: already.id, qty: already.qty + n })
         : client.mutate('kit.add', { id: newId(), projectId: job.id, phaseId, modelId: m.id, qty: n, subhireQty: 0, supplier: '', notes: '' })
-    ).then(
-      () => setAdded(already ? `Now ${already.qty + n} × ${m.name} ${days}.` : `Added ${n} × ${m.name} ${days}.`),
-      (err: Error) => setError(err.message)
-    )
-    setF({ ...f, product: '', qty: '1' })
+    ).then((ok) => {
+      if (ok) setAdded(already ? `Now ${already.qty + n} × ${m.name} ${days}.` : `Added ${n} × ${m.name} ${days}.`)
+      else setF((now) => (now === cleared ? f : now))
+    })
   }
 
   return (
@@ -327,7 +338,7 @@ function AddKit({ job, view, lines }: { job: JobView; view: View; lines: readonl
       <label>
         For <ForChoice job={job} value={f.phaseId} onChange={(phaseId) => setF({ ...f, phaseId })} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       {added && !error && (
         <p className="added wide" role="status">
           {added}

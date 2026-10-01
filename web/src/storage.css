@@ -1,0 +1,7 @@
+/* One line at the top while this device isn't keeping the data (StorageBanner.tsx). In the page's flow, so it never hides the header. */
+.keep { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-8) var(--space-12); padding: var(--space-8) var(--space-16); background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid var(--line); font-size: .9rem; font-weight: 600; text-align: center; }
+.keep.bad { background: var(--bad-soft); color: var(--bad); }
+.keep button { min-height: 36px; padding-block: var(--space-4); }
+/* With the update bar fixed above it, the line moves down under that bar, and the page follows the line as usual. */
+.update ~ .keep { margin-top: calc(56px + env(safe-area-inset-top)); }
+.keep ~ .app { padding-top: max(var(--space-12), env(safe-area-inset-top)); }

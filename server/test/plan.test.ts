@@ -201,7 +201,7 @@ describe('the week by person', () => {
     const week = plan(await synced(app), weekOf(MON!))
     const row = (id: string) => week.people.find((l) => l.person.id === id)!.days
     expect(row(aoife)[MON!]).toEqual({
-      work: [expect.objectContaining({ job: 'Web Summit', phase: 'Build', role: 'Audio tech', booked: true })],
+      work: [expect.objectContaining({ job: 'Web Summit', phase: 'Build', role: 'Audio tech', booked: true, confirmed: true })],
       away: null,
       problem: null,
       severity: null,
@@ -233,6 +233,7 @@ describe('the week by person', () => {
       dayRateCents: null,
       notes: '',
       linkToken: '',
+      archived: false,
       pending: false,
     }
     const call = (id: string, project: string, status: CallView['status'], offers: [string, CallView['offers'][number]['status']][]): CallView => ({
@@ -267,12 +268,14 @@ describe('the week by person', () => {
         respondedAt: null,
         respondedVia: null,
         override: false,
+        seenAt: null,
         pending: false,
         person: aoife,
       })),
     })
     const crew: CrewView = {
-      people: [aoife],
+      // Someone who has left gets no lane, even with "Show everyone".
+      people: [aoife, { ...aoife, id: 'p2', name: 'Niall Kerr', archived: true }],
       calls: [
         call('c1', 'Web Summit', 'open', [['o1', 'confirmed']]),
         call('c2', 'Electric Picnic', 'open', [['o2', 'accepted']]),
@@ -286,6 +289,7 @@ describe('the week by person', () => {
     expect(week.people[0]!.days['2031-03-04']).toMatchObject({ severity: 'clash', problem: 'Booked on Web Summit and Electric Picnic' })
     expect(week.people[0]!.days['2031-03-04']!.work.map((w) => w.job)).toEqual(['Web Summit', 'Electric Picnic'])
     expect(week.jobs.map((l) => l.name)).toEqual(['Electric Picnic', 'Fairview', 'Nissan launch', 'Web Summit'])
+    expect(week.people.map((l) => l.person.name)).toEqual(['Aoife Byrne'])
   })
 })
 

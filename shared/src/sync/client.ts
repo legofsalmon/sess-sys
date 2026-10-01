@@ -9,6 +9,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { officeView, type OfficeView } from './office-view.ts'
 import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
@@ -109,6 +110,8 @@ export interface View {
   inspections: InspectionsView
   /** Freelancers' timesheets for their bookings (ADR 0022). */
   timesheets: TimesheetsView
+  /** The office's own details, shown on every freelancer page. */
+  office: OfficeView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -149,9 +152,24 @@ export interface SyncClientOptions {
 export class SyncClient {
   private state!: Snapshot
   private connection: Connection = 'idle'
+  /**
+   * The view the screens were last told. A round that finds nothing leaves
+   * it as it is and needn't wake them; one that moves on from it (the
+   * signal back, or a new day in Ireland) does. Unset while some screen
+   * holds a different one, having opened mid-round.
+   */
+  private told: View | undefined
   private running: Promise<void> | undefined
   private again = false
   private listeners = new Set<(view: View) => void>()
+  /**
+   * Goes up on every change to `state`. With the day and the connection it
+   * keys the view, so `view()` costs nothing until something has changed:
+   * screens, pokes and sync ticks all ask for it far more often than that.
+   */
+  private version = 0
+  private built: { version: number; today: string; view: Omit<View, 'connection'> } | undefined
+  private views: Partial<Record<Connection, View>> = {}
   private readonly storage: Storage
   private readonly transport: Transport
   private readonly now: () => Date
@@ -177,7 +195,7 @@ export class SyncClient {
   private async unbrick() {
     if (this.state.outbox.length === 0) return
     try {
-      this.view()
+      this.build()
       return
     } catch {
       // Something is in the way. If the view works without the outbox, the outbox holds it.
@@ -185,7 +203,7 @@ export class SyncClient {
     const all = this.state.outbox
     this.state.outbox = []
     try {
-      this.view()
+      this.build()
     } catch {
       this.state.outbox = all
       return
@@ -193,7 +211,7 @@ export class SyncClient {
     for (const m of all) {
       this.state.outbox.push(m)
       try {
-        this.view()
+        this.build()
       } catch (err) {
         this.state.outbox.pop()
         const why = err instanceof Error ? err.message : String(err)
@@ -204,11 +222,22 @@ export class SyncClient {
         })
       }
     }
-    await this.storage.save(this.state)
+    this.version++
+    await this.save()
   }
 
   get clientId() {
     return this.state.clientId
+  }
+
+  /** Where this device's copy is up to, without building the view: a poke only needs the number. */
+  get cursor() {
+    return this.state.cursor
+  }
+
+  /** Changes waiting to be sent, without building the view. */
+  get pendingCount() {
+    return this.state.outbox.filter((m) => m.appliedSeq === undefined).length
   }
 
   /**
@@ -221,17 +250,29 @@ export class SyncClient {
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
     this.state.outbox.push(mutation)
+    this.version++
+    const takeBack = () => {
+      this.state.outbox = this.state.outbox.filter((m) => m.id !== mutation.id)
+      this.version++
+    }
     // A change the view can't lay over the rest would leave every screen blank
     // until the device's storage was wiped, so it's taken back before it's saved.
-    let view: View
     try {
-      view = this.view()
+      this.view()
     } catch (err) {
-      this.state.outbox = this.state.outbox.filter((m) => m.id !== mutation.id)
+      takeBack()
       throw new Error(`This change can't be shown on this device, so it wasn't kept: ${err instanceof Error ? err.message : String(err)}`)
     }
-    await this.storage.save(this.state)
-    this.emit(view)
+    // A change the device can't keep (out of storage, or another tab holds the
+    // data) would be lost on the next reload, so it isn't taken either: the
+    // storage says why, and the person tries again once that's sorted.
+    try {
+      await this.storage.save(this.state)
+    } catch (err) {
+      takeBack()
+      throw err
+    }
+    this.emit()
     return mutation
   }
 
@@ -258,18 +299,44 @@ export class SyncClient {
     return this.running
   }
 
-  dismissProblem(mutationId: string) {
-    this.state.problems = this.state.problems.filter((p) => p.mutation.id !== mutationId)
-    return this.persist()
+  async dismissProblem(mutationId: string) {
+    const kept = this.state.problems.filter((p) => p.mutation.id !== mutationId)
+    if (kept.length === this.state.problems.length) return
+    this.state.problems = kept
+    this.version++
+    await this.persist()
   }
 
   subscribe(fn: (view: View) => void): () => void {
     this.listeners.add(fn)
-    fn(this.view())
+    const view = this.view()
+    // A screen opened mid-round (the first one always is: the app starts a
+    // round before it draws) holds a different view from the rest, so the end
+    // of the round tells them all, even when it found nothing.
+    if (view !== this.told) this.told = undefined
+    fn(view)
     return () => this.listeners.delete(fn)
   }
 
+  /**
+   * The same object until something changes: the device's copy (`version`),
+   * the connection, or the day in Ireland, which moves what's overdue and
+   * what's coming up. Screens can then compare by identity, and a poke or a
+   * sync tick that finds nothing costs no rebuild.
+   */
   view(): View {
+    const today = irishToday(this.now())
+    if (!this.built || this.built.version !== this.version || this.built.today !== today) {
+      this.built = { version: this.version, today, view: this.build(today) }
+      this.views = {}
+    }
+    let view = this.views[this.connection]
+    if (!view) this.views[this.connection] = view = { ...this.built.view, connection: this.connection }
+    return view
+  }
+
+  /** The device's data model, built from scratch. Throws if a change can't be laid over the rest. */
+  private build(today = irishToday(this.now())): Omit<View, 'connection'> {
     const { entities, outbox } = this.state
     const bookings = new Map<string, BookingView>()
     for (const b of Object.values(entities.booking)) bookings.set(b.id, { ...b, pending: false })
@@ -297,7 +364,6 @@ export class SyncClient {
     const crew = crewView(entities, outbox, this.state.cursor)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
-    const today = irishToday(this.now())
     const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)
     const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse, (id) => !!inspections.blocks(id))
     const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults)
@@ -316,17 +382,20 @@ export class SyncClient {
       faults,
       inspections,
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
+      office: officeView(entities, outbox, this.state.cursor),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
-      connection: this.connection,
       cursor: this.state.cursor,
       madeUp: this.state.madeUp === true,
     }
   }
 
   private async round() {
-    this.setConnection('syncing')
+    // Not announced: a round that pushes and pulls nothing ends as it began,
+    // and the screens hear nothing of it. Whatever a round does persist is
+    // announced as it lands, and the end of the round after that.
+    this.connection = 'syncing'
     try {
       await this.push()
       await this.pull()
@@ -364,6 +433,7 @@ export class SyncClient {
         else this.state.problems.push({ mutation: strip(m), reason: r.reason, at: this.now().toISOString() })
       }
       this.state.outbox = kept
+      this.version++
       await this.persist()
     }
   }
@@ -374,15 +444,24 @@ export class SyncClient {
       const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
       const behind = res.head !== undefined && res.head < this.state.cursor
       if (restored || behind) return this.restart(res.generation, restored && res.cleared === true)
-      if (res.generation) this.state.generation = res.generation
-      this.state.madeUp = res.madeUp === true
+      // Nothing new, most of the time: then nothing is saved and nobody is told.
+      let changed = res.changes.length > 0
+      if (res.generation && res.generation !== this.state.generation) [this.state.generation, changed] = [res.generation, true]
+      // Copies saved before made-up data existed have no flag, which means no.
+      if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]
       for (const change of res.changes) applyChange(this.state, change)
-      this.state.cursor = Math.max(this.state.cursor, res.cursor)
+      if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
       // Applied mutations leave the outbox once their result has arrived.
       const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)
-      this.state.outbox = this.state.outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > this.state.cursor)
-      if (done.length) this.remember(done)
-      await this.persist()
+      if (done.length) {
+        this.state.outbox = this.state.outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > this.state.cursor)
+        this.remember(done)
+        changed = true
+      }
+      if (changed) {
+        this.version++
+        await this.persist()
+      }
       if (!res.more) return
     }
   }
@@ -418,25 +497,42 @@ export class SyncClient {
       replay.push(strip(m))
     }
     this.state = { ...emptySnapshot(this.state.clientId), generation, outbox: replay, problems: cleared ? [] : this.state.problems }
+    this.version++
     await this.persist()
     this.again = true
   }
 
   private setConnection(c: Connection) {
-    if (this.connection === c) return
     this.connection = c
-    this.emit()
+    // Told only if the view has moved on from what the screens hold: the
+    // connection, or the day in Ireland, which moves what's due and what's
+    // today on a screen left open overnight. The one rebuild is the emit's.
+    if (this.view() !== this.told) this.emit()
   }
 
   private async persist() {
-    await this.storage.save(this.state)
+    await this.save()
     this.emit()
   }
 
-  /** Tell the screens, with the view already built when the caller has one. */
-  private emit(view?: View) {
-    if (this.listeners.size === 0) return
-    view ??= this.view()
+  /**
+   * The copy in memory is right whether or not this works. A save that fails
+   * (the device out of storage, say) leaves the saved copy behind, which the
+   * first pull after a reload makes up, and the storage itself tells the
+   * person. A change of their own is the exception, taken back in `mutate`.
+   */
+  private async save() {
+    try {
+      await this.storage.save(this.state)
+    } catch {
+      // Said to the person by the storage; the copy in memory carries on.
+    }
+  }
+
+  /** Tell the screens. The view is cached, so this rebuilds only when something has changed. */
+  private emit() {
+    const view = this.view()
+    this.told = view
     for (const fn of this.listeners) fn(view)
   }
 }

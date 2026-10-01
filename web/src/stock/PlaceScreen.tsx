@@ -1,9 +1,9 @@
 import { normaliseNumber, plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
-import { NotDone, Top } from '../jobs/common.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
+import { Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemNumbered, numberLabel, Pending, STOCK_COMMANDS, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, itemNumbered, numberLabel, Pending, WhereChoices } from './common.tsx'
 
 /**
  * One place: what's kept there, cases and what's in them, and what's
@@ -31,7 +31,6 @@ export function PlaceScreen({ view, id }: { view: View; id: string }) {
       <a className="back" href="#stock">
         ‹ All stock
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <Summary p={p} w={w} />
       <Here p={p} w={w} />
       <WhereChoices w={w} />
@@ -41,30 +40,24 @@ export function PlaceScreen({ view, id }: { view: View; id: string }) {
 
 function Summary({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const [editing, setEditing] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [f, setF] = useState({ name: p.name, notes: p.notes })
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const empty = p.items.length === 0 && p.counted.length === 0
   const save = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const name = f.name.trim()
     if (!name) return
     const taken = w.places.find((x) => x.id !== p.id && x.name.trim().toLowerCase() === name.toLowerCase())
-    if (taken) return setError(`There's already a place called ${taken.name}.`)
+    if (taken) return refuse(`There's already a place called ${taken.name}.`)
     if (name === p.name && f.notes.trim() === p.notes) return setEditing(false)
-    void act(() => client.mutate('place.upsert', { id: p.id, name, notes: f.notes.trim() })).then(
-      () => setEditing(false),
-      (err: Error) => setError(err.message)
-    )
+    void run(() => client.mutate('place.upsert', { id: p.id, name, notes: f.notes.trim() })).then((ok) => ok && setEditing(false))
   }
   const remove = () => {
-    if (!confirm(`Remove ${p.name}?`)) return
-    void act(() => client.mutate('place.remove', { id: p.id })).then(
-      () => {
-        location.hash = '#stock'
-      },
-      (err: Error) => alert(err.message)
-    )
+    setRemoving(false)
+    void run(() => client.mutate('place.remove', { id: p.id })).then((ok) => {
+      if (ok) location.hash = '#stock'
+    })
   }
   return (
     <section className="card">
@@ -91,7 +84,7 @@ function Summary({ p, w }: { p: PlaceView; w: WarehouseView }) {
           <label className="wide">
             Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="e.g. Top shelf is for spares" />
           </label>
-          {error && <p className="alert wide">{error}</p>}
+          <Refusal error={error} className="wide" />
           <div className="actions wide">
             <button type="submit" className="primary">
               Save
@@ -101,17 +94,22 @@ function Summary({ p, w }: { p: PlaceView; w: WarehouseView }) {
             </button>
           </div>
         </form>
+      ) : removing ? (
+        <Confirm question={`Remove ${p.name}? Nothing is kept there, so nothing moves.`} yes="Remove it" onYes={remove} onNo={() => setRemoving(false)} />
       ) : (
-        <div className="actions">
-          <button type="button" onClick={() => (setF({ name: p.name, notes: p.notes }), setEditing(true))}>
-            Change details
-          </button>
-          {empty && (
-            <button type="button" className="link" onClick={remove}>
-              Remove place
+        <>
+          <Refusal error={error} />
+          <div className="actions">
+            <button type="button" onClick={() => (setF({ name: p.name, notes: p.notes }), setEditing(true))}>
+              Change details
             </button>
-          )}
-        </div>
+            {empty && (
+              <button type="button" className="link" onClick={() => setRemoving(true)}>
+                Remove place
+              </button>
+            )}
+          </div>
+        </>
       )}
     </section>
   )
@@ -180,24 +178,22 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
 /** Scan or type an item's number to say it's kept here. */
 function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const [moved, setMoved] = useState('')
   const put = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     setMoved('')
     const t = number.trim()
     if (!t) return
     const item = itemNumbered(t, w)
     const typed = normaliseNumber(t)
     if (!item)
-      return setError(typed ? `No item has the number ${typed}.` : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
-    if (item.number !== typed) return setError(`${typed} was an old label. That item is ${numberLabel(item)} now.`)
-    if (item.status !== 'active') return setError(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
-    if (item.placeId === p.id) return setError(`${item.number} is here already.`)
-    void act(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
-      () => setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`),
-      (err: Error) => setError(err.message)
+      return refuse(typed ? `No item has the number ${typed}.` : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
+    if (item.number !== typed) return refuse(`${typed} was an old label. That item is ${numberLabel(item)} now.`)
+    if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
+    if (item.placeId === p.id) return refuse(`${item.number} is here already.`)
+    void run(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
+      (ok) => ok && setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`)
     )
     setNumber('')
   }
@@ -215,7 +211,7 @@ function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
           enterKeyHint="done"
         />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       {moved && !error && (
         <p className="added wide" role="status">
           {moved}

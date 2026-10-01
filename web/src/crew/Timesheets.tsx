@@ -3,8 +3,10 @@ import {
   daysLabel,
   eachDay,
   euro,
+  euroText,
   MAX_EXTRAS,
   noTimesheetReason,
+  parseEuro,
   timesheetChanges,
   timesheetMessage,
   timesheetSummary,
@@ -15,9 +17,10 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type ReactNode } from 'react'
-import { NotDone, today, Top } from '../jobs/common.tsx'
+import { Refusal, useAct } from '../act.tsx'
+import { today, Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { act, euroToCents, SharePanel } from './CrewScreen.tsx'
+import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
 
 /**
  * Timesheets (ADR 0022) as the office works with them: the ones sent to
@@ -27,7 +30,6 @@ import { act, euroToCents, SharePanel } from './CrewScreen.tsx'
  * private link; the office can put one in for someone who doesn't.
  */
 
-const TIMESHEET_COMMANDS = /^timesheet\./
 const on = (iso: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }))
 const job = (r: TimesheetRow) => `${r.call.project}${r.call.phase ? ` · ${r.call.phase}` : ''}`
 
@@ -113,29 +115,34 @@ function Ask({ r, person, onClose }: { r: TimesheetRow; person: PersonView; onCl
   )
 }
 
+/** Opens the message to the freelancer after the office approves or reopens their timesheet (audit finding 9). */
+type OnTell = (share: Share | undefined) => void
+
 /** One booking's timesheet: check it, change it, approve it; or, approved, what was agreed. */
 export function TimesheetScreen({ view, offerId }: { view: View; offerId: string }) {
   const r = view.timesheets.row(offerId)
+  // Kept here, above the timesheet, which starts again once it's approved.
+  const [tell, setTell] = useState<Share | undefined>()
   return (
     <div className="app crew jobs timesheet-screen">
       <Top view={view} title="Crew" />
       <a className="back" href="#crew">
         ‹ Crew
       </a>
-      <NotDone view={view} names={TIMESHEET_COMMANDS} />
       {!r ? (
         <section className="card">
           <p className="empty">This booking isn't on this device. It may have been removed, or still be on its way: check again once it says “Up to date”.</p>
         </section>
       ) : (
         // Starts again from what's saved whenever that changes, such as when it syncs or is approved.
-        <Timesheet key={`${r.timesheet?.status}:${r.timesheet?.sentAt}:${r.timesheet?.approvedAt}`} view={view} r={r} />
+        <Timesheet key={`${r.timesheet?.status}:${r.timesheet?.sentAt}:${r.timesheet?.approvedAt}`} view={view} r={r} onTell={setTell} />
       )}
+      {tell && <SharePanelFor share={tell} onClose={() => setTell(undefined)} />}
     </div>
   )
 }
 
-function Timesheet({ view, r }: { view: View; r: TimesheetRow }) {
+function Timesheet({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTell }) {
   const t = r.timesheet
   const first = r.person?.name.split(' ')[0] ?? 'them'
   const [asking, setAsking] = useState(false)
@@ -170,15 +177,21 @@ function Timesheet({ view, r }: { view: View; r: TimesheetRow }) {
         )}
       </section>
       {asking && r.person && <Ask r={r} person={r.person} onClose={() => setAsking(false)} />}
-      {t?.status === 'approved' ? <Approved r={r} /> : !why && <Check view={view} r={r} />}
+      {t?.status === 'approved' ? <Approved r={r} onTell={onTell} /> : !why && <Check view={view} r={r} onTell={onTell} />}
     </>
   )
 }
 
-function Approved({ r }: { r: TimesheetRow }) {
+function Approved({ r, onTell }: { r: TimesheetRow; onTell: OnTell }) {
   const t = r.timesheet!
   const changes = timesheetChanges(t)
   const { fees } = timesheetTotal(t)
+  const { run, error } = useAct()
+  const reopen = () => {
+    void run(() => client.mutate('timesheet.reopen', { id: t.id })).then(
+      (ok) => ok && r.person && onTell(promptFor('timesheet-reopened', [{ person: r.person, context: { call: r.call, offerId: r.offer.id } }]))
+    )
+  }
   return (
     <section className="card" aria-label="Approved">
       <h2>Approved: {euro(r.total.total)}</h2>
@@ -208,8 +221,9 @@ function Approved({ r }: { r: TimesheetRow }) {
       )}
       {t.officeNote && <p className="lines">{t.officeNote}</p>}
       {t.pending && <span className="pill pending">Waiting to sync</span>}
+      <Refusal error={error} />
       <div className="actions">
-        <button type="button" onClick={() => act(() => client.mutate('timesheet.reopen', { id: t.id }))}>
+        <button type="button" onClick={reopen}>
           Reopen to change it
         </button>
       </div>
@@ -222,10 +236,8 @@ interface ExtraRow {
   euro: string
 }
 
-const euroText = (c: number) => (c / 100).toFixed(c % 100 === 0 ? 0 : 2)
-
 /** The days worked, the rate and the extras, as the office agrees them, and approving. */
-function Check({ view, r }: { view: View; r: TimesheetRow }) {
+function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTell }) {
   const t = r.timesheet
   const [days, setDays] = useState(() => new Set(t?.days ?? r.offer.days))
   const [rate, setRate] = useState(() => {
@@ -244,21 +256,29 @@ function Check({ view, r }: { view: View; r: TimesheetRow }) {
   const [showAll, setShowAll] = useState(() => [...days].some((d) => !booked.has(d)))
   const shown = showAll ? jobDays : [...booked].sort()
 
-  const rateCents = euroToCents(rate)
-  const typed = extras.filter((e) => e.what.trim() || e.euro.trim())
-  const parsed: TimesheetExtra[] = typed.map((e) => ({ what: e.what.trim(), cents: euroToCents(e.euro) ?? 0 }))
+  // Money as typed (audit finding 15): "€12.50", "12,50" or "1,250" all read as a person means them.
+  const rateTyped = parseEuro(rate)
+  const rateCents = rateTyped.cents ?? null
+  const typed = extras.filter((e) => e.what.trim() || e.euro.trim()).map((e) => ({ what: e.what.trim(), euro: parseEuro(e.euro) }))
+  const parsed: TimesheetExtra[] = typed.map((e) => ({ what: e.what, cents: e.euro.cents ?? 0 }))
+  const unreadable = typed.find((e) => e.euro.reason !== undefined)
   const problem =
     days.size === 0
       ? 'Tick at least one day worked.'
-      : rateCents === null || !Number.isFinite(rateCents) || rateCents < 0
-        ? 'Put in the day rate.'
-        : parsed.some((e) => !e.what)
-          ? 'Say what each extra is for.'
-          : parsed.some((e) => !Number.isFinite(e.cents) || e.cents <= 0)
-            ? 'Each extra needs an amount in euro.'
-            : null
+      : rateTyped.reason !== undefined
+        ? `Day rate: ${rateTyped.reason}`
+        : rateCents === null
+          ? 'Put in the day rate.'
+          : typed.some((e) => !e.what)
+            ? 'Say what each extra is for.'
+            : unreadable
+              ? `${unreadable.what || 'An extra'}: ${unreadable.euro.reason}`
+              : parsed.some((e) => e.cents <= 0)
+                ? 'Each extra needs an amount in euro.'
+                : null
   const figures = { days: [...days].sort(), dayRateCents: rateCents, extras: parsed }
   const changes = t && !problem ? timesheetChanges({ ...figures, sent: t.sent }) : []
+  const { run, error } = useAct()
 
   const toggle = (d: string) => {
     const next = new Set(days)
@@ -269,11 +289,15 @@ function Check({ view, r }: { view: View; r: TimesheetRow }) {
   const setExtra = (i: number, e: Partial<ExtraRow>) => setExtras(extras.map((x, j) => (j === i ? { ...x, ...e } : x)))
   const approve = () => {
     if (problem || rateCents === null) return
-    void act(async () => {
+    const person = r.person
+    void run(async () => {
       // Put in for them first, when they haven't sent it: it's then approved as it was put in.
       if (!t) await client.mutate('timesheet.send', { id: r.offer.id, days: figures.days, extras: parsed, note: '' })
       await client.mutate('timesheet.approve', { id: r.offer.id, days: figures.days, dayRateCents: rateCents, extras: parsed, officeNote: note.trim() })
-    }).catch((err: Error) => alert(err.message))
+    }).then(
+      // Then tell them what was agreed, and what changed from what they sent.
+      (ok) => ok && person && onTell(promptFor('timesheet-approved', [{ person, context: { call: r.call, offerId: r.offer.id, summary: timesheetSummary(figures), changes } }]))
+    )
   }
 
   return (
@@ -330,6 +354,7 @@ function Check({ view, r }: { view: View; r: TimesheetRow }) {
         </div>
       )}
       <p className="ts-total">{problem ?? timesheetSummary(figures)}</p>
+      <Refusal error={error} />
       <div className="actions">
         <button type="button" className="primary" disabled={!!problem} onClick={approve}>
           {problem || rateCents === null ? 'Approve' : `Approve ${euro(timesheetTotal(figures).total)}`}

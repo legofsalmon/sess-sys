@@ -183,7 +183,8 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(form.getByLabel('First day')).toHaveValue(threeMonthsBack)
   await page.screenshot(shot('import-choose'))
   await form.getByRole('button', { name: 'Look at the calendar' }).click()
-  expect(calls.looked).toEqual([{ calendarId: OPS, from: threeMonthsBack }])
+  // The request goes a moment after the press.
+  await expect.poll(() => calls.looked).toEqual([{ calendarId: OPS, from: threeMonthsBack }])
 
   // What would come in, before anything is saved.
   await expect(page.getByRole('region', { name: 'What was found' })).toContainText('4 jobs found in 148 events.')
@@ -233,15 +234,13 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(page.getByRole('button', { name: /^Bring in/ })).toBeDisabled()
   await jobs.getByRole('textbox', { name: 'Name for Nissan' }).fill('Nissan')
 
-  let asked = ''
-  page.once('dialog', (d) => {
-    asked = d.message()
-    void d.accept()
-  })
+  // The question comes in the app, in the bar the button was in, with what will happen in words.
   await bring.click()
-  expect(asked).toBe(
-    'Bring in 2 jobs and more days for 1 job, adding 2 people to the crew list? They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.'
-  )
+  const question = page.getByRole('group', {
+    name: 'Bring in 2 jobs and more days for 1 job, adding 2 people to the crew list? They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.',
+  })
+  await expect(question).toBeVisible()
+  await question.getByRole('button', { name: 'Bring them in' }).click()
   await expect(page.getByRole('heading', { name: 'Brought in' })).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Brought in' })).toHaveText(
     'Brought in 2 jobs and more days for 1 job from ops@sessionhire.com: 8 days, 6 crew bookings and offers, 2 new people, 2 new venues.'

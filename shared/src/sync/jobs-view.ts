@@ -97,7 +97,8 @@ export function jobsView(
       case 'phase.update': {
         const a = m.args as CommandArgs<'phase.update'>
         const p = phases.get(a.id)
-        if (p) phases.set(a.id, { ...patch(p, a), pending: true })
+        // Whether to move the crew is an instruction, not a field of the phase.
+        if (p) phases.set(a.id, { ...patch(p, { ...a, moveCrew: undefined }), pending: true })
         break
       }
       case 'phase.remove':
@@ -145,14 +146,23 @@ export function jobsView(
   return { jobs, clients: [...clients.values()].sort(byName), venues: [...venues.values()].sort(byName) }
 }
 
-/** How many of the people a job's open crew calls need are holding every day of them. */
-export function crewFill(calls: readonly CallView[]): { needed: number; held: number } {
+/**
+ * How many of the people a job's open crew calls need are booked (confirmed
+ * for every day of the call), and how many more have said yes and wait on
+ * the office (accepted for every day). "Booked" means confirmed everywhere
+ * in the app, as the call sheet says it.
+ */
+export function crewFill(calls: readonly CallView[]): { needed: number; booked: number; toConfirm: number } {
   let needed = 0
-  let held = 0
+  let booked = 0
+  let toConfirm = 0
   for (const c of calls) {
     if (c.status !== 'open') continue
     needed += c.needed
-    held += Math.min(c.needed, ...c.days.map((d) => c.heldByDay[d] ?? 0))
+    const confirmed = Math.min(c.needed, ...c.days.map((d) => c.offers.filter((o) => o.status === 'confirmed' && o.days.includes(d)).length))
+    const holding = Math.min(c.needed, ...c.days.map((d) => c.heldByDay[d] ?? 0))
+    booked += confirmed
+    toConfirm += holding - confirmed
   }
-  return { needed, held }
+  return { needed, booked, toConfirm }
 }

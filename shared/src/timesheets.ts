@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { dayLabel, daysLabel, euro, type CrewCall, type Offer, type Person } from './crew.ts'
 import { day } from './day.ts'
+import { EURO_HINT } from './money.ts'
+import { euroCents, text } from './plain.ts'
 
 /**
  * Timesheets (ADR 0022): what a freelancer worked on a booking, so they're
@@ -15,14 +17,14 @@ import { day } from './day.ts'
 
 const id = z.string().min(1).max(64)
 /** Euro cents, as everywhere else. */
-const rate = z.number().int().min(0).max(100_000_00)
+const rate = euroCents(100_000_00, 'A day rate')
 
 /** A timesheet has room for this many extras. */
 export const MAX_EXTRAS = 10
 
 export const timesheetExtra = z.object({
-  what: z.string().trim().min(1, 'Say what each extra is for.').max(100),
-  cents: z.number().int().min(1, 'An extra needs an amount.').max(10_000_00),
+  what: z.string().trim().min(1, 'Say what each extra is for.').max(100, 'What an extra is for can be up to 100 characters.'),
+  cents: z.number({ invalid_type_error: EURO_HINT }).int(EURO_HINT).min(1, 'An extra needs an amount.').max(10_000_00, 'An extra can be up to €10,000.'),
 })
 export type TimesheetExtra = z.infer<typeof timesheetExtra>
 
@@ -60,9 +62,9 @@ const extras = z.array(timesheetExtra).max(MAX_EXTRAS, `A timesheet has room for
 
 export const timesheetCommandSchemas = {
   /** Send a booking's timesheet, or change what was sent while the office hasn't approved it. */
-  'timesheet.send': z.object({ id, days, extras, note: z.string().max(1000) }),
+  'timesheet.send': z.object({ id, days, extras, note: text(1000, 'The note') }),
   /** Approve it with the figures the office agrees, which may differ from what was sent. */
-  'timesheet.approve': z.object({ id, days, dayRateCents: rate, extras, officeNote: z.string().max(1000) }),
+  'timesheet.approve': z.object({ id, days, dayRateCents: rate, extras, officeNote: text(1000, 'The note') }),
   /** Take an approval back, to change it. */
   'timesheet.reopen': z.object({ id }),
 } as const

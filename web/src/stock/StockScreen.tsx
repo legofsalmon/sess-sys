@@ -5,6 +5,7 @@ import {
   DEPARTMENTS,
   newId,
   normaliseNumber,
+  parseEuro,
   plural,
   spanLabel,
   type Department,
@@ -14,12 +15,12 @@ import {
   type View,
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
+import { Refusal, useAct } from '../act.tsx'
 import { App } from '../App.tsx'
-import { act, euroToCents } from '../crew/CrewScreen.tsx'
-import { NotDone, StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
+import { StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
-import { amountLabel, atLabel, numberLabel, Pending, STOCK_COMMANDS, TrackingChoice, whereLabel } from './common.tsx'
+import { amountLabel, atLabel, numberLabel, Pending, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
 import { InspectionsDue, TestingScreen } from './Inspections.tsx'
@@ -117,7 +118,6 @@ function Catalogue({ view }: { view: View }) {
   return (
     <div className="app crew jobs warehouse">
       <Top view={view} title="Stock" />
-      <NotDone view={view} names={STOCK_COMMANDS} />
 
       <section className="card">
         <h2>Stock</h2>
@@ -306,15 +306,16 @@ function NewProduct({ view, department }: { view: View; department: Department }
   const w = view.warehouse
   const blank = { name: '', department, category: '', tracking: 'serialised' as Tracking, isCase: false, value: '' }
   const [f, setF] = useState(blank)
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const name = f.name.trim()
     if (!name) return
     const taken = w.models.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
-    if (taken) return setError(`There's already a product called ${taken.name}.`)
-    const valueCents = euroToCents(f.value)
-    if (valueCents !== null && !(valueCents >= 0)) return setError('The value is a number of euro, such as 350 or 12.50.')
+    if (taken) return refuse(`There's already a product called ${taken.name}.`)
+    const value = parseEuro(f.value)
+    if (value.reason !== undefined) return refuse(value.reason)
+    const valueCents = value.cents
     const id = newId()
     const args = {
       id,
@@ -326,14 +327,13 @@ function NewProduct({ view, department }: { view: View; department: Department }
       valueCents,
       notes: '',
     }
-    void act(() => client.mutate('model.create', args)).then(
-      () => {
-        location.hash = `#stock/product/${id}`
-      },
-      (err: Error) => setError(err.message)
-    )
-    setF({ ...blank, department: f.department })
-    setError('')
+    // A refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { ...blank, department: f.department }
+    setF(cleared)
+    void run(() => client.mutate('model.create', args)).then((ok) => {
+      if (ok) location.hash = `#stock/product/${id}`
+      else setF((now) => (now === cleared ? f : now))
+    })
   }
   const categories = [...new Set([...w.categories, ...CATEGORY_IDEAS])]
   return (
@@ -364,7 +364,7 @@ function NewProduct({ view, department }: { view: View; department: Department }
           placeholder="What it would cost to replace; optional"
         />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Add product
       </button>
@@ -380,16 +380,15 @@ function NewProduct({ view, department }: { view: View; department: Department }
 function Places({ view }: { view: View }) {
   const w = view.warehouse
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const add = (e: FormEvent) => {
     e.preventDefault()
     const n = name.trim()
     if (!n) return
     const taken = w.places.find((p) => p.name.trim().toLowerCase() === n.toLowerCase())
-    if (taken) return setError(`There's already a place called ${taken.name}.`)
-    void act(() => client.mutate('place.upsert', { id: newId(), name: n, notes: '' })).catch((err: Error) => setError(err.message))
+    if (taken) return refuse(`There's already a place called ${taken.name}.`)
+    void run(() => client.mutate('place.upsert', { id: newId(), name: n, notes: '' }))
     setName('')
-    setError('')
   }
   return (
     <section className="card">
@@ -420,7 +419,7 @@ function Places({ view }: { view: View }) {
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bay A3, Van 1" aria-label="New place" />
         <button type="submit">Add place</button>
       </form>
-      {error && <p className="alert">{error}</p>}
+      <Refusal error={error} />
     </section>
   )
 }

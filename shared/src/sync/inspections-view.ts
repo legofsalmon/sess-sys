@@ -55,6 +55,17 @@ const monthsFor = (m: Model | undefined, kind: InspectionKind) => (kind === 'pat
 const newest = (a: Inspection, b: Inspection) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
 const rank: Record<DueState, number> = { failed: 0, overdue: 1, soon: 2, unrecorded: 3, ok: 4 }
 
+/**
+ * The day in Ireland a record was made: what `irishToday` says, from one
+ * formatter rather than one made for every record, which was most of what
+ * this view cost. A time that isn't one reads as it did before.
+ */
+const dublin = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Dublin' })
+const irishDay = (at: string) => {
+  const d = new Date(at)
+  return Number.isNaN(d.getTime()) ? irishToday(d) : dublin.format(d)
+}
+
 export function inspectionsView(
   entities: Partial<Tables>,
   outbox: readonly (Mutation & { appliedSeq?: number })[],
@@ -63,7 +74,7 @@ export function inspectionsView(
   today: string
 ): InspectionsView {
   const records = new Map<string, InspectionView>()
-  const view = (i: Inspection, pending: boolean): InspectionView => ({ ...i, pending, day: irishToday(new Date(i.at)) })
+  const view = (i: Inspection, pending: boolean): InspectionView => ({ ...i, pending, day: irishDay(i.at) })
   for (const i of Object.values(entities.inspection ?? {})) records.set(i.id, view(i, false))
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue

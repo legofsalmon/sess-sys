@@ -16,9 +16,9 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
+import { Refusal, useAct } from '../act.tsx'
 import { client } from '../sync.ts'
-import { Choices, clientNamed, NotDone, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
+import { Choices, clientNamed, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
 import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
@@ -81,7 +81,6 @@ function JobList({ view }: { view: View }) {
     <div className="app crew jobs">
       <Top view={view} />
       <JobViews />
-      <NotDone view={view} />
 
       <section className="card">
         <h2>Jobs</h2>
@@ -149,7 +148,8 @@ function JobRow({ job, kit }: { job: JobView; kit: readonly KitLineView[] | unde
         <StatusPill status={job.status} pending={job.pending} />
         {crew.needed > 0 && (
           <small>
-            Crew {crew.held} of {crew.needed}
+            Crew {crew.booked} of {crew.needed}
+            {crew.toConfirm > 0 && `, ${crew.toConfirm} to confirm`}
           </small>
         )}
         {short && <small className={`flag ${short}`}>Kit short</small>}
@@ -171,6 +171,7 @@ function NewJob({ view }: { view: View }) {
   const first = (): PhaseDraft => ({ key: newId(), name: 'Show', start: today(), end: today() })
   const [f, setF] = useState({ name: '', client: '', venue: '', status: 'confirmed' as ProjectStatus })
   const [phases, setPhases] = useState<PhaseDraft[]>(() => [first()])
+  const { run, error } = useAct()
   const setPhase = (key: string, changes: Partial<PhaseDraft>) =>
     setPhases(
       phases.map((p) => {
@@ -185,17 +186,24 @@ function NewJob({ view }: { view: View }) {
     e.preventDefault()
     if (!f.name.trim()) return
     const id = newId()
-    void act(async () => {
+    // A refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { name: '', client: '', venue: '', status: 'confirmed' as ProjectStatus }
+    const clearedPhases = [first()]
+    setF(cleared)
+    setPhases(clearedPhases)
+    void run(async () => {
       const clientId = await clientNamed(f.client, clients)
       const venueId = await venueNamed(f.venue, venues)
       await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: f.status, notes: '' })
       for (const p of phases)
         if (p.name.trim()) await client.mutate('phase.add', { id: newId(), projectId: id, name: p.name.trim(), start: p.start, end: p.end, venueId: null, notes: '' })
-    }).then(() => {
-      location.hash = `#jobs/${id}`
-    }, (err: Error) => alert(err.message))
-    setF({ name: '', client: '', venue: '', status: 'confirmed' })
-    setPhases([first()])
+    }).then((ok) => {
+      if (ok) location.hash = `#jobs/${id}`
+      else {
+        setF((now) => (now === cleared ? f : now))
+        setPhases((now) => (now === clearedPhases ? phases : now))
+      }
+    })
   }
 
   return (
@@ -241,6 +249,7 @@ function NewJob({ view }: { view: View }) {
           Add a phase
         </button>
       </fieldset>
+      <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Add job
       </button>
@@ -260,6 +269,7 @@ const blankContact = (): Contact => ({ name: '', role: '', email: null, phone: n
 function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ name: c.name, notes: c.notes, contacts: c.contacts })
+  const { run, error } = useAct()
   const setContact = (i: number, changes: Partial<Contact>) => setF({ ...f, contacts: f.contacts.map((x, j) => (j === i ? { ...x, ...changes } : x)) })
   const save = (e: FormEvent) => {
     e.preventDefault()
@@ -267,10 +277,7 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
     const contacts = f.contacts
       .filter((x) => x.name.trim())
       .map((x) => ({ name: x.name.trim(), role: x.role.trim(), email: x.email?.trim() || null, phone: x.phone?.trim() || null }))
-    void act(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then(
-      () => setOpen(false),
-      (err: Error) => alert(err.message)
-    )
+    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
   }
   return (
     <div className="row person">
@@ -310,6 +317,7 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
           <label className="wide">
             Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
           </label>
+          <Refusal error={error} className="wide" />
           <button type="submit" className="primary wide">
             Save client
           </button>
@@ -322,13 +330,11 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
 function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ name: v.name, address: v.address, notes: v.notes })
+  const { run, error } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
-    void act(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then(
-      () => setOpen(false),
-      (err: Error) => alert(err.message)
-    )
+    void run(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
   }
   return (
     <div className="row person">
@@ -359,6 +365,7 @@ function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
           <label className="wide">
             Notes <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Access, load-in, power, parking" />
           </label>
+          <Refusal error={error} className="wide" />
           <div className="actions wide">
             <button type="submit" className="primary">
               Save venue

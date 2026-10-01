@@ -1,5 +1,6 @@
 import { invitesLabel, irishToday, type CalendarCheck, type CalendarChoice, type CalendarInvites, type CalendarLink, type View } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Confirm } from './act.tsx'
 import { when } from './format.ts'
 import { ask, post, serverUrl } from './server.ts'
 import { client, syncSoon } from './sync.ts'
@@ -13,6 +14,8 @@ import { client, syncSoon } from './sync.ts'
  */
 
 type Note = { ok: boolean; text: string }
+/** A question before something that reaches crew or Google: what will happen, what to do on yes, and whether it's about the crew invites, which are asked in their own group. */
+type Asking = { question: string; yes: string; no: string; go: () => void; invites?: true }
 
 const OUTCOMES: Record<string, Note> = {
   connected: { ok: true, text: 'Connected to Google.' },
@@ -58,6 +61,21 @@ export function CalendarCard({ view, available }: { view: View; available: boole
   const [note, setNote] = useState<Note | undefined>(outcome)
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [asking, setAsking] = useState<Asking | undefined>()
+  const asked = asking && (
+    <Confirm
+      question={asking.question}
+      yes={asking.yes}
+      no={asking.no}
+      onYes={() => {
+        setAsking(undefined)
+        asking.go()
+      }}
+      onNo={() => setAsking(undefined)}
+    />
+  )
+  const question = asking?.invites ? undefined : asked
+  const invitesQuestion = asking?.invites ? asked : undefined
 
   const run = async (what: () => Promise<Note | undefined>) => {
     setBusy(true)
@@ -80,10 +98,15 @@ export function CalendarCard({ view, available }: { view: View; available: boole
   const disconnect = () => {
     const where = link?.calendarName ? ` off ${link.calendarName}` : ''
     const told = invites ? ' Crew invited to those days get an email saying they are cancelled, and crew invites turn off.' : ''
-    if (!confirm(`Disconnect Google Calendar? The app takes its days${where} from today on, and hands back its access. Days before today stay.${told}`)) return
-    void run(async () => {
-      await post<CalendarLink>('/api/calendar/disconnect')
-      return undefined
+    setAsking({
+      question: `Disconnect Google Calendar? The app takes its days${where} from today on, and hands back its access. Days before today stay.${told}`,
+      yes: 'Disconnect it',
+      no: 'Stay connected',
+      go: () =>
+        void run(async () => {
+          await post<CalendarLink>('/api/calendar/disconnect')
+          return undefined
+        }),
     })
   }
 
@@ -140,14 +163,16 @@ export function CalendarCard({ view, available }: { view: View; available: boole
         <h2>Google Calendar needs connecting again</h2>
         {link.problem && <p className="alert">{link.problem}</p>}
         {noteLine}
-        <div className="actions">
-          <a className="button primary" href={connectUrl()}>
-            Connect again
-          </a>
-          <button type="button" className="link" onClick={disconnect} disabled={busy}>
-            Disconnect
-          </button>
-        </div>
+        {question ?? (
+          <div className="actions">
+            <a className="button primary" href={connectUrl()}>
+              Connect again
+            </a>
+            <button type="button" className="link" onClick={disconnect} disabled={busy}>
+              Disconnect
+            </button>
+          </div>
+        )}
         <p className="hint">Until then nothing on {link.calendarName ?? 'the calendar'} is updated. Everything else in the app carries on.</p>
       </section>
     )
@@ -156,17 +181,20 @@ export function CalendarCard({ view, available }: { view: View; available: boole
   if (link.state === 'choosing' || picking) {
     const use = (choice: CalendarChoice) => {
       const told = invites ? ` Crew invited get an email saying the days on ${link.calendarName} are cancelled, and a new invite on ${choice.name}.` : ''
-      if (
-        link.state === 'on' &&
-        link.calendarName &&
-        !confirm(`Move the app's days from ${link.calendarName} to ${choice.name}? Days before today stay where they are.${told}`)
-      )
-        return
-      void run(async () => {
-        await post<CalendarLink>('/api/calendar/use', { calendarId: choice.id })
-        setPicking(false)
-        return { ok: true, text: `Jobs go on ${choice.name} from now on.` }
-      })
+      const go = () =>
+        void run(async () => {
+          await post<CalendarLink>('/api/calendar/use', { calendarId: choice.id })
+          setPicking(false)
+          return { ok: true, text: `Jobs go on ${choice.name} from now on.` }
+        })
+      if (link.state === 'on' && link.calendarName)
+        return setAsking({
+          question: `Move the app's days from ${link.calendarName} to ${choice.name}? Days before today stay where they are.${told}`,
+          yes: 'Move them',
+          no: 'Leave them',
+          go,
+        })
+      go()
     }
     return (
       <section className="card" aria-label="Google Calendar">
@@ -176,21 +204,24 @@ export function CalendarCard({ view, available }: { view: View; available: boole
         </p>
         {noteLine}
         <Picker current={link.calendarId} busy={busy} onUse={use} />
-        <div className="actions">
-          {picking && (
-            <button type="button" onClick={() => setPicking(false)} disabled={busy}>
-              Keep {link.calendarName}
+        {question ?? (
+          <div className="actions">
+            {picking && (
+              <button type="button" onClick={() => setPicking(false)} disabled={busy}>
+                Keep {link.calendarName}
+              </button>
+            )}
+            <button type="button" className="link" onClick={disconnect} disabled={busy}>
+              Disconnect
             </button>
-          )}
-          <button type="button" className="link" onClick={disconnect} disabled={busy}>
-            Disconnect
-          </button>
-        </div>
+          </div>
+        )}
         <p className="hint">A calendar of its own, shared with the crew and the office, keeps jobs apart from people's own plans.</p>
       </section>
     )
   }
 
+  // The counts come from the server first, so the question comes a moment after the press.
   const turnOn = () =>
     void run(async () => {
       const ahead = await ask<CalendarInvites>('/api/calendar/invites')
@@ -198,23 +229,33 @@ export function CalendarCard({ view, available }: { view: View; available: boole
       const missing = ahead.noEmail.length
         ? ` ${names(ahead.noEmail)} ${ahead.noEmail.length === 1 ? 'has' : 'have'} no email address in the app, so won't be invited.`
         : ''
-      if (!confirm(`Turn on crew invites? ${now}, by email from ${link.account}, and more as crew are offered work.${missing}`)) return undefined
-      await post<CalendarLink>('/api/calendar/invites', { on: true })
-      return { ok: true, text: ahead.invites ? `Crew invites are on: ${invitesLabel(ahead.invites, ahead.people)} on their way.` : 'Crew invites are on.' }
+      setAsking({
+        question: `Turn on crew invites? ${now}, by email from ${link.account}, and more as crew are offered work.${missing}`,
+        yes: 'Turn them on',
+        no: 'Not now',
+        invites: true,
+        go: () =>
+          void run(async () => {
+            await post<CalendarLink>('/api/calendar/invites', { on: true })
+            return { ok: true, text: ahead.invites ? `Crew invites are on: ${invitesLabel(ahead.invites, ahead.people)} on their way.` : 'Crew invites are on.' }
+          }),
+      })
+      return undefined
     })
 
-  const turnOff = () => {
-    if (
-      !confirm(
-        'Turn off crew invites? Nothing more is sent, and answers in Google stop counting. Crew already invited keep their invites; answers on their links still count.'
-      )
-    )
-      return
-    void run(async () => {
-      await post<CalendarLink>('/api/calendar/invites', { on: false })
-      return { ok: true, text: 'Crew invites are off.' }
+  const turnOff = () =>
+    setAsking({
+      question:
+        'Turn off crew invites? Nothing more is sent, and answers in Google stop counting. Crew already invited keep their invites; answers on their links still count.',
+      yes: 'Turn them off',
+      no: 'Keep them on',
+      invites: true,
+      go: () =>
+        void run(async () => {
+          await post<CalendarLink>('/api/calendar/invites', { on: false })
+          return { ok: true, text: 'Crew invites are off.' }
+        }),
     })
-  }
 
   return (
     <section className={link.problem ? 'card attention' : 'card'} aria-label="Google Calendar">
@@ -228,17 +269,19 @@ export function CalendarCard({ view, available }: { view: View; available: boole
         </p>
       )}
       {noteLine}
-      <div className="actions">
-        <button type="button" onClick={() => void run(async () => ({ ok: true, text: checked(await post<CalendarCheck>('/api/calendar/check'), onIt) }))} disabled={busy}>
-          {busy ? 'Checking…' : 'Check now'}
-        </button>
-        <button type="button" onClick={() => setPicking(true)} disabled={busy}>
-          Change calendar
-        </button>
-        <button type="button" className="link" onClick={disconnect} disabled={busy}>
-          Disconnect
-        </button>
-      </div>
+      {question ?? (
+        <div className="actions">
+          <button type="button" onClick={() => void run(async () => ({ ok: true, text: checked(await post<CalendarCheck>('/api/calendar/check'), onIt) }))} disabled={busy}>
+            {busy ? 'Checking…' : 'Check now'}
+          </button>
+          <button type="button" onClick={() => setPicking(true)} disabled={busy}>
+            Change calendar
+          </button>
+          <button type="button" className="link" onClick={disconnect} disabled={busy}>
+            Disconnect
+          </button>
+        </div>
+      )}
       <p className="hint">
         Jobs already on a calendar {link.account} can see? <a href="#import">Bring them in</a>.
       </p>
@@ -260,9 +303,12 @@ export function CalendarCard({ view, available }: { view: View; available: boole
             their answer.
           </p>
         )}
-        <button type="button" onClick={invites ? turnOff : turnOn} disabled={busy}>
-          {invites ? 'Turn off crew invites' : 'Turn on crew invites'}
-        </button>
+        {invitesQuestion ??
+          (!asking && (
+            <button type="button" onClick={invites ? turnOff : turnOn} disabled={busy}>
+              {invites ? 'Turn off crew invites' : 'Turn on crew invites'}
+            </button>
+          ))}
         {!invites && <p className="hint">Try it on a test calendar first, with staff as the crew, to see what freelancers will get.</p>}
       </div>
     </section>

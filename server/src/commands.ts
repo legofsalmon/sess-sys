@@ -11,6 +11,7 @@ import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
 import { reportError } from './monitoring.ts'
+import { officeHandlers } from './office/handlers.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
@@ -131,6 +132,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...faultHandlers,
   ...inspectionHandlers,
   ...timesheetHandlers,
+  ...officeHandlers,
 }
 
 /**

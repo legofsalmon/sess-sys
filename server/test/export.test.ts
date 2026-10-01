@@ -120,6 +120,7 @@ describe('download everything', () => {
       'products',
       'projects',
       'scans',
+      'settings',
       'stock',
       'timesheets',
       'unavailability',
@@ -162,7 +163,7 @@ describe('download everything', () => {
     const { app, colly } = await company()
     const { files } = await download(app, colly.cookies)
     const people = table(files['tables/people.csv']!)
-    expect(Object.keys(people[0]!)).toEqual(['id', 'name', 'kind', 'email', 'phone', 'skills', 'day_rate_cents', 'notes'])
+    expect(Object.keys(people[0]!)).toEqual(['id', 'name', 'kind', 'email', 'phone', 'skills', 'day_rate_cents', 'notes', 'archived'])
     expect(people[0]).toMatchObject({
       name: 'Seán Ó Briain',
       phone: '+353 87 123 4567',

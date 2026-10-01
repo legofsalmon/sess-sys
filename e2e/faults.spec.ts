@@ -200,8 +200,11 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await page.goto('/#stock')
   await repairs.getByRole('link', { name: `3 × ${cable}` }).click()
   const cableFaults = page.getByRole('region', { name: 'Faults' })
-  page.once('dialog', (d) => void d.accept())
-  await cableFaults.getByRole('listitem', { name: `3 × ${cable}` }).getByRole('button', { name: 'Write off' }).click()
+  const cableFault = cableFaults.getByRole('listitem', { name: `3 × ${cable}` })
+  await cableFault.getByRole('button', { name: 'Write off' }).click()
+  // Asked in the card first, with what will happen.
+  await expect(cableFault.getByRole('group', { name: `Write off 3 × ${cable}? They're taken off the count, and it's kept in the history.` })).toBeVisible()
+  await cableFault.getByRole('button', { name: 'Write it off' }).click()
   await expect(page.locator('.facts')).toContainText("In all17 2 can't go out")
   await expect(page.locator('.conn')).toHaveText('Up to date')
 })

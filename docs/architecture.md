@@ -295,16 +295,23 @@ says product and item; the code says model and asset.
 
 - **Person**: staff, freelancer, or a supplier company's contact.
   Skills (audio no. 1, LX op, video tech, rigger, driver), day and half-day
-  rates, contact details, emergency contact.
+  rates, contact details, emergency contact. Every field can be edited;
+  a leaver is archived, never deleted, and can be brought back; a
+  freelancer corrects their own phone and email on their link
+  ([ADR 0023](adr/0023-audit-round-two-the-loops.md)).
 - **Documents**: Safe Pass, manual handling, working at height, IPAF/PASMA,
   driving licence, insurance for companies; with expiry dates and reminders.
   An expired required certificate blocks the assignment, the same way an
   overdue PAT test blocks an asset.
 - **Availability**: freelancers mark unavailable days; offers respect them.
 - **Crew assignment**: person on a phase in a role at an agreed rate, with a
-  status (proposed, offered, accepted, declined, confirmed, cancelled) and a
+  status (proposed, offered, accepted, declined, confirmed, cancelled, or
+  pulled-out when a booked freelancer says they can't make it) and a
   call time. Offers go out by app, email, calendar invite, and SMS or
-  WhatsApp.
+  WhatsApp. A call can be changed after it's made and a moved phase can
+  take its crew with it; the app prompts the office to tell the people
+  affected, and the office's own phone and email sit on every
+  freelancer page ([ADR 0023](adr/0023-audit-round-two-the-loops.md)).
 - **Timesheet**: the days worked on a booking at its day rate, and the
   extras (parking, mileage), sent by the freelancer from their link and
   approved by ops, who can change it and say why

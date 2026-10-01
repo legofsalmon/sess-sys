@@ -1,5 +1,6 @@
 import { encode } from 'uqr'
 import { z } from 'zod'
+import { text, whole } from './plain.ts'
 
 /**
  * Printing labels (ADR 0015). Numbers are set aside a run at a time before
@@ -36,12 +37,12 @@ export interface LabelEntities {
 }
 export const LABEL_ENTITY_NAMES = ['labelRun'] as const
 
-const name = z.string().max(200)
-const notes = z.string().max(2000)
+const name = text(200, "What they're for")
+const notes = text(2000, 'The notes')
 
 export const labelCommandSchemas = {
   /** The next free numbers, as many as asked for. The server picks them, so two devices never get the same ones. */
-  'labels.reserve': z.object({ id, count: z.number().int().min(1).max(MAX_RUN), name, notes }),
+  'labels.reserve': z.object({ id, count: whole(1, MAX_RUN, 'How many labels'), name, notes }),
   /** What a run is for. Its numbers stay as they are. */
   'labels.update': z
     .object({ id, name: name.optional(), notes: notes.optional() })

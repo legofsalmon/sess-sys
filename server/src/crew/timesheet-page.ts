@@ -1,5 +1,5 @@
-import { dayLabel, daysLabel, euro, MAX_EXTRAS, timesheetChanges, timesheetTotal, type CrewCall, type Offer, type Timesheet } from '@sh/shared'
-import { CSS, flash } from './page.ts'
+import { dayLabel, daysLabel, euro, MAX_EXTRAS, timesheetChanges, timesheetTotal, type CrewCall, type Offer, type OfficeDetails, type Timesheet } from '@sh/shared'
+import { CSS, flash, officeBlock } from './page.ts'
 import { SHEET_CSS } from './sheet.ts'
 
 /**
@@ -25,6 +25,8 @@ export interface TimesheetPage {
   why: string | null
   base: string
   flash?: { ok: boolean; text: string }
+  /** The office's phone and email, once set. */
+  office?: OfficeDetails | null
 }
 
 export function renderTimesheet(d: TimesheetPage): string {
@@ -45,6 +47,7 @@ export function renderTimesheet(d: TimesheetPage): string {
 <body>
 <main class="sheet">
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Timesheet</small></div></header>
+  ${officeBlock(d.office)}
   <a class="back" href="${h(d.base)}">‹ Your work</a>
   ${d.flash ? flash(d.flash) : ''}
   <section class="head">
@@ -98,7 +101,7 @@ function form(d: TimesheetPage, action: string): string {
       ${rows
         .map(
           (r, i) =>
-            `<div class="extra"><label><span>What</span> <input name="what" maxlength="100" value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${h(r.euro)}"></label></div>`
+            `<div class="extra"><label><span>What</span> <input name="what" maxlength="100" value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal" value="${h(r.euro)}"></label></div>`
         )
         .join('')}
     </fieldset>

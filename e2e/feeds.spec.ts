@@ -9,7 +9,8 @@ import { expect, test } from '@playwright/test'
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
 const phoneSize = { width: 390, height: 844 }
-const FEED = /^http:\/\/localhost:3099\/cal\/[\w-]{24}\.ics$/
+// The address carries the test server's port, which playwright.config.ts takes from E2E_PORT.
+const FEED = new RegExp(`^http://localhost:${process.env.E2E_PORT ?? '3099'}/cal/[\\w-]{24}\\.ics$`)
 
 test('the office copies a freelancer their calendar address, the same one their page gives', async ({ browser }) => {
   const office = await (await browser.newContext({ viewport: phoneSize, permissions: ['clipboard-read', 'clipboard-write'] })).newPage()

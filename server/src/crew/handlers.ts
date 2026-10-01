@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import { daysLabel, eachDay, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { daysBetween, daysLabel, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
-import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, offersForCall } from './store.ts'
+import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
 
 /**
  * The crew rules the server enforces, whatever device or link a request
@@ -18,15 +18,22 @@ import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, offersFor
 type CrewCommand =
   | 'person.upsert'
   | 'person.newLink'
+  | 'person.archive'
+  | 'person.contact'
   | 'unavailability.add'
   | 'unavailability.remove'
   | 'call.create'
+  | 'call.update'
   | 'call.cancel'
   | 'offer.send'
   | 'offer.respond'
   | 'offer.confirm'
   | 'offer.cancel'
+  | 'offer.seen'
 type Handler<N extends CrewCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
+
+/** Answers that end an offer for good: the person can be offered the same call afresh. */
+const OVER: readonly Offer['status'][] = ['declined', 'filled', 'cancelled', 'pulled-out']
 
 /** 24 characters of randomness; the whole secret in a person's link. */
 export const newLinkToken = () => randomBytes(18).toString('base64url')
@@ -97,7 +104,102 @@ export async function cancelCall(ctx: Ctx, callId: string) {
   await ctx.tx.query(`UPDATE crew_calls SET status = 'cancelled' WHERE id = $1`, [callId])
   await emit(ctx, 'crewCall', callId, await getCall(ctx.tx, callId))
   for (const o of await offersForCall(ctx.tx, callId))
-    if (!['declined', 'filled', 'cancelled'].includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
+    if (!OVER.includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
+}
+
+/** "Aoife Byrne", "Aoife Byrne and Dara Walsh", "Aoife Byrne, Dara Walsh and Niall Kerr". */
+const names = (list: string[]) => (list.length < 2 ? (list[0] ?? 'someone') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`)
+
+/**
+ * Change a call to `next`, taking its offers along. A change of dates
+ * moves each live offer's days: all the new days for one holding all the
+ * old ones, otherwise the chosen days still in range. A change of rate
+ * reaches only offers nobody has answered; accepted, countered and
+ * confirmed ones keep what was agreed. Nobody booked is ever left with no
+ * days, or put on a day they hold elsewhere, and the call never needs
+ * fewer people than are booked: those are refused by name, for the office
+ * to release someone or keep the days. Once every day is covered again,
+ * anyone still waiting is told it's filled, as after an acceptance. With
+ * `shift`, the days people chose move by that many days first: the whole
+ * job has moved, so the second day's person stays on the second day.
+ */
+async function changeCall(ctx: Ctx, call: CrewCall, next: CrewCall, shift = 0) {
+  const offers = await offersForCall(ctx.tx, call.id)
+  const oldDays = eachDay(call.start, call.end)
+  const newDays = eachDay(next.start, next.end)
+  const moved = next.start !== call.start || next.end !== call.end
+  const changes = new Map<string, { days?: string[]; day_rate_cents?: number | null }>()
+  const stranded: { booked: string[]; countered: string[] } = { booked: [], countered: [] }
+  const daysOf = new Map<string, string[]>()
+  for (const o of offers) {
+    if (!LIVE.includes(o.status)) continue
+    const fields: { days?: string[]; day_rate_cents?: number | null } = {}
+    let days = o.days
+    if (moved) {
+      days = offerDaysAfter(o.days, oldDays, newDays, shift)
+      if (days.length === 0) {
+        const who = (await getPerson(ctx.tx, o.personId))?.name ?? 'Someone'
+        if (o.status === 'countered') stranded.countered.push(who)
+        else if (o.status !== 'offered') stranded.booked.push(who)
+        else days = [...newDays]
+      }
+      if (days.join() !== o.days.join()) fields.days = days
+    }
+    if (next.dayRateCents !== call.dayRateCents && o.status === 'offered') fields.day_rate_cents = next.dayRateCents
+    daysOf.set(o.id, days)
+    if (Object.keys(fields).length) changes.set(o.id, fields)
+  }
+  if (stranded.booked.length || stranded.countered.length) {
+    const parts: string[] = []
+    if (stranded.booked.length)
+      parts.push(`${names(stranded.booked)} ${stranded.booked.length === 1 ? 'is' : 'are'} booked for days that would go. Release them or keep those days.`)
+    if (stranded.countered.length)
+      parts.push(`${names(stranded.countered)} asked for a rate for days that would go. Say no to it or keep those days.`)
+    throw new Refused({ code: 'conflict', message: parts.join(' ') })
+  }
+  // A day new to someone booked may be one they marked off, or hold on another job: the same clashes an offer needs an override for.
+  for (const o of offers) {
+    if (o.status !== 'accepted' && o.status !== 'confirmed') continue
+    const added = (daysOf.get(o.id) ?? []).filter((d) => !o.days.includes(d))
+    if (!added.length) continue
+    const reasons: string[] = []
+    for (const { u, hit } of await awayOn(ctx.tx, o.personId, added)) reasons.push(`marked unavailable ${daysLabel(hit)}${u.note ? ` (${u.note})` : ''}`)
+    for (const c of await heldElsewhere(ctx.tx, o.personId, added, call.id)) reasons.push(`already booked on ${c.project} ${daysLabel(c.days)}`)
+    if (reasons.length) {
+      const who = (await getPerson(ctx.tx, o.personId))?.name ?? 'Someone'
+      throw new Refused({ code: 'clash', message: `${who} is ${reasons.join(' and ')}. Release them or keep those days.` })
+    }
+  }
+  const held: Record<string, number> = {}
+  for (const d of newDays) held[d] = 0
+  for (const o of offers) if (o.status === 'accepted' || o.status === 'confirmed') for (const d of daysOf.get(o.id) ?? []) if (d in held) held[d]!++
+  const most = Math.max(0, ...Object.values(held))
+  if (next.needed < most) {
+    const spare = most - next.needed
+    throw new Refused({ code: 'conflict', message: `${most} people are booked; release ${spare === 1 ? 'one' : spare} first.` })
+  }
+  await ctx.tx.query(
+    `UPDATE crew_calls SET project = $2, phase = $3, venue = $4, role = $5, start_day = $6, end_day = $7, call_time = $8,
+            needed = $9, day_rate_cents = $10, details = $11, reply_by = $12 WHERE id = $1`,
+    [call.id, next.project, next.phase, next.venue, next.role, next.start, next.end, next.callTime, next.needed, next.dayRateCents, next.details, next.replyBy]
+  )
+  await emit(ctx, 'crewCall', call.id, await getCall(ctx.tx, call.id))
+  for (const [id, fields] of changes) await setOffer(ctx, id, fields)
+  await closeIfFull(ctx, next)
+}
+
+/**
+ * A phase's open calls once it moves: each by the same shift as the
+ * phase's start, kept inside the phase, with its offers' days along, under
+ * the same refusals as changing a call. How a phase takes its crew with it.
+ */
+export async function moveCallsWithPhase(ctx: Ctx, phaseId: string, from: { start: string; end: string }, to: { start: string; end: string }) {
+  for (const c of await openCallsFor(ctx.tx, { phaseId })) {
+    const span = movedCallSpan(c, from, to)
+    if (span.start === c.start && span.end === c.end) continue
+    const call = await getCall(ctx.tx, c.id, true)
+    if (call) await changeCall(ctx, call, { ...call, ...span }, daysBetween(from.start, to.start))
+  }
 }
 
 /**
@@ -146,6 +248,38 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
 
+  async 'person.archive'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (person.archived === a.archived) return
+    if (a.archived) {
+      // Nothing is left hanging: an offer waiting on them, or days they hold from today on, is settled first.
+      const hold = await holdsFrom(ctx.tx, person.id, irishToday())
+      if (hold) {
+        const what =
+          hold.status === 'confirmed' ? `is booked on ${hold.project}; release them first` : hold.status === 'accepted' ? `has accepted ${hold.project}; release them first` : `has an open offer for ${hold.project}; withdraw it first`
+        throw new Refused({ code: 'conflict', message: `${person.name} ${what}.` })
+      }
+    }
+    await ctx.tx.query('UPDATE people SET archived = $2 WHERE id = $1', [person.id, a.archived])
+    await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
+  },
+
+  /**
+   * A person's own email and phone. On a link the route has already matched
+   * the id to the link's person, so the handler only sets what was sent.
+   */
+  async 'person.contact'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    const fields: [string, string | null][] = []
+    if (a.email !== undefined) fields.push(['email', a.email])
+    if (a.phone !== undefined) fields.push(['phone', a.phone])
+    if (!fields.length) return
+    await ctx.tx.query(`UPDATE people SET ${fields.map(([k], i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [person.id, ...fields.map(([, v]) => v)])
+    await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
+  },
+
   async 'unavailability.add'(ctx, a) {
     if (!(await getPerson(ctx.tx, a.personId))) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (await getAway(ctx.tx, a.id)) return
@@ -173,6 +307,18 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     await emit(ctx, 'crewCall', a.id, await getCall(ctx.tx, a.id))
   },
 
+  async 'call.update'(ctx, a) {
+    const call = await openCall(ctx, a.id)
+    if (call.projectId && (a.project !== undefined || a.phase !== undefined || a.venue !== undefined))
+      throw new Refused({ code: 'invalid', message: `This call is part of ${call.project}: change the job, its phase or its venue in Jobs.` })
+    const next: CrewCall = { ...call }
+    for (const k of ['role', 'start', 'end', 'callTime', 'needed', 'dayRateCents', 'details', 'replyBy', 'project', 'phase', 'venue'] as const)
+      if (a[k] !== undefined) (next as Record<string, unknown>)[k] = a[k]
+    // One end may have moved on another device, so check the call as it will be.
+    if (next.start > next.end) throw new Refused({ code: 'invalid', message: `${next.role} on ${next.project} would end before it starts.` })
+    await changeCall(ctx, call, next)
+  },
+
   async 'call.cancel'(ctx, a) {
     const call = await getCall(ctx.tx, a.id, true)
     if (!call) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
@@ -184,8 +330,9 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const call = await openCall(ctx, a.callId)
     const person = await getPerson(ctx.tx, a.personId)
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to offer them work.` })
     const offers = await offersForCall(ctx.tx, call.id)
-    const live = offers.find((o) => o.personId === person.id && !['declined', 'filled', 'cancelled'].includes(o.status))
+    const live = offers.find((o) => o.personId === person.id && !OVER.includes(o.status))
     if (live) throw new Refused({ code: 'conflict', message: `${person.name} already has this offer (${live.status}).` })
     const days = eachDay(call.start, call.end)
     const held = heldByDay(call, offers)
@@ -211,12 +358,25 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const offer = await getOffer(ctx.tx, a.id)
     if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
     const call = await openCall(ctx, offer.callId)
+    // Every answer is new to the office, so it goes back into "Answers to check".
+    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via, note: a.note, seen_at: null }
+    if (a.answer === 'pullOut') {
+      // Only a place they hold can be given back. The held count drops with the
+      // status, so the call is short again, and the office hears of it in
+      // "Answers to check" until they note it (audit finding 10).
+      if (!HOLDING.includes(offer.status)) throw new Refused({ code: 'conflict', message: "You can only pull out of a job you've said yes to." })
+      // The page never offers it after the job, but a crafted post could reach here and lose the timesheet.
+      if (call.end < irishToday()) throw new Refused({ code: 'conflict', message: 'That job has already happened; talk to the office.' })
+      await setOffer(ctx, offer.id, { ...answered, status: 'pulled-out' })
+      return
+    }
     if (offer.status === 'filled') throw new Refused({ code: 'filled', message: 'Sorry, this has already been filled by someone else.' })
     if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: 'This offer was withdrawn.' })
+    // Pulled out is over: the office offers it afresh if they can do it after all.
+    if (offer.status === 'pulled-out') throw new Refused({ code: 'conflict', message: "You've pulled out of this one. Ask the office if you can do it after all." })
     if (offer.status === 'confirmed')
       throw new Refused({ code: 'conflict', message: 'You are confirmed for this job. Please contact the office to change it.' })
 
-    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via, note: a.note }
     if (a.answer === 'decline') {
       await setOffer(ctx, offer.id, { ...answered, status: 'declined' })
       return
@@ -254,7 +414,16 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'offer.cancel'(ctx, a) {
     const offer = await getOffer(ctx.tx, a.id)
     if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
-    if (offer.status === 'cancelled') return
+    // An offer that is over stays as it ended: a Withdraw queued on an offline device must not rewrite a decline or a pull-out.
+    if (OVER.includes(offer.status)) return
     await setOffer(ctx, offer.id, { status: 'cancelled' })
+  },
+
+  async 'offer.seen'(ctx, a) {
+    const offer = await getOffer(ctx.tx, a.id)
+    if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
+    // Noted once is noted: a second device's Noted changes nothing.
+    if (offer.seenAt) return
+    await setOffer(ctx, offer.id, { seen_at: new Date().toISOString() })
   },
 }

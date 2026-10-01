@@ -86,6 +86,9 @@ function patch<T extends object>(target: T, changes: object): T {
   return out
 }
 
+/** Product names in order, as the Stock tab has them: one collator, not one made for every comparison. */
+const byProductName = new Intl.Collator('en-IE', { sensitivity: 'base' })
+
 /** What one product has out on one day. */
 interface DayUse {
   held: number
@@ -221,7 +224,7 @@ export function kitView(
     list.sort(
       (a, b) =>
         department(a) - department(b) ||
-        productName(a).localeCompare(productName(b), 'en-IE', { sensitivity: 'base' }) ||
+        byProductName.compare(productName(a), productName(b)) ||
         phaseStart(a).localeCompare(phaseStart(b)) ||
         a.id.localeCompare(b.id)
     )

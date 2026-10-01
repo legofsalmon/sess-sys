@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import { dayLabel, eachDay } from './crew.ts'
+import { dayLabel, eachDay, somethingToChange } from './crew.ts'
 import { day } from './day.ts'
+import { needed, text } from './plain.ts'
 
 /**
  * Jobs (ADR 0007): who a job is for, where it is, and its phases. The code
@@ -15,29 +16,29 @@ const id = z.string().min(1).max(64)
 const phone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.')
 
 export const contact = z.object({
-  name: z.string().min(1).max(200),
+  name: needed(200, "The contact's name", "A contact's name"),
   /** Such as "Producer" or "Accounts". */
-  role: z.string().max(100),
-  email: z.string().email().max(200).nullable(),
+  role: text(100, "The contact's role"),
+  email: z.string().email("That email address doesn't look right.").max(200, 'The email address can be up to 200 characters.').nullable(),
   phone: phone.nullable(),
 })
 export type Contact = z.infer<typeof contact>
 
 export const client = z.object({
   id,
-  name: z.string().min(1).max(200),
-  contacts: z.array(contact).max(20),
-  notes: z.string().max(2000),
+  name: needed(200, "The client's name", "The client's name"),
+  contacts: z.array(contact).max(20, 'Up to 20 contacts, please.'),
+  notes: text(2000, 'The notes'),
 })
 export type Client = z.infer<typeof client>
 
 export const venue = z.object({
   id,
-  name: z.string().min(1).max(200),
+  name: needed(200, "The venue's name", "The venue's name"),
   /** As typed; an Eircode in it makes the map link exact. */
-  address: z.string().max(500),
+  address: text(500, 'The address'),
   /** Access, load-in, power, parking. */
-  notes: z.string().max(4000),
+  notes: text(4000, 'The notes'),
 })
 export type Venue = z.infer<typeof venue>
 
@@ -61,12 +62,12 @@ export const STOPPED: readonly ProjectStatus[] = ['cancelled', 'lost']
 
 export const project = z.object({
   id,
-  name: z.string().min(1).max(200),
+  name: needed(200, "The job's name", "The job's name"),
   clientId: id.nullable(),
   /** Where most of it happens; a phase can have its own. */
   venueId: id.nullable(),
   status: z.enum(PROJECT_STATUSES),
-  notes: z.string().max(4000),
+  notes: text(4000, 'The notes'),
 })
 export type Project = z.infer<typeof project> & {
   /**
@@ -85,12 +86,12 @@ export const MAX_PHASE_DAYS = 366
 export const phase = z.object({
   id,
   projectId: id,
-  name: z.string().min(1).max(100),
+  name: needed(100, "The phase's name", "The phase's name"),
   start: day,
   end: day,
   /** Null: the job's venue. */
   venueId: id.nullable(),
-  notes: z.string().max(2000),
+  notes: text(2000, 'The notes'),
   /**
    * Who crew ring on the day (ADR 0021): a person, whose name and number go
    * on the phase's call sheet for everyone on it. Missing on phases saved
@@ -117,7 +118,6 @@ const phaseNotTooLong = [
   (p: { start?: string; end?: string }) => !p.start || !p.end || phaseDays({ start: p.start, end: p.end }) <= MAX_PHASE_DAYS,
   { message: `A phase can be at most ${MAX_PHASE_DAYS} days.` },
 ] as const
-const somethingToChange = [(u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined), { message: 'Nothing to change.' }] as const
 
 export const jobCommandSchemas = {
   /** Saved whole, like a person: clients are edited rarely. */
@@ -140,7 +140,11 @@ export const jobCommandSchemas = {
     })
     .refine(...somethingToChange),
   'phase.add': phase.refine(...phaseFits).refine(...phaseNotTooLong),
-  /** Field by field, as for jobs. Its crew keep their own dates. */
+  /**
+   * Field by field, as for jobs. Its crew keep their own dates unless the
+   * dates change with `moveCrew`: then its open calls, and the days their
+   * offers hold, move by the same shift as the phase's start.
+   */
   'phase.update': z
     .object({
       id,
@@ -150,8 +154,11 @@ export const jobCommandSchemas = {
       venueId: phase.shape.venueId.optional(),
       notes: phase.shape.notes.optional(),
       contactId: phase.shape.contactId,
+      moveCrew: z.boolean().optional(),
     })
     .refine(...somethingToChange)
+    // Saying whether to move the crew isn't a change on its own.
+    .refine((u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && k !== 'moveCrew' && u[k] !== undefined), { message: 'Nothing to change.' })
     .refine(...phaseFits)
     .refine(...phaseNotTooLong),
   /** Refused while the phase has crew; cancel them first. */

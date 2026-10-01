@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { text, whole } from './plain.ts'
 import { MAX_QTY } from './stock.ts'
 
 /**
@@ -71,17 +72,17 @@ export const faultCommandSchemas = {
       kind: z.enum(FAULT_KINDS),
       assetId: id.nullable(),
       modelId: id,
-      qty: z.number().int().min(1).max(MAX_QTY),
+      qty: whole(1, MAX_QTY, 'How many'),
       projectId: id.nullable(),
       usable: z.boolean(),
-      note: z.string().max(2000),
+      note: text(2000, "What's wrong"),
       at: z.string().datetime({ offset: true }),
     })
     .refine((f) => f.assetId === null || f.qty === 1, { message: 'A numbered item is reported one at a time.' })
     .refine((f) => f.kind === 'damaged' || !f.usable, { message: "Missing kit can't go out." }),
   /** What's wrong, what's been done, and whether it can go out meanwhile. */
   'fault.update': z
-    .object({ id, usable: z.boolean().optional(), note: z.string().max(2000).optional(), repair: z.string().max(4000).optional() })
+    .object({ id, usable: z.boolean().optional(), note: text(2000, "What's wrong").optional(), repair: text(4000, 'The repair notes').optional() })
     .refine((u) => u.usable !== undefined || u.note !== undefined || u.repair !== undefined, { message: 'Nothing to change.' }),
   /** Done with: fixed, not faulty, found, or written off. Written off retires an item or takes counted kit off the count. */
   'fault.close': z.object({ id, outcome: z.enum(FAULT_OUTCOMES), at: z.string().datetime({ offset: true }) }),

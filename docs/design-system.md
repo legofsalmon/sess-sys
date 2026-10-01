@@ -119,6 +119,15 @@ in px too.
   and who to ring the next, with a red one. On paper it's black on
   white, one A4 page where it fits, only those who've said yes, and it
   says it's the office's copy. Not in Figma yet.
+- A refusal is shown where the action was
+  ([ADR 0023](adr/0023-audit-round-two-the-loops.md)): a line in the
+  **bad** tone under the form or button, read out as an alert, in a plain
+  sentence, never a browser alert; the form keeps what was typed. The top
+  bar counts what the server turned down ("1 not done", bad tone, outlined
+  when open) beside what's waiting, and opens the one list of them for
+  every area, with Dismiss. An "are you sure?" is a question in place: the
+  consequence in words in a warn line, the safe button first and focused,
+  the fields held still. Not in Figma yet.
 - Made-up data ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md))
   is named beside every screen's name in the top bar, "· made-up data" in
   the bold amber warn tone, on every phone while it's in. Deleting

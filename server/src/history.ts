@@ -181,7 +181,7 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look, left.get(r.id)),
+      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app'),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -287,9 +287,10 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
 /**
  * What an entry did, in words, as the History tab and the exported history
  * show it. `left` is the item as the command left it, for the ones that
- * give an item its number.
+ * give an item its number. `from` says whether a freelancer did it on their
+ * own link, for the few commands that read differently in their voice.
  */
-export function describe(command: string, a: Data, look: Look, left?: Data): string {
+export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar'): string {
   const product = (id: unknown) => text(look('product', id)?.name, 'an item')
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
@@ -345,6 +346,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       return `Saved ${text(a.name, 'someone')}'s details`
     case 'person.newLink':
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
+    case 'person.archive':
+      return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
+    case 'person.contact': {
+      // Which details changed, never what they are now: the history is read by every member of staff.
+      const parts: string[] = []
+      if (a.email !== undefined) parts.push('email address')
+      if (a.phone !== undefined) parts.push('phone number')
+      const who = person(a.id)
+      return from === 'link' ? `${who} changed their ${inWords(parts)}` : `Changed ${who}'s ${inWords(parts)}`
+    }
     case 'unavailability.add':
       return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${typeof a.note === 'string' && a.note ? ` (${clip(a.note)})` : ''}`
     case 'unavailability.remove': {
@@ -355,14 +366,39 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}`
     case 'call.cancel':
       return `Cancelled the call for ${call(a.id)}`
+    case 'call.update': {
+      const c = look('crewCall', a.id)
+      const parts: string[] = []
+      if (a.role !== undefined) parts.push(`role to ${text(a.role, 'a role')}`)
+      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? c?.start, a.end ?? c?.end)}`)
+      if (a.callTime !== undefined) parts.push(typeof a.callTime === 'string' ? `call time to ${a.callTime}` : 'no call time')
+      if (a.needed !== undefined) parts.push(`how many to ${a.needed}`)
+      if (a.dayRateCents !== undefined) parts.push(typeof a.dayRateCents === 'number' ? `day rate to ${euro(a.dayRateCents)}` : 'rate to agree')
+      if (a.details !== undefined) parts.push('the details')
+      if (a.replyBy !== undefined) parts.push(typeof a.replyBy === 'string' ? `reply by ${dayLabel(a.replyBy)}` : 'no reply-by day')
+      if (a.project !== undefined) parts.push(`job to ${text(a.project, 'a job')}`)
+      if (a.phase !== undefined) parts.push(typeof a.phase === 'string' && a.phase ? `phase to ${a.phase}` : 'no phase')
+      if (a.venue !== undefined) parts.push(typeof a.venue === 'string' && a.venue ? `venue to ${clip(a.venue)}` : 'no venue')
+      return `Changed the call for ${call(a.id)}: ${inWords(parts)}`
+    }
     case 'offer.send':
       return `Offered ${call(a.callId)} to ${person(a.personId)}${a.override ? ', despite a clash or a day off' : ''}`
     case 'offer.respond': {
       const o = offer(a.id)
       if (a.answer === 'decline') return `${o.who} declined ${o.what}`
       if (a.answer === 'counter') return `${o.who} asked for ${euro(a.counterRateCents as number)} a day for ${o.what}`
+      if (a.answer === 'pullOut') return `${o.who} can't make it any more: ${o.what}${typeof a.note === 'string' && a.note.trim() ? ` (${clip(a.note.trim())})` : ''}`
       return `${o.who} accepted ${o.what}${Array.isArray(a.days) && a.days.length ? `, ${daysLabel(a.days as string[])}` : ''}`
     }
+    case 'offer.seen': {
+      const o = offer(a.id)
+      const was = look('offer', a.id)?.status
+      if (was === 'pulled-out') return `Noted that ${o.who} can't make ${o.what}`
+      if (was === 'declined') return `Noted that ${o.who} declined ${o.what}`
+      return `Noted ${o.who}'s answer on ${o.what}`
+    }
+    case 'office.update':
+      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`
@@ -392,7 +428,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       const p = look('phase', a.id)
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a phase')}`)
-      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}`)
+      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}${a.moveCrew ? ', with its crew' : ''}`)
       if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : "venue to the job's")
       if (a.notes !== undefined) parts.push('the notes')
       if (a.contactId !== undefined) parts.push(a.contactId ? `the contact on the day to ${person(a.contactId)}` : 'no contact on the day')
