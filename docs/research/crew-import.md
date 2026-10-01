@@ -62,14 +62,15 @@ they are the person's profile the roadmap always planned
 1. **Department** (one of the eleven above, or none). The main grouping
    for the Crew tab and the person picker, which round three gives a
    search and a filter. Skills stay the finer grain.
-2. **Rank**: one number per person, higher meaning more preferred
-   (Colly, 1 October: a numerical value rather than preferred and
-   onboarded flags). 0 to 5, where the office can use the whole range.
-   The picker sorts a department by rank, highest first, and hides rank
-   0 unless asked. From the file: preferred becomes 3, onboarded but not
-   preferred 2, known but not onboarded 1, and an applicant nobody has
-   vetted 0. The office nudges a rank up or down from the person's
-   card as it gets to know them.
+2. **Level**: one number per person, higher meaning more preferred,
+   shown as "Level 1", "Level 2" and so on (Colly, 1 October: a
+   numerical value rather than preferred and onboarded flags). Levels 0
+   to 5, where the office can use the whole range. The picker sorts a
+   department by level, highest first, and hides level 0 unless asked.
+   From the file: preferred becomes level 3, onboarded but not preferred
+   level 2, known but not onboarded level 1, and an applicant nobody has
+   vetted level 0. The office moves a person up or down a level from
+   their card as it gets to know them.
 3. **Certificates**: first aider, manual handling, driving licence, each
    yes, no or unknown, with an optional expiry date and note. This is
    the start of the documents-with-expiry item; Safe Pass, working at
@@ -107,7 +108,7 @@ second email or phone a person has used.
   The file is personal data for 124 people, and the live app is open
   until the Google key is in, so the real list goes in only once sign-in
   is on.
-- **The eight applicants** come in at rank 0 with their notes, so the
+- **The eight applicants** come in at level 0 with their notes, so the
   queue of CVs lives where the rest does. Removing an
   applicant who isn't taken on is the right-to-erasure item, which
   should come before the first real deletion is needed.
@@ -121,7 +122,7 @@ second email or phone a person has used.
 
 About a day: the six model additions with their commands, history
 labels and export; the import step with its preview; the person card
-and the picker showing department, rank, certificates and company;
+and the picker showing department, level, certificates and company;
 tests; an ADR. Then the import itself takes an afternoon of checking.
 
 ## For Colly to confirm
