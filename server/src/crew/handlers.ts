@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { daysBetween, daysLabel, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
@@ -17,6 +17,7 @@ import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom
 
 type CrewCommand =
   | 'person.upsert'
+  | 'person.level'
   | 'person.newLink'
   | 'person.archive'
   | 'person.contact'
@@ -232,16 +233,53 @@ async function openCall(ctx: Ctx, callId: string) {
 
 export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'person.upsert'(ctx, a) {
-    // Only staff approve time off (ADR 0024); an edit from a version of the app that doesn't know the flag keeps it as it is.
-    const approvesLeave = a.kind === 'staff' ? (a.approvesLeave ?? null) : false
+    // Only staff approve time off (ADR 0024); an edit from a version of the app that doesn't know the flag keeps it as it is,
+    // and one that says nothing about the profile (ADR 0025) keeps that as it is too.
+    const was = await getPerson(ctx.tx, a.id)
+    const approvesLeave = a.kind === 'staff' ? (a.approvesLeave ?? was?.approvesLeave ?? false) : false
+    const department = a.department !== undefined ? a.department : (was?.department ?? null)
+    const level = a.level ?? was?.level ?? DEFAULT_LEVEL
+    const knownAs = a.knownAs !== undefined ? a.knownAs : (was?.knownAs ?? null)
+    const certificates = a.certificates ?? was?.certificates ?? {}
+    const company = a.company !== undefined ? a.company : (was?.company ?? null)
     await ctx.tx.query(
-      `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, coalesce($10::boolean, false))
+      `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave,
+                           department, level, known_as, certificates, company_name, company_vat_number, company_cro_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, kind = EXCLUDED.kind, email = EXCLUDED.email,
          phone = EXCLUDED.phone, skills = EXCLUDED.skills, day_rate_cents = EXCLUDED.day_rate_cents, notes = EXCLUDED.notes,
-         approves_leave = coalesce($10::boolean, people.approves_leave)`,
-      [a.id, a.name, a.kind, a.email, a.phone, JSON.stringify(a.skills), a.dayRateCents, a.notes, newLinkToken(), approvesLeave]
+         approves_leave = EXCLUDED.approves_leave, department = EXCLUDED.department, level = EXCLUDED.level, known_as = EXCLUDED.known_as,
+         certificates = EXCLUDED.certificates, company_name = EXCLUDED.company_name, company_vat_number = EXCLUDED.company_vat_number,
+         company_cro_number = EXCLUDED.company_cro_number`,
+      [
+        a.id,
+        a.name,
+        a.kind,
+        a.email,
+        a.phone,
+        JSON.stringify(a.skills),
+        a.dayRateCents,
+        a.notes,
+        newLinkToken(),
+        approvesLeave,
+        department,
+        level,
+        knownAs,
+        JSON.stringify(certificates),
+        company?.name ?? null,
+        company?.vatNumber ?? null,
+        company?.croNumber ?? null,
+      ]
     )
+    await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
+  },
+
+  async 'person.level'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    // The archived list is kept as it was, as offers are.
+    if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to change their level.` })
+    await ctx.tx.query('UPDATE people SET level = $2 WHERE id = $1', [a.id, a.level])
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
 

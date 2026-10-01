@@ -3,6 +3,95 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 1 October 2026: crew profiles and bringing in the list
+
+**Done**
+
+- The real crew list is a spreadsheet of 124 staff, freelancers and
+  applicants, and the app's person now holds all of it
+  ([Decision 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md)):
+  a department (free text, the known ones offered as you type), a level
+  from 0 to 5 shown as "Level 3" (Colly's call: one number in place of
+  preferred and onboarded, higher more preferred, 0 an applicant nobody
+  has vetted), the name they go by (used in the greeting on their link
+  and in every message the office is prompted with), first aid, manual
+  handling and driving licence as held, not held or unknown with an
+  expiry date, and the company a freelancer trades through with its VAT
+  and CRO numbers. Each is optional on the command, so an older version
+  of the app keeps what the server has.
+- The person's card shows it all, with a warning when a certificate has
+  run out, a Level select that moves them without opening the form
+  ("Moved Dara Quinn to Level 3" in the history), and "Worked": the jobs
+  they were booked on, built on each device from their bookings, newest
+  first, with a count. Past events from the spreadsheet aren't brought
+  in (Colly, 1 October): the list grows from here.
+- The Crew tab's list says the department and level on each person and
+  narrows to one department; the Offer to… picker sorts by department
+  then level, highest first, and keeps applicants out until "Show
+  applicants" is ticked.
+- **Bring in a list**, from a card on the Account tab: choose the
+  spreadsheet saved as a .csv, see every row as the app read it with the
+  counts at the top, fix a phone, email or name in place (checked again
+  by the same rules as you type) or skip the row, then bring them all in
+  at once. Phones in every shape the file has go into international
+  form; what can't be read is marked, never guessed. Rows match people
+  already here by email, then phone, so the file can go in again after
+  it's updated without doubling anyone; a matched person keeps the
+  office's level, day rate and kind, gains the file's skills and notes
+  once, and nothing in the app is erased by a blank cell, down to a
+  certificate's expiry date and a VAT number. One bad row refuses the
+  whole import, naming it, and nothing goes in.
+- Two reviewers read the build (a data lens and an app lens) and the
+  import was tightened before the real file goes near it: a row for
+  someone archived is marked and never revives them; a row whose email
+  is one person's and whose phone is another's, or a second row for one
+  person, is marked rather than guessed at; a phone fixed in place is
+  matched again on the device, and the server refuses a row whose match
+  isn't what the preview showed rather than overwriting someone unseen;
+  the fields on a row with a problem stay put as the problem clears
+  instead of vanishing mid-word; a second import of the same file sends
+  nothing for anyone it would leave as they are ("4 were already up to
+  date"), so the history doesn't gain 124 lines each time; "Bring in"
+  asks first, as the calendar import does; and the reader marks a UK
+  number typed locally, a day rate it can't read and a name over 200
+  characters, numbers rows by their line in the spreadsheet, and says
+  when a file's letters didn't survive the save.
+- The made-up people have departments and levels, a certificate in date
+  and one run out, Dara trading through a VAT-registered company, and
+  an applicant at Level 0.
+- Checked: typecheck; 80 shared tests (14 new: the CSV reader on quotes,
+  line breaks, Windows line endings, the byte-order mark and blank
+  lines; the phone normaliser on every shape and the ones it must mark;
+  a row read end to end; a row with problems fixed in place; matching
+  with what the office must decide marked; the counts; Worked from a
+  person's own first day); the server suite on PGlite (9 new: the
+  preview's matching by email then phone with an archived person marked,
+  bringing in with the union of skills, notes added once and cut to fit,
+  the level and rate kept, a certificate's expiry and the VAT and CRO
+  numbers kept, the same file again adding nobody and sending nothing, a
+  bad row refusing the lot with nothing applied, a match the preview
+  didn't show refused, the history and export lines, the level's own
+  command and its plain refusals); the web build; the full browser suite
+  with a new test (from the Account tab, a small made-up file with a
+  company email, an unreadable phone and an applicant, the phone fixed in
+  place a key at a time with the field staying put, the question before
+  bringing them in, the Crew tab showing department and level, the
+  applicant hidden from the picker until asked for, and the same file
+  again adding nobody).
+
+**Next**
+
+- The afternoon of checking the real file in the preview: the phones the
+  reader marks, the email with the typo, the four people with no way to
+  reach them, and what the three blank departments should be. It goes
+  in after Start fresh, and only once sign-in is on: until then the app
+  is open to anyone with its address, and the file is personal data for
+  124 people.
+- Later items written into the ADR: Safe Pass, working at height and
+  IPAF; an expired required certificate blocking an assignment; a text
+  search in the picker that matches jobs worked; the stock list through
+  the same step; removing an applicant who isn't taken on.
+
 ## 1 October 2026: the Blueprint's hero
 
 **Done**
@@ -37,6 +126,7 @@ waiting on someone.
 - The hero's facts (lines of code, tests, decisions) are typed into the
   page; the build script could fill them from the repo so they never
   drift.
+
 
 ## 1 October 2026: staff leave and time in lieu
 

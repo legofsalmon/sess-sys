@@ -21,6 +21,7 @@ export async function ask<T>(path: string, init?: RequestInit): Promise<T> {
     markSignedOut()
     throw new Error('Signed out.')
   }
+  if (res.status === 413) throw new Error('That is too big to send: up to 5 MB.')
   if (!res.ok) {
     const { error } = (await res.json().catch(() => ({}))) as { error?: string }
     throw new Error(error ?? `The server answered ${res.status}. Try again in a minute.`)

@@ -1,5 +1,7 @@
 # Bringing in the crew list
 
+*Built, 1 October 2026: see [ADR 0025](../adr/0025-crew-profiles-and-bringing-in-the-list.md).*
+
 Colly's crew database (a spreadsheet, "V3", 124 people, 17 columns) is
 the real list of staff, freelancers and applicants. This is what it
 holds, how it fits the app's model of a person, what the model needs

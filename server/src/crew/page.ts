@@ -1,4 +1,4 @@
-import { dayLabel, daysLabel, eachDay, euro, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
+import { dayLabel, daysLabel, eachDay, euro, firstName, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { officeContact, telHref, type OfficeDetails } from '@sh/shared'
 
 /**
@@ -185,7 +185,7 @@ export function renderPage(d: PageData): string {
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
   const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
   const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
-  const first = d.person.name.split(' ')[0]
+  const first = firstName(d.person)
   // A message about an offer sits in that offer's card, one about their details in that section; any other at the top.
   const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
 

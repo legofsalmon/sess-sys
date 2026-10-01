@@ -235,7 +235,13 @@ describe('the week by person', () => {
       linkToken: '',
       archived: false,
       approvesLeave: false,
+      department: null,
+      level: 1,
+      knownAs: null,
+      certificates: {},
+      company: null,
       pending: false,
+      worked: [],
     }
     const call = (id: string, project: string, status: CallView['status'], offers: [string, CallView['offers'][number]['status']][]): CallView => ({
       id,

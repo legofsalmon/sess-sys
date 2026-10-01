@@ -1,4 +1,4 @@
-import { daysLabel, eachDay, type OfferStatus } from './crew.ts'
+import { daysLabel, eachDay, firstName, type OfferStatus } from './crew.ts'
 import { mapLink, type Contact, type Venue } from './jobs.ts'
 import { DEPARTMENTS, DEPARTMENT_LABELS, type Department } from './stock.ts'
 
@@ -214,8 +214,8 @@ export function callSheetText(s: CallSheet): string {
 }
 
 /** Sending someone the sheet on their private link, by WhatsApp, text or email. */
-export function sheetMessage(p: { name: string }, s: Pick<CallSheet, 'job' | 'phase' | 'when'>, link: string): { text: string; subject: string } {
-  const first = p.name.split(' ')[0]
+export function sheetMessage(p: { name: string; knownAs?: string | null }, s: Pick<CallSheet, 'job' | 'phase' | 'when'>, link: string): { text: string; subject: string } {
+  const first = firstName(p)
   return {
     text: `Hi ${first}, here's the call sheet for ${s.job}${s.phase ? ` (${s.phase})` : ''}, ${s.when}: who's on, where, and who to ring on the day.\n${link}`,
     subject: `Call sheet: ${s.job}, ${s.when}`,

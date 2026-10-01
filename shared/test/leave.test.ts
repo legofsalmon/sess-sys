@@ -26,6 +26,11 @@ const person = (id: string, name: string, extra: Partial<Person> = {}): Person =
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
   approvesLeave: false,
+  department: null,
+  level: 1,
+  knownAs: null,
+  certificates: {},
+  company: null,
   ...extra,
 })
 const request = (id: string, personId: string, start: string, end: string, extra: Partial<LeaveRequest> = {}): LeaveRequest => ({

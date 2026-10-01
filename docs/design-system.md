@@ -141,6 +141,30 @@ in px too.
   the primary button and Decline opening a reason field in place. In the
   planner a public holiday is a faint band in the off tone, a shade
   deeper than a weekend, named under its date. Not in Figma yet.
+- A person's level ([ADR 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md))
+  is always written "Level 3", never a bare number, in the crew list,
+  the Offer to… picker and the history ("Moved Dara Quinn to Level 3");
+  Level 0 is an applicant, written "Level 0 (applicant)" in the crew
+  list and the card's select, and out of the picker until "Show
+  applicants" is ticked. The card lists the certificates held in muted
+  text and says one that has run out in the **bad** tone, as an overdue
+  test on an item is said. The form keeps the profile under a "More"
+  fold, open when any of it is set.
+- Bringing in the crew list ([ADR 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md))
+  is a card per row: the name in bold with Skip on the right, the kind,
+  department, level and skills in one muted line, "Updates Dara Quinn
+  (matched by email)" where it would, and for a row the app couldn't
+  read, the name, email and phone as fields that stay for the rest of
+  the preview, with each problem in the warn tone under the field it's
+  about, clearing as it's fixed; a problem about the row as a whole
+  (someone archived, a second row for one person) is a warn line under
+  the facts. The counts sit in one line at the top ("3 rows read: 2 new
+  people, 1 with a problem.") and the one button in the bar above the
+  tabs says what it will do ("Bring in 3 people"), disabled while any
+  row not skipped still has a problem; tapped, it asks in the same bar
+  ("3 new people added. Each can be edited afterwards, but this can't be
+  undone in one go." with Bring them in and Not yet), as the calendar
+  import does. Not in Figma yet.
 - Made-up data ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md))
   is named beside every screen's name in the top bar, "· made-up data" in
   the bold amber warn tone, on every phone while it's in. Deleting

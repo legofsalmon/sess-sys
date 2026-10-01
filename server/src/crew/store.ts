@@ -1,9 +1,9 @@
-import type { CrewCall, Offer, Person, Unavailability } from '@sh/shared'
+import { DEFAULT_LEVEL, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave`
+const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
@@ -22,6 +22,12 @@ export const toPerson = (r: Row): Person => ({
   linkToken: r.link_token,
   archived: r.archived ?? false,
   approvesLeave: r.approves_leave ?? false,
+  department: r.department ?? null,
+  level: r.level ?? DEFAULT_LEVEL,
+  knownAs: r.known_as ?? null,
+  certificates: r.certificates ?? {},
+  // A company is there when any of its three columns is.
+  company: r.company_name || r.company_vat_number || r.company_cro_number ? { name: r.company_name ?? '', vatNumber: r.company_vat_number ?? null, croNumber: r.company_cro_number ?? null } : null,
 })
 export const toCall = (r: Row): CrewCall => ({
   id: r.id,

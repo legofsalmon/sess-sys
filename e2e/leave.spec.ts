@@ -162,7 +162,7 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await eoin.goto('/#crew')
   await expect(eoin.getByRole('status')).toHaveText('Up to date')
   const call = eoin.getByRole('article').filter({ hasText: `Leave check ${id}` })
-  await call.getByLabel('Offer to').selectOption({ label: `Nora Walsh ${id} ⚠` })
+  await call.getByLabel('Offer to').selectOption({ label: `Nora Walsh ${id} · Level 1 ⚠` })
   await expect(call.locator('.warn')).toContainText(`Marked unavailable ${FROM} to ${MIDDLE} (Annual leave)`)
   await expect(call.getByRole('button', { name: 'Offer', exact: true })).toBeDisabled()
 })

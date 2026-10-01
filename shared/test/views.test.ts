@@ -67,7 +67,7 @@ const phase = (id: string, projectId: string, name: string, start: string, end: 
 describe('crew: each call’s offers, gathered once', () => {
   it('match looking through every offer for every call, in order, with the same days held', () => {
     const rnd = random(7)
-    const people: Person[] = NAMES.map((name, i) => ({ id: `p${i}`, name, kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '', linkToken: '', archived: false, approvesLeave: false }))
+    const people: Person[] = NAMES.map((name, i) => ({ id: `p${i}`, name, kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '', linkToken: '', archived: false, approvesLeave: false, department: null, level: 1, knownAs: null, certificates: {}, company: null }))
     const calls: CrewCall[] = Array.from({ length: 60 }, (_, i) => {
       const start = 1 + Math.floor(rnd() * 25)
       return {
@@ -111,7 +111,8 @@ describe('crew: each call’s offers, gathered once', () => {
       }
     })
     const view = crewView({ person: table(people), crewCall: table(calls), offer: table(offers) }, [], 0)
-    const person = new Map(people.map((p) => [p.id, { ...p, pending: false }]))
+    // Each offer carries the view's own person, with what they've worked (ADR 0025).
+    const person = new Map(view.people.map((p) => [p.id, p]))
     // The same order the view uses: live answers first, then the ones that are over.
     const rank = (s: Offer['status']) => ['confirmed', 'accepted', 'countered', 'offered', 'pulled-out', 'declined', 'filled', 'cancelled'].indexOf(s)
     let seen = 0

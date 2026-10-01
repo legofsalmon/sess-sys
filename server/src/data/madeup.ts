@@ -33,7 +33,10 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   check" beside the decline;
  * - staff leave (ADR 0024): the staff's allowances for this year, Aoife
  *   approving time off, Cian waiting on a week's leave and a day in lieu,
- *   and Orla's week last month approved, so her days off are in the planner.
+ *   and Orla's week last month approved, so her days off are in the planner;
+ * - profiles (ADR 0025): departments and levels, a certificate in date and
+ *   one run out, a freelancer trading through a VAT-registered company, and
+ *   an applicant at Level 0.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -95,8 +98,8 @@ export function madeUpData(today: string): Mutation[] {
   const gala = job('Autumn Gala', brightwater, northbank.id, 'confirmed')
   const galaShow = phase(gala, 'Show', -10, -9)
 
-  // Crew: staff, freelancers, and some days off.
-  const person = (name: string, kind: 'staff' | 'freelancer', skills: string[], euroADay: number | null, approvesLeave = false) =>
+  // Crew: staff, freelancers and an applicant, with their departments and levels (ADR 0025), and some days off.
+  const person = (name: string, kind: 'staff' | 'freelancer', department: string, level: number, skills: string[], euroADay: number | null, more: Partial<CommandInput<'person.upsert'>> = {}) =>
     add('person.upsert', {
       id: newId(),
       name,
@@ -106,19 +109,26 @@ export function madeUpData(today: string): Mutation[] {
       skills,
       dayRateCents: euroADay === null ? null : euroADay * 100,
       notes: '',
-      approvesLeave,
+      department,
+      level,
+      ...more,
     }).id
-  const aoife = person('Aoife Brennan', 'staff', ['Crew chief', 'Audio'], null, true)
-  const cian = person('Cian Murphy', 'staff', ['Warehouse', 'Driver'], null)
-  const orla = person('Orla Hayes', 'staff', ['Lighting'], null)
-  const dara = person('Dara Quinn', 'freelancer', ['Sound No.1', 'Audio'], 320)
-  const eimear = person('Eimear Nolan', 'freelancer', ['Monitors', 'Audio'], 300)
-  const fionn = person('Fionn Gallagher', 'freelancer', ['LX op', 'Lighting'], 280)
-  const grainne = person('Gráinne Power', 'freelancer', ['Video', 'Camera'], 300)
-  const padraig = person('Pádraig Kenny', 'freelancer', ['Rigger'], 290)
-  const roisin = person('Róisín Farrell', 'freelancer', ['Rigger'], 290)
-  const tadhg = person('Tadhg Brady', 'freelancer', ['Stagehand', 'Driver'], 200)
-  const laoise = person('Laoise Keane', 'freelancer', ['Stagehand'], 200)
+  const held = (expires: string | null) => ({ held: true, expires, note: '' })
+  const aoife = person('Aoife Brennan', 'staff', 'Production', 3, ['Crew chief', 'Audio'], null, { approvesLeave: true })
+  const cian = person('Cian Murphy', 'staff', 'Transport', 2, ['Warehouse', 'Driver'], null, { certificates: { 'driving-licence': held(null), 'manual-handling': held(day(400)) } })
+  const orla = person('Orla Hayes', 'staff', 'LX', 2, ['Lighting'], null)
+  // Dara trades through a company and charges VAT, which the invoicing work reads.
+  const dara = person('Dara Quinn', 'freelancer', 'Audio', 3, ['Sound No.1', 'Audio'], 320, { company: { name: 'Quinn Audio Ltd', vatNumber: 'IE0000001A', croNumber: '000001' } })
+  const eimear = person('Eimear Nolan', 'freelancer', 'Audio', 2, ['Monitors', 'Audio'], 300, { knownAs: 'Eims' })
+  const fionn = person('Fionn Gallagher', 'freelancer', 'LX', 3, ['LX op', 'Lighting'], 280)
+  const grainne = person('Gráinne Power', 'freelancer', 'Video', 2, ['Video', 'Camera'], 300)
+  // Pádraig's first aid is in date; Tadhg's manual handling ran out last month, which his card warns about.
+  const padraig = person('Pádraig Kenny', 'freelancer', 'Rigger', 3, ['Rigger'], 290, { certificates: { 'first-aid': held(day(300)) } })
+  const roisin = person('Róisín Farrell', 'freelancer', 'Rigger', 2, ['Rigger'], 290)
+  const tadhg = person('Tadhg Brady', 'freelancer', 'Transport', 1, ['Stagehand', 'Driver'], 200, { certificates: { 'manual-handling': held(day(-30)), 'driving-licence': held(null) } })
+  const laoise = person('Laoise Keane', 'freelancer', 'Production', 1, ['Stagehand'], 200)
+  // An applicant nobody has vetted: out of the Offer to… picker until "Show applicants" is ticked.
+  person('Saoirse Daly', 'freelancer', 'Audio', 0, [], null, { notes: 'New applicant, CV received, not yet vetted.' })
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
 
   // Staff leave (ADR 0024). A week counted from today, moved a week on when it would cross the year end, since a request belongs to one year.
