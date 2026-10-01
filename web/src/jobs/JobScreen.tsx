@@ -5,6 +5,7 @@ import {
   eachDay,
   irishToday,
   mapLink,
+  movedCallSpan,
   newId,
   phaseOnCalendar,
   phaseOnlyGrew,
@@ -327,7 +328,7 @@ function Phase({
         </a>
         <span>{contact ? `Contact on the day: ${contact.name}` : 'No contact on the day yet'}</span>
       </div>
-      {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} />}
+      {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
       {outside.map((c) => (
         <p className="warn-line" key={c.id}>
           The {c.role} crew are asked for {daysLabel(c.days)}, outside {phase.name}.
@@ -340,13 +341,25 @@ function Phase({
   )
 }
 
-function EditPhase({ phase, view, onDone }: { phase: PhaseView; view: View; onDone: () => void }) {
+function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: View; onDone: () => void; onTell: (share: Share | undefined) => void }) {
   const { venues } = view.jobs
   const [f, setF] = useState({ name: phase.name, start: phase.start, end: phase.end, venue: phase.venueId ? (phase.venue?.name ?? '') : '', notes: phase.notes })
   // A change of dates to a phase with crew waits here until the office says whether the crew move too.
   const [ask, setAsk] = useState<CommandInput<'phase.update'> | undefined>()
   const openCalls = phase.calls.filter((c) => c.status === 'open')
-  const send = (changes: CommandInput<'phase.update'>) => void act(() => client.mutate('phase.update', changes)).then(onDone, (err: Error) => alert(err.message))
+  // Everyone on the phase's open calls, with the days the move gives each call. Their own days move with it, so the message gives the call's and the page has the rest.
+  const movedPeople = (changes: CommandInput<'phase.update'>) => {
+    const to = { start: changes.start ?? phase.start, end: changes.end ?? phase.end }
+    return openCalls.flatMap((c) => {
+      const span = movedCallSpan(c, phase, to)
+      return peopleOn({ ...c, ...span, days: eachDay(span.start, span.end) }).map((t) => ({ ...t, context: { ...t.context, days: undefined } }))
+    })
+  }
+  const send = (changes: CommandInput<'phase.update'>) =>
+    void act(() => client.mutate('phase.update', changes)).then(() => {
+      onDone()
+      if (changes.moveCrew) onTell(promptFor('phase-moved', movedPeople(changes)))
+    }, (err: Error) => alert(err.message))
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return

@@ -187,7 +187,8 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
   const first = (days: object) => Object.keys(days).sort()[0] ?? ''
   const jobs = [...lanes.values()].sort((a, b) => first(a.days).localeCompare(first(b.days)) || a.name.localeCompare(b.name))
 
-  const people = view.crew.people.map((person): PersonLane => ({ person, days: {} }))
+  // Archived people have left: no lane, even with "Show everyone".
+  const people = view.crew.people.filter((p) => !p.archived).map((person): PersonLane => ({ person, days: {} }))
   const byId = new Map(people.map((l) => [l.person.id, l]))
   const at = (lane: PersonLane, day: string) => (lane.days[day] ??= { work: [], away: null, problem: null, severity: null })
   for (const c of calls) {

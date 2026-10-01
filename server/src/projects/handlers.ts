@@ -39,7 +39,11 @@ async function checkVenue(ctx: Ctx, id: string | null | undefined) {
   if (id && !(await getVenue(ctx.tx, id))) throw new Refused({ code: 'not-found', message: 'That venue no longer exists.' })
 }
 async function checkContact(ctx: Ctx, id: string | null | undefined) {
-  if (id && !(await getPerson(ctx.tx, id))) throw new Refused({ code: 'not-found', message: "That person isn't in the app any more." })
+  if (!id) return
+  const person = await getPerson(ctx.tx, id)
+  if (!person) throw new Refused({ code: 'not-found', message: "That person isn't in the app any more." })
+  // Someone who has left can't be the contact on the day; a phase that already names them keeps them until it's changed.
+  if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived; pick someone else as the contact.` })
 }
 
 /**

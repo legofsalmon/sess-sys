@@ -274,7 +274,8 @@ describe('the week by person', () => {
       })),
     })
     const crew: CrewView = {
-      people: [aoife],
+      // Someone who has left gets no lane, even with "Show everyone".
+      people: [aoife, { ...aoife, id: 'p2', name: 'Niall Kerr', archived: true }],
       calls: [
         call('c1', 'Web Summit', 'open', [['o1', 'confirmed']]),
         call('c2', 'Electric Picnic', 'open', [['o2', 'accepted']]),
@@ -288,6 +289,7 @@ describe('the week by person', () => {
     expect(week.people[0]!.days['2031-03-04']).toMatchObject({ severity: 'clash', problem: 'Booked on Web Summit and Electric Picnic' })
     expect(week.people[0]!.days['2031-03-04']!.work.map((w) => w.job)).toEqual(['Web Summit', 'Electric Picnic'])
     expect(week.jobs.map((l) => l.name)).toEqual(['Electric Picnic', 'Fairview', 'Nissan launch', 'Web Summit'])
+    expect(week.people.map((l) => l.person.name)).toEqual(['Aoife Byrne'])
   })
 })
 

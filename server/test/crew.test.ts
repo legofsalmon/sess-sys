@@ -2,6 +2,7 @@ import { feedCodeFor, feedPath, MemoryStorage, newId, SyncClient, type CommandIn
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
+import { readApp } from '../src/calendar/import.ts'
 import { pgliteDb } from '../src/db.ts'
 import { IPHONE, server as signedIn, staff } from './people.ts'
 
@@ -468,6 +469,9 @@ describe('changing a call', () => {
     await client.sync()
     expect(client.view().crew.calls[0]).toMatchObject({ pending: false, start: '2026-10-03', end: '2026-10-05' })
     expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ days: ['2026-10-03', '2026-10-04', '2026-10-05'], dayRateCents: 30000 })
+  })
+})
+
 describe('telling the office', () => {
   it('keeps a decline for the office to note, and says so in the history', async () => {
     // A decline leaves a call short; it waits in "Answers to check" (seenAt null) until the office taps Noted.
@@ -676,6 +680,28 @@ describe('correcting people (audit finding 7)', () => {
 
     const page = await colly.history()
     expect(page.entries.filter((e) => e.command === 'person.archive').map((e) => e.what)).toEqual(['Brought Aoife Byrne back', 'Archived Aoife Byrne', 'Archived Aoife Byrne'])
+  })
+
+  it("keeps an archived person off the contact-on-the-day list and out of the calendar import's matching", async () => {
+    // Being the contact isn't a booking, so archiving goes through; but nobody can name them as a contact afterwards,
+    // a phase that already does keeps them until it's changed, and the import stops matching their email.
+    const db = await pgliteDb()
+    const app = await buildApp({ db })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    const aoife = await person(app, 'Aoife Byrne')
+    await send(app, 'project.create', { id: 'j1', name: 'Nissan launch', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+    await send(app, 'phase.add', { id: 'ph1', projectId: 'j1', name: 'Show', start: '2030-10-02', end: '2030-10-02', venueId: null, notes: '', contactId: aoife.id })
+    await send(app, 'phase.add', { id: 'ph2', projectId: 'j1', name: 'Build', start: '2030-10-01', end: '2030-10-01', venueId: null, notes: '', contactId: null })
+    expect((await send(app, 'person.archive', { id: aoife.id, archived: true })).status).toBe('applied')
+
+    const refusal = { status: 'rejected', reason: { code: 'conflict', message: 'Aoife Byrne has been archived; pick someone else as the contact.' } }
+    expect(await send(app, 'phase.update', { id: 'ph2', contactId: aoife.id })).toMatchObject(refusal)
+    expect(await send(app, 'phase.add', { id: 'ph3', projectId: 'j1', name: 'Out', start: '2030-10-03', end: '2030-10-03', venueId: null, notes: '', contactId: aoife.id })).toMatchObject(refusal)
+    expect((await entity<{ contactId: string | null }>(app, 'phase', 'ph1')).contactId).toBe(aoife.id)
+    expect((await readApp(db, '2030-10-01', '2030-10-31')).people.map((p) => p.id)).not.toContain(aoife.id)
   })
 
   it('refuses to archive someone with an open offer or a booking from today on, naming the job', async () => {

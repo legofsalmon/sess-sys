@@ -89,10 +89,11 @@ export function sourceEvent(ev: GoogleEvent): SourceEvent {
   }
 }
 
-/** What the app already holds that events could match: everyone, every venue, jobs near those days, and what came in before. */
-async function readApp(q: Queryable, from: string, to: string): Promise<AppData> {
+/** What the app already holds that events could match: everyone still here, every venue, jobs near those days, and what came in before. Exported for the tests. */
+export async function readApp(q: Queryable, from: string, to: string): Promise<AppData> {
   // One after another: inside a transaction they share one connection.
-  const people = await q.query<{ id: string; name: string; email: string | null }>('SELECT id, name, email FROM people ORDER BY id')
+  // Someone who has left isn't matched by email, so an old calendar can't book them again.
+  const people = await q.query<{ id: string; name: string; email: string | null }>('SELECT id, name, email FROM people WHERE NOT archived ORDER BY id')
   const venues = await q.query<{ id: string; name: string; address: string }>('SELECT id, name, address FROM venues ORDER BY id')
   const jobs = await q.query<AppData['jobs'][number]>(
     `SELECT p.id, p.name, p.status, p.venue_id AS "venueId", p.source_calendar AS "sourceCalendar",

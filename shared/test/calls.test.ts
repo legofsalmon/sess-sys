@@ -42,6 +42,7 @@ const offer = (id: string, personId: string, status: Offer['status'], days: stri
   respondedAt: null,
   respondedVia: null,
   override: false,
+  seenAt: null,
 })
 
 const build: Phase = { id: 'build', projectId: 'nissan', name: 'Build', start: '2026-10-07', end: '2026-10-08', venueId: null, notes: '', contactId: null }

@@ -398,7 +398,7 @@ export function CallCard({
       )}
 
       {open && !filled && <OfferForm call={call} crew={crew} onShare={onShare} />}
-      {editing && <EditCall call={call} onDone={() => setEditing(false)} />}
+      {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
       <div className="actions end">
         {call.projectId && !inJob && (
           <a className="link" href={`#jobs/${call.projectId}`}>
@@ -429,7 +429,33 @@ export function CallCard({
  * to the offers out: booked days move with the call, and a new rate
  * reaches only offers nobody has answered.
  */
-function EditCall({ call, onDone }: { call: CallView; onDone: () => void }) {
+/** The same person, told the call's days rather than their own: after a date change their own days have moved too, and the page has the detail. */
+const forCallDays = (t: TellTo): TellTo => ({ ...t, context: { ...t.context, days: undefined } })
+
+/** What the crew would notice; how many are needed and the reply-by date aren't worth a message. */
+const NOTICED = ['role', 'start', 'end', 'callTime', 'dayRateCents', 'details', 'project', 'phase', 'venue'] as const
+
+/** The call as the change leaves it, for the message to the people on it; undefined when nobody would notice. */
+function afterChange(call: CallView, changes: CommandInput<'call.update'>): CallView | undefined {
+  if (!NOTICED.some((k) => changes[k] !== undefined)) return undefined
+  const start = changes.start ?? call.start
+  const end = changes.end ?? call.end
+  return {
+    ...call,
+    role: changes.role ?? call.role,
+    start,
+    end,
+    days: eachDay(start, end),
+    callTime: changes.callTime === undefined ? call.callTime : changes.callTime,
+    dayRateCents: changes.dayRateCents === undefined ? call.dayRateCents : changes.dayRateCents,
+    details: changes.details ?? call.details,
+    project: changes.project ?? call.project,
+    phase: changes.phase ?? call.phase,
+    venue: changes.venue ?? call.venue,
+  }
+}
+
+function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => void; onSaved?: (after: CallView, datesMoved: boolean) => void }) {
   const tied = !!call.projectId
   const [f, setF] = useState({
     project: call.project,
@@ -468,7 +494,11 @@ function EditCall({ call, onDone }: { call: CallView; onDone: () => void }) {
       if (f.venue.trim() !== call.venue) changes.venue = f.venue.trim()
     }
     if (Object.keys(changes).length === 1) return onDone()
-    void act(() => client.mutate('call.update', changes)).then(onDone, (err: Error) => alert(err.message))
+    void act(() => client.mutate('call.update', changes)).then(() => {
+      onDone()
+      const after = afterChange(call, changes)
+      if (after) onSaved?.(after, changes.start !== undefined || changes.end !== undefined)
+    }, (err: Error) => alert(err.message))
   }
   return (
     <form className="grid-form" onSubmit={save} aria-label={`Change the call for ${call.role}`}>
