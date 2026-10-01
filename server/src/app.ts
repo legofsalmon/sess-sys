@@ -2,7 +2,7 @@ import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
@@ -116,7 +116,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.decorate('calendar', calendarSync)
   /** Something changed in the app: devices pull it, and the calendar catches up. */
   const changed = () => {
-    void poke()
+    // A poke that fails (the database hiccuping right after a push, say) is
+    // the server's own trouble: the push has already answered, and devices
+    // pull on their own clock anyway. Left unhandled, it would stop the server.
+    poke().catch((err) => {
+      app.log.error({ err }, 'Could not tell devices about a change')
+      reportError(err, { area: 'poke' })
+    })
     calendarSync?.kick()
   }
 
@@ -125,6 +131,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook('onError', async (req, _reply, err) => {
     if ((err.statusCode ?? 500) < 500) return
     reportError(err, { route: req.routeOptions.url ?? 'unknown', method: req.method })
+  })
+
+  // What goes back when a request fails on the server: never the error's own
+  // words, which could be Postgres's, with a value from the request in them.
+  // A request turned away (400, 401, 404) keeps Fastify's answer saying why.
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    const status = err.statusCode ?? 500
+    if (status < 500) {
+      reply.send(err)
+      return
+    }
+    req.log.error({ req, res: reply, err }, err.message)
+    reply.code(status).send({ error: 'Something went wrong on the server.' })
   })
 
   registerAuth(app, db, auth)
