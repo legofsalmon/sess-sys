@@ -39,7 +39,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   const call = office.getByRole('article').filter({ hasText: 'Electric Picnic' })
-  await call.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne (audio, monitors)' })
+  await call.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne · Level 1 (audio, monitors)' })
   await call.getByRole('button', { name: 'Offer', exact: true }).click()
   const share = office.getByRole('region', { name: 'Send offer to Aoife Byrne' })
   await expect(share.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\/353871234567\?text=/)

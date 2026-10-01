@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { dayLabel, daysLabel, euro, type CrewCall, type Offer, type Person } from './crew.ts'
+import { dayLabel, daysLabel, euro, firstName, type CrewCall, type Offer, type Person } from './crew.ts'
 import { day } from './day.ts'
 import { EURO_HINT } from './money.ts'
 import { euroCents, text } from './plain.ts'
@@ -127,8 +127,8 @@ export function noTimesheetReason(
 }
 
 /** Asking for a timesheet, for WhatsApp, a text or an email. */
-export function timesheetMessage(p: Pick<Person, 'name'>, c: Pick<CrewCall, 'project' | 'phase'>, link: string): { text: string; subject: string } {
-  const first = p.name.split(' ')[0]
+export function timesheetMessage(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>, c: Pick<CrewCall, 'project' | 'phase'>, link: string): { text: string; subject: string } {
+  const first = firstName(p)
   const job = `${c.project}${c.phase ? ` (${c.phase})` : ''}`
   return {
     text: `Hi ${first}, could you send your timesheet for ${job}? Tick the days you worked and add any extras, such as parking or mileage, here: ${link}`,

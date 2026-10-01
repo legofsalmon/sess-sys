@@ -100,6 +100,19 @@ const MIGRATIONS: string[] = [
   ALTER TABLE unavailability DROP CONSTRAINT IF EXISTS unavailability_source_check;
   ALTER TABLE unavailability ADD CONSTRAINT unavailability_source_check CHECK (source IN ('ops', 'self', 'calendar', 'leave'));
   `,
+  // The profile (ADR 0025): the department, the level (0 an applicant, 1
+  // known, higher more preferred), the name they go by, certificates by
+  // kind as JSON, and the company they trade through. Older rows read as
+  // Level 1 with nothing else set.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS department text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 1 CHECK (level BETWEEN 0 AND 5);
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS known_as text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS certificates jsonb NOT NULL DEFAULT '{}';
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS company_name text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS company_vat_number text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS company_cro_number text;
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

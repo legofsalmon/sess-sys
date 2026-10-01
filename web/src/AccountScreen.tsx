@@ -4,15 +4,17 @@ import { Confirm } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
+import { ImportPeopleScreen } from './crew/ImportPeople.tsx'
 import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
-import { MadeUp } from './jobs/common.tsx'
+import { ImportPeopleCard } from './ImportPeopleCard.tsx'
+import { MadeUp, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { useNotDone } from './problems.tsx'
 import { client, storage } from './sync.ts'
 
-/** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, and the device's own sync state. */
+/** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, bringing in the crew list, and the device's own sync state. */
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -23,12 +25,15 @@ function useView(): View {
 export function AccountScreen() {
   const auth = useAuth()
   const view = useView()
+  const hash = useHash()
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
   // Signing out with changes still waiting asks first, in the card.
   const [asking, setAsking] = useState(false)
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
+  // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
+  if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
 
   const out = async () => {
     setAsking(false)
@@ -117,6 +122,7 @@ export function AccountScreen() {
           <BackupsCard />
           <ExportCard />
           <DataCard view={view} />
+          <ImportPeopleCard />
         </>
       )}
 

@@ -23,6 +23,59 @@ const time = z.string().regex(/^\d{2}:\d{2}$/, 'The call time is a time of day, 
 /** Money in euro cents, so sums never drift. */
 const cents = euroCents(100_000_00, 'A day rate')
 
+/**
+ * The profile (ADR 0025): the department, the level, the name they go by,
+ * their certificates and the company they trade through.
+ */
+
+/** The departments the form offers as you type. Free text, so a new one needs no change here. */
+export const CREW_DEPARTMENTS = ['Audio', 'LX', 'Video', 'Backline', 'Laser', 'Transport', 'Production', 'LED Tech', 'Rigger', 'Stage Manager', 'SFX'] as const
+
+/** 0 is an applicant nobody has vetted; 1 is known; higher is more preferred. */
+export const LEVELS = [0, 1, 2, 3, 4, 5] as const
+export const APPLICANT_LEVEL = 0
+export const DEFAULT_LEVEL = 1
+export const levelLabel = (level: number) => `Level ${level}`
+/** The level with "applicant" said for 0, where nothing else on the screen says it: the crew list, the card's select and the import's preview. */
+export const levelLine = (level: number) => (level === APPLICANT_LEVEL ? `${levelLabel(level)} (applicant)` : levelLabel(level))
+
+/** A department as typed, tidied: spaces collapsed, and a known one in its own spelling, so "audio" and "Audio" are one department. Null for nothing. */
+export function tidyDepartment(typed: string): string | null {
+  const s = typed.trim().replace(/\s+/g, ' ')
+  if (!s) return null
+  return CREW_DEPARTMENTS.find((d) => d.toLowerCase() === s.toLowerCase()) ?? s
+}
+
+/** How much the notes hold; the crew list's notes are added to fit it. */
+export const NOTES_LENGTH = 2000
+const level = whole(0, 5, 'The level')
+
+export const CERTIFICATE_KINDS = ['first-aid', 'manual-handling', 'driving-licence'] as const
+export type CertificateKind = (typeof CERTIFICATE_KINDS)[number]
+export const CERTIFICATE_LABELS: Record<CertificateKind, string> = {
+  'first-aid': 'First aid',
+  'manual-handling': 'Manual handling',
+  'driving-licence': 'Driving licence',
+}
+
+/** One certificate: held, not held, or unknown (null), with an expiry day where there is one. */
+export const certificate = z.object({ held: z.boolean().nullable(), expires: day.nullable(), note: text(200, 'The note') })
+export type Certificate = z.infer<typeof certificate>
+/** By kind; a kind that isn't there is unknown. */
+export const certificates = z.record(z.enum(CERTIFICATE_KINDS), certificate)
+export type Certificates = z.infer<typeof certificates>
+
+/** The company a freelancer trades through. VAT-registered is derived: a VAT number is held. */
+export const company = z.object({
+  name: text(200, 'The company name'),
+  vatNumber: text(40, 'The VAT number').nullable(),
+  croNumber: text(40, 'The CRO number').nullable(),
+})
+export type Company = z.infer<typeof company>
+
+const department = text(60, 'The department').nullable()
+const knownAs = text(100, 'The name they go by').nullable()
+
 export const person = z.object({
   id,
   name: needed(200, 'The name', 'A name'),
@@ -32,7 +85,7 @@ export const person = z.object({
   phone: z.string().max(40).nullable(),
   skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
   dayRateCents: cents.nullable(),
-  notes: text(2000, 'The notes'),
+  notes: text(NOTES_LENGTH, 'The notes'),
   /**
    * The secret in the person's private link. Set by the server, never by a
    * device. Anyone holding the link acts as this person, so it can be
@@ -52,8 +105,41 @@ export const person = z.object({
    * before it existed read as not.
    */
   approvesLeave: z.boolean().default(false),
+  /** The profile (ADR 0025). Each defaults so records synced before it existed read as not set. */
+  department: department.default(null),
+  level: level.default(DEFAULT_LEVEL),
+  knownAs: knownAs.default(null),
+  certificates: certificates.default({}),
+  company: company.nullable().default(null),
 })
 export type Person = z.infer<typeof person>
+
+/** What a person is called in a greeting or a message: the name they go by, or else the first word of their name. */
+export function firstName(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>): string {
+  return p.knownAs?.trim() || p.name.trim().split(/\s+/)[0] || p.name
+}
+
+/** A freelancer who charges VAT: the invoicing work reads this. */
+export function isVatRegistered(p: Pick<Person, 'company'>): boolean {
+  return !!p.company?.vatNumber?.trim()
+}
+
+/** "Trades as Quinn Audio Ltd, VAT-registered"; empty when there's no company. */
+export function companyLine(p: Pick<Person, 'company'>): string {
+  if (!p.company) return ''
+  const name = p.company.name.trim()
+  const parts = [name ? `Trades as ${name}` : 'Trades through a company', isVatRegistered(p) ? 'VAT-registered' : '']
+  return parts.filter(Boolean).join(', ')
+}
+
+export type CertificateState = 'held' | 'expired' | 'not-held' | 'unknown'
+
+/** What a certificate is worth today: held, held but past its expiry, not held, or not known. */
+export function certificateState(c: Certificate | undefined, today: string): CertificateState {
+  if (!c || c.held === null) return 'unknown'
+  if (!c.held) return 'not-held'
+  return c.expires !== null && c.expires < today ? 'expired' : 'held'
+}
 
 /** Days a person can't work. Offers for those days need an explicit override. */
 export const unavailability = z.object({
@@ -173,10 +259,18 @@ export const crewCommandSchemas = {
     phone: contactPhone,
     skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
     dayRateCents: cents.nullable(),
-    notes: text(2000, 'The notes'),
+    notes: text(NOTES_LENGTH, 'The notes'),
     /** Left out by versions of the app from before leave existed, which then keeps what the server has. */
     approvesLeave: z.boolean().optional(),
+    /** The profile (ADR 0025), likewise: anything left out keeps what the server has. */
+    department: department.optional(),
+    level: level.optional(),
+    knownAs: knownAs.optional(),
+    certificates: certificates.optional(),
+    company: company.nullable().optional(),
   }),
+  /** Move a person up or down a level from their card, so the history says so by name (ADR 0025). */
+  'person.level': z.object({ id, level }),
   /** Replace a person's private link, so the old one stops working. */
   'person.newLink': z.object({ id }),
   /**
@@ -358,8 +452,8 @@ export function euro(c: number | null | undefined): string {
  * The message ops paste into WhatsApp, SMS or email. Everything a freelancer
  * needs to decide is in it; the link is for answering.
  */
-export function offerMessage(p: Pick<Person, 'name'>, c: CrewCall, link: string): string {
-  const first = p.name.split(' ')[0]
+export function offerMessage(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>, c: CrewCall, link: string): string {
+  const first = firstName(p)
   const lines = [
     `Hi ${first}, are you free for ${c.project}${c.phase ? ` (${c.phase})` : ''}?`,
     `${c.role}, ${daysLabel(eachDay(c.start, c.end))}${c.callTime ? `, call ${c.callTime}` : ''}`,
@@ -443,8 +537,8 @@ const whenLine = (c: TellContext['call'], days?: readonly string[]) =>
 const rateLine = (c: TellContext['call']) => `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
 
 /** The message, its subject for an email, and what it is, for the panel's name ("Send confirmation to …"). */
-export function tellMessage(event: TellEvent, p: Pick<Person, 'name'>, ctx: TellContext, link: string): { text: string; subject: string; what: string } {
-  const first = p.name.split(' ')[0]
+export function tellMessage(event: TellEvent, p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>, ctx: TellContext, link: string): { text: string; subject: string; what: string } {
+  const first = firstName(p)
   const c = ctx.call
   const job = jobName(c)
   const when = whenLine(c, ctx.days)

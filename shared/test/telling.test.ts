@@ -23,6 +23,11 @@ const person = (id: string, name: string): Person => ({
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
   approvesLeave: false,
+  department: null,
+  level: 1,
+  knownAs: null,
+  certificates: {},
+  company: null,
 })
 const call = (id: string, start: string, end: string, needed = 2): CrewCall => ({
   id,

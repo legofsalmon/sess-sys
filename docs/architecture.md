@@ -302,7 +302,20 @@ says product and item; the code says model and asset.
   rates, contact details, emergency contact. Every field can be edited;
   a leaver is archived, never deleted, and can be brought back; a
   freelancer corrects their own phone and email on their link
-  ([ADR 0023](adr/0023-audit-round-two-the-loops.md)).
+  ([ADR 0023](adr/0023-audit-round-two-the-loops.md)). The profile is
+  built ([ADR 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md)):
+  a department, a level from 0 (an applicant) to 5 (higher is more
+  preferred), the name they go by, certificates by kind with an expiry,
+  the company a freelancer trades through with its VAT and CRO numbers,
+  and a "Worked" list built on each device from their bookings. The crew
+  list comes in from a spreadsheet through "Bring in a list" on the
+  Account tab: every row shown as the app read it, phones put in
+  international form, problems fixed or skipped in place, rows matched
+  to people already here by email then phone (a row for someone
+  archived is marked, never applied), and all of it brought in through
+  the same command a device would send; a blank cell never erases what
+  the app has, and a second import of the same file sends nothing for
+  anyone it would leave as they are.
 - **Documents**: Safe Pass, manual handling, working at height, IPAF/PASMA,
   driving licence, insurance for companies; with expiry dates and reminders.
   An expired required certificate blocks the assignment, the same way an

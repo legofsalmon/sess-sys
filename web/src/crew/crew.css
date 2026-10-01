@@ -61,6 +61,37 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .grid-form label.tick input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
 .crew .grid-form label.tick small { display: block; color: var(--muted); font-size: .8rem; }
 
+/* The profile (ADR 0025): the department filter over the list, the level on a card, what they've worked, the form's "More", and the picker's applicants tick. */
+.crew .dept-filter { justify-self: start; }
+.crew .detail .level-pick { display: flex; gap: var(--space-8); align-items: center; font-size: .85rem; color: var(--muted); }
+.crew .detail .level-pick select { min-width: 9em; }
+.crew .detail .worked { display: grid; gap: var(--space-2); }
+.crew .detail .alert { font-size: .85rem; }
+.crew .grid-form details.more summary { display: flex; align-items: center; min-height: 44px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; padding-top: var(--space-4); }
+.crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
+.crew .offer-form .applicants { grid-column: 1 / -1; display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.crew .offer-form .applicants input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+/* Bringing in the crew list (ADR 0025): the Account tab's card, and the screen's rows, each a card with its fields to fix. */
+.account .import-people-card .warn-line { margin: 0; }
+.account .import-people-card a.button { justify-self: start; }
+.import-people .field input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.import-people .people-rows .head { justify-content: space-between; }
+.import-people .people-rows .head b { font-size: 1.05rem; }
+.import-people .people-rows .skip { display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.import-people .people-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.import-people .people-rows .updates { color: var(--ink); }
+.import-people .people-rows .updates b { color: var(--accent-ink); }
+.import-people .fix { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-8); align-items: start; padding-top: var(--space-4); }
+.import-people .fix label { display: grid; gap: var(--space-4); font-size: .85rem; color: var(--muted); }
+.import-people .fix input { width: 100%; }
+.import-people .fix .warn-line { display: block; font-size: .8rem; }
+.import-people .bring .hint { text-align: center; }
+@media (max-width: 480px) {
+  .import-people .fix { grid-template-columns: 1fr; }
+}
+
 /* Staff leave (ADR 0024): the Crew tab's card, and the Leave screen's balances, forms, requests and queue. */
 .crew .leave-card a.button { justify-self: start; }
 .leave-screen .card p { margin: 0; }

@@ -1,6 +1,7 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { daysBetween, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
-import { STOPPED, type Phase } from '../jobs.ts'
+import { irishToday } from '../calendar.ts'
+import { daysBetween, DEFAULT_LEVEL, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
 
 /**
@@ -9,8 +10,20 @@ import { leaveLabel, type LeaveRequest } from '../leave.ts'
  * shown in SyncClient.view().
  */
 
+/** A job a person was booked on (ADR 0025): the booking's call, with the person's own days. */
+export interface Worked {
+  callId: string
+  projectId: string | null
+  name: string
+  phase: string
+  start: string
+  end: string
+}
+
 export interface PersonView extends Person {
   pending: boolean
+  /** The jobs they were booked on whose first day has come, newest first. */
+  worked: Worked[]
 }
 export interface OfferView extends Offer {
   pending: boolean
@@ -44,14 +57,26 @@ function changed(a: object): Record<string, unknown> {
   return out
 }
 
+/** A person synced before the profile existed (ADR 0025) reads as not archived, not approving leave, Level 1, with nothing else set. */
+const withDefaults = (p: Person): Person => ({
+  ...p,
+  archived: p.archived ?? false,
+  approvesLeave: p.approvesLeave ?? false,
+  department: p.department ?? null,
+  level: p.level ?? DEFAULT_LEVEL,
+  knownAs: p.knownAs ?? null,
+  certificates: p.certificates ?? {},
+  company: p.company ?? null,
+})
+
 export function crewView(
-  entities: Partial<Tables> & { phase?: Record<string, Phase>; leaveRequest?: Record<string, LeaveRequest> },
+  entities: Partial<Tables> & { phase?: Record<string, Phase>; project?: Record<string, Project>; leaveRequest?: Record<string, LeaveRequest> },
   outbox: readonly (Mutation & { appliedSeq?: number })[],
-  cursor: number
+  cursor: number,
+  today = irishToday()
 ): CrewView {
   const people = new Map<string, PersonView>()
-  // People synced before archiving or leave existed read as not archived, and as not approving leave.
-  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, archived: p.archived ?? false, approvesLeave: p.approvesLeave ?? false, pending: false })
+  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...withDefaults(p), pending: false, worked: [] })
   const calls = new Map<string, CrewCall & { pending: boolean }>()
   // Calls synced before jobs existed have no job or phase.
   for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
@@ -83,11 +108,29 @@ export function crewView(
     switch (m.name) {
       case 'person.upsert': {
         // Editing someone keeps what a device doesn't own: their link, and whether they're archived. An
-        // edit that says nothing about approving leave keeps that too; only staff can approve it.
+        // edit that says nothing about approving leave, or about the profile (ADR 0025), keeps those too.
         const a = m.args as CommandArgs<'person.upsert'>
         const was = people.get(a.id)
         const approvesLeave = a.kind === 'staff' && (a.approvesLeave ?? was?.approvesLeave ?? false)
-        people.set(a.id, { linkToken: was?.linkToken ?? '', archived: was?.archived ?? false, ...a, approvesLeave, pending: true })
+        people.set(a.id, {
+          linkToken: was?.linkToken ?? '',
+          archived: was?.archived ?? false,
+          ...a,
+          approvesLeave,
+          department: a.department !== undefined ? a.department : (was?.department ?? null),
+          level: a.level ?? was?.level ?? DEFAULT_LEVEL,
+          knownAs: a.knownAs !== undefined ? a.knownAs : (was?.knownAs ?? null),
+          certificates: a.certificates ?? was?.certificates ?? {},
+          company: a.company !== undefined ? a.company : (was?.company ?? null),
+          pending: true,
+          worked: was?.worked ?? [],
+        })
+        break
+      }
+      case 'person.level': {
+        const a = m.args as CommandArgs<'person.level'>
+        const p = people.get(a.id)
+        if (p) people.set(p.id, { ...p, level: a.level, pending: true })
         break
       }
       case 'person.archive': {
@@ -234,6 +277,23 @@ export function crewView(
     for (const d of days) heldByDay[d] = own.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
     return { ...c, offers: own, days, heldByDay, openDays: days.filter((d) => heldByDay[d]! < c.needed) }
   })
+
+  // What each person has worked (ADR 0025): a place held on a call that stands, from the person's own first day on it, newest first.
+  // The job's name as it is today, where the call is part of one; the call's own name otherwise. A cancelled call's
+  // offers are cancelled too once the server has it; skipping the call shows the same while that's still pending.
+  for (const c of callViews) {
+    if (c.status === 'cancelled') continue
+    const name = (c.projectId && entities.project?.[c.projectId]?.name) || c.project
+    for (const o of c.offers) {
+      if (!HOLDING.includes(o.status) || o.days.length === 0) continue
+      const p = people.get(o.personId)
+      if (!p) continue
+      const days = [...o.days].sort()
+      if (days[0]! > today) continue
+      p.worked.push({ callId: c.id, projectId: c.projectId, name, phase: c.phase, start: days[0]!, end: days[days.length - 1]! })
+    }
+  }
+  for (const p of people.values()) p.worked.sort((a, b) => b.start.localeCompare(a.start) || a.name.localeCompare(b.name))
 
   return {
     people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)),

@@ -1,10 +1,21 @@
 import {
   answersToCheck,
+  APPLICANT_LEVEL,
+  CERTIFICATE_KINDS,
+  CERTIFICATE_LABELS,
+  certificateState,
+  companyLine,
+  CREW_DEPARTMENTS,
+  dayLabel,
+  DEFAULT_LEVEL,
   daysLabel,
   eachDay,
   euro,
   euroText,
   HOLDING,
+  levelLabel,
+  levelLine,
+  LEVELS,
   newId,
   offerMessage,
   offerOnCalendar,
@@ -12,9 +23,12 @@ import {
   parseEuro,
   personConflicts,
   tellMessage,
+  tidyDepartment,
   whatsappNumber,
   type AnswerKind,
   type CallView,
+  type CertificateKind,
+  type Certificates,
   type CommandInput,
   type CrewView,
   type OfferView,
@@ -24,7 +38,7 @@ import {
   type TellEvent,
   type View,
 } from '@sh/shared'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
@@ -62,6 +76,30 @@ const STATUS: Record<OfferView['status'], [string, string]> = {
 }
 
 export const linkFor = (p: Pick<Person, 'linkToken'>) => (p.linkToken ? `${location.origin}/f/${p.linkToken}` : '')
+
+/** The filter's choice for people with no department. */
+const NO_DEPARTMENT = '-'
+
+/** "Fri 3 Oct 2027": a certificate's expiry wants its year. */
+const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
+
+/** A department as compared: free text, so "audio" and "Audio" are one. */
+const dept = (p: Pick<PersonView, 'department'>) => (p.department ?? '').toLowerCase()
+
+/** The picker's order (ADR 0025): by department, then the highest level first, then by name. */
+function byDepartmentThenLevel(a: PersonView, b: PersonView): number {
+  if (dept(a) !== dept(b)) {
+    if (!a.department) return 1
+    if (!b.department) return -1
+    return dept(a).localeCompare(dept(b))
+  }
+  return b.level - a.level || a.name.localeCompare(b.name)
+}
+
+/** "Dara Quinn · Audio · Level 3 (Sound No.1, Audio)", as the picker lists someone. */
+function pickerLabel(p: PersonView): string {
+  return `${p.name}${p.department ? ` · ${p.department}` : ''} · ${levelLabel(p.level)}${p.skills.length ? ` (${p.skills.join(', ')})` : ''}`
+}
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -134,6 +172,15 @@ export function CrewScreen() {
   // Archived people (leavers) are kept for the record but out of the way.
   const active = crew.people.filter((p) => !p.archived)
   const archived = crew.people.filter((p) => p.archived)
+  // The list narrowed to one department (ADR 0025): the ones in use, not a fixed list.
+  const [department, setDepartment] = useState('')
+  const departments: string[] = []
+  for (const p of active) if (p.department && !departments.some((d) => d.toLowerCase() === dept(p))) departments.push(p.department)
+  departments.sort((a, b) => a.localeCompare(b))
+  // A department whose last person was edited or archived away narrows to nobody, so it's no filter at all until it's back.
+  const chosen =
+    department === NO_DEPARTMENT ? (active.some((p) => !p.department) ? department : '') : departments.some((d) => d.toLowerCase() === department.toLowerCase()) ? department : ''
+  const shown = active.filter((p) => !chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase()))
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
@@ -260,7 +307,18 @@ export function CrewScreen() {
         <h2>People</h2>
         <Refusal error={roster.error} />
         {active.length === 0 && archived.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
-        {active.map((p) => (
+        {departments.length > 0 && (
+          <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+            {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
+          </select>
+        )}
+        {shown.map((p) => (
           <PersonRow key={p.id} person={p} crew={crew} />
         ))}
         {archived.length > 0 && (
@@ -580,9 +638,13 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
 export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void }) {
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
+  const [applicants, setApplicants] = useState(false)
   // Someone who declined, pulled out or was told it's filled can be offered it again.
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled', 'pulled-out'].includes(o.status)).map((o) => o.personId))
-  const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
+  const everyone = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
+  // Applicants nobody has vetted (Level 0) stay out of the way unless asked for (ADR 0025).
+  const hidden = everyone.filter((p) => p.level === APPLICANT_LEVEL).length
+  const candidates = everyone.filter((p) => applicants || p.level !== APPLICANT_LEVEL).sort(byDepartmentThenLevel)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
   const { run, error } = useAct()
@@ -605,8 +667,7 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
         <option value="">Offer to…</option>
         {candidates.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.name}
-            {p.skills.length ? ` (${p.skills.join(', ')})` : ''}
+            {pickerLabel(p)}
             {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
           </option>
         ))}
@@ -614,6 +675,12 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
       <button type="submit" disabled={!chosen || (conflicts.length > 0 && !override)}>
         Offer
       </button>
+      {(hidden > 0 || applicants) && (
+        <label className="applicants">
+          <input type="checkbox" checked={applicants} onChange={(e) => setApplicants(e.target.checked)} />
+          <span>Show applicants{hidden > 0 ? ` (${hidden})` : ''}</span>
+        </label>
+      )}
       {conflicts.length > 0 && (
         <label className="warn">
           <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
@@ -779,6 +846,8 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
         <small>
           {[
             person.kind === 'staff' ? 'Staff' : null,
+            person.department,
+            levelLine(person.level),
             person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
             person.skills.join(', '),
             person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null,
@@ -799,7 +868,21 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
       {open && !editing && (
         <div className="detail">
           {(person.phone || person.email) && <p className="muted">{[person.phone, person.email].filter(Boolean).join(' · ')}</p>}
+          {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
+          {person.company && <p className="muted">{companyLine(person)}</p>}
+          <CertificateLines person={person} />
           {person.notes && <p className="muted">{person.notes}</p>}
+          <label className="level-pick">
+            Level
+            <select value={person.level} onChange={(e) => void run(() => client.mutate('person.level', { id: person.id, level: Number(e.target.value) }))} aria-label={`Level for ${person.name}`}>
+              {LEVELS.map((n) => (
+                <option key={n} value={n}>
+                  {levelLine(n)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Worked person={person} />
           {booked.map(({ c, o }) => (
             <p key={o.id}>
               {c.project} · {daysLabel(o.days)} · {STATUS[o.status][0]}
@@ -889,6 +972,45 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   )
 }
 
+/** The certificates someone holds, and any that have run out (ADR 0025). Nothing for ones not held or not known. */
+function CertificateLines({ person }: { person: PersonView }) {
+  const states = CERTIFICATE_KINDS.map((kind) => ({ kind, c: person.certificates[kind], state: certificateState(person.certificates[kind], today) }))
+  const held = states.filter((x) => x.state === 'held')
+  const expired = states.filter((x) => x.state === 'expired')
+  if (!held.length && !expired.length) return null
+  return (
+    <>
+      {held.length > 0 && (
+        <p className="muted">Holds {held.map((x) => `${CERTIFICATE_LABELS[x.kind].toLowerCase()}${x.c?.expires ? ` (to ${dateLabel(x.c.expires)})` : ''}`).join(', ')}</p>
+      )}
+      {expired.map((x) => (
+        <p key={x.kind} className="alert">
+          {CERTIFICATE_LABELS[x.kind]} ran out on {dateLabel(x.c!.expires!)}.
+        </p>
+      ))}
+    </>
+  )
+}
+
+/** The jobs someone was booked on, newest first (ADR 0025): the last few, and how many in all. */
+function Worked({ person }: { person: PersonView }) {
+  const { worked } = person
+  if (!worked.length) return null
+  return (
+    <div className="worked" role="group" aria-label={`Worked: ${person.name}`}>
+      <p className="muted">
+        <b>Worked on {worked.length === 1 ? '1 job' : `${worked.length} jobs`}</b>
+      </p>
+      {worked.slice(0, 3).map((w) => (
+        <p key={w.callId}>
+          {w.name}
+          {w.phase && <span className="muted"> · {w.phase}</span>} · {daysLabel(eachDay(w.start, w.end))}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 function NewCall() {
   const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
   const [f, setF] = useState(blank)
@@ -972,8 +1094,51 @@ type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>
  * them (audit finding 7). A refused change says why under the fields and
  * keeps what was typed.
  */
+/** A certificate as the form holds it: yes, no or not known, and an expiry day or none. */
+type CertField = { held: '' | 'yes' | 'no'; expires: string }
+type CertFields = Record<CertificateKind, CertField>
+
+const blankCerts = (): CertFields => ({ 'first-aid': { held: '', expires: '' }, 'manual-handling': { held: '', expires: '' }, 'driving-licence': { held: '', expires: '' } })
+
+function certFieldsOf(c: Certificates): CertFields {
+  const out = blankCerts()
+  for (const kind of CERTIFICATE_KINDS) {
+    const x = c[kind]
+    if (x) out[kind] = { held: x.held === null ? '' : x.held ? 'yes' : 'no', expires: x.expires ?? '' }
+  }
+  return out
+}
+
+/** Only the kinds that say something go back; a kind with nothing set stays unknown, keeping any note it had. */
+function certificatesOf(fields: CertFields, was: Certificates): Certificates {
+  const out: Certificates = {}
+  for (const kind of CERTIFICATE_KINDS) {
+    const f = fields[kind]
+    const note = was[kind]?.note ?? ''
+    if (f.held === '' && !f.expires && !note) continue
+    out[kind] = { held: f.held === '' ? null : f.held === 'yes', expires: f.expires || null, note }
+  }
+  return out
+}
+
 function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
-  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff', notes: '', approvesLeave: false }
+  const blank = {
+    name: '',
+    phone: '',
+    email: '',
+    skills: '',
+    rate: '',
+    kind: 'freelancer' as 'freelancer' | 'staff',
+    notes: '',
+    approvesLeave: false,
+    department: '',
+    knownAs: '',
+    level: String(DEFAULT_LEVEL),
+    certs: blankCerts(),
+    companyName: '',
+    vatNumber: '',
+    croNumber: '',
+  }
   const from = (p: PersonView) => ({
     name: p.name,
     phone: p.phone ?? '',
@@ -983,15 +1148,30 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
     kind: p.kind,
     notes: p.notes,
     approvesLeave: p.approvesLeave,
+    department: p.department ?? '',
+    knownAs: p.knownAs ?? '',
+    level: String(p.level),
+    certs: certFieldsOf(p.certificates),
+    companyName: p.company?.name ?? '',
+    vatNumber: p.company?.vatNumber ?? '',
+    croNumber: p.company?.croNumber ?? '',
   })
   const [f, setF] = useState(initial ? from(initial) : blank)
+  // The profile (ADR 0025) folds away on a phone, open when any of it is set; once open or shut by hand it stays so.
+  const [moreOpen] = useState(() => !!initial && (!!initial.department || !!initial.knownAs || initial.level !== DEFAULT_LEVEL || !!initial.company || Object.keys(initial.certificates).length > 0))
+  const listId = useId()
   const { run, error, refuse } = useAct()
-  const set = (k: Exclude<keyof typeof blank, 'approvesLeave'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const set = (k: Exclude<keyof typeof blank, 'approvesLeave' | 'certs'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  // Only freelancers trade through a company (ADR 0025); one a member of staff already has (from the crew list, say)
+  // stays in view so it can be seen and cleared, never dropped without a word.
+  const showCompany = f.kind === 'freelancer' || !!initial?.company
+  const setCert = (kind: CertificateKind, field: Partial<CertField>) => setF({ ...f, certs: { ...f.certs, [kind]: { ...f.certs[kind], ...field } } })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
     const rate = parseEuro(f.rate)
     if (rate.reason !== undefined) return refuse(rate.reason)
+    const company = f.companyName.trim() || f.vatNumber.trim() || f.croNumber.trim()
     void run(() =>
       onSubmit({
         name: f.name.trim(),
@@ -1003,6 +1183,11 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
         notes: f.notes.trim(),
         // Only staff approve time off (ADR 0024).
         approvesLeave: f.kind === 'staff' && f.approvesLeave,
+        department: tidyDepartment(f.department),
+        knownAs: f.knownAs.trim() || null,
+        level: Number(f.level),
+        certificates: certificatesOf(f.certs, initial?.certificates ?? {}),
+        company: showCompany && company ? { name: f.companyName.trim(), vatNumber: f.vatNumber.trim() || null, croNumber: f.croNumber.trim() || null } : null,
       })
     ).then((taken) => {
       if (!taken) return
@@ -1047,6 +1232,61 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
         Notes <textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Notes for the office" />
       </label>
       <p className="hint wide">They can read these in their own data download.</p>
+      <details className="wide more" open={moreOpen}>
+        <summary>More: department, level, certificates{showCompany ? ', company' : ''}</summary>
+        <div className="more-grid">
+          <label>
+            Department <input list={listId} value={f.department} onChange={set('department')} placeholder="Audio, LX…" maxLength={60} />
+            <datalist id={listId}>
+              {CREW_DEPARTMENTS.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+          </label>
+          <label>
+            Known as <input value={f.knownAs} onChange={set('knownAs')} placeholder="The name they go by" maxLength={100} />
+          </label>
+          <label className="wide">
+            Level
+            <select value={f.level} onChange={set('level')}>
+              {LEVELS.map((n) => (
+                <option key={n} value={n}>
+                  {levelLabel(n)}
+                </option>
+              ))}
+            </select>
+            <small>{Number(f.level) === APPLICANT_LEVEL ? 'An applicant, not vetted yet: out of the Offer to… picker unless asked for.' : 'Higher is more preferred. 1 is known.'}</small>
+          </label>
+          {CERTIFICATE_KINDS.map((kind) => (
+            <div className="cert wide" key={kind}>
+              <label>
+                {CERTIFICATE_LABELS[kind]}
+                <select value={f.certs[kind].held} onChange={(e) => setCert(kind, { held: e.target.value as CertField['held'] })}>
+                  <option value="">Unknown</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </label>
+              <label>
+                Expires <input type="date" value={f.certs[kind].expires} onChange={(e) => setCert(kind, { expires: e.target.value })} aria-label={`${CERTIFICATE_LABELS[kind]} expires`} />
+              </label>
+            </div>
+          ))}
+          {showCompany && (
+            <>
+              <label className="wide">
+                Company <input value={f.companyName} onChange={set('companyName')} placeholder="If they trade through a company" maxLength={200} />
+              </label>
+              <label>
+                VAT number <input value={f.vatNumber} onChange={set('vatNumber')} maxLength={40} />
+              </label>
+              <label>
+                CRO number <input value={f.croNumber} onChange={set('croNumber')} maxLength={40} />
+              </label>
+            </>
+          )}
+        </div>
+      </details>
       <Refusal error={error} className="wide" />
       <button type="submit" className={initial ? 'primary' : 'wide'}>
         {submitLabel}

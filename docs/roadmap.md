@@ -156,7 +156,18 @@ never counted; approved leave in the planner and respected by offers.
 Half days, working patterns, sick and unpaid leave, and carrying days
 over by rule are later.
 
-- Freelancer profiles, skills, rates, documents with expiry reminders.
+- Freelancer profiles, skills, rates, documents with expiry reminders
+  (built, 1 October 2026,
+  [ADR 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md): a
+  department, a level shown as "Level 1" to "Level 5" with 0 for an
+  applicant, the name they go by, first aid, manual handling and driving
+  licence as held, not held or unknown with an expiry the card warns
+  about, the company and VAT and CRO numbers a freelancer trades
+  through, and the jobs they've worked from their bookings; the crew
+  list brought in from a spreadsheet, checked row by row first. Still
+  later: Safe Pass, working at height and IPAF; an expired required
+  certificate blocking an assignment; expiry reminders; the stock list
+  through the same step).
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the

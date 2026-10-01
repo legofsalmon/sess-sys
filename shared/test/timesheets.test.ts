@@ -23,6 +23,11 @@ const person = (id: string, name: string, kind: Person['kind'] = 'freelancer'): 
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
   approvesLeave: false,
+  department: null,
+  level: 1,
+  knownAs: null,
+  certificates: {},
+  company: null,
 })
 const call = (id: string, start: string, end: string, status: CrewCall['status'] = 'open'): CrewCall => ({
   id,

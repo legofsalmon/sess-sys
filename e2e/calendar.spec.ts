@@ -308,7 +308,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   await ask.getByRole('button', { name: 'Ask for crew' }).click()
   const build = page.getByRole('article', { name: 'Build' })
   for (const name of [niamh, conor, sean]) {
-    await build.getByLabel('Offer to').selectOption({ label: name })
+    await build.getByLabel('Offer to').selectOption({ label: `${name} · Level 1` })
     await build.getByRole('button', { name: 'Offer', exact: true }).click()
     await expect(build.locator('.offers')).toContainText(name)
   }

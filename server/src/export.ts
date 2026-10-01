@@ -201,7 +201,7 @@ const ABOUT: Record<string, string> = {
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
-  people: 'Staff and freelancers on the crew list: contact details, skills and rates, whether they have been archived, and which staff can approve time off.',
+  people: 'Staff and freelancers on the crew list: contact details, department, level, the name they go by, certificates, the company and VAT and CRO numbers they trade through, skills and rates, whether they have been archived, and which staff can approve time off.',
   phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   products: 'Stock items (sync test).',

@@ -364,7 +364,7 @@ export class SyncClient {
     }
 
     const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id)
-    const crew = crewView(entities, outbox, this.state.cursor)
+    const crew = crewView(entities, outbox, this.state.cursor, today)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
     const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)

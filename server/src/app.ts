@@ -17,6 +17,7 @@ import { applyMutationIn, currentSeq } from './commands.ts'
 import { clearedSince, startedFresh } from './data/fresh.ts'
 import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
+import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
@@ -244,6 +245,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerCrewLinks(app, db, changed, feeds)
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, onChange: changed })
+  registerPeopleImportRoutes(app, { db, onChange: changed })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 

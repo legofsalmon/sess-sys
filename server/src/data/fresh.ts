@@ -145,8 +145,8 @@ export async function startFresh(db: Db, who: Who, now = new Date()): Promise<{ 
   })
 }
 
-/** In the history as that person's, like connecting a calendar. */
-async function recordAction(tx: Queryable, who: Who, name: string, args: Record<string, unknown>, now: Date) {
+/** In the history as that person's, like connecting a calendar. Bringing in the crew list (ADR 0025) records itself the same way. */
+export async function recordAction(tx: Queryable, who: Who, name: string, args: Record<string, unknown>, now: Date) {
   await tx.query(
     `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, device, received_at, status, result)
      VALUES ($1, $2, $3, $4, $5, $6, $7, clock_timestamp(), 'applied', '{}')`,

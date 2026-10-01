@@ -7,6 +7,7 @@ import {
   invitesLabel,
   irishToday,
   leaveDays,
+  levelLabel,
   newId,
   normaliseNumber,
   numberText,
@@ -33,6 +34,8 @@ import type { Queryable } from './db.ts'
 
 /** What the server records a download of everything as. Not a command, so no device can send it. */
 export const EXPORT_COMMAND = 'data.export'
+/** What it records bringing in the crew list as (ADR 0025), likewise. */
+export const IMPORT_PEOPLE_ACTION = 'people.import'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -364,6 +367,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'person.upsert':
       return `Saved ${text(a.name, 'someone')}'s details`
+    case 'person.level':
+      return `Moved ${person(a.id)} to ${levelLabel(typeof a.level === 'number' ? a.level : 1)}`
     case 'person.newLink':
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':
@@ -471,6 +476,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return 'Put in made-up data to try the app with, all of it shown in the history as from "Made-up data"'
     case 'data.fresh':
       return `Started fresh: deleted everything${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''} except the staff accounts`
+    case IMPORT_PEOPLE_ACTION: {
+      const n = (v: unknown) => (typeof v === 'number' ? v : 0)
+      const parts = [`${n(a.added)} added`, `${n(a.updated)} updated`]
+      if (n(a.unchanged) > 0) parts.push(`${n(a.unchanged)} unchanged`)
+      if (n(a.skipped) > 0) parts.push(`${n(a.skipped)} skipped`)
+      return `Brought in the crew list: ${parts.join(', ')}`
+    }
     case 'calendar.import': {
       const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
       const some = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined)

@@ -1,4 +1,4 @@
-import { dayLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
+import { dayLabel, levelLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
 import { useEffect, useState, type ReactNode } from 'react'
 import { reasonOf } from './act.tsx'
 import { when } from './format.ts'
@@ -132,6 +132,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Scan ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} ${a.direction === 'in' ? 'back in' : 'out'}`
       case 'person.upsert':
         return `Save ${str(a.name, 'someone')}'s details`
+      case 'person.level':
+        return `Move ${person(a.id)} to ${levelLabel(typeof a.level === 'number' ? a.level : 1)}`
       case 'person.newLink':
         return `Give ${person(a.id)} a new private link`
       case 'person.archive':
