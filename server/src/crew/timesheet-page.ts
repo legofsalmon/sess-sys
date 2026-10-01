@@ -1,5 +1,5 @@
 import { dayLabel, daysLabel, euro, MAX_EXTRAS, timesheetChanges, timesheetTotal, type CrewCall, type Offer, type Timesheet } from '@sh/shared'
-import { CSS } from './page.ts'
+import { CSS, flash } from './page.ts'
 import { SHEET_CSS } from './sheet.ts'
 
 /**
@@ -46,13 +46,13 @@ export function renderTimesheet(d: TimesheetPage): string {
 <main class="sheet">
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Timesheet</small></div></header>
   <a class="back" href="${h(d.base)}">‹ Your work</a>
-  ${d.flash ? `<p class="flash ${d.flash.ok ? 'ok' : 'bad'}" role="status">${h(d.flash.text)}</p>` : ''}
+  ${d.flash ? flash(d.flash) : ''}
   <section class="head">
     <h1>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</h1>
     <p class="when">${h(call.role)}, ${h(daysLabel(offer.days))}</p>
     <p class="small">${rate === null ? 'Day rate to agree with the office.' : `${h(euro(rate))} a day${t && t.dayRateCents !== offer.dayRateCents ? '' : ', as agreed'}.`}</p>
   </section>
-  ${!t && d.why ? `<p class="flash bad">${h(d.why)}</p>` : t?.status === 'approved' ? approved(t) : form(d, action)}
+  ${!t && d.why ? `<p class="flash warn">${h(d.why)}</p>` : t?.status === 'approved' ? approved(t) : form(d, action)}
   <footer>
     <span>Keep this link to yourself: anyone with it can answer for you.</span>
   </footer>

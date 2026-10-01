@@ -10,7 +10,7 @@ const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
 /** The message after a post. A refusal is an alert, so it's read out and looks like one; a thank-you is a status. */
-const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.ok ? 'ok' : 'bad'}" role="${f.ok ? 'status' : 'alert'}">${h(f.text)}</p>`
+export const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.ok ? 'ok' : 'bad'}" role="${f.ok ? 'status' : 'alert'}">${h(f.text)}</p>`
 
 export interface PageData {
   person: Person
@@ -65,8 +65,9 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
           })
           .join('')}</fieldset>`
       : ''
-  // Enter (or a phone keyboard's Go) in the rate field presses the form's first button. This hidden one, so it's never Accept: the server sends the rate, or asks for a tap.
-  const onEnter = `<button name="answer" value="implicit" hidden></button>`
+  // Enter (or a phone keyboard's Go) in the rate field presses the form's first button. This one, so it's never Accept: the server sends the rate, or asks for a tap.
+  // Drawn out of sight rather than hidden: Safari before 16.4 passes over a hidden button and presses the next, which is Accept.
+  const onEnter = `<button class="on-enter" name="answer" value="implicit" tabindex="-1" aria-hidden="true"></button>`
   // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
     ${d.flash?.offer === offer.id ? flash(d.flash) : ''}
@@ -225,13 +226,14 @@ fieldset.days label{display:flex;gap:6px;align-items:center;padding:8px 10px;bor
 fieldset.days label.gone{opacity:.55}fieldset.days input{width:20px;height:20px;accent-color:var(--accent)}
 .buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;min-height:48px}
+.on-enter{position:absolute;width:1px;height:1px;min-height:0;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
 details[open]{display:grid;gap:8px}
 label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
 fieldset.days input{width:20px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}
+.flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}code{word-break:break-all;font-size:.8rem}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}

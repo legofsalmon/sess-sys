@@ -29,6 +29,8 @@ export function watchForUpdates() {
   reload = () => update(true)
 
   addEventListener('vite:preloadError', (event) => {
+    // With no signal the file isn't gone, only out of reach: a reload would lose the page for nothing.
+    if (!navigator.onLine) return
     // A file this page was built with has gone, most likely because a new version
     // replaced it before the bar was answered. Not twice in a minute, so a build
     // that really is missing a file doesn't reload for ever.
@@ -43,7 +45,7 @@ export function watchForUpdates() {
     try {
       sessionStorage.setItem(RELOADED, String(Date.now()))
     } catch {
-      // Same.
+      // Storage blocked: nothing to remember the reload by, but reload anyway.
     }
     location.reload()
   })
@@ -62,10 +64,15 @@ function useUpdateReady() {
 /** One line at the top until they reload; the page below moves down so it hides nothing. */
 export function UpdateBar() {
   if (!useUpdateReady()) return null
+  const onReload = () => {
+    void reload?.()
+    // The new version takes the page over and reloads it. Should it not (an older browser, say), start again anyway.
+    setTimeout(() => location.reload(), 2000)
+  }
   return (
-    <div className="update" role="status">
+    <div className="update">
       <span>A new version is ready.</span>
-      <button type="button" className="primary" onClick={() => void reload?.()}>
+      <button type="button" className="primary" onClick={onReload}>
         Reload
       </button>
     </div>

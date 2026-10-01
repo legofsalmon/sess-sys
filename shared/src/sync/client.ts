@@ -164,7 +164,47 @@ export class SyncClient {
 
   async open(): Promise<this> {
     this.state = (await this.storage.load()) ?? emptySnapshot(this.options.clientId ?? newId())
+    await this.unbrick()
     return this
+  }
+
+  /**
+   * A change the view can't lay over the rest would leave every screen
+   * blank. `mutate` turns such a change away now, but a copy saved by a
+   * build from before it did may still hold one: it's set aside as a
+   * problem, with its reason, and the rest of the outbox carries on.
+   */
+  private async unbrick() {
+    if (this.state.outbox.length === 0) return
+    try {
+      this.view()
+      return
+    } catch {
+      // Something is in the way. If the view works without the outbox, the outbox holds it.
+    }
+    const all = this.state.outbox
+    this.state.outbox = []
+    try {
+      this.view()
+    } catch {
+      this.state.outbox = all
+      return
+    }
+    for (const m of all) {
+      this.state.outbox.push(m)
+      try {
+        this.view()
+      } catch (err) {
+        this.state.outbox.pop()
+        const why = err instanceof Error ? err.message : String(err)
+        this.state.problems.push({
+          mutation: strip(m),
+          reason: { code: 'invalid', message: `This change can't be shown on this device, so it was set aside: ${why}` },
+          at: this.now().toISOString(),
+        })
+      }
+    }
+    await this.storage.save(this.state)
   }
 
   get clientId() {
@@ -183,13 +223,15 @@ export class SyncClient {
     this.state.outbox.push(mutation)
     // A change the view can't lay over the rest would leave every screen blank
     // until the device's storage was wiped, so it's taken back before it's saved.
+    let view: View
     try {
-      this.view()
+      view = this.view()
     } catch (err) {
       this.state.outbox = this.state.outbox.filter((m) => m.id !== mutation.id)
       throw new Error(`This change can't be shown on this device, so it wasn't kept: ${err instanceof Error ? err.message : String(err)}`)
     }
-    await this.persist()
+    await this.storage.save(this.state)
+    this.emit(view)
     return mutation
   }
 
@@ -391,9 +433,10 @@ export class SyncClient {
     this.emit()
   }
 
-  private emit() {
+  /** Tell the screens, with the view already built when the caller has one. */
+  private emit(view?: View) {
     if (this.listeners.size === 0) return
-    const view = this.view()
+    view ??= this.view()
     for (const fn of this.listeners) fn(view)
   }
 }
@@ -403,6 +446,8 @@ function strip(m: PendingMutation): Mutation {
 }
 
 export function applyChange(state: Snapshot, change: Change) {
+  // A name a plain object treats specially would reach every object, not a table.
+  if ((change.entity as string) === '__proto__' || change.id === '__proto__') return
   // A change for an entity this build doesn't know is kept under its name, not
   // dropped: a phone open during a deploy that adds one would otherwise move its
   // cursor past those rows and never see them. The views only read the tables

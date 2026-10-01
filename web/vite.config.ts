@@ -23,8 +23,12 @@ export default defineConfig({
         display: 'standalone',
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
-      // Freelancer links and calendar feeds come from the server, never the app shell.
-      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//] },
+      workbox: {
+        // Freelancer links and calendar feeds come from the server, never the app shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//],
+        // Once Reload lets the new version in, it takes the open page straight away, so the reload lands on it.
+        clientsClaim: true,
+      },
     }),
   ],
   server: {

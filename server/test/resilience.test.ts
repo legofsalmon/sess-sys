@@ -2,6 +2,7 @@ import { newId, type CommandInput, type CommandName, type Mutation } from '@sh/s
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
+import { applyMutationIn } from '../src/commands.ts'
 import { pgliteDb, type Db, type Queryable } from '../src/db.ts'
 import { reportError } from '../src/monitoring.ts'
 
@@ -68,6 +69,7 @@ function push(app: FastifyInstance, mutations: Mutation[]) {
 
 const Y10P = { id: 'y10p', name: 'd&b Y10P', quantity: 4 }
 const LS9 = { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }
+const SM58 = { id: 'sm58', name: 'Shure SM58', quantity: 6 }
 
 describe('a fault the server did not expect', () => {
   it('drops that one change with a reason, reports it, and lets the device carry on', async () => {
@@ -86,7 +88,7 @@ describe('a fault the server did not expect', () => {
         {
           id: bad.id,
           status: 'rejected',
-          reason: { code: 'invalid', message: "The server couldn't apply this change, so it was dropped. It's been reported. Check it and send it again." },
+          reason: { code: 'invalid', message: "The server couldn't apply this change, so it was dropped. Check it and send it again." },
         },
       ],
     })
@@ -111,23 +113,38 @@ describe('a fault the server did not expect', () => {
     expect((await db.query('SELECT id FROM products')).rows).toEqual([{ id: 'ls9' }])
   })
 
-  it('takes a change whose time of making is not a time at all, as made when it arrived', async () => {
-    // Proves: a bad createdAt costs that one change its device-clock time, not the whole push.
+  it('takes a change whose time of making is not a time Postgres keeps, as made when it arrived', async () => {
+    // Proves: a bad createdAt, or one in a year Postgres has no room for, costs
+    // that one change its device-clock time, not the whole push.
     const db = await pgliteDb()
     const app = await server(db)
     const good = mutation('product.upsert', Y10P)
     const odd = mutation('product.upsert', LS9, 'not a date')
-    const res = await push(app, [good, odd])
+    const yearNought = mutation('product.upsert', SM58, '0000-01-01T00:00:00Z')
+    const res = await push(app, [good, odd, yearNought])
     expect(res.statusCode).toBe(200)
-    expect(res.json().results.map((r: { status: string }) => r.status)).toEqual(['applied', 'applied'])
+    expect(res.json().results.map((r: { status: string }) => r.status)).toEqual(['applied', 'applied', 'applied'])
     expect(reportError).not.toHaveBeenCalled()
 
     const { rows } = await db.query<{ id: string; gap: string | number }>(
       'SELECT id, extract(epoch FROM received_at - created_at) AS gap FROM mutations ORDER BY received_at'
     )
-    expect(rows.map((r) => r.id)).toEqual([good.id, odd.id])
-    expect(Number(rows[1]!.gap)).toBeGreaterThanOrEqual(0)
-    expect(Number(rows[1]!.gap)).toBeLessThan(1)
+    expect(rows.map((r) => r.id)).toEqual([good.id, odd.id, yearNought.id])
+    for (const row of rows.slice(1)) {
+      expect(Number(row.gap)).toBeGreaterThanOrEqual(0)
+      expect(Number(row.gap)).toBeLessThan(1)
+    }
+  })
+
+  it('is left to the calendar sync, which tries again next round', async () => {
+    // Proves: an answer from Google Calendar is not dropped for good; the fault goes up to the sync's own round.
+    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO products'))
+    await server(db)
+    db.failNext = true
+    const m = mutation('product.upsert', Y10P)
+    await expect(db.transaction((tx) => applyMutationIn(tx, 'calendar:someone', m, { via: 'calendar' }))).rejects.toThrow('division by zero')
+    expect(reportError).not.toHaveBeenCalled()
+    expect((await db.query('SELECT 1 FROM mutations')).rows).toHaveLength(0)
   })
 })
 

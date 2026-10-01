@@ -3,6 +3,46 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 1 October 2026: audit round one
+
+**Done**
+
+- The P0 fixes from [the audit](audit-2026-09-30.md), findings 2 to 6.
+  Each finding there now says how it was fixed.
+- One bad change can't strand a phone any more. A server error nobody
+  expected drops that one change with a plain reason, logs and reports
+  it, and lets the rest of the push through; a 500 never carries
+  Postgres's words; a date that isn't real is turned away on the device
+  in plain words; a change the device's own view can't show is turned
+  away before it's saved, or set aside as a problem when the app opens
+  on an old copy.
+- A big backlog goes up in slices of 500, with a 30 s push timeout.
+- A deploy no longer breaks the open app: a bar offers "A new version
+  is ready. Reload", a missing file answers 404 rather than the page,
+  a page whose file has gone starts itself again, and a change for a
+  table this build doesn't know is kept for the build that will.
+- On the freelancer's page, Enter in the rate field sends the rate
+  (never accepts), and the message after an answer lands in the card,
+  as an alert when it's a refusal.
+- Checked: typecheck; the shared tests (22, with new ones for slices,
+  the stale stop, bad dates, the view guard, the un-brick on open,
+  unknown tables and the prototype guard); the server tests on PGlite
+  and on real Postgres (new: a fault inside a handler, a year-0
+  timestamp, a 500's answer, a 400's answer, the calendar sync getting
+  the fault, Enter on the link page, the message in the card, a missing
+  asset); the web build; the whole Playwright suite with a new
+  freelancer-on-a-phone test. Each fix was reviewed by a separate
+  reader before it was merged, and their two must-fixes (the year-0
+  timestamp, and old Safari passing over a hidden button) went in.
+
+**Next**
+
+- Round two: the P1 loops (edit person, `call.update`, prompted
+  messages, the Crew tab count, "Can't make it", one not-done
+  indicator, the idle sync cost, storage, "booked", the money parser).
+- Colly: the Google key and the backups bucket are still the first two
+  items on the list.
+
 ## 30 September 2026: audit
 
 **Done**

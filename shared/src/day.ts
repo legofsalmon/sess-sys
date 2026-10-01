@@ -9,13 +9,14 @@ import { z } from 'zod'
  * it. It lives on its own so the modules can share it without a cycle.
  */
 
-/** A real date written as 2026-10-05. */
+/** A real date written as 2026-10-05, in a year the app could be about. */
 export function isDay(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  // A year like 0226 is a slip, and one like 9999 would stretch every plan to it.
+  const year = Number(s.slice(0, 4))
+  if (year < 1900 || year > 2999) return false
   const d = new Date(`${s}T12:00:00Z`)
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
 }
 
-const NOT_A_DATE = "That isn't a real date."
-
-export const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, NOT_A_DATE).refine(isDay, NOT_A_DATE)
+export const day = z.string().refine(isDay, "That isn't a real date.")

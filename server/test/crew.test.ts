@@ -161,8 +161,8 @@ describe('freelancer link', () => {
     expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'confirmed', dayRateCents: 30000 })
   })
 
-  it('sends the rate when Enter is pressed in the rate field, and never accepts', async () => {
-    // Enter presses the form's hidden first button, which answers "implicit": a rate is a counter, and nothing else happens.
+  it('takes Enter in the rate field as Send rate, or asks for a tap: never as Accept', async () => {
+    // Enter presses the form's out-of-sight first button, which answers "implicit": a rate is a counter, and nothing else happens.
     const app = await server()
     const aoife = await person(app, 'Aoife Byrne')
     const o = await offer(app, await call(app), aoife.id)

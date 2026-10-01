@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { EntityName } from '../src/model.ts'
 import { PUSH_LIMIT, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
-import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
+import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 
 /**
  * The device side of sync on its own, against a pretend server: a big
@@ -76,6 +76,9 @@ describe('a date that is not real', () => {
     await expect(phone.mutate('unavailability.add', { id: 'u', personId: 'aoife', start: '2026-13-01', end: '2026-13-01', note: '' })).rejects.toThrow(
       "That isn't a real date."
     )
+    // A year the app could never be about is a slip, not a date.
+    await expect(phone.mutate('booking.create', booking('b', '0226-10-05'))).rejects.toThrow("That isn't a real date.")
+    await expect(phone.mutate('booking.create', booking('b', '9999-10-05'))).rejects.toThrow("That isn't a real date.")
     expect(phone.view().pendingCount).toBe(0)
     await phone.sync()
     expect(server.pushes).toEqual([])
@@ -97,6 +100,46 @@ describe('a change the view cannot show', () => {
 
     await phone.mutate('booking.create', booking('c'))
     expect(phone.view().bookings).toMatchObject([{ id: 'c', pending: true }])
+  })
+
+  it('is set aside as a problem when the app opens on a copy an older build saved it in, and the rest carries on', async () => {
+    // A build from before mutate() checked could save a crew call on a day that
+    // isn't one; this build's view throws on it. Opening must not leave the
+    // screens blank: that change becomes a problem, the others stay and are sent.
+    const server = new PretendServer()
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    await phone.mutate('project.create', { id: 'j', name: 'Nissan launch', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+    const snapshot = (await storage.load())!
+    snapshot.outbox.push({
+      id: 'bad',
+      name: 'call.create',
+      args: { id: 'c', projectId: 'j', phaseId: null, project: 'Nissan launch', phase: '', venue: '', role: 'Sound No.1', start: '2026-13-45', end: '2026-13-45', callTime: null, needed: 1, dayRateCents: null, details: '', replyBy: null },
+      createdAt: '2026-10-01T09:00:00Z',
+    } as never)
+    snapshot.outbox.push({ id: 'after', name: 'product.upsert', args: { id: 'p', name: 'Cable', quantity: 1 }, createdAt: '2026-10-01T09:01:00Z' } as never)
+    await storage.save(snapshot)
+
+    const reopened = await device(server, storage)
+    const view = reopened.view()
+    expect(view.pendingCount).toBe(2)
+    expect(view.problems).toMatchObject([{ mutation: { id: 'bad', name: 'call.create' }, reason: { code: 'invalid', message: expect.stringContaining("can't be shown on this device") } }])
+    expect((await storage.load())!.outbox.map((m) => m.id)).not.toContain('bad')
+
+    await reopened.sync()
+    expect(server.pushes.flatMap((p) => p.mutations.map((m) => m.id))).toEqual(expect.arrayContaining(['after']))
+    expect(server.pushes.flatMap((p) => p.mutations.map((m) => m.id))).not.toContain('bad')
+    expect(reopened.view().pendingCount).toBe(0)
+  })
+})
+
+describe('a change named after an object’s own insides', () => {
+  it('is dropped rather than reaching every object', () => {
+    const state = { ...emptySnapshot('phone') }
+    applyChange(state, { seq: 1, entity: '__proto__' as EntityName, id: 'x', op: 'put', data: { polluted: true } })
+    applyChange(state, { seq: 2, entity: 'product' as EntityName, id: '__proto__', op: 'put', data: { polluted: true } })
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+    expect(Object.keys(state.entities.product)).toEqual([])
   })
 })
 

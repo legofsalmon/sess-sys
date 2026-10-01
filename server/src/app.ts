@@ -71,6 +71,9 @@ declare module 'fastify' {
   }
 }
 
+/** The status an error asks for, by either name libraries give it; without one, it's a fault. */
+const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCode ?? err.status ?? 500
+
 /**
  * The sync API. Three routes do the work (push, pull, live); `history` and
  * `export` keep the principles' promises of an audit trail on everything and
@@ -95,9 +98,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const poke = async () => {
     feeds.stale()
     if (sockets.size === 0) return
-    const msg: Poke = { type: 'poke', cursor: await currentSeq(db) }
-    const text = JSON.stringify(msg)
-    for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
+    // A poke that fails (the database hiccuping right after a push, say) is
+    // the server's own trouble: the change is already made, and devices
+    // pull on their own clock anyway. Left to throw, it would stop the server.
+    try {
+      const msg: Poke = { type: 'poke', cursor: await currentSeq(db) }
+      const text = JSON.stringify(msg)
+      for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
+    } catch (err) {
+      app.log.error({ err }, 'Could not tell devices about a change')
+      reportError(err, { area: 'poke' })
+    }
   }
 
   const google = calendar ? new Google({ clientId: calendar.clientId, clientSecret: calendar.clientSecret, fetch: calendar.fetch }) : undefined
@@ -116,20 +127,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.decorate('calendar', calendarSync)
   /** Something changed in the app: devices pull it, and the calendar catches up. */
   const changed = () => {
-    // A poke that fails (the database hiccuping right after a push, say) is
-    // the server's own trouble: the push has already answered, and devices
-    // pull on their own clock anyway. Left unhandled, it would stop the server.
-    poke().catch((err) => {
-      app.log.error({ err }, 'Could not tell devices about a change')
-      reportError(err, { area: 'poke' })
-    })
+    void poke()
     calendarSync?.kick()
   }
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
   // code names it, never the address used, which could hold a private link.
   app.addHook('onError', async (req, _reply, err) => {
-    if ((err.statusCode ?? 500) < 500) return
+    if (statusOf(err) < 500) return
     reportError(err, { route: req.routeOptions.url ?? 'unknown', method: req.method })
   })
 
@@ -137,7 +142,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // words, which could be Postgres's, with a value from the request in them.
   // A request turned away (400, 401, 404) keeps Fastify's answer saying why.
   app.setErrorHandler((err: FastifyError, req, reply) => {
-    const status = err.statusCode ?? 500
+    const status = statusOf(err)
     if (status < 500) {
       reply.send(err)
       return
@@ -186,7 +191,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         await tx.query('SELECT pg_advisory_xact_lock(7331)')
         // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
         if (generation && (await clearedSince(tx, generation))) return undefined
-        return applyMutationIn(tx, clientId, m as never, from)
+        return applyMutationIn(tx, clientId, m as never, from, req.log)
       })
       if (!result) {
         stale = true

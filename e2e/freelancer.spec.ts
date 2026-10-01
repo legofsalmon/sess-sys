@@ -27,11 +27,12 @@ test('a refusal shows in the offer’s card, and Enter in the rate field sends t
   await card.getByRole('button', { name: 'Accept these days' }).click()
   const alert = card.getByRole('alert')
   await expect(alert).toHaveText(/^Already booked on Harbour Lights Festival/)
-  const box = (await alert.boundingBox())!
-  expect(box.x).toBeGreaterThanOrEqual(0)
-  expect(box.y).toBeGreaterThanOrEqual(0)
-  expect(box.x + box.width).toBeLessThanOrEqual(phoneSize.width)
-  expect(box.y + box.height).toBeLessThanOrEqual(phoneSize.height)
+  const box = await alert.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.y).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(phoneSize.width)
+  expect(box!.y + box!.height).toBeLessThanOrEqual(phoneSize.height)
   await expect(card.locator('.tag')).toHaveText('Waiting on you')
 
   // Drops the clashing day and asks for a different rate, with Enter in the rate field: the rate goes to the office, nothing is accepted.
