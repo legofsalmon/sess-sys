@@ -278,7 +278,7 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
     const first = cell.work.find((w) => w.booked) ?? cell.work[0]
     const words = [
       tag && `${tag}: ${cell.problem}`,
-      ...cell.work.map((w) => `${w.booked ? 'Booked or to confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}`),
+      ...cell.work.map((w) => `${w.confirmed ? 'Booked on' : w.booked ? 'To confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}`),
       cell.away !== null && `Unavailable${cell.away ? ` (${cell.away})` : ''}`,
     ]
       .filter(Boolean)

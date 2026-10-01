@@ -201,7 +201,7 @@ describe('the week by person', () => {
     const week = plan(await synced(app), weekOf(MON!))
     const row = (id: string) => week.people.find((l) => l.person.id === id)!.days
     expect(row(aoife)[MON!]).toEqual({
-      work: [expect.objectContaining({ job: 'Web Summit', phase: 'Build', role: 'Audio tech', booked: true })],
+      work: [expect.objectContaining({ job: 'Web Summit', phase: 'Build', role: 'Audio tech', booked: true, confirmed: true })],
       away: null,
       problem: null,
       severity: null,
