@@ -118,12 +118,18 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
     }
   }
 
+  // Each call's offers gathered once: looking through every offer for every call is calls × offers, most of a year's rebuild.
+  const byCall = new Map<string, OfferView[]>()
+  for (const o of offers.values()) {
+    const list = byCall.get(o.callId) ?? []
+    list.push({ ...o, person: people.get(o.personId) })
+    byCall.set(o.callId, list)
+  }
   const callViews: CallView[] = [...calls.values()].map((c) => {
     const days = eachDay(c.start, c.end)
-    const own = [...offers.values()]
-      .filter((o) => o.callId === c.id)
-      .map((o) => ({ ...o, person: people.get(o.personId) }))
-      .sort((a, b) => statusRank(a.status) - statusRank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? ''))
+    const own = (byCall.get(c.id) ?? []).sort(
+      (a, b) => statusRank(a.status) - statusRank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '')
+    )
     const heldByDay: Record<string, number> = {}
     for (const d of days) heldByDay[d] = own.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
     return { ...c, offers: own, days, heldByDay, openDays: days.filter((d) => heldByDay[d]! < c.needed) }

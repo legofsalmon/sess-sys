@@ -76,7 +76,9 @@ function patch<T extends object>(target: T, changes: object): T {
   return out
 }
 
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'en-IE', { sensitivity: 'base' }) || a.name.localeCompare(b.name)
+/** One collator, not one made for every comparison: with a few hundred products that was most of what a rebuild cost. */
+const irishNames = new Intl.Collator('en-IE', { sensitivity: 'base' })
+const byName = (a: { name: string }, b: { name: string }) => irishNames.compare(a.name, b.name) || a.name.localeCompare(b.name)
 /** By number; items still waiting for one last, in the order they were added. */
 const byNumber = (a: Asset, b: Asset) => (a.number ? 0 : 1) - (b.number ? 0 : 1) || a.number.localeCompare(b.number) || a.id.localeCompare(b.id)
 

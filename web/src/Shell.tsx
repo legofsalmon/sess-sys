@@ -6,6 +6,7 @@ import { HistoryScreen } from './HistoryScreen.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
+import { StorageBanner } from './StorageBanner.tsx'
 import { UpdateBar } from './update.tsx'
 
 /**
@@ -44,6 +45,7 @@ export function Shell() {
   return (
     <>
       <UpdateBar />
+      <StorageBanner />
       <area.Screen />
       <nav className="tabs" aria-label="Areas">
         {AREAS.map((a) => (

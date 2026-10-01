@@ -98,6 +98,8 @@ export interface MovesView {
 type Tables = { [E in keyof MoveEntities]: Record<string, MoveEntities[E]> }
 
 const later = (a: Movement, b: Movement) => a.at > b.at || (a.at === b.at && a.id > b.id)
+/** Places in order, "Bay 2" before "Bay 10": one collator, not one made for every comparison. */
+const byWhere = new Intl.Collator('en-IE', { numeric: true })
 
 /** "Bay A3", "Bay A3, in SH-000009", or "in SH-000009" when the case isn't anywhere yet. */
 function whereKept(a: { at: { name: string } | undefined; inCase: AssetView | undefined; place?: { name: string } | undefined }): string {
@@ -272,7 +274,7 @@ export function movesView(
       const at = (where: string) => from.get(where) ?? (from.set(where, { where, items: [], counted: 0 }), from.get(where)!)
       for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.cantGoOut(a.id)) at(whereKept(a)).items.push(a)
       for (const s of r.model?.counted ?? []) at(whereKept(s)).counted += s.qty
-      r.from = [...from.values()].sort((a, b) => a.where.localeCompare(b.where, 'en-IE', { numeric: true }))
+      r.from = [...from.values()].sort((a, b) => byWhere.compare(a.where, b.where))
     }
     // The kit's own order (by department, then product), then what isn't on it.
     const onKit = [...rows.values()].filter((r) => r.lines.length > 0)

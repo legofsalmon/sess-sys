@@ -90,26 +90,28 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const say = (tone: Tone, text: string, back?: AssetView) => setSaid({ tone, text, at: Date.now(), back })
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
+  // What's looked up before anything is recorded comes from the view on screen;
+  // only the count after a scan is recorded needs the device's latest.
   const onCode = async (code: string) => {
-    const w = client.view().warehouse
+    const w = view.warehouse
     const n = normaliseNumber(code)
     const serial = code.trim().toLowerCase()
     const bySerial = [...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial)
     const a = (n && w.byNumber.get(n)) || (bySerial.length === 1 ? bySerial[0] : undefined)
     if (!a) return say('warn', n ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
-    const was = client.view().moves.outOf(a.id)
+    const was = view.moves.outOf(a.id)
     const other = was && was.projectId !== job.id ? (view.jobs.jobs.find((j) => j.id === was.projectId)?.name ?? 'another job') : undefined
     const notes: string[] = []
     if (a.status === 'retired') notes.push(`It's marked as ${a.retiredReason ? RETIRED_LABELS[a.retiredReason].toLowerCase() : 'retired'}.`)
     // Scanned, so it isn't missing any more; damaged, and it shouldn't go out.
-    const fault = client.view().faults.stopping(a.id)
+    const fault = view.faults.stopping(a.id)
     const found = fault?.kind === 'missing'
     if (found) await act(() => client.mutate('fault.close', { id: fault.id, outcome: 'found', at: new Date().toISOString() }))
     if (found) notes.push("It was reported missing, so it's marked found.")
     else if (fault && mode === 'out') notes.push(`It's reported ${faultState(fault).toLowerCase()}${fault.note ? `: ${fault.note}` : ''}. Check it before it goes.`)
     // Failed or overdue its PAT or examination (ADR 0020): it shouldn't go.
-    const check = mode === 'out' ? client.view().inspections.blocks(a.id) : undefined
+    const check = mode === 'out' ? view.inspections.blocks(a.id) : undefined
     if (check) notes.push(`${dueText(check)}. Test it before it goes.`)
 
     if (mode === 'out') {
