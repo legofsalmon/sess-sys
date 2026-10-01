@@ -387,8 +387,18 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const o = offer(a.id)
       if (a.answer === 'decline') return `${o.who} declined ${o.what}`
       if (a.answer === 'counter') return `${o.who} asked for ${euro(a.counterRateCents as number)} a day for ${o.what}`
+      if (a.answer === 'pullOut') return `${o.who} can't make it any more: ${o.what}${typeof a.note === 'string' && a.note.trim() ? ` (${clip(a.note.trim())})` : ''}`
       return `${o.who} accepted ${o.what}${Array.isArray(a.days) && a.days.length ? `, ${daysLabel(a.days as string[])}` : ''}`
     }
+    case 'offer.seen': {
+      const o = offer(a.id)
+      const was = look('offer', a.id)?.status
+      if (was === 'pulled-out') return `Noted that ${o.who} can't make ${o.what}`
+      if (was === 'declined') return `Noted that ${o.who} declined ${o.what}`
+      return `Noted ${o.who}'s answer on ${o.what}`
+    }
+    case 'office.update':
+      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`

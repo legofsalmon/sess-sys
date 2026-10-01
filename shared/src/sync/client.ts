@@ -9,6 +9,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { officeView, type OfficeView } from './office-view.ts'
 import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
@@ -109,6 +110,8 @@ export interface View {
   inspections: InspectionsView
   /** Freelancers' timesheets for their bookings (ADR 0022). */
   timesheets: TimesheetsView
+  /** The office's own details, shown on every freelancer page. */
+  office: OfficeView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -379,6 +382,7 @@ export class SyncClient {
       faults,
       inspections,
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
+      office: officeView(entities, outbox, this.state.cursor),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

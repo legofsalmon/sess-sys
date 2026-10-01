@@ -268,6 +268,7 @@ describe('the week by person', () => {
         respondedAt: null,
         respondedVia: null,
         override: false,
+        seenAt: null,
         pending: false,
         person: aoife,
       })),

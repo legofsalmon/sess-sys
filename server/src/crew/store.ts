@@ -5,7 +5,7 @@ import type { Queryable } from '../db.ts'
 
 const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
-const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override`
+const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
 
 type Row = Record<string, any>
@@ -51,6 +51,7 @@ export const toOffer = (r: Row): Offer => ({
   respondedAt: r.responded_at ? new Date(r.responded_at).toISOString() : null,
   respondedVia: r.responded_via,
   override: r.override,
+  seenAt: r.seen_at ? new Date(r.seen_at).toISOString() : null,
 })
 export const toAway = (r: Row): Unavailability => ({
   id: r.id,
@@ -93,7 +94,7 @@ export async function awayFor(q: Queryable, personId: string) {
 }
 
 const OFFER_WITH_CALL = `o.id, o.call_id, o.person_id, o.status, o.days, o.day_rate_cents, o.counter_rate_cents, o.note,
-            o.responded_at, o.responded_via, o.override,
+            o.responded_at, o.responded_via, o.override, o.seen_at,
             c.id AS c_id, c.project_id AS c_project_id, c.phase_id AS c_phase_id,
             c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
             c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,

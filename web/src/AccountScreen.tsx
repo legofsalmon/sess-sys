@@ -7,6 +7,7 @@ import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
 import { MadeUp } from './jobs/common.tsx'
+import { OfficeCard } from './OfficeCard.tsx'
 import { client, storage } from './sync.ts'
 
 /** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, and the device's own sync state. */
@@ -98,6 +99,7 @@ export function AccountScreen() {
 
       {(auth.status === 'signed-in' || auth.status === 'open') && (
         <>
+          <OfficeCard office={view.office} />
           <CalendarCard view={view} available={auth.status === 'signed-in'} />
           <BackupsCard />
           <ExportCard />

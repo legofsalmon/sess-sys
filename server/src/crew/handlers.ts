@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { daysBetween, daysLabel, eachDay, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { daysBetween, daysLabel, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
@@ -29,7 +29,11 @@ type CrewCommand =
   | 'offer.respond'
   | 'offer.confirm'
   | 'offer.cancel'
+  | 'offer.seen'
 type Handler<N extends CrewCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
+
+/** Answers that end an offer for good: the person can be offered the same call afresh. */
+const OVER: readonly Offer['status'][] = ['declined', 'filled', 'cancelled', 'pulled-out']
 
 /** 24 characters of randomness; the whole secret in a person's link. */
 export const newLinkToken = () => randomBytes(18).toString('base64url')
@@ -100,7 +104,7 @@ export async function cancelCall(ctx: Ctx, callId: string) {
   await ctx.tx.query(`UPDATE crew_calls SET status = 'cancelled' WHERE id = $1`, [callId])
   await emit(ctx, 'crewCall', callId, await getCall(ctx.tx, callId))
   for (const o of await offersForCall(ctx.tx, callId))
-    if (!['declined', 'filled', 'cancelled'].includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
+    if (!OVER.includes(o.status)) await setOffer(ctx, o.id, { status: 'cancelled' })
 }
 
 /** "Aoife Byrne", "Aoife Byrne and Dara Walsh", "Aoife Byrne, Dara Walsh and Niall Kerr". */
@@ -328,7 +332,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to offer them work.` })
     const offers = await offersForCall(ctx.tx, call.id)
-    const live = offers.find((o) => o.personId === person.id && !['declined', 'filled', 'cancelled'].includes(o.status))
+    const live = offers.find((o) => o.personId === person.id && !OVER.includes(o.status))
     if (live) throw new Refused({ code: 'conflict', message: `${person.name} already has this offer (${live.status}).` })
     const days = eachDay(call.start, call.end)
     const held = heldByDay(call, offers)
@@ -354,12 +358,25 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const offer = await getOffer(ctx.tx, a.id)
     if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
     const call = await openCall(ctx, offer.callId)
+    // Every answer is new to the office, so it goes back into "Answers to check".
+    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via, note: a.note, seen_at: null }
+    if (a.answer === 'pullOut') {
+      // Only a place they hold can be given back. The held count drops with the
+      // status, so the call is short again, and the office hears of it in
+      // "Answers to check" until they note it (audit finding 10).
+      if (!HOLDING.includes(offer.status)) throw new Refused({ code: 'conflict', message: "You can only pull out of a job you've said yes to." })
+      // The page never offers it after the job, but a crafted post could reach here and lose the timesheet.
+      if (call.end < irishToday()) throw new Refused({ code: 'conflict', message: 'That job has already happened; talk to the office.' })
+      await setOffer(ctx, offer.id, { ...answered, status: 'pulled-out' })
+      return
+    }
     if (offer.status === 'filled') throw new Refused({ code: 'filled', message: 'Sorry, this has already been filled by someone else.' })
     if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: 'This offer was withdrawn.' })
+    // Pulled out is over: the office offers it afresh if they can do it after all.
+    if (offer.status === 'pulled-out') throw new Refused({ code: 'conflict', message: "You've pulled out of this one. Ask the office if you can do it after all." })
     if (offer.status === 'confirmed')
       throw new Refused({ code: 'conflict', message: 'You are confirmed for this job. Please contact the office to change it.' })
 
-    const answered = { responded_at: new Date().toISOString(), responded_via: ctx.via, note: a.note }
     if (a.answer === 'decline') {
       await setOffer(ctx, offer.id, { ...answered, status: 'declined' })
       return
@@ -397,7 +414,16 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'offer.cancel'(ctx, a) {
     const offer = await getOffer(ctx.tx, a.id)
     if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
-    if (offer.status === 'cancelled') return
+    // An offer that is over stays as it ended: a Withdraw queued on an offline device must not rewrite a decline or a pull-out.
+    if (OVER.includes(offer.status)) return
     await setOffer(ctx, offer.id, { status: 'cancelled' })
+  },
+
+  async 'offer.seen'(ctx, a) {
+    const offer = await getOffer(ctx.tx, a.id)
+    if (!offer) throw new Refused({ code: 'not-found', message: 'That offer no longer exists.' })
+    // Noted once is noted: a second device's Noted changes nothing.
+    if (offer.seenAt) return
+    await setOffer(ctx, offer.id, { seen_at: new Date().toISOString() })
   },
 }

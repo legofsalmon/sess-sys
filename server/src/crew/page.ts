@@ -1,4 +1,5 @@
 import { dayLabel, daysLabel, eachDay, euro, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
+import { officeContact, telHref, type OfficeDetails } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -12,6 +13,22 @@ const h = (s: unknown) =>
 /** The message after a post. A refusal is an alert, so it's read out and looks like one; a thank-you is a status. */
 export const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.ok ? 'ok' : 'bad'}" role="${f.ok ? 'status' : 'alert'}">${h(f.text)}</p>`
 
+/**
+ * The way back to the office (audit finding 10), on every page: the phone
+ * and email as links a phone taps. Nothing until the office sets them on the
+ * Account tab.
+ */
+export function officeBlock(o: OfficeDetails | null | undefined): string {
+  const c = officeContact(o)
+  if (!c) return ''
+  const parts = [
+    h(c.name),
+    c.phone && `<a href="${h(telHref(c.phone))}">${h(c.phone)}</a>`,
+    c.email && `<a href="mailto:${h(c.email)}">${h(c.email)}</a>`,
+  ].filter(Boolean)
+  return `<p class="office">${parts.join(' · ')}</p>`
+}
+
 export interface PageData {
   person: Person
   jobs: { offer: Offer; call: CrewCall; openDays: string[] }[]
@@ -24,6 +41,8 @@ export interface PageData {
   today: string
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
+  /** The office's phone and email, once set. */
+  office?: OfficeDetails | null
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -34,6 +53,23 @@ const STATUS_TEXT: Record<Offer['status'], string> = {
   declined: 'You declined',
   filled: 'Filled by someone else',
   cancelled: 'Withdrawn',
+  'pulled-out': "You've pulled out",
+}
+
+/**
+ * The way out of a job they said yes to (audit finding 10), folded away so
+ * it's never pressed by accident: a note and one button, in a form of its
+ * own so the day picker and the rate stay out of it.
+ */
+function pullOut(d: PageData, action: string) {
+  const phone = officeContact(d.office)?.phone
+  return `<details class="pull-out"><summary>Can't make it any more?</summary>
+      <form method="post" action="${action}">
+        <p class="small">Tell us as soon as you can, so we can find cover.${phone ? ` Ringing ${h(phone)} is quickest.` : ''}</p>
+        <label>Why, if you like <textarea name="note" rows="2" maxlength="1000"></textarea></label>
+        <button class="no" name="answer" value="pullOut">I can't make it</button>
+      </form>
+    </details>`
 }
 
 function facts(call: CrewCall, offer: Offer) {
@@ -54,7 +90,10 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const days = eachDay(call.start, call.end)
   const action = `${d.base}/offers/${encodeURIComponent(offer.id)}`
   const title = `${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}`
-  const canAnswer = offer.status === 'offered' || offer.status === 'countered' || offer.status === 'accepted'
+  // Someone who said yes can still change their days; on a one-day job there is nothing to change.
+  const canAnswer = offer.status === 'offered' || offer.status === 'countered' || (offer.status === 'accepted' && days.length > 1)
+  // Someone who said yes gives the place back with "Can't make it", not Decline.
+  const holding = (offer.status === 'accepted' || offer.status === 'confirmed') && call.status === 'open'
   const dayPicker =
     days.length > 1
       ? `<input type="hidden" name="picker" value="1"><fieldset class="days"><legend>Your days</legend>${days
@@ -73,15 +112,15 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
     ${d.flash?.offer === offer.id ? flash(d.flash) : ''}
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
     ${facts(call, offer)}
-    ${(offer.status === 'accepted' || offer.status === 'confirmed') && call.status === 'open' ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
+    ${holding ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
     ${
       canAnswer
         ? `<form method="post" action="${action}">
       ${onEnter}
       ${dayPicker}
-      <div class="buttons">
+      <div class="buttons${holding ? ' one' : ''}">
         <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
-        <button class="no" name="answer" value="decline">${offer.status === 'accepted' ? 'I can no longer do it' : 'Decline'}</button>
+        ${holding ? '' : '<button class="no" name="answer" value="decline">Decline</button>'}
       </div>
       <details${offer.status === 'countered' ? ' open' : ''}><summary>Ask for a different rate or add a note</summary>
         <label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>
@@ -91,6 +130,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
     </form>`
         : ''
     }
+    ${holding ? pullOut(d, action) : ''}
   </article>`
 }
 
@@ -163,6 +203,7 @@ export function renderPage(d: PageData): string {
 <body>
 <main>
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
+  ${officeBlock(d.office)}
   ${d.flash && !inCard ? flash(d.flash) : ''}
 
   <section>
@@ -237,6 +278,9 @@ h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 section{display:grid;gap:10px}
 .offer{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
 .offer.offered{border-left-color:var(--accent)}.offer.confirmed{border-left-color:var(--good)}.offer.accepted,.offer.countered{border-left-color:var(--warn)}
+.office{margin:0;font-size:.92rem;color:var(--muted)}.office a{font-weight:600;white-space:nowrap}
+.pull-out summary{color:var(--bad)}.pull-out[open]{display:grid;gap:8px}.tag.pulled-out{background:var(--bad-soft);color:var(--bad)}
+.buttons.one{grid-template-columns:1fr}
 .offer header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
 h3{margin:0;font-size:1.1rem}h3 span{font-weight:500;color:var(--muted)}
 .tag{font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--line);white-space:nowrap}

@@ -4,6 +4,7 @@ import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { publicOrigin } from '../http.ts'
+import { officeFor } from '../office/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
 import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
@@ -85,6 +86,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
           flash,
           today: today(),
           timesheets: await timesheetsFor(db, person.id),
+          office: await officeFor(db),
         })
       )
   })
@@ -96,7 +98,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (!person) return reply.code(404).type('text/html').send(renderGone())
     const sheet = await sheetFor(db, person.id, req.params.id ?? '')
     if (!sheet) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken)))
-    return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken)))
+    return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken), await officeFor(db)))
   })
 
   // A booking's timesheet (ADR 0022): the person's own, from its first day.
@@ -116,6 +118,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         why: noTimesheetReason(offer, call, person, today()),
         base: base(req, person.linkToken),
         flash,
+        office: await officeFor(db),
       })
     )
   })
@@ -170,6 +173,8 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     let result: MutationResult
     if (answer === 'accept') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'accept', days, note })
     else if (answer === 'decline') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'decline', note })
+    // "Can't make it any more" (audit finding 10): a job they had said yes to, given back.
+    else if (answer === 'pullOut') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'pullOut', note })
     else if (answer === 'counter') {
       const euros = Number((form.get('rate') ?? '').replace(',', '.'))
       if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
@@ -182,8 +187,11 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         ? "Thanks, you're down for it. The office will confirm."
         : answer === 'decline'
           ? "Thanks for letting us know. You're off this one."
-          : 'Thanks, your rate has gone to the office.'
-    return back(reply, person.linkToken, text, true, offer.id)
+          : answer === 'pullOut'
+            ? "Thanks for telling us. You're off this one, and the office will find cover."
+            : 'Thanks, your rate has gone to the office.'
+    // A pull-out leaves the card for "Earlier", so its message goes at the top.
+    return back(reply, person.linkToken, text, true, answer === 'pullOut' ? undefined : offer.id)
   })
 
   // Their own email and phone (audit finding 7). Only what differs is sent, so the history can say which changed.

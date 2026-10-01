@@ -120,6 +120,7 @@ describe('download everything', () => {
       'products',
       'projects',
       'scans',
+      'settings',
       'stock',
       'timesheets',
       'unavailability',

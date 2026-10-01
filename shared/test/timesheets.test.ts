@@ -52,6 +52,7 @@ const offer = (id: string, callId: string, personId: string, days: string[], sta
   respondedAt: null,
   respondedVia: null,
   override: false,
+  seenAt: null,
 })
 const sheet = (id: string, t: Partial<Timesheet>): Timesheet => {
   const days = t.days ?? ['2026-09-18', '2026-09-19']

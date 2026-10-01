@@ -468,6 +468,107 @@ describe('changing a call', () => {
     await client.sync()
     expect(client.view().crew.calls[0]).toMatchObject({ pending: false, start: '2026-10-03', end: '2026-10-05' })
     expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ days: ['2026-10-03', '2026-10-04', '2026-10-05'], dayRateCents: 30000 })
+describe('telling the office', () => {
+  it('keeps a decline for the office to note, and says so in the history', async () => {
+    // A decline leaves a call short; it waits in "Answers to check" (seenAt null) until the office taps Noted.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app, { needed: 2 })
+    const o = await offer(app, c, aoife.id)
+    expect(await answer(app, aoife.linkToken, o.id, { answer: 'decline', note: 'At a wedding that weekend.' })).toMatchObject({ ok: true })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'declined', note: 'At a wedding that weekend.', seenAt: null })
+
+    expect((await send(app, 'offer.seen', { id: o.id })).status).toBe('applied')
+    const noted = await entity<Offer>(app, 'offer', o.id)
+    expect(noted.seenAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    // Noted again, from another device: nothing changes.
+    expect((await send(app, 'offer.seen', { id: o.id })).status).toBe('applied')
+    expect((await entity<Offer>(app, 'offer', o.id)).seenAt).toBe(noted.seenAt)
+    expect((await send(app, 'offer.seen', { id: 'nope' })).status).toBe('rejected')
+
+    const history = (await app.inject({ url: '/api/history' })).json() as { entries: { what: string; outcome: string }[] }
+    expect(history.entries.map((e) => [e.what, e.outcome]).slice(0, 4)).toEqual([
+      ["Noted someone's answer on a role on a job", 'turned-down'],
+      ['Noted that Aoife Byrne declined Audio tech on Electric Picnic', 'done'],
+      ['Noted that Aoife Byrne declined Audio tech on Electric Picnic', 'done'],
+      ['Aoife Byrne declined Audio tech on Electric Picnic', 'done'],
+    ])
+  })
+
+  it('lets someone booked say they can’t make it: the place is free again, and the office hears of it', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const c = await call(app, { needed: 1 })
+    const o = await offer(app, c, aoife.id)
+    await answer(app, aoife.linkToken, o.id, { answer: 'accept' })
+    await send(app, 'offer.confirm', { id: o.id })
+    await send(app, 'offer.seen', { id: o.id })
+    // Full, so Niall's offer is turned down.
+    expect((await offer(app, c, niall.id)).result).toMatchObject({ status: 'rejected', reason: { code: 'filled' } })
+
+    // Her page offers the way out on a booking, folded away, and takes the pull-out from its own form.
+    let page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    expect(cardOf(page, o.id)).toContain("Can't make it any more?")
+    expect(cardOf(page, o.id)).toContain('name="answer" value="pullOut"')
+    expect(cardOf(page, o.id)).not.toContain('value="decline"')
+    const out = await answer(app, aoife.linkToken, o.id, { answer: 'pullOut', note: 'Double booked, sorry.' })
+    expect(out).toMatchObject({ ok: true, message: "Thanks for telling us. You're off this one, and the office will find cover." })
+    // A pull-out is new to the office, so it waits to be noted even though the booking had been.
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'pulled-out', note: 'Double booked, sorry.', respondedVia: 'link', seenAt: null })
+
+    // The card has gone to "Earlier", with the message at the top; the place is free, so Niall can be offered it and the sheet leaves her out.
+    page = (await app.inject({ url: out.to.pathname + out.to.search })).body
+    expect(page).toContain("You've pulled out")
+    expect(page).not.toContain(`id="o-${o.id}"`)
+    expect(page.indexOf('class="flash ok"')).toBeLessThan(page.indexOf('<section>'))
+    const n = await offer(app, c, niall.id)
+    expect(n.result.status).toBe('applied')
+    // And she can be offered the same call again, afresh, while it's still open.
+    const again = await offer(app, c, aoife.id)
+    expect(again.result.status).toBe('applied')
+    expect(await answer(app, niall.linkToken, n.id, { answer: 'accept' })).toMatchObject({ ok: true })
+    expect((await entity<Offer>(app, 'offer', again.id)).status).toBe('filled')
+    expect((await app.inject({ url: `/f/${aoife.linkToken}/sheet/${c}` })).statusCode).toBe(404)
+    expect((await app.inject({ url: `/f/${niall.linkToken}/sheet/${c}` })).body).not.toContain('Aoife Byrne')
+
+    const history = (await app.inject({ url: '/api/history' })).json() as { entries: { what: string; who: { kind: string; name: string } }[] }
+    expect(history.entries.find((e) => e.what.startsWith('Aoife Byrne can'))).toMatchObject({
+      what: "Aoife Byrne can't make it any more: Audio tech on Electric Picnic (Double booked, sorry.)",
+      who: { kind: 'link', name: 'Aoife Byrne' },
+    })
+  })
+
+  it('takes a pull-out only from someone who said yes, from the link or the app', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app)
+    const o = await offer(app, c, aoife.id)
+    const early = await answer(app, aoife.linkToken, o.id, { answer: 'pullOut' })
+    expect(early).toMatchObject({ ok: false, message: "You can only pull out of a job you've said yes to." })
+    expect((await entity<Offer>(app, 'offer', o.id)).status).toBe('offered')
+
+    // Accepted, not yet confirmed: the office records a pull-out that came by phone.
+    await answer(app, aoife.linkToken, o.id, { answer: 'accept' })
+    expect((await send(app, 'offer.respond', { id: o.id, answer: 'pullOut', note: 'Rang to say so.' })).status).toBe('applied')
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'pulled-out', respondedVia: 'app' })
+    // Pulled out is over: no answering it again.
+    expect(await answer(app, aoife.linkToken, o.id, { answer: 'accept' })).toMatchObject({ ok: false, message: "You've pulled out of this one. Ask the office if you can do it after all." })
+    const history = (await app.inject({ url: '/api/history' })).json() as { entries: { what: string }[] }
+    expect(history.entries[1]!.what).toBe("Aoife Byrne can't make it any more: Audio tech on Electric Picnic (Rang to say so.)")
+    await send(app, 'offer.seen', { id: o.id })
+    expect((await app.inject({ url: '/api/history' })).json().entries[0].what).toBe("Noted that Aoife Byrne can't make Audio tech on Electric Picnic")
+    // A Withdraw queued on another device changes nothing: the pull-out stays for the office to see.
+    expect((await send(app, 'offer.cancel', { id: o.id })).status).toBe('applied')
+    expect((await entity<Offer>(app, 'offer', o.id)).status).toBe('pulled-out')
+
+    // Once the job has happened the page shows no way out, and a crafted post is refused, so the timesheet stays.
+    const past = await call(app, { start: '2026-09-01', end: '2026-09-02' })
+    const done = await offer(app, past, aoife.id)
+    await answer(app, aoife.linkToken, done.id, { answer: 'accept' })
+    await send(app, 'offer.confirm', { id: done.id })
+    expect(await answer(app, aoife.linkToken, done.id, { answer: 'pullOut' })).toMatchObject({ ok: false, message: 'That job has already happened; talk to the office.' })
+    expect((await entity<Offer>(app, 'offer', done.id)).status).toBe('confirmed')
   })
 })
 

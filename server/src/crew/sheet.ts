@@ -1,7 +1,7 @@
-import { callSheet, HOLDING, type CallSheet, type SheetKitLine, type SheetPerson } from '@sh/shared'
+import { callSheet, HOLDING, type CallSheet, type OfficeDetails, type SheetKitLine, type SheetPerson } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { getClient, getPhase, getProject, getVenue } from '../projects/store.ts'
-import { CSS } from './page.ts'
+import { CSS, officeBlock } from './page.ts'
 import { getCall, getPerson, offersForCall, openCallsFor } from './store.ts'
 
 /**
@@ -68,7 +68,7 @@ const h = (s: unknown) =>
 const lines = (s: string) => h(s).replace(/\n/g, '<br>')
 const tel = (phone: string) => `<a href="tel:${h(phone.replace(/[^\d+]/g, ''))}">${h(phone)}</a>`
 
-export function renderSheet(s: CallSheet, base: string): string {
+export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails | null): string {
   const mine = s.calls.filter((c) => c.crew.some((p) => p.me))
   return `<!doctype html>
 <html lang="en-IE">
@@ -84,6 +84,7 @@ export function renderSheet(s: CallSheet, base: string): string {
 <body>
 <main class="sheet">
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Call sheet</small></div></header>
+  ${officeBlock(office)}
   <a class="back" href="${h(base)}">‹ Your work</a>
   <section class="head">
     <h1>${h(s.job)}${s.phase ? ` <span>${h(s.phase)}</span>` : ''}</h1>

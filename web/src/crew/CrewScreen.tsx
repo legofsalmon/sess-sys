@@ -1,17 +1,25 @@
 import {
+  answersToCheck,
   daysLabel,
   eachDay,
   euro,
+  HOLDING,
   newId,
   offerMessage,
   offerOnCalendar,
+  OPEN,
   personConflicts,
+  tellMessage,
   whatsappNumber,
+  type AnswerKind,
   type CallView,
   type CommandInput,
   type CrewView,
   type OfferView,
+  type Person,
   type PersonView,
+  type TellContext,
+  type TellEvent,
   type View,
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -27,6 +35,11 @@ import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
  * 0009), and show up here live; everything also works with no signal and
  * syncs later, like the rest of the app. Timesheets for bookings that
  * have happened are checked and approved here too (ADR 0022).
+ *
+ * After anything the office does that a freelancer should hear about
+ * (Confirm, Withdraw, Release, a cancelled call or job, a timesheet
+ * approved), the message for it opens below, ready to send (audit finding
+ * 9). The app sends nothing itself.
  */
 
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
@@ -39,6 +52,7 @@ const STATUS: Record<OfferView['status'], [string, string]> = {
   declined: ['Declined', 'cancelled'],
   filled: ['Filled', 'cancelled'],
   cancelled: ['Withdrawn', 'cancelled'],
+  'pulled-out': ["Can't make it", 'cancelled'],
 }
 
 export const act = async (fn: () => Promise<unknown>) => {
@@ -46,7 +60,7 @@ export const act = async (fn: () => Promise<unknown>) => {
   syncSoon()
 }
 
-export const linkFor = (p: PersonView) => (p.linkToken ? `${location.origin}/f/${p.linkToken}` : '')
+export const linkFor = (p: Pick<Person, 'linkToken'>) => (p.linkToken ? `${location.origin}/f/${p.linkToken}` : '')
 
 function useView(): View {
   const [view, setView] = useState(() => client.view())
@@ -54,20 +68,75 @@ function useView(): View {
   return view
 }
 
+/** One person to tell, with the call it's about and whatever else the message needs. */
+export interface TellTo {
+  person: Person
+  context: TellContext
+}
+
+/** People to tell after something the office did, and what happened. */
+export interface Tell {
+  /** Its own, so a new prompt starts from its first person even when it replaces one still open. */
+  id: string
+  event: TellEvent
+  to: TellTo[]
+}
+
+/** What's open at the bottom of a screen: an offer to send, or people to tell. One at a time. */
+export type Share = { kind: 'offer'; person: PersonView; call: CallView } | { kind: 'tell'; tell: Tell }
+
+/**
+ * The prompt after something the office did (audit finding 9): a message
+ * for each person, written for what happened, to send by WhatsApp, text or
+ * email as the offer is, or to copy. The app sends nothing itself. Nothing
+ * when there's nobody to tell. A call changed or a phase moved prompts the
+ * same way: setShare(promptFor('call-changed', peopleOn(call))).
+ */
+export function promptFor(event: TellEvent, to: TellTo[]): Share | undefined {
+  return to.length ? { kind: 'tell', tell: { id: newId(), event, to } } : undefined
+}
+
+/** Someone to tell about a call, with their own days and agreed rate when they have an offer on it. */
+export function tellTo(person: Person, call: CallView, offer?: Pick<OfferView, 'id' | 'days' | 'status' | 'dayRateCents' | 'counterRateCents'>): TellTo {
+  const agreed = offer ? (offer.status === 'countered' ? offer.counterRateCents : offer.dayRateCents) : call.dayRateCents
+  return { person, context: { call: { ...call, dayRateCents: agreed }, days: offer?.days, offerId: offer?.id } }
+}
+
+/** Everyone offered or holding a place on a call, to tell when it changes or goes. */
+export function peopleOn(call: CallView, statuses: readonly OfferView['status'][] = [...OPEN, ...HOLDING]): TellTo[] {
+  return call.offers.filter((o) => o.person && statuses.includes(o.status)).map((o) => tellTo(o.person as Person, call, o))
+}
+
+/** The panel for whatever is open: the offer to send, or the people to tell one at a time. */
+export function SharePanelFor({ share, onClose }: { share: Share; onClose: () => void }) {
+  if (share.kind === 'offer') return <SharePanel person={share.person} call={share.call} onClose={onClose} />
+  return <TellPanel key={share.tell.id} tell={share.tell} onClose={onClose} />
+}
+
+/**
+ * What the call needs after a no, under "Aoife Byrne declined": "The call is 1 short",
+ * or "Was down for 2 days; the call is filled" after a pull-out. "Down for", not
+ * "booked": a pull-out can come before the office confirmed.
+ */
+function whatItNeeds(kind: AnswerKind, offer: OfferView, short: number): string {
+  const needs = short > 0 ? `${short} short` : 'filled'
+  if (kind === 'pulled-out') return `Was down for ${offer.days.length} day${offer.days.length === 1 ? '' : 's'}; the call is ${needs}`
+  return `The call is ${needs}`
+}
+
 export function CrewScreen() {
   const view = useView()
   const hash = useHash()
   const crew = view.crew
-  const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
+  const [share, setShare] = useState<Share | undefined>()
   const people = new Map(crew.people.map((p) => [p.id, p]))
   // Archived people (leavers) are kept for the record but out of the way.
   const active = crew.people.filter((p) => !p.archived)
   const archived = crew.people.filter((p) => p.archived)
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
-  const toCheck = upcoming.flatMap((c) =>
-    c.offers.filter((o) => o.status === 'accepted' || o.status === 'countered').map((o) => ({ c, o, warning: onCalendar(o)?.warning }))
-  )
+  // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
+  const toCheck = answersToCheck(crew, today).map((a) => ({ ...a, warning: onCalendar(a.offer)?.warning }))
   // Answers in Google the app couldn't act on, such as a No to a booked day: for the office to sort out.
   const toSortOut = upcoming.flatMap((c) =>
     c.offers
@@ -80,6 +149,12 @@ export function CrewScreen() {
   const problems = view.problems.filter((p) => /^(person|call|offer|unavailability|timesheet)\./.test(p.mutation.name))
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
+
+  /** Settle a yes or a counter, then tell them. */
+  const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
+    void act(() => client.mutate(command, { id: o.id }))
+    if (o.person) setShare(promptFor(event, [tellTo(o.person, c, o)]))
+  }
 
   return (
     <div className="app crew">
@@ -121,27 +196,51 @@ export function CrewScreen() {
               )}
             </div>
           ))}
-          {toCheck.map(({ c, o, warning }) => (
+          {toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
             <div className="row" key={o.id}>
               <div>
                 <b>{o.person?.name ?? 'Someone'}</b>{' '}
-                {o.status === 'accepted'
+                {kind === 'accepted'
                   ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
-                  : `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`}
+                  : kind === 'countered'
+                    ? `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`
+                    : kind === 'declined'
+                      ? 'declined'
+                      : "can't make it any more"}
                 <p>
                   {c.project} · {c.role} · {daysLabel(o.days)}
+                  {(kind === 'declined' || kind === 'pulled-out') && <><br />{whatItNeeds(kind, o, short)}</>}
                   {o.note && <><br />“{o.note}”</>}
                   {warning && <><br />{warning}</>}
                 </p>
               </div>
-              <div className="actions">
-                <button type="button" className="primary" onClick={() => act(() => client.mutate('offer.confirm', { id: o.id }))}>
-                  {o.status === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
-                </button>
-                <button type="button" onClick={() => act(() => client.mutate('offer.cancel', { id: o.id }))}>
-                  {o.status === 'countered' ? 'Say no' : 'Release'}
-                </button>
-              </div>
+              {kind === 'accepted' || kind === 'countered' ? (
+                <div className="actions">
+                  <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
+                    {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
+                  </button>
+                  <button type="button" onClick={() => settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')}>
+                    {kind === 'countered' ? 'Say no' : 'Release'}
+                  </button>
+                </div>
+              ) : (
+                <div className="actions">
+                  <button type="button" onClick={() => act(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
+                    Noted
+                  </button>
+                </div>
+              )}
+              {(kind === 'declined' || kind === 'pulled-out') && c.openDays.length > 0 && (
+                <OfferForm
+                  call={c}
+                  crew={crew}
+                  onShare={(person) => {
+                    // Offering the call to someone else is acting on the answer, so it's noted without another tap.
+                    void act(() => client.mutate('offer.seen', { id: o.id }))
+                    setShare({ kind: 'offer', person, call: c })
+                  }}
+                />
+              )}
             </div>
           ))}
         </section>
@@ -153,11 +252,11 @@ export function CrewScreen() {
         <h2>Crew needed</h2>
         {upcoming.length === 0 && <p className="empty">No crew needed yet. Ask for crew from a job in Jobs, or below.</p>}
         {upcoming.map((c) => (
-          <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ person, call: c })} />
+          <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
         ))}
       </section>
 
-      {share && <SharePanel {...share} onClose={() => setShare(undefined)} />}
+      {share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />}
 
       <section className="card">
         <h2>Crew for something not in Jobs</h2>
@@ -208,33 +307,30 @@ export function CallCard({
   crew,
   calendar,
   onShare,
+  onTell,
   inJob = false,
 }: {
   call: CallView
   crew: CrewView
   calendar: View['calendar']
   onShare: (p: PersonView) => void
+  /** Opens the message for whoever should hear about a withdrawal or a cancelled call; without it, nobody is prompted. */
+  onTell?: (share: Share | undefined) => void
   inJob?: boolean
 }) {
-  const [personId, setPersonId] = useState('')
-  const [override, setOverride] = useState(false)
   const [editing, setEditing] = useState(false)
-  const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
-  const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
-  const chosen = candidates.find((p) => p.id === personId)
-  const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
   const filled = call.openDays.length === 0
   const open = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
 
-  const send = (e: FormEvent) => {
-    e.preventDefault()
-    if (!chosen) return
-    const p = chosen
-    void act(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override }))
-    setPersonId('')
-    setOverride(false)
-    onShare(p)
+  const withdraw = (o: OfferView) => {
+    void act(() => client.mutate('offer.cancel', { id: o.id }))
+    if (o.person) onTell?.(promptFor(HOLDING.includes(o.status) ? 'released' : 'withdrawn', [tellTo(o.person, call, o)]))
+  }
+  const cancel = () => {
+    if (!confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`)) return
+    void act(() => client.mutate('call.cancel', { id: call.id }))
+    onTell?.(promptFor('call-cancelled', peopleOn(call)))
   }
 
   return (
@@ -287,7 +383,7 @@ export function CallCard({
                     </button>
                   )}
                   {(o.status === 'offered' || o.status === 'confirmed') && (
-                    <button type="button" className="link" onClick={() => act(() => client.mutate('offer.cancel', { id: o.id }))}>
+                    <button type="button" className="link" onClick={() => withdraw(o)}>
                       Withdraw
                     </button>
                   )}
@@ -301,31 +397,7 @@ export function CallCard({
         </ul>
       )}
 
-      {open && !filled && (
-        <form className="offer-form" onSubmit={send}>
-          <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
-            <option value="">Offer to…</option>
-            {candidates.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {p.skills.length ? ` (${p.skills.join(', ')})` : ''}
-                {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
-              </option>
-            ))}
-          </select>
-          <button type="submit" disabled={!chosen || (conflicts.length > 0 && !override)}>
-            Offer
-          </button>
-          {conflicts.length > 0 && (
-            <label className="warn">
-              <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
-              <span>
-                {conflicts.join('. ')}. <b>Offer anyway</b>
-              </span>
-            </label>
-          )}
-        </form>
-      )}
+      {open && !filled && <OfferForm call={call} crew={crew} onShare={onShare} />}
       {editing && <EditCall call={call} onDone={() => setEditing(false)} />}
       <div className="actions end">
         {call.projectId && !inJob && (
@@ -340,14 +412,7 @@ export function CallCard({
           </button>
         )}
         {open && (
-          <button
-            type="button"
-            className="link"
-            onClick={() =>
-              confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`) &&
-              act(() => client.mutate('call.cancel', { id: call.id }))
-            }
-          >
+          <button type="button" className="link" onClick={cancel}>
             Cancel crew call
           </button>
         )}
@@ -471,7 +536,98 @@ function EditCall({ call, onDone }: { call: CallView; onDone: () => void }) {
   )
 }
 
-/** The offer, ready to go wherever the freelancer already looks. Nothing is sent for you. */
+/** Offer a call to someone not yet offered it, with a warning when their days clash. Also beside a decline or a pull-out in "Answers to check". */
+export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewView; onShare: (p: PersonView) => void }) {
+  const [personId, setPersonId] = useState('')
+  const [override, setOverride] = useState(false)
+  // Someone who declined, pulled out or was told it's filled can be offered it again.
+  const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled', 'pulled-out'].includes(o.status)).map((o) => o.personId))
+  const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
+  const chosen = candidates.find((p) => p.id === personId)
+  const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
+
+  const send = (e: FormEvent) => {
+    e.preventDefault()
+    if (!chosen) return
+    const p = chosen
+    void act(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override }))
+    setPersonId('')
+    setOverride(false)
+    onShare(p)
+  }
+
+  return (
+    <form className="offer-form" onSubmit={send}>
+      <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
+        <option value="">Offer to…</option>
+        {candidates.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+            {p.skills.length ? ` (${p.skills.join(', ')})` : ''}
+            {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
+          </option>
+        ))}
+      </select>
+      <button type="submit" disabled={!chosen || (conflicts.length > 0 && !override)}>
+        Offer
+      </button>
+      {conflicts.length > 0 && (
+        <label className="warn">
+          <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+          <span>
+            {conflicts.join('. ')}. <b>Offer anyway</b>
+          </span>
+        </label>
+      )}
+    </form>
+  )
+}
+
+/** WhatsApp, a text or an email with the words filled in, or a copy of them. Nothing is sent for you. */
+function SendButtons({ person, text, subject }: { person: Pick<Person, 'phone' | 'email'>; text: string; subject: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <>
+      {person.phone && (
+        <>
+          <a className="button primary" href={`https://wa.me/${whatsappNumber(person.phone)}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">
+            WhatsApp
+          </a>
+          <a className="button" href={`sms:${person.phone}?&body=${encodeURIComponent(text)}`}>
+            Text
+          </a>
+        </>
+      )}
+      {person.email && (
+        <a className="button" href={`mailto:${person.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`}>
+          Email
+        </a>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard?.writeText(text).then(() => setCopied(true))
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </>
+  )
+}
+
+/** Their private link isn't on this device yet: it's made by the server when the person first syncs. */
+function NoLinkYet({ person, onClose }: { person: Pick<Person, 'name'>; onClose: () => void }) {
+  return (
+    <section className="card share">
+      <h2>Send to {person.name}</h2>
+      <p className="empty">Their private link is made when this device next syncs. Try again once it says “Up to date”.</p>
+      <button type="button" onClick={onClose}>
+        Close
+      </button>
+    </section>
+  )
+}
+
 /** Send a person something on their private link: an offer, or with `message`, something else such as their call sheet (ADR 0021). */
 export function SharePanel({
   person,
@@ -485,17 +641,7 @@ export function SharePanel({
   message?: (link: string) => { text: string; subject: string; what: string }
 }) {
   const link = linkFor(person)
-  const [copied, setCopied] = useState(false)
-  if (!link)
-    return (
-      <section className="card share">
-        <h2>Send to {person.name}</h2>
-        <p className="empty">Their private link is made when this device next syncs. Try again once it says “Up to date”.</p>
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
-      </section>
-    )
+  if (!link) return <NoLinkYet person={person} onClose={onClose} />
   const custom = message?.(link)
   const text = custom?.text ?? offerMessage(person, call, link)
   const subject = custom?.subject ?? `Work: ${call.project}, ${daysLabel(call.days)}`
@@ -504,32 +650,45 @@ export function SharePanel({
       <h2>Send to {person.name}</h2>
       <textarea readOnly value={text} rows={6} />
       <div className="actions">
-        {person.phone && (
-          <>
-            <a className="button primary" href={`https://wa.me/${whatsappNumber(person.phone)}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">
-              WhatsApp
-            </a>
-            <a className="button" href={`sms:${person.phone}?&body=${encodeURIComponent(text)}`}>
-              Text
-            </a>
-          </>
-        )}
-        {person.email && (
-          <a className="button" href={`mailto:${person.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`}>
-            Email
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(text).then(() => setCopied(true))
-          }}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+        <SendButtons key={person.id} person={person} text={text} subject={subject} />
         <button type="button" className="link" onClick={onClose}>
           Done
         </button>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The people to tell after something the office did, one at a time: the
+ * message written for what happened, the ways to send it, and Done or Skip
+ * to move to the next. "Tell 3 people" for a cancelled job; just the one
+ * after a Confirm.
+ */
+export function TellPanel({ tell, onClose }: { tell: Tell; onClose: () => void }) {
+  const [at, setAt] = useState(0)
+  const to = tell.to[at]
+  if (!to) return null
+  const { person, context } = to
+  const n = tell.to.length
+  const next = () => (at + 1 < n ? setAt(at + 1) : onClose())
+  const link = linkFor(person)
+  if (!link) return <NoLinkYet person={person} onClose={next} />
+  const { text, subject, what } = tellMessage(tell.event, person, context, link)
+  return (
+    <section className="card share" aria-label={`Send ${what} to ${person.name}`}>
+      <h2>{n === 1 ? `Tell ${person.name}` : `Tell ${n} people: ${person.name} (${at + 1} of ${n})`}</h2>
+      <textarea readOnly value={text} rows={6} />
+      <div className="actions">
+        <SendButtons key={person.id} person={person} text={text} subject={subject} />
+        <button type="button" className="link" onClick={next}>
+          {at + 1 < n ? 'Done, next' : 'Done'}
+        </button>
+        {at + 1 < n && (
+          <button type="button" className="link" onClick={next}>
+            Skip
+          </button>
+        )}
       </div>
     </section>
   )

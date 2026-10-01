@@ -55,7 +55,8 @@ export function crewView(
   // Calls synced before jobs existed have no job or phase.
   for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
   const offers = new Map<string, Offer & { pending: boolean }>()
-  for (const o of Object.values(entities.offer ?? {})) offers.set(o.id, { ...o, pending: false })
+  // Offers synced before "Answers to check" kept declines have no seenAt.
+  for (const o of Object.values(entities.offer ?? {})) offers.set(o.id, { ...o, seenAt: o.seenAt ?? null, pending: false })
   const away = new Map<string, UnavailabilityView>()
   for (const u of Object.values(entities.unavailability ?? {})) away.set(u.id, { ...u, pending: false })
 
@@ -166,6 +167,7 @@ export function crewView(
             respondedAt: null,
             respondedVia: null,
             override: a.override,
+            seenAt: null,
             pending: true,
           })
         break
@@ -174,15 +176,21 @@ export function crewView(
         const a = m.args as CommandArgs<'offer.respond'>
         const o = offers.get(a.id)
         if (!o) break
-        const status = a.answer === 'accept' ? 'accepted' : a.answer === 'decline' ? 'declined' : 'countered'
-        const days = a.answer !== 'decline' && a.days ? a.days : o.days
-        offers.set(o.id, { ...o, status, days, pending: true })
+        const status = a.answer === 'accept' ? 'accepted' : a.answer === 'decline' ? 'declined' : a.answer === 'pullOut' ? 'pulled-out' : 'countered'
+        const days = (a.answer === 'accept' || a.answer === 'counter') && a.days ? a.days : o.days
+        // A new answer is one the office hasn't seen yet.
+        offers.set(o.id, { ...o, status, days, note: a.note, seenAt: null, pending: true })
         break
       }
       case 'offer.confirm':
       case 'offer.cancel': {
         const o = offers.get((m.args as { id: string }).id)
         if (o) offers.set(o.id, { ...o, status: m.name === 'offer.confirm' ? 'confirmed' : 'cancelled', pending: true })
+        break
+      }
+      case 'offer.seen': {
+        const o = offers.get((m.args as CommandArgs<'offer.seen'>).id)
+        if (o && !o.seenAt) offers.set(o.id, { ...o, seenAt: m.createdAt, pending: true })
         break
       }
       case 'unavailability.add': {
@@ -221,7 +229,41 @@ export function crewView(
 }
 
 function statusRank(s: Offer['status']) {
-  return ['confirmed', 'accepted', 'countered', 'offered', 'declined', 'filled', 'cancelled'].indexOf(s)
+  return ['confirmed', 'accepted', 'countered', 'offered', 'pulled-out', 'declined', 'filled', 'cancelled'].indexOf(s)
+}
+
+/** Why an offer is in "Answers to check", and so what the office does next. */
+export type AnswerKind = 'accepted' | 'countered' | 'declined' | 'pulled-out'
+
+export interface AnswerToCheck {
+  call: CallView
+  offer: OfferView
+  kind: AnswerKind
+  /** Places still to fill on the call's busiest day, now that this answer is in. */
+  short: number
+}
+
+const ANSWER_ORDER: readonly AnswerKind[] = ['pulled-out', 'accepted', 'countered', 'declined']
+
+/**
+ * Answers the office hasn't dealt with, on calls still to come (audit
+ * finding 9): a yes or a counter waits for Confirm or Withdraw; a decline or
+ * a pull-out stays until the office taps Noted (offer.seen), since either
+ * can leave the call short. The Crew tab's count is the length of this.
+ */
+export function answersToCheck(crew: CrewView, today: string): AnswerToCheck[] {
+  const out: AnswerToCheck[] = []
+  for (const call of crew.calls) {
+    if (call.status !== 'open' || call.end < today) continue
+    const short = Math.max(0, ...call.days.map((d) => call.needed - (call.heldByDay[d] ?? 0)))
+    for (const offer of call.offers) {
+      const kind = offer.status as AnswerKind
+      if (!ANSWER_ORDER.includes(kind)) continue
+      if ((kind === 'declined' || kind === 'pulled-out') && offer.seenAt) continue
+      out.push({ call, offer, kind, short })
+    }
+  }
+  return out.sort((a, b) => ANSWER_ORDER.indexOf(a.kind) - ANSWER_ORDER.indexOf(b.kind) || a.call.start.localeCompare(b.call.start))
 }
 
 /**

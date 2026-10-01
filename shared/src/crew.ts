@@ -104,6 +104,8 @@ export const OFFER_STATUSES = [
   'filled',
   /** Ops withdrew it, or the call was cancelled. */
   'cancelled',
+  /** Had accepted, or was booked, then said they can't make it any more. The office finds cover. */
+  'pulled-out',
 ] as const
 export type OfferStatus = (typeof OFFER_STATUSES)[number]
 
@@ -124,6 +126,12 @@ export const offer = z.object({
   respondedVia: z.enum(['link', 'app', 'calendar', 'ops']).nullable(),
   /** Sent despite a clash or marked day off; kept for the audit trail. */
   override: z.boolean(),
+  /**
+   * When the office noted a decline or a pull-out, so it left "Answers to
+   * check"; null while it waits there. A yes or a counter leaves the queue
+   * through Confirm and Withdraw instead. Missing on offers synced before.
+   */
+  seenAt: z.string().nullable(),
 })
 export type Offer = z.infer<typeof offer>
 
@@ -239,10 +247,14 @@ export const crewCommandSchemas = {
       days: z.array(day).min(1).nullable(),
       note: z.string().max(1000),
     }),
+    /** Can't make it any more, having accepted or been booked: the place is free again and the office finds cover. */
+    z.object({ id, answer: z.literal('pullOut'), note: z.string().max(1000) }),
   ]),
   /** Ops confirm an acceptance, or agree a counter-offer at the asked rate. */
   'offer.confirm': z.object({ id }),
   'offer.cancel': z.object({ id }),
+  /** The office has seen a decline or a pull-out, so it leaves "Answers to check". */
+  'offer.seen': z.object({ id }),
 } as const
 
 /** Every day from start to end, inclusive. */
@@ -376,3 +388,143 @@ export async function feedCodeFor(linkToken: string): Promise<string> {
 }
 
 export const feedPath = (code: string) => `/cal/${code}.ics`
+
+/**
+ * What the office tells someone after an offer, in the voice of the offer
+ * message: short, the job and days named, and what happens next. The app
+ * sends nothing itself: the office opens WhatsApp, a text or an email with
+ * the words, or copies them, as it does for the offer (audit finding 9).
+ * One message for each thing that changes; the app prompts with it right
+ * after the office's own action.
+ */
+export type TellEvent =
+  /** Confirm, or a counter-offer agreed: it's a booking. */
+  | 'confirmed'
+  /** An offer withdrawn before an answer, or a counter-offer turned down. */
+  | 'withdrawn'
+  /** Someone who had said yes, or was booked, is let go. */
+  | 'released'
+  /** The job is cancelled or lost, taking its crew calls with it. */
+  | 'job-stopped'
+  /** One crew call cancelled. */
+  | 'call-cancelled'
+  /** The call's days, time, rate or details changed; the message reads them as they are now. */
+  | 'call-changed'
+  /** The phase moved and its crew with it; the message reads the call's new days. */
+  | 'phase-moved'
+  | 'timesheet-approved'
+  | 'timesheet-reopened'
+
+/** What a message needs besides the person: the call as it stands, and the booking's own figures where they differ. */
+export interface TellContext {
+  call: Pick<CrewCall, 'id' | 'project' | 'phase' | 'role' | 'start' | 'end' | 'callTime' | 'venue' | 'dayRateCents'>
+  /** The person's own days, when they took only some. */
+  days?: readonly string[]
+  /** The booking, for the timesheet's address. */
+  offerId?: string
+  /** For a timesheet: the figures approved, in words ("2 days at €320, and €43.50 of extras: €683.50"). */
+  summary?: string
+  /** For a timesheet: what the office changed from what was sent, in words. */
+  changes?: readonly string[]
+}
+
+const jobName = (c: TellContext['call']) => `${c.project}${c.phase ? ` (${c.phase})` : ''}`
+const whenLine = (c: TellContext['call'], days?: readonly string[]) =>
+  `${daysLabel(days?.length ? [...days] : eachDay(c.start, c.end))}${c.callTime ? `, call ${c.callTime}` : ''}`
+const rateLine = (c: TellContext['call']) => `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
+
+/** The message, its subject for an email, and what it is, for the panel's name ("Send confirmation to …"). */
+export function tellMessage(event: TellEvent, p: Pick<Person, 'name'>, ctx: TellContext, link: string): { text: string; subject: string; what: string } {
+  const first = p.name.split(' ')[0]
+  const c = ctx.call
+  const job = jobName(c)
+  const when = whenLine(c, ctx.days)
+  const next = "we'll be in touch about the next one."
+  const timesheet = `${link}/timesheet/${ctx.offerId ?? c.id}`
+  const lines = (parts: (string | false | undefined | 0)[]) => parts.filter(Boolean).join('\n')
+  switch (event) {
+    case 'confirmed':
+      return {
+        text: lines([
+          `Hi ${first}, you're confirmed for ${job}.`,
+          `${c.role}, ${when}`,
+          c.venue && `At ${c.venue}`,
+          c.dayRateCents !== null && rateLine(c),
+          `Your call sheet, with who's on and who to ring on the day, is here: ${link}/sheet/${c.id}`,
+          'If anything changes on your side, let us know.',
+        ]),
+        subject: `Confirmed: ${job}, ${when}`,
+        what: 'confirmation',
+      }
+    case 'withdrawn':
+      return {
+        text: lines([`Hi ${first}, we've withdrawn the offer of ${c.role} on ${job}, ${when}, so there's nothing to answer.`, `Sorry for the bother, and ${next}`]),
+        subject: `Withdrawn: ${job}, ${when}`,
+        what: 'withdrawal',
+      }
+    case 'released':
+      return {
+        text: lines([
+          `Hi ${first}, sorry, we no longer need you for ${job}: ${c.role}, ${when}.`,
+          `It's off your page and your calendar feed, so there's nothing to do. Thanks for holding the days, and ${next}`,
+        ]),
+        subject: `No longer needed: ${job}, ${when}`,
+        what: 'release',
+      }
+    case 'job-stopped':
+      return {
+        text: lines([
+          `Hi ${first}, ${c.project} isn't going ahead, so ${c.role} on ${when} is off. Sorry about that.`,
+          `It's off your page and your calendar feed. Thanks, and ${next}`,
+        ]),
+        subject: `Not going ahead: ${c.project}, ${when}`,
+        what: 'cancellation',
+      }
+    case 'call-cancelled':
+      return {
+        text: lines([
+          `Hi ${first}, we no longer need ${c.role} on ${job}, ${when}, so that's off. Sorry about that.`,
+          `It's off your page and your calendar feed. Thanks, and ${next}`,
+        ]),
+        subject: `Cancelled: ${job}, ${when}`,
+        what: 'cancellation',
+      }
+    case 'call-changed':
+      return {
+        text: lines([
+          `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}, ${rateLine(c)}.`,
+          `The details are on your page: ${link}`,
+          'If that no longer suits, say so there or ring the office.',
+        ]),
+        subject: `Changed: ${job}, ${when}`,
+        what: 'change',
+      }
+    case 'phase-moved':
+      return {
+        text: lines([
+          `Hi ${first}, ${job} has moved: ${c.role} is now ${when}.`,
+          `The details are on your page: ${link}`,
+          "If the new days don't suit, say so there or ring the office.",
+        ]),
+        subject: `Moved: ${job}, ${when}`,
+        what: 'change',
+      }
+    case 'timesheet-approved':
+      return {
+        text: lines([
+          `Hi ${first}, your timesheet for ${job} is approved${ctx.summary ? `: ${ctx.summary}` : ''}.`,
+          ctx.changes?.length && `We changed what you sent: ${ctx.changes.join('; ')}.`,
+          `It's here, with any note from us: ${timesheet}`,
+          'Payment follows the usual way.',
+        ]),
+        subject: `Timesheet approved: ${job}`,
+        what: 'timesheet approval',
+      }
+    case 'timesheet-reopened':
+      return {
+        text: lines([`Hi ${first}, we've reopened your timesheet for ${job} to sort something out. You can change it again until we approve it: ${timesheet}`]),
+        subject: `Timesheet reopened: ${job}`,
+        what: 'timesheet reopening',
+      }
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AccountScreen } from './AccountScreen.tsx'
 import { useAuth } from './auth.ts'
+import { CrewBadge } from './crew/CrewBadge.tsx'
 import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
@@ -51,6 +52,7 @@ export function Shell() {
         {AREAS.map((a) => (
           <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>
             {a.label}
+            {a.hash === '#crew' && <CrewBadge />}
           </a>
         ))}
       </nav>

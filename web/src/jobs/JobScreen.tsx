@@ -23,7 +23,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act, CallCard, euroToCents, SharePanel } from '../crew/CrewScreen.tsx'
+import { act, CallCard, euroToCents, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
 import { client } from '../sync.ts'
 import { Choices, clientNamed, NotDone, StatusPill, Top, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
@@ -37,7 +37,8 @@ import { KitCard, kitSummary } from './Kit.tsx'
 
 export function JobScreen({ view, id }: { view: View; id: string }) {
   const job = view.jobs.jobs.find((j) => j.id === id)
-  const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
+  // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
+  const [share, setShare] = useState<Share | undefined>()
   if (!job)
     return (
       <div className="app crew jobs">
@@ -50,11 +51,13 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
         </section>
       </div>
     )
-  const onShare = (call: CallView) => (person: PersonView) => setShare({ person, call })
+  const onShare = (call: CallView) => (person: PersonView) => setShare({ kind: 'offer', person, call })
   const stopped = STOPPED.includes(job.status)
-  // Sending an offer opens beside the call it's for: under the phases, or over the crew across phases.
-  const sharing = share && <SharePanel {...share} onClose={() => setShare(undefined)} />
-  const inPhase = !!share && job.phases.some((p) => p.id === share.call.phaseId)
+  // Sending an offer opens beside the call it's for: under the phases, or over the crew across phases. People to tell open under the job's details.
+  const panel = share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />
+  const offering = share?.kind === 'offer' && panel
+  const telling = share?.kind === 'tell' && panel
+  const inPhase = share?.kind === 'offer' && job.phases.some((p) => p.id === share.call.phaseId)
 
   return (
     <div className="app crew jobs">
@@ -63,26 +66,27 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
         ‹ All jobs
       </a>
       <NotDone view={view} />
-      <Summary job={job} view={view} />
+      <Summary job={job} view={view} onTell={setShare} />
+      {telling}
 
       <section className="card" aria-label="Phases">
         <h2>Phases</h2>
         {job.phases.length === 0 && <p className="empty">No phases yet, so no dates. Add the first below.</p>}
         {job.phases.map((p) => (
-          <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} />
+          <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} />
         ))}
         <AddPhase job={job} />
       </section>
 
-      {inPhase && sharing}
+      {inPhase && offering}
       <KitCard job={job} view={view} />
-      {!inPhase && sharing}
+      {!inPhase && offering}
 
       <section className="card" aria-label="Crew">
         <h2>Crew</h2>
         {job.otherCalls.length > 0 && <p className="hint">Across phases:</p>}
         {job.otherCalls.map((c) => (
-          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} inJob />
+          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} onTell={setShare} inJob />
         ))}
         {stopped ? <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p> : <AskForCrew job={job} />}
       </section>
@@ -90,7 +94,7 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
   )
 }
 
-function Summary({ job, view }: { job: JobView; view: View }) {
+function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (share: Share | undefined) => void }) {
   const [editing, setEditing] = useState(false)
   const crew = crewFill(job.calls)
   const kit = kitSummary(job, view.kit.byJob.get(job.id) ?? [])
@@ -143,7 +147,7 @@ function Summary({ job, view }: { job: JobView; view: View }) {
       {job.notes && <p className="notes">{job.notes}</p>}
       {job.venue?.notes && <p className="notes">At the venue: {job.venue.notes}</p>}
       {editing ? (
-        <EditJob job={job} view={view} onDone={() => setEditing(false)} />
+        <EditJob job={job} view={view} onDone={() => setEditing(false)} onTell={onTell} />
       ) : (
         <button type="button" onClick={() => setEditing(true)}>
           Change details
@@ -154,16 +158,15 @@ function Summary({ job, view }: { job: JobView; view: View }) {
 }
 
 /** Only what was changed is sent, so someone else's change to another detail stands (ADR 0007). */
-function EditJob({ job, view, onDone }: { job: JobView; view: View; onDone: () => void }) {
+function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDone: () => void; onTell: (share: Share | undefined) => void }) {
   const { clients, venues } = view.jobs
   const [f, setF] = useState({ name: job.name, client: job.client?.name ?? '', venue: job.venue?.name ?? '', status: job.status, notes: job.notes })
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
     const stopping = STOPPED.includes(f.status) && !STOPPED.includes(job.status)
-    const people = job.calls
-      .filter((c) => c.status === 'open')
-      .flatMap((c) => c.offers.filter((o) => ['offered', 'countered', 'accepted', 'confirmed'].includes(o.status)))
+    // Everyone offered or booked on the job's open calls: told it's off once it's stopped.
+    const people = job.calls.filter((c) => c.status === 'open').flatMap((c) => peopleOn(c))
     if (
       stopping &&
       job.calls.some((c) => c.status === 'open') &&
@@ -184,7 +187,10 @@ function EditJob({ job, view, onDone }: { job: JobView; view: View; onDone: () =
       const venueId = await venueNamed(f.venue, venues)
       if (venueId !== job.venueId) changes.venueId = venueId
       if (Object.keys(changes).length > 1) await client.mutate('project.update', changes)
-    }).then(onDone, (err: Error) => alert(err.message))
+    }).then(() => {
+      onDone()
+      if (stopping) onTell(promptFor('job-stopped', people))
+    }, (err: Error) => alert(err.message))
   }
   return (
     <form className="grid-form" onSubmit={save}>
@@ -281,7 +287,19 @@ function CalendarLine({ job, phase, view }: { job: JobView; phase: PhaseView; vi
   }
 }
 
-function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; view: View; onShare: (c: CallView) => (p: PersonView) => void }) {
+function Phase({
+  job,
+  phase,
+  view,
+  onShare,
+  onTell,
+}: {
+  job: JobView
+  phase: PhaseView
+  view: View
+  onShare: (c: CallView) => (p: PersonView) => void
+  onTell: (share: Share | undefined) => void
+}) {
   const [editing, setEditing] = useState(false)
   const outside = phase.calls.filter((c) => c.status === 'open' && (c.start < phase.start || c.end > phase.end))
   const ownVenue = phase.venueId && phase.venueId !== job.venueId ? phase.venue : undefined
@@ -316,7 +334,7 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
         </p>
       ))}
       {phase.calls.map((c) => (
-        <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} inJob />
+        <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} onTell={onTell} inJob />
       ))}
     </article>
   )
