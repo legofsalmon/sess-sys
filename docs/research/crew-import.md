@@ -24,8 +24,8 @@ here, only counts.
 | Notes | 18 | 8 are applicants ("new applicant, CV received, not yet vetted", with a link to the CV in the office's mail); 9 record a second email or phone the person has used, or a name they go by; one says where someone is based. |
 | Skills / tags | 57 | 35 tags in a two-level shape, "Department: skill" (Audio: Front of House, Lighting: Show Op, Video: LED Screen Build…), with a bare department as the general tag. |
 
-Four people have no phone and no email. Four of the eight company-email
-people are probably staff; the file doesn't say who is staff.
+Four people have no phone and no email. Staff are the people on company
+emails.
 
 ## How it fits the model today
 
@@ -38,8 +38,10 @@ approve time off. So, straight in:
 
 - **Name**: first and last joined. The app keeps one name; a person's
   private link greets them by the first word.
-- **Kind**: staff for the company-domain emails, once Colly confirms the
-  list; everyone else a freelancer.
+- **Kind**: staff for the company-domain emails (Colly, 1 October:
+  staff are on company emails, so that's the rule); everyone else a
+  freelancer. A person whose second, "also seen with" address is the
+  company's counts too, since the file holds one primary address.
 - **Email**: as given, lower-cased, the one typo fixed.
 - **Phone**: every shape turned into international form (`+353 87 …`),
   which the app already requires so WhatsApp links work: a leading 0
@@ -121,8 +123,6 @@ tests; an ADR. Then the import itself takes an afternoon of checking.
 
 ## For Colly to confirm
 
-- Who on the list is staff (the company-domain emails, or a shorter or
-  longer list).
 - That "preferred" means first call for the department and "onboarded"
   means the paperwork is done.
 - Whether applicants belong in the app or somewhere else.
