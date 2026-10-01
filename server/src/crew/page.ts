@@ -19,8 +19,8 @@ export interface PageData {
   base: string
   /** The read-only calendar feed address (ADR 0012), safe to add to a shared calendar. */
   feed: string
-  /** The message after a post, and the offer it's about, when it's about one: it goes in that card. */
-  flash?: { ok: boolean; text: string; offer?: string }
+  /** The message after a post, and the offer it's about, when it's about one: it goes in that card. Or the section it's about. */
+  flash?: { ok: boolean; text: string; offer?: string; section?: 'details' }
   today: string
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
@@ -119,14 +119,35 @@ function timesheets(d: PageData): string {
 }
 const rank = (t: Timesheet | undefined) => (!t ? 0 : t.status === 'sent' ? 1 : 2)
 
+/**
+ * Their own email and phone, to fix themselves (audit finding 7). Folded
+ * away until wanted, and open with the message after they save.
+ */
+function details(d: PageData): string {
+  const mine = d.flash?.section === 'details'
+  return `<section class="me">
+    <details id="details"${mine ? ' open' : ''}>
+      <summary><h2>Your details</h2></summary>
+      ${mine && d.flash ? flash(d.flash) : ''}
+      <form method="post" action="${d.base}/details">
+        <p class="small">You're down as <b>${h(d.person.name)}</b>. Ask the office to change your name; your number and email you can fix here.</p>
+        <label>Mobile <input type="tel" name="phone" value="${h(d.person.phone ?? '')}" maxlength="40" placeholder="+353 87 123 4567" autocomplete="tel"></label>
+        <label>Email <input type="email" name="email" value="${h(d.person.email ?? '')}" maxlength="200" autocomplete="email"></label>
+        <p class="small">Write your mobile with the country code, +353 for Ireland, so WhatsApp messages and texts reach you.</p>
+        <button>Save</button>
+      </form>
+    </details>
+  </section>`
+}
+
 export function renderPage(d: PageData): string {
   const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
   const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
   const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
   const first = d.person.name.split(' ')[0]
-  // A message about an offer sits in that offer's card; any other at the top.
-  const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer)
+  // A message about an offer sits in that offer's card, one about their details in that section; any other at the top.
+  const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -177,6 +198,8 @@ export function renderPage(d: PageData): string {
       <button>Add days off</button>
     </form>
   </section>
+
+  ${details(d)}
 
   ${
     closed.length
@@ -242,6 +265,8 @@ fieldset.days input{width:20px}
 .add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
 footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
 .sheet-link{font-weight:600;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-decoration:none}
+.me details{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:4px 14px}.me details[open]{padding-bottom:14px}
+.me summary{padding:10px 0;list-style-position:inside}.me summary h2{display:inline;margin:0}.me form{margin-top:4px}
 .ts-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .ts-list a{display:grid;gap:2px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none}
 .ts-list a.to-send{border-left-color:var(--accent)}.ts-list a.sent{border-left-color:var(--warn)}.ts-list a.approved{border-left-color:var(--good)}

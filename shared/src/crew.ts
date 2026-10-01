@@ -38,6 +38,13 @@ export const person = z.object({
    * replaced (person.newLink) if it leaks.
    */
   linkToken: z.string(),
+  /**
+   * Archived people have left, or stopped working for us: they're kept for
+   * the record (past bookings, timesheets, the history) but offered nothing,
+   * and their link and calendar feed stop. Defaults so records synced
+   * before it existed read as not archived.
+   */
+  archived: z.boolean().default(false),
 })
 export type Person = z.infer<typeof person>
 
@@ -133,19 +140,35 @@ export const HOLDING: readonly OfferStatus[] = ['accepted', 'confirmed']
 /** Offers still waiting on someone. */
 export const OPEN: readonly OfferStatus[] = ['offered', 'countered']
 
+/** The same checks wherever contact details are typed: the office's form, or the person's own link. */
+const contactEmail = z.string().email("That email address doesn't look right.").max(200).nullable()
+const contactPhone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.').nullable()
+
 export const crewCommandSchemas = {
   'person.upsert': z.object({
     id,
     name: z.string().min(1).max(200),
     kind: z.enum(['staff', 'freelancer']),
-    email: z.string().email().max(200).nullable(),
-    phone: z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.').nullable(),
+    email: contactEmail,
+    phone: contactPhone,
     skills: z.array(z.string().min(1).max(60)).max(30),
     dayRateCents: cents.nullable(),
     notes: z.string().max(2000),
   }),
   /** Replace a person's private link, so the old one stops working. */
   'person.newLink': z.object({ id }),
+  /**
+   * Archive someone who has left, or bring them back. Refused while they
+   * hold an open offer or a booking from today on, so nothing is left hanging.
+   */
+  'person.archive': z.object({ id, archived: z.boolean() }),
+  /**
+   * A person's own contact details, from their link or the app. Only the
+   * fields sent change, so the history can say which, never what.
+   */
+  'person.contact': z
+    .object({ id, email: contactEmail.optional(), phone: contactPhone.optional() })
+    .refine((c) => c.email !== undefined || c.phone !== undefined, { message: 'Nothing to change.' }),
   'unavailability.add': z
     .object({ id, personId: id, start: day, end: day, note: z.string().max(500) })
     .refine((u) => u.start <= u.end, { message: 'The days off end before they start.' }),

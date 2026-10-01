@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import { daysLabel, eachDay, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { daysLabel, eachDay, irishToday, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
-import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, offersForCall } from './store.ts'
+import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall } from './store.ts'
 
 /**
  * The crew rules the server enforces, whatever device or link a request
@@ -18,6 +18,8 @@ import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, offersFor
 type CrewCommand =
   | 'person.upsert'
   | 'person.newLink'
+  | 'person.archive'
+  | 'person.contact'
   | 'unavailability.add'
   | 'unavailability.remove'
   | 'call.create'
@@ -146,6 +148,38 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
 
+  async 'person.archive'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (person.archived === a.archived) return
+    if (a.archived) {
+      // Nothing is left hanging: an offer waiting on them, or days they hold from today on, is settled first.
+      const hold = await holdsFrom(ctx.tx, person.id, irishToday())
+      if (hold) {
+        const what =
+          hold.status === 'confirmed' ? `is booked on ${hold.project}; release them first` : hold.status === 'accepted' ? `has accepted ${hold.project}; release them first` : `has an open offer for ${hold.project}; withdraw it first`
+        throw new Refused({ code: 'conflict', message: `${person.name} ${what}.` })
+      }
+    }
+    await ctx.tx.query('UPDATE people SET archived = $2 WHERE id = $1', [person.id, a.archived])
+    await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
+  },
+
+  /**
+   * A person's own email and phone. On a link the route has already matched
+   * the id to the link's person, so the handler only sets what was sent.
+   */
+  async 'person.contact'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    const fields: [string, string | null][] = []
+    if (a.email !== undefined) fields.push(['email', a.email])
+    if (a.phone !== undefined) fields.push(['phone', a.phone])
+    if (!fields.length) return
+    await ctx.tx.query(`UPDATE people SET ${fields.map(([k], i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [person.id, ...fields.map(([, v]) => v)])
+    await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
+  },
+
   async 'unavailability.add'(ctx, a) {
     if (!(await getPerson(ctx.tx, a.personId))) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (await getAway(ctx.tx, a.id)) return
@@ -184,6 +218,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const call = await openCall(ctx, a.callId)
     const person = await getPerson(ctx.tx, a.personId)
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to offer them work.` })
     const offers = await offersForCall(ctx.tx, call.id)
     const live = offers.find((o) => o.personId === person.id && !['declined', 'filled', 'cancelled'].includes(o.status))
     if (live) throw new Refused({ code: 'conflict', message: `${person.name} already has this offer (${live.status}).` })

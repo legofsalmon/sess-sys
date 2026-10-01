@@ -181,7 +181,7 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look, left.get(r.id)),
+      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app'),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -287,9 +287,10 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
 /**
  * What an entry did, in words, as the History tab and the exported history
  * show it. `left` is the item as the command left it, for the ones that
- * give an item its number.
+ * give an item its number. `from` says whether a freelancer did it on their
+ * own link, for the few commands that read differently in their voice.
  */
-export function describe(command: string, a: Data, look: Look, left?: Data): string {
+export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar'): string {
   const product = (id: unknown) => text(look('product', id)?.name, 'an item')
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
@@ -345,6 +346,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data): str
       return `Saved ${text(a.name, 'someone')}'s details`
     case 'person.newLink':
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
+    case 'person.archive':
+      return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
+    case 'person.contact': {
+      // Which details changed, never what they are now: the history is read by every member of staff.
+      const parts: string[] = []
+      if (a.email !== undefined) parts.push('email address')
+      if (a.phone !== undefined) parts.push('phone number')
+      const who = person(a.id)
+      return from === 'link' ? `${who} changed their ${inWords(parts)}` : `Changed ${who}'s ${inWords(parts)}`
+    }
     case 'unavailability.add':
       return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${typeof a.note === 'string' && a.note ? ` (${clip(a.note)})` : ''}`
     case 'unavailability.remove': {

@@ -1,8 +1,9 @@
-import { MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type MutationResult, type Offer, type Person } from '@sh/shared'
+import { feedCodeFor, feedPath, MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type MutationResult, type Offer, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
+import { IPHONE, server as signedIn, staff } from './people.ts'
 
 /**
  * Crew booking, as the people involved see it: ops send offers from the
@@ -350,5 +351,149 @@ describe('offline ops device', () => {
     expect(view.people[0]!.pending).toBe(false)
     expect(view.people[0]!.linkToken.length).toBeGreaterThanOrEqual(24)
     expect(view.calls[0]!.offers[0]).toMatchObject({ status: 'offered', pending: false })
+  })
+})
+
+/** A form posted from a freelancer's page, as their phone would, and where it lands. */
+async function post(app: FastifyInstance, path: string, fields: Record<string, string>) {
+  const res = await app.inject({
+    method: 'POST',
+    url: path,
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    payload: new URLSearchParams(fields).toString(),
+  })
+  expect(res.statusCode).toBe(303)
+  const to = new URL(res.headers.location as string, 'http://x')
+  return { ok: to.searchParams.get('ok') === '1', message: to.searchParams.get('m') ?? '', to }
+}
+
+describe('correcting people (audit finding 7)', () => {
+  it('edits a person with person.upsert, keeping their link and whether they are archived', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const edited = await send(app, 'person.upsert', { ...aoife, name: 'Aoife Byrne-Walsh', phone: '+353871234568', email: 'aoife@example.com', notes: 'Has a van' })
+    expect(edited.status).toBe('applied')
+    const after = await entity<Person>(app, 'person', aoife.id)
+    expect(after).toMatchObject({ name: 'Aoife Byrne-Walsh', phone: '+353871234568', email: 'aoife@example.com', notes: 'Has a van', archived: false })
+    // The link is the server's, not the device's: an edit never replaces it.
+    expect(after.linkToken).toBe(aoife.linkToken)
+    expect((await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })).body).toContain('Hi Aoife')
+
+    // Nor does an edit from a device that doesn't know they were archived bring them back.
+    expect((await send(app, 'person.archive', { id: aoife.id, archived: true })).status).toBe('applied')
+    expect((await send(app, 'person.upsert', { ...aoife, notes: 'Moved to Galway' })).status).toBe('applied')
+    expect(await entity<Person>(app, 'person', aoife.id)).toMatchObject({ notes: 'Moved to Galway', archived: true, linkToken: aoife.linkToken })
+  })
+
+  it('archives someone who holds nothing, which stops their link and feed and keeps them off offers, and brings them back', async () => {
+    const { app, db } = await signedIn()
+    const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+    await colly.send('person.upsert', { id: 'p1', name: 'Aoife Byrne', kind: 'freelancer', email: null, phone: '+353871234567', skills: ['audio'], dayRateCents: null, notes: '' })
+    const aoife = await colly.record<Person>('person', 'p1')
+    const feed = feedPath(await feedCodeFor(aoife.linkToken))
+    expect((await app.inject({ method: 'GET', url: feed })).statusCode).toBe(200)
+
+    expect((await colly.send('person.archive', { id: 'p1', archived: true })).status).toBe('applied')
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ archived: true, linkToken: aoife.linkToken })
+    const gone = await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })
+    expect(gone.statusCode).toBe(404)
+    expect(gone.body).toContain("This link doesn't work any more")
+    expect((await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}/data.json` })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'GET', url: feed })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}/calendar.ics` })).statusCode).toBe(404)
+    const c = newId()
+    await colly.send('call.create', { id: c, project: 'Electric Picnic', phase: 'Build', venue: '', role: 'Audio tech', start: '2030-10-02', end: '2030-10-04', callTime: null, needed: 1, dayRateCents: 25000, details: '', replyBy: null })
+    const refused = await colly.send('offer.send', { id: newId(), callId: c, personId: 'p1', override: false })
+    expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: 'Aoife Byrne has been archived. Bring them back on the Crew tab to offer them work.' } })
+    // Archiving twice changes nothing.
+    expect((await colly.send('person.archive', { id: 'p1', archived: true })).status).toBe('applied')
+
+    expect((await colly.send('person.archive', { id: 'p1', archived: false })).status).toBe('applied')
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ archived: false })
+    expect((await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: feed })).statusCode).toBe(200)
+    expect((await colly.send('offer.send', { id: newId(), callId: c, personId: 'p1', override: false })).status).toBe('applied')
+
+    const page = await colly.history()
+    expect(page.entries.filter((e) => e.command === 'person.archive').map((e) => e.what)).toEqual(['Brought Aoife Byrne back', 'Archived Aoife Byrne', 'Archived Aoife Byrne'])
+  })
+
+  it('refuses to archive someone with an open offer or a booking from today on, naming the job', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app, { start: '2030-10-02', end: '2030-10-04' })
+    const o = await offer(app, c, aoife.id)
+    const archive = () => send(app, 'person.archive', { id: aoife.id, archived: true })
+
+    expect(await archive()).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: 'Aoife Byrne has an open offer for Electric Picnic (Build); withdraw it first.' } })
+    await answer(app, aoife.linkToken, o.id, { answer: 'accept' })
+    expect(await archive()).toMatchObject({ status: 'rejected', reason: { message: 'Aoife Byrne has accepted Electric Picnic (Build); release them first.' } })
+    await send(app, 'offer.confirm', { id: o.id })
+    expect(await archive()).toMatchObject({ status: 'rejected', reason: { message: 'Aoife Byrne is booked on Electric Picnic (Build); release them first.' } })
+    expect((await entity<Person>(app, 'person', aoife.id)).archived).toBe(false)
+
+    // Released, nothing holds them. A job long over never did.
+    await send(app, 'offer.cancel', { id: o.id })
+    const old = await offer(app, await call(app, { project: 'Ploughing 2020', start: '2020-09-15', end: '2020-09-17' }), aoife.id)
+    await answer(app, aoife.linkToken, old.id, { answer: 'accept' })
+    await send(app, 'offer.confirm', { id: old.id })
+    expect((await archive()).status).toBe('applied')
+    expect((await entity<Person>(app, 'person', aoife.id)).archived).toBe(true)
+  })
+
+  it('lets a freelancer fix their own phone and email on their link, and tells the history which changed, never what', async () => {
+    const { app, db } = await signedIn()
+    const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+    await colly.send('person.upsert', { id: 'p1', name: 'Aoife Byrne', kind: 'freelancer', email: 'aoife@example.com', phone: '+353871234567', skills: [], dayRateCents: null, notes: '' })
+    const aoife = await colly.record<Person>('person', 'p1')
+    const details = `/f/${aoife.linkToken}/details`
+
+    // Folded away until wanted, with what we hold filled in.
+    let page = (await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })).body
+    expect(page).toContain('<details id="details">')
+    expect(page).toContain('value="+353871234567"')
+    expect(page).toContain('value="aoife@example.com"')
+
+    // A new number, the email as it was: only the number is sent, and named.
+    const saved = await post(app, details, { phone: '+353 87 999 8888', email: 'aoife@example.com' })
+    expect(saved).toMatchObject({ ok: true, message: 'Saved. The office has your new details.' })
+    expect(saved.to.searchParams.get('s')).toBe('details')
+    expect(saved.to.hash).toBe('#details')
+    page = (await app.inject({ method: 'GET', url: saved.to.pathname + saved.to.search })).body
+    const open = page.indexOf('<details id="details" open>')
+    expect(open).toBeGreaterThan(-1)
+    const message = page.indexOf('<p class="flash ok" role="status">Saved. The office has your new details.</p>')
+    expect(message).toBeGreaterThan(open)
+    expect(message).toBeLessThan(page.indexOf('</details>', open))
+    expect(page.match(/class="flash/g)).toHaveLength(1)
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353 87 999 8888', email: 'aoife@example.com', linkToken: aoife.linkToken })
+    let history = await colly.history()
+    expect(history.entries[0]).toMatchObject({ who: { kind: 'link', name: 'Aoife Byrne' }, command: 'person.contact', what: 'Aoife Byrne changed their phone number' })
+    expect(JSON.stringify(history.entries[0])).not.toContain('999 8888')
+
+    // Both at once; then nothing, which sends nothing.
+    expect(await post(app, details, { phone: '', email: 'aoife.byrne@example.com' })).toMatchObject({ ok: true })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
+    expect((await colly.history()).entries[0]?.what).toBe('Aoife Byrne changed their email address and phone number')
+    expect(await post(app, details, { phone: '', email: 'aoife.byrne@example.com' })).toMatchObject({ ok: true, message: 'Nothing to change: those are the details we have.' })
+    expect((await colly.history()).entries).toHaveLength(3)
+    // A post with no fields at all, as a half-formed one would be, clears nothing.
+    expect(await post(app, details, {})).toMatchObject({ ok: true, message: 'Nothing to change: those are the details we have.' })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
+
+    // The same checks as the office's form, with the reason in the section.
+    const badPhone = await post(app, details, { phone: 'ring me', email: 'aoife.byrne@example.com' })
+    expect(badPhone).toMatchObject({ ok: false, message: 'Phone numbers need digits only, ideally starting with +353.' })
+    expect(badPhone.to.searchParams.get('s')).toBe('details')
+    expect(await post(app, details, { phone: '', email: 'not an address' })).toMatchObject({ ok: false, message: "That email address doesn't look right." })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
+
+    // The office can run it from the app too, in its own words. A change with nothing in it is turned down, not quietly applied.
+    expect((await colly.send('person.contact', { id: 'p1', phone: '+353871234567' })).status).toBe('applied')
+    history = await colly.history()
+    expect(history.entries[0]).toMatchObject({ who: { kind: 'staff', name: 'Colly Hewson' }, what: "Changed Aoife Byrne's phone number" })
+    expect(await colly.send('person.contact', { id: 'p1' })).toMatchObject({ status: 'rejected', reason: { code: 'invalid', message: 'Nothing to change.' } })
+    expect((await colly.history()).entries[0]).toMatchObject({ command: 'person.contact', outcome: 'turned-down', reason: 'Nothing to change.' })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353871234567', email: 'aoife.byrne@example.com' })
   })
 })

@@ -38,7 +38,8 @@ type Tables = { [E in keyof CrewEntities]: Record<string, CrewEntities[E]> }
 
 export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number): CrewView {
   const people = new Map<string, PersonView>()
-  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, pending: false })
+  // People synced before archiving existed read as not archived.
+  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, archived: p.archived ?? false, pending: false })
   const calls = new Map<string, CrewCall & { pending: boolean }>()
   // Calls synced before jobs existed have no job or phase.
   for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
@@ -51,8 +52,23 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
       case 'person.upsert': {
+        // Editing someone keeps what a device doesn't own: their link, and whether they're archived.
         const a = m.args as CommandArgs<'person.upsert'>
-        people.set(a.id, { linkToken: people.get(a.id)?.linkToken ?? '', ...a, pending: true })
+        const was = people.get(a.id)
+        people.set(a.id, { linkToken: was?.linkToken ?? '', archived: was?.archived ?? false, ...a, pending: true })
+        break
+      }
+      case 'person.archive': {
+        const a = m.args as CommandArgs<'person.archive'>
+        const p = people.get(a.id)
+        if (p) people.set(p.id, { ...p, archived: a.archived, pending: true })
+        break
+      }
+      case 'person.contact': {
+        // Only the fields sent change, so an unchanged one is never named in the history.
+        const a = m.args as CommandArgs<'person.contact'>
+        const p = people.get(a.id)
+        if (p) people.set(p.id, { ...p, ...(a.email !== undefined ? { email: a.email } : {}), ...(a.phone !== undefined ? { phone: a.phone } : {}), pending: true })
         break
       }
       case 'call.create': {

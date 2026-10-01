@@ -158,8 +158,10 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
 function Contact({ view, phase, sheet }: { view: View; phase: PhaseView; sheet: CallSheet }) {
   const on = new Set(phase.calls.flatMap((c) => (c.status === 'open' ? c.offers.filter((o) => HOLDING.includes(o.status)).map((o) => o.personId) : [])))
   const byName = (a: PersonView, b: PersonView) => a.name.localeCompare(b.name, 'en-IE')
-  const onPhase = view.crew.people.filter((p) => on.has(p.id)).sort(byName)
-  const others = view.crew.people.filter((p) => !on.has(p.id)).sort((a, b) => Number(b.kind === 'staff') - Number(a.kind === 'staff') || byName(a, b))
+  // Archived people aren't offered, unless they're the contact already, so the choice still shows who it is.
+  const pickable = view.crew.people.filter((p) => !p.archived || p.id === phase.contactId)
+  const onPhase = pickable.filter((p) => on.has(p.id)).sort(byName)
+  const others = pickable.filter((p) => !on.has(p.id)).sort((a, b) => Number(b.kind === 'staff') - Number(a.kind === 'staff') || byName(a, b))
   const choose = (id: string) => void act(() => client.mutate('phase.update', { id: phase.id, contactId: id || null })).catch((err: Error) => alert(err.message))
   return (
     <section className="card" aria-label="On the day">
@@ -188,7 +190,7 @@ function Contact({ view, phase, sheet }: { view: View; phase: PhaseView; sheet: 
         </select>
       </label>
       {sheet.contact && !sheet.contact.phone && (
-        <p className="warn-line">There's no number for {sheet.contact.name} yet: add one on the Crew tab, or crew won't know how to reach them.</p>
+        <p className="warn-line">There's no number for {sheet.contact.name} yet: edit them on the Crew tab to add one, or crew won't know how to reach them.</p>
       )}
       <p className="hint">
         Their name and number go on everyone's call sheet for {phase.name}. On theirs, they see the crew's numbers and the kit too.

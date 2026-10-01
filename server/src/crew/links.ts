@@ -24,7 +24,7 @@ import { getTimesheet, timesheetsFor } from './timesheets.ts'
  */
 
 type Form = URLSearchParams
-type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string; o?: string } }>
+type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string; o?: string; s?: string } }>
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -69,7 +69,9 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         if (o.status === 'accepted' || o.status === 'confirmed') for (const d of o.days) if (d in held) held[d]!++
       jobs.push({ offer, call, openDays: Object.keys(held).filter((d) => held[d]! < call.needed) })
     }
-    const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o } : undefined
+    const flash = req.query.m
+      ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o, ...(req.query.s === 'details' ? { section: 'details' as const } : {}) }
+      : undefined
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
     return reply
       .type('text/html')
@@ -182,6 +184,26 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
           ? "Thanks for letting us know. You're off this one."
           : 'Thanks, your rate has gone to the office.'
     return back(reply, person.linkToken, text, true, offer.id)
+  })
+
+  // Their own email and phone (audit finding 7). Only what differs is sent, so the history can say which changed.
+  app.post('/f/:token/details', async (req: Req, reply) => {
+    const person = await personByToken(db, req.params.token)
+    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    const inSection = (text: string, ok: boolean) =>
+      reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ m: text, ok: ok ? '1' : '0', s: 'details' })}#details`, 303)
+    const form = (req.body ?? new URLSearchParams()) as Form
+    // A field the form didn't send is left alone; one sent empty is cleared.
+    const typed = (name: string) => (form.has(name) ? form.get(name)!.trim().slice(0, 200) || null : undefined)
+    const changes: CommandArgs<'person.contact'> = { id: person.id }
+    const email = typed('email')
+    const phone = typed('phone')
+    if (email !== undefined && email !== person.email) changes.email = email
+    if (phone !== undefined && phone !== person.phone) changes.phone = phone
+    if (changes.email === undefined && changes.phone === undefined) return inSection('Nothing to change: those are the details we have.', true)
+    const result = await run(req, person.id, 'person.contact', changes)
+    if (result.status === 'rejected') return inSection(result.reason.message, false)
+    return inSection('Saved. The office has your new details.', true)
   })
 
   app.post('/f/:token/away', async (req: Req, reply) => {

@@ -8,6 +8,7 @@ import {
   personConflicts,
   whatsappNumber,
   type CallView,
+  type CommandInput,
   type CrewView,
   type OfferView,
   type PersonView,
@@ -59,6 +60,9 @@ export function CrewScreen() {
   const crew = view.crew
   const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
   const people = new Map(crew.people.map((p) => [p.id, p]))
+  // Archived people (leavers) are kept for the record but out of the way.
+  const active = crew.people.filter((p) => !p.archived)
+  const archived = crew.people.filter((p) => p.archived)
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   const toCheck = upcoming.flatMap((c) =>
@@ -163,10 +167,30 @@ export function CrewScreen() {
 
       <section className="card">
         <h2>People</h2>
-        {crew.people.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
-        {crew.people.map((p) => (
+        {active.length === 0 && archived.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
+        {active.map((p) => (
           <PersonRow key={p.id} person={p} crew={crew} />
         ))}
+        {archived.length > 0 && (
+          <details className="archived">
+            <summary>Archived ({archived.length})</summary>
+            {archived.map((p) => (
+              <div className="row person" key={p.id}>
+                <span className="who">
+                  <b>{p.name}</b>
+                  <small>{[p.kind === 'staff' ? 'Staff' : null, p.skills.join(', ')].filter(Boolean).join(' · ')}</small>
+                </span>
+                {p.pending ? (
+                  <span className="pill pending">Waiting to sync</span>
+                ) : (
+                  <button type="button" onClick={() => act(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
+                    Bring back
+                  </button>
+                )}
+              </div>
+            ))}
+          </details>
+        )}
         <NewPerson />
       </section>
 
@@ -195,7 +219,7 @@ export function CallCard({
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
-  const candidates = crew.people.filter((p) => !offered.has(p.id))
+  const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
   const filled = call.openDays.length === 0
@@ -387,13 +411,36 @@ export function SharePanel({
 
 function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [cannotArchive, setCannotArchive] = useState('')
   const [away, setAway] = useState({ start: today, end: today, note: '' })
   const booked = crew.calls.flatMap((c) =>
     c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')).map((o) => ({ c, o })) : []
   )
+  // Offers still waiting on them: like a booking, settled before they can be archived. The server checks the same.
+  const waiting = crew.calls.flatMap((c) =>
+    c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'offered' || o.status === 'countered')).map((o) => ({ c, o })) : []
+  )
   const off = crew.unavailability.filter((u) => u.personId === person.id && u.end >= today)
   const link = linkFor(person)
   const feed = useFeedAddress(open ? person.linkToken : undefined)
+  const archive = () => {
+    // The same test as the server's: held days from today on, or any offer still waiting.
+    const hold = booked.find(({ o }) => o.days.some((d) => d >= today)) ?? waiting[0]
+    if (hold) {
+      const job = hold.c.phase ? `${hold.c.project} (${hold.c.phase})` : hold.c.project
+      setCannotArchive(
+        hold.o.status === 'confirmed'
+          ? `${person.name} is booked on ${job}; release them first.`
+          : hold.o.status === 'accepted'
+            ? `${person.name} has accepted ${job}; release them first.`
+            : `${person.name} has an open offer for ${job}; withdraw it first.`
+      )
+      return
+    }
+    setCannotArchive('')
+    void act(() => client.mutate('person.archive', { id: person.id, archived: true }))
+  }
   return (
     <div className="row person">
       <button type="button" className="who" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -407,8 +454,20 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
         </small>
       </button>
       {person.pending && <span className="pill pending">Waiting to sync</span>}
-      {open && (
+      {open && editing && (
         <div className="detail">
+          <PersonForm
+            initial={person}
+            submitLabel="Save"
+            onSubmit={(fields) => act(() => client.mutate('person.upsert', { id: person.id, ...fields })).then(() => true, (err: Error) => (alert(err.message), false))}
+            onDone={() => setEditing(false)}
+          />
+        </div>
+      )}
+      {open && !editing && (
+        <div className="detail">
+          {(person.phone || person.email) && <p className="muted">{[person.phone, person.email].filter(Boolean).join(' · ')}</p>}
+          {person.notes && <p className="muted">{person.notes}</p>}
           {booked.map(({ c, o }) => (
             <p key={o.id}>
               {c.project} · {daysLabel(o.days)} · {STATUS[o.status][0]}
@@ -460,6 +519,15 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               New link
             </button>
           </div>
+          <div className="actions">
+            <button type="button" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+            <button type="button" className="link" onClick={archive}>
+              Archive
+            </button>
+          </div>
+          {cannotArchive && <p className="warn-line">{cannotArchive}</p>}
         </div>
       )}
     </div>
@@ -533,28 +601,48 @@ function NewCall() {
 }
 
 function NewPerson() {
-  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff' }
-  const [f, setF] = useState(blank)
+  return <PersonForm submitLabel="Add person" onSubmit={(fields) => act(() => client.mutate('person.upsert', { id: newId(), ...fields })).then(() => true, (err: Error) => (alert(err.message), false))} />
+}
+
+type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>
+
+/**
+ * A person's details: the Add form, and the same form again to correct
+ * them (audit finding 7). `onSubmit` says whether the change was taken, so
+ * a refused one keeps what was typed.
+ */
+function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<boolean>; onDone?: () => void }) {
+  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff', notes: '' }
+  const from = (p: PersonView) => ({
+    name: p.name,
+    phone: p.phone ?? '',
+    email: p.email ?? '',
+    skills: p.skills.join(', '),
+    rate: p.dayRateCents === null ? '' : String(p.dayRateCents / 100),
+    kind: p.kind,
+    notes: p.notes,
+  })
+  const [f, setF] = useState(initial ? from(initial) : blank)
   const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
-    void act(() =>
-      client.mutate('person.upsert', {
-        id: newId(),
-        name: f.name.trim(),
-        kind: f.kind,
-        phone: f.phone.trim() || null,
-        email: f.email.trim() || null,
-        skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
-        dayRateCents: euroToCents(f.rate),
-        notes: '',
-      })
-    ).catch((err: Error) => alert(err.message))
-    setF(blank)
+    void onSubmit({
+      name: f.name.trim(),
+      kind: f.kind,
+      phone: f.phone.trim() || null,
+      email: f.email.trim() || null,
+      skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
+      dayRateCents: euroToCents(f.rate),
+      notes: f.notes.trim(),
+    }).then((taken) => {
+      if (!taken) return
+      if (initial) onDone?.()
+      else setF(blank)
+    })
   }
   return (
-    <form className="grid-form" onSubmit={submit}>
+    <form className="grid-form" onSubmit={submit} aria-label={initial ? `Edit ${initial.name}` : 'Add person'}>
       <label className="wide">
         Name <input value={f.name} onChange={set('name')} placeholder="Full name" required />
       </label>
@@ -577,9 +665,18 @@ function NewPerson() {
           <option value="staff">Staff</option>
         </select>
       </label>
-      <button type="submit" className="wide">
-        Add person
+      <label className="wide">
+        Notes <textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Notes for the office" />
+      </label>
+      <p className="hint wide">They can read these in their own data download.</p>
+      <button type="submit" className={initial ? 'primary' : 'wide'}>
+        {submitLabel}
       </button>
+      {initial && (
+        <button type="button" onClick={onDone}>
+          Cancel
+        </button>
+      )}
     </form>
   )
 }

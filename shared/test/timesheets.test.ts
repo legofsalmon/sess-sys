@@ -21,6 +21,7 @@ const person = (id: string, name: string, kind: Person['kind'] = 'freelancer'): 
   dayRateCents: 30000,
   notes: '',
   linkToken: `${id}-link-token-000000000000`,
+  archived: false,
 })
 const call = (id: string, start: string, end: string, status: CrewCall['status'] = 'open'): CrewCall => ({
   id,

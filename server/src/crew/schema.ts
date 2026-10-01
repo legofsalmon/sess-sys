@@ -85,6 +85,11 @@ const MIGRATIONS: string[] = [
     approved_at     timestamptz
   );
   `,
+  // Archived people (audit finding 7): leavers kept for the record, offered
+  // nothing, their link and feed stopped. Older rows read as not archived.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS archived boolean NOT NULL DEFAULT false;
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

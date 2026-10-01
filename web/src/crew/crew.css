@@ -39,6 +39,10 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .detail p { margin: 0; color: var(--ink); }
 .crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
 .crew .away-form input:nth-child(3), .crew .away-form button { grid-column: 1 / -1; }
+/* Leavers, folded away under the list (audit finding 7). */
+.crew details.archived { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.crew details.archived summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
+.crew details.archived .row { padding-top: var(--space-8); }
 
 /* Timesheets (ADR 0022): what's waiting on the office in the Crew tab, and a booking's timesheet to check and approve. */
 .crew .ts-group { display: grid; gap: var(--space-8); }

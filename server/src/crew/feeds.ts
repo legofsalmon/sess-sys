@@ -94,6 +94,8 @@ export class Feeds {
     const codes = new Map<string, string>()
     const built: Built = { version, at: now.getTime(), byCode: new Map(), byLink: new Map() }
     for (const person of people) {
+      // An archived person's feed stops with their link.
+      if (person.archived) continue
       const jobs = jobsOf.get(person.id) ?? []
       const key = hash(calendarFeed(person, jobs, new Date(0)))
       const last = before.get(person.id)
