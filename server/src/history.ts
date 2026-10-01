@@ -366,6 +366,21 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}`
     case 'call.cancel':
       return `Cancelled the call for ${call(a.id)}`
+    case 'call.update': {
+      const c = look('crewCall', a.id)
+      const parts: string[] = []
+      if (a.role !== undefined) parts.push(`role to ${text(a.role, 'a role')}`)
+      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? c?.start, a.end ?? c?.end)}`)
+      if (a.callTime !== undefined) parts.push(typeof a.callTime === 'string' ? `call time to ${a.callTime}` : 'no call time')
+      if (a.needed !== undefined) parts.push(`how many to ${a.needed}`)
+      if (a.dayRateCents !== undefined) parts.push(typeof a.dayRateCents === 'number' ? `day rate to ${euro(a.dayRateCents)}` : 'rate to agree')
+      if (a.details !== undefined) parts.push('the details')
+      if (a.replyBy !== undefined) parts.push(typeof a.replyBy === 'string' ? `reply by ${dayLabel(a.replyBy)}` : 'no reply-by day')
+      if (a.project !== undefined) parts.push(`job to ${text(a.project, 'a job')}`)
+      if (a.phase !== undefined) parts.push(typeof a.phase === 'string' && a.phase ? `phase to ${a.phase}` : 'no phase')
+      if (a.venue !== undefined) parts.push(typeof a.venue === 'string' && a.venue ? `venue to ${clip(a.venue)}` : 'no venue')
+      return `Changed the call for ${call(a.id)}: ${inWords(parts)}`
+    }
     case 'offer.send':
       return `Offered ${call(a.callId)} to ${person(a.personId)}${a.override ? ', despite a clash or a day off' : ''}`
     case 'offer.respond': {
@@ -403,7 +418,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const p = look('phase', a.id)
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a phase')}`)
-      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}`)
+      if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? p?.start, a.end ?? p?.end)}${a.moveCrew ? ', with its crew' : ''}`)
       if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : "venue to the job's")
       if (a.notes !== undefined) parts.push('the notes')
       if (a.contactId !== undefined) parts.push(a.contactId ? `the contact on the day to ${person(a.contactId)}` : 'no contact on the day')

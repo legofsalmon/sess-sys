@@ -359,7 +359,7 @@ describe("crew for a job's phases", () => {
     const job = phone.client.view().jobs.jobs[0]!
     expect(job.phases[0]!.calls.map((c) => c.role)).toEqual(['Audio tech'])
     expect(job.phases[1]!.calls.map((c) => c.role)).toEqual(['LX op'])
-    expect(crewFill(job.calls)).toEqual({ needed: 3, held: 0 })
+    expect(crewFill(job.calls)).toEqual({ needed: 3, booked: 0, toConfirm: 0 })
 
     const pid2 = newId()
     await send(app, 'person.upsert', { id: pid2, name: 'Dara Walsh', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '' })
@@ -367,7 +367,85 @@ describe("crew for a job's phases", () => {
     await send(app, 'offer.send', { id: offer2, callId, personId: pid2, override: false })
     await send(app, 'offer.respond', { id: offer2, answer: 'accept', days: null, note: '' })
     await phone.client.sync()
-    expect(crewFill(phone.client.view().jobs.jobs[0]!.calls)).toEqual({ needed: 3, held: 1 })
+    // Dara has said yes to every day, but "booked" means confirmed: he's to confirm until the office does.
+    expect(crewFill(phone.client.view().jobs.jobs[0]!.calls)).toEqual({ needed: 3, booked: 0, toConfirm: 1 })
+    await send(app, 'offer.confirm', { id: offer2 })
+    await phone.client.sync()
+    expect(crewFill(phone.client.view().jobs.jobs[0]!.calls)).toEqual({ needed: 3, booked: 1, toConfirm: 0 })
+  })
+
+  it("leaves a job's call's job, phase and venue to the job", async () => {
+    const { app } = await server()
+    const ids = await nissan(app)
+    const { id: callId } = await crewFor(app, ids.build)
+    const refused = await send(app, 'call.update', { id: callId, venue: 'Somewhere else' })
+    expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'invalid', message: 'This call is part of Nissan launch: change the job, its phase or its venue in Jobs.' } })
+    expect(await send(app, 'call.update', { id: callId, callTime: '07:30' })).toMatchObject({ status: 'applied' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ callTime: '07:30', venue: 'The Heritage, Killenard, Co. Laois' })
+  })
+})
+
+describe('a phase that moves', () => {
+  /** Build with two crew: Aoife confirmed for both days, Dara accepted for the second only. */
+  async function buildCrew(app: FastifyInstance) {
+    const ids = await nissan(app)
+    const { id: callId } = await crewFor(app, ids.build, { needed: 2 })
+    const [aoife, dara] = [newId(), newId()]
+    await send(app, 'person.upsert', { id: aoife, name: 'Aoife Byrne', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '' })
+    await send(app, 'person.upsert', { id: dara, name: 'Dara Walsh', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '' })
+    const [a, d] = [newId(), newId()]
+    await send(app, 'offer.send', { id: a, callId, personId: aoife, override: false })
+    await send(app, 'offer.respond', { id: a, answer: 'accept', days: null, note: '' })
+    await send(app, 'offer.confirm', { id: a })
+    await send(app, 'offer.send', { id: d, callId, personId: dara, override: false })
+    await send(app, 'offer.respond', { id: d, answer: 'accept', days: ['2026-10-08'], note: '' })
+    return { ids, callId, offers: { aoife: a, dara: d }, people: { aoife, dara } }
+  }
+
+  it('takes its crew with it when asked, and leaves them on their days when not', async () => {
+    const { app, db } = await server()
+    const { ids, callId, offers, people } = await buildCrew(app)
+
+    // Longer at the front, even when asked to move the crew: the phase hasn't moved, so they keep the days they agreed.
+    expect(await send(app, 'phase.update', { id: ids.build, start: '2026-10-06', moveCrew: true })).toMatchObject({ status: 'applied' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ start: '2026-10-07', end: '2026-10-08' })
+    expect(await latest<Offer>(app, 'offer', offers.aoife)).toMatchObject({ days: ['2026-10-07', '2026-10-08'] })
+
+    // Not asked: the call stays where it was, outside its phase, as before.
+    expect(await send(app, 'phase.update', { id: ids.build, start: '2026-10-08', end: '2026-10-09' })).toMatchObject({ status: 'applied' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ start: '2026-10-07', end: '2026-10-08' })
+
+    // Asked: the call moves by the same shift as the phase's start, and the days each person holds move with it.
+    expect(await send(app, 'phase.update', { id: ids.build, start: '2026-10-14', end: '2026-10-15', moveCrew: true })).toMatchObject({ status: 'applied' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ start: '2026-10-13', end: '2026-10-14' })
+    expect(await latest<Offer>(app, 'offer', offers.aoife)).toMatchObject({ status: 'confirmed', days: ['2026-10-13', '2026-10-14'] })
+    expect(await latest<Offer>(app, 'offer', offers.dara)).toMatchObject({ status: 'accepted', days: ['2026-10-14'] })
+
+    // A phone sees the call under its phase on the new days (Build now comes after Show), and Aoife's page says so too.
+    const phone = await device(app)
+    await phone.client.sync()
+    expect(phone.client.view().jobs.jobs[0]!.phases.find((p) => p.id === ids.build)!.calls[0]).toMatchObject({ start: '2026-10-13', end: '2026-10-14' })
+    const aoife = (await latest<Person>(app, 'person', people.aoife))!
+    expect((await app.inject({ url: `/f/${aoife.linkToken}` })).body).toContain('Tue 13 Oct to Wed 14 Oct')
+
+    const { entries } = await readHistory(db)
+    expect(entries[0]!.what).toBe('Changed Build on Nissan launch: dates to Wed 14 Oct to Thu 15 Oct, with its crew')
+  })
+
+  it('keeps a call inside the phase, and never un-books anyone quietly', async () => {
+    const { app } = await server()
+    const { ids, callId, offers } = await buildCrew(app)
+    // Shrunk to one day: the call is cut to it, Aoife holds it, but Dara's one day would go.
+    const refused = await send(app, 'phase.update', { id: ids.build, end: '2026-10-07', moveCrew: true })
+    expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: 'Dara Walsh is booked for days that would go. Release them or keep those days.' } })
+    expect(await latest<Phase>(app, 'phase', ids.build)).toMatchObject({ start: '2026-10-07', end: '2026-10-08' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ start: '2026-10-07', end: '2026-10-08' })
+
+    // Released, the same move goes through, and the call fits the phase.
+    await send(app, 'offer.cancel', { id: offers.dara })
+    expect(await send(app, 'phase.update', { id: ids.build, end: '2026-10-07', moveCrew: true })).toMatchObject({ status: 'applied' })
+    expect(await latest<CrewCall>(app, 'crewCall', callId)).toMatchObject({ start: '2026-10-07', end: '2026-10-07' })
+    expect(await latest<Offer>(app, 'offer', offers.aoife)).toMatchObject({ status: 'confirmed', days: ['2026-10-07'] })
   })
 })
 

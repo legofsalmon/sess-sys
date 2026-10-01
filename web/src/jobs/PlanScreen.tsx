@@ -220,7 +220,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
 function summary(p: Plan, scale: Scale): string {
   const parts = [p.jobs.length ? `${p.jobs.length} job${p.jobs.length === 1 ? '' : 's'} this ${scale}` : `Nothing on this ${scale}`]
   const crew = p.jobs.some((l) => Object.values(l.days).some((x) => x.needed > 0))
-  if (crew) parts.push(p.short ? `crew still needed on ${p.short} day${p.short === 1 ? '' : 's'}` : 'all crew booked')
+  if (crew) parts.push(p.short ? `crew still needed on ${p.short} day${p.short === 1 ? '' : 's'}` : 'crew found for every day')
   const clashes = p.problems.filter((x) => x.severity === 'clash').length
   const checks = p.problems.length - clashes
   if (clashes) parts.push(`${clashes} clash${clashes === 1 ? '' : 'es'}`)
@@ -278,7 +278,7 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
     const first = cell.work.find((w) => w.booked) ?? cell.work[0]
     const words = [
       tag && `${tag}: ${cell.problem}`,
-      ...cell.work.map((w) => `${w.booked ? 'Booked on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}`),
+      ...cell.work.map((w) => `${w.booked ? 'Booked or to confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}`),
       cell.away !== null && `Unavailable${cell.away ? ` (${cell.away})` : ''}`,
     ]
       .filter(Boolean)
@@ -317,12 +317,12 @@ function Legend({ rows }: { rows: Rows }) {
       ? [
           ['blk solid', 'Confirmed'],
           ['blk dashed', 'Enquiry or quote'],
-          ['blk solid full', 'All crew booked'],
+          ['blk solid full', 'All crew found'],
           ['blk solid short', 'Crew still to find'],
           ['blk solid stray', 'Crew on a day their phase moved off'],
         ]
       : [
-          ['item booked', 'Booked'],
+          ['item booked', 'Booked, or to confirm'],
           ['item offered', 'Offered, no answer yet'],
           ['item away', 'Unavailable'],
           ['swatch clash', 'Clash: booked twice, or while unavailable'],

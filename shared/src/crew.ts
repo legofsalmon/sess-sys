@@ -139,6 +139,11 @@ export const CREW_ENTITY_NAMES = ['person', 'unavailability', 'crewCall', 'offer
 export const HOLDING: readonly OfferStatus[] = ['accepted', 'confirmed']
 /** Offers still waiting on someone. */
 export const OPEN: readonly OfferStatus[] = ['offered', 'countered']
+/** Offers a change to the call still reaches: waiting on someone, or holding days. */
+export const LIVE: readonly OfferStatus[] = ['offered', 'countered', 'accepted', 'confirmed']
+
+/** A field-by-field change must name at least one field; shared with the job and phase changes. */
+export const somethingToChange = [(u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined), { message: 'Nothing to change.' }] as const
 
 /** The same checks wherever contact details are typed: the office's form, or the person's own link. */
 const contactEmail = z.string().email("That email address doesn't look right.").max(200).nullable()
@@ -192,6 +197,31 @@ export const crewCommandSchemas = {
       replyBy: day.nullable(),
     })
     .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' }),
+  /**
+   * Only the fields the person changed, like a phase (ADR 0007). A change
+   * of dates takes each offer's days along; a change of rate reaches only
+   * offers nobody has answered yet; nobody booked is ever left with no
+   * days without the office being told. A call that is part of a job takes
+   * its job, phase and venue from the job, so those can only be typed for
+   * a call that isn't.
+   */
+  'call.update': z
+    .object({
+      id,
+      role: z.string().min(1).max(100).optional(),
+      start: day.optional(),
+      end: day.optional(),
+      callTime: time.nullable().optional(),
+      needed: z.number().int().min(1).max(100).optional(),
+      dayRateCents: cents.nullable().optional(),
+      details: z.string().max(4000).optional(),
+      replyBy: day.nullable().optional(),
+      project: z.string().min(1).max(200).optional(),
+      phase: z.string().max(100).optional(),
+      venue: z.string().max(300).optional(),
+    })
+    .refine(...somethingToChange)
+    .refine((c) => !c.start || !c.end || c.start <= c.end, { message: 'The call ends before it starts.' }),
   'call.cancel': z.object({ id }),
   /**
    * Offer a call to one person. Send several for a shortlist: whoever
@@ -226,6 +256,59 @@ export function eachDay(start: string, end: string): string[] {
     d.setUTCDate(d.getUTCDate() + 1)
   }
   return out
+}
+
+const dayMs = 86_400_000
+const shiftDay = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * dayMs).toISOString().slice(0, 10)
+
+/** How many days `to` is after `from`; negative when before. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / dayMs)
+}
+
+/**
+ * Whether a phase's new span holds the whole of its old one: it got longer
+ * at one end or both, but didn't move, so nothing on it needs to.
+ */
+export function phaseOnlyGrew(from: { start: string; end: string }, to: { start: string; end: string }): boolean {
+  return to.start <= from.start && to.end >= from.end
+}
+
+/**
+ * Where a call lands when its phase moves: shifted by the same number of
+ * days as the phase's start. A call that was inside the phase stays inside
+ * it, cut to the phase's new span, or given the phase's days when none of
+ * its own fit; a call that was already outside its phase just moves with
+ * it. A phase that only grows hasn't moved, so its calls stay where they
+ * are: the crew keep the days they agreed. The server and the device's
+ * view work it out the same way.
+ */
+export function movedCallSpan(
+  call: { start: string; end: string },
+  from: { start: string; end: string },
+  to: { start: string; end: string }
+): { start: string; end: string } {
+  if (phaseOnlyGrew(from, to)) return { start: call.start, end: call.end }
+  const shift = daysBetween(from.start, to.start)
+  let start = shiftDay(call.start, shift)
+  let end = shiftDay(call.end, shift)
+  if (call.start < from.start || call.end > from.end) return { start, end }
+  if (start < to.start) start = to.start
+  if (end > to.end) end = to.end
+  return start > end ? { start: to.start, end: to.end } : { start, end }
+}
+
+/**
+ * An offer's days once its call's days change: all the new days when it
+ * held all the old ones, otherwise the days the person chose that are
+ * still in range. When the whole job has moved, `shift` moves the chosen
+ * days with it first, so the second day's person is still on the second
+ * day. Empty means the person would be left with nothing, which the server
+ * refuses for anyone booked rather than quietly un-booking them.
+ */
+export function offerDaysAfter(held: readonly string[], oldDays: readonly string[], newDays: readonly string[], shift = 0): string[] {
+  if (oldDays.every((d) => held.includes(d))) return [...newDays]
+  return held.map((d) => (shift ? shiftDay(d, shift) : d)).filter((d) => newDays.includes(d))
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

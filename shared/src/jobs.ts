@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { dayLabel, eachDay } from './crew.ts'
+import { dayLabel, eachDay, somethingToChange } from './crew.ts'
 import { day } from './day.ts'
 
 /**
@@ -117,7 +117,6 @@ const phaseNotTooLong = [
   (p: { start?: string; end?: string }) => !p.start || !p.end || phaseDays({ start: p.start, end: p.end }) <= MAX_PHASE_DAYS,
   { message: `A phase can be at most ${MAX_PHASE_DAYS} days.` },
 ] as const
-const somethingToChange = [(u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined), { message: 'Nothing to change.' }] as const
 
 export const jobCommandSchemas = {
   /** Saved whole, like a person: clients are edited rarely. */
@@ -140,7 +139,11 @@ export const jobCommandSchemas = {
     })
     .refine(...somethingToChange),
   'phase.add': phase.refine(...phaseFits).refine(...phaseNotTooLong),
-  /** Field by field, as for jobs. Its crew keep their own dates. */
+  /**
+   * Field by field, as for jobs. Its crew keep their own dates unless the
+   * dates change with `moveCrew`: then its open calls, and the days their
+   * offers hold, move by the same shift as the phase's start.
+   */
   'phase.update': z
     .object({
       id,
@@ -150,8 +153,11 @@ export const jobCommandSchemas = {
       venueId: phase.shape.venueId.optional(),
       notes: phase.shape.notes.optional(),
       contactId: phase.shape.contactId,
+      moveCrew: z.boolean().optional(),
     })
     .refine(...somethingToChange)
+    // Saying whether to move the crew isn't a change on its own.
+    .refine((u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && k !== 'moveCrew' && u[k] !== undefined), { message: 'Nothing to change.' })
     .refine(...phaseFits)
     .refine(...phaseNotTooLong),
   /** Refused while the phase has crew; cancel them first. */

@@ -7,6 +7,7 @@ import {
   mapLink,
   newId,
   phaseOnCalendar,
+  phaseOnlyGrew,
   PHASE_NAMES,
   PROJECT_STATUSES,
   STATUS_LABELS,
@@ -127,7 +128,8 @@ function Summary({ job, view }: { job: JobView; view: View }) {
           <div>
             <dt>Crew</dt>
             <dd>
-              {crew.held} of {crew.needed} booked
+              {crew.booked} of {crew.needed} booked
+              {crew.toConfirm > 0 && `, ${crew.toConfirm} to confirm`}
             </dd>
           </div>
         )}
@@ -323,9 +325,14 @@ function Phase({ job, phase, view, onShare }: { job: JobView; phase: PhaseView; 
 function EditPhase({ phase, view, onDone }: { phase: PhaseView; view: View; onDone: () => void }) {
   const { venues } = view.jobs
   const [f, setF] = useState({ name: phase.name, start: phase.start, end: phase.end, venue: phase.venueId ? (phase.venue?.name ?? '') : '', notes: phase.notes })
+  // A change of dates to a phase with crew waits here until the office says whether the crew move too.
+  const [ask, setAsk] = useState<CommandInput<'phase.update'> | undefined>()
+  const openCalls = phase.calls.filter((c) => c.status === 'open')
+  const send = (changes: CommandInput<'phase.update'>) => void act(() => client.mutate('phase.update', changes)).then(onDone, (err: Error) => alert(err.message))
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
+    let asking = false
     void act(async () => {
       const changes: CommandInput<'phase.update'> = { id: phase.id }
       if (f.name.trim() !== phase.name) changes.name = f.name.trim()
@@ -334,8 +341,16 @@ function EditPhase({ phase, view, onDone }: { phase: PhaseView; view: View; onDo
       if (f.notes.trim() !== phase.notes) changes.notes = f.notes.trim()
       const venueId = await venueNamed(f.venue, venues)
       if (venueId !== phase.venueId) changes.venueId = venueId
-      if (Object.keys(changes).length > 1) await client.mutate('phase.update', changes)
-    }).then(onDone, (err: Error) => alert(err.message))
+      if (Object.keys(changes).length === 1) return
+      // A phase that only grows hasn't moved, so its crew stay on their days and there's nothing to ask.
+      const to = { start: changes.start ?? phase.start, end: changes.end ?? phase.end }
+      if ((changes.start !== undefined || changes.end !== undefined) && openCalls.length && !phaseOnlyGrew(phase, to)) {
+        asking = true
+        setAsk(changes)
+        return
+      }
+      await client.mutate('phase.update', changes)
+    }).then(() => asking || onDone(), (err: Error) => alert(err.message))
   }
   const remove = () => {
     if (phase.calls.some((c) => c.status === 'open')) return alert(`${phase.name} still has crew. Cancel its crew calls first.`)
@@ -345,31 +360,60 @@ function EditPhase({ phase, view, onDone }: { phase: PhaseView; view: View; onDo
   }
   return (
     <form className="grid-form" onSubmit={save}>
+      {/* While the move question is open, the fields hold still: Move them and Keep their dates send what Save captured. */}
       <label className="wide">
-        Phase <input list="phase-names-edit" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
+        Phase <input list="phase-names-edit" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required disabled={!!ask} />
       </label>
       <label>
-        From <input type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })} />
+        From{' '}
+        <input
+          type="date"
+          value={f.start}
+          onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })}
+          disabled={!!ask}
+        />
       </label>
       <label>
-        To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} />
+        To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} disabled={!!ask} />
       </label>
       <label className="wide">
-        Venue <input list="phase-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="The job's venue" />
+        Venue{' '}
+        <input list="phase-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="The job's venue" disabled={!!ask} />
       </label>
       <label className="wide">
-        Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
+        Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={!!ask} />
       </label>
+      {ask && (
+        <p className="warn-line wide" role="status">
+          Move its {openCalls.length} crew call{openCalls.length === 1 ? '' : 's'} too? The days their crew hold move with them.
+        </p>
+      )}
       <div className="actions wide">
-        <button type="submit" className="primary">
-          Save
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-        <button type="button" className="link" onClick={remove}>
-          Remove phase
-        </button>
+        {ask ? (
+          <>
+            <button type="button" className="primary" onClick={() => send({ ...ask, moveCrew: true })}>
+              Move them
+            </button>
+            <button type="button" onClick={() => send(ask)}>
+              Keep their dates
+            </button>
+            <button type="button" className="link" onClick={() => setAsk(undefined)}>
+              Back
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="submit" className="primary">
+              Save
+            </button>
+            <button type="button" onClick={onDone}>
+              Cancel
+            </button>
+            <button type="button" className="link" onClick={remove}>
+              Remove phase
+            </button>
+          </>
+        )}
       </div>
       <Choices id="phase-venue-names" names={venues} />
       <datalist id="phase-names-edit">

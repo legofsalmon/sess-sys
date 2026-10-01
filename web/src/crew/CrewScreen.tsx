@@ -218,11 +218,13 @@ export function CallCard({
 }) {
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
+  const [editing, setEditing] = useState(false)
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled'].includes(o.status)).map((o) => o.personId))
   const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
   const filled = call.openDays.length === 0
+  const open = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
 
   const send = (e: FormEvent) => {
@@ -299,7 +301,7 @@ export function CallCard({
         </ul>
       )}
 
-      {!filled && (
+      {open && !filled && (
         <form className="offer-form" onSubmit={send}>
           <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
             <option value="">Offer to…</option>
@@ -324,24 +326,148 @@ export function CallCard({
           )}
         </form>
       )}
+      {editing && <EditCall call={call} onDone={() => setEditing(false)} />}
       <div className="actions end">
         {call.projectId && !inJob && (
           <a className="link" href={`#jobs/${call.projectId}`}>
             Open job
           </a>
         )}
-        <button
-          type="button"
-          className="link"
-          onClick={() =>
-            confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`) &&
-            act(() => client.mutate('call.cancel', { id: call.id }))
-          }
-        >
-          Cancel crew call
-        </button>
+        {/* A cancelled call, kept on the job's page for the record, can't be changed or cancelled again. */}
+        {open && !call.pending && (
+          <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+            Change
+          </button>
+        )}
+        {open && (
+          <button
+            type="button"
+            className="link"
+            onClick={() =>
+              confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`) &&
+              act(() => client.mutate('call.cancel', { id: call.id }))
+            }
+          >
+            Cancel crew call
+          </button>
+        )}
       </div>
     </article>
+  )
+}
+
+/**
+ * Change a crew call. Only what was changed is sent (call.update), so
+ * another device's change to something else stands. The job, phase and
+ * venue of a call that's part of a job come from the job, so they're
+ * changed there. Before saving, the office is told what the change does
+ * to the offers out: booked days move with the call, and a new rate
+ * reaches only offers nobody has answered.
+ */
+function EditCall({ call, onDone }: { call: CallView; onDone: () => void }) {
+  const tied = !!call.projectId
+  const [f, setF] = useState({
+    project: call.project,
+    phase: call.phase,
+    venue: call.venue,
+    role: call.role,
+    start: call.start,
+    end: call.end,
+    callTime: call.callTime ?? '',
+    needed: call.needed,
+    rate: call.dayRateCents === null ? '' : String(call.dayRateCents / 100),
+    details: call.details,
+    replyBy: call.replyBy ?? '',
+  })
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const booked = Math.max(0, ...call.days.map((d) => call.heldByDay[d] ?? 0))
+  const agreed = call.offers.filter((o) => o.status === 'accepted' || o.status === 'countered' || o.status === 'confirmed').length
+  const rateChanged = euroToCents(f.rate) !== call.dayRateCents
+  const datesChanged = f.start !== call.start || f.end !== call.end
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.role.trim() || (!tied && !f.project.trim())) return
+    const changes: CommandInput<'call.update'> = { id: call.id }
+    if (f.role.trim() !== call.role) changes.role = f.role.trim()
+    if (f.start !== call.start) changes.start = f.start
+    const end = f.end < f.start ? f.start : f.end
+    if (end !== call.end) changes.end = end
+    if ((f.callTime || null) !== call.callTime) changes.callTime = f.callTime || null
+    if (Math.max(1, f.needed) !== call.needed) changes.needed = Math.max(1, f.needed)
+    if (rateChanged) changes.dayRateCents = euroToCents(f.rate)
+    if (f.details.trim() !== call.details) changes.details = f.details.trim()
+    if ((f.replyBy || null) !== call.replyBy) changes.replyBy = f.replyBy || null
+    if (!tied) {
+      if (f.project.trim() !== call.project) changes.project = f.project.trim()
+      if (f.phase.trim() !== call.phase) changes.phase = f.phase.trim()
+      if (f.venue.trim() !== call.venue) changes.venue = f.venue.trim()
+    }
+    if (Object.keys(changes).length === 1) return onDone()
+    void act(() => client.mutate('call.update', changes)).then(onDone, (err: Error) => alert(err.message))
+  }
+  return (
+    <form className="grid-form" onSubmit={save} aria-label={`Change the call for ${call.role}`}>
+      {!tied && (
+        <>
+          <label className="wide">
+            Project <input value={f.project} onChange={set('project')} required />
+          </label>
+          <label>
+            Phase <input value={f.phase} onChange={set('phase')} placeholder="Build, Show…" />
+          </label>
+          <label>
+            Venue <input value={f.venue} onChange={set('venue')} />
+          </label>
+        </>
+      )}
+      <label>
+        Role <input value={f.role} onChange={set('role')} required />
+      </label>
+      <label>
+        How many <input type="number" min={Math.max(1, booked)} value={f.needed} onChange={set('needed')} />
+      </label>
+      <label>
+        From <input type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })} />
+      </label>
+      <label>
+        To <input type="date" value={f.end} min={f.start} onChange={set('end')} />
+      </label>
+      <label>
+        Call time <input type="time" value={f.callTime} onChange={set('callTime')} />
+      </label>
+      <label>
+        Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
+      </label>
+      <label className="wide">
+        Reply by <input type="date" value={f.replyBy} onChange={set('replyBy')} />
+      </label>
+      <label className="wide">
+        Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
+      </label>
+      {datesChanged && booked > 0 && (
+        <p className="hint wide">
+          {booked === 1 ? '1 person is' : `${booked} people are`} booked: the days they hold move with the call. Anyone who would be left with no days stops the
+          change, so release them first or keep their days.
+        </p>
+      )}
+      {rateChanged && agreed > 0 && (
+        <p className="hint wide">
+          The new rate goes to offers still waiting on an answer. {agreed === 1 ? 'The 1 person who has' : `The ${agreed} people who have`} accepted, asked for
+          a rate or been confirmed keep what was agreed.
+        </p>
+      )}
+      {f.needed > call.needed && call.openDays.length === 0 && (
+        <p className="hint wide">The call is filled: needing more opens it again. Anyone told it had filled gets a new offer, not the old one back.</p>
+      )}
+      <div className="actions wide">
+        <button type="submit" className="primary">
+          Save
+        </button>
+        <button type="button" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -421,6 +547,9 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   const waiting = crew.calls.flatMap((c) =>
     c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'offered' || o.status === 'countered')).map((o) => ({ c, o })) : []
   )
+  // Booked means confirmed; someone who has said yes is still to confirm.
+  const confirmed = booked.filter(({ o }) => o.status === 'confirmed').length
+  const toConfirm = booked.length - confirmed
   const off = crew.unavailability.filter((u) => u.personId === person.id && u.end >= today)
   const link = linkFor(person)
   const feed = useFeedAddress(open ? person.linkToken : undefined)
@@ -449,7 +578,8 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
           {[person.kind === 'staff' ? 'Staff' : null, person.skills.join(', '), person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null]
             .filter(Boolean)
             .join(' · ')}
-          {booked.length > 0 && ` · ${booked.length} booking${booked.length === 1 ? '' : 's'}`}
+          {confirmed > 0 && ` · ${confirmed} booking${confirmed === 1 ? '' : 's'}`}
+          {toConfirm > 0 && ` · ${toConfirm} to confirm`}
           {off.length > 0 && ' · has days off'}
         </small>
       </button>

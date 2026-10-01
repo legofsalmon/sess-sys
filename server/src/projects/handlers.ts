@@ -1,5 +1,5 @@
 import { MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
-import { cancelCall } from '../crew/handlers.ts'
+import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
 import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { kitOnPhase } from '../stock/kit.ts'
@@ -148,6 +148,8 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     await setFields(ctx, 'phases', PHASE_COLUMNS, a)
     await emit(ctx, 'phase', a.id, await getPhase(ctx.tx, a.id))
     if (a.name !== undefined || a.venueId !== undefined) await renameCalls(ctx, { phaseId: a.id })
+    // Asked to, the phase takes its crew with it: its open calls move by the same shift, and their offers' days too.
+    if (a.moveCrew && (start !== before.start || end !== before.end)) await moveCallsWithPhase(ctx, a.id, before, { start, end })
   },
 
   async 'phase.remove'(ctx, a) {

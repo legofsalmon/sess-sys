@@ -1,6 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { eachDay, HOLDING, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
-import { STOPPED } from '../jobs.ts'
+import { daysBetween, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { STOPPED, type Phase } from '../jobs.ts'
 
 /**
  * The crew screen's view of a device's data: what the server has said, with
@@ -36,7 +36,18 @@ export interface CrewView {
 
 type Tables = { [E in keyof CrewEntities]: Record<string, CrewEntities[E]> }
 
-export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number): CrewView {
+/** The fields a change names, without its id; the rest stay as they are. */
+function changed(a: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(a)) if (k !== 'id' && v !== undefined) out[k] = v
+  return out
+}
+
+export function crewView(
+  entities: Partial<Tables> & { phase?: Record<string, Phase> },
+  outbox: readonly (Mutation & { appliedSeq?: number })[],
+  cursor: number
+): CrewView {
   const people = new Map<string, PersonView>()
   // People synced before archiving existed read as not archived.
   for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, archived: p.archived ?? false, pending: false })
@@ -47,6 +58,23 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
   for (const o of Object.values(entities.offer ?? {})) offers.set(o.id, { ...o, pending: false })
   const away = new Map<string, UnavailabilityView>()
   for (const u of Object.values(entities.unavailability ?? {})) away.set(u.id, { ...u, pending: false })
+
+  // Phases' dates, followed through this device's own changes, for calls that move with their phase.
+  const phaseDates = new Map<string, { start: string; end: string }>()
+  for (const p of Object.values(entities.phase ?? {})) phaseDates.set(p.id, { start: p.start, end: p.end })
+  /** A call's offers once its days change, by the same rule as the server's: chosen days shift with a phase that moved. */
+  const moveOffers = (callId: string, oldDays: string[], newDays: string[], shift = 0) => {
+    for (const o of offers.values()) {
+      if (o.callId !== callId || !LIVE.includes(o.status)) continue
+      let days = offerDaysAfter(o.days, oldDays, newDays, shift)
+      if (!days.length) {
+        // Nobody has answered, so the offer is simply for the new days. Anyone booked or countering is shown as they were: the server refuses to strand them.
+        if (o.status !== 'offered') continue
+        days = [...newDays]
+      }
+      if (days.join() !== o.days.join()) offers.set(o.id, { ...o, days, pending: true })
+    }
+  }
 
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
@@ -86,6 +114,40 @@ export function crewView(entities: Partial<Tables>, outbox: readonly (Mutation &
       case 'call.cancel': {
         const c = calls.get((m.args as CommandArgs<'call.cancel'>).id)
         if (c) calls.set(c.id, { ...c, status: 'cancelled', pending: true })
+        break
+      }
+      case 'call.update': {
+        const a = m.args as CommandArgs<'call.update'>
+        const c = calls.get(a.id)
+        if (!c) break
+        const next = { ...c, ...(changed(a) as Partial<CrewCall>), pending: true }
+        calls.set(c.id, next)
+        if (next.start !== c.start || next.end !== c.end) moveOffers(c.id, eachDay(c.start, c.end), eachDay(next.start, next.end))
+        // A new rate reaches only offers nobody has answered; the rest keep what was agreed.
+        if (next.dayRateCents !== c.dayRateCents)
+          for (const o of offers.values()) if (o.callId === c.id && o.status === 'offered') offers.set(o.id, { ...o, dayRateCents: next.dayRateCents, pending: true })
+        break
+      }
+      case 'phase.add': {
+        const a = m.args as CommandArgs<'phase.add'>
+        if (!phaseDates.has(a.id)) phaseDates.set(a.id, { start: a.start, end: a.end })
+        break
+      }
+      case 'phase.update': {
+        // A phase moving with its crew takes its open calls, and their offers' days, along.
+        const a = m.args as CommandArgs<'phase.update'>
+        const from = phaseDates.get(a.id)
+        if (!from) break
+        const to = { start: a.start ?? from.start, end: a.end ?? from.end }
+        phaseDates.set(a.id, to)
+        if (!a.moveCrew || (to.start === from.start && to.end === from.end)) break
+        for (const c of [...calls.values()]) {
+          if (c.phaseId !== a.id || c.status !== 'open') continue
+          const span = movedCallSpan(c, from, to)
+          if (span.start === c.start && span.end === c.end) continue
+          calls.set(c.id, { ...c, ...span, pending: true })
+          moveOffers(c.id, eachDay(c.start, c.end), eachDay(span.start, span.end), daysBetween(from.start, to.start))
+        }
         break
       }
       case 'offer.send': {

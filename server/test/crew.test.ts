@@ -1,4 +1,4 @@
-import { feedCodeFor, feedPath, MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type MutationResult, type Offer, type Person } from '@sh/shared'
+import { feedCodeFor, feedPath, MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type CrewCall, type HistoryPage, type MutationResult, type Offer, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
@@ -309,6 +309,165 @@ describe('booking rules', () => {
     expect((await entity<Offer>(app, 'offer', o.id)).status).toBe('cancelled')
     const page = await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })
     expect(page.body).toContain('Nothing waiting right now')
+  })
+})
+
+describe('changing a call', () => {
+  it("changes a call's time, rate and details, and the freelancer's page, feed and call sheet read the new values", async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const c = await call(app, { needed: 2 })
+    const a = await offer(app, c, aoife.id)
+    const n = await offer(app, c, niall.id)
+    await answer(app, aoife.linkToken, a.id, { answer: 'accept' })
+    await send(app, 'offer.confirm', { id: a.id })
+
+    const r = await send(app, 'call.update', { id: c, callTime: '09:00', dayRateCents: 28000, details: 'Food on site. Parking at gate B.', replyBy: '2026-09-30' })
+    expect(r.status).toBe('applied')
+    expect(await entity<CrewCall>(app, 'crewCall', c)).toMatchObject({ callTime: '09:00', dayRateCents: 28000, details: 'Food on site. Parking at gate B.', replyBy: '2026-09-30' })
+    // The new rate reaches Niall, still deciding; Aoife keeps the rate she was confirmed at.
+    expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'offered', dayRateCents: 28000 })
+    expect(await entity<Offer>(app, 'offer', a.id)).toMatchObject({ status: 'confirmed', dayRateCents: 25000 })
+
+    const nialls = (await app.inject({ url: `/f/${niall.linkToken}` })).body
+    expect(nialls).toContain('<dt>Call</dt><dd>09:00</dd>')
+    expect(nialls).toContain('€280 a day')
+    expect(nialls).toContain('<dt>Reply by</dt><dd>Wed 30 Sep</dd>')
+    const aoifes = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    expect(aoifes).toContain('<dt>Call</dt><dd>09:00</dd>')
+    expect(aoifes).toContain('€250 a day')
+    expect(aoifes).toContain('Parking at gate B.')
+    const sheet = (await app.inject({ url: `/f/${aoife.linkToken}/sheet/${c}` })).body
+    expect(sheet).toContain('call <b>09:00</b>')
+    expect(sheet).toContain('Parking at gate B.')
+    const feed = (await app.inject({ url: `/f/${aoife.linkToken}/calendar.ics` })).body
+    expect(feed).toContain('09:00')
+
+    const history: HistoryPage = (await app.inject({ url: '/api/history' })).json()
+    expect(history.entries[0]!.what).toBe('Changed the call for Audio tech on Electric Picnic: call time to 09:00, day rate to €280, the details and reply by Wed 30 Sep')
+  })
+
+  it("moves a call's days with the days its offers hold, and never strands anyone booked", async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const dara = await person(app, 'Dara Walsh')
+    const c = await call(app, { needed: 2 })
+    const a = await offer(app, c, aoife.id)
+    const n = await offer(app, c, niall.id)
+    const d = await offer(app, c, dara.id)
+    await answer(app, aoife.linkToken, a.id, { answer: 'accept' })
+    await send(app, 'offer.confirm', { id: a.id })
+    await answer(app, niall.linkToken, n.id, { answer: 'accept', picker: '1', days: ['2026-10-04'] })
+
+    // A day later: Aoife, who held every day, holds every new day; Niall keeps the 4th; Dara is offered the new days.
+    expect(await send(app, 'call.update', { id: c, start: '2026-10-03', end: '2026-10-05' })).toMatchObject({ status: 'applied' })
+    expect(await entity<Offer>(app, 'offer', a.id)).toMatchObject({ status: 'confirmed', days: ['2026-10-03', '2026-10-04', '2026-10-05'] })
+    expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'accepted', days: ['2026-10-04'] })
+    expect(await entity<Offer>(app, 'offer', d.id)).toMatchObject({ status: 'offered', days: ['2026-10-03', '2026-10-04', '2026-10-05'] })
+    expect((await app.inject({ url: `/f/${aoife.linkToken}` })).body).toContain('Sat 3 Oct to Mon 5 Oct')
+    const ics = (await app.inject({ url: `/f/${aoife.linkToken}/calendar.ics` })).body
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261003')
+    expect(ics).not.toContain('DTSTART;VALUE=DATE:20261002')
+
+    // Past the one day Niall holds: refused by name, and nothing changes.
+    const refused = await send(app, 'call.update', { id: c, start: '2026-10-05', end: '2026-10-06' })
+    expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: 'Niall Kerr is booked for days that would go. Release them or keep those days.' } })
+    expect(await entity<CrewCall>(app, 'crewCall', c)).toMatchObject({ start: '2026-10-03', end: '2026-10-05' })
+    expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'accepted', days: ['2026-10-04'] })
+  })
+
+  it("won't move someone booked onto a day they hold on another job", async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const picnic = await call(app)
+    const gig = await call(app, { project: 'Vicar Street', phase: 'Show', start: '2026-10-05', end: '2026-10-05' })
+    const a = await offer(app, picnic, aoife.id)
+    const g = await offer(app, gig, aoife.id)
+    await answer(app, aoife.linkToken, a.id, { answer: 'accept' })
+    await answer(app, aoife.linkToken, g.id, { answer: 'accept' })
+    const refused = await send(app, 'call.update', { id: picnic, start: '2026-10-03', end: '2026-10-05' })
+    expect(refused).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'clash', message: 'Aoife Byrne is already booked on Vicar Street (Show) Mon 5 Oct. Release them or keep those days.' },
+    })
+  })
+
+  it("won't move someone booked onto a day they marked off, which an offer would need an override for", async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app)
+    const a = await offer(app, c, aoife.id)
+    await answer(app, aoife.linkToken, a.id, { answer: 'accept' })
+    await send(app, 'unavailability.add', { id: newId(), personId: aoife.id, start: '2026-10-05', end: '2026-10-05', note: 'Dentist' })
+    const refused = await send(app, 'call.update', { id: c, end: '2026-10-05' })
+    expect(refused).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'clash', message: 'Aoife Byrne is marked unavailable Mon 5 Oct (Dentist). Release them or keep those days.' },
+    })
+    expect(await entity<CrewCall>(app, 'crewCall', c)).toMatchObject({ end: '2026-10-04' })
+    expect(await entity<Offer>(app, 'offer', a.id)).toMatchObject({ days: ['2026-10-02', '2026-10-03', '2026-10-04'] })
+  })
+
+  it("won't need fewer people than are booked, and opens the call again when it needs more", async () => {
+    const app = await server()
+    const [aoife, niall, dara, eimear] = await Promise.all(['Aoife Byrne', 'Niall Kerr', 'Dara Walsh', 'Eimear Nolan'].map((n) => person(app, n)))
+    const c = await call(app, { needed: 2, start: '2026-10-10', end: '2026-10-10' })
+    const a = await offer(app, c, aoife!.id)
+    const n = await offer(app, c, niall!.id)
+    const d = await offer(app, c, dara!.id)
+    await answer(app, aoife!.linkToken, a.id, { answer: 'accept' })
+    await answer(app, niall!.linkToken, n.id, { answer: 'accept' })
+    expect((await entity<Offer>(app, 'offer', d.id)).status).toBe('filled')
+
+    const refused = await send(app, 'call.update', { id: c, needed: 1 })
+    expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: '2 people are booked; release one first.' } })
+    expect((await offer(app, c, eimear!.id)).result).toMatchObject({ status: 'rejected', reason: { code: 'filled' } })
+
+    // Needing one more opens it again. Dara was told it had filled, so a new offer goes out.
+    expect(await send(app, 'call.update', { id: c, needed: 3 })).toMatchObject({ status: 'applied' })
+    expect((await entity<Offer>(app, 'offer', d.id)).status).toBe('filled')
+    const again = await offer(app, c, dara!.id)
+    expect(again.result.status).toBe('applied')
+    expect(await answer(app, dara!.linkToken, again.id, { answer: 'accept' })).toMatchObject({ ok: true })
+  })
+
+  it('shows a change made with no signal at once, with the offers it reaches', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const c = await call(app, { needed: 2 })
+    const a = await offer(app, c, aoife.id)
+    const n = await offer(app, c, niall.id)
+    await answer(app, aoife.linkToken, a.id, { answer: 'accept', picker: '1', days: ['2026-10-02', '2026-10-03', '2026-10-04'] })
+    let online = true
+    const client = await new SyncClient({
+      storage: new MemoryStorage(),
+      transport: {
+        push: async (req) => {
+          if (!online) throw new Error('offline')
+          return (await app.inject({ method: 'POST', url: '/api/sync/push', payload: req })).json()
+        },
+        pull: async (after) => {
+          if (!online) throw new Error('offline')
+          return (await app.inject({ method: 'GET', url: `/api/sync/pull?after=${after}` })).json()
+        },
+      },
+    }).open()
+    await client.sync()
+    online = false
+    await client.mutate('call.update', { id: c, start: '2026-10-03', end: '2026-10-05', dayRateCents: 30000 })
+    await expect(client.sync()).rejects.toThrow('offline')
+    const view = client.view().crew.calls[0]!
+    expect(view).toMatchObject({ pending: true, start: '2026-10-03', end: '2026-10-05', dayRateCents: 30000 })
+    expect(view.offers.find((o) => o.id === a.id)).toMatchObject({ days: ['2026-10-03', '2026-10-04', '2026-10-05'], dayRateCents: 25000, pending: true })
+    expect(view.offers.find((o) => o.id === n.id)).toMatchObject({ days: ['2026-10-03', '2026-10-04', '2026-10-05'], dayRateCents: 30000, pending: true })
+
+    online = true
+    await client.sync()
+    expect(client.view().crew.calls[0]).toMatchObject({ pending: false, start: '2026-10-03', end: '2026-10-05' })
+    expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ days: ['2026-10-03', '2026-10-04', '2026-10-05'], dayRateCents: 30000 })
   })
 })
 

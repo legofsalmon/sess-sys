@@ -149,7 +149,8 @@ function JobRow({ job, kit }: { job: JobView; kit: readonly KitLineView[] | unde
         <StatusPill status={job.status} pending={job.pending} />
         {crew.needed > 0 && (
           <small>
-            Crew {crew.held} of {crew.needed}
+            Crew {crew.booked} of {crew.needed}
+            {crew.toConfirm > 0 && `, ${crew.toConfirm} to confirm`}
           </small>
         )}
         {short && <small className={`flag ${short}`}>Kit short</small>}
