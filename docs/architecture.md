@@ -304,6 +304,12 @@ says product and item; the code says model and asset.
   An expired required certificate blocks the assignment, the same way an
   overdue PAT test blocks an asset.
 - **Availability**: freelancers mark unavailable days; offers respect them.
+- **Leave and time in lieu**, for staff ([ADR 0024](adr/0024-staff-leave.md)):
+  annual leave applied for and approved in whole days, counted in the
+  weekdays that aren't Irish public holidays, against a calendar-year
+  allowance; days in lieu logged for a day worked and approved the same
+  way. Whoever has "Can approve time off" decides, never their own.
+  Approved leave is days off, so the planner shows it and offers warn.
 - **Crew assignment**: person on a phase in a role at an agreed rate, with a
   status (proposed, offered, accepted, declined, confirmed, cancelled, or
   pulled-out when a booked freelancer says they can't make it) and a

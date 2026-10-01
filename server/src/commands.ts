@@ -10,6 +10,7 @@ import { crewHandlers } from './crew/handlers.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
+import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
 import { officeHandlers } from './office/handlers.ts'
 import { projectHandlers } from './projects/handlers.ts'
@@ -133,6 +134,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...inspectionHandlers,
   ...timesheetHandlers,
   ...officeHandlers,
+  ...leaveHandlers,
 }
 
 /**
@@ -177,6 +179,8 @@ export interface From {
   via?: Ctx['via']
   /** The signed-in member of staff whose device sent it: the history's "who". */
   userId?: string
+  /** The same account with its email, for the handlers that check who is asking (ADR 0024). */
+  user?: { id: string; email: string }
   /** When the device sent it, by the device's own clock. */
   sentAt?: string
   /** The kind of device, such as "Safari on iPhone". */
@@ -200,7 +204,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
   if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
 
-  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app' }
+  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app', ...(from.user ? { user: from.user } : {}) }
   let result: MutationResult
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.

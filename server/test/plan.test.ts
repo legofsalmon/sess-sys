@@ -234,6 +234,7 @@ describe('the week by person', () => {
       notes: '',
       linkToken: '',
       archived: false,
+      approvesLeave: false,
       pending: false,
     }
     const call = (id: string, project: string, status: CallView['status'], offers: [string, CallView['offers'][number]['status']][]): CallView => ({

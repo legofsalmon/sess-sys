@@ -29,6 +29,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
 import { useFeedAddress } from './feed.ts'
+import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
 /**
@@ -151,6 +152,8 @@ export function CrewScreen() {
   const roster = useAct()
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
+  // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
+  if (hash === '#crew/leave') return <LeaveScreen view={view} />
 
   /** Settle a yes or a counter, then tell them. */
   const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
@@ -235,6 +238,7 @@ export function CrewScreen() {
       )}
 
       <TimesheetsCard view={view} />
+      <LeaveCard view={view} />
 
       <section className="card">
         <h2>Crew needed</h2>
@@ -773,7 +777,12 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
       <button type="button" className="who" onClick={() => setOpen(!open)} aria-expanded={open}>
         <b>{person.name}</b>
         <small>
-          {[person.kind === 'staff' ? 'Staff' : null, person.skills.join(', '), person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null]
+          {[
+            person.kind === 'staff' ? 'Staff' : null,
+            person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
+            person.skills.join(', '),
+            person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null,
+          ]
             .filter(Boolean)
             .join(' · ')}
           {confirmed > 0 && ` · ${confirmed} booking${confirmed === 1 ? '' : 's'}`}
@@ -800,10 +809,23 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
             <p key={u.id}>
               Off {daysLabel(eachDay(u.start, u.end))}
               {u.note && ` (${u.note})`}
-              {u.source === 'self' && ' · said on their link'}{' '}
-              <button type="button" className="link" onClick={() => void run(() => client.mutate('unavailability.remove', { id: u.id }))}>
-                Remove
-              </button>
+              {u.source === 'self' && ' · said on their link'}
+              {/* Approved leave is cancelled on the Leave screen, so the two never disagree (ADR 0024). */}
+              {u.source === 'leave' ? (
+                <>
+                  {' · '}
+                  <a className="link" href="#crew/leave">
+                    approved leave
+                  </a>
+                </>
+              ) : (
+                <>
+                  {' '}
+                  <button type="button" className="link" onClick={() => void run(() => client.mutate('unavailability.remove', { id: u.id }))}>
+                    Remove
+                  </button>
+                </>
+              )}
             </p>
           ))}
           <form
@@ -951,7 +973,7 @@ type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>
  * keeps what was typed.
  */
 function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
-  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff', notes: '' }
+  const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff', notes: '', approvesLeave: false }
   const from = (p: PersonView) => ({
     name: p.name,
     phone: p.phone ?? '',
@@ -960,10 +982,11 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
     rate: p.dayRateCents === null ? '' : euroText(p.dayRateCents),
     kind: p.kind,
     notes: p.notes,
+    approvesLeave: p.approvesLeave,
   })
   const [f, setF] = useState(initial ? from(initial) : blank)
   const { run, error, refuse } = useAct()
-  const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const set = (k: Exclude<keyof typeof blank, 'approvesLeave'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
@@ -978,6 +1001,8 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
         skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
         dayRateCents: rate.cents,
         notes: f.notes.trim(),
+        // Only staff approve time off (ADR 0024).
+        approvesLeave: f.kind === 'staff' && f.approvesLeave,
       })
     ).then((taken) => {
       if (!taken) return
@@ -1009,6 +1034,15 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
           <option value="staff">Staff</option>
         </select>
       </label>
+      {f.kind === 'staff' && (
+        <label className="wide tick">
+          <input type="checkbox" checked={f.approvesLeave} onChange={(e) => setF({ ...f, approvesLeave: e.target.checked })} />
+          <span>
+            Can approve time off
+            <small>Decides other staff's leave and days in lieu, and sets allowances, on the Leave screen.</small>
+          </span>
+        </label>
+      )}
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Notes for the office" />
       </label>

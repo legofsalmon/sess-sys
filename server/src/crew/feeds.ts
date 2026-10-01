@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { feedCodeFor, type CrewCall, type Offer, type Person } from '@sh/shared'
+import { feedCodeFor, type CrewCall, type LeaveRequest, type Offer, type Person } from '@sh/shared'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Queryable } from '../db.ts'
+import { approvedLeave } from '../leave/store.ts'
 import { calendarFeed } from './ical.ts'
 import { everyonesBookings } from './store.ts'
 
@@ -90,6 +91,9 @@ export class Feeds {
     const { people, bookings } = await everyonesBookings(this.db)
     const jobsOf = new Map<string, { offer: Offer; call: CrewCall }[]>()
     for (const b of bookings) jobsOf.set(b.offer.personId, [...(jobsOf.get(b.offer.personId) ?? []), b])
+    // Staff see their approved leave beside their bookings (ADR 0024).
+    const leaveOf = new Map<string, LeaveRequest[]>()
+    for (const r of await approvedLeave(this.db)) leaveOf.set(r.personId, [...(leaveOf.get(r.personId) ?? []), r])
     const before = new Map([...(this.built?.byLink.values() ?? [])].map((f) => [f.personId, f]))
     const codes = new Map<string, string>()
     const built: Built = { version, at: now.getTime(), byCode: new Map(), byLink: new Map() }
@@ -97,10 +101,11 @@ export class Feeds {
       // An archived person's feed stops with their link.
       if (person.archived) continue
       const jobs = jobsOf.get(person.id) ?? []
-      const key = hash(calendarFeed(person, jobs, new Date(0)))
+      const leave = leaveOf.get(person.id) ?? []
+      const key = hash(calendarFeed(person, jobs, new Date(0), leave))
       const last = before.get(person.id)
       // Unchanged keeps its stamp and ETag, so calendar apps asking "anything new?" hear no.
-      const feed = last?.key === key ? last : make(person, jobs, key, now)
+      const feed = last?.key === key ? last : make(person, jobs, leave, key, now)
       const code = this.codes.get(person.linkToken) ?? (await feedCodeFor(person.linkToken))
       codes.set(person.linkToken, code)
       built.byCode.set(code, feed)
@@ -112,9 +117,9 @@ export class Feeds {
   }
 }
 
-function make(person: Person, jobs: { offer: Offer; call: CrewCall }[], key: string, now: Date): Feed {
+function make(person: Person, jobs: { offer: Offer; call: CrewCall }[], leave: LeaveRequest[], key: string, now: Date): Feed {
   const changedAt = new Date(Math.floor(now.getTime() / 1000) * 1000)
-  const ics = calendarFeed(person, jobs, changedAt)
+  const ics = calendarFeed(person, jobs, changedAt, leave)
   return { personId: person.id, ics, etag: `"${hash(ics).slice(0, 27)}"`, changedAt, key }
 }
 

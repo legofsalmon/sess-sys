@@ -67,7 +67,7 @@ const phase = (id: string, projectId: string, name: string, start: string, end: 
 describe('crew: each call’s offers, gathered once', () => {
   it('match looking through every offer for every call, in order, with the same days held', () => {
     const rnd = random(7)
-    const people: Person[] = NAMES.map((name, i) => ({ id: `p${i}`, name, kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '', linkToken: '', archived: false }))
+    const people: Person[] = NAMES.map((name, i) => ({ id: `p${i}`, name, kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '', linkToken: '', archived: false, approvesLeave: false }))
     const calls: CrewCall[] = Array.from({ length: 60 }, (_, i) => {
       const start = 1 + Math.floor(rnd() * 25)
       return {

@@ -1,6 +1,7 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { daysBetween, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
 import { STOPPED, type Phase } from '../jobs.ts'
+import { leaveLabel, type LeaveRequest } from '../leave.ts'
 
 /**
  * The crew screen's view of a device's data: what the server has said, with
@@ -44,13 +45,13 @@ function changed(a: object): Record<string, unknown> {
 }
 
 export function crewView(
-  entities: Partial<Tables> & { phase?: Record<string, Phase> },
+  entities: Partial<Tables> & { phase?: Record<string, Phase>; leaveRequest?: Record<string, LeaveRequest> },
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number
 ): CrewView {
   const people = new Map<string, PersonView>()
-  // People synced before archiving existed read as not archived.
-  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, archived: p.archived ?? false, pending: false })
+  // People synced before archiving or leave existed read as not archived, and as not approving leave.
+  for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...p, archived: p.archived ?? false, approvesLeave: p.approvesLeave ?? false, pending: false })
   const calls = new Map<string, CrewCall & { pending: boolean }>()
   // Calls synced before jobs existed have no job or phase.
   for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
@@ -81,10 +82,12 @@ export function crewView(
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
       case 'person.upsert': {
-        // Editing someone keeps what a device doesn't own: their link, and whether they're archived.
+        // Editing someone keeps what a device doesn't own: their link, and whether they're archived. An
+        // edit that says nothing about approving leave keeps that too; only staff can approve it.
         const a = m.args as CommandArgs<'person.upsert'>
         const was = people.get(a.id)
-        people.set(a.id, { linkToken: was?.linkToken ?? '', archived: was?.archived ?? false, ...a, pending: true })
+        const approvesLeave = a.kind === 'staff' && (a.approvesLeave ?? was?.approvesLeave ?? false)
+        people.set(a.id, { linkToken: was?.linkToken ?? '', archived: was?.archived ?? false, ...a, approvesLeave, pending: true })
         break
       }
       case 'person.archive': {
@@ -200,6 +203,17 @@ export function crewView(
       }
       case 'unavailability.remove':
         away.delete((m.args as CommandArgs<'unavailability.remove'>).id)
+        break
+      case 'leave.decide': {
+        // Approved leave is days off (ADR 0024), under the request's own id, so the planner shows it before it syncs.
+        const a = m.args as CommandArgs<'leave.decide'>
+        const r = entities.leaveRequest?.[a.id]
+        if (!r || r.status !== 'waiting' || !a.approved || away.has(a.id)) break
+        away.set(a.id, { id: a.id, personId: r.personId, start: r.start, end: r.end, note: leaveLabel(r.type, r.days), source: 'leave', pending: true })
+        break
+      }
+      case 'leave.cancel':
+        away.delete((m.args as CommandArgs<'leave.cancel'>).id)
         break
     }
   }

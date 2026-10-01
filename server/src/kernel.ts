@@ -25,6 +25,12 @@ export interface Ctx {
    * private link, or a person's answer in Google Calendar (ADR 0009).
    */
   via: 'app' | 'link' | 'calendar'
+  /**
+   * The signed-in member of staff whose device sent it, once sign-in is
+   * on: leave (ADR 0024) matches the email to a person on the Crew tab.
+   * Absent while sign-in is off, when nothing checks who a device is.
+   */
+  user?: { id: string; email: string }
 }
 
 /**

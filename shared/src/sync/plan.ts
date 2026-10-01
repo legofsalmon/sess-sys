@@ -1,4 +1,5 @@
 import { eachDay, HOLDING, OPEN } from '../crew.ts'
+import { publicHolidaysAmong } from '../holidays.ts'
 import { STOPPED, type ProjectStatus } from '../jobs.ts'
 import type { CallView, CrewView, PersonView } from './crew-view.ts'
 import type { JobsView } from './jobs-view.ts'
@@ -127,6 +128,8 @@ export interface Plan {
   problems: PlanProblem[]
   /** Job-days with fewer crew booked than needed. */
   short: number
+  /** The public holidays among the days, by day (ADR 0024): shown as a band, never counted as leave. */
+  holidays: Record<string, string>
 }
 
 export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly string[]): Plan {
@@ -246,7 +249,7 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
   let short = 0
   for (const lane of jobs) for (const x of Object.values(lane.days)) if (x.booked < x.needed) short++
 
-  return { days: [...days], jobs, people, problems, short }
+  return { days: [...days], jobs, people, problems, short, holidays: publicHolidaysAmong(days) }
 }
 
 function unique(names: string[]): string[] {

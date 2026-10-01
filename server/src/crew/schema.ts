@@ -93,6 +93,13 @@ const MIGRATIONS: string[] = [
   // Declines and pull-outs wait in "Answers to check" until the office
   // notes them (audit finding 9): when that was, or null while they wait.
   `ALTER TABLE offers ADD COLUMN IF NOT EXISTS seen_at timestamptz;`,
+  // Staff leave (ADR 0024): who can approve time off, and approved leave
+  // as days off, under the request's own id, with a source of its own.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS approves_leave boolean NOT NULL DEFAULT false;
+  ALTER TABLE unavailability DROP CONSTRAINT IF EXISTS unavailability_source_check;
+  ALTER TABLE unavailability ADD CONSTRAINT unavailability_source_check CHECK (source IN ('ops', 'self', 'calendar', 'leave'));
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

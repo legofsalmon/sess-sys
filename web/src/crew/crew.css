@@ -56,6 +56,35 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .account .office-form .wide { grid-column: 1 / -1; }
 .account .office-form button { justify-self: start; }
 
+/* A yes-or-no on the person form, such as "Can approve time off" (ADR 0024). */
+.crew .grid-form label.tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; color: var(--ink); cursor: pointer; }
+.crew .grid-form label.tick input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.crew .grid-form label.tick small { display: block; color: var(--muted); font-size: .8rem; }
+
+/* Staff leave (ADR 0024): the Crew tab's card, and the Leave screen's balances, forms, requests and queue. */
+.crew .leave-card a.button { justify-self: start; }
+.leave-screen .card p { margin: 0; }
+.leave-screen h3 { margin: var(--space-4) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.leave-screen .facts { grid-template-columns: 1fr 1fr 1fr; }
+.leave-screen .facts dd small { color: var(--muted); font-weight: 400; }
+.leave-screen .facts dd.bad { color: var(--bad); }
+.leave-screen .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.leave-screen .who-form { display: grid; gap: var(--space-10); }
+.leave-screen .who-form button { justify-self: start; }
+.leave-screen .ts-total small { font-weight: 400; }
+.leave-screen .leave-row > div:first-child { flex: 1 1 14em; }
+.leave-screen .leave-row .hint { align-self: center; }
+.leave-screen .leave-warnings { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; gap: var(--space-4); }
+.leave-screen .decline-form { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-6); align-items: center; flex-basis: 100%; }
+.leave-screen .allowance-row .actions { align-items: flex-end; }
+.leave-screen .allowance-row .field input { width: 6em; }
+.leave-screen .allowance-row .alert { flex-basis: 100%; }
+.leave-screen button.link.start { justify-self: start; }
+@media (max-width: 480px) {
+  .leave-screen .facts { grid-template-columns: 1fr 1fr; }
+  .leave-screen .decline-form { grid-template-columns: 1fr; }
+}
+
 /* Timesheets (ADR 0022): what's waiting on the office in the Crew tab, and a booking's timesheet to check and approve. */
 .crew .ts-group { display: grid; gap: var(--space-8); }
 .crew .ts-group + .ts-group { padding-top: var(--space-10); border-top: 1px solid var(--line); }

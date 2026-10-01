@@ -148,6 +148,14 @@ on each freelancer's private link. So are timesheets
 ([ADR 0022](adr/0022-timesheets.md)): the days worked at the day rate and
 the extras, sent from a freelancer's link and approved by the office.
 
+**Staff** (built, 1 October 2026, [ADR 0024](adr/0024-staff-leave.md)):
+annual leave and time in lieu, in whole days against a calendar-year
+allowance, applied for on the Leave screen and approved by whoever has
+"Can approve time off"; Irish public holidays worked out by rule and
+never counted; approved leave in the planner and respected by offers.
+Half days, working patterns, sick and unpaid leave, and carrying days
+over by rule are later.
+
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.

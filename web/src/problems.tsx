@@ -1,4 +1,4 @@
-import { normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
+import { dayLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
 import { useEffect, useState, type ReactNode } from 'react'
 import { reasonOf } from './act.tsx'
 import { when } from './format.ts'
@@ -110,6 +110,14 @@ function describer(view: View): (m: Mutation) => string {
     return f.assetId ? item(f.assetId) : `${f.qty.toLocaleString('en-IE')} × ${model(f.modelId)}`
   }
   const span = (a: Record<string, unknown>) => (typeof a.start === 'string' && typeof a.end === 'string' ? `, ${spanLabel({ start: a.start, end: a.end })}` : '')
+  const leave = (id: unknown) => {
+    const r = view.leave.requests.find((x) => x.id === id)
+    return r ? `${r.person?.name ?? 'someone'}'s ${r.type === 'lieu' ? 'days in lieu' : 'annual leave'}` : "someone's leave"
+  }
+  const lieu = (id: unknown) => {
+    const e = view.leave.entries.find((x) => x.id === id)
+    return e ? `${e.person?.name ?? 'someone'}'s day in lieu for ${dayLabel(e.day)}` : "someone's day in lieu"
+  }
 
   return (m: Mutation) => {
     const a = m.args as Record<string, unknown>
@@ -224,6 +232,20 @@ function describer(view: View): (m: Mutation) => string {
         return `Approve ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
       case 'timesheet.reopen':
         return `Reopen ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
+      case 'leave.request':
+        return `Ask for ${a.type === 'lieu' ? 'days in lieu' : 'annual leave'} for ${person(a.personId)}${span(a)}`
+      case 'leave.cancel':
+        return `Cancel ${leave(a.id)}`
+      case 'leave.decide':
+        return `${a.approved ? 'Approve' : 'Decline'} ${leave(a.id)}`
+      case 'lieu.log':
+        return `Log ${typeof a.days === 'number' && a.days !== 1 ? `${a.days} days` : 'a day'} in lieu for ${person(a.personId)}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}`
+      case 'lieu.cancel':
+        return `Cancel ${lieu(a.id)}`
+      case 'lieu.decide':
+        return `${a.approved ? 'Approve' : 'Decline'} ${lieu(a.id)}`
+      case 'leave.allowance':
+        return `Set ${person(a.personId)}'s ${num(a.year)} allowance`
     }
   }
 }

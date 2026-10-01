@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  irishToday,
   MemoryStorage,
   START_FRESH_WORDS,
   SyncClient,
@@ -146,7 +147,26 @@ describe('made-up data', () => {
     for (const s of ['confirmed', 'offered', 'countered', 'declined']) expect(statuses).toContain(s)
     expect(offers.find((o) => o.status === 'countered')).toMatchObject({ person: { name: 'Fionn Gallagher' }, counterRateCents: 32000 })
     expect(offers.filter((o) => o.person?.name === 'Dara Quinn' && o.override)).toHaveLength(1)
-    expect(view.crew.unavailability).toHaveLength(1)
+    // Laoise's holidays, and Orla's approved week of leave as days off (ADR 0024).
+    expect(view.crew.unavailability.map((u) => [u.source, u.note]).sort()).toEqual([
+      ['leave', 'Annual leave'],
+      ['ops', 'Holidays'],
+    ])
+
+    // Staff leave: Aoife approves, Cian's week and his day in lieu wait on her, and Orla's week is taken.
+    const year = Number(irishToday().slice(0, 4))
+    const byName = Object.fromEntries(view.leave.staff.map((p) => [p.name, p]))
+    expect(view.leave.approvers.map((p) => p.name)).toEqual(['Aoife Brennan'])
+    expect(view.leave.balance(byName['Aoife Brennan']!.id, year)).toMatchObject({ allowance: 22, carriedOver: 2, allowanceSet: true })
+    const orlaLeave = view.leave.requests.find((r) => r.person?.name === 'Orla Hayes')!
+    expect(orlaLeave).toMatchObject({ status: 'approved', type: 'annual' })
+    const orla = view.leave.balance(byName['Orla Hayes']!.id, Number(orlaLeave.start.slice(0, 4)))
+    expect(orla.annual.taken + orla.annual.booked).toBe(orlaLeave.days)
+    expect(orla.annual.left).toBe(orla.allowance + orla.carriedOver - orlaLeave.days)
+    expect(view.leave.queue.map((q) => [q.kind, q.person?.name])).toEqual([
+      ['request', 'Cian Murphy'],
+      ['entry', 'Cian Murphy'],
+    ])
 
     // Timesheets for the gala that's over: Dara's to approve, Tadhg's approved without his dinner, and Laoise's not in yet.
     const ts = view.timesheets
