@@ -115,8 +115,32 @@ anything had changed, on storage that could hang or go blank.
   newest tab wins. A start-up that fails shows a card with the reason
   and Try again, never a white page.
 
-**Refusals and money** (findings 11 and 15) are the fifth stream of this
-round; its section follows once it lands.
+**Refusals, where they happen.**
+
+- One count in every screen's top bar, beside what's waiting: "1 not
+  done", in the bad tone. It opens the one list of every area's server
+  refusals, wherever the page is scrolled to: what was asked, in words,
+  when it was asked and turned down, the reason, and Dismiss. The
+  per-area "Not done" cards are gone; the top bar is the whole list.
+- One `act()` for the whole app. Every change goes through it; a local
+  refusal (the shared schema, the view guard, "this phone is out of
+  storage", "the app is open in another tab") is shown in a line where
+  the action was, never in a browser alert. The schema's wording never
+  reaches the screen: every typed field has a plain sentence ("How many
+  is a whole number from 1 to 100."), and anything else becomes one
+  general sentence. A form keeps what was typed when its change is
+  refused, so the reason points at the field it means.
+- Every "are you sure?" is a question in place: the consequence in
+  words, two buttons (the safe one first and focused), the fields held
+  still, and a way back. Nothing blocks the page.
+
+**Money reads as typed.** One parser in `shared/src/money.ts` takes
+"€1,250", "1 250,50", "1.250,50", "250.5" and "250"; a single separator
+with three digits after it is a thousands mark, and with both a comma and
+a dot the last one is the decimal point. Nonsense is refused in words
+("Put in a price like 250 or 1,250.50."). Every money field in the app
+and on the freelancer's link uses it, and the link's inputs no longer
+carry a pattern that would stop "€300" at the browser.
 
 ## Consequences
 

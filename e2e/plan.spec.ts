@@ -210,7 +210,7 @@ test('a month on a laptop, whose dates open their week', async ({ browser }) => 
   await expect(aoife.nth(3)).toHaveClass(/clash/)
   await expect(aoife.nth(3).locator('[aria-hidden]')).toHaveText('WS')
   await expect(aoife.nth(3).locator('.sr-only')).toHaveText(
-    `Clash: Booked on ${named('Web Summit')} but marked unavailable (Dentist). Booked or to confirm on ${named('Web Summit')}, Build. Unavailable (Dentist)`
+    `Clash: Booked on ${named('Web Summit')} but marked unavailable (Dentist). Booked on ${named('Web Summit')}, Build. Unavailable (Dentist)`
   )
 
   // A date opens its week, still by person; Previous and Next move a week at a time.
