@@ -3,6 +3,41 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 1 October 2026: the Blueprint's hero
+
+**Done**
+
+- The system map at the top of the Blueprint (the flight-case board,
+  merged this morning) is replaced by a full-width hero above the
+  sidebar and the content, as Colly asked: the business first, the
+  systems second. One job goes through eight numbered chapters (enquire
+  and quote, book and plan, crew it, prep the kit, deliver and run the
+  show, return and repair, pay and invoice, and underneath it all, the
+  cloud). Each chapter says who and where, its state in words, what the
+  app does there, and names the parts of the app that do the work as a
+  second layer, each with its build mark (built, in progress, planned,
+  waiting on a key).
+- A tag travels the baseline as one job, lighting each chapter as it
+  arrives with a word on what just happened. Hover, tap or Enter pins a
+  chapter and the footnote says what is left. Reduced motion gets a
+  still frame. Laptop, tablet and phone each have their own layout, in
+  light and dark, with nothing under 12px.
+- Chosen from three concepts (a strip, an arc, and chapters) by three
+  judges reading against Colly's critique, with the runners-up's best
+  ideas grafted in; then read by a reviewer whose four must-fixes (a
+  cramped top, ragged card bottoms, a half-empty title spread on
+  tablets, and freelancer invoices over-claimed) and most suggestions
+  went in.
+- Checked at 1440, 1280, 1150, 1100, 1024, 768 and 390, light and dark,
+  motion and reduced motion: no console errors, no horizontal scroll,
+  the hero under 760px on a laptop.
+
+**Next**
+
+- The hero's facts (lines of code, tests, decisions) are typed into the
+  page; the build script could fill them from the repo so they never
+  drift.
+
 ## 1 October 2026: staff leave and time in lieu
 
 **Done**
@@ -61,6 +96,10 @@ waiting on someone.
   days, the approver's badge counts it at once, the approver approves,
   a blanked allowance is turned down in place, the planner shows the
   days off, an offer warns).
+- Merged into `main` at 14:14 UTC once GitHub's checks passed, and live
+  by 14:21: Railway waited for main's checks, then deployed it on its
+  own. The three leave tables are in the live database at version 1,
+  and the health check answers on the new build.
 
 **Next**
 
