@@ -165,10 +165,11 @@ over by rule are later.
   invoices and email them to the office (Colly, 1 October 2026). The
   app tells each freelancer on their link what to invoice from their
   approved timesheets (days, rate, extras, the total, and VAT on top for
-  the ones who are VAT-registered), and where to send it; the office
-  records each invoice as it arrives against those timesheets, checks
-  the figures, and marks it paid, with the status visible to the
-  freelancer.
+  the ones who are VAT-registered), and where to send it. An invoice
+  can cover one job or several over a period, as the freelancer likes;
+  the office records each invoice as it arrives against the timesheets
+  it covers, checks the figures, and marks it paid, with the status
+  visible to the freelancer.
 - Offers by app, email, SMS or WhatsApp: send a role to one person or a
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.
