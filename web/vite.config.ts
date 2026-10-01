@@ -13,7 +13,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // A new version waits until someone taps Reload (update.tsx), so the page that's open keeps its files.
+      registerType: 'prompt',
       manifest: {
         name: 'Session Hire',
         short_name: 'Session Hire',

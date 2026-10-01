@@ -280,8 +280,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   if (webRoot) {
     await app.register(fastifyStatic, { root: webRoot })
     // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.
+    // A missing file under /assets/ is a plain 404, never the page: a page from before a deploy
+    // asking for a file that's gone should see it fail (and reload), not get HTML as its script.
     app.setNotFoundHandler((req, reply) =>
-      /^\/(api|f|cal)\//.test(req.url) ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
+      /^\/(api|f|cal|assets)\//.test(req.url) ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html')
     )
     // Fastify's own answer would write the whole address in the log.
   } else app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found' }))
