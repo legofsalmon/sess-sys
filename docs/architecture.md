@@ -96,8 +96,12 @@ also work for other companies, so the system bends to them instead:
   times, venue, rate, travel, food), a clear deadline to answer, the option
   to accept only some days of a multi-day job, and to counter the rate.
 - **Get paid without chasing.** The days worked and the extras from the
-  job (a timesheet, sent from their link) become a ready-made invoice (self-billing, if they agree) that they check and
-  approve in one step, with the payment status visible to them.
+  job (a timesheet, sent from their link) add up to exactly what to
+  invoice. Freelancers write their own invoices and email them in, some
+  with VAT (Colly, 1 October 2026), so their link shows the figures to
+  put on it and the office's address, and the office matches each
+  invoice to its timesheets and marks it paid, with the status visible
+  to them.
 - **Two-way.** Freelancers can tell the company things too: flag they're
   running late, add a note to the call sheet, swap a shift with another
   approved freelancer if ops allow it.

@@ -7,6 +7,12 @@ waiting on someone.
 
 **Done**
 
+- Colly answered two of the three invoice questions: freelancers write
+  their own invoices and email them to the office, and some of them are
+  VAT-registered. So the app will tell each freelancer what to invoice
+  and track what arrives, rather than make the invoice; the roadmap and
+  the architecture say so now. Still open: one invoice per job, or one
+  per freelancer per month.
 - Colly answered the open question from ADR 0009: calendar invites go
   out to crew when they're offered a job, and accepting the invite in
   Google Calendar is one acceptable way of agreeing to it. That is what

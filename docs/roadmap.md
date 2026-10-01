@@ -161,8 +161,14 @@ over by rule are later.
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
   call sheet; partial acceptance of multi-day jobs; rate counter-offers.
-- Ready-made freelancer invoices from hours and extras, approved in one
-  step, with payment status visible to them.
+- Invoicing made easy, not made for them: freelancers write their own
+  invoices and email them to the office (Colly, 1 October 2026). The
+  app tells each freelancer on their link what to invoice from their
+  approved timesheets (days, rate, extras, the total, and VAT on top for
+  the ones who are VAT-registered), and where to send it; the office
+  records each invoice as it arrives against those timesheets, checks
+  the figures, and marks it paid, with the status visible to the
+  freelancer.
 - Offers by app, email, SMS or WhatsApp: send a role to one person or a
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.
