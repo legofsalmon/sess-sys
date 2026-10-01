@@ -10,8 +10,8 @@ import {
   type WarehouseView,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
-import { NotDone, Top } from '../jobs/common.tsx'
+import { Refusal, useAct } from '../act.tsx'
+import { Top } from '../jobs/common.tsx'
 import { when } from '../format.ts'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
@@ -25,7 +25,6 @@ import {
   loopIn,
   numberLabel,
   Pending,
-  STOCK_COMMANDS,
   whereLabel,
   WhereChoices,
   whereNamed,
@@ -60,7 +59,6 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
       <a className="back" href={a.model ? `#stock/product/${a.model.id}` : '#stock'}>
         ‹ {a.model?.name ?? 'All stock'}
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <Summary a={a} w={w} view={view} />
       <FaultsCard faults={view.faults.ofAsset(a.id)}>
         {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
@@ -83,7 +81,8 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
   const retired = a.status === 'retired'
   const toggle = (m: Mode) => setMode(mode === m ? undefined : m)
   const done = () => setMode(undefined)
-  const reinstate = () => void act(() => client.mutate('asset.reinstate', { id: a.id })).catch((err: Error) => alert(err.message))
+  const { run, error } = useAct()
+  const reinstate = () => void run(() => client.mutate('asset.reinstate', { id: a.id }))
   return (
     <section className="card">
       <header className="title">
@@ -145,6 +144,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
         )}
       </dl>
       {a.notes && <p className="notes">{a.notes}</p>}
+      <Refusal error={error} />
       {retired ? (
         <div className="actions">
           <button type="button" onClick={reinstate}>
@@ -192,20 +192,19 @@ function WhereLink({ a }: { a: AssetView }) {
 
 function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
   const [to, setTo] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const typed = itemNumbered(to, w)
     if (typed?.model?.isCase && typed.status === 'active') {
       const loop = loopIn(a.id, typed.id, w)
-      if (loop) return setError(loop)
+      if (loop) return refuse(loop)
     }
-    void act(async () => {
+    void run(async () => {
       const dest = (await whereNamed(to, w)) ?? { placeId: null, caseId: null }
       if (dest.placeId === a.placeId && dest.caseId === a.caseId) return
       await client.mutate('asset.move', { id: a.id, ...dest })
-    }).then(onDone, (err: Error) => setError(err.message))
+    }).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -220,7 +219,7 @@ function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => 
         />
       </label>
       {a.model?.isCase && (a.items.length > 0 || a.counted.length > 0) && <p className="hint wide">Everything in it goes too.</p>}
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Move {numberLabel(a)}
@@ -236,23 +235,22 @@ function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => 
 /** Only what changed is sent, as for products and jobs. */
 function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
   const [f, setF] = useState({ modelId: a.modelId, serial: a.serial, notes: a.notes })
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   // Another numbered product, when it was put down as the wrong one.
   const products = w.models.filter((m) => m.tracking === 'serialised')
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const changes: CommandInput<'asset.update'> = { id: a.id }
     if (f.modelId !== a.modelId) {
       const next = products.find((m) => m.id === f.modelId)
       if (next && !next.isCase && (a.items.length > 0 || a.counted.length > 0))
-        return setError(`${numberLabel(a)} has kit in it, and ${next.name} doesn't hold other kit. Empty it first.`)
+        return refuse(`${numberLabel(a)} has kit in it, and ${next.name} doesn't hold other kit. Empty it first.`)
       changes.modelId = f.modelId
     }
     if (f.serial.trim() !== a.serial) changes.serial = f.serial.trim()
     if (f.notes.trim() !== a.notes) changes.notes = f.notes.trim()
     if (Object.keys(changes).length === 1) return onDone()
-    void act(() => client.mutate('asset.update', changes)).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('asset.update', changes)).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -272,7 +270,7 @@ function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save
@@ -288,17 +286,16 @@ function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
 /** For a label that's lost or worn out. The old number stays with the item and is never used again. */
 function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
   const [typed, setTyped] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const t = typed.trim()
     const number = (t && normaliseNumber(t)) || null
-    if (t && !number) return setError(`“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
-    if (number && number === a.number) return setError(`${number} is its label now.`)
+    if (t && !number) return refuse(`“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
+    if (number && number === a.number) return refuse(`${number} is its label now.`)
     const other = number ? w.byNumber.get(number) : undefined
     if (number && other) {
-      return setError(
+      return refuse(
         other.id === a.id
           ? `${number} was its label before, and a number is never used twice. Use another label.`
           : other.number === number
@@ -306,7 +303,7 @@ function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
             : `${number} was used before (${other.model?.name ?? 'another item'}, now ${numberLabel(other)}), and a number is never used twice. Use another label.`
       )
     }
-    void act(() => client.mutate('asset.relabel', { id: a.id, number })).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('asset.relabel', { id: a.id, number })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -322,7 +319,7 @@ function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
           autoFocus
         />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save new label
@@ -338,15 +335,15 @@ function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
 function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
   const [reason, setReason] = useState<RetiredReason>('scrapped')
   const [note, setNote] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const holding = [
     a.items.length > 0 && plural(a.items.length, 'item'),
     a.counted.length > 0 && `${a.counted.reduce((n, s) => n + s.qty, 0).toLocaleString('en-IE')} counted`,
   ].filter(Boolean)
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (holding.length) return setError(`${numberLabel(a)} still holds ${holding.join(' and ')}. Empty it first.`)
-    void act(() => client.mutate('asset.retire', { id: a.id, reason, note: note.trim() })).then(onDone, (err: Error) => setError(err.message))
+    if (holding.length) return refuse(`${numberLabel(a)} still holds ${holding.join(' and ')}. Empty it first.`)
+    void run(() => client.mutate('asset.retire', { id: a.id, reason, note: note.trim() })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -363,7 +360,7 @@ function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
       <label className="wide">
         Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Dropped at the Point, cone torn" maxLength={500} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Retire {numberLabel(a)}
@@ -379,25 +376,24 @@ function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
 /** A case's contents: items in it, and what's counted in it. */
 function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const put = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const t = number.trim()
     if (!t) return
     const item = itemNumbered(t, w)
     if (!item)
-      return setError(
+      return refuse(
         normaliseNumber(t)
           ? `No item has the number ${normaliseNumber(t)}.`
           : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`
       )
-    if (item.number !== normaliseNumber(t)) return setError(`${normaliseNumber(t)} was an old label. That item is ${numberLabel(item)} now.`)
-    if (item.status !== 'active') return setError(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
-    if (item.caseId === c.id) return setError(`${item.number} is in here already.`)
+    if (item.number !== normaliseNumber(t)) return refuse(`${normaliseNumber(t)} was an old label. That item is ${numberLabel(item)} now.`)
+    if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
+    if (item.caseId === c.id) return refuse(`${item.number} is in here already.`)
     const loop = loopIn(item.id, c.id, w)
-    if (loop) return setError(loop)
-    void act(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id })).catch((err: Error) => setError(err.message))
+    if (loop) return refuse(loop)
+    void run(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id }))
     setNumber('')
   }
   const empty = c.items.length === 0 && c.counted.length === 0
@@ -439,7 +435,7 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
             enterKeyHint="done"
           />
         </label>
-        {error && <p className="alert wide">{error}</p>}
+        <Refusal error={error} className="wide" />
         <button type="submit" className="wide">
           Put it in {numberLabel(c)}
         </button>

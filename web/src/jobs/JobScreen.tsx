@@ -7,6 +7,7 @@ import {
   mapLink,
   movedCallSpan,
   newId,
+  parseEuro,
   phaseOnCalendar,
   phaseOnlyGrew,
   PHASE_NAMES,
@@ -24,9 +25,10 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act, CallCard, euroToCents, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
+import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
 import { client } from '../sync.ts'
-import { Choices, clientNamed, NotDone, StatusPill, Top, venueNamed } from './common.tsx'
+import { Choices, clientNamed, StatusPill, Top, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
 
 /**
@@ -66,7 +68,6 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
       <a className="back" href="#jobs">
         ‹ All jobs
       </a>
-      <NotDone view={view} />
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
 
@@ -162,23 +163,15 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
 function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDone: () => void; onTell: (share: Share | undefined) => void }) {
   const { clients, venues } = view.jobs
   const [f, setF] = useState({ name: job.name, client: job.client?.name ?? '', venue: job.venue?.name ?? '', status: job.status, notes: job.notes })
-  const save = (e: FormEvent) => {
-    e.preventDefault()
-    if (!f.name.trim()) return
-    const stopping = STOPPED.includes(f.status) && !STOPPED.includes(job.status)
-    // Everyone offered or booked on the job's open calls: told it's off once it's stopped.
-    const people = job.calls.filter((c) => c.status === 'open').flatMap((c) => peopleOn(c))
-    if (
-      stopping &&
-      job.calls.some((c) => c.status === 'open') &&
-      !confirm(
-        `Marking ${job.name} ${STATUS_LABELS[f.status].toLowerCase()} also cancels its crew calls${
-          people.length ? `: ${people.length === 1 ? '1 person' : `${people.length} people`} offered or booked will see it's withdrawn` : ''
-        }. Go ahead?`
-      )
-    )
-      return
-    void act(async () => {
+  // Stopping a job with crew out waits here until the office says so, with the fields held still.
+  const [asking, setAsking] = useState(false)
+  const { run, error } = useAct()
+  const stopping = STOPPED.includes(f.status) && !STOPPED.includes(job.status)
+  // Everyone offered or booked on the job's open calls: told it's off once it's stopped.
+  const people = job.calls.filter((c) => c.status === 'open').flatMap((c) => peopleOn(c))
+  const send = () => {
+    setAsking(false)
+    void run(async () => {
       const changes: CommandInput<'project.update'> = { id: job.id }
       if (f.name.trim() !== job.name) changes.name = f.name.trim()
       if (f.status !== job.status) changes.status = f.status
@@ -188,25 +181,32 @@ function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDo
       const venueId = await venueNamed(f.venue, venues)
       if (venueId !== job.venueId) changes.venueId = venueId
       if (Object.keys(changes).length > 1) await client.mutate('project.update', changes)
-    }).then(() => {
+    }).then((ok) => {
+      if (!ok) return
       onDone()
       if (stopping) onTell(promptFor('job-stopped', people))
-    }, (err: Error) => alert(err.message))
+    })
+  }
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.name.trim()) return
+    if (stopping && job.calls.some((c) => c.status === 'open')) return setAsking(true)
+    send()
   }
   return (
     <form className="grid-form" onSubmit={save}>
       <label className="wide">
-        Job <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
+        Job <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required disabled={asking} />
       </label>
       <label>
-        Client <input list="edit-client-names" value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })} />
+        Client <input list="edit-client-names" value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })} disabled={asking} />
       </label>
       <label>
-        Venue <input list="edit-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} />
+        Venue <input list="edit-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} disabled={asking} />
       </label>
       <label className="wide">
         Status
-        <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as ProjectStatus })}>
+        <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as ProjectStatus })} disabled={asking}>
           {PROJECT_STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
@@ -215,16 +215,30 @@ function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDo
         </select>
       </label>
       <label className="wide">
-        Notes <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
+        Notes <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={asking} />
       </label>
-      <div className="actions wide">
-        <button type="submit" className="primary">
-          Save
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
+      <Refusal error={error} className="wide" />
+      {asking ? (
+        <Confirm
+          className="wide"
+          question={`Marking ${job.name} ${STATUS_LABELS[f.status].toLowerCase()} also cancels its crew calls${
+            people.length ? `: ${people.length === 1 ? '1 person' : `${people.length} people`} offered or booked will see it's withdrawn` : ''
+          }.`}
+          yes={`Mark it ${STATUS_LABELS[f.status].toLowerCase()}`}
+          no="Keep it as it is"
+          onYes={send}
+          onNo={() => setAsking(false)}
+        />
+      ) : (
+        <div className="actions wide">
+          <button type="submit" className="primary">
+            Save
+          </button>
+          <button type="button" onClick={onDone}>
+            Cancel
+          </button>
+        </div>
+      )}
       <Choices id="edit-client-names" names={clients} />
       <Choices id="edit-venue-names" names={venues} />
     </form>
@@ -346,6 +360,8 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
   const [f, setF] = useState({ name: phase.name, start: phase.start, end: phase.end, venue: phase.venueId ? (phase.venue?.name ?? '') : '', notes: phase.notes })
   // A change of dates to a phase with crew waits here until the office says whether the crew move too.
   const [ask, setAsk] = useState<CommandInput<'phase.update'> | undefined>()
+  const [removing, setRemoving] = useState(false)
+  const { run, error, refuse } = useAct()
   const openCalls = phase.calls.filter((c) => c.status === 'open')
   // Everyone on the phase's open calls, with the days the move gives each call. Their own days move with it, so the message gives the call's and the page has the rest.
   const movedPeople = (changes: CommandInput<'phase.update'>) => {
@@ -356,15 +372,16 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
     })
   }
   const send = (changes: CommandInput<'phase.update'>) =>
-    void act(() => client.mutate('phase.update', changes)).then(() => {
+    void run(() => client.mutate('phase.update', changes)).then((ok) => {
+      if (!ok) return
       onDone()
       if (changes.moveCrew) onTell(promptFor('phase-moved', movedPeople(changes)))
-    }, (err: Error) => alert(err.message))
+    })
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
     let asking = false
-    void act(async () => {
+    void run(async () => {
       const changes: CommandInput<'phase.update'> = { id: phase.id }
       if (f.name.trim() !== phase.name) changes.name = f.name.trim()
       if (f.start !== phase.start) changes.start = f.start
@@ -381,19 +398,20 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
         return
       }
       await client.mutate('phase.update', changes)
-    }).then(() => asking || onDone(), (err: Error) => alert(err.message))
+    }).then((ok) => ok && !asking && onDone())
   }
   const remove = () => {
-    if (phase.calls.some((c) => c.status === 'open')) return alert(`${phase.name} still has crew. Cancel its crew calls first.`)
+    if (phase.calls.some((c) => c.status === 'open')) return refuse(`${phase.name} still has crew. Cancel its crew calls first.`)
     const kit = view.kit.lines.filter((l) => l.phaseId === phase.id)
-    if (kit.length) return alert(`${phase.name} still has kit. Put it on the whole job or take it off first.`)
-    if (confirm(`Remove ${phase.name}?`)) void act(() => client.mutate('phase.remove', { id: phase.id })).then(onDone)
+    if (kit.length) return refuse(`${phase.name} still has kit. Put it on the whole job or take it off first.`)
+    setRemoving(true)
   }
+  const held = !!ask || removing
   return (
     <form className="grid-form" onSubmit={save}>
-      {/* While the move question is open, the fields hold still: Move them and Keep their dates send what Save captured. */}
+      {/* While a question is open, the fields hold still: Move them and Keep their dates send what Save captured. */}
       <label className="wide">
-        Phase <input list="phase-names-edit" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required disabled={!!ask} />
+        Phase <input list="phase-names-edit" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required disabled={held} />
       </label>
       <label>
         From{' '}
@@ -401,25 +419,38 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
           type="date"
           value={f.start}
           onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })}
-          disabled={!!ask}
+          disabled={held}
         />
       </label>
       <label>
-        To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} disabled={!!ask} />
+        To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} disabled={held} />
       </label>
       <label className="wide">
         Venue{' '}
-        <input list="phase-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="The job's venue" disabled={!!ask} />
+        <input list="phase-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="The job's venue" disabled={held} />
       </label>
       <label className="wide">
-        Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={!!ask} />
+        Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={held} />
       </label>
       {ask && (
         <p className="warn-line wide" role="status">
           Move its {openCalls.length} crew call{openCalls.length === 1 ? '' : 's'} too? The days their crew hold move with them.
         </p>
       )}
-      <div className="actions wide">
+      <Refusal error={error} className="wide" />
+      {removing && (
+        <Confirm
+          className="wide"
+          question={`Remove ${phase.name}? Its days come off the job and the calendar.`}
+          yes="Remove it"
+          onYes={() => {
+            setRemoving(false)
+            void run(() => client.mutate('phase.remove', { id: phase.id })).then((ok) => ok && onDone())
+          }}
+          onNo={() => setRemoving(false)}
+        />
+      )}
+      <div className="actions wide" hidden={removing}>
         {ask ? (
           <>
             <button type="button" className="primary" onClick={() => send({ ...ask, moveCrew: true })}>
@@ -460,13 +491,18 @@ function AddPhase({ job }: { job: JobView }) {
   const last = job.phases.at(-1)
   const start = last?.end ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
   const [f, setF] = useState({ name: '', start, end: start })
+  const { run, error } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
-    void act(() =>
+    // Ready for the next phase, starting where this one ends; a refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { name: '', start: f.end, end: f.end }
+    setF(cleared)
+    void run(() =>
       client.mutate('phase.add', { id: newId(), projectId: job.id, name: f.name.trim(), start: f.start, end: f.end < f.start ? f.start : f.end, venueId: null, notes: '' })
-    ).catch((err: Error) => alert(err.message))
-    setF({ name: '', start: f.end, end: f.end })
+    ).then((ok) => {
+      if (!ok) setF((now) => (now === cleared ? f : now))
+    })
   }
   return (
     <form className="grid-form add-phase" onSubmit={submit} aria-label="Add a phase">
@@ -479,6 +515,7 @@ function AddPhase({ job }: { job: JobView }) {
       <label>
         To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} />
       </label>
+      <Refusal error={error} className="wide" />
       <button type="submit" className="wide">
         Add phase
       </button>
@@ -502,12 +539,19 @@ function AskForCrew({ job }: { job: JobView }) {
   const start = dates?.start ?? span?.start ?? ''
   const end = dates?.end ?? span?.end ?? ''
   const venue = phase?.venue ?? job.venue
+  const { run, error, refuse } = useAct()
 
   if (!job.span) return <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.role.trim() || !start) return
-    void act(() =>
+    const rate = parseEuro(f.rate)
+    if (rate.reason !== undefined) return refuse(rate.reason)
+    // Ready for the next call; a refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { ...blank, phaseId: f.phaseId }
+    setF(cleared)
+    setDates(undefined)
+    void run(() =>
       client.mutate('call.create', {
         id: newId(),
         projectId: job.id,
@@ -520,13 +564,15 @@ function AskForCrew({ job }: { job: JobView }) {
         end: end < start ? start : end,
         callTime: f.callTime || null,
         needed: Math.max(1, f.needed),
-        dayRateCents: euroToCents(f.rate),
+        dayRateCents: rate.cents,
         details: f.details.trim(),
         replyBy: null,
       })
-    ).catch((err: Error) => alert(err.message))
-    setF({ ...blank, phaseId: f.phaseId })
-    setDates(undefined)
+    ).then((ok) => {
+      if (ok) return
+      setF((now) => (now === cleared ? f : now))
+      setDates((now) => now ?? dates)
+    })
   }
   return (
     <form className="grid-form" onSubmit={submit} aria-label="Ask for crew">
@@ -574,6 +620,7 @@ function AskForCrew({ job }: { job: JobView }) {
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={(e) => setF({ ...f, details: e.target.value })} placeholder="Travel, food, parking, dress" />
       </label>
+      <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Ask for crew
       </button>

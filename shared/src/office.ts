@@ -32,9 +32,9 @@ export const SETTING_ENTITY_NAMES = ['setting'] as const
 export const officeCommandSchemas = {
   /** Set the office's details, all of them at once: there is only one office. */
   'office.update': z.object({
-    name: z.string().trim().max(200),
+    name: z.string().trim().max(200, "The office's name can be up to 200 characters."),
     phone: phone.nullable(),
-    email: z.string().trim().email('That email address doesn’t look right.').max(200).nullable(),
+    email: z.string().trim().email('That email address doesn’t look right.').max(200, 'The email address can be up to 200 characters.').nullable(),
   }),
 } as const
 

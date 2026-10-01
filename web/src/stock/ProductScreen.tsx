@@ -2,12 +2,14 @@ import {
   CATEGORY_IDEAS,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
+  euroText,
   INSPECTION_MONTHS,
   irishToday,
   MAX_MONTHS,
   MAX_QTY,
   newId,
   normaliseNumber,
+  parseEuro,
   plural,
   RETIRED_LABELS,
   stockId,
@@ -22,8 +24,8 @@ import {
   type WarehouseView,
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
-import { act, euroToCents } from '../crew/CrewScreen.tsx'
-import { NotDone, StatusPill, Top } from '../jobs/common.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
+import { StatusPill, Top } from '../jobs/common.tsx'
 import { forLabel, kitState } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
 import {
@@ -33,7 +35,6 @@ import {
   findWhere,
   numberLabel,
   Pending,
-  STOCK_COMMANDS,
   TrackingChoice,
   whereLabel,
   WhereChoices,
@@ -72,7 +73,6 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
       <a className="back" href="#stock">
         ‹ All stock
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
@@ -89,18 +89,17 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
 
 function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View }) {
   const [editing, setEditing] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const { run, error } = useAct()
   const onKit = view.kit.lines.some((l) => l.modelId === m.id)
   const unusable = view.faults.unusable(m.id)
   const removable =
     m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0 && !onKit && !view.faults.all.some((f) => f.modelId === m.id)
   const remove = () => {
-    if (!confirm(`Remove ${m.name} from the stock list?`)) return
-    void act(() => client.mutate('model.remove', { id: m.id })).then(
-      () => {
-        location.hash = '#stock'
-      },
-      (err: Error) => alert(err.message)
-    )
+    setRemoving(false)
+    void run(() => client.mutate('model.remove', { id: m.id })).then((ok) => {
+      if (ok) location.hash = '#stock'
+    })
   }
   return (
     <section className="card">
@@ -143,15 +142,18 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
         )}
       </dl>
       {m.notes && <p className="notes">{m.notes}</p>}
+      <Refusal error={error} />
       {editing ? (
         <EditProduct m={m} w={w} onDone={() => setEditing(false)} />
+      ) : removing ? (
+        <Confirm question={`Remove ${m.name} from the stock list? Nothing is counted or labelled as it, so nothing else changes.`} yes="Remove it" onYes={remove} onNo={() => setRemoving(false)} />
       ) : (
         <div className="actions">
           <button type="button" onClick={() => setEditing(true)}>
             Change details
           </button>
           {removable && (
-            <button type="button" className="link" onClick={remove}>
+            <button type="button" className="link" onClick={() => setRemoving(true)}>
               Remove product
             </button>
           )}
@@ -223,30 +225,31 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     category: m.category,
     tracking: m.tracking,
     isCase: m.isCase,
-    value: m.valueCents === null ? '' : String(m.valueCents / 100),
+    value: m.valueCents === null ? '' : euroText(m.valueCents),
     notes: m.notes,
     pat: m.patMonths === null ? '' : String(m.patMonths),
     lifting: m.liftingMonths === null ? '' : String(m.liftingMonths),
   })
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
     const name = f.name.trim()
     if (!name) return
     const taken = w.models.find((x) => x.id !== m.id && x.name.trim().toLowerCase() === name.toLowerCase())
-    if (taken) return setError(`There's already a product called ${taken.name}.`)
-    const valueCents = euroToCents(f.value)
-    if (valueCents !== null && !(valueCents >= 0)) return setError('The value is a number of euro, such as 350 or 12.50.')
+    if (taken) return refuse(`There's already a product called ${taken.name}.`)
+    const value = parseEuro(f.value)
+    if (value.reason !== undefined) return refuse(value.reason)
+    const valueCents = value.cents
     // What the server would turn down, said now.
     if (f.tracking === 'bulk' && m.tracking === 'serialised' && m.items.length > 0)
-      return setError(`${m.name} has ${plural(m.items.length, 'numbered item')}, so it can't be counted only. Retire them first.`)
+      return refuse(`${m.name} has ${plural(m.items.length, 'numbered item')}, so it can't be counted only. Retire them first.`)
     const holding = m.items.filter((a) => a.items.length > 0 || a.counted.length > 0).length
     if (!f.isCase && m.isCase && holding > 0)
-      return setError(`${plural(holding, 'case')} of ${m.name} ${holding === 1 ? 'has' : 'have'} kit in ${holding === 1 ? 'it' : 'them'}. Empty them first.`)
+      return refuse(`${plural(holding, 'case')} of ${m.name} ${holding === 1 ? 'has' : 'have'} kit in ${holding === 1 ? 'it' : 'them'}. Empty them first.`)
     const numbered = f.tracking === 'serialised'
     const patMonths = numbered ? monthsTyped(f.pat) : m.patMonths
     const liftingMonths = numbered ? monthsTyped(f.lifting) : m.liftingMonths
-    if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return setError(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
+    if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return refuse(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
     // Only what changed, so two people changing different things both keep theirs.
     const next = {
       name,
@@ -262,7 +265,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     const changes: Partial<CommandInput<'model.update'>> = {}
     for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== m[k]) (changes as Record<string, unknown>)[k] = next[k]
     if (Object.keys(changes).length === 0) return onDone()
-    void act(() => client.mutate('model.update', { id: m.id, ...changes })).then(onDone, (err: Error) => setError(err.message))
+    void run(() => client.mutate('model.update', { id: m.id, ...changes })).then((ok) => ok && onDone())
   }
   const categories = [...new Set([...w.categories, ...CATEGORY_IDEAS])]
   return (
@@ -313,7 +316,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save product
@@ -380,7 +383,7 @@ function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; 
 function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
   const [f, setF] = useState({ number: '', serial: '', where: m.counted.length === 1 ? whereText(m.counted[0]!, w) : '' })
   const [fromCount, setFromCount] = useState(true)
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const [lastId, setLastId] = useState('')
   const numberField = useRef<HTMLInputElement>(null)
   const known = findWhere(f.where, w)
@@ -390,32 +393,32 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const typed = f.number.trim()
     const number = (typed && normaliseNumber(typed)) || null
-    if (typed && !number) return setError(`“${typed}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
+    if (typed && !number) return refuse(`“${typed}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
     const other = number ? w.byNumber.get(number) : undefined
     if (number && other) {
-      return setError(
+      return refuse(
         other.number === number
           ? `${number} is already in use (${other.model?.name ?? 'another item'}).`
           : `${number} was used before (${other.model?.name ?? 'another item'}, now ${numberLabel(other)}), and a number is never used twice. Use another label.`
       )
     }
     const problem = whereProblem(f.where, w)
-    if (problem) return setError(problem)
+    if (problem) return refuse(problem)
     const id = newId()
     const one = countedThere > 0 && fromCount
-    void act(async () => {
+    // Ready for the next label, in the same place; a refusal brings what was typed back, unless the next label has been typed since.
+    const cleared = { ...f, number: '', serial: '' }
+    setF(cleared)
+    numberField.current?.focus()
+    void run(async () => {
       const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
       await client.mutate('asset.add', { id, modelId: m.id, number, serial: f.serial.trim(), ...where, notes: '', fromCount: one })
-    }).then(
-      () => setLastId(id),
-      (err: Error) => setError(err.message)
-    )
-    // Ready for the next label, in the same place.
-    setF({ ...f, number: '', serial: '' })
-    numberField.current?.focus()
+    }).then((ok) => {
+      if (ok) setLastId(id)
+      else setF((now) => (now === cleared ? f : now))
+    })
   }
 
   return (
@@ -448,7 +451,7 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
           </span>
         </label>
       )}
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       {last && !error && (
         <p className="added wide" role="status">
           {last.number ? (
@@ -489,40 +492,54 @@ function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
 function NewCount({ m, w }: { m: ModelView; w: WarehouseView }) {
   const [where, setWhere] = useState('')
   const [qty, setQty] = useState('')
-  const [error, setError] = useState('')
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
-    const n = Number(qty)
-    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return setError('How many are there? A whole number, please.')
-    const known = findWhere(where, w)
-    const already = known && m.counted.find((s) => s.id === stockId(m.id, known))
-    if (already && !confirm(`${already.qty.toLocaleString('en-IE')} are counted ${atLabel(known, w)} already. Make it ${n.toLocaleString('en-IE')}?`)) return
-    void act(async () => {
+  // A count that would replace one already made waits here until the office says so.
+  const [asking, setAsking] = useState<{ n: number; already: number; at: string } | undefined>()
+  const { run, error, refuse } = useAct()
+  const save = (n: number) => {
+    setAsking(undefined)
+    void run(async () => {
       const at = await whereNamed(where, w)
       if (!at) throw new Error('Where are they?')
       await client.mutate('stock.set', { modelId: m.id, ...at, qty: n })
-    }).then(
-      () => {
-        setWhere('')
-        setQty('')
-      },
-      (err: Error) => setError(err.message)
-    )
+    }).then((ok) => {
+      if (!ok) return
+      setWhere('')
+      setQty('')
+    })
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    const n = Number(qty)
+    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many are there? A whole number, please.')
+    const known = findWhere(where, w)
+    const already = known && m.counted.find((s) => s.id === stockId(m.id, known))
+    if (known && already) return setAsking({ n, already: already.qty, at: atLabel(known, w) })
+    save(n)
   }
   return (
     <form className="grid-form" onSubmit={submit}>
       <h3 className="wide">Add a count</h3>
       <label>
-        Counted at <input list="where-choices" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="A place, or a case's number" required />
+        Counted at <input list="where-choices" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="A place, or a case's number" required disabled={!!asking} />
       </label>
       <label>
-        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required />
+        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required disabled={!!asking} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
-      <button type="submit" className="wide">
-        Save count
-      </button>
+      <Refusal error={error} className="wide" />
+      {asking ? (
+        <Confirm
+          className="wide"
+          question={`${asking.already.toLocaleString('en-IE')} are counted ${asking.at} already. Make it ${asking.n.toLocaleString('en-IE')}?`}
+          yes={`Make it ${asking.n.toLocaleString('en-IE')}`}
+          no="Leave the count"
+          onYes={() => save(asking.n)}
+          onNo={() => setAsking(undefined)}
+        />
+      ) : (
+        <button type="submit" className="wide">
+          Save count
+        </button>
+      )}
     </form>
   )
 }

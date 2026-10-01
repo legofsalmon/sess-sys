@@ -3,11 +3,13 @@ import {
   daysLabel,
   eachDay,
   euro,
+  euroText,
   HOLDING,
   newId,
   offerMessage,
   offerOnCalendar,
   OPEN,
+  parseEuro,
   personConflicts,
   tellMessage,
   whatsappNumber,
@@ -23,8 +25,9 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
-import { client, syncSoon } from '../sync.ts'
+import { client } from '../sync.ts'
 import { useFeedAddress } from './feed.ts'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
@@ -39,7 +42,9 @@ import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
  * After anything the office does that a freelancer should hear about
  * (Confirm, Withdraw, Release, a cancelled call or job, a timesheet
  * approved), the message for it opens below, ready to send (audit finding
- * 9). The app sends nothing itself.
+ * 9). The app sends nothing itself. Anything the device turns down is said
+ * beside the button or form that asked (act.tsx), and anything the server
+ * turns down is counted in the top bar with every other screen's.
  */
 
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
@@ -53,11 +58,6 @@ const STATUS: Record<OfferView['status'], [string, string]> = {
   filled: ['Filled', 'cancelled'],
   cancelled: ['Withdrawn', 'cancelled'],
   'pulled-out': ["Can't make it", 'cancelled'],
-}
-
-export const act = async (fn: () => Promise<unknown>) => {
-  await fn()
-  syncSoon()
 }
 
 export const linkFor = (p: Pick<Person, 'linkToken'>) => (p.linkToken ? `${location.origin}/f/${p.linkToken}` : '')
@@ -146,37 +146,25 @@ export function CrewScreen() {
         return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
       })
   )
-  const problems = view.problems.filter((p) => /^(person|call|offer|unavailability|timesheet)\./.test(p.mutation.name))
+  // What the device turned down, said in the card it was asked from.
+  const answers = useAct()
+  const roster = useAct()
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
 
   /** Settle a yes or a counter, then tell them. */
   const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
-    void act(() => client.mutate(command, { id: o.id }))
-    if (o.person) setShare(promptFor(event, [tellTo(o.person, c, o)]))
+    void answers.run(() => client.mutate(command, { id: o.id })).then((ok) => ok && o.person && setShare(promptFor(event, [tellTo(o.person, c, o)])))
   }
 
   return (
     <div className="app crew">
       <Top view={view} title="Crew" />
 
-      {problems.length > 0 && (
-        <section className="card attention">
-          <h2>Not done</h2>
-          {problems.map((p) => (
-            <div className="row" key={p.mutation.id}>
-              <p>{p.reason.message}</p>
-              <button type="button" onClick={() => client.dismissProblem(p.mutation.id)}>
-                Dismiss
-              </button>
-            </div>
-          ))}
-        </section>
-      )}
-
       {(toCheck.length > 0 || toSortOut.length > 0) && (
         <section className="card">
           <h2>Answers to check</h2>
+          <Refusal error={answers.error} />
           {toSortOut.map(({ c, o, text }) => (
             <div className="row" key={o.id}>
               <div>
@@ -225,7 +213,7 @@ export function CrewScreen() {
                 </div>
               ) : (
                 <div className="actions">
-                  <button type="button" onClick={() => act(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
+                  <button type="button" onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
                     Noted
                   </button>
                 </div>
@@ -236,7 +224,7 @@ export function CrewScreen() {
                   crew={crew}
                   onShare={(person) => {
                     // Offering the call to someone else is acting on the answer, so it's noted without another tap.
-                    void act(() => client.mutate('offer.seen', { id: o.id }))
+                    void answers.run(() => client.mutate('offer.seen', { id: o.id }))
                     setShare({ kind: 'offer', person, call: c })
                   }}
                 />
@@ -266,6 +254,7 @@ export function CrewScreen() {
 
       <section className="card">
         <h2>People</h2>
+        <Refusal error={roster.error} />
         {active.length === 0 && archived.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
         {active.map((p) => (
           <PersonRow key={p.id} person={p} crew={crew} />
@@ -282,7 +271,7 @@ export function CrewScreen() {
                 {p.pending ? (
                   <span className="pill pending">Waiting to sync</span>
                 ) : (
-                  <button type="button" onClick={() => act(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
+                  <button type="button" onClick={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
                     Bring back
                   </button>
                 )}
@@ -319,18 +308,20 @@ export function CallCard({
   inJob?: boolean
 }) {
   const [editing, setEditing] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const { run, error } = useAct()
   const filled = call.openDays.length === 0
   const open = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
 
   const withdraw = (o: OfferView) => {
-    void act(() => client.mutate('offer.cancel', { id: o.id }))
-    if (o.person) onTell?.(promptFor(HOLDING.includes(o.status) ? 'released' : 'withdrawn', [tellTo(o.person, call, o)]))
+    void run(() => client.mutate('offer.cancel', { id: o.id })).then(
+      (ok) => ok && o.person && onTell?.(promptFor(HOLDING.includes(o.status) ? 'released' : 'withdrawn', [tellTo(o.person, call, o)]))
+    )
   }
   const cancel = () => {
-    if (!confirm(`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`)) return
-    void act(() => client.mutate('call.cancel', { id: call.id }))
-    onTell?.(promptFor('call-cancelled', peopleOn(call)))
+    setCancelling(false)
+    void run(() => client.mutate('call.cancel', { id: call.id })).then((ok) => ok && onTell?.(promptFor('call-cancelled', peopleOn(call))))
   }
 
   return (
@@ -399,24 +390,34 @@ export function CallCard({
 
       {open && !filled && <OfferForm call={call} crew={crew} onShare={onShare} />}
       {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
-      <div className="actions end">
-        {call.projectId && !inJob && (
-          <a className="link" href={`#jobs/${call.projectId}`}>
-            Open job
-          </a>
-        )}
-        {/* A cancelled call, kept on the job's page for the record, can't be changed or cancelled again. */}
-        {open && !call.pending && (
-          <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
-            Change
-          </button>
-        )}
-        {open && (
-          <button type="button" className="link" onClick={cancel}>
-            Cancel crew call
-          </button>
-        )}
-      </div>
+      <Refusal error={error} />
+      {cancelling ? (
+        <Confirm
+          question={`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`}
+          yes="Cancel it"
+          onYes={cancel}
+          onNo={() => setCancelling(false)}
+        />
+      ) : (
+        <div className="actions end">
+          {call.projectId && !inJob && (
+            <a className="link" href={`#jobs/${call.projectId}`}>
+              Open job
+            </a>
+          )}
+          {/* A cancelled call, kept on the job's page for the record, can't be changed or cancelled again. */}
+          {open && !call.pending && (
+            <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+              Change
+            </button>
+          )}
+          {open && (
+            <button type="button" className="link" onClick={() => setCancelling(true)}>
+              Cancel crew call
+            </button>
+          )}
+        </div>
+      )}
     </article>
   )
 }
@@ -466,18 +467,21 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     end: call.end,
     callTime: call.callTime ?? '',
     needed: call.needed,
-    rate: call.dayRateCents === null ? '' : String(call.dayRateCents / 100),
+    rate: call.dayRateCents === null ? '' : euroText(call.dayRateCents),
     details: call.details,
     replyBy: call.replyBy ?? '',
   })
+  const { run, error, refuse } = useAct()
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
   const booked = Math.max(0, ...call.days.map((d) => call.heldByDay[d] ?? 0))
   const agreed = call.offers.filter((o) => o.status === 'accepted' || o.status === 'countered' || o.status === 'confirmed').length
-  const rateChanged = euroToCents(f.rate) !== call.dayRateCents
+  const rate = parseEuro(f.rate)
+  const rateChanged = rate.cents !== undefined && rate.cents !== call.dayRateCents
   const datesChanged = f.start !== call.start || f.end !== call.end
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.role.trim() || (!tied && !f.project.trim())) return
+    if (rate.reason !== undefined) return refuse(rate.reason)
     const changes: CommandInput<'call.update'> = { id: call.id }
     if (f.role.trim() !== call.role) changes.role = f.role.trim()
     if (f.start !== call.start) changes.start = f.start
@@ -485,7 +489,7 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     if (end !== call.end) changes.end = end
     if ((f.callTime || null) !== call.callTime) changes.callTime = f.callTime || null
     if (Math.max(1, f.needed) !== call.needed) changes.needed = Math.max(1, f.needed)
-    if (rateChanged) changes.dayRateCents = euroToCents(f.rate)
+    if (rateChanged) changes.dayRateCents = rate.cents
     if (f.details.trim() !== call.details) changes.details = f.details.trim()
     if ((f.replyBy || null) !== call.replyBy) changes.replyBy = f.replyBy || null
     if (!tied) {
@@ -494,11 +498,12 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
       if (f.venue.trim() !== call.venue) changes.venue = f.venue.trim()
     }
     if (Object.keys(changes).length === 1) return onDone()
-    void act(() => client.mutate('call.update', changes)).then(() => {
+    void run(() => client.mutate('call.update', changes)).then((ok) => {
+      if (!ok) return
       onDone()
       const after = afterChange(call, changes)
       if (after) onSaved?.(after, changes.start !== undefined || changes.end !== undefined)
-    }, (err: Error) => alert(err.message))
+    })
   }
   return (
     <form className="grid-form" onSubmit={save} aria-label={`Change the call for ${call.role}`}>
@@ -554,6 +559,7 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
       {f.needed > call.needed && call.openDays.length === 0 && (
         <p className="hint wide">The call is filled: needing more opens it again. Anyone told it had filled gets a new offer, not the old one back.</p>
       )}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Save
@@ -575,15 +581,18 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   const candidates = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
+  const { run, error } = useAct()
 
   const send = (e: FormEvent) => {
     e.preventDefault()
     if (!chosen) return
     const p = chosen
-    void act(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override }))
-    setPersonId('')
-    setOverride(false)
-    onShare(p)
+    void run(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override })).then((ok) => {
+      if (!ok) return
+      setPersonId('')
+      setOverride(false)
+      onShare(p)
+    })
   }
 
   return (
@@ -609,6 +618,7 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
           </span>
         </label>
       )}
+      <Refusal error={error} />
     </form>
   )
 }
@@ -727,7 +737,8 @@ export function TellPanel({ tell, onClose }: { tell: Tell; onClose: () => void }
 function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [cannotArchive, setCannotArchive] = useState('')
+  const [relinking, setRelinking] = useState(false)
+  const { run, error, refuse } = useAct()
   const [away, setAway] = useState({ start: today, end: today, note: '' })
   const booked = crew.calls.flatMap((c) =>
     c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')).map((o) => ({ c, o })) : []
@@ -747,17 +758,15 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
     const hold = booked.find(({ o }) => o.days.some((d) => d >= today)) ?? waiting[0]
     if (hold) {
       const job = hold.c.phase ? `${hold.c.project} (${hold.c.phase})` : hold.c.project
-      setCannotArchive(
+      return refuse(
         hold.o.status === 'confirmed'
           ? `${person.name} is booked on ${job}; release them first.`
           : hold.o.status === 'accepted'
             ? `${person.name} has accepted ${job}; release them first.`
             : `${person.name} has an open offer for ${job}; withdraw it first.`
       )
-      return
     }
-    setCannotArchive('')
-    void act(() => client.mutate('person.archive', { id: person.id, archived: true }))
+    void run(() => client.mutate('person.archive', { id: person.id, archived: true }))
   }
   return (
     <div className="row person">
@@ -775,12 +784,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
       {person.pending && <span className="pill pending">Waiting to sync</span>}
       {open && editing && (
         <div className="detail">
-          <PersonForm
-            initial={person}
-            submitLabel="Save"
-            onSubmit={(fields) => act(() => client.mutate('person.upsert', { id: person.id, ...fields })).then(() => true, (err: Error) => (alert(err.message), false))}
-            onDone={() => setEditing(false)}
-          />
+          <PersonForm initial={person} submitLabel="Save" onSubmit={(fields) => client.mutate('person.upsert', { id: person.id, ...fields })} onDone={() => setEditing(false)} />
         </div>
       )}
       {open && !editing && (
@@ -797,7 +801,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               Off {daysLabel(eachDay(u.start, u.end))}
               {u.note && ` (${u.note})`}
               {u.source === 'self' && ' · said on their link'}{' '}
-              <button type="button" className="link" onClick={() => act(() => client.mutate('unavailability.remove', { id: u.id }))}>
+              <button type="button" className="link" onClick={() => void run(() => client.mutate('unavailability.remove', { id: u.id }))}>
                 Remove
               </button>
             </p>
@@ -806,7 +810,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
             className="away-form"
             onSubmit={(e) => {
               e.preventDefault()
-              void act(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
+              void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
             }}
           >
             <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} aria-label="Off from" />
@@ -830,14 +834,24 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
                 Copy calendar address
               </button>
             )}
-            <button
-              type="button"
-              className="link"
-              onClick={() => confirm(`Make a new link for ${person.name}? The old one stops working.`) && act(() => client.mutate('person.newLink', { id: person.id }))}
-            >
-              New link
-            </button>
+            {!relinking && (
+              <button type="button" className="link" onClick={() => setRelinking(true)}>
+                New link
+              </button>
+            )}
           </div>
+          {relinking && (
+            <Confirm
+              question={`Make a new link for ${person.name}? The old one stops working, so anything sent with it no longer opens.`}
+              yes="Make a new link"
+              no="Keep the old one"
+              onYes={() => {
+                setRelinking(false)
+                void run(() => client.mutate('person.newLink', { id: person.id }))
+              }}
+              onNo={() => setRelinking(false)}
+            />
+          )}
           <div className="actions">
             <button type="button" onClick={() => setEditing(true)}>
               Edit
@@ -846,23 +860,27 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               Archive
             </button>
           </div>
-          {cannotArchive && <p className="warn-line">{cannotArchive}</p>}
+          <Refusal error={error} />
         </div>
       )}
     </div>
   )
 }
 
-export const euroToCents = (s: string) => (s.trim() === '' ? null : Math.round(Number(s.replace(',', '.')) * 100))
-
 function NewCall() {
   const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
   const [f, setF] = useState(blank)
+  const { run, error, refuse } = useAct()
   const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.project.trim() || !f.role.trim()) return
-    void act(() =>
+    const rate = parseEuro(f.rate)
+    if (rate.reason !== undefined) return refuse(rate.reason)
+    // Ready for the next call on the same job and days; a refusal brings what was typed back, unless the next thing has been typed since.
+    const cleared = { ...blank, project: f.project, venue: f.venue, start: f.start, end: f.end }
+    setF(cleared)
+    void run(() =>
       client.mutate('call.create', {
         id: newId(),
         project: f.project.trim(),
@@ -873,12 +891,13 @@ function NewCall() {
         end: f.end < f.start ? f.start : f.end,
         callTime: f.callTime || null,
         needed: Math.max(1, f.needed),
-        dayRateCents: euroToCents(f.rate),
+        dayRateCents: rate.cents,
         details: f.details.trim(),
         replyBy: null,
       })
-    )
-    setF({ ...blank, project: f.project, venue: f.venue, start: f.start, end: f.end })
+    ).then((ok) => {
+      if (!ok) setF((now) => (now === cleared ? f : now))
+    })
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -912,6 +931,7 @@ function NewCall() {
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
+      <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Ask for crew
       </button>
@@ -920,41 +940,46 @@ function NewCall() {
 }
 
 function NewPerson() {
-  return <PersonForm submitLabel="Add person" onSubmit={(fields) => act(() => client.mutate('person.upsert', { id: newId(), ...fields })).then(() => true, (err: Error) => (alert(err.message), false))} />
+  return <PersonForm submitLabel="Add person" onSubmit={(fields) => client.mutate('person.upsert', { id: newId(), ...fields })} />
 }
 
 type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>
 
 /**
  * A person's details: the Add form, and the same form again to correct
- * them (audit finding 7). `onSubmit` says whether the change was taken, so
- * a refused one keeps what was typed.
+ * them (audit finding 7). A refused change says why under the fields and
+ * keeps what was typed.
  */
-function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<boolean>; onDone?: () => void }) {
+function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
   const blank = { name: '', phone: '', email: '', skills: '', rate: '', kind: 'freelancer' as 'freelancer' | 'staff', notes: '' }
   const from = (p: PersonView) => ({
     name: p.name,
     phone: p.phone ?? '',
     email: p.email ?? '',
     skills: p.skills.join(', '),
-    rate: p.dayRateCents === null ? '' : String(p.dayRateCents / 100),
+    rate: p.dayRateCents === null ? '' : euroText(p.dayRateCents),
     kind: p.kind,
     notes: p.notes,
   })
   const [f, setF] = useState(initial ? from(initial) : blank)
+  const { run, error, refuse } = useAct()
   const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
-    void onSubmit({
-      name: f.name.trim(),
-      kind: f.kind,
-      phone: f.phone.trim() || null,
-      email: f.email.trim() || null,
-      skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
-      dayRateCents: euroToCents(f.rate),
-      notes: f.notes.trim(),
-    }).then((taken) => {
+    const rate = parseEuro(f.rate)
+    if (rate.reason !== undefined) return refuse(rate.reason)
+    void run(() =>
+      onSubmit({
+        name: f.name.trim(),
+        kind: f.kind,
+        phone: f.phone.trim() || null,
+        email: f.email.trim() || null,
+        skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        dayRateCents: rate.cents,
+        notes: f.notes.trim(),
+      })
+    ).then((taken) => {
       if (!taken) return
       if (initial) onDone?.()
       else setF(blank)
@@ -988,6 +1013,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
         Notes <textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Notes for the office" />
       </label>
       <p className="hint wide">They can read these in their own data download.</p>
+      <Refusal error={error} className="wide" />
       <button type="submit" className={initial ? 'primary' : 'wide'}>
         {submitLabel}
       </button>

@@ -1,5 +1,6 @@
 import type { View } from '@sh/shared'
 import { useEffect, useState } from 'react'
+import { Confirm } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
@@ -8,6 +9,7 @@ import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
 import { MadeUp } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
+import { useNotDone } from './problems.tsx'
 import { client, storage } from './sync.ts'
 
 /** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, and the device's own sync state. */
@@ -23,14 +25,13 @@ export function AccountScreen() {
   const view = useView()
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
+  // Signing out with changes still waiting asks first, in the card.
+  const [asking, setAsking] = useState(false)
   const waiting = view.pendingCount
+  const notDone = useNotDone(view)
 
   const out = async () => {
-    if (
-      waiting > 0 &&
-      !confirm(`${waiting === 1 ? "1 change hasn't" : `${waiting} changes haven't`} synced yet. Signing out deletes ${waiting === 1 ? 'it' : 'them'} from this device. Sign out anyway?`)
-    )
-      return
+    setAsking(false)
     setBusy(true)
     setProblem('')
     try {
@@ -57,6 +58,8 @@ export function AccountScreen() {
             </small>
           </span>
         </div>
+        <div className="state">{notDone.count}</div>
+        {notDone.list}
       </header>
 
       {auth.status === 'signed-in' && (
@@ -66,9 +69,19 @@ export function AccountScreen() {
             <b>{auth.user.name}</b>
             <span>{auth.user.email}</span>
           </p>
-          <button type="button" onClick={out} disabled={busy}>
-            Sign out
-          </button>
+          {asking ? (
+            <Confirm
+              question={`${waiting === 1 ? "1 change hasn't" : `${waiting} changes haven't`} synced yet. Signing out deletes ${waiting === 1 ? 'it' : 'them'} from this device.`}
+              yes="Sign out anyway"
+              no="Stay signed in"
+              onYes={() => void out()}
+              onNo={() => setAsking(false)}
+            />
+          ) : (
+            <button type="button" onClick={() => (waiting > 0 ? setAsking(true) : void out())} disabled={busy}>
+              Sign out
+            </button>
+          )}
           {problem && (
             <p className="alert" role="alert">
               {problem}

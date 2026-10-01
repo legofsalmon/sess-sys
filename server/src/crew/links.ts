@@ -1,4 +1,4 @@
-import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
+import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, parseEuro, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
@@ -138,12 +138,13 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const extras: TimesheetExtra[] = []
     for (let i = 0; i < Math.max(whats.length, euros.length); i++) {
       const what = (whats[i] ?? '').trim().slice(0, 100)
-      const amount = (euros[i] ?? '').replace(/[€\s]/g, '').replace(',', '.')
-      if (!what && !amount) continue
+      const typed = (euros[i] ?? '').trim()
+      if (!what && !typed) continue
       if (!what) return again('Say what each extra is for.', false)
-      const n = Number(amount)
-      if (!amount || !Number.isFinite(n) || n <= 0) return again(`Put in the amount for ${what}, in euro.`, false)
-      extras.push({ what, cents: Math.round(n * 100) })
+      // As typed on a phone: "€12.50", "12,50" or "1,250" all read as a person means them (audit finding 15).
+      const amount = parseEuro(typed)
+      if (amount.reason !== undefined || !amount.cents) return again(`Put in the amount for ${what}, in euro.`, false)
+      extras.push({ what, cents: amount.cents })
     }
     if (extras.length > MAX_EXTRAS) return again(`There's room for ${MAX_EXTRAS} extras: put the rest together, or in the note.`, false)
     const note = (form.get('note') ?? '').slice(0, 1000)
@@ -176,9 +177,11 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     // "Can't make it any more" (audit finding 10): a job they had said yes to, given back.
     else if (answer === 'pullOut') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'pullOut', note })
     else if (answer === 'counter') {
-      const euros = Number((form.get('rate') ?? '').replace(',', '.'))
-      if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
-      result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: Math.round(euros * 100), days, note })
+      // "€300", "1,250" or "1 250,50" read as the person means them (audit finding 15); anything else says what to put in.
+      const rate = parseEuro(form.get('rate') ?? '')
+      if (rate.reason !== undefined) return back(reply, person.linkToken, rate.reason, false, offer.id)
+      if (!rate.cents) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
+      result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: rate.cents, days, note })
     } else return back(reply, person.linkToken, 'Something went wrong; please try again.', false)
 
     if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false, offer.id)

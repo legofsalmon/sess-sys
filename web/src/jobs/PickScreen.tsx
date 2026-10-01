@@ -17,12 +17,12 @@ import {
   type View,
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
+import { act, Refusal, useAct } from '../act.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
 import { client } from '../sync.ts'
-import { NotDone, StatusPill, today, Top } from './common.tsx'
+import { StatusPill, today, Top } from './common.tsx'
 
 /**
  * A job's pick list (ADR 0017): what its kit needs from Session Hire's
@@ -59,8 +59,9 @@ function inside(c: AssetView, seen = new Set<string>()): number {
   return n
 }
 
+/** One scan, or one count, as a change; whoever asks for it runs it through act(). */
 const record = (projectId: string, direction: Direction, what: { assetId: string; modelId: string } | { modelId: string; qty: number }) =>
-  act(() => client.mutate('move.record', { id: newId(), projectId, direction, assetId: null, qty: 1, ...what, at: new Date().toISOString() }))
+  client.mutate('move.record', { id: newId(), projectId, direction, assetId: null, qty: 1, ...what, at: new Date().toISOString() })
 
 export function PickScreen({ view, id }: { view: View; id: string }) {
   const job = view.jobs.jobs.find((j) => j.id === id)
@@ -116,7 +117,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
 
     if (mode === 'out') {
       if (was && !other) return say('quiet', `${name} is already out with ${job.name}${was.inCase ? `, in ${was.inCase.number}` : ''}.`)
-      await record(job.id, 'out', { assetId: a.id, modelId: a.modelId })
+      await act(() => record(job.id, 'out', { assetId: a.id, modelId: a.modelId }))
       const row = client.view().moves.pickList(job.id)?.rows.find((r) => r.modelId === a.modelId)
       const contents = a.model?.isCase ? inside(a) : 0
       const withIt = contents ? `, with ${plural(contents, 'item')} in it` : ''
@@ -129,7 +130,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     }
 
     if (!was) return say(found ? 'warn' : 'quiet', [`${name} isn't out, so there's nothing to bring back.`, ...notes].join(' '))
-    await record(was.projectId, 'in', { assetId: a.id, modelId: a.modelId })
+    await act(() => record(was.projectId, 'in', { assetId: a.id, modelId: a.modelId }))
     const row = client.view().moves.pickList(job.id)?.rows.find((r) => r.modelId === a.modelId)
     let text = `${name} back.`
     if (!other && row) text = `${name} back: ${row.back} of ${row.back + row.out} back.`
@@ -162,7 +163,6 @@ function Pick({ view, job }: { view: View; job: JobView }) {
       <a className="back" href={`#jobs/${job.id}`}>
         ‹ {job.name}
       </a>
-      <NotDone view={view} names={/^(move|fault)\./} />
 
       <section className="card" aria-label="Scanning">
         <header className="title">
@@ -277,6 +277,7 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
           : `All ${row.back} back`
   const done = mode === 'out' ? !extra && row.out >= row.need : row.out === 0 && row.missing === 0
   const [damage, setDamage] = useState(false)
+  const { run, error } = useAct()
   const countable = row.model?.tracking === 'bulk' || (row.model?.countedTotal ?? 0) > 0 || row.counted > 0 || row.countedBack > 0
   const lines = row.lines.length > 1 ? row.lines.map((l) => `${l.own} for ${l.phase?.name ?? (l.phaseId ? 'a phase' : 'the whole job')}`).join(', ') : ''
   return (
@@ -312,18 +313,14 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
           {row.items.map((a) => (
             <li key={a.id}>
               <a href={`#stock/item/${a.id}`}>{a.number || 'no number yet'}</a>
-              <button type="button" className="link" onClick={() => void record(job.id, 'in', { assetId: a.id, modelId: a.modelId }).catch((err: Error) => alert(err.message))}>
+              <button type="button" className="link" onClick={() => void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId }))}>
                 {mode === 'out' ? 'Not going' : 'Back'}
               </button>
               {mode === 'in' && (
                 <button
                   type="button"
                   className="link"
-                  onClick={() =>
-                    void reportFault({ kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' }).catch((err: Error) =>
-                      alert(err.message)
-                    )
-                  }
+                  onClick={() => void run(() => reportFault({ kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' }))}
                 >
                   Missing
                 </button>
@@ -332,6 +329,7 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
           ))}
         </ul>
       )}
+      <Refusal error={error} />
       {mode === 'in' && row.missingItems.length > 0 && (
         <ul className="numbers missing-items" aria-label="Missing">
           {row.missingItems.map((a) => (
@@ -356,16 +354,15 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
 function Count({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }) {
   const name = rowName(row)
   const [qty, setQty] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const go = (what: Direction | 'missing') => {
-    setError('')
     const n = Number(qty)
-    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return setError('How many? A whole number, please.')
-    const done =
+    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many? A whole number, please.')
+    void run(() =>
       what === 'missing'
         ? reportFault({ kind: 'missing', assetId: null, modelId: row.modelId, qty: n, projectId: job.id, usable: false, note: '' })
         : record(job.id, what, { modelId: row.modelId, qty: n })
-    void done.then(() => setQty(''), (err: Error) => setError(err.message))
+    ).then((ok) => ok && setQty(''))
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -393,7 +390,7 @@ function Count({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction
           Missing
         </button>
       )}
-      {error && <p className="alert">{error}</p>}
+      <Refusal error={error} />
     </form>
   )
 }

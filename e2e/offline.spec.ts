@@ -52,12 +52,18 @@ test('two devices, one offline, four speakers', async ({ browser }) => {
   await book(office, nissan)
   await expect(booking(office, nissan)).toContainText('Confirmed')
 
-  // Signal back: the phone's request is turned down with a reason, and
-  // both devices show the same confirmed booking.
+  // Signal back: the phone's request is turned down with a reason, counted
+  // in the top bar and read from its list, and both devices show the same
+  // confirmed booking.
   await phoneContext.setOffline(false)
   await phone.evaluate(() => dispatchEvent(new Event('online')))
-  const turnedDown = phone.locator('.attention .row', { hasText: `Only 0 × ${kit} free` })
-  await expect(turnedDown).toContainText('Not booked', { timeout: 20_000 })
+  const count = phone.getByRole('button', { name: /not done$/ })
+  await expect(count).toHaveText('1 not done', { timeout: 20_000 })
+  await count.click()
+  const turnedDown = phone.getByRole('region', { name: 'Not done' }).locator('.row', { hasText: `Only 0 × ${kit} free` })
+  await expect(turnedDown).toContainText(`Book 4 × ${kit} for ${fuel}`)
+  await turnedDown.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(count).toHaveCount(0)
   await expect(booking(phone, nissan)).toContainText('Confirmed')
   await expect(phone.getByText(fuel)).toHaveCount(0)
   await expect(phone.getByRole('status')).toHaveText('Up to date')

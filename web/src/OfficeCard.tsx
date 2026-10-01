@@ -1,6 +1,7 @@
 import { officeLine, type OfficeView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { client, syncSoon } from './sync.ts'
+import { Refusal, useAct } from './act.tsx'
+import { client } from './sync.ts'
 
 /**
  * The office's own details (audit finding 10): shown on every freelancer
@@ -17,12 +18,11 @@ export function OfficeCard({ office }: { office: OfficeView }) {
 function Form({ office }: { office: OfficeView }) {
   const { details, pending } = office
   const [f, setF] = useState({ name: details?.name ?? 'Session Hire office', phone: details?.phone ?? '', email: details?.email ?? '' })
-  const [problem, setProblem] = useState('')
+  const { run, error } = useAct()
   const shown = officeLine(details)
   const save = (e: FormEvent) => {
     e.preventDefault()
-    setProblem('')
-    client.mutate('office.update', { name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null }).then(syncSoon, (err: Error) => setProblem(err.message))
+    void run(() => client.mutate('office.update', { name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null }))
   }
   return (
     <section className="card office" aria-labelledby="office-title">
@@ -54,11 +54,7 @@ function Form({ office }: { office: OfficeView }) {
           {pending && <span className="pill pending">Waiting to sync</span>}
         </div>
       </form>
-      {problem && (
-        <p className="alert" role="alert">
-          {problem}
-        </p>
-      )}
+      <Refusal error={error} />
     </section>
   )
 }

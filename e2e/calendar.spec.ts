@@ -191,29 +191,24 @@ test('connecting Google Calendar, choosing its calendar, checking and disconnect
   await page.reload()
   await expect(card.getByRole('alert')).toContainText('The Google Calendar API is switched off')
 
-  // Changing calendar moves the days, after saying so.
-  let asked = ''
-  page.once('dialog', (d) => {
-    asked = d.message()
-    void d.dismiss()
-  })
+  // Changing calendar moves the days, after asking in the card, with what will happen in words.
   await card.getByRole('button', { name: 'Change calendar' }).click()
   await card.getByRole('radio', { name: /Session Hire Gigs/ }).check()
   await card.getByRole('button', { name: 'Use this calendar' }).click()
-  expect(asked).toBe("Move the app's days from Test calendar to Session Hire Gigs? Days before today stay where they are.")
+  await expect(card.getByRole('group', { name: "Move the app's days from Test calendar to Session Hire Gigs? Days before today stay where they are." })).toBeVisible()
+  await card.getByRole('button', { name: 'Leave them' }).click()
   await card.getByRole('button', { name: 'Keep Test calendar' }).click()
 
-  // Disconnecting takes the days off, after saying so.
+  // Disconnecting takes the days off, after asking.
   await page.route(/\/api\/calendar\/disconnect/, (route) => {
     server.link = connected({ state: 'stopping' })
     return route.fulfill({ json: server.link })
   })
-  page.once('dialog', (d) => {
-    asked = d.message()
-    void d.accept()
-  })
   await card.getByRole('button', { name: 'Disconnect' }).click()
-  expect(asked).toBe('Disconnect Google Calendar? The app takes its days off Test calendar from today on, and hands back its access. Days before today stay.')
+  await expect(
+    card.getByRole('group', { name: 'Disconnect Google Calendar? The app takes its days off Test calendar from today on, and hands back its access. Days before today stay.' })
+  ).toBeVisible()
+  await card.getByRole('button', { name: 'Disconnect it' }).click()
   await expect(card).toContainText("Disconnecting: taking the app's days off Test calendar…")
 
   // Google no longer accepts the app's key: connect again.
@@ -330,31 +325,28 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   })
   await page.goto('/#account')
   const card = page.getByRole('region', { name: 'Google Calendar' })
-  const invites = card.getByRole('group', { name: 'Crew invites' })
+  const invites = card.getByRole('group', { name: 'Crew invites', exact: true })
   await expect(invites.getByRole('heading')).toHaveText('Crew invites: off')
-  // The counts come from the server first, so the question comes a moment after the press.
-  const question = page.waitForEvent('dialog')
+  // The counts come from the server first, so the question comes a moment after the press, in the card.
   await invites.getByRole('button', { name: 'Turn on crew invites' }).click()
-  const dialog = await question
-  expect(dialog.message()).toBe(
-    `Turn on crew invites? 4 invites to 2 people go out straight away, by email from ops@sessionhire.com, and more as crew are offered work. ${sean} has no email address in the app, so won't be invited.`
-  )
-  await dialog.accept()
+  const question = card.getByRole('group', {
+    name: `Turn on crew invites? 4 invites to 2 people go out straight away, by email from ops@sessionhire.com, and more as crew are offered work. ${sean} has no email address in the app, so won't be invited.`,
+  })
+  await expect(question).toBeVisible()
+  await question.getByRole('button', { name: 'Turn them on' }).click()
   await expect(card.getByRole('status')).toHaveText('Crew invites are on: 4 invites to 2 people on their way.')
   await expect(invites.getByRole('heading')).toHaveText('Crew invites: on')
   await card.evaluate((el) => scrollTo(0, el.getBoundingClientRect().top + scrollY - 70))
   await page.screenshot(shot('account-invites'))
 
   // With invites on, disconnecting says what crew are sent.
-  let asked = ''
-  page.once('dialog', (d) => {
-    asked = d.message()
-    void d.dismiss()
-  })
   await card.getByRole('button', { name: 'Disconnect' }).click()
-  expect(asked).toBe(
-    'Disconnect Google Calendar? The app takes its days off Test calendar from today on, and hands back its access. Days before today stay. Crew invited to those days get an email saying they are cancelled, and crew invites turn off.'
-  )
+  await expect(
+    card.getByRole('group', {
+      name: 'Disconnect Google Calendar? The app takes its days off Test calendar from today on, and hands back its access. Days before today stay. Crew invited to those days get an email saying they are cancelled, and crew invites turn off.',
+    })
+  ).toBeVisible()
+  await card.getByRole('button', { name: 'Stay connected' }).click()
 
   // Niamh said yes, and the office confirmed her; then she said no to the second day in Google. Conor hasn't answered.
   server.answers.set(niamh, { '2030-10-14': 'accepted', '2030-10-15': 'declined' })

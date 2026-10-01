@@ -10,10 +10,10 @@ import {
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
-import { NotDone, today, Top } from '../jobs/common.tsx'
+import { act, Refusal, useAct } from '../act.tsx'
+import { today, Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { numberLabel, Pending, STOCK_COMMANDS } from './common.tsx'
+import { numberLabel, Pending } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
@@ -62,8 +62,9 @@ function saveTester(by: string) {
 /** When it was done: now for today, else noon that day. */
 const whenDone = (day: string) => (day === today() ? new Date().toISOString() : `${day}T12:00:00.000Z`)
 
+/** One test as a change; whoever asks for it runs it through act(). */
 const record = (a: { assetId: string; kind: InspectionKind; passed: boolean; day: string; by: string; note: string }) =>
-  act(() => client.mutate('inspection.record', { id: newId(), assetId: a.assetId, kind: a.kind, passed: a.passed, at: whenDone(a.day), by: a.by, note: a.note }))
+  client.mutate('inspection.record', { id: newId(), assetId: a.assetId, kind: a.kind, passed: a.passed, at: whenDone(a.day), by: a.by, note: a.note })
 
 /** An item's inspections: where it stands on each its product needs, the record, and recording one. */
 export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
@@ -139,13 +140,12 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
   const [day, setDay] = useState(today())
   const [by, setBy] = useState(savedTester)
   const [note, setNote] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
-    if (!day || day > today()) return setError('When was it done? Today or a day before.')
+    if (!day || day > today()) return refuse('When was it done? Today or a day before.')
     saveTester(by.trim())
-    void record({ assetId: a.id, kind, passed, day, by: by.trim(), note: note.trim() }).then(onDone, (err: Error) => setError(err.message))
+    void run(() => record({ assetId: a.id, kind, passed, day, by: by.trim(), note: note.trim() })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit} aria-label={`Record a test of ${numberLabel(a)}`}>
@@ -180,7 +180,7 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
       <label className="wide">
         Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={passed ? 'e.g. Earth 0.08 Ω' : 'e.g. Earth fault on the IEC inlet'} maxLength={2000} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
+      <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
           Record {INSPECTION_SHORT[kind] === 'PAT' ? 'PAT' : 'examination'}
@@ -277,7 +277,7 @@ export function TestingScreen({ view }: { view: View }) {
     const name = [numberLabel(a), a.model?.name].filter(Boolean).join(' ')
     if (a.status !== 'active') return say('warn', `${name} is retired, so it wasn't recorded. Bring it back first if it's still here.`)
     saveTester(by.trim())
-    await record({ assetId: a.id, kind, passed: true, day, by: by.trim(), note: '' })
+    await act(() => record({ assetId: a.id, kind, passed: true, day, by: by.trim(), note: '' }))
     setDone((d) => [{ a, passed: true, at: Date.now() }, ...d])
     const due = client.view().inspections.dueOf(a.id).find((d) => d.kind === kind)
     if (!due) return say('warn', `${name}: passed. Its product doesn't say how often it needs one, so it's never due; set it on the product's page.`, { a, kind })
@@ -292,7 +292,7 @@ export function TestingScreen({ view }: { view: View }) {
     read(code)
   }
   const failed = (last: NonNullable<Said['last']>) =>
-    void record({ assetId: last.a.id, kind: last.kind, passed: false, day, by: by.trim(), note: '' }).then(
+    void act(() => record({ assetId: last.a.id, kind: last.kind, passed: false, day, by: by.trim(), note: '' })).then(
       () => {
         setDone((d) => [{ a: last.a, passed: false, at: Date.now() }, ...d])
         say('warn', `${numberLabel(last.a)} ${last.a.model?.name ?? ''}: failed. It can't go out until it passes. Report what's wrong on its page.`.replace('  ', ' '))
@@ -306,7 +306,6 @@ export function TestingScreen({ view }: { view: View }) {
       <a className="back" href="#stock">
         ‹ All stock
       </a>
-      <NotDone view={view} names={STOCK_COMMANDS} />
       <section className="card" aria-label="Testing">
         <header className="title">
           <h1>Test a batch</h1>

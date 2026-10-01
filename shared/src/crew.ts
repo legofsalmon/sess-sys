@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { day } from './day.ts'
+import { euroCents, needed, text, whole } from './plain.ts'
 
 /**
  * Crew booking: people, the roles a job needs (calls), the offers that fill
@@ -18,20 +19,20 @@ import { day } from './day.ts'
  */
 
 const id = z.string().min(1).max(64)
-const time = z.string().regex(/^\d{2}:\d{2}$/)
+const time = z.string().regex(/^\d{2}:\d{2}$/, 'The call time is a time of day, such as 08:00.')
 /** Money in euro cents, so sums never drift. */
-const cents = z.number().int().min(0).max(100_000_00)
+const cents = euroCents(100_000_00, 'A day rate')
 
 export const person = z.object({
   id,
-  name: z.string().min(1).max(200),
+  name: needed(200, 'The name', 'A name'),
   kind: z.enum(['staff', 'freelancer']),
   email: z.string().max(200).nullable(),
   /** International format, e.g. +353871234567, so WhatsApp links work. */
   phone: z.string().max(40).nullable(),
-  skills: z.array(z.string().min(1).max(60)).max(30),
+  skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
   dayRateCents: cents.nullable(),
-  notes: z.string().max(2000),
+  notes: text(2000, 'The notes'),
   /**
    * The secret in the person's private link. Set by the server, never by a
    * device. Anyone holding the link acts as this person, so it can be
@@ -54,7 +55,7 @@ export const unavailability = z.object({
   personId: id,
   start: day,
   end: day,
-  note: z.string().max(500),
+  note: text(500, 'The note'),
   /** Who said so: ops, the person on their link, or their own calendar (later). */
   source: z.enum(['ops', 'self', 'calendar']),
 })
@@ -73,17 +74,17 @@ export const crewCall = z.object({
   projectId: id.nullable(),
   /** The phase, when the call is for one; null for a call across several, or not tied to a job. */
   phaseId: id.nullable(),
-  project: z.string().min(1).max(200),
-  phase: z.string().max(100),
-  venue: z.string().max(300),
-  role: z.string().min(1).max(100),
+  project: needed(200, "The job's name", "The job's name"),
+  phase: text(100, 'The phase'),
+  venue: text(300, 'The venue'),
+  role: needed(100, 'The role', 'A role'),
   start: day,
   end: day,
   callTime: time.nullable(),
-  needed: z.number().int().min(1).max(100),
+  needed: whole(1, 100, 'How many'),
   dayRateCents: cents.nullable(),
   /** Everything a freelancer wants up front: travel, food, parking, dress. */
-  details: z.string().max(4000),
+  details: text(4000, 'The details for crew'),
   /** When offers stop being open, if ops set one. */
   replyBy: day.nullable(),
   status: z.enum(['open', 'cancelled']),
@@ -121,7 +122,7 @@ export const offer = z.object({
   dayRateCents: cents.nullable(),
   counterRateCents: cents.nullable(),
   /** What the freelancer said when answering, for ops to read. */
-  note: z.string().max(1000),
+  note: text(1000, 'The note'),
   respondedAt: z.string().nullable(),
   respondedVia: z.enum(['link', 'app', 'calendar', 'ops']).nullable(),
   /** Sent despite a clash or marked day off; kept for the audit trail. */
@@ -154,19 +155,19 @@ export const LIVE: readonly OfferStatus[] = ['offered', 'countered', 'accepted',
 export const somethingToChange = [(u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined), { message: 'Nothing to change.' }] as const
 
 /** The same checks wherever contact details are typed: the office's form, or the person's own link. */
-const contactEmail = z.string().email("That email address doesn't look right.").max(200).nullable()
+const contactEmail = z.string().email("That email address doesn't look right.").max(200, 'The email address can be up to 200 characters.').nullable()
 const contactPhone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.').nullable()
 
 export const crewCommandSchemas = {
   'person.upsert': z.object({
     id,
-    name: z.string().min(1).max(200),
+    name: needed(200, 'The name', 'A name'),
     kind: z.enum(['staff', 'freelancer']),
     email: contactEmail,
     phone: contactPhone,
-    skills: z.array(z.string().min(1).max(60)).max(30),
+    skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
     dayRateCents: cents.nullable(),
-    notes: z.string().max(2000),
+    notes: text(2000, 'The notes'),
   }),
   /** Replace a person's private link, so the old one stops working. */
   'person.newLink': z.object({ id }),
@@ -183,7 +184,7 @@ export const crewCommandSchemas = {
     .object({ id, email: contactEmail.optional(), phone: contactPhone.optional() })
     .refine((c) => c.email !== undefined || c.phone !== undefined, { message: 'Nothing to change.' }),
   'unavailability.add': z
-    .object({ id, personId: id, start: day, end: day, note: z.string().max(500) })
+    .object({ id, personId: id, start: day, end: day, note: text(500, 'The note') })
     .refine((u) => u.start <= u.end, { message: 'The days off end before they start.' }),
   'unavailability.remove': z.object({ id }),
   'call.create': z
@@ -192,16 +193,16 @@ export const crewCommandSchemas = {
       /** Optional so versions of the app from before jobs can still send it. */
       projectId: id.nullable().default(null),
       phaseId: id.nullable().default(null),
-      project: z.string().min(1).max(200),
-      phase: z.string().max(100),
-      venue: z.string().max(300),
-      role: z.string().min(1).max(100),
+      project: needed(200, "The job's name", "The job's name"),
+      phase: text(100, 'The phase'),
+      venue: text(300, 'The venue'),
+      role: needed(100, 'The role', 'A role'),
       start: day,
       end: day,
       callTime: time.nullable(),
-      needed: z.number().int().min(1).max(100),
+      needed: whole(1, 100, 'How many'),
       dayRateCents: cents.nullable(),
-      details: z.string().max(4000),
+      details: text(4000, 'The details for crew'),
       replyBy: day.nullable(),
     })
     .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' }),
@@ -216,17 +217,17 @@ export const crewCommandSchemas = {
   'call.update': z
     .object({
       id,
-      role: z.string().min(1).max(100).optional(),
+      role: needed(100, 'The role', 'A role').optional(),
       start: day.optional(),
       end: day.optional(),
       callTime: time.nullable().optional(),
-      needed: z.number().int().min(1).max(100).optional(),
+      needed: whole(1, 100, 'How many').optional(),
       dayRateCents: cents.nullable().optional(),
-      details: z.string().max(4000).optional(),
+      details: text(4000, 'The details for crew').optional(),
       replyBy: day.nullable().optional(),
-      project: z.string().min(1).max(200).optional(),
-      phase: z.string().max(100).optional(),
-      venue: z.string().max(300).optional(),
+      project: needed(200, "The job's name", "The job's name").optional(),
+      phase: text(100, 'The phase').optional(),
+      venue: text(300, 'The venue').optional(),
     })
     .refine(...somethingToChange)
     .refine((c) => !c.start || !c.end || c.start <= c.end, { message: 'The call ends before it starts.' }),
@@ -238,17 +239,17 @@ export const crewCommandSchemas = {
   'offer.send': z.object({ id, callId: id, personId: id, override: z.boolean() }),
   /** The freelancer's answer, from their link or the app. */
   'offer.respond': z.discriminatedUnion('answer', [
-    z.object({ id, answer: z.literal('accept'), days: z.array(day).min(1).nullable(), note: z.string().max(1000) }),
-    z.object({ id, answer: z.literal('decline'), note: z.string().max(1000) }),
+    z.object({ id, answer: z.literal('accept'), days: z.array(day).min(1).nullable(), note: text(1000, 'The note') }),
+    z.object({ id, answer: z.literal('decline'), note: text(1000, 'The note') }),
     z.object({
       id,
       answer: z.literal('counter'),
       counterRateCents: cents,
       days: z.array(day).min(1).nullable(),
-      note: z.string().max(1000),
+      note: text(1000, 'The note'),
     }),
     /** Can't make it any more, having accepted or been booked: the place is free again and the office finds cover. */
-    z.object({ id, answer: z.literal('pullOut'), note: z.string().max(1000) }),
+    z.object({ id, answer: z.literal('pullOut'), note: text(1000, 'The note') }),
   ]),
   /** Ops confirm an acceptance, or agree a counter-offer at the asked rate. */
   'offer.confirm': z.object({ id }),

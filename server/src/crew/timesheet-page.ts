@@ -101,7 +101,7 @@ function form(d: TimesheetPage, action: string): string {
       ${rows
         .map(
           (r, i) =>
-            `<div class="extra"><label><span>What</span> <input name="what" maxlength="100" value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${h(r.euro)}"></label></div>`
+            `<div class="extra"><label><span>What</span> <input name="what" maxlength="100" value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal" value="${h(r.euro)}"></label></div>`
         )
         .join('')}
     </fieldset>

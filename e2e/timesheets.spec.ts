@@ -54,7 +54,8 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   await expect(phone.getByRole('heading', { name: /Autumn Gala/ })).toBeVisible()
   await expect(phone.getByText('€200 a day, as agreed.')).toBeVisible()
   await phone.getByLabel('What').first().fill('Parking')
-  await phone.getByLabel('€', { exact: true }).first().fill('12')
+  // With the euro sign typed in too: the browser lets it through, and the page reads it (audit finding 15).
+  await phone.getByLabel('€', { exact: true }).first().fill('€12')
   await phone.screenshot(shot('timesheet-crew'))
   await phone.getByRole('button', { name: 'Send to the office' }).click()
   await expect(phone.getByText("Thanks, it's gone to the office.")).toBeVisible()

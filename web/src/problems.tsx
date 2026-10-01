@@ -1,0 +1,229 @@
+import { normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
+import { useEffect, useState, type ReactNode } from 'react'
+import { reasonOf } from './act.tsx'
+import { when } from './format.ts'
+import { client } from './sync.ts'
+
+/**
+ * Changes that weren't done (audit finding 11). A change the server turns
+ * down after a sync used to show only on the screen of its own area: an
+ * offer sent from a job's page was refused on the Crew tab, and a scan
+ * refused on a pick list was invisible from Stock or the job. Now every
+ * screen's top bar counts them all, beside what's waiting, and one list
+ * opens from it, inside the bar, saying what was asked, when, and why not,
+ * in plain words, until each is dismissed. A change this device turns down
+ * before keeping it isn't here: that's said where it was asked for
+ * (act.tsx).
+ */
+
+/** The count for the top bar and the list for under it, wired together: the count opens and closes the list. */
+export function useNotDone(view: View): { count: ReactNode; list: ReactNode } {
+  const [open, setOpen] = useState(false)
+  const n = view.problems.length
+  // Dismissing the last one closes the list, so the next refusal doesn't pop it open unasked.
+  useEffect(() => {
+    if (n === 0) setOpen(false)
+  }, [n])
+  if (n === 0) return { count: null, list: null }
+  return {
+    count: (
+      <button type="button" className="not-done" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {n} not done
+      </button>
+    ),
+    list: open ? <NotDoneList view={view} /> : null,
+  }
+}
+
+function NotDoneList({ view }: { view: View }) {
+  const say = describer(view)
+  // Newest first: the one that just arrived is the one to read.
+  const problems = [...view.problems].reverse()
+  return (
+    <section className="card attention not-done-list" aria-label="Not done">
+      <h2>Not done</h2>
+      <p className="hint">The server turned these down, so they weren't made. Sort out what each says and ask again, or dismiss it.</p>
+      {problems.map((p) => {
+        const what = say(p.mutation)
+        return (
+          <div className="row" key={p.mutation.id}>
+            <div>
+              <b>{what}</b>
+              <p>{reasonOf(p.reason.message)}</p>
+              <p className="meta">
+                Asked {when(p.mutation.createdAt)}
+                {p.at.slice(0, 16) !== p.mutation.createdAt.slice(0, 16) && `, turned down ${when(p.at)}`}
+              </p>
+            </div>
+            <button type="button" onClick={() => void client.dismissProblem(p.mutation.id)} aria-label={`Dismiss: ${what}`}>
+              Dismiss
+            </button>
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+const str = (v: unknown, or: string) => (typeof v === 'string' && v.trim() ? v.trim() : or)
+const num = (v: unknown) => (typeof v === 'number' ? v.toLocaleString('en-IE') : 'some')
+
+/**
+ * What a change asked for, in words, from what this device knows: "Offer
+ * Audio tech on Electric Picnic to Aoife Byrne". A refused change made
+ * nothing, so what it would have made is read from its own arguments, and
+ * what it refers to from the view; anything since gone is named in general.
+ */
+function describer(view: View): (m: Mutation) => string {
+  const w = view.warehouse
+  const people = new Map(view.crew.people.map((p) => [p.id, p.name]))
+  const person = (id: unknown) => (typeof id === 'string' && people.get(id)) || 'someone'
+  const calls = new Map(view.crew.calls.map((c) => [c.id, c]))
+  const call = (id: unknown) => {
+    const c = typeof id === 'string' ? calls.get(id) : undefined
+    return c ? `${c.role} on ${c.project}` : 'a crew call'
+  }
+  const offers = new Map(view.crew.calls.flatMap((c) => c.offers.map((o) => [o.id, { who: o.person?.name ?? 'someone', what: `${c.role} on ${c.project}` }])))
+  const offer = (id: unknown) => (typeof id === 'string' && offers.get(id)) || { who: 'someone', what: 'a crew call' }
+  const job = (id: unknown) => view.jobs.jobs.find((j) => j.id === id)?.name ?? 'a job'
+  const phase = (id: unknown) => {
+    for (const j of view.jobs.jobs) {
+      const p = j.phases.find((x) => x.id === id)
+      if (p) return { name: p.name, job: j.name }
+    }
+    return { name: 'a phase', job: 'a job' }
+  }
+  const model = (id: unknown) => w.models.find((m) => m.id === id)?.name ?? 'a product'
+  const item = (id: unknown) => {
+    const a = typeof id === 'string' ? w.assets.get(id) : undefined
+    return a ? `${a.number || 'an item'} (${a.model?.name ?? 'a product'})` : 'an item'
+  }
+  const place = (id: unknown) => w.places.find((p) => p.id === id)?.name ?? 'a place'
+  const where = (placeId: unknown, caseId: unknown) => (placeId ? ` at ${place(placeId)}` : caseId ? ` in ${item(caseId)}` : '')
+  const kitLine = (id: unknown) => {
+    const l = view.kit.lines.find((x) => x.id === id)
+    return { model: l?.model?.name ?? 'a product', job: l?.job?.name ?? 'a job' }
+  }
+  const faultOn = (id: unknown) => {
+    const f = view.faults.all.find((x) => x.id === id)
+    if (!f) return 'some kit'
+    return f.assetId ? item(f.assetId) : `${f.qty.toLocaleString('en-IE')} × ${model(f.modelId)}`
+  }
+  const span = (a: Record<string, unknown>) => (typeof a.start === 'string' && typeof a.end === 'string' ? `, ${spanLabel({ start: a.start, end: a.end })}` : '')
+
+  return (m: Mutation) => {
+    const a = m.args as Record<string, unknown>
+    switch (m.name) {
+      case 'product.upsert':
+        return `Set ${str(a.name, 'a product')} to ${num(a.quantity)} in stock`
+      case 'booking.create':
+        return `Book ${num(a.qty)} × ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} for ${str(a.project, 'a job')}`
+      case 'booking.cancel':
+        return 'Cancel a booking'
+      case 'scan.record':
+        return `Scan ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} ${a.direction === 'in' ? 'back in' : 'out'}`
+      case 'person.upsert':
+        return `Save ${str(a.name, 'someone')}'s details`
+      case 'person.newLink':
+        return `Give ${person(a.id)} a new private link`
+      case 'person.archive':
+        return a.archived ? `Archive ${person(a.id)}` : `Bring ${person(a.id)} back`
+      case 'person.contact':
+        return `Change ${person(a.id)}'s contact details`
+      case 'unavailability.add':
+        return `Mark ${person(a.personId)} away${span(a)}`
+      case 'unavailability.remove': {
+        const u = view.crew.unavailability.find((x) => x.id === a.id)
+        return u ? `Remove ${person(u.personId)}'s days off, ${spanLabel(u)}` : 'Remove some days off'
+      }
+      case 'call.create':
+        return `Ask for ${num(a.needed)} × ${str(a.role, 'crew')} for ${str(a.project, 'a job')}`
+      case 'call.update':
+        return `Change the call for ${call(a.id)}`
+      case 'call.cancel':
+        return `Cancel the call for ${call(a.id)}`
+      case 'offer.send':
+        return `Offer ${call(a.callId)} to ${person(a.personId)}`
+      case 'offer.respond':
+        return `Answer ${offer(a.id).who}'s offer of ${offer(a.id).what}`
+      case 'offer.confirm':
+        return `Confirm ${offer(a.id).who} for ${offer(a.id).what}`
+      case 'offer.cancel':
+        return `Withdraw the offer of ${offer(a.id).what} to ${offer(a.id).who}`
+      case 'offer.seen':
+        return `Note ${offer(a.id).who}'s answer on ${offer(a.id).what}`
+      case 'office.update':
+        return 'Set the office details'
+      case 'client.upsert':
+        return `Save the client ${str(a.name, 'a client')}`
+      case 'venue.upsert':
+        return `Save the venue ${str(a.name, 'a venue')}`
+      case 'project.create':
+        return `Add the job ${str(a.name, 'a job')}`
+      case 'project.update':
+        return `Change the job ${job(a.id)}`
+      case 'phase.add':
+        return `Add ${str(a.name, 'a phase')} to ${job(a.projectId)}${span(a)}`
+      case 'phase.update':
+        return `Change ${phase(a.id).name} on ${phase(a.id).job}`
+      case 'phase.remove':
+        return `Remove ${phase(a.id).name} from ${phase(a.id).job}`
+      case 'model.create':
+        return `Add the product ${str(a.name, 'a product')}`
+      case 'model.update':
+        return `Change the product ${model(a.id)}`
+      case 'model.remove':
+        return `Remove the product ${model(a.id)}`
+      case 'place.upsert':
+        return `Save the place ${str(a.name, 'a place')}`
+      case 'place.remove':
+        return `Remove the place ${place(a.id)}`
+      case 'asset.add':
+        return `Add ${(typeof a.number === 'string' && normaliseNumber(a.number)) || 'an item'} (${model(a.modelId)})${where(a.placeId, a.caseId)}`
+      case 'asset.update':
+        return `Change ${item(a.id)}`
+      case 'asset.move':
+        return a.placeId ? `Move ${item(a.id)} to ${place(a.placeId)}` : a.caseId ? `Put ${item(a.id)} in ${item(a.caseId)}` : `Clear where ${item(a.id)} is kept`
+      case 'asset.relabel':
+        return `Put a new label on ${item(a.id)}`
+      case 'asset.retire':
+        return `Retire ${item(a.id)}`
+      case 'asset.reinstate':
+        return `Bring back ${item(a.id)}`
+      case 'stock.set':
+        return `Count ${num(a.qty)} × ${model(a.modelId)}${where(a.placeId, a.caseId)}`
+      case 'stock.move':
+        return `Move ${num(a.qty)} × ${model(a.modelId)}${where(a.toPlaceId, a.toCaseId).replace(/^ (at|in) /, ' to ')}`
+      case 'kit.add':
+        return `Add ${num(a.qty)} × ${model(a.modelId)} to the kit for ${job(a.projectId)}`
+      case 'kit.update':
+        return `Change ${kitLine(a.id).model} on the kit for ${kitLine(a.id).job}`
+      case 'kit.remove':
+        return `Take ${kitLine(a.id).model} off the kit for ${kitLine(a.id).job}`
+      case 'labels.reserve':
+        return `Set aside ${num(a.count)} numbers for labels`
+      case 'labels.update':
+        return 'Change what some labels are for'
+      case 'move.record': {
+        const way = a.direction === 'in' ? 'back in from' : 'out to'
+        return a.assetId ? `Scan ${item(a.assetId)} ${way} ${job(a.projectId)}` : `Count ${num(a.qty)} × ${model(a.modelId)} ${way} ${job(a.projectId)}`
+      }
+      case 'fault.report':
+        return `Report ${a.assetId ? item(a.assetId) : `${num(a.qty)} × ${model(a.modelId)}`} ${a.kind === 'missing' ? 'missing' : 'damaged'}`
+      case 'fault.update':
+        return `Change the fault on ${faultOn(a.id)}`
+      case 'fault.close':
+        return a.outcome === 'written-off'
+          ? `Write off ${faultOn(a.id)}`
+          : `Mark ${faultOn(a.id)} as ${a.outcome === 'found' ? 'found' : a.outcome === 'not-faulty' ? 'not faulty' : 'fixed'}`
+      case 'inspection.record':
+        return `Record ${item(a.assetId)} ${a.passed ? 'passing' : 'failing'} its ${a.kind === 'lifting' ? 'thorough examination' : 'PAT'}`
+      case 'timesheet.send':
+        return `Send ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
+      case 'timesheet.approve':
+        return `Approve ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
+      case 'timesheet.reopen':
+        return `Reopen ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
+    }
+  }
+}

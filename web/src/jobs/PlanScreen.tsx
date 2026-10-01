@@ -19,7 +19,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { NotDone, today, Top } from './common.tsx'
+import { today, Top } from './common.tsx'
 
 /**
  * The planner (ADR 0010): a week or a month of jobs, or of people, with the
@@ -98,7 +98,6 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
     <div className="app crew jobs plan">
       <Top view={view} />
       <JobViews place={place} />
-      <NotDone view={view} />
 
       <section className="card">
         <div className="plan-title">

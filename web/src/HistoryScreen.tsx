@@ -2,8 +2,8 @@ import { waitLabel, type HistoryEntry, type HistoryPage } from '@sh/shared'
 import { useEffect, useRef, useState } from 'react'
 import { markSignedOut } from './auth.ts'
 import { when } from './format.ts'
-import { MadeUp } from './jobs/common.tsx'
-import { client } from './sync.ts'
+import { MadeUp, useView } from './jobs/common.tsx'
+import { useNotDone } from './problems.tsx'
 
 /**
  * The history (ADR 0006): who did what, when, on which device, whether it
@@ -29,6 +29,8 @@ async function fetchPage(who: string, before?: string): Promise<HistoryPage | un
 }
 
 export function HistoryScreen() {
+  const view = useView()
+  const notDone = useNotDone(view)
   const [who, setWho] = useState('')
   const [people, setPeople] = useState<Person[]>([])
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
@@ -77,10 +79,12 @@ export function HistoryScreen() {
             <b>Session Hire</b>
             <small>
               History
-              <MadeUp view={client.view()} />
+              <MadeUp view={view} />
             </small>
           </span>
         </div>
+        <div className="state">{notDone.count}</div>
+        {notDone.list}
       </header>
 
       <section className="card">

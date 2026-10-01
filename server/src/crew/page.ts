@@ -123,7 +123,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
         ${holding ? '' : '<button class="no" name="answer" value="decline">Decline</button>'}
       </div>
       <details${offer.status === 'countered' ? ' open' : ''}><summary>Ask for a different rate or add a note</summary>
-        <label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>
+        <label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>
         <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(offer.note)}</textarea></label>
         <button name="answer" value="counter">Send rate</button>
       </details>

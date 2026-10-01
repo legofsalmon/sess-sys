@@ -12,13 +12,10 @@ import {
   type Where,
 } from '@sh/shared'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { act } from '../crew/CrewScreen.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { client } from '../sync.ts'
 
 /** What the Stock screens share: names for where things are, and picking a place or case by typing (ADR 0013). */
-
-/** The commands whose refusals the Stock screens show. */
-export const STOCK_COMMANDS = /^(model|place|asset|stock|labels|fault|inspection)\./
 
 /** An item's number, or what it will have. */
 export const numberLabel = (a: { number: string }) => a.number || 'Number when synced'
@@ -166,30 +163,26 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
   const [mode, setMode] = useState<'count' | 'move' | undefined>()
   const [qty, setQty] = useState('')
   const [to, setTo] = useState('')
-  const [error, setError] = useState('')
+  const { run, error, refuse } = useAct()
   const name = s.model?.name ?? 'them'
   const open = (next: 'count' | 'move') => {
-    setError('')
+    refuse('')
     setQty(next === 'count' ? String(s.qty) : '')
     setMode(mode === next ? undefined : next)
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const n = Number(qty)
-    if (!Number.isInteger(n) || n < 0 || n > MAX_QTY) return setError('A whole number, please.')
+    if (!Number.isInteger(n) || n < 0 || n > MAX_QTY) return refuse('A whole number, please.')
     if (mode === 'count') {
-      void act(() => client.mutate('stock.set', { modelId: s.modelId, placeId: s.placeId, caseId: s.caseId, qty: n })).then(
-        () => setMode(undefined),
-        (err: Error) => setError(err.message)
-      )
+      void run(() => client.mutate('stock.set', { modelId: s.modelId, placeId: s.placeId, caseId: s.caseId, qty: n })).then((ok) => ok && setMode(undefined))
       return
     }
-    if (n < 1) return setError('How many to move?')
-    if (n > s.qty) return setError(`Only ${s.qty.toLocaleString('en-IE')} counted ${atLabel(s, w)}.`)
+    if (n < 1) return refuse('How many to move?')
+    if (n > s.qty) return refuse(`Only ${s.qty.toLocaleString('en-IE')} counted ${atLabel(s, w)}.`)
     const known = findWhere(to, w)
-    if (known && stockId(s.modelId, known) === s.id) return setError("That's where they are already.")
-    void act(async () => {
+    if (known && stockId(s.modelId, known) === s.id) return refuse("That's where they are already.")
+    void run(async () => {
       const dest = await whereNamed(to, w)
       if (!dest) throw new Error('Where to?')
       await client.mutate('stock.move', {
@@ -200,13 +193,11 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
         toCaseId: dest.caseId,
         qty: n,
       })
-    }).then(
-      () => {
-        setMode(undefined)
-        setTo('')
-      },
-      (err: Error) => setError(err.message)
-    )
+    }).then((ok) => {
+      if (!ok) return
+      setMode(undefined)
+      setTo('')
+    })
   }
   return (
     <div className="row count">
@@ -233,7 +224,7 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
               To <input list="where-choices" value={to} onChange={(e) => setTo(e.target.value)} placeholder="A place, or a case's number" required />
             </label>
           )}
-          {error && <p className="alert wide">{error}</p>}
+          <Refusal error={error} className="wide" />
           <button type="submit" className="primary wide">
             {mode === 'count' ? 'Save count' : `Move ${name}`}
           </button>
@@ -247,38 +238,51 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
 export function CountHere({ w, at, title }: { w: WarehouseView; at: Where; title: string }) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
-  const [error, setError] = useState('')
+  // A count that would replace one already made waits here until the office says so.
+  const [asking, setAsking] = useState<{ m: ModelView; n: number; already: number } | undefined>()
+  const { run, error, refuse } = useAct()
+  const save = (m: ModelView, n: number) => {
+    setAsking(undefined)
+    void run(() => client.mutate('stock.set', { modelId: m.id, ...at, qty: n })).then((ok) => {
+      if (!ok) return
+      setName('')
+      setQty('')
+    })
+  }
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     const m = w.models.find((x) => same(x.name, name))
-    if (!m) return setError(`No product is called ${name.trim()}. Add it on the Stock page first.`)
+    if (!m) return refuse(`No product is called ${name.trim()}. Add it on the Stock page first.`)
     const n = Number(qty)
-    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return setError('How many are there? A whole number, please.')
+    if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many are there? A whole number, please.')
     const already = m.counted.find((s) => s.id === stockId(m.id, at))
-    if (already && !confirm(`${already.qty.toLocaleString('en-IE')} × ${m.name} are counted ${atLabel(at, w)} already. Make it ${n.toLocaleString('en-IE')}?`))
-      return
-    void act(() => client.mutate('stock.set', { modelId: m.id, ...at, qty: n })).then(
-      () => {
-        setName('')
-        setQty('')
-      },
-      (err: Error) => setError(err.message)
-    )
+    if (already) return setAsking({ m, n, already: already.qty })
+    save(m, n)
   }
   return (
     <form className="grid-form" onSubmit={submit}>
       <h3 className="wide">{title}</h3>
       <label>
-        Product <input list="product-names" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. XLR 10 m" required autoComplete="off" />
+        Product <input list="product-names" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. XLR 10 m" required autoComplete="off" disabled={!!asking} />
       </label>
       <label>
-        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required />
+        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required disabled={!!asking} />
       </label>
-      {error && <p className="alert wide">{error}</p>}
-      <button type="submit" className="wide">
-        Save count
-      </button>
+      <Refusal error={error} className="wide" />
+      {asking ? (
+        <Confirm
+          className="wide"
+          question={`${asking.already.toLocaleString('en-IE')} × ${asking.m.name} are counted ${atLabel(at, w)} already. Make it ${asking.n.toLocaleString('en-IE')}?`}
+          yes={`Make it ${asking.n.toLocaleString('en-IE')}`}
+          no="Leave the count"
+          onYes={() => save(asking.m, asking.n)}
+          onNo={() => setAsking(undefined)}
+        />
+      ) : (
+        <button type="submit" className="wide">
+          Save count
+        </button>
+      )}
       <ProductChoices w={w} />
     </form>
   )

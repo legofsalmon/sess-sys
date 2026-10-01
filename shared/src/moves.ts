@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { whole } from './plain.ts'
 import { MAX_QTY } from './stock.ts'
 
 /**
@@ -43,7 +44,7 @@ export const moveCommandSchemas = {
       direction: z.enum(DIRECTIONS),
       assetId: id.nullable(),
       modelId: id,
-      qty: z.number().int().min(1).max(MAX_QTY),
+      qty: whole(1, MAX_QTY, 'How many'),
       at: z.string().datetime({ offset: true }),
     })
     .refine((m) => m.assetId === null || m.qty === 1, { message: 'A numbered item is scanned one at a time.' }),

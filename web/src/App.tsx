@@ -1,5 +1,7 @@
 import { newId, overlaps, type BookingView, type Product, type View } from '@sh/shared'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Refusal, useAct } from './act.tsx'
+import { useNotDone } from './problems.tsx'
 import { client, syncSoon, transport } from './sync.ts'
 
 /**
@@ -39,10 +41,9 @@ export function App() {
     setNoSignal(!noSignal)
     if (noSignal) syncSoon()
   }
-  const act = async (fn: () => Promise<unknown>) => {
-    await fn()
-    syncSoon()
-  }
+  const { run, error } = useAct()
+  const act = (fn: () => Promise<unknown>) => void run(fn)
+  const notDone = useNotDone(view)
 
   const products = new Map(view.products.map((p) => [p.id, p]))
   const status = view.connection === 'offline' || noSignal ? 'offline' : view.connection === 'syncing' ? 'syncing' : 'online'
@@ -65,9 +66,13 @@ export function App() {
             <small>Sync test · Phase 0</small>
           </span>
         </div>
-        <span className={`conn ${status}`} role="status">
-          {statusText}
-        </span>
+        <div className="state">
+          {notDone.count}
+          <span className={`conn ${status}`} role="status">
+            {statusText}
+          </span>
+        </div>
+        {notDone.list}
       </header>
       <a className="back" href="#stock">
         ‹ Stock
@@ -81,20 +86,9 @@ export function App() {
         </span>
       </label>
 
-      {(view.problems.length > 0 || view.issues.length > 0) && (
+      {view.issues.length > 0 && (
         <section className="card attention">
           <h2>Needs attention</h2>
-          {view.problems.map((p) => (
-            <div className="row" key={p.mutation.id}>
-              <div>
-                <b>Not booked</b>
-                <p>{p.reason.message}</p>
-              </div>
-              <button type="button" onClick={() => client.dismissProblem(p.mutation.id)}>
-                Dismiss
-              </button>
-            </div>
-          ))}
           {view.issues.map((i) => (
             <div className="row" key={i.id}>
               <div>
@@ -105,6 +99,8 @@ export function App() {
           ))}
         </section>
       )}
+
+      <Refusal error={error} />
 
       <section className="card">
         <h2>Stock</h2>

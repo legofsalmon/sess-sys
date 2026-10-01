@@ -24,6 +24,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .offer-form { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
 .crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--space-8); align-items: flex-start; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); }
 .crew .offer-form .warn input { accent-color: var(--accent); margin-top: 3px; }
+.crew .offer-form .alert { grid-column: 1 / -1; }
 /* "Offer to…" beside a decline or a pull-out in Answers to check: on its own line under the answer. */
 .crew .row > .offer-form { flex-basis: 100%; }
 .crew button:disabled { opacity: .5; cursor: not-allowed; }

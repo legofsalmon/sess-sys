@@ -177,6 +177,31 @@ describe('freelancer link', () => {
     expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'countered', counterRateCents: 35000, days: ['2026-10-02', '2026-10-03'] })
   })
 
+  it('reads the rate as the freelancer means it, and says what to put in when it is not a price', async () => {
+    // "€1,250" was read as €1.25 and "€250" as nothing at all (audit finding 15).
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const o = await offer(app, await call(app), aoife.id)
+    const rate = (typed: string) => answer(app, aoife.linkToken, o.id, { answer: 'counter', picker: '1', days: ['2026-10-02'], rate: typed })
+
+    expect(await rate('lots')).toMatchObject({ ok: false, message: 'Put in a price like 250 or 1,250.50.' })
+    expect(await rate('0')).toMatchObject({ ok: false, message: 'Put in the day rate you would do it for.' })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'offered', counterRateCents: null })
+
+    expect(await rate('€1,250')).toMatchObject({ ok: true })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'countered', counterRateCents: 125000 })
+    expect(await rate('1 250,50')).toMatchObject({ ok: true })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'countered', counterRateCents: 125050 })
+    expect(await rate('€ 300')).toMatchObject({ ok: true })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'countered', counterRateCents: 30000 })
+
+    // The field itself lets those through: a pattern on it would have the browser refuse "€300" in its own words before the page saw it.
+    const card = cardOf((await app.inject({ url: `/f/${aoife.linkToken}` })).body, o.id)
+    const field = /<input name="rate"[^>]*>/.exec(card)?.[0]
+    expect(field).toContain('inputmode="decimal"')
+    expect(field).not.toContain('pattern=')
+  })
+
   it('puts the message in the offer’s card, where the page lands after an answer', async () => {
     const app = await server()
     const aoife = await person(app, 'Aoife Byrne')

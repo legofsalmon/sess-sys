@@ -36,14 +36,15 @@ test('a refusal shows in the offer’s card, and Enter in the rate field sends t
   await expect(card.locator('.tag')).toHaveText('Waiting on you')
 
   // Drops the clashing day and asks for a different rate, with Enter in the rate field: the rate goes to the office, nothing is accepted.
+  // Typed with a euro sign and a comma, as the audit found it (finding 15): the browser lets it through and the page reads it as €1,250.
   await card.getByRole('checkbox').first().uncheck()
   await card.getByText('Ask for a different rate or add a note').click()
   const rate = card.getByLabel("Day rate you'd do it for")
-  await rate.fill('350')
+  await rate.fill('€1,250')
   await rate.press('Enter')
   await expect(card.getByRole('status')).toHaveText('Thanks, your rate has gone to the office.')
   await expect(card.locator('.tag')).toHaveText('Rate sent to the office')
-  await expect(card.getByText('€350 a day asked (offered €320)')).toBeVisible()
+  await expect(card.getByText('€1250 a day asked (offered €320)')).toBeVisible()
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
