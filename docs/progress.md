@@ -7,6 +7,12 @@ waiting on someone.
 
 **Done**
 
+- Colly answered the open question from ADR 0009: calendar invites go
+  out to crew when they're offered a job, and accepting the invite in
+  Google Calendar is one acceptable way of agreeing to it. That is what
+  was built, so the decision record now says so.
+- The stray `@sh/web` service on Railway is gone: Colly committed the
+  staged deletion on 1 October. Only `@sh/server` is left.
 - The first part of the app that is for the staff rather than the jobs:
   annual leave and days in lieu, applied for and approved in the app.
   [Decision 0024](adr/0024-staff-leave.md) has the reasons, and Colly's

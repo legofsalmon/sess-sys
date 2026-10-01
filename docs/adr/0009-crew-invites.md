@@ -4,8 +4,9 @@
   Built behind a switch on the Account tab that starts off, since each
   invite is an email to a freelancer. Colly was asked on 30 September
   whether invites go out when crew are offered a job or once they are
-  booked; this records the first, which keeps today's habit, and the
-  switch stays off until Colly chooses.
+  booked, and answered on 1 October: with the offer, and accepting the
+  invite in Google Calendar is one acceptable way of agreeing to the job.
+  That is what's built; the switch stays off until the Google key is in.
 - **Decides:** who gets a Google Calendar invite to a job's days, from
   whom and when, and what their Yes or No in Google does in the app.
 
