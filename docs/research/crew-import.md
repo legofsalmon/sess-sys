@@ -53,7 +53,7 @@ approve time off. So, straight in:
 
 ## What the model needs before it can hold the rest
 
-Six things in the file have no home yet. Each is small, and together
+Five things in the file have no home yet. Each is small, and together
 they are the person's profile the roadmap always planned
 ("freelancer profiles, skills, rates, documents with expiry reminders").
 
@@ -74,12 +74,16 @@ they are the person's profile the roadmap always planned
    number is held, which the invoicing work needs (freelancers who
    charge VAT put it on their own invoices; the link shows the figures
    with VAT on top for them).
-5. **Worked with us before**: the events as a list of names. Going
-   forward the app knows this from bookings; for the first year the
-   imported list is what the office remembers people by, shown on the
-   person's card and searchable in the picker.
-6. **Known as**: the name they go by, used in messages and the greeting
+5. **Known as**: the name they go by, used in messages and the greeting
    on their link.
+
+The file's "events worked" column is not brought in: Colly decided on
+1 October that past work needn't come across, but that a history of
+events per person is wanted going forward. The app already holds what it
+needs for that (every confirmed booking), so the person's card gets a
+"Worked" list of the jobs they were booked on, newest first, built from
+bookings, and the picker can search it. That is part of the profile
+work, not the import.
 
 Three other things stay in notes for now: where someone is based (two
 people), the CV links (they point into the office's own mail), and the
@@ -102,9 +106,9 @@ second email or phone a person has used.
   notes, so the queue of CVs lives where the rest does. Removing an
   applicant who isn't taken on is the right-to-erasure item, which
   should come before the first real deletion is needed.
-- **The 33 people known only from events worked** come in with a name,
-  a department and the events, nothing else, so the office can fill
-  them in as it books them.
+- **The 33 people known only from events worked** come in with a name
+  and a department, nothing else, so the office can fill them in as it
+  books them.
 - **Day rates** stay empty until the office puts them in; the file has
   none.
 
@@ -122,5 +126,3 @@ tests; an ADR. Then the import itself takes an afternoon of checking.
 - That "preferred" means first call for the department and "onboarded"
   means the paperwork is done.
 - Whether applicants belong in the app or somewhere else.
-- Whether a person's 2026 events should show on their card as "worked
-  with us before".
