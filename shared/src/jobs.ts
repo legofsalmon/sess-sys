@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { dayLabel, eachDay } from './crew.ts'
+import { day } from './day.ts'
 
 /**
  * Jobs (ADR 0007): who a job is for, where it is, and its phases. The code
@@ -11,7 +12,6 @@ import { dayLabel, eachDay } from './crew.ts'
  */
 
 const id = z.string().min(1).max(64)
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const phone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.')
 
 export const contact = z.object({

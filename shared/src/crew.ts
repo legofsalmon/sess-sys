@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { day } from './day.ts'
 
 /**
  * Crew booking: people, the roles a job needs (calls), the offers that fill
@@ -17,7 +18,6 @@ import { z } from 'zod'
  */
 
 const id = z.string().min(1).max(64)
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const time = z.string().regex(/^\d{2}:\d{2}$/)
 /** Money in euro cents, so sums never drift. */
 const cents = z.number().int().min(0).max(100_000_00)

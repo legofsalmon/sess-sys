@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { CALENDAR_ENTITY_NAMES, type CalendarEntities } from './calendar.ts'
 import { CREW_ENTITY_NAMES, type CrewEntities } from './crew.ts'
+import { day } from './day.ts'
 import { FAULT_ENTITY_NAMES, type FaultEntities } from './faults.ts'
 import { INSPECTION_ENTITY_NAMES, type InspectionEntities } from './inspections.ts'
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
@@ -18,8 +19,6 @@ import { TIMESHEET_ENTITY_NAMES, type TimesheetEntities } from './timesheets.ts'
  */
 
 const id = z.string().min(1).max(64)
-/** A calendar day, YYYY-MM-DD, in Europe/Dublin. Bookings are whole days. */
-export const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 export const product = z.object({
   id,

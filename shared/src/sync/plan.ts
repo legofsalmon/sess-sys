@@ -9,12 +9,8 @@ import type { JobsView } from './jobs-view.ts'
  * holds, so it works with no signal like the rest of the app.
  */
 
-/** A real date written as 2026-10-05. */
-export function isDay(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
-  const d = new Date(`${s}T12:00:00Z`)
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
-}
+// Lives in day.ts now, where the schemas can reach it without a cycle; still offered here, where it began.
+export { isDay } from '../day.ts'
 
 /** The day `n` days after `day`, or before it for a negative `n`. */
 export function addDays(day: string, n: number): string {
