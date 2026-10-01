@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { dayLabel, daysLabel, euro, type CrewCall, type Offer, type Person } from './crew.ts'
+import { day } from './day.ts'
 
 /**
  * Timesheets (ADR 0022): what a freelancer worked on a booking, so they're
@@ -13,7 +14,6 @@ import { dayLabel, daysLabel, euro, type CrewCall, type Offer, type Person } fro
  */
 
 const id = z.string().min(1).max(64)
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 /** Euro cents, as everywhere else. */
 const rate = z.number().int().min(0).max(100_000_00)
 

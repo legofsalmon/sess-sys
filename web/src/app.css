@@ -45,6 +45,10 @@
 body { margin: 0; background: var(--bg); color: var(--ink); }
 .app { max-width: 640px; margin: 0 auto; padding: max(var(--space-12), env(safe-area-inset-top)) var(--space-16) var(--space-40); display: grid; gap: var(--space-14); }
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
+/* A new version arrived while the app was open: one line fixed at the top until they reload. The page and its sticky header move down under it, so it hides nothing. */
+.update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--space-12); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--space-16) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+.update ~ .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
+.update ~ .app .top { top: calc(56px + env(safe-area-inset-top)); }
 .brand { display: flex; gap: var(--space-10); align-items: center; }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
 .brand small, label small { display: block; color: var(--muted); font-size: .8rem; }

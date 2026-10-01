@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
+import { day } from './day.ts'
 import { faultCommandSchemas } from './faults.ts'
 import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
 import { labelCommandSchemas } from './labels.ts'
-import { day } from './model.ts'
 import { moveCommandSchemas } from './moves.ts'
 import { stockCommandSchemas } from './stock.ts'
 import { timesheetCommandSchemas } from './timesheets.ts'
@@ -36,7 +36,7 @@ export const commandSchemas = {
     productId: id,
     bookingId: id.nullable(),
     direction: z.enum(['out', 'in']),
-    at: z.string(),
+    at: z.string().datetime({ offset: true }),
   }),
   ...crewCommandSchemas,
   ...jobCommandSchemas,
@@ -71,7 +71,7 @@ export const mutationSchema = z.object({
   id,
   name: z.enum(COMMAND_NAMES as [CommandName, ...CommandName[]]),
   args: z.unknown(),
-  createdAt: z.string(),
+  createdAt: z.string().max(40),
 })
 
 /** Why the server turned a command down, in words for the person who sent it. */

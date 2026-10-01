@@ -1,4 +1,5 @@
 export * from './ids.ts'
+export * from './day.ts'
 export * from './model.ts'
 export * from './crew.ts'
 export * from './jobs.ts'

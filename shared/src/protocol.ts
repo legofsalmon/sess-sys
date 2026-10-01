@@ -16,10 +16,13 @@ import type { EntityName } from './model.ts'
  *   never loses anything; the next pull covers it.
  */
 
+/** How many changes one push may carry; a device with more waiting sends them in slices. */
+export const PUSH_LIMIT = 500
+
 export const pushRequest = z.object({
   // "link:…" marks a freelancer's own answers in the history, so no device may call itself that.
   clientId: z.string().min(1).max(64).refine((id) => !id.startsWith('link:'), { message: 'That device id is reserved.' }),
-  mutations: z.array(mutationSchema).max(500),
+  mutations: z.array(mutationSchema).max(PUSH_LIMIT),
   /**
    * When this push left the device, by the device's own clock. Against each
    * mutation's `createdAt`, on the same clock, it says how long the change

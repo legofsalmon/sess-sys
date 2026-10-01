@@ -10,6 +10,7 @@ import { crewHandlers } from './crew/handlers.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { emit, Refused, type Ctx } from './kernel.ts'
+import { reportError } from './monitoring.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
@@ -189,7 +190,7 @@ export async function applyMutation(db: Db, clientId: string, m: Mutation, from:
  * command stands or falls with the caller's other changes: the calendar
  * sync records a crew member's answer and acts on it together.
  */
-export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutation, from: From = {}): Promise<MutationResult> {
+export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutation, from: From = {}, log?: Log): Promise<MutationResult> {
   // One writer at a time; see `emit`. At Session Hire's volume (a few
   // people, hundreds of jobs a year) this costs nothing.
   await tx.query('SELECT pg_advisory_xact_lock(7331)')
@@ -203,8 +204,8 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
   await tx.query(
     `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp(), 'applied', '{}')`,
-    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), m.createdAt, from.sentAt ?? null, from.device ?? null]
+     VALUES ($1, $2, $3, $4, $5, coalesce($6::timestamptz, clock_timestamp()), $7, $8, clock_timestamp(), 'applied', '{}')`,
+    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), timestampOrNull(m.createdAt), from.sentAt ?? null, from.device ?? null]
   )
   const parsed = commandSchemas[m.name].safeParse(m.args)
   if (!parsed.success) {
@@ -217,13 +218,54 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
       if (ctx.seq === 0) ctx.seq = await currentSeq(tx)
       result = { id: m.id, status: 'applied', seq: ctx.seq }
     } catch (err) {
-      if (!(err instanceof Refused)) throw err
+      // Whatever went wrong, the transaction takes nothing more until the
+      // savepoint is rolled back. If even that fails the connection is gone,
+      // and failing the whole push is right.
       await tx.query('ROLLBACK TO SAVEPOINT cmd')
-      result = { id: m.id, status: 'rejected', reason: err.reason }
+      if (err instanceof Refused) {
+        result = { id: m.id, status: 'rejected', reason: err.reason }
+      } else {
+        // The calendar sync runs an answer inside its own round and tries
+        // again next time: it wants the fault, not a change dropped for good.
+        if (ctx.via === 'calendar') throw err
+        // The server's fault, not the device's: a database error the handler
+        // didn't see coming, or a bug. Thrown, it would fail the whole push,
+        // and the phone would show "No signal" and resend the same batch for
+        // ever, with every later change stuck behind it. So the change is
+        // dropped with a reason the person can read, recorded like any other
+        // refusal so a resend gets the same answer, and logged and reported
+        // by the command's name, never with what was in it.
+        log?.warn({ err, command: m.name }, 'Dropped a change the server could not apply')
+        reportError(err, { area: 'commands', command: m.name })
+        result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: DROPPED } }
+      }
     }
   }
   await tx.query('UPDATE mutations SET status = $2, result = $3 WHERE id = $1', [m.id, result.status, JSON.stringify(result)])
   return result
+}
+
+const DROPPED = "The server couldn't apply this change, so it was dropped. Check it and send it again."
+
+/** Where a dropped change is noted, besides the error report: the request's log. */
+export interface Log {
+  warn(detail: object, message: string): void
+}
+
+/**
+ * A device's own timestamp, as Postgres will always take it, or null when it
+ * isn't one. Checked here, mutation by mutation, rather than in the push's
+ * schema: the insert runs outside the savepoint, so a value Postgres
+ * refused would fail the whole push and strand the device just the same,
+ * and a schema check would turn the whole push away instead.
+ */
+function timestampOrNull(s: string): string | null {
+  const ms = Date.parse(s)
+  if (Number.isNaN(ms)) return null
+  // Only a four-digit year: Postgres has no year 0, and JavaScript writes a
+  // year beyond 9999 (or before 0) in a form Postgres doesn't read.
+  const iso = new Date(ms).toISOString()
+  return /^[1-9]\d{3}-/.test(iso) ? iso : null
 }
 
 export async function currentSeq(q: Queryable): Promise<number> {

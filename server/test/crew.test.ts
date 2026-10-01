@@ -87,7 +87,14 @@ async function answer(app: FastifyInstance, token: string, offerId: string, fiel
   })
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
-  return { ok: to.searchParams.get('ok') === '1', message: to.searchParams.get('m') ?? '' }
+  return { ok: to.searchParams.get('ok') === '1', message: to.searchParams.get('m') ?? '', to }
+}
+
+/** One offer's card, as the page draws it. */
+function cardOf(html: string, offerId: string) {
+  const from = html.indexOf(`id="o-${offerId}"`)
+  expect(from).toBeGreaterThan(-1)
+  return html.slice(from, html.indexOf('</article>', from))
 }
 
 describe('freelancer link', () => {
@@ -152,6 +159,47 @@ describe('freelancer link', () => {
     const confirmed = await send(app, 'offer.confirm', { id: n.id })
     expect(confirmed.status).toBe('applied')
     expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'confirmed', dayRateCents: 30000 })
+  })
+
+  it('takes Enter in the rate field as Send rate, or asks for a tap: never as Accept', async () => {
+    // Enter presses the form's out-of-sight first button, which answers "implicit": a rate is a counter, and nothing else happens.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const o = await offer(app, await call(app), aoife.id)
+
+    const blank = await answer(app, aoife.linkToken, o.id, { answer: 'implicit', picker: '1', days: ['2026-10-02', '2026-10-03'], rate: '' })
+    expect(blank).toMatchObject({ ok: false, message: 'Tap Accept, Decline or Send rate.' })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'offered', counterRateCents: null })
+
+    expect(await answer(app, aoife.linkToken, o.id, { answer: 'implicit', picker: '1', days: ['2026-10-02', '2026-10-03'], rate: '350' })).toMatchObject({ ok: true })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'countered', counterRateCents: 35000, days: ['2026-10-02', '2026-10-03'] })
+  })
+
+  it('puts the message in the offer’s card, where the page lands after an answer', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const picnic = await offer(app, await call(app), aoife.id)
+    const gig = await offer(app, await call(app, { project: 'Vicar Street', phase: 'Show', start: '2026-10-04', end: '2026-10-04' }), aoife.id)
+
+    const thanks = await answer(app, aoife.linkToken, picnic.id, { answer: 'accept', picker: '1', days: ['2026-10-02', '2026-10-03', '2026-10-04'] })
+    expect(thanks.to.searchParams.get('o')).toBe(picnic.id)
+    expect(thanks.to.hash).toBe(`#o-${picnic.id}`)
+    let page = (await app.inject({ method: 'GET', url: thanks.to.pathname + thanks.to.search })).body
+    expect(cardOf(page, picnic.id)).toContain('<p class="flash ok" role="status">Thanks, you&#39;re down for it.')
+    expect(page.match(/class="flash/g)).toHaveLength(1)
+
+    // A refusal is an alert, in the card of the offer it's about.
+    const refused = await answer(app, aoife.linkToken, gig.id, { answer: 'accept' })
+    expect(refused.to.searchParams.get('o')).toBe(gig.id)
+    page = (await app.inject({ method: 'GET', url: refused.to.pathname + refused.to.search })).body
+    expect(cardOf(page, gig.id)).toContain('<p class="flash bad" role="alert">Already booked on Electric Picnic (Build)')
+    expect(page.match(/class="flash/g)).toHaveLength(1)
+
+    // A declined offer has no card any more, so its message goes at the top.
+    const off = await answer(app, aoife.linkToken, gig.id, { answer: 'decline' })
+    page = (await app.inject({ method: 'GET', url: off.to.pathname + off.to.search })).body
+    expect(page).not.toContain(`id="o-${gig.id}"`)
+    expect(page.indexOf('<p class="flash ok" role="status">Thanks for letting us know.')).toBeLessThan(page.indexOf('<section>'))
   })
 
   it('lets a freelancer mark days off, which ops then need to override', async () => {

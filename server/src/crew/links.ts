@@ -24,7 +24,7 @@ import { getTimesheet, timesheetsFor } from './timesheets.ts'
  */
 
 type Form = URLSearchParams
-type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string } }>
+type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; ok?: string; o?: string } }>
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -46,9 +46,13 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     return result
   }
 
-  /** After a post, back to the page with a message, so a refresh never resubmits. */
-  const back = (reply: FastifyReply, token: string, text: string, ok: boolean, anchor = '') =>
-    reply.redirect(`/f/${token}?${new URLSearchParams({ m: text, ok: ok ? '1' : '0' })}${anchor}`, 303)
+  /**
+   * After a post, back to the page with a message, so a refresh never
+   * resubmits. An answer names its offer, so the page lands on that card
+   * with the message in it.
+   */
+  const back = (reply: FastifyReply, token: string, text: string, ok: boolean, offer?: string) =>
+    reply.redirect(`/f/${token}?${new URLSearchParams({ m: text, ok: ok ? '1' : '0', ...(offer ? { o: offer } : {}) })}${offer ? `#o-${offer}` : ''}`, 303)
 
   const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store').header('x-robots-tag', 'noindex')
 
@@ -65,7 +69,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
         if (o.status === 'accepted' || o.status === 'confirmed') for (const d of o.days) if (d in held) held[d]!++
       jobs.push({ offer, call, openDays: Object.keys(held).filter((d) => held[d]! < call.needed) })
     }
-    const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300) } : undefined
+    const flash = req.query.m ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o } : undefined
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
     return reply
       .type('text/html')
@@ -149,11 +153,16 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const offer = await getOffer(db, req.params.id!)
     if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, "That offer isn't one of yours.", false)
     const form = (req.body ?? new URLSearchParams()) as Form
-    const answer = form.get('answer')
+    let answer = form.get('answer')
+    // Enter in the rate field presses the form's hidden first button. With a rate that's a counter; without one there's only a tap to ask for. Never an accept.
+    if (answer === 'implicit') {
+      if (!(form.get('rate') ?? '').trim()) return back(reply, person.linkToken, 'Tap Accept, Decline or Send rate.', false, offer.id)
+      answer = 'counter'
+    }
     const note = (form.get('note') ?? '').slice(0, 1000)
     const picked = form.getAll('days')
     if (form.get('picker') && picked.length === 0 && answer !== 'decline')
-      return back(reply, person.linkToken, 'Tick at least one day, or press Decline.', false, `#o-${offer.id}`)
+      return back(reply, person.linkToken, 'Tick at least one day, or press Decline.', false, offer.id)
     const days = picked.length ? picked : null
 
     let result: MutationResult
@@ -161,18 +170,18 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     else if (answer === 'decline') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'decline', note })
     else if (answer === 'counter') {
       const euros = Number((form.get('rate') ?? '').replace(',', '.'))
-      if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, `#o-${offer.id}`)
+      if (!Number.isFinite(euros) || euros <= 0) return back(reply, person.linkToken, 'Put in the day rate you would do it for.', false, offer.id)
       result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: Math.round(euros * 100), days, note })
     } else return back(reply, person.linkToken, 'Something went wrong; please try again.', false)
 
-    if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false, `#o-${offer.id}`)
+    if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false, offer.id)
     const text =
       answer === 'accept'
         ? "Thanks, you're down for it. The office will confirm."
         : answer === 'decline'
           ? "Thanks for letting us know. You're off this one."
           : 'Thanks, your rate has gone to the office.'
-    return back(reply, person.linkToken, text, true, `#o-${offer.id}`)
+    return back(reply, person.linkToken, text, true, offer.id)
   })
 
   app.post('/f/:token/away', async (req: Req, reply) => {

@@ -238,3 +238,29 @@ describe('audit and export', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+describe('one bad change in a batch', () => {
+  it("turns down a date that isn't real with a plain reason, and still applies the change after it", async () => {
+    const app = await server()
+    await seed(app)
+    const createdAt = new Date().toISOString()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/sync/push',
+      payload: {
+        clientId: 'phone',
+        mutations: [
+          { id: 'bad', name: 'booking.create', args: { id: 'bad', productId: 'y10p', project: 'A', qty: 1, start: '2026-02-31', end: '2026-02-31' }, createdAt },
+          { id: 'good', name: 'booking.create', args: { id: 'good', productId: 'y10p', project: 'B', qty: 1, start: '2026-10-05', end: '2026-10-05' }, createdAt },
+        ],
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results).toEqual([
+      { id: 'bad', status: 'rejected', reason: { code: 'invalid', message: "That isn't a real date." } },
+      expect.objectContaining({ id: 'good', status: 'applied' }),
+    ])
+    const exported = (await app.inject('/api/export')).json()
+    expect(exported.bookings.map((b: { id: string }) => b.id)).toEqual(['good'])
+  })
+})

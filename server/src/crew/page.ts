@@ -9,6 +9,9 @@ import { dayLabel, daysLabel, eachDay, euro, noTimesheetReason, timesheetTotal, 
 const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
+/** The message after a post. A refusal is an alert, so it's read out and looks like one; a thank-you is a status. */
+export const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.ok ? 'ok' : 'bad'}" role="${f.ok ? 'status' : 'alert'}">${h(f.text)}</p>`
+
 export interface PageData {
   person: Person
   jobs: { offer: Offer; call: CrewCall; openDays: string[] }[]
@@ -16,7 +19,8 @@ export interface PageData {
   base: string
   /** The read-only calendar feed address (ADR 0012), safe to add to a shared calendar. */
   feed: string
-  flash?: { ok: boolean; text: string }
+  /** The message after a post, and the offer it's about, when it's about one: it goes in that card. */
+  flash?: { ok: boolean; text: string; offer?: string }
   today: string
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
@@ -61,13 +65,19 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
           })
           .join('')}</fieldset>`
       : ''
+  // Enter (or a phone keyboard's Go) in the rate field presses the form's first button. This one, so it's never Accept: the server sends the rate, or asks for a tap.
+  // Drawn out of sight rather than hidden: Safari before 16.4 passes over a hidden button and presses the next, which is Accept.
+  const onEnter = `<button class="on-enter" name="answer" value="implicit" tabindex="-1" aria-hidden="true"></button>`
+  // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
+    ${d.flash?.offer === offer.id ? flash(d.flash) : ''}
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
     ${facts(call, offer)}
     ${(offer.status === 'accepted' || offer.status === 'confirmed') && call.status === 'open' ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
     ${
       canAnswer
         ? `<form method="post" action="${action}">
+      ${onEnter}
       ${dayPicker}
       <div class="buttons">
         <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
@@ -115,6 +125,8 @@ export function renderPage(d: PageData): string {
   const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
   const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
   const first = d.person.name.split(' ')[0]
+  // A message about an offer sits in that offer's card; any other at the top.
+  const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer)
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -130,7 +142,7 @@ export function renderPage(d: PageData): string {
 <body>
 <main>
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
-  ${d.flash ? `<p class="flash ${d.flash.ok ? 'ok' : 'bad'}" role="status">${h(d.flash.text)}</p>` : ''}
+  ${d.flash && !inCard ? flash(d.flash) : ''}
 
   <section>
     <h2>Offers waiting on you</h2>
@@ -191,8 +203,8 @@ export function renderGone(): string {
 }
 
 export const CSS = `
-:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;color-scheme:dark}}
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;--bad:#a8480f;--bad-soft:#f9e4d6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;--bad:#f0a064;--bad-soft:#3a2414;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
@@ -214,13 +226,14 @@ fieldset.days label{display:flex;gap:6px;align-items:center;padding:8px 10px;bor
 fieldset.days label.gone{opacity:.55}fieldset.days input{width:20px;height:20px;accent-color:var(--accent)}
 .buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;min-height:48px}
+.on-enter{position:absolute;width:1px;height:1px;min-height:0;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
 details[open]{display:grid;gap:8px}
 label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
 fieldset.days input{width:20px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--warn-soft);color:var(--warn)}
+.flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}code{word-break:break-all;font-size:.8rem}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}

@@ -2,7 +2,7 @@ import { CALENDAR_LINK_ID, irishToday, type CalendarDay, type CalendarLink } fro
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
-import type { Change, MutationResult, PullResponse, PushRequest, PushResponse } from '../protocol.ts'
+import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { faultsView, type FaultsView } from './faults-view.ts'
 import { inspectionsView, type InspectionsView } from './inspections-view.ts'
@@ -164,7 +164,47 @@ export class SyncClient {
 
   async open(): Promise<this> {
     this.state = (await this.storage.load()) ?? emptySnapshot(this.options.clientId ?? newId())
+    await this.unbrick()
     return this
+  }
+
+  /**
+   * A change the view can't lay over the rest would leave every screen
+   * blank. `mutate` turns such a change away now, but a copy saved by a
+   * build from before it did may still hold one: it's set aside as a
+   * problem, with its reason, and the rest of the outbox carries on.
+   */
+  private async unbrick() {
+    if (this.state.outbox.length === 0) return
+    try {
+      this.view()
+      return
+    } catch {
+      // Something is in the way. If the view works without the outbox, the outbox holds it.
+    }
+    const all = this.state.outbox
+    this.state.outbox = []
+    try {
+      this.view()
+    } catch {
+      this.state.outbox = all
+      return
+    }
+    for (const m of all) {
+      this.state.outbox.push(m)
+      try {
+        this.view()
+      } catch (err) {
+        this.state.outbox.pop()
+        const why = err instanceof Error ? err.message : String(err)
+        this.state.problems.push({
+          mutation: strip(m),
+          reason: { code: 'invalid', message: `This change can't be shown on this device, so it was set aside: ${why}` },
+          at: this.now().toISOString(),
+        })
+      }
+    }
+    await this.storage.save(this.state)
   }
 
   get clientId() {
@@ -181,7 +221,17 @@ export class SyncClient {
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
     this.state.outbox.push(mutation)
-    await this.persist()
+    // A change the view can't lay over the rest would leave every screen blank
+    // until the device's storage was wiped, so it's taken back before it's saved.
+    let view: View
+    try {
+      view = this.view()
+    } catch (err) {
+      this.state.outbox = this.state.outbox.filter((m) => m.id !== mutation.id)
+      throw new Error(`This change can't be shown on this device, so it wasn't kept: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    await this.storage.save(this.state)
+    this.emit(view)
     return mutation
   }
 
@@ -292,26 +342,30 @@ export class SyncClient {
 
   private async push() {
     const waiting = this.state.outbox.filter((m) => m.appliedSeq === undefined)
-    if (waiting.length === 0) return
-    const { results, stale } = await this.transport.push({
-      clientId: this.state.clientId,
-      mutations: waiting.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
-      // On the same clock as each createdAt, so the server can tell how long each waited here.
-      sentAt: this.now().toISOString(),
-      ...(this.state.generation ? { generation: this.state.generation } : {}),
-    })
-    // The app started fresh after this device's copy: the pull that follows starts it afresh, dropping these.
-    if (stale) return
-    const byId = new Map<string, MutationResult>(results.map((r) => [r.id, r]))
-    const kept: PendingMutation[] = []
-    for (const m of this.state.outbox) {
-      const r = byId.get(m.id)
-      if (!r) kept.push(m)
-      else if (r.status === 'applied') kept.push({ ...m, appliedSeq: r.seq })
-      else this.state.problems.push({ mutation: strip(m), reason: r.reason, at: this.now().toISOString() })
+    // The server takes PUSH_LIMIT at a time, so a long day with no signal, or a replay
+    // after a restore, goes up in slices, each answered and saved before the next is sent.
+    for (let from = 0; from < waiting.length; from += PUSH_LIMIT) {
+      const slice = waiting.slice(from, from + PUSH_LIMIT)
+      const { results, stale } = await this.transport.push({
+        clientId: this.state.clientId,
+        mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
+        // On the same clock as each createdAt, so the server can tell how long each waited here.
+        sentAt: this.now().toISOString(),
+        ...(this.state.generation ? { generation: this.state.generation } : {}),
+      })
+      // The app started fresh after this device's copy: the pull that follows starts it afresh, dropping these.
+      if (stale) return
+      const byId = new Map<string, MutationResult>(results.map((r) => [r.id, r]))
+      const kept: PendingMutation[] = []
+      for (const m of this.state.outbox) {
+        const r = byId.get(m.id)
+        if (!r) kept.push(m)
+        else if (r.status === 'applied') kept.push({ ...m, appliedSeq: r.seq })
+        else this.state.problems.push({ mutation: strip(m), reason: r.reason, at: this.now().toISOString() })
+      }
+      this.state.outbox = kept
+      await this.persist()
     }
-    this.state.outbox = kept
-    await this.persist()
   }
 
   private async pull() {
@@ -379,9 +433,10 @@ export class SyncClient {
     this.emit()
   }
 
-  private emit() {
+  /** Tell the screens, with the view already built when the caller has one. */
+  private emit(view?: View) {
     if (this.listeners.size === 0) return
-    const view = this.view()
+    view ??= this.view()
     for (const fn of this.listeners) fn(view)
   }
 }
@@ -391,7 +446,12 @@ function strip(m: PendingMutation): Mutation {
 }
 
 export function applyChange(state: Snapshot, change: Change) {
-  if (!ENTITY_NAMES.includes(change.entity)) return
+  // A name a plain object treats specially would reach every object, not a table.
+  if ((change.entity as string) === '__proto__' || change.id === '__proto__') return
+  // A change for an entity this build doesn't know is kept under its name, not
+  // dropped: a phone open during a deploy that adds one would otherwise move its
+  // cursor past those rows and never see them. The views only read the tables
+  // they know, and the next build reads the rest like any other table.
   // Snapshots saved before a module existed have no table for it yet.
   const table = (state.entities[change.entity] ??= {} as never) as Record<string, unknown>
   if (change.op === 'delete') delete table[change.id]

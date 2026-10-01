@@ -6,6 +6,7 @@ import { HistoryScreen } from './HistoryScreen.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
+import { UpdateBar } from './update.tsx'
 
 /**
  * Switches between the app's areas. The address keeps the area, and within
@@ -29,13 +30,20 @@ export function Shell() {
     addEventListener('hashchange', on)
     return () => removeEventListener('hashchange', on)
   }, [])
-  // Only once the server has said so: offline, the device carries on.
-  if (auth.status === 'signed-out') return <SignIn />
+  // Only once the server has said so: offline, the device carries on. A new version is offered here too.
+  if (auth.status === 'signed-out')
+    return (
+      <>
+        <UpdateBar />
+        <SignIn />
+      </>
+    )
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
   // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab.
   const area = within('#plan') || within('#import') ? AREAS[0] : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
   return (
     <>
+      <UpdateBar />
       <area.Screen />
       <nav className="tabs" aria-label="Areas">
         {AREAS.map((a) => (

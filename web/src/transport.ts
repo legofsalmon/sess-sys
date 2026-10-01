@@ -16,16 +16,17 @@ export class HttpTransport implements Transport {
   constructor(private readonly base = '') {}
 
   async push(req: PushRequest): Promise<PushResponse> {
-    return this.call('/api/sync/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) })
+    // A push after a day with no signal carries hundreds of changes, so it gets longer than a pull.
+    return this.call('/api/sync/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) }, 30_000)
   }
 
   async pull(after: number): Promise<PullResponse> {
     return this.call(`/api/sync/pull?after=${after}`)
   }
 
-  private async call<T>(path: string, init?: RequestInit): Promise<T> {
+  private async call<T>(path: string, init?: RequestInit, timeoutMs = 10_000): Promise<T> {
     if (this.forcedOffline) throw new Error('No signal (simulated)')
-    const res = await fetch(this.base + path, { ...init, signal: AbortSignal.timeout(10_000) })
+    const res = await fetch(this.base + path, { ...init, signal: AbortSignal.timeout(timeoutMs) })
     if (res.status === 401) throw new SignedOutError('Not signed in')
     if (!res.ok) throw new Error(`Server answered ${res.status}`)
     return res.json() as Promise<T>

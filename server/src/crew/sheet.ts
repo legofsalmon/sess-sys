@@ -161,7 +161,7 @@ export function renderNoSheet(base: string, what: 'call sheet' | 'timesheet' = '
   return `<!doctype html><html lang="en-IE"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex"><title>Session Hire</title><style>${CSS}${SHEET_CSS}</style></head>
 <body><main><header class="top"><span class="mark">SH</span><div><b>Session Hire</b></div></header>
-<p class="flash bad">There's no ${what} here for you: you may not be booked on it any more, or the job has changed.</p>
+<p class="flash warn">There's no ${what} here for you: you may not be booked on it any more, or the job has changed.</p>
 <a class="back" href="${h(base)}">‹ Your work</a></main></body></html>`
 }
 
