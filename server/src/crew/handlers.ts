@@ -232,12 +232,15 @@ async function openCall(ctx: Ctx, callId: string) {
 
 export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'person.upsert'(ctx, a) {
+    // Only staff approve time off (ADR 0024); an edit from a version of the app that doesn't know the flag keeps it as it is.
+    const approvesLeave = a.kind === 'staff' ? (a.approvesLeave ?? null) : false
     await ctx.tx.query(
-      `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, coalesce($10::boolean, false))
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, kind = EXCLUDED.kind, email = EXCLUDED.email,
-         phone = EXCLUDED.phone, skills = EXCLUDED.skills, day_rate_cents = EXCLUDED.day_rate_cents, notes = EXCLUDED.notes`,
-      [a.id, a.name, a.kind, a.email, a.phone, JSON.stringify(a.skills), a.dayRateCents, a.notes, newLinkToken()]
+         phone = EXCLUDED.phone, skills = EXCLUDED.skills, day_rate_cents = EXCLUDED.day_rate_cents, notes = EXCLUDED.notes,
+         approves_leave = coalesce($10::boolean, people.approves_leave)`,
+      [a.id, a.name, a.kind, a.email, a.phone, JSON.stringify(a.skills), a.dayRateCents, a.notes, newLinkToken(), approvesLeave]
     )
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
@@ -291,8 +294,11 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   },
 
   async 'unavailability.remove'(ctx, a) {
-    const { rows } = await ctx.tx.query('DELETE FROM unavailability WHERE id = $1 RETURNING id', [a.id])
-    if (!rows.length) return
+    const away = await getAway(ctx.tx, a.id)
+    if (!away) return
+    // Approved leave and its days off never disagree: the leave is cancelled instead (ADR 0024).
+    if (away.source === 'leave') throw new Refused({ code: 'conflict', message: 'These days off are approved leave: cancel the leave on the Leave screen instead.' })
+    await ctx.tx.query('DELETE FROM unavailability WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'unavailability', a.id)
   },
 

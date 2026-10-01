@@ -1,8 +1,9 @@
-import { eachDay, euro, type CrewCall, type Offer, type Person } from '@sh/shared'
+import { eachDay, euro, leaveLabel, type CrewCall, type LeaveRequest, type Offer, type Person } from '@sh/shared'
 
 /**
  * A person's private calendar feed: every job they hold, as all-day events
- * in the same "<Project> - <Phase>" shape as the Session Hire Gigs calendar.
+ * in the same "<Project> - <Phase>" shape as the Session Hire Gigs calendar,
+ * and for staff their approved leave (ADR 0024) beside them.
  * Works in Google, Apple and Outlook calendars, so a freelancer sees our
  * bookings next to everyone else's without another app.
  *
@@ -48,7 +49,7 @@ export function runs(days: string[]): string[][] {
   return out
 }
 
-export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCall }[], now = new Date()): string {
+export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCall }[], now = new Date(), leave: readonly LeaveRequest[] = []): string {
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
   const lines = [
     'BEGIN:VCALENDAR',
@@ -90,6 +91,21 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
         'END:VEVENT'
       )
     })
+  }
+  for (const r of leave) {
+    if (r.status !== 'approved') continue
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${r.id}@crew.sessionhire.com`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${compact(r.start)}`,
+      `DTEND;VALUE=DATE:${compact(nextDay(r.end))}`,
+      `SUMMARY:${esc(leaveLabel(r.type, r.days))}`,
+      `DESCRIPTION:${esc(`${r.days} day${r.days === 1 ? '' : 's'} of ${leaveLabel(r.type, r.days).toLowerCase()}, approved.`)}`,
+      'STATUS:CONFIRMED',
+      'TRANSP:OPAQUE',
+      'END:VEVENT'
+    )
   }
   lines.push('END:VCALENDAR')
   return lines.filter(Boolean).map(fold).join('\r\n') + '\r\n'

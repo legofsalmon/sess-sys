@@ -6,6 +6,7 @@ import {
   euro,
   invitesLabel,
   irishToday,
+  leaveDays,
   newId,
   normaliseNumber,
   numberText,
@@ -225,6 +226,7 @@ const REFERENCES = [
   'toPlaceId',
   'toCaseId',
   'contactId',
+  'by',
 ] as const
 
 /**
@@ -328,6 +330,24 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
   /** ", 2 subhired from PRG". */
   const subhired = (n: unknown, from: unknown) =>
     typeof n === 'number' && n > 0 ? `, ${n} subhired${typeof from === 'string' && from.trim() ? ` from ${clip(from.trim())}` : ''}` : ''
+  /** "annual leave", "a day in lieu", "3 days in lieu" (ADR 0024). */
+  const leaveWords = (type: unknown, days: number) => (type === 'lieu' ? (days === 1 ? 'a day in lieu' : `${days} days in lieu`) : 'annual leave')
+  /** A request as the record has it: whose, what and when. */
+  const leaveOf = (id: unknown) => {
+    const r = look('leaveRequest', id)
+    return r ? { who: person(r.personId), what: `${leaveWords(r.type, typeof r.days === 'number' ? r.days : 0)}, ${dates(r.start, r.end)}` } : { who: 'someone', what: 'leave' }
+  }
+  const lieuOf = (id: unknown) => {
+    const e = look('lieuEntry', id)
+    const n = typeof e?.days === 'number' ? e.days : 1
+    return e ? { who: person(e.personId), what: `${n === 1 ? 'day' : `${n} days`} in lieu for ${typeof e.day === 'string' ? dayLabel(e.day) : 'a day since removed'}` } : { who: 'someone', what: 'day in lieu' }
+  }
+  /** "Colly Hewson approved" while the device says who (sign-in off), else "Approved": the entry's own who names them. */
+  const decided = (by: unknown, approved: unknown) => {
+    const verb = approved ? 'approved' : 'declined'
+    return by ? `${person(by)} ${verb}` : verb[0]!.toUpperCase() + verb.slice(1)
+  }
+  const why = (approved: unknown, reason: unknown) => (!approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
 
   switch (command) {
     case 'product.upsert':
@@ -589,6 +609,30 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const o = offer(a.id)
       return `Reopened ${o.who}'s timesheet for ${o.what}, to change it`
     }
+    case 'leave.request': {
+      const n = typeof a.start === 'string' && typeof a.end === 'string' ? leaveDays(a.start, a.end) : 0
+      return `${person(a.personId)} asked for ${leaveWords(a.type, n)}, ${dates(a.start, a.end)} (${n} day${n === 1 ? '' : 's'})`
+    }
+    case 'leave.cancel': {
+      const r = leaveOf(a.id)
+      return `${r.who} cancelled their ${r.what}`
+    }
+    case 'leave.decide': {
+      const r = leaveOf(a.id)
+      return `${decided(a.by, a.approved)} ${r.who}'s ${r.what}${why(a.approved, a.reason)}`
+    }
+    case 'lieu.log':
+      return `${person(a.personId)} logged ${leaveWords('lieu', typeof a.days === 'number' ? a.days : 1)} for ${typeof a.day === 'string' ? dayLabel(a.day) : 'a day'}`
+    case 'lieu.cancel': {
+      const e = lieuOf(a.id)
+      return `${e.who} cancelled their ${e.what}`
+    }
+    case 'lieu.decide': {
+      const e = lieuOf(a.id)
+      return `${decided(a.by, a.approved)} ${e.who}'s ${e.what}${why(a.approved, a.reason)}`
+    }
+    case 'leave.allowance':
+      return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over`
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

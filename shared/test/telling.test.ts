@@ -22,6 +22,7 @@ const person = (id: string, name: string): Person => ({
   notes: '',
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
+  approvesLeave: false,
 })
 const call = (id: string, start: string, end: string, needed = 2): CrewCall => ({
   id,

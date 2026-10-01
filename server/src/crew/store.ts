@@ -3,7 +3,7 @@ import type { Queryable } from '../db.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived`
+const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
@@ -21,6 +21,7 @@ export const toPerson = (r: Row): Person => ({
   notes: r.notes,
   linkToken: r.link_token,
   archived: r.archived ?? false,
+  approvesLeave: r.approves_leave ?? false,
 })
 export const toCall = (r: Row): CrewCall => ({
   id: r.id,
@@ -70,6 +71,13 @@ export async function getPerson(q: Queryable, id: string) {
 export async function personByToken(q: Queryable, token: string) {
   if (!token || token.length < 16) return undefined
   const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE link_token = $1 AND NOT archived`, [token])
+  return rows[0] ? toPerson(rows[0]) : undefined
+}
+/** The person a signed-in account is, by email, case aside (ADR 0024): the match the Account tab's feed card makes. */
+export async function personByEmail(q: Queryable, email: string) {
+  const wanted = email.trim().toLowerCase()
+  if (!wanted) return undefined
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE lower(trim(email)) = $1 AND NOT archived ORDER BY id LIMIT 1`, [wanted])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
 export async function getCall(q: Queryable, id: string, lock = false) {

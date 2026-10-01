@@ -128,6 +128,19 @@ in px too.
   every area, with Dismiss. An "are you sure?" is a question in place: the
   consequence in words in a warn line, the safe button first and focused,
   the fields held still. Not in Figma yet.
+- The Leave screen ([ADR 0024](adr/0024-staff-leave.md)) is the Crew
+  tab's facts layout for a person's year, three to a row (allowance,
+  carried over, taken, booked, waiting, left, with "left" in bold and in
+  the **bad** tone if ever below nothing), with the year stepped by the
+  filter buttons; Apply is the grid form with the day count said in bold
+  under it before anything is sent ("3 days"); each request is a list row
+  with its status pill (Waiting amber, Approved green, Declined or
+  Cancelled grey, and "Waiting to sync" amber while this device's own
+  change is still on its way) and Cancel as a link; the approvers' queue
+  puts what to weigh up in warn lines under the request, with Approve as
+  the primary button and Decline opening a reason field in place. In the
+  planner a public holiday is a faint band in the off tone, a shade
+  deeper than a weekend, named under its date. Not in Figma yet.
 - Made-up data ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md))
   is named beside every screen's name in the top bar, "· made-up data" in
   the bold amber warn tone, on every phone while it's in. Deleting

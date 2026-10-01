@@ -164,11 +164,15 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                 <tr>
                   <th scope="col">{rows === 'jobs' ? 'Job' : 'Person'}</th>
                   {days.map((d) => (
-                    <th scope="col" key={d} className={dayClass(d, now)} aria-current={d === now ? 'date' : undefined}>
+                    <th scope="col" key={d} className={dayClass(d, now, p.holidays)} aria-current={d === now ? 'date' : undefined} title={p.holidays[d]}>
                       {scale === 'week' ? (
-                        dayLabel(d)
+                        <>
+                          {dayLabel(d)}
+                          {/* A public holiday (ADR 0024) is named on its day, so nobody counts it as a working day. */}
+                          {p.holidays[d] && <small className="holiday-name">{p.holidays[d]}</small>}
+                        </>
                       ) : (
-                        <a href={at({ scale: 'week', day: d })} aria-label={`${dayLabel(d)}: open its week`}>
+                        <a href={at({ scale: 'week', day: d })} aria-label={`${dayLabel(d)}${p.holidays[d] ? `, ${p.holidays[d]}` : ''}: open its week`}>
                           <small>{dayLabel(d).slice(0, 2)}</small>
                           {Number(d.slice(8))}
                         </a>
@@ -183,7 +187,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                       <tr key={lane.key}>
                         <JobName lane={lane} />
                         {days.map((d) => (
-                          <td key={d} className={dayClass(d, now)}>
+                          <td key={d} className={dayClass(d, now, p.holidays)}>
                             {lane.days[d] && <JobDay lane={lane} cell={lane.days[d]} scale={scale} />}
                           </td>
                         ))}
@@ -196,7 +200,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                           {lane.person.kind === 'staff' && <small>Staff</small>}
                         </th>
                         {days.map((d) => (
-                          <PersonDay key={d} cell={lane.days[d]} scale={scale} className={dayClass(d, now)} />
+                          <PersonDay key={d} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} />
                         ))}
                       </tr>
                     ))}
@@ -227,9 +231,9 @@ function summary(p: Plan, scale: Scale): string {
   return parts.join(' · ')
 }
 
-function dayClass(d: string, now: string): string | undefined {
+function dayClass(d: string, now: string, holidays: Record<string, string>): string | undefined {
   const weekend = [0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay())
-  return [weekend && 'weekend', d === now && 'today'].filter(Boolean).join(' ') || undefined
+  return [weekend && 'weekend', d in holidays && 'holiday', d === now && 'today'].filter(Boolean).join(' ') || undefined
 }
 
 function JobName({ lane }: { lane: JobLane }) {
@@ -319,13 +323,15 @@ function Legend({ rows }: { rows: Rows }) {
           ['blk solid full', 'All crew found'],
           ['blk solid short', 'Crew still to find'],
           ['blk solid stray', 'Crew on a day their phase moved off'],
+          ['swatch holiday', 'Public holiday'],
         ]
       : [
           ['item booked', 'Booked, or to confirm'],
           ['item offered', 'Offered, no answer yet'],
-          ['item away', 'Unavailable'],
+          ['item away', 'Unavailable, or on leave'],
           ['swatch clash', 'Clash: booked twice, or while unavailable'],
           ['swatch check', 'Check: would clash if they said yes'],
+          ['swatch holiday', 'Public holiday'],
         ]
   return (
     <ul className="legend" aria-label="Key">

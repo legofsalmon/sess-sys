@@ -3,6 +3,75 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 1 October 2026: staff leave and time in lieu
+
+**Done**
+
+- Colly answered the three invoice questions: freelancers write their
+  own invoices and email them to the office; some of them are
+  VAT-registered; and an invoice can cover one job or several over a
+  period, either way. So the app will tell each freelancer what to
+  invoice and track what arrives, rather than make the invoice; the
+  roadmap and the architecture say so now.
+- Colly answered the open question from ADR 0009: calendar invites go
+  out to crew when they're offered a job, and accepting the invite in
+  Google Calendar is one acceptable way of agreeing to it. That is what
+  was built, so the decision record now says so.
+- The stray `@sh/web` service on Railway is gone: Colly committed the
+  staged deletion on 1 October. Only `@sh/server` is left.
+- The first part of the app that is for the staff rather than the jobs:
+  annual leave and days in lieu, applied for and approved in the app.
+  [Decision 0024](adr/0024-staff-leave.md) has the reasons, and Colly's
+  calls: the calendar year, lieu in days, a flag for who approves until
+  roles exist, and no sick or unpaid leave yet.
+- A request is a span of whole days, counted in the weekdays that aren't
+  Irish public holidays, which a new rule book works out for any year
+  (checked against the published 2026 and 2027 dates). The form says the
+  count before anything is sent; the server counts again.
+- The **Leave** screen under Crew: my year as facts (allowance, carried
+  over, taken, booked, waiting, left; and lieu earned, to be approved,
+  taken, booked, waiting, left), last year and next year, Apply, Log a
+  day in lieu, and my requests with Cancel. For anyone with "Can approve
+  time off" on their person: the queue, oldest first, with what to weigh
+  up (jobs they hold those days, other staff off or asking for the same
+  days), Approve and Decline in place, and every staff member's
+  allowance to set. The Crew tab's badge counts the waiting requests for
+  an approver.
+- Approved leave is days off under the request's own id: the planner
+  shows it, offers warn, the clash is flagged if they're booked, and the
+  person's own calendar feed carries it as an all-day event. Declining
+  or cancelling takes it off again, and neither the office by hand nor
+  the person from their private link can remove those days off. The
+  planner marks public holidays as a faint band.
+- Who "me" is: the signed-in account's email matched to a person on the
+  Crew tab, and the server checks a request is the person's own and a
+  decision is by an approver. While sign-in is off the screen asks "Who
+  are you?" once and the device says who is deciding, so it works today
+  and becomes honest by itself when the Google key goes in.
+- The made-up data has allowances for the three staff, Aoife approving,
+  Cian's week and day in lieu waiting, and Orla's week last month taken.
+- Checked: typecheck; 66 shared tests (10 new: the holidays by rule, the
+  count across a bank holiday, the balances with and without an
+  allowance, overlaps, the device's view with its own changes and the
+  planner's clash); the server suite on PGlite (8 new, each rule in turn
+  with signed-in staff, the planner, offers, the feed and the private
+  link after approval, nothing approved for someone archived, and the
+  device saying who it is with sign-in off); the web build; the full
+  browser suite with a new test (pick who you are, apply for three
+  days, the approver's badge counts it at once, the approver approves,
+  a blanked allowance is turned down in place, the planner shows the
+  days off, an offer warns).
+
+**Next**
+
+- Later items written into the ADR: half days, working patterns, sick
+  and unpaid leave, carrying days over by rule at the year end, lieu in
+  hours, roles instead of the flag, and telling the person their request
+  was decided through the Send panel.
+- Colly: the Google key, the backups bucket and the Sentry key are still
+  the first three items on the list; with the key in, leave checks who
+  is asking by itself.
+
 ## 1 October 2026: audit round two
 
 **Done**

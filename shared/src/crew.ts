@@ -46,6 +46,12 @@ export const person = z.object({
    * before it existed read as not archived.
    */
   archived: z.boolean().default(false),
+  /**
+   * Can approve staff leave and days in lieu (ADR 0024). Staff only; the
+   * senior staff are a flag until roles exist. Defaults so records synced
+   * before it existed read as not.
+   */
+  approvesLeave: z.boolean().default(false),
 })
 export type Person = z.infer<typeof person>
 
@@ -56,8 +62,8 @@ export const unavailability = z.object({
   start: day,
   end: day,
   note: text(500, 'The note'),
-  /** Who said so: ops, the person on their link, or their own calendar (later). */
-  source: z.enum(['ops', 'self', 'calendar']),
+  /** Who said so: ops, the person on their link, their own calendar (later), or approved leave (ADR 0024), which has the request's own id. */
+  source: z.enum(['ops', 'self', 'calendar', 'leave']),
 })
 export type Unavailability = z.infer<typeof unavailability>
 
@@ -168,6 +174,8 @@ export const crewCommandSchemas = {
     skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
     dayRateCents: cents.nullable(),
     notes: text(2000, 'The notes'),
+    /** Left out by versions of the app from before leave existed, which then keeps what the server has. */
+    approvesLeave: z.boolean().optional(),
   }),
   /** Replace a person's private link, so the old one stops working. */
   'person.newLink': z.object({ id }),

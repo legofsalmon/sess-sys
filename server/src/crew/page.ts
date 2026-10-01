@@ -227,7 +227,10 @@ export function renderPage(d: PageData): string {
             .filter((u) => u.end >= d.today)
             .map(
               (u) => `<li><span>${h(daysLabel(eachDay(u.start, u.end)))}${u.note ? ` <small>${h(u.note)}</small>` : ''}</span>
-          <form method="post" action="${d.base}/away/${encodeURIComponent(u.id)}/remove"><button>Remove</button></form></li>`
+          ${
+            // Approved leave is cancelled in the app, never taken off here, so the two never disagree (ADR 0024).
+            u.source === 'leave' ? '<small>Approved leave</small>' : `<form method="post" action="${d.base}/away/${encodeURIComponent(u.id)}/remove"><button>Remove</button></form>`
+          }</li>`
             )
             .join('')}</ul>`
         : ''

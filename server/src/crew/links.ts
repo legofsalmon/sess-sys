@@ -240,7 +240,8 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (!person) return reply.code(404).type('text/html').send(renderGone())
     const away = await getAway(db, req.params.id!)
     if (!away || away.personId !== person.id) return back(reply, person.linkToken, 'Already removed.', true)
-    await run(req, person.id, 'unavailability.remove', { id: away.id })
+    const result = await run(req, person.id, 'unavailability.remove', { id: away.id })
+    if (result.status === 'rejected') return back(reply, person.linkToken, result.reason.message, false)
     return back(reply, person.linkToken, 'Removed. You can be offered work on those days again.', true)
   })
 

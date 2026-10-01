@@ -30,7 +30,10 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   waiting on the office; one approved with a change; and one not in yet;
  * - the office's own details, on every freelancer page, and a freelancer
  *   who was booked and can't make it any more, waiting in "Answers to
- *   check" beside the decline.
+ *   check" beside the decline;
+ * - staff leave (ADR 0024): the staff's allowances for this year, Aoife
+ *   approving time off, Cian waiting on a week's leave and a day in lieu,
+ *   and Orla's week last month approved, so her days off are in the planner.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -93,7 +96,7 @@ export function madeUpData(today: string): Mutation[] {
   const galaShow = phase(gala, 'Show', -10, -9)
 
   // Crew: staff, freelancers, and some days off.
-  const person = (name: string, kind: 'staff' | 'freelancer', skills: string[], euroADay: number | null) =>
+  const person = (name: string, kind: 'staff' | 'freelancer', skills: string[], euroADay: number | null, approvesLeave = false) =>
     add('person.upsert', {
       id: newId(),
       name,
@@ -103,8 +106,9 @@ export function madeUpData(today: string): Mutation[] {
       skills,
       dayRateCents: euroADay === null ? null : euroADay * 100,
       notes: '',
+      approvesLeave,
     }).id
-  const aoife = person('Aoife Brennan', 'staff', ['Crew chief', 'Audio'], null)
+  const aoife = person('Aoife Brennan', 'staff', ['Crew chief', 'Audio'], null, true)
   const cian = person('Cian Murphy', 'staff', ['Warehouse', 'Driver'], null)
   const orla = person('Orla Hayes', 'staff', ['Lighting'], null)
   const dara = person('Dara Quinn', 'freelancer', ['Sound No.1', 'Audio'], 320)
@@ -116,6 +120,21 @@ export function madeUpData(today: string): Mutation[] {
   const tadhg = person('Tadhg Brady', 'freelancer', ['Stagehand', 'Driver'], 200)
   const laoise = person('Laoise Keane', 'freelancer', ['Stagehand'], 200)
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
+
+  // Staff leave (ADR 0024). A week counted from today, moved a week on when it would cross the year end, since a request belongs to one year.
+  const week = (from: number): [string, string] => {
+    const [s, e] = [day(from), day(from + 4)]
+    return s.slice(0, 4) === e.slice(0, 4) ? [s, e] : from < 0 ? [day(from - 7), day(from - 3)] : [day(from + 7), day(from + 11)]
+  }
+  const year = Number(today.slice(0, 4))
+  for (const [personId, days, carriedOver] of [[aoife, 22, 2], [cian, 20, 0], [orla, 20, 3]] as const)
+    add('leave.allowance', { personId, year, days, carriedOver, note: '', by: aoife })
+  const [orlaStart, orlaEnd] = week(-20)
+  const orlaLeave = add('leave.request', { id: newId(), personId: orla, type: 'annual', start: orlaStart, end: orlaEnd, note: 'Week away with the family.' }).id
+  add('leave.decide', { id: orlaLeave, approved: true, reason: '', by: aoife })
+  const [cianStart, cianEnd] = week(25)
+  add('leave.request', { id: newId(), personId: cian, type: 'annual', start: cianStart, end: cianEnd, note: 'Flights booked, if that suits.' })
+  add('lieu.log', { id: newId(), personId: cian, day: day(-9), days: 1, note: 'Drove the gala kit back.' })
 
   // Crew asked for from the jobs, and what each person said.
   const venues = new Map([riverside, northbank, granary, pier3, clonmore].map((v) => [v.id, venueLabel(v)]))

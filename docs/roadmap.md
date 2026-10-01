@@ -148,13 +148,28 @@ on each freelancer's private link. So are timesheets
 ([ADR 0022](adr/0022-timesheets.md)): the days worked at the day rate and
 the extras, sent from a freelancer's link and approved by the office.
 
+**Staff** (built, 1 October 2026, [ADR 0024](adr/0024-staff-leave.md)):
+annual leave and time in lieu, in whole days against a calendar-year
+allowance, applied for on the Leave screen and approved by whoever has
+"Can approve time off"; Irish public holidays worked out by rule and
+never counted; approved leave in the planner and respected by offers.
+Half days, working patterns, sick and unpaid leave, and carrying days
+over by rule are later.
+
 - Freelancer profiles, skills, rates, documents with expiry reminders.
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
   call sheet; partial acceptance of multi-day jobs; rate counter-offers.
-- Ready-made freelancer invoices from hours and extras, approved in one
-  step, with payment status visible to them.
+- Invoicing made easy, not made for them: freelancers write their own
+  invoices and email them to the office (Colly, 1 October 2026). The
+  app tells each freelancer on their link what to invoice from their
+  approved timesheets (days, rate, extras, the total, and VAT on top for
+  the ones who are VAT-registered), and where to send it. An invoice
+  can cover one job or several over a period, as the freelancer likes;
+  the office records each invoice as it arrives against the timesheets
+  it covers, checks the figures, and marks it paid, with the status
+  visible to the freelancer.
 - Offers by app, email, SMS or WhatsApp: send a role to one person or a
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.

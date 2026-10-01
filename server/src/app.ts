@@ -182,7 +182,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
     const { clientId, mutations, sentAt, generation } = parsed.data
-    const from = { userId: req.user?.id, sentAt, device: describeDevice(req.headers['user-agent']) }
+    // Who is asking, for the history and for the handlers that check it (ADR 0024); nobody while sign-in is off.
+    const from = {
+      userId: req.user?.id,
+      ...(req.user ? { user: { id: req.user.id, email: req.user.email } } : {}),
+      sentAt,
+      device: describeDevice(req.headers['user-agent']),
+    }
     const results: MutationResult[] = []
     let stale = false
     // In order: a device's later request may depend on an earlier one.

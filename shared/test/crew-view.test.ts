@@ -20,6 +20,7 @@ const aoife: Person = {
   notes: '',
   linkToken: 'abcdefghijklmnopqrstuvwx',
   archived: false,
+  approvesLeave: false,
 }
 
 const pending = <N extends Mutation['name']>(name: N, args: Mutation<N>['args']): Mutation => ({ id: `m-${name}`, name, args, createdAt: '2026-10-01T09:00:00Z' }) as Mutation

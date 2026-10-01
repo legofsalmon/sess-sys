@@ -6,6 +6,7 @@ import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
 import { labelCommandSchemas } from './labels.ts'
+import { leaveCommandSchemas } from './leave.ts'
 import { moveCommandSchemas } from './moves.ts'
 import { officeCommandSchemas } from './office.ts'
 import { stockCommandSchemas } from './stock.ts'
@@ -49,6 +50,7 @@ export const commandSchemas = {
   ...inspectionCommandSchemas,
   ...timesheetCommandSchemas,
   ...officeCommandSchemas,
+  ...leaveCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

@@ -19,6 +19,7 @@ const DOCS = [
   ['Error alerts', 'docs/monitoring.md'],
   ['Architecture', 'docs/architecture.md'],
   ['Roadmap', 'docs/roadmap.md'],
+  ['Bringing in the crew list', 'docs/research/crew-import.md'],
   ['Stock tracking', 'docs/research/stock-tracking.md'],
   ['Competitor audit', 'docs/research/competitor-audit.md'],
   ['How booking works today', 'docs/research/current-process.md'],
