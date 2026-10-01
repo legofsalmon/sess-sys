@@ -78,6 +78,11 @@ waiting on someone.
   bringing them in, the Crew tab showing department and level, the
   applicant hidden from the picker until asked for, and the same file
   again adding nobody).
+- Merged into `main` at 20:51 UTC once GitHub's checks passed, and live
+  by 20:58: Railway waited for main's checks, then deployed it on its
+  own. The live database has the crew schema at version 7 with the
+  seven new columns on people, and the health check answers on the new
+  build.
 
 **Next**
 
