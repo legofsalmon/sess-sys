@@ -25,27 +25,35 @@ const notSignedIn = async (page: Page) => {
 }
 
 test('a device that is signed out sees only the way in, and keeps what it has waiting', async ({ page }) => {
-  await page.goto('/#stock/sync-test')
-  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.goto('/#stock')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  // Sign-in gets switched on while this device holds a change. The test
-  // server is shared with the other browser tests, so the kit has a name of its own.
-  const kit = `d&b Y10P ${Math.random().toString(36).slice(2, 8)}`
+  // Sign-in gets switched on while this device holds a change: made while
+  // the server can't be reached, so it waits, and the next sync is told to
+  // sign in. The test server is shared with the other browser tests, so the
+  // place has a name of its own.
+  const bay = `Bay ${Math.random().toString(36).slice(2, 8)}`
+  await page.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  await page.getByRole('button', { name: 'Add place' }).click()
+  await page.getByLabel('New place').fill(bay)
+  await page.getByRole('button', { name: 'Add place' }).click()
+  await expect(page.locator('.conn')).toHaveText(/1 waiting/)
+  await page.unroute('**/api/sync/push')
   await notSignedIn(page)
-  await page.locator('#product-name').fill(kit)
-  await page.locator('#product-qty').fill('4')
-  await page.getByRole('button', { name: 'Add' }).click()
+  await page.evaluate(() => dispatchEvent(new Event('online')))
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(page.getByText(kit)).toHaveCount(0)
+  await expect(page.getByText(bay)).toHaveCount(0)
   await expect(page.getByText('1 change made on this device is waiting')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toHaveAttribute('href', '/api/auth/google/start?next=%23stock%2Fsync-test')
+  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toHaveAttribute('href', '/api/auth/google/start?next=%23stock')
 
   // Once the device is let in again, the waiting change goes through.
   await page.unrouteAll()
   await page.reload()
-  await expect(page.locator('.stock li', { hasText: kit })).toContainText('4 of 4 free')
-  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  const all = page.getByRole('button', { name: /^Show all \d+ places$/ })
+  if (await all.count()) await all.click()
+  await expect(page.locator('.job-row', { hasText: bay })).toContainText('Nothing here yet')
 })
 
 test('says why a sign-in was refused, then tidies the address', async ({ page }) => {

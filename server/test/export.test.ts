@@ -14,8 +14,8 @@ import { IPHONE, onLink, server, staff } from './people.ts'
 async function company() {
   const { app, db } = await server()
   const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
-  await colly.send('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
-  await colly.send('booking.create', { id: 'b1', productId: 'y10p', project: 'Electric Picnic', qty: 2, start: '2026-10-02', end: '2026-10-04' })
+  await colly.send('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })
+  await colly.send('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
   await colly.send('person.upsert', {
     id: 'p1',
     name: 'Seán Ó Briain',
@@ -96,7 +96,6 @@ describe('download everything', () => {
     const tables = [
       'assets',
       'backup_runs',
-      'bookings',
       'calendar_days',
       'calendar_guests',
       'calendar_imports',
@@ -107,7 +106,6 @@ describe('download everything', () => {
       'faults',
       'identifiers',
       'inspections',
-      'issues',
       'kit_lines',
       'label_runs',
       'leave_allowances',
@@ -120,9 +118,7 @@ describe('download everything', () => {
       'people',
       'phases',
       'places',
-      'products',
       'projects',
-      'scans',
       'settings',
       'stock',
       'timesheets',
@@ -207,8 +203,8 @@ describe('download everything', () => {
     const { files } = await download(app, colly.cookies)
     const history = table(files['history.csv']!)
     expect(history.map((h) => [h.Who, h.How, h.What])).toEqual([
-      ['Colly Hewson', 'App, device c0ffee', 'Set d&b Y10P to 4 in stock'],
-      ['Colly Hewson', 'App, device c0ffee', 'Booked 2 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct'],
+      ['Colly Hewson', 'App, device c0ffee', 'Added the product d&b Y10P (Audio, counted)'],
+      ['Colly Hewson', 'App, device c0ffee', 'Saved the place Bay A3'],
       ['Colly Hewson', 'App, device c0ffee', "Saved Seán Ó Briain's details"],
       ['Colly Hewson', 'App, device c0ffee', 'Gave Seán Ó Briain a new private link; the old one stopped working'],
       ['Colly Hewson', 'App, device c0ffee', 'Asked for 1 × Audio tech for Electric Picnic (Build), Fri 2 Oct to Sun 4 Oct'],

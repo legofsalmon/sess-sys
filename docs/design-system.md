@@ -219,6 +219,16 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   every area, with Dismiss. An "are you sure?" is a question in place: the
   consequence in words in a warn line, the safe button first and focused,
   the fields held still. Not in Figma yet.
+- The History tab ([ADR 0006](adr/0006-audit-trail-and-export.md)) is a
+  card per day, the day as its heading ("Today", "Thursday 1 October").
+  One person's changes one after another are one line in bold, after a
+  muted triangle like a fold's: whose, how many and when ("Colly Hewson,
+  14 changes, 09:12 to 09:40"), with the devices and how many were
+  turned down in muted small text under it. A tap opens the changes
+  under it, set in behind a line. One the server turned down stays on
+  show under the shut line, its reason in the **bad** tone. While
+  sign-in is off nobody has a name, so a line is a device's ("Device
+  c0ffee"), and the top of the tab says why once. Not in Figma yet.
 - The Leave screen ([ADR 0024](adr/0024-staff-leave.md)) is the Crew
   tab's facts layout for a person's year, three to a row (allowance,
   carried over, taken, booked, waiting, left, with "left" in bold and in

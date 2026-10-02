@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { plural, pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -26,6 +26,7 @@ import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
+import { keptSyncTestTables } from './schema.ts'
 
 const PULL_LIMIT = 500
 
@@ -90,6 +91,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     logger: logger && { serializers: { req: requestForLog }, ...(logTo && { stream: logTo }) },
     bodyLimit: 5 * 1024 * 1024,
   })
+  // The old sync test's tables go only when empty (schema.ts), so one still holding rows is said once, here at start.
+  const kept = await keptSyncTestTables(db)
+  if (kept.length > 0) {
+    const which = kept.map((k) => `${k.table} (${plural(k.rows, 'row')})`).join(', ')
+    app.log.warn({ tables: kept }, `Kept the old sync test's tables that still hold rows: ${which}. Nothing uses them now; drop them by hand once the rows are copied somewhere.`)
+  }
   const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch, key: backupKey }).load()
   app.decorate('backups', backups)
   await app.register(websocket)

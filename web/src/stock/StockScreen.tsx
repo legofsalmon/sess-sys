@@ -17,7 +17,6 @@ import {
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
-import { App } from '../App.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { Beside, JobStatusPill, Top, useHash } from '../jobs/common.tsx'
@@ -44,15 +43,13 @@ import './stock.css'
  * (ADR 0020). A product, item or place opens on its own page
  * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>), labels on
  * theirs (#stock/labels, #stock/labels/<id>), and testing a batch on
- * #stock/testing. The Phase 0
- * sync test lives at #stock/sync-test until the phone field test is done.
+ * #stock/testing.
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 export function StockScreen() {
   const view = useView()
   const hash = useHash()
   const wide = useWide()
-  if (hash === '#stock/sync-test') return <App />
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
   if (hash === '#stock/testing') return <TestingScreen view={view} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
@@ -107,14 +104,6 @@ function StockRest({ view }: { view: View }) {
       <LabelsCard labels={view.labels} />
 
       <Places view={view} />
-
-      <section className="card">
-        <h2>Sync test</h2>
-        <p className="hint">The Phase 0 phone field test: book speakers with no signal and watch the server sort it out.</p>
-        <a className="button" href="#stock/sync-test">
-          Open the sync test
-        </a>
-      </section>
     </>
   )
 }

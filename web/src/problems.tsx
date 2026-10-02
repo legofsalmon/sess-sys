@@ -127,14 +127,6 @@ function describer(view: View): (m: Mutation) => string {
   return (m: Mutation) => {
     const a = m.args as Record<string, unknown>
     switch (m.name) {
-      case 'product.upsert':
-        return `Set ${str(a.name, 'a product')} to ${num(a.quantity)} in stock`
-      case 'booking.create':
-        return `Book ${num(a.qty)} × ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} for ${str(a.project, 'a job')}`
-      case 'booking.cancel':
-        return 'Cancel a booking'
-      case 'scan.record':
-        return `Scan ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} ${a.direction === 'in' ? 'back in' : 'out'}`
       case 'person.upsert':
         return `Save ${str(a.name, 'someone')}'s details`
       case 'person.level':
@@ -257,6 +249,9 @@ function describer(view: View): (m: Mutation) => string {
         return `${a.approved ? 'Approve' : 'Decline'} ${lieu(a.id)}`
       case 'leave.allowance':
         return `Set ${person(a.personId)}'s ${num(a.year)} allowance`
+      // Kept from an older version of the app, such as the old sync test's bookings. The server's reason says it's gone, so this only says where it came from.
+      default:
+        return 'A change from an older version of the app'
     }
   }
 }

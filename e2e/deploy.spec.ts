@@ -24,20 +24,20 @@ test('a new version waits for Reload, which brings it in with an unsynced change
   // Proves: a deploy never takes the open page over by itself, and Reload brings the new build with nothing lost.
   const context = await browser.newContext()
   const tab = await context.newPage()
-  await tab.goto('/#stock/sync-test')
-  await expect(tab.getByRole('status')).toHaveText('Up to date')
+  await tab.goto('/#stock')
+  await expect(tab.locator('.conn')).toHaveText('Up to date')
   // The service worker is in control, as it is on any phone that has opened the app before.
   await tab.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 }).catch(() => tab.reload())
   await tab.waitForFunction(() => navigator.serviceWorker?.controller != null)
 
   // A change made with no signal: the server can't be reached, so it waits in the outbox.
   const id = Math.random().toString(36).slice(2, 8)
-  const kit = `Deploy test ${id}`
+  const bay = `Deploy test ${id}`
   await context.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
-  await tab.locator('#product-name').fill(kit)
-  await tab.locator('#product-qty').fill('2')
-  await tab.getByRole('button', { name: 'Add' }).click()
-  await expect(tab.getByRole('status')).toHaveText(/1 waiting/)
+  await tab.getByRole('button', { name: 'Add place' }).click()
+  await tab.getByLabel('New place').fill(bay)
+  await tab.getByRole('button', { name: 'Add place' }).click()
+  await expect(tab.locator('.conn')).toHaveText(/1 waiting/)
 
   // The deploy: a new page, and a service worker whose list of files says so.
   const next = {
@@ -52,13 +52,17 @@ test('a new version waits for Reload, which brings it in with an unsynced change
   await expect(tab.getByText('A new version is ready.')).toBeVisible({ timeout: 20_000 })
   // Still the old page, with the change still waiting: nothing happens until someone taps.
   expect(await tab.evaluate(() => document.querySelector('meta[name="build"]')?.getAttribute('content') ?? null)).toBeNull()
-  await expect(tab.getByRole('status')).toHaveText(/1 waiting/)
+  await expect(tab.locator('.conn')).toHaveText(/1 waiting/)
 
   // Signal back, and Reload: the new build, with the change made before it now synced.
   await context.unroute('**/api/sync/push')
   await tab.getByRole('button', { name: 'Reload' }).click()
   await tab.waitForFunction(() => document.querySelector('meta[name="build"]')?.getAttribute('content') === 'two', null, { timeout: 20_000 })
-  await expect(tab.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
-  await expect(tab.locator('.stock li', { hasText: kit })).toContainText('2 of 2 free')
+  await expect(tab.locator('.conn')).toHaveText('Up to date', { timeout: 20_000 })
+  const all = tab.getByRole('button', { name: /^Show all \d+ places$/ })
+  if (await all.count()) await all.click()
+  const row = tab.locator('.job-row', { hasText: bay })
+  await expect(row).toContainText('Nothing here yet')
+  await expect(row).not.toContainText('Waiting to sync')
   await context.close()
 })

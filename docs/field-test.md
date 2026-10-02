@@ -21,24 +21,25 @@ every screen then says "made-up data" beside its name.
    the home screen. iPhone: Share, then Add to Home Screen. Android: the ⋮
    menu, then Install app. From now on, open it from the home screen icon.
 2. On the laptop, open the same address in a browser.
-3. The app opens on **Jobs**. This test uses the sync test under
-   **Stock**: on both, tap Stock at the bottom, then **Open the sync
-   test** at the end of that page.
+3. The app opens on **Jobs**. This test uses **Stock**. On the laptop,
+   tap Stock at the bottom, then **Add product**: call it "Test
+   speaker", tap **Counted**, and add it. On its page, under **Add a
+   count**, count 4 at "Bay T1" and tap **Make the place** when it asks.
+4. On the phone, tap Stock and open Test speaker. It shows 4 at Bay T1.
 
 ## The test
 
 | Step | Where | Do this | You should see |
 |---|---|---|---|
-| 1 | Laptop | Add a product, e.g. "d&b Y10P", quantity 4 | "4 of 4 free" on both devices within a second or two |
-| 2 | Phone | Turn on flight mode, or walk into your worst dead spot | The top pill says "No signal" |
-| 3 | Phone | Close the app fully, open it again from the icon, then tap Stock and Open the sync test | It opens anyway, with the stock still showing |
-| 4 | Phone | Book 4 of the product for a job called "Fuel" | The booking shows "Waiting to sync" |
-| 5 | Laptop | Book the same 4, same day, for a job called "Nissan" | "Confirmed" |
-| 6 | Phone | Turn flight mode off | Within a few seconds: "Needs attention: Not booked", with the reason, and Nissan in the list |
+| 1 | Phone | Turn on flight mode, or walk into your worst dead spot | The top pill says "No signal" |
+| 2 | Phone | Close the app fully, open it again from the icon, then tap Stock and open Test speaker | It opens anyway, with 4 at Bay T1 still showing |
+| 3 | Phone | Beside Bay T1, tap **Move some**: 4, to "Van T1" (make the place) | 4 at Van T1, marked "Waiting to sync" |
+| 4 | Laptop | Beside Bay T1, tap **Move some**: 4, to "Van T2" (make the place) | 4 at Van T2, and "Up to date" |
+| 5 | Phone | Turn flight mode off | Within a few seconds: "1 not done" at the top; tapped, it says "Move 4 × Test speaker to Van T1" and why ("Only 0 × Test speaker counted at Bay T1"), and the 4 show at Van T2, as on the laptop |
 
 ## Worth noting
 
-- How long step 6 took to catch up.
+- How long step 5 took to catch up.
 - Anything that looked wrong, slow or confusing, with a screenshot if you
   can.
 - Whether the phone ever showed something different from the laptop once

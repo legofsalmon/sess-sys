@@ -6,7 +6,7 @@ import { euroCents, needed, text, whole } from './plain.ts'
  * The warehouse catalogue (ADR 0013): products, the numbered items of them,
  * the places kit lives, cases, and counted stock.
  *
- * The code calls a product a model, since the Phase 0 sync test already has
+ * The code calls a product a model, since the Phase 0 sync test already had
  * products, and a numbered item an asset, as the architecture does; the app
  * says product and item.
  *

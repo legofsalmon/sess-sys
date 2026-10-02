@@ -232,7 +232,7 @@ describe('made-up data', () => {
   it('only goes into an empty app', async () => {
     const { app } = await server()
     const office = await phone(app)
-    await office.client.mutate('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
+    await office.client.mutate('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
     await office.client.sync()
     const res = await putInMadeUpData(app)
     expect(res.statusCode).toBe(409)
@@ -272,7 +272,7 @@ describe('starting fresh', () => {
     const { app, db } = await signedInServer()
     const aoife = await staff(app, db, 'Aoife Brennan', IPHONE, CODE)
     await putInMadeUpData(app, aoife)
-    await aoife.send('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 })
+    await aoife.send('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
     const before = await rowsLeft(db)
     expect(before.projects).toBe(7)
     const total = Object.values(before).reduce((a, b) => a + b, 0)
@@ -313,10 +313,10 @@ describe('starting fresh', () => {
     await dara.client.sync()
     const job = dara.client.view().jobs.jobs.find((j) => j.name === 'Clonmore Wedding')!
 
-    // Dara, with no signal, moves a job on and adds a product; then the office starts fresh.
+    // Dara, with no signal, moves a job on and adds a place; then the office starts fresh.
     dara.link.online = false
     await dara.client.mutate('project.update', { id: job.id, status: 'confirmed' })
-    await dara.client.mutate('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 })
+    await dara.client.mutate('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
     await dara.client.sync().catch(() => {})
     expect(dara.client.view().pendingCount).toBe(2)
     expect((await startFresh(app)).statusCode).toBe(200)
@@ -331,15 +331,15 @@ describe('starting fresh', () => {
     expect((await pull(app)).changes).toEqual([])
     const view = dara.client.view()
     expect(view.jobs.jobs).toEqual([])
-    expect(view.products).toEqual([])
+    expect(view.warehouse.places).toEqual([])
     expect(view.pendingCount).toBe(0)
     expect(view.problems).toEqual([])
 
     // What's done after goes in as normal, from either phone.
-    await dara.client.mutate('product.upsert', { id: 'sm58', name: 'Shure SM58', quantity: 20 })
+    await dara.client.mutate('place.upsert', { id: 'van8', name: 'Van 8', notes: '' })
     await dara.client.sync()
     await office.client.sync()
-    expect(office.client.view().products.map((p) => p.id)).toEqual(['sm58'])
+    expect(office.client.view().warehouse.places.map((p) => p.id)).toEqual(['van8'])
     expect(dara.client.view().pendingCount).toBe(0)
   })
 
@@ -354,7 +354,7 @@ describe('starting fresh', () => {
       payload: {
         clientId: 'phone1',
         generation,
-        mutations: [{ id: 'm1', name: 'product.upsert', args: { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }, createdAt: new Date().toISOString() }],
+        mutations: [{ id: 'm1', name: 'place.upsert', args: { id: 'van9', name: 'Van 9', notes: '' }, createdAt: new Date().toISOString() }],
       },
     })
     expect(stale.json()).toEqual({ results: [], stale: true })
@@ -369,7 +369,7 @@ describe('starting fresh', () => {
       payload: {
         clientId: 'phone1',
         generation: now,
-        mutations: [{ id: 'm2', name: 'product.upsert', args: { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }, createdAt: new Date().toISOString() }],
+        mutations: [{ id: 'm2', name: 'place.upsert', args: { id: 'van9', name: 'Van 9', notes: '' }, createdAt: new Date().toISOString() }],
       },
     })
     expect(ok.json().results[0]).toMatchObject({ status: 'applied' })

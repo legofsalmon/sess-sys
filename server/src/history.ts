@@ -212,8 +212,6 @@ type Look = (entity: string, id: unknown) => Data | undefined
 
 const REFERENCES = [
   'id',
-  'productId',
-  'bookingId',
   'personId',
   'callId',
   'projectId',
@@ -296,7 +294,6 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
  * own link, for the few commands that read differently in their voice.
  */
 export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar'): string {
-  const product = (id: unknown) => text(look('product', id)?.name, 'an item')
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
     const c = look('crewCall', id)
@@ -353,18 +350,6 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
   const why = (approved: unknown, reason: unknown) => (!approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
 
   switch (command) {
-    case 'product.upsert':
-      return `Set ${text(a.name, 'an item')} to ${a.quantity} in stock`
-    case 'booking.create':
-      return `Booked ${a.qty} × ${product(a.productId)} for ${text(a.project, 'a job')}, ${dates(a.start, a.end)}`
-    case 'booking.cancel': {
-      const b = look('booking', a.id)
-      return b ? `Cancelled the booking of ${b.qty} × ${product(b.productId)} for ${text(b.project, 'a job')}, ${dates(b.start, b.end)}` : 'Cancelled a booking'
-    }
-    case 'scan.record': {
-      const b = look('booking', a.bookingId)
-      return `Scanned ${product(a.productId)} ${a.direction === 'in' ? 'back in' : 'out'}${b ? ` for ${text(b.project, 'a job')}` : ''}`
-    }
     case 'person.upsert':
       return `Saved ${text(a.name, 'someone')}'s details`
     case 'person.level':

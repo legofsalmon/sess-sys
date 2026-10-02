@@ -160,9 +160,9 @@ export interface ClientConfig {
  */
 export interface HistoryEntry {
   id: string
-  /** What was done, in words, such as "Booked 4 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct". */
+  /** What was done, in words, such as "Moved 4 × d&b Y10P from Bay A3 to Van 1". */
   what: string
-  /** The command's name, such as `booking.create`. */
+  /** The command's name, such as `stock.move`. */
   command: string
   outcome: 'done' | 'turned-down'
   /** Why the server turned it down. */

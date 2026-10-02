@@ -1,7 +1,7 @@
 import { CALENDAR_LINK_ID, irishToday, type CalendarDay, type CalendarLink } from '../calendar.ts'
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
 import { newId } from '../ids.ts'
-import { ENTITY_NAMES, type Booking, type Entities, type EntityName, type Scan } from '../model.ts'
+import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
 import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { faultsView, type FaultsView } from './faults-view.ts'
@@ -81,19 +81,7 @@ export interface Problem {
 
 export type Connection = 'idle' | 'syncing' | 'offline'
 
-/** A booking as the person sees it, including ones still waiting to sync. */
-export interface BookingView extends Booking {
-  pending: boolean
-}
-export interface ScanView extends Scan {
-  pending: boolean
-}
-
 export interface View {
-  products: Entities['product'][]
-  bookings: BookingView[]
-  scans: ScanView[]
-  issues: Entities['issue'][]
   problems: Problem[]
   crew: CrewView
   jobs: JobsView
@@ -341,29 +329,6 @@ export class SyncClient {
   /** The device's data model, built from scratch. Throws if a change can't be laid over the rest. */
   private build(today = irishToday(this.now())): Omit<View, 'connection'> {
     const { entities, outbox } = this.state
-    const bookings = new Map<string, BookingView>()
-    for (const b of Object.values(entities.booking)) bookings.set(b.id, { ...b, pending: false })
-    const scans = new Map<string, ScanView>()
-    for (const s of Object.values(entities.scan)) scans.set(s.id, { ...s, pending: false })
-
-    // Lay what is still waiting over what the server has said, so the person
-    // sees their own requests immediately. The server may still say no.
-    for (const m of outbox) {
-      if (m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor) continue
-      if (m.name === 'booking.create') {
-        const a = m.args as CommandArgs<'booking.create'>
-        if (!bookings.has(a.id)) bookings.set(a.id, { ...a, status: 'confirmed', pending: true })
-      } else if (m.name === 'booking.cancel') {
-        const a = m.args as CommandArgs<'booking.cancel'>
-        const b = bookings.get(a.id)
-        if (b) bookings.set(a.id, { ...b, status: 'cancelled', pending: true })
-      } else if (m.name === 'scan.record') {
-        const a = m.args as CommandArgs<'scan.record'>
-        if (!scans.has(a.id)) scans.set(a.id, { ...a, pending: true })
-      }
-    }
-
-    const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id) || a.id.localeCompare(b.id)
     const crew = crewView(entities, outbox, this.state.cursor, today)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
@@ -371,10 +336,6 @@ export class SyncClient {
     const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse, (id) => !!inspections.blocks(id))
     const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults)
     return {
-      products: Object.values(entities.product).sort(byName),
-      bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
-      scans: [...scans.values()].sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)),
-      issues: Object.values(entities.issue).filter((i) => !i.resolved),
       problems: [...this.state.problems],
       crew,
       jobs,

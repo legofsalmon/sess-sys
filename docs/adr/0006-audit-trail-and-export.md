@@ -8,6 +8,22 @@
   the history with a post as it asks for the file, so an address opened on
   its own (a link checked by a browser, say) never puts a download in the
   history; a script's download is recorded only if it posts too.
+- **Amended:** 2 October 2026, from the audit's P3 list: the History tab
+  is grouped, so a busy morning reads as a few lines. Entries go under
+  the Irish day the server took them on ("Today", "Yesterday",
+  "Thursday 1 October"), so a day never comes round twice, even when a
+  change made offline at night arrives in the morning; it still says
+  when it was made. Within a day, one person's changes one after
+  another, with nobody else's between and no gap of more than an hour,
+  are one line ("Colly Hewson, 14 changes, 09:12 to 09:40") that opens
+  on a tap. A single change stays a line of its own, and one the server
+  turned down stays in view under its line. While there are no names
+  (sign-in off, when every change was "Someone"), a run is a device's
+  ("Device c0ffee"), and the top of the tab says once why ("Names show
+  once sign-in is on") instead of "Someone" on every line. The days and
+  runs are worked out afresh from every page loaded, so "Show older"
+  joins up a day or a run that a page cut in two. The export's
+  `history.csv` is as it was, a line per change.
 
 ## Context
 
