@@ -40,7 +40,11 @@ export const toEntry = (r: Row): LieuEntry => ({
 })
 
 export async function getAllowance(q: Queryable, personId: string, year: number) {
-  const { rows } = await q.query(`SELECT ${ALLOWANCE} FROM leave_allowances WHERE id = $1`, [allowanceId(personId, year)])
+  return getAllowanceById(q, allowanceId(personId, year))
+}
+
+export async function getAllowanceById(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${ALLOWANCE} FROM leave_allowances WHERE id = $1`, [id])
   return rows[0] ? toAllowance(rows[0]) : undefined
 }
 

@@ -1,10 +1,11 @@
 import type { Mutation } from '../commands.ts'
 import { HOLDING, OPEN, type Offer, type Person } from '../crew.ts'
-import { ERASED_REFUSAL, erasedPerson, keptArgs, nameKeptUntil, PERSON_COMMANDS, personNamedBy, type Erasure, type PersonRecord } from '../erasure.ts'
-import type { LeaveRequest, LieuEntry } from '../leave.ts'
+import { ERASED_REFUSAL, erasedPerson, keptArgs, nameKeptUntil, PERSON_COMMANDS, personNamedBy, type Erasure, type KeptRecords, type PersonRecord } from '../erasure.ts'
+import type { LeaveAllowance, LeaveRequest, LieuEntry } from '../leave.ts'
 import type { Timesheet } from '../timesheets.ts'
 import type { Snapshot, View } from './client.ts'
 import type { CrewView, PersonView } from './crew-view.ts'
+import type { LeaveView } from './leave-view.ts'
 
 /**
  * Erasing a person (ADR 0027) on a device: who has been erased, with an
@@ -25,16 +26,24 @@ type Entities = {
   timesheet?: Record<string, Timesheet>
   leaveRequest?: Record<string, LeaveRequest>
   lieuEntry?: Record<string, LieuEntry>
+  leaveAllowance?: Record<string, LeaveAllowance>
 }
 
-/** The day a person's name can go, as the server will work it out: from their approved timesheets. */
-function keptUntil(entities: Entities, personId: string, today: string): string | null {
-  const approved: string[] = []
+/**
+ * What a person has on record that keeps their name, from this device's
+ * copy: their approved timesheets and their staff leave, read as the
+ * server reads its tables (`keptRecords` in server/src/erasure/places.ts),
+ * so both decide the same day from the same records.
+ */
+export function keptRecordsOf(entities: Entities, personId: string): KeptRecords {
+  const approvedAt: string[] = []
   for (const o of Object.values(entities.offer ?? {})) {
     const t = o.personId === personId ? entities.timesheet?.[o.id] : undefined
-    if (t?.status === 'approved' && t.approvedAt) approved.push(t.approvedAt)
+    if (t?.status === 'approved' && t.approvedAt) approvedAt.push(t.approvedAt)
   }
-  return nameKeptUntil(approved, today)
+  // Snapshots saved before leave existed have no tables for it.
+  const theirs = <T extends { personId: string }>(table: Record<string, T> | undefined) => Object.values(table ?? {}).filter((r) => r.personId === personId)
+  return { approvedAt, leave: [...theirs(entities.leaveRequest), ...theirs(entities.lieuEntry), ...theirs(entities.leaveAllowance)] }
 }
 
 export function erasuresView(entities: Entities, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number, today: string): ErasuresView {
@@ -45,7 +54,7 @@ export function erasuresView(entities: Entities, outbox: readonly (Mutation & { 
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     if (m.name !== 'person.erase') continue
     const id = (m.args as { id: string }).id
-    out[id] = { id, erasedAt: out[id]?.erasedAt ?? m.createdAt, nameKeptUntil: keptUntil(entities, id, today), pending: true }
+    out[id] = { id, erasedAt: out[id]?.erasedAt ?? m.createdAt, nameKeptUntil: nameKeptUntil(keptRecordsOf(entities, id), today), pending: true }
   }
   return out
 }
@@ -74,10 +83,22 @@ export function withErasures(crew: CrewView, erasures: ErasuresView): CrewView {
 }
 
 /**
+ * Their leave still waiting on an approver, as the refusal says it: a
+ * request before a day in lieu, as the server looks. Their leave is kept
+ * once they're erased, and nothing more can be decided for them, so one
+ * left waiting would sit in the approvers' queue for good.
+ */
+function undecidedLeave(personId: string, leave: Pick<LeaveView, 'requests' | 'entries'>): string | undefined {
+  if (leave.requests.some((r) => r.personId === personId && r.status === 'waiting')) return 'leave'
+  if (leave.entries.some((e) => e.personId === personId && e.status === 'waiting')) return 'a day in lieu'
+  return undefined
+}
+
+/**
  * Why a person can't be erased yet, as the server will say it, or
  * undefined when they can. Only someone archived is offered it at all.
  */
-export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'archived'>, view: Pick<View, 'crew' | 'jobs' | 'timesheets' | 'calendar'>, today: string): string | undefined {
+export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'archived'>, view: Pick<View, 'crew' | 'jobs' | 'timesheets' | 'leave' | 'calendar'>, today: string): string | undefined {
   if (!person.archived) return `${person.name} isn't archived. Archive them first, then erase their details.`
   // The earliest of several, as the server picks it, so both say the same job.
   const first = <T extends { start: string; id: string }>(a: T | undefined, b: T) => (!a || b.start < a.start || (b.start === a.start && b.id < a.id) ? b : a)
@@ -97,6 +118,8 @@ export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'arc
   if (contact) return `${person.name} is the contact on the day for ${contact.job}, which hasn't ended. Choose someone else first.`
   const waiting = view.timesheets.toApprove.find((r) => r.offer.personId === person.id)
   if (waiting) return `${person.name} has a timesheet waiting on ${waiting.call.project}: approve it first, so their pay is on record.`
+  const leave = undecidedLeave(person.id, view.leave)
+  if (leave) return `${person.name} has ${leave} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
   const account = view.calendar.link?.state !== 'off' ? view.calendar.link?.account : undefined
   if (account && person.email && account.trim().toLowerCase() === person.email.trim().toLowerCase())
     return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`

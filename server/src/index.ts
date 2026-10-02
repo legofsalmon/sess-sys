@@ -59,6 +59,8 @@ async function main() {
     }
     await app.erasures?.keep()
   }
+  // Then what an erasure kept and the law no longer asks for, as on every day from now on (ADR 0027).
+  await app.dueErasures.start()
   const port = Number(process.env.PORT ?? 3030)
   await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)

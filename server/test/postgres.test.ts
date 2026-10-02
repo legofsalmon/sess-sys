@@ -1,4 +1,4 @@
-import { itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
+import { irishToday, itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -9,6 +9,8 @@ import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/
 import { restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { checkRestores } from '../src/backup/service.ts'
 import { postgresDb, type Db } from '../src/db.ts'
+import { eraseWhatIsDue } from '../src/erasure/due.ts'
+import { ERASED_WHEN_DUE_ACTION } from '../src/history.ts'
 import { FakeGoogle } from './fake-google-calendar.ts'
 import { IPHONE, onLink, staff } from './people.ts'
 
@@ -351,7 +353,11 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await person('cian', 'Cian Ó Murchú', cian.email, '+353 87 444 0909', 'Vegetarian')
       await person('dara', 'Dara Quinn', 'dara.cian@sessionhire.com', '+353 87 444 09090')
       await colly.send('person.contact', { id: 'cian', phone: '+353 87 444 1010' })
-      await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: '2031-03-03', end: '2031-03-04', note: 'Skiing in Andorra' })
+      // Leave from four years ago, whose three years are up, so it goes and his name with it (Colly's decision, 2 October
+      // 2026, keeps anything newer); declined first, as leave still waiting stops an erasure.
+      const old = Number(irishToday().slice(0, 4)) - 4
+      await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: `${old}-03-02`, end: `${old}-03-06`, note: 'Skiing in Andorra' })
+      expect(await colly.send('leave.decide', { id: 'r1', approved: false, reason: '' })).toMatchObject({ status: 'applied' })
       await colly.send('person.archive', { id: 'cian', archived: true })
       expect(await colly.send('person.level', { id: 'cian', level: 2 })).toMatchObject({ status: 'rejected' })
       expect(await colly.send('person.erase', { id: 'cian' })).toMatchObject({ status: 'applied' })
@@ -369,9 +375,83 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       ])
       const fresh = await app.inject({ url: '/api/sync/pull?after=0', cookies: colly.cookies })
       expect(fresh.body).not.toContain('Murchú')
-      expect(fresh.json().changes.filter((c: { entity: string }) => c.entity === 'leaveRequest').map((c: { op: string }) => c.op)).toEqual(['delete', 'delete'])
+      expect(fresh.json().changes.filter((c: { entity: string }) => c.entity === 'leaveRequest').map((c: { op: string }) => c.op)).toEqual(['delete', 'delete', 'delete'])
     } finally {
       await app.close()
+      await db.close()
+    }
+  })
+
+  it("keeps a member of staff's leave for three years without what anyone wrote in it, as on PGlite (ADR 0027)", async () => {
+    // Proves: the reading of each record's year, and the rewrite of its rows and earlier copies, do on Postgres what they do
+    // on PGlite: this year's request stays without its note or reason, and the name with it; four years ago's goes.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const aoife = await staff(app, db, 'Aoife Byrne', IPHONE, 'phone-a0f1e0')
+      const person = (id: string, name: string, email: string) =>
+        colly.send('person.upsert', { id, name, kind: 'staff', email, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: id === 'colly' })
+      await person('colly', 'Colly Hewson', colly.email)
+      await person('aoife', 'Aoife Byrne', aoife.email)
+      const year = Number(irishToday().slice(0, 4))
+      for (const [id, y, note] of [['now', year, 'Family wedding in Kerry'], ['old', year - 4, 'Lanzarote with the girls']] as const) {
+        expect(await aoife.send('leave.request', { id, personId: 'aoife', type: 'annual', start: `${y}-02-09`, end: `${y}-02-13`, note })).toMatchObject({ status: 'applied' })
+        expect(await colly.send('leave.decide', { id, approved: true, reason: 'Covered by Cian' })).toMatchObject({ status: 'applied' })
+      }
+      await colly.send('person.archive', { id: 'aoife', archived: true })
+      expect(await colly.send('person.erase', { id: 'aoife' })).toMatchObject({ status: 'applied' })
+
+      expect((await db.query(`SELECT id, start_day::text AS start, status, note, reason FROM leave_requests`)).rows).toEqual([
+        { id: 'now', start: `${year}-02-09`, status: 'approved', note: '', reason: '' },
+      ])
+      expect((await db.query(`SELECT p.name, e.name_kept_until::text AS until FROM people p JOIN erasures e ON e.person_id = p.id`)).rows).toEqual([
+        { name: 'Aoife Byrne', until: `${year + 4}-01-01` },
+      ])
+      const copies = (await db.query<{ id: string; op: string; data: string | null }>(`SELECT entity_id AS id, op, data::text AS data FROM changes WHERE entity = 'leaveRequest'`)).rows
+      expect([...new Set(copies.filter((c) => c.id === 'now').map((c) => c.op))]).toEqual(['put'])
+      expect([...new Set(copies.filter((c) => c.id === 'old').map((c) => c.op))]).toEqual(['delete'])
+      for (const t of ['Kerry', 'Lanzarote', 'Covered by']) expect(JSON.stringify(copies), t).not.toContain(t)
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('takes what an erasure kept on its day once, with two copies of the server looking at the same moment (ADR 0027)', async () => {
+    // Proves: each run looks again under the lock every change takes, so two servers on one database, each looking twice,
+    // delete two years ago's leave on the day its three years are up once, in one history entry, and leave this year's.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db })
+    const other = postgresDb(url!)
+    try {
+      const m = (name: Mutation['name'], args: object): Mutation => ({ id: newId(), name, args: args as never, createdAt: new Date().toISOString() })
+      const person = (id: string, name: string) =>
+        m('person.upsert', { id, name, kind: 'staff', email: null, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: id === 'colly' })
+      const year = Number(irishToday().slice(0, 4))
+      const mutations = [person('colly', 'Colly Hewson'), person('aoife', 'Aoife Byrne')]
+      for (const [id, y] of [['then', year - 2], ['now', year]] as const)
+        mutations.push(
+          m('leave.request', { id, personId: 'aoife', type: 'annual', start: `${y}-02-09`, end: `${y}-02-13`, note: 'Family wedding in Kerry' }),
+          m('leave.decide', { id, approved: true, reason: '', by: 'colly' })
+        )
+      mutations.push(m('person.archive', { id: 'aoife', archived: true }), m('person.erase', { id: 'aoife' }))
+      const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations } })
+      expect(res.json().results.map((r: { status: string }) => r.status)).toEqual(mutations.map(() => 'applied'))
+
+      const day = `${year + 2}-01-01`
+      expect((await Promise.all([eraseWhatIsDue(db, day), eraseWhatIsDue(other, day), eraseWhatIsDue(db, day), eraseWhatIsDue(other, day)])).sort()).toEqual([0, 0, 0, 1])
+      expect((await db.query(`SELECT id FROM leave_requests`)).rows).toEqual([{ id: 'now' }])
+      expect((await db.query(`SELECT count(*)::int AS n FROM mutations WHERE name = $1`, [ERASED_WHEN_DUE_ACTION])).rows).toEqual([{ n: 1 }])
+      const sent = await db.query(`SELECT c.entity_id AS id, c.op FROM changes c JOIN mutations m ON m.id = c.mutation_id WHERE m.name = $1 AND c.entity = 'leaveRequest'`, [
+        ERASED_WHEN_DUE_ACTION,
+      ])
+      expect(sent.rows).toEqual([{ id: 'then', op: 'delete' }])
+    } finally {
+      await app.close()
+      await other.close()
       await db.close()
     }
   })

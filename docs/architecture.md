@@ -541,10 +541,14 @@ Crewbox.
   unsettled, and the app takes their details from everywhere they live:
   their record, every earlier copy in the change feed, the history, the
   export, each device's copy, their link, feed and sign-in account. Their
-  name and timesheets stay for six years if they were paid, for Revenue,
-  and bookings stay as records of work. Backups can't be edited, so old
-  copies age out on their own schedule (a year and a month at most); a
-  restore applies the list of erasures again, so nobody comes back.
+  name and timesheets stay for six years if they were paid, for Revenue;
+  a member of staff's leave records stay for three years, without their
+  notes, as the Organisation of Working Time Act asks, and their name
+  with them; and bookings stay as records of work. The server deletes
+  each kept record, and the name, by itself on the day its time is up.
+  Backups can't be edited, so old copies age out on their own schedule
+  (a year and a month at most); a restore applies the list of erasures
+  again, so nobody comes back.
 - Data stays in the EU. A processing record and retention rules are written
   before crew data goes in.
 

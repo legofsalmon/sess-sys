@@ -21,6 +21,7 @@ import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
+import { DueErasures } from './erasure/due.ts'
 import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
@@ -79,6 +80,8 @@ declare module 'fastify' {
     calendar: CalendarSync | undefined
     /** The list of erasures kept beside the backups (ADR 0027), when there is somewhere to keep them. */
     erasures: ErasureList | undefined
+    /** What erasures kept, taken on the day the law stops asking for it (ADR 0027); the caller starts it. */
+    dueErasures: DueErasures
   }
 }
 
@@ -150,6 +153,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     calendarSync?.kick()
     void erasures?.keep()
   }
+  app.decorate('dueErasures', new DueErasures(db, { changed, log: app.log, report: (err) => reportError(err, { area: 'erasure' }) }))
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
   // code names it, never the address used, which could hold a private link.
@@ -349,6 +353,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.addHook('onClose', async () => {
     backups.stop()
+    app.dueErasures.stop()
     calendarSync?.stop()
     for (const ws of sockets) ws.close()
   })

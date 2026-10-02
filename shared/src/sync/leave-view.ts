@@ -1,5 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { HOLDING } from '../crew.ts'
+import { leaveRecordKept } from '../erasure.ts'
 import {
   allowanceId,
   canApproveLeave,
@@ -64,7 +65,15 @@ export interface LeaveView {
 
 type Tables = { [E in keyof LeaveEntities]: Record<string, LeaveEntities[E]> }
 
-export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number, crew: CrewView, today: string): LeaveView {
+export function leaveView(
+  entities: Partial<Tables>,
+  outbox: readonly (Mutation & { appliedSeq?: number })[],
+  cursor: number,
+  crew: CrewView,
+  today: string,
+  /** People erased on request, an erasure still to send included (ADR 0027). */
+  erased: Readonly<Record<string, { pending: boolean; nameKeptUntil: string | null }>> = {}
+): LeaveView {
   const people = new Map(crew.people.map((p) => [p.id, p]))
   const requests = new Map<string, LeaveRequestView>()
   // Snapshots saved before leave existed have no tables for it.
@@ -138,6 +147,21 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
       }
     }
   }
+
+  // Someone erased (ADR 0027): their leave as the server leaves it, kept under the Working Time Act without what anyone
+  // wrote in it. An erasure still to send also drops what the server will delete: records whose three years are up, and
+  // all of them when the name goes, as a record has to say whose it is.
+  const erasing = <R extends LeaveRequest | LieuEntry | LeaveAllowance>(records: Map<string, R>, clear: Partial<R>) => {
+    for (const r of records.values()) {
+      const e = erased[r.personId]
+      if (!e) continue
+      if (e.pending && (e.nameKeptUntil === null || !leaveRecordKept(r, today))) records.delete(r.id)
+      else records.set(r.id, { ...r, ...clear })
+    }
+  }
+  erasing(requests, { note: '', reason: '' })
+  erasing(entries, { note: '', reason: '' })
+  erasing(allowances, { note: '' })
 
   const allRequests = [...requests.values()].sort((a, b) => a.start.localeCompare(b.start) || a.requestedAt.localeCompare(b.requestedAt) || a.id.localeCompare(b.id))
   const allEntries = [...entries.values()].sort((a, b) => a.day.localeCompare(b.day) || a.loggedAt.localeCompare(b.loggedAt) || a.id.localeCompare(b.id))
