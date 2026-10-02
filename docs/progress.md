@@ -61,9 +61,14 @@ waiting on someone.
   offer made with no signal showing nothing on its call line; Enter in
   the picker's search sending the offer; a reply-by after the job being
   accepted; and staff being named a rate in messages.
+- Checking the four together found one more. Moving the focus to a new
+  screen's heading happens a frame after the move, and could take it
+  from someone already typing in that screen's search, so their Enter
+  went nowhere. A field someone is typing in now keeps the focus, and a
+  test holds that frame back to prove it.
 - Checked with all four streams together: the typecheck; the shared
   tests (110); the server tests (313 on PGlite, and the real-Postgres
-  file); the web build; the full browser suite (62), with new specs for
+  file); the web build; the full browser suite (63), with new specs for
   the layout, scanning, accessibility and a deploy while the app is
   open; and screenshots of every area at phone and laptop widths, light
   and dark.
