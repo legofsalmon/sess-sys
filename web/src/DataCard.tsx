@@ -32,7 +32,7 @@ export function DataCard({ view }: { view: View }) {
   // Again when the calendar above is connected or disconnected, or another phone puts in made-up data or starts fresh.
   useEffect(() => void refresh(), [view.calendar.link?.state, view.madeUp, view.cursor === 0])
 
-  const act = async (which: 'made-up' | 'fresh') => {
+  const send = async (which: 'made-up' | 'fresh') => {
     setBusy(which)
     setNote(undefined)
     try {
@@ -83,7 +83,7 @@ export function DataCard({ view }: { view: View }) {
             Disconnect Google Calendar first, above: the made-up jobs would go on it.
           </p>
         )}
-        <button type="button" className="primary" onClick={() => act('made-up')} disabled={!!busy || status.calendarConnected}>
+        <button type="button" className="primary" onClick={() => send('made-up')} disabled={!!busy || status.calendarConnected}>
           {busy === 'made-up' ? 'Putting it in…' : 'Put in made-up data'}
         </button>
         {said}
@@ -139,7 +139,7 @@ export function DataCard({ view }: { view: View }) {
                 Type “{START_FRESH_WORDS}” to confirm
                 <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} />
               </label>
-              <button type="button" className="danger" onClick={() => act('fresh')} disabled={!ready || !!busy}>
+              <button type="button" className="danger" onClick={() => send('fresh')} disabled={!ready || !!busy}>
                 {busy === 'fresh' ? 'Deleting everything…' : 'Delete everything'}
               </button>
             </>

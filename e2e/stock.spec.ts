@@ -30,6 +30,7 @@ const part = (page: Page, heading: string) => page.locator('form').filter({ has:
 
 async function newProduct(page: Page, name: string, how: 'numbered' | 'counted' | 'case') {
   await page.goto('/#stock')
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
   if (how === 'counted') await form.getByRole('radio', { name: /^Counted/ }).check()
@@ -106,7 +107,7 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
 
   // A speaker goes in the rack, and eight cables are counted in it.
   const inIt = page.getByRole('region', { name: 'In it' })
-  await expect(inIt).toContainText('Nothing yet.')
+  await expect(inIt).toContainText('Nothing here yet.')
   const put = part(page, 'Put an item in')
   await put.getByLabel('Its number').fill(sh(first))
   await put.getByRole('button', { name: `Put it in ${rackNumber}` }).click()
@@ -167,7 +168,10 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(page.locator('.facts')).toContainText('WhereNot placed yet')
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  await page.goto('/#stock')
+  await ready(page)
+  // The catalogue shows its first five, with the rest behind "Show all" (audit finding 16).
+  const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
+  if (await all.count()) await all.click()
   await expect(page.locator('.job-row', { hasText: speaker })).toContainText('2 items · 4 not labelled yet')
   await expect(page.locator('.job-row', { hasText: cable })).toContainText('8 counted')
   await page.screenshot(shot('stock-list'))

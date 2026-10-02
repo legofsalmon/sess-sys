@@ -39,6 +39,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // The product, with three items.
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(speaker)
   await form.getByRole('button', { name: 'Add product' }).click()
@@ -139,6 +140,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await newJob.getByLabel('Phase 1 to').fill(fromToday(3))
   await newJob.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { level: 1, name: job })).toBeVisible()
+  await page.getByRole('button', { name: 'Add kit' }).click()
   const kit = page.getByRole('form', { name: 'Add kit' })
   await kit.getByLabel('Product').fill(speaker)
   await kit.getByLabel('How many').fill('3')

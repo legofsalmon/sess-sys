@@ -3,7 +3,6 @@ import {
   crewFill,
   daysLabel,
   eachDay,
-  irishToday,
   mapLink,
   movedCallSpan,
   newId,
@@ -20,6 +19,7 @@ import {
   type CommandInput,
   type JobView,
   type PersonView,
+  type PhaseOnCalendar,
   type PhaseView,
   type ProjectStatus,
   type View,
@@ -27,8 +27,12 @@ import {
 import { useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
+import { Empty } from '../Empty.tsx'
+import { Fold } from '../Fold.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { Choices, clientNamed, StatusPill, Top, venueNamed } from './common.tsx'
+import { useToday } from '../view.ts'
+import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
 
 /**
@@ -38,21 +42,22 @@ import { KitCard, kitSummary } from './Kit.tsx'
  * and venue.
  */
 
-export function JobScreen({ view, id }: { view: View; id: string }) {
+export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const job = view.jobs.jobs.find((j) => j.id === id)
   // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
   const [share, setShare] = useState<Share | undefined>()
+  const back = (
+    <a className="back" href="#jobs">
+      ‹ All jobs
+    </a>
+  )
   if (!job)
     return (
-      <div className="app crew jobs">
-        <Top view={view} />
-        <a className="back" href="#jobs">
-          ‹ All jobs
-        </a>
+      <Page view={view} className="crew jobs" back={back} bare={bare}>
         <section className="card">
           <p className="empty">This job isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
-      </div>
+      </Page>
     )
   const onShare = (call: CallView) => (person: PersonView) => setShare({ kind: 'offer', person, call })
   const stopped = STOPPED.includes(job.status)
@@ -63,21 +68,19 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
   const inPhase = share?.kind === 'offer' && job.phases.some((p) => p.id === share.call.phaseId)
 
   return (
-    <div className="app crew jobs">
-      <Top view={view} />
-      <a className="back" href="#jobs">
-        ‹ All jobs
-      </a>
+    <Page view={view} className="crew jobs" back={back} bare={bare}>
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
 
       <section className="card" aria-label="Phases">
         <h2>Phases</h2>
-        {job.phases.length === 0 && <p className="empty">No phases yet, so no dates. Add the first below.</p>}
+        {job.phases.length === 0 && <Empty>Add the first phase below, so the job has dates.</Empty>}
         {job.phases.map((p) => (
           <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} />
         ))}
-        <AddPhase job={job} />
+        <Fold label="Add phase">
+          <AddPhase job={job} />
+        </Fold>
       </section>
 
       {inPhase && offering}
@@ -90,9 +93,17 @@ export function JobScreen({ view, id }: { view: View; id: string }) {
         {job.otherCalls.map((c) => (
           <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} onTell={setShare} inJob />
         ))}
-        {stopped ? <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p> : <AskForCrew job={job} />}
+        {stopped ? (
+          <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p>
+        ) : !job.span ? (
+          <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
+        ) : (
+          <Fold label="Ask for crew">
+            <AskForCrew job={job} />
+          </Fold>
+        )}
       </section>
-    </div>
+    </Page>
   )
 }
 
@@ -104,7 +115,7 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
     <section className="card">
       <header className="title">
         <h1>{job.name}</h1>
-        <StatusPill status={job.status} pending={job.pending} />
+        <JobStatusPill status={job.status} pending={job.pending} />
       </header>
       <dl className="facts">
         <div>
@@ -257,9 +268,7 @@ function titlesLine(job: string, p: PhaseView, from = '') {
 }
 
 /** How a phase stands with Google Calendar (ADR 0008), in a line. */
-function CalendarLine({ job, phase, view }: { job: JobView; phase: PhaseView; view: View }) {
-  const today = irishToday()
-  const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
+function CalendarLine({ job, phase, on, today }: { job: JobView; phase: PhaseView; on: PhaseOnCalendar; today: string }) {
   switch (on.state) {
     case 'theirs':
       return <p className="cal">Brought in from {on.calendar}, which keeps its days, so the app doesn't add them to the jobs calendar.</p>
@@ -316,32 +325,42 @@ function Phase({
   onTell: (share: Share | undefined) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const today = useToday()
   const outside = phase.calls.filter((c) => c.status === 'open' && (c.start < phase.start || c.end > phase.end))
   const ownVenue = phase.venueId && phase.venueId !== job.venueId ? phase.venue : undefined
   const contact = phase.contactId ? view.crew.people.find((p) => p.id === phase.contactId) : undefined
+  const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
+  // A calendar line to act on stays in view; the rest of the phase's details wait behind a tap (audit finding 16).
+  const calendarWarns = on.state === 'paused' || on.state === 'failed'
   return (
     <article className="phase" aria-label={phase.name}>
       <header>
         <div>
           <b>{phase.name}</b> <span className="muted">{spanLabel(phase)}</span>
           {ownVenue && <p>At {venueLabel(ownVenue)}</p>}
-          {phase.notes && <p>{phase.notes}</p>}
         </div>
         {/* A phase still waiting to sync can be changed too: the change waits behind it, in order. */}
         <div className="actions">
-          {phase.pending && <span className="pill pending">Waiting to sync</span>}
+          <Pending pending={phase.pending} />
           <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
             Change
           </button>
         </div>
       </header>
-      <CalendarLine job={job} phase={phase} view={view} />
-      <div className="pick-link">
-        <a className="button" href={`#jobs/${job.id}/sheet/${phase.id}`}>
-          Call sheet
-        </a>
-        <span>{contact ? `Contact on the day: ${contact.name}` : 'No contact on the day yet'}</span>
-      </div>
+      {calendarWarns && <CalendarLine job={job} phase={phase} on={on} today={today} />}
+      <details className="phase-details">
+        <summary>{phase.notes ? 'Running order, call sheet, calendar' : 'Call sheet and calendar'}</summary>
+        <div>
+          {phase.notes && <p className="notes">{phase.notes}</p>}
+          {!calendarWarns && <CalendarLine job={job} phase={phase} on={on} today={today} />}
+          <div className="pick-link">
+            <a className="button" href={`#jobs/${job.id}/sheet/${phase.id}`}>
+              Call sheet
+            </a>
+            <span>{contact ? `Contact on the day: ${contact.name}` : 'No contact on the day yet'}</span>
+          </div>
+        </div>
+      </details>
       {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
       {outside.map((c) => (
         <p className="warn-line" key={c.id}>
@@ -349,7 +368,16 @@ function Phase({
         </p>
       ))}
       {phase.calls.map((c) => (
-        <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} onTell={onTell} inJob />
+        <CallCard
+          key={c.id}
+          call={c}
+          crew={view.crew}
+          calendar={view.calendar}
+          onShare={onShare(c)}
+          onTell={onTell}
+          inJob
+          phaseDays={c.start === phase.start && c.end === phase.end}
+        />
       ))}
     </article>
   )
@@ -489,7 +517,8 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
 
 function AddPhase({ job }: { job: JobView }) {
   const last = job.phases.at(-1)
-  const start = last?.end ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
+  const today = useToday()
+  const start = last?.end ?? today
   const [f, setF] = useState({ name: '', start, end: start })
   const { run, error } = useAct()
   const submit = (e: FormEvent) => {

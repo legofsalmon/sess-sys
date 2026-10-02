@@ -29,6 +29,7 @@ test('a change the server turns down is counted in the top bar and listed from i
       json: { results: mutations.map((m) => ({ id: m.id, status: 'rejected', reason: { code: 'conflict', message: 'Pretend the server said no.' } })) },
     })
   })
+  await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
   await person.getByLabel('Name').fill(`Nora Walsh ${id}`)
   await person.getByRole('button', { name: 'Add person' }).click()
@@ -48,6 +49,7 @@ test('a change the server turns down is counted in the top bar and listed from i
 
   // A refusal from a second area counts with the first: a product added on the Stock tab.
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Stock' }).click()
+  await page.getByRole('button', { name: 'Add product' }).click()
   const product = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await product.getByLabel('Name').fill(`Y10P ${id}`)
   await product.getByRole('button', { name: 'Add product' }).click()
@@ -78,6 +80,7 @@ test('a price is read as meant, nonsense is refused beside the field, and cancel
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
   // 500 crew is more than a call can ask for: the shared schema says so in plain words, in the form, with everything typed still there to put right.
+  await page.getByRole('button', { name: 'Ask for crew' }).click()
   const job = page.locator('form').filter({ has: page.getByRole('button', { name: 'Ask for crew' }) })
   await job.getByLabel('Project').fill(`Galway Arts ${id}`)
   await job.getByLabel('Role').fill('Rigger')
@@ -98,7 +101,9 @@ test('a price is read as meant, nonsense is refused beside the field, and cancel
   // "€1,250" is €1,250, not €1.25 (audit finding 15).
   await job.getByLabel('Day rate €').fill('€1,250')
   await job.getByRole('button', { name: 'Ask for crew' }).click()
-  const call = page.getByRole('article').filter({ hasText: `Galway Arts ${id}` })
+  // The call is one line under its job (audit finding 16); opened, it says its rate.
+  const call = page.locator('.call-group', { hasText: `Galway Arts ${id}` }).getByRole('article', { name: '1 × Rigger' })
+  await call.getByRole('button', { name: '1 × Rigger' }).click()
   await expect(call).toContainText('€1250')
   await expect(job.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('status')).toHaveText('Up to date')

@@ -1,17 +1,10 @@
 import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueView, type View } from '@sh/shared'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNotDone } from '../problems.tsx'
+import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 
-/** What the Jobs screens share, and Stock and Crew too: the device's view, the header, and picking or adding a client or venue by name. */
-
-export const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
-
-export function useView(): View {
-  const [view, setView] = useState(() => client.view())
-  useEffect(() => client.subscribe(setView), [])
-  return view
-}
+/** What the Jobs screens share, and Stock and Crew too: the header, a record's page, and picking or adding a client or venue by name. */
 
 export function useHash(): string {
   const [hash, setHash] = useState(location.hash)
@@ -62,7 +55,61 @@ export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
   return view.madeUp ? <span className="made-up"> · made-up data</span> : null
 }
 
-export const STATUS_TONE: Record<ProjectStatus, string> = {
+/**
+ * A record's page (a job, a product, an item, a place): on its own with the
+ * top bar and a way back, or beside its list on a laptop (audit finding
+ * 25), where the list is the way back, so just its cards.
+ */
+export function Page({ view, title, className, back, bare, children }: { view: View; title?: string; className: string; back: ReactNode; bare?: boolean; children: ReactNode }) {
+  if (bare) return <>{children}</>
+  return (
+    <div className={`app ${className}`}>
+      <Top view={view} title={title} />
+      {back}
+      {children}
+    </div>
+  )
+}
+
+/** On a laptop (audit finding 25): the list down the left, kept in view, with the open record beside it; `head` goes over both. */
+export function Beside({
+  view,
+  title,
+  className,
+  head,
+  list,
+  open,
+  children,
+}: {
+  view: View
+  title?: string
+  className: string
+  head?: ReactNode
+  list: ReactNode
+  /** Which record is open, if any: another picked from the list starts at its top. */
+  open?: string
+  children: ReactNode
+}) {
+  // The window may be far down the last record, which would leave the next one's title out of sight; the list keeps its own place.
+  const was = useRef(open)
+  useEffect(() => {
+    if (was.current === open) return
+    was.current = open
+    scrollTo(0, 0)
+  }, [open])
+  return (
+    <div className={`app ${className} beside`}>
+      <Top view={view} title={title} />
+      {head}
+      <div className="columns">
+        <div className="column list">{list}</div>
+        <div className="column open">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+export const STATUS_TONE: Record<ProjectStatus, PillTone> = {
   enquiry: 'pending',
   quoted: 'pending',
   confirmed: 'confirmed',
@@ -70,8 +117,13 @@ export const STATUS_TONE: Record<ProjectStatus, string> = {
   lost: 'cancelled',
 }
 
-export function StatusPill({ status, pending }: { status: ProjectStatus; pending: boolean }) {
-  return <span className={`pill ${pending ? 'pending' : STATUS_TONE[status]}`}>{pending ? 'Waiting to sync' : STATUS_LABELS[status]}</span>
+/** A job's status as a pill, "Waiting to sync" while this device's change is on its way. */
+export function JobStatusPill({ status, pending }: { status: ProjectStatus; pending: boolean }) {
+  return (
+    <StatusPill tone={STATUS_TONE[status]} pending={pending}>
+      {STATUS_LABELS[status]}
+    </StatusPill>
+  )
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()

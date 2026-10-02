@@ -14,8 +14,10 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
+import { Empty } from '../Empty.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { numberLabel, Pending } from './common.tsx'
+import { numberLabel } from './common.tsx'
 
 /**
  * Faults and missing kit (ADR 0018): reporting damage or kit that's
@@ -142,7 +144,7 @@ export function FaultsCard({ faults, children, title = 'Faults' }: { faults: Fau
   return (
     <section className="card faults" aria-label={title}>
       <h2>{title}</h2>
-      {faults.length === 0 && <p className="empty">None reported.</p>}
+      {faults.length === 0 && <Empty />}
       {open.length > 0 && (
         <ul className="fault-list">
           {open.map((f) => (

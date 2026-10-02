@@ -1,22 +1,17 @@
-import { newId, overlaps, type BookingView, type Product, type View } from '@sh/shared'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { newId, overlaps, type BookingView, type Product } from '@sh/shared'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from './act.tsx'
+import { Empty } from './Empty.tsx'
 import { useNotDone } from './problems.tsx'
+import { StatusPill } from './StatusPill.tsx'
 import { client, syncSoon, transport } from './sync.ts'
+import { useToday, useView } from './view.ts'
 
 /**
  * Phase 0 demo: the smallest screen that shows the sync promise working on
  * a real phone. Book speakers, switch the signal off, book on another
  * device, switch it back on, and watch the server decide.
  */
-
-const today = new Date().toISOString().slice(0, 10)
-
-function useView(): View {
-  const [view, setView] = useState(() => client.view())
-  useEffect(() => client.subscribe(setView), [])
-  return view
-}
 
 /** The most booked on any one day in the range, counting pending requests too. */
 function freeFor(p: Product, bookings: BookingView[], start: string, end: string) {
@@ -33,6 +28,7 @@ function freeFor(p: Product, bookings: BookingView[], start: string, end: string
 
 export function App() {
   const view = useView()
+  const today = useToday()
   const [noSignal, setNoSignal] = useState(false)
   const [range, setRange] = useState({ start: today, end: today })
 
@@ -42,7 +38,6 @@ export function App() {
     if (noSignal) syncSoon()
   }
   const { run, error } = useAct()
-  const act = (fn: () => Promise<unknown>) => void run(fn)
   const notDone = useNotDone(view)
 
   const products = new Map(view.products.map((p) => [p.id, p]))
@@ -112,7 +107,7 @@ export function App() {
             To <input type="date" id="range-end" value={range.end} min={range.start} onChange={(e) => setRange({ ...range, end: e.target.value })} />
           </label>
         </div>
-        {view.products.length === 0 && <p className="empty">No stock yet. Add a product below to start.</p>}
+        {view.products.length === 0 && <Empty>Add a product below to start.</Empty>}
         <ul className="stock">
           {view.products.map((p) => {
             const free = freeFor(p, view.bookings, range.start, range.end)
@@ -126,17 +121,17 @@ export function App() {
             )
           })}
         </ul>
-        <AddProduct onAdd={(name, quantity) => act(() => client.mutate('product.upsert', { id: newId(), name, quantity }))} />
+        <AddProduct onAdd={(name, quantity) => void run(() => client.mutate('product.upsert', { id: newId(), name, quantity }))} />
       </section>
 
       <section className="card">
         <h2>Book kit</h2>
-        <BookForm products={view.products} range={range} onBook={(b) => act(() => client.mutate('booking.create', { id: newId(), ...b }))} />
+        <BookForm products={view.products} range={range} onBook={(b) => void run(() => client.mutate('booking.create', { id: newId(), ...b }))} />
       </section>
 
       <section className="card">
         <h2>Bookings</h2>
-        {view.bookings.length === 0 && <p className="empty">Nothing booked yet.</p>}
+        {view.bookings.length === 0 && <Empty />}
         {view.bookings.map((b) => (
           <div className="row" key={b.id}>
             <div>
@@ -146,18 +141,20 @@ export function App() {
               </p>
             </div>
             <div className="actions">
-              <span className={`pill ${b.pending ? 'pending' : b.status}`}>{b.pending ? 'Waiting to sync' : b.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}</span>
+              <StatusPill tone={b.status === 'confirmed' ? 'confirmed' : 'cancelled'} pending={b.pending}>
+                {b.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+              </StatusPill>
               {b.status === 'confirmed' && (
                 <>
                   <button
                     type="button"
                     onClick={() =>
-                      act(() => client.mutate('scan.record', { id: newId(), productId: b.productId, bookingId: b.id, direction: 'out', at: new Date().toISOString() }))
+                      void run(() => client.mutate('scan.record', { id: newId(), productId: b.productId, bookingId: b.id, direction: 'out', at: new Date().toISOString() }))
                     }
                   >
                     Scan one out
                   </button>
-                  <button type="button" onClick={() => act(() => client.mutate('booking.cancel', { id: b.id }))}>
+                  <button type="button" onClick={() => void run(() => client.mutate('booking.cancel', { id: b.id }))}>
                     Cancel
                   </button>
                 </>

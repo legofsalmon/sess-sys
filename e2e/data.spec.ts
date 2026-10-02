@@ -32,7 +32,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   await office.screenshot(shot('data-jobs'))
   await office.goto('/#crew')
   await expect(office.locator('.brand small')).toHaveText('Crew · made-up data')
-  await expect(office.getByRole('button', { name: 'Fionn Gallagher' })).toBeVisible()
+  await expect(office.getByRole('button', { name: /^Fionn Gallagher/ })).toBeVisible()
   await office.goto('/#stock')
   await expect(office.locator('.brand small')).toHaveText('Stock · made-up data')
   await expect(office.getByText('d&b Y10P').first()).toBeVisible()

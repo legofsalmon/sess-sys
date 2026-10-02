@@ -14,6 +14,7 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 
 /**
@@ -197,10 +198,6 @@ export function WhereChoices({ w }: { w: WarehouseView }) {
         ))}
     </datalist>
   )
-}
-
-export function Pending({ pending }: { pending: boolean }) {
-  return pending ? <span className="pill pending">Waiting to sync</span> : null
 }
 
 /** Products to pick from as you type. */

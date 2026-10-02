@@ -79,6 +79,7 @@ async function ready(page: Page, hash = '#stock') {
 
 async function newProduct(page: Page, name: string, counted?: number) {
   await page.goto('/#stock')
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
   if (counted) await form.getByRole('radio', { name: /^Counted/ }).check()
@@ -145,6 +146,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await form.getByLabel('Phase 1 to').fill(fromToday(3))
   await form.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { level: 1, name: job })).toBeVisible()
+  await page.getByRole('button', { name: 'Add kit' }).click()
   for (const [product, qty] of [
     [speaker, 2],
     [cable, 12],

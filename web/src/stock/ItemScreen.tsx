@@ -11,8 +11,10 @@ import {
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
-import { Top } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { Page } from '../jobs/common.tsx'
 import { when } from '../format.ts'
+import { Pending, StatusPill } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText, InspectionsCard } from './Inspections.tsx'
@@ -26,7 +28,6 @@ import {
   loopIn,
   mistakeLabel,
   numberLabel,
-  Pending,
   ScanResult,
   useNewPlace,
   whereLabel,
@@ -42,27 +43,39 @@ import {
  * each fault is fixed, found or written off here too (ADR 0018), and its
  * electrical tests and thorough examinations are recorded (ADR 0020).
  */
-export function ItemScreen({ view, id }: { view: View; id: string }) {
+export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
   const a = w.assets.get(id)
   if (!a)
     return (
-      <div className="app crew jobs warehouse">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock">
-          ‹ All stock
-        </a>
+      <Page
+        view={view}
+        title="Stock"
+        className="warehouse"
+        back={
+          <a className="back" href="#stock">
+            ‹ All stock
+          </a>
+        }
+        bare={bare}
+      >
         <section className="card">
           <p className="empty">This item isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
-      </div>
+      </Page>
     )
   return (
-    <div className="app crew jobs warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href={a.model && !a.model.mistake ? `#stock/product/${a.model.id}` : '#stock'}>
-        ‹ {a.model && !a.model.mistake ? a.model.name : 'All stock'}
-      </a>
+    <Page
+      view={view}
+      title="Stock"
+      className="warehouse"
+      back={
+        <a className="back" href={a.model && !a.model.mistake ? `#stock/product/${a.model.id}` : '#stock'}>
+          ‹ {a.model && !a.model.mistake ? a.model.name : 'All stock'}
+        </a>
+      }
+      bare={bare}
+    >
       <Summary a={a} w={w} view={view} />
       <FaultsCard faults={view.faults.ofAsset(a.id)}>
         {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
@@ -70,7 +83,7 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
       <InspectionsCard view={view} a={a} />
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       <WhereChoices w={w} />
-    </div>
+    </Page>
   )
 }
 
@@ -91,7 +104,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
     <section className="card">
       <header className="title">
         <h1 className="number">{numberLabel(a)}</h1>
-        {a.pending ? <Pending pending /> : retired && <span className="pill cancelled">Retired</span>}
+        {a.pending ? <Pending pending /> : retired && <StatusPill tone="cancelled">Retired</StatusPill>}
       </header>
       <dl className="facts">
         <div>
@@ -427,7 +440,7 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
   return (
     <section className="card" aria-label="In it">
       <h2>In it</h2>
-      {empty && <p className="empty">Nothing yet.</p>}
+      {empty && <Empty />}
       {c.items.length > 0 && (
         <ul className="item-list">
           {c.items.map((i) => (

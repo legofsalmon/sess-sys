@@ -16,6 +16,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Refusal, useAct } from '../act.tsx'
 import { linkFor, SharePanel } from '../crew/CrewScreen.tsx'
+import { Empty } from '../Empty.tsx'
+import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Top } from './common.tsx'
 
@@ -201,7 +203,7 @@ function Contact({ view, phase, sheet }: { view: View; phase: PhaseView; sheet: 
   )
 }
 
-const STATUS_PILL = { booked: ['confirmed', 'Booked'], 'to confirm': ['pending', 'To confirm'], offered: ['offered', 'Offered'] } as const
+const STATUS_PILL: Record<'booked' | 'to confirm' | 'offered', [PillTone, string]> = { booked: ['confirmed', 'Booked'], 'to confirm': ['pending', 'To confirm'], offered: ['cancelled', 'Offered'] }
 
 function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: readonly CallView[]; onSend?: (call: CallView, personId: string) => void; print?: boolean }) {
   return (
@@ -236,7 +238,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
 
       <section className={print ? '' : 'card'} aria-label="Crew">
         <h2>Crew</h2>
-        {sheet.calls.length === 0 && <p className="empty">No crew asked for yet.</p>}
+        {sheet.calls.length === 0 && <Empty>Crew are asked for on the job's page.</Empty>}
         {sheet.calls.map((c) => (
           <article key={c.id} className="sheet-call">
             <header>
@@ -245,7 +247,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
                 {c.role}
               </b>
               {c.days && <span className="muted"> {c.days}</span>}
-              {!!c.toFind && (print ? <span className="muted"> · {c.toFind} to find</span> : <span className="pill pending">{c.toFind} to find</span>)}
+              {!!c.toFind && (print ? <span className="muted"> · {c.toFind} to find</span> : <StatusPill tone="pending">{c.toFind} to find</StatusPill>)}
             </header>
             {c.details && <p className="lines muted">{c.details}</p>}
             <ul>
@@ -259,7 +261,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
                       {p.days && <span className="muted"> {p.days}</span>}
                     </span>
                     {p.phone && (print ? <span> · {p.phone}</span> : <a href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a>)}
-                    {print ? p.status === 'to confirm' && <span className="muted"> · to confirm</span> : <span className={`pill ${STATUS_PILL[p.status][0]}`}>{STATUS_PILL[p.status][1]}</span>}
+                    {print ? p.status === 'to confirm' && <span className="muted"> · to confirm</span> : <StatusPill tone={STATUS_PILL[p.status][0]}>{STATUS_PILL[p.status][1]}</StatusPill>}
                     {!print && onSend && call && p.status !== 'offered' && (
                       <button type="button" className="link" onClick={() => onSend(call, p.personId)} aria-label={`Send ${p.name} their call sheet`}>
                         Send

@@ -18,9 +18,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } 
 import { createPortal } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
+import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { atLabel, findWhere, Pending, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
+import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
@@ -201,7 +203,7 @@ export function LabelsCard({ labels }: { labels: LabelsView }) {
 export function LabelsScreen({ view }: { view: View }) {
   const runs = view.labels.runs
   return (
-    <div className="app crew jobs warehouse">
+    <div className="app warehouse">
       <Top view={view} title="Stock" />
       <a className="back" href="#stock">
         ‹ All stock
@@ -216,7 +218,7 @@ export function LabelsScreen({ view }: { view: View }) {
       </section>
       <section className="card" aria-label="Set aside">
         <h2>Set aside</h2>
-        {runs.length === 0 && <p className="empty">None yet.</p>}
+        {runs.length === 0 && <Empty />}
         <ul className="job-list">
           {runs.map((r) => (
             <li key={r.id}>
@@ -330,7 +332,7 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
   const r = view.labels.runs.find((x) => x.id === id)
   if (!r)
     return (
-      <div className="app crew jobs warehouse">
+      <div className="app warehouse">
         <Top view={view} title="Stock" />
         <a className="back" href="#stock/labels">
           ‹ Labels
@@ -341,7 +343,7 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
       </div>
     )
   return (
-    <div className="app crew jobs warehouse">
+    <div className="app warehouse">
       <Top view={view} title="Stock" />
       <a className="back" href="#stock/labels">
         ‹ Labels

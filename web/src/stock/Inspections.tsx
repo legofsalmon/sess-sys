@@ -11,9 +11,11 @@ import {
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
-import { today, Top } from '../jobs/common.tsx'
+import { Top } from '../jobs/common.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { mistakeLabel, numberLabel, Pending } from './common.tsx'
+import { useToday } from '../view.ts'
+import { mistakeLabel, numberLabel } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
@@ -62,11 +64,11 @@ function saveTester(by: string) {
 }
 
 /** When it was done: now for today, else noon that day. */
-const whenDone = (day: string) => (day === today() ? new Date().toISOString() : `${day}T12:00:00.000Z`)
+const whenDone = (day: string, today: string) => (day === today ? new Date().toISOString() : `${day}T12:00:00.000Z`)
 
 /** One test as a change; whoever asks for it runs it through act(). */
-const record = (a: { assetId: string; kind: InspectionKind; passed: boolean; day: string; by: string; note: string }) =>
-  client.mutate('inspection.record', { id: newId(), assetId: a.assetId, kind: a.kind, passed: a.passed, at: whenDone(a.day), by: a.by, note: a.note })
+const record = (a: { assetId: string; kind: InspectionKind; passed: boolean; day: string; today: string; by: string; note: string }) =>
+  client.mutate('inspection.record', { id: newId(), assetId: a.assetId, kind: a.kind, passed: a.passed, at: whenDone(a.day, a.today), by: a.by, note: a.note })
 
 /** An item's inspections: where it stands on each its product needs, the record, and recording one. */
 export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
@@ -139,15 +141,16 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
 function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]; onDone: () => void }) {
   const [kind, setKind] = useState<InspectionKind>(kinds[0]!)
   const [passed, setPassed] = useState(true)
-  const [day, setDay] = useState(today())
+  const today = useToday()
+  const [day, setDay] = useState(today)
   const [by, setBy] = useState(savedTester)
   const [note, setNote] = useState('')
   const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!day || day > today()) return refuse('When was it done? Today or a day before.')
+    if (!day || day > today) return refuse('When was it done? Today or a day before.')
     saveTester(by.trim())
-    void run(() => record({ assetId: a.id, kind, passed, day, by: by.trim(), note: note.trim() })).then((ok) => ok && onDone())
+    void run(() => record({ assetId: a.id, kind, passed, day, today, by: by.trim(), note: note.trim() })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit} aria-label={`Record a test of ${numberLabel(a)}`}>
@@ -174,7 +177,7 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
         </label>
       </fieldset>
       <label>
-        When <input type="date" value={day} max={today()} onChange={(e) => setDay(e.target.value)} />
+        When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} />
       </label>
       <label>
         By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who tested it" maxLength={200} />
@@ -255,7 +258,7 @@ interface Said {
   text: string
   at: number
   /** The item and record just made, with who tested it and when, so it can be marked failed instead. */
-  last?: { a: AssetView; kind: InspectionKind; by: string; day: string }
+  last?: { a: AssetView; kind: InspectionKind; by: string; day: string; today: string }
 }
 
 /** How long a pass is held with Undo before it's recorded: time to see the wrong label was read. */
@@ -267,6 +270,8 @@ interface Held {
   kind: InspectionKind
   by: string
   day: string
+  /** The day it was read on, which says whether `day` means now, however long the screen has been open. */
+  today: string
   /** When it's recorded, unless undone first. */
   until: number
 }
@@ -284,7 +289,8 @@ const itemName = (a: AssetView) => [numberLabel(a), a.model?.name].filter(Boolea
 export function TestingScreen({ view }: { view: View }) {
   const [kind, setKind] = useState<InspectionKind>('pat')
   const [by, setBy] = useState(savedTester)
-  const [day, setDay] = useState(today())
+  const today = useToday()
+  const [day, setDay] = useState(today)
   const [typed, setTyped] = useState('')
   const [camera, setCamera] = useState(false)
   const [said, setSaid] = useState<Said>()
@@ -313,13 +319,13 @@ export function TestingScreen({ view }: { view: View }) {
   const commit = async (h: Held) => {
     const name = itemName(h.a)
     try {
-      await act(() => record({ assetId: h.a.id, kind: h.kind, passed: true, day: h.day, by: h.by, note: '' }))
+      await act(() => record({ assetId: h.a.id, kind: h.kind, passed: true, day: h.day, today: h.today, by: h.by, note: '' }))
     } catch (err) {
       return say('warn', (err as Error).message)
     }
     setDone((d) => [{ a: h.a, passed: true, at: Date.now() }, ...d])
     const due = client.view().inspections.dueOf(h.a.id).find((d) => d.kind === h.kind)
-    const last = { a: h.a, kind: h.kind, by: h.by, day: h.day }
+    const last = { a: h.a, kind: h.kind, by: h.by, day: h.day, today: h.today }
     if (!due) return say('warn', `${name}: passed. Its product doesn't say how often it needs one, so it's never due; set it on the product's page.`, last)
     return say('ok', `${name}: passed, next due ${dateLabel(due.due!)}.`, last)
   }
@@ -366,7 +372,7 @@ export function TestingScreen({ view }: { view: View }) {
     if (heldRef.current?.a.id === a.id) return
     // Only one is ever held: a new read takes the last one as passed.
     const before = take()
-    hold({ a, kind, by: by.trim(), day, until: Date.now() + HOLD_MS })
+    hold({ a, kind, by: by.trim(), day, today, until: Date.now() + HOLD_MS })
     if (before) await commit(before)
   }
   const read = (code: string) => void onCode(code).catch((err: Error) => say('warn', err.message))
@@ -383,7 +389,7 @@ export function TestingScreen({ view }: { view: View }) {
   }
   /** A fail recorded for the last item read, by the tester and on the day it was read as, whether it was held or recorded as passed. */
   const failed = (last: NonNullable<Said['last']>) =>
-    void act(() => record({ assetId: last.a.id, kind: last.kind, passed: false, day: last.day, by: last.by, note: '' })).then(
+    void act(() => record({ assetId: last.a.id, kind: last.kind, passed: false, day: last.day, today: last.today, by: last.by, note: '' })).then(
       () => {
         setDone((d) => [{ a: last.a, passed: false, at: Date.now() }, ...d])
         say('warn', `${itemName(last.a)}: failed. It can't go out until it passes. Report what's wrong on its page.`)
@@ -398,7 +404,7 @@ export function TestingScreen({ view }: { view: View }) {
   const left = held ? Math.max(1, Math.ceil((held.until - now) / 1000)) : 0
 
   return (
-    <div className="app crew jobs warehouse pick">
+    <div className="app warehouse pick">
       <Top view={view} title="Stock" />
       <a className="back" href="#stock">
         ‹ All stock
@@ -439,7 +445,7 @@ export function TestingScreen({ view }: { view: View }) {
             By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
           </label>
           <label>
-            When <input type="date" value={day} max={today()} onChange={(e) => setDay(e.target.value || today())} />
+            When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
           </label>
         </div>
         <form className="scan-row" onSubmit={submit}>

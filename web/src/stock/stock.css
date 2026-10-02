@@ -148,6 +148,6 @@
 .warehouse .scan-result { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: center; }
 .warehouse .scan-result .added { margin: 0; }
 .warehouse .grid-form .scan-row { align-items: end; }
-.warehouse .zoom { display: grid; grid-template-columns: auto 1fr; gap: var(--space-8); align-items: center; width: 100%; max-width: 420px; justify-self: center; font-size: .85rem; color: var(--muted); }
+.warehouse .zoom { display: grid; grid-template-columns: auto 1fr; gap: var(--space-8); align-items: center; width: 100%; max-width: 420px; justify-self: center; font-size: var(--text-hint); color: var(--muted); }
 .warehouse .zoom input { width: 100%; min-height: 0; padding: 0; accent-color: var(--accent); }
-.warehouse .scanner .elsewhere input { justify-self: stretch; width: 100%; font-size: .85rem; color: var(--muted); }
+.warehouse .scanner .elsewhere input { justify-self: stretch; width: 100%; font-size: var(--text-hint); color: var(--muted); }

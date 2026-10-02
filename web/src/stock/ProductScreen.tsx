@@ -4,7 +4,6 @@ import {
   DEPARTMENTS,
   euroText,
   INSPECTION_MONTHS,
-  irishToday,
   MAX_MONTHS,
   MAX_QTY,
   newId,
@@ -26,16 +25,18 @@ import {
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
-import { StatusPill, Top } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { JobStatusPill, Page } from '../jobs/common.tsx'
 import { forLabel, kitState } from '../jobs/Kit.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday } from '../view.ts'
 import {
   amountLabel,
   atLabel,
   CountRow,
   findWhere,
   numberLabel,
-  Pending,
   TrackingChoice,
   useNewPlace,
   whereLabel,
@@ -56,17 +57,18 @@ import { dueText } from './Inspections.tsx'
  * marked as a mistake, which hides it and its items everywhere but the
  * history (audit finding 19).
  */
-export function ProductScreen({ view, id }: { view: View; id: string }) {
+export function ProductScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
   const m = w.models.find((x) => x.id === id)
   const mistake = w.mistakes.get(id)
+  const back = (
+    <a className="back" href="#stock">
+      ‹ All stock
+    </a>
+  )
   if (!m)
     return (
-      <div className="app crew jobs warehouse">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock">
-          ‹ All stock
-        </a>
+      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
         <section className="card">
           <p className="empty">
             {mistake
@@ -74,14 +76,10 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
               : "This product isn't on this device. It may still be on its way, or it was removed: check again once it says “Up to date”."}
           </p>
         </section>
-      </div>
+      </Page>
     )
   return (
-    <div className="app crew jobs warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
@@ -92,7 +90,7 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
         </FaultsCard>
       )}
       <WhereChoices w={w} />
-    </div>
+    </Page>
   )
 }
 
@@ -214,7 +212,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
 
 /** The jobs it's on from today on, soonest first, each with whether there's enough; the first few, then the rest on request. */
 function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
-  const today = irishToday()
+  const today = useToday()
   const row = (l: KitLineView) => {
     const state = kitState(l, today)
     return (
@@ -226,7 +224,7 @@ function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
             {state && <p className={`kit-note ${state.tone}`}>{state.text}</p>}
           </div>
           <div className="side">
-            {l.job && <StatusPill status={l.job.status} pending={l.pending} />}
+            {l.job && <JobStatusPill status={l.job.status} pending={l.pending} />}
             <small>{l.qty.toLocaleString('en-IE')} needed</small>
           </div>
         </a>
@@ -387,7 +385,7 @@ function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; 
   return (
     <section className="card" aria-label="Items">
       <h2>Items</h2>
-      {m.items.length === 0 && <p className="empty">None labelled yet.</p>}
+      {m.items.length === 0 && <Empty />}
       <ul className="item-list">
         {m.items.map((a) => (
           <li key={a.id}>
@@ -532,7 +530,7 @@ function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
     <section className="card" aria-label={numbered ? 'Not labelled yet' : 'Counted'}>
       <h2>{numbered ? 'Not labelled yet' : 'Counted'}</h2>
       {numbered && <p className="hint">How many are here but not labelled yet. Adding an item where some are counted takes one off.</p>}
-      {m.counted.length === 0 && <p className="empty">{numbered ? 'None counted.' : 'None counted yet.'}</p>}
+      {m.counted.length === 0 && <Empty />}
       {m.counted.map((s) => (
         <CountRow key={s.id} s={s} w={w}>
           {whereLabel(s, w)}

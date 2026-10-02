@@ -1,6 +1,7 @@
 import { officeLine, type OfficeView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from './act.tsx'
+import { Pending } from './StatusPill.tsx'
 import { client } from './sync.ts'
 
 /**
@@ -51,7 +52,7 @@ function Form({ office }: { office: OfficeView }) {
           <button type="submit" className="primary">
             Save
           </button>
-          {pending && <span className="pill pending">Waiting to sync</span>}
+          <Pending pending={pending} />
         </div>
       </form>
       <Refusal error={error} />

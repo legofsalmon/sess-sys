@@ -85,6 +85,7 @@ async function ready(page: Page, hash = '#stock') {
 
 async function newProduct(page: Page, name: string) {
   await page.goto('/#stock')
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
   await form.getByRole('button', { name: 'Add product' }).click()

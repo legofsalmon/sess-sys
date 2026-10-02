@@ -1,9 +1,11 @@
 import { normaliseNumber, plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
-import { Top } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { Page } from '../jobs/common.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemNumbered, mistakeLabel, numberLabel, Pending, ScanResult, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, itemNumbered, mistakeLabel, numberLabel, ScanResult, WhereChoices } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
@@ -12,31 +14,28 @@ import { CameraScanner, primeSound } from './Scanner.tsx'
  * number, scanned with the camera or typed, and counts taken as they're
  * found.
  */
-export function PlaceScreen({ view, id }: { view: View; id: string }) {
+export function PlaceScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
   const p = w.places.find((x) => x.id === id)
+  const back = (
+    <a className="back" href="#stock">
+      ‹ All stock
+    </a>
+  )
   if (!p)
     return (
-      <div className="app crew jobs warehouse">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock">
-          ‹ All stock
-        </a>
+      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
         <section className="card">
           <p className="empty">This place isn't on this device. It may still be on its way, or it was removed: check again once it says “Up to date”.</p>
         </section>
-      </div>
+      </Page>
     )
   return (
-    <div className="app crew jobs warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
       <Summary p={p} w={w} />
       <Here p={p} w={w} />
       <WhereChoices w={w} />
-    </div>
+    </Page>
   )
 }
 
@@ -130,7 +129,7 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
   return (
     <section className="card" aria-label="Here">
       <h2>Here</h2>
-      {empty && <p className="empty">Nothing here yet.</p>}
+      {empty && <Empty />}
       {cases.length > 0 && (
         <ul className="item-list">
           {cases.map((c) => (

@@ -129,7 +129,8 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await expect(office.getByText(`+353877000102 · oisin.${id}@example.com`)).toBeVisible()
 
   // The applicant is out of the Offer to… picker until asked for.
-  const call = office.getByRole('article').filter({ hasText: `Import check ${id}` })
+  const call = office.locator('.call-group', { hasText: `Import check ${id}` }).getByRole('article', { name: 'Stagehand' })
+  await call.getByRole('button', { name: 'Offer…' }).click()
   const picker = call.getByLabel('Offer to')
   await expect(picker.locator('option', { hasText: `Nuala Breen ${id}` })).toHaveText(`Nuala Breen ${id} · Production · Level 3 (Production: Crew chief)`)
   await expect(picker.locator('option', { hasText: `Ruth Devane ${id}` })).toHaveCount(0)

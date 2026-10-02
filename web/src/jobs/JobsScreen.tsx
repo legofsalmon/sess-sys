@@ -17,8 +17,11 @@ import {
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
+import { Empty } from '../Empty.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { Choices, clientNamed, StatusPill, today, Top, useHash, useView, venueNamed } from './common.tsx'
+import { useToday, useView, useWide } from '../view.ts'
+import { Beside, Choices, clientNamed, JobStatusPill, Top, useHash, venueNamed } from './common.tsx'
 import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
@@ -51,6 +54,7 @@ function filterOf(j: JobView, day: string): Filter {
 export function JobsScreen() {
   const view = useView()
   const hash = useHash()
+  const wide = useWide()
   if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
   if (hash === '#import') return <ImportScreen view={view} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
@@ -58,50 +62,36 @@ export function JobsScreen() {
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []
   if (sheetJob && sheetPhase) return <SheetScreen view={view} jobId={decodeURIComponent(sheetJob)} phaseId={decodeURIComponent(sheetPhase)} />
   const open = hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
+  // On a laptop the list keeps a column of its own (audit finding 25), with its search and filter, beside the open job or the rest of the tab; on a phone the job is a page of its own.
+  if (wide)
+    return (
+      <Beside view={view} className="crew jobs" head={<JobViews />} list={<JobsCard view={view} current={open} />} open={open}>
+        {/* Keyed by the job, so a form left open on one isn't still open on the next picked from the list. */}
+        {open ? <JobScreen key={open} view={view} id={open} bare /> : <JobsRest view={view} />}
+      </Beside>
+    )
   if (open) return <JobScreen view={view} id={open} />
   return <JobList view={view} />
 }
 
 function JobList({ view }: { view: View }) {
-  const { jobs, clients, venues } = view.jobs
-  const [filter, setFilter] = useState<Filter>('coming')
-  const [search, setSearch] = useState('')
-  const day = today()
-  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  const matches = (j: JobView) => {
-    const text = [j.name, j.client?.name, j.venue?.name, ...j.phases.map((p) => p.venue?.name)].filter(Boolean).join(' ').toLowerCase()
-    return words.every((w) => text.includes(w))
-  }
-  const shown = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
-  // Past jobs newest first; everything else soonest first.
-  if (filter === 'past') shown.reverse()
-  const count = (f: Filter) => jobs.filter((j) => filterOf(j, day) === f).length
-
   return (
     <div className="app crew jobs">
       <Top view={view} />
       <JobViews />
 
-      <section className="card">
-        <h2>Jobs</h2>
-        <input className="search" type="search" placeholder="Find a job, client or venue" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find" />
-        <div className="filters" role="group" aria-label="Show">
-          {FILTERS.map(([f, label]) => (
-            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-              {label} ({count(f)})
-            </button>
-          ))}
-        </div>
-        {shown.length === 0 && <p className="empty">{jobs.length === 0 ? 'No jobs yet. Add the first one below.' : 'Nothing here.'}</p>}
-        <ul className="job-list">
-          {shown.map((j) => (
-            <li key={j.id}>
-              <JobRow job={j} kit={view.kit.byJob.get(j.id)} />
-            </li>
-          ))}
-        </ul>
-      </section>
+      <JobsCard view={view} />
 
+      <JobsRest view={view} />
+    </div>
+  )
+}
+
+/** A new job, the clients and the venues: under the list on a phone, beside it on a laptop. */
+function JobsRest({ view }: { view: View }) {
+  const { jobs, clients, venues } = view.jobs
+  return (
+    <>
       <section className="card">
         <h2>New job</h2>
         <NewJob view={view} />
@@ -114,7 +104,7 @@ function JobList({ view }: { view: View }) {
 
       <section className="card">
         <h2>Clients</h2>
-        {clients.length === 0 && <p className="empty">Clients are added as you type them into a job.</p>}
+        {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
         {clients.map((c) => (
           <ClientRow key={c.id} c={c} jobs={jobs.filter((j) => j.clientId === c.id).length} />
         ))}
@@ -122,20 +112,59 @@ function JobList({ view }: { view: View }) {
 
       <section className="card">
         <h2>Venues</h2>
-        {venues.length === 0 && <p className="empty">Venues are added as you type them into a job.</p>}
+        {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
         {venues.map((v) => (
           <VenueRow key={v.id} v={v} jobs={jobs.filter((j) => j.venueId === v.id || j.phases.some((p) => p.venueId === v.id)).length} />
         ))}
       </section>
-    </div>
+    </>
   )
 }
 
-function JobRow({ job, kit }: { job: JobView; kit: readonly KitLineView[] | undefined }) {
+/** Every job, searched and filtered; `current` marks the one open beside the list. */
+function JobsCard({ view, current }: { view: View; current?: string }) {
+  const { jobs } = view.jobs
+  const [filter, setFilter] = useState<Filter>('coming')
+  const [search, setSearch] = useState('')
+  const day = useToday()
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const matches = (j: JobView) => {
+    const text = [j.name, j.client?.name, j.venue?.name, ...j.phases.map((p) => p.venue?.name)].filter(Boolean).join(' ').toLowerCase()
+    return words.every((w) => text.includes(w))
+  }
+  const shown = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
+  // Past jobs newest first; everything else soonest first.
+  if (filter === 'past') shown.reverse()
+  const count = (f: Filter) => jobs.filter((j) => filterOf(j, day) === f).length
+
+  return (
+    <section className="card" aria-label="Jobs">
+      <h2>Jobs</h2>
+      <input className="search" type="search" placeholder="Find a job, client or venue" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find" />
+      <div className="filters" role="group" aria-label="Show">
+        {FILTERS.map(([f, label]) => (
+          <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+            {label} ({count(f)})
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
+      <ul className="job-list">
+        {shown.map((j) => (
+          <li key={j.id}>
+            <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={j.id === current} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitLineView[] | undefined; current: boolean }) {
   const crew = crewFill(job.calls)
   const short = kitShort(kit)
   return (
-    <a className="job-row" href={`#jobs/${job.id}`}>
+    <a className="job-row" href={`#jobs/${job.id}`} aria-current={current ? 'page' : undefined}>
       <div>
         <b>{job.name}</b>
         <p>{[job.client?.name, job.venue?.name].filter(Boolean).join(' · ') || 'No client or venue yet'}</p>
@@ -145,7 +174,7 @@ function JobRow({ job, kit }: { job: JobView; kit: readonly KitLineView[] | unde
         </p>
       </div>
       <div className="side">
-        <StatusPill status={job.status} pending={job.pending} />
+        <JobStatusPill status={job.status} pending={job.pending} />
         {crew.needed > 0 && (
           <small>
             Crew {crew.booked} of {crew.needed}
@@ -168,7 +197,8 @@ interface PhaseDraft {
 /** A new job with its first phases, all in one go. Clients and venues not yet known are added as typed. */
 function NewJob({ view }: { view: View }) {
   const { clients, venues } = view.jobs
-  const first = (): PhaseDraft => ({ key: newId(), name: 'Show', start: today(), end: today() })
+  const today = useToday()
+  const first = (): PhaseDraft => ({ key: newId(), name: 'Show', start: today, end: today })
   const [f, setF] = useState({ name: '', client: '', venue: '', status: 'confirmed' as ProjectStatus })
   const [phases, setPhases] = useState<PhaseDraft[]>(() => [first()])
   const { run, error } = useAct()
@@ -243,7 +273,7 @@ function NewJob({ view }: { view: View }) {
           type="button"
           onClick={() => {
             const last = phases.at(-1)
-            setPhases([...phases, { key: newId(), name: '', start: last?.end ?? today(), end: last?.end ?? today() }])
+            setPhases([...phases, { key: newId(), name: '', start: last?.end ?? today, end: last?.end ?? today }])
           }}
         >
           Add a phase
@@ -296,7 +326,7 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
           {c.contacts.length > 0 && ` · ${c.contacts.map((x) => x.name).join(', ')}`}
         </small>
       </button>
-      {c.pending && <span className="pill pending">Waiting to sync</span>}
+      <Pending pending={c.pending} />
       {open && (
         <form className="detail grid-form" onSubmit={save}>
           <label className="wide">
@@ -353,7 +383,7 @@ function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
           {v.address && ` · ${v.address.split('\n')[0]}`}
         </small>
       </button>
-      {v.pending && <span className="pill pending">Waiting to sync</span>}
+      <Pending pending={v.pending} />
       {open && (
         <form className="detail grid-form" onSubmit={save}>
           <label className="wide">
