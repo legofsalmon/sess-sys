@@ -76,13 +76,23 @@ waiting on someone.
   web build; the Blueprint build; the full browser suite (72), with the
   new specs run three more times; and screenshots of each new screen at
   phone and laptop widths, light and dark.
+- Merged into `main` at 18:46 UTC once GitHub's checks passed, and live
+  by 18:55: Railway waited for main's checks, then deployed it on its
+  own. The live database has the core schema at version 5, with the old
+  sync test's four empty tables gone; stock at 8, with an item's old
+  number, its PAT due date and the new index; crew at 9, with what a
+  call needs and the running-late table; and erasure's own module at 1.
+  The new import route answers, the start-up log says where the list of
+  erasures is kept while backups are off, and nothing went wrong. The
+  Blueprint rebuilt itself from `main`.
 
 **Next**
 
-- Colly to confirm erasure's defaults: archive first, and the name and
-  timesheets kept for six years where there's paid work. Staff leave
-  records go with the rest; Irish working-time rules may want them kept
-  for three years instead.
+- Colly confirmed erasure's defaults and asked for every record to be
+  kept for its recommended time (2 October). Pay records already keep
+  their six years for Revenue. Staff leave records, which erasure
+  deletes at once today, are next: they will be kept for three years
+  under the Organisation of Working Time Act, with their notes cleared.
 - The stock list next week. On the live server, a list of 1,500 rows is
   expected to take about 8 to 10 minutes with the page left open.
 - The keys, as before: the Google key, the backups bucket (and a
