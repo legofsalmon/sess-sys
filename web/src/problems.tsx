@@ -93,7 +93,8 @@ function describer(view: View): (m: Mutation) => string {
     }
     return { name: 'a phase', job: 'a job' }
   }
-  const model = (id: unknown) => w.models.find((m) => m.id === id)?.name ?? 'a product'
+  // A product marked as added by mistake since is still named.
+  const model = (id: unknown) => (w.models.find((m) => m.id === id) ?? (typeof id === 'string' ? w.mistakes.get(id) : undefined))?.name ?? 'a product'
   const item = (id: unknown) => {
     const a = typeof id === 'string' ? w.assets.get(id) : undefined
     return a ? `${a.number || 'an item'} (${a.model?.name ?? 'a product'})` : 'an item'
@@ -184,6 +185,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Change the product ${model(a.id)}`
       case 'model.remove':
         return `Remove the product ${model(a.id)}`
+      case 'model.mistake':
+        return `Mark the product ${model(a.id)} as added by mistake`
       case 'place.upsert':
         return `Save the place ${str(a.name, 'a place')}`
       case 'place.remove':
@@ -214,6 +217,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Set aside ${num(a.count)} numbers for labels`
       case 'labels.update':
         return 'Change what some labels are for'
+      case 'labels.cancel':
+        return 'Cancel a run of labels set aside'
       case 'move.record': {
         const way = a.direction === 'in' ? 'back in from' : 'out to'
         return a.assetId ? `Scan ${item(a.assetId)} ${way} ${job(a.projectId)}` : `Count ${num(a.qty)} × ${model(a.modelId)} ${way} ${job(a.projectId)}`

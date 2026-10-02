@@ -16,19 +16,22 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { Refusal, useAct } from '../act.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
 import { Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { atLabel, findWhere, Pending, ProductChoices, WhereChoices, whereNamed, whereProblem } from './common.tsx'
+import { atLabel, findWhere, Pending, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
 
 /**
- * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels)
- * before their labels are printed, so the next free number never lands on
- * a label that isn't stuck on yet. A run prints here, or goes to a label
- * maker as a spreadsheet (#stock/labels/<id>); an item's own label prints
- * from its page; and a label from a run goes on an item when its number is
- * scanned or typed in the Stock search.
+ * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
+ * after a question saying how many, before their labels are printed, so
+ * the next free number never lands on a label that isn't stuck on yet; a
+ * run none of whose labels is on an item yet can be cancelled (audit
+ * finding 19), which takes it off the list without ever giving its
+ * numbers out again. A run prints here, or goes to a label maker as a
+ * spreadsheet (#stock/labels/<id>); an item's own label prints from its
+ * page; and a label from a run goes on an item when its number is scanned
+ * or typed in the Stock search.
  */
 
 /** How labels are laid out for the printer they go through. */
@@ -241,6 +244,8 @@ export function LabelsScreen({ view }: { view: View }) {
 
 function SetAside({ labels }: { labels: LabelsView }) {
   const [f, setF] = useState({ count: '', name: '' })
+  // The count, said back before anything is set aside: a slip of a zero is 10,000 labels.
+  const [asking, setAsking] = useState<number>()
   const { run, error, refuse } = useAct()
   const [lastId, setLastId] = useState('')
   const last = labels.runs.find((r) => r.id === lastId)
@@ -248,6 +253,10 @@ function SetAside({ labels }: { labels: LabelsView }) {
     e.preventDefault()
     const count = Number(f.count)
     if (!Number.isInteger(count) || count < 1 || count > MAX_RUN) return refuse(`How many labels? From 1 to ${MAX_RUN.toLocaleString('en-IE')} at a time.`)
+    setAsking(count)
+  }
+  const reserve = (count: number) => {
+    setAsking(undefined)
     const id = newId()
     // A refusal brings what was typed back, unless the next run has been typed since.
     const cleared = { count: '', name: '' }
@@ -261,11 +270,26 @@ function SetAside({ labels }: { labels: LabelsView }) {
     <form className="grid-form" onSubmit={submit} aria-label="Set numbers aside">
       <label>
         How many labels
-        <input type="number" inputMode="numeric" min={1} max={MAX_RUN} value={f.count} onChange={(e) => setF({ ...f, count: e.target.value })} required />
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={MAX_RUN}
+          value={f.count}
+          onChange={(e) => setF({ ...f, count: e.target.value })}
+          required
+          disabled={asking !== undefined}
+        />
       </label>
       <label>
         What for{' '}
-        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Label World roll" maxLength={200} />
+        <input
+          value={f.name}
+          onChange={(e) => setF({ ...f, name: e.target.value })}
+          placeholder="e.g. Label World roll"
+          maxLength={200}
+          disabled={asking !== undefined}
+        />
       </label>
       <Refusal error={error} className="wide" />
       {last && !error && (
@@ -283,9 +307,20 @@ function SetAside({ labels }: { labels: LabelsView }) {
           )}
         </p>
       )}
-      <button type="submit" className="primary wide">
-        Set numbers aside
-      </button>
+      {asking !== undefined ? (
+        <Confirm
+          className="wide"
+          question={`Reserve ${plural(asking, 'number')}? Nothing else gets them. The run can be cancelled until one of its labels is on an item.`}
+          yes="Reserve them"
+          no="Not yet"
+          onYes={() => reserve(asking)}
+          onNo={() => setAsking(undefined)}
+        />
+      ) : (
+        <button type="submit" className="primary wide">
+          Set numbers aside
+        </button>
+      )}
     </form>
   )
 }
@@ -301,7 +336,7 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
           ‹ Labels
         </a>
         <section className="card">
-          <p className="empty">These labels aren't on this device. They may still be on their way: check again once it says “Up to date”.</p>
+          <p className="empty">These labels aren't on the list. They were cancelled, or they're still on their way: check again once it says “Up to date”.</p>
         </section>
       </div>
     )
@@ -328,6 +363,14 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
 
 function RunSummary({ r }: { r: LabelRunView }) {
   const [editing, setEditing] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const { run, error } = useAct()
+  const cancel = () => {
+    setCancelling(false)
+    void run(() => client.mutate('labels.cancel', { id: r.id })).then((ok) => {
+      if (ok) location.hash = '#stock/labels'
+    })
+  }
   return (
     <section className="card">
       <header className="title">
@@ -355,13 +398,27 @@ function RunSummary({ r }: { r: LabelRunView }) {
         </div>
       </dl>
       {r.notes && <p className="notes">{r.notes}</p>}
+      <Refusal error={error} />
       {editing ? (
         <EditRun r={r} onDone={() => setEditing(false)} />
+      ) : cancelling ? (
+        <Confirm
+          question={`Cancel the run ${rangeLabel(r)}? It comes off the list, and its ${r.count === 1 ? 'number is' : `${plural(r.count, 'number')} are`} never given out again.`}
+          yes="Cancel the run"
+          no="Keep it"
+          onYes={cancel}
+          onNo={() => setCancelling(false)}
+        />
       ) : (
         <div className="actions">
           <button type="button" onClick={() => setEditing(true)}>
             Change details
           </button>
+          {r.used === 0 && r.firstNumber && (
+            <button type="button" className="link" onClick={() => setCancelling(true)}>
+              Cancel the run
+            </button>
+          )}
         </div>
       )}
     </section>
@@ -488,6 +545,7 @@ export function ClaimLabel({
   const [f, setF] = useState(memory.current)
   const [fromCount, setFromCount] = useState(true)
   const { run: tryTo, error, refuse } = useAct()
+  const { ask, question, asking } = useNewPlace(w)
   const run = view.labels.runOf(number)
   const m = findProduct(f.product, w)
   const known = findWhere(f.where, w)
@@ -503,10 +561,12 @@ export function ClaimLabel({
     const id = newId()
     const one = countedThere > 0 && fromCount
     memory.current = { product: m.name, where: f.where }
-    void tryTo(async () => {
-      const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
-      await client.mutate('asset.add', { id, modelId: m.id, number, serial: '', ...where, notes: '', fromCount: one })
-    }).then((ok) => ok && onClaimed(id))
+    const go = () =>
+      void tryTo(async () => {
+        const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
+        await client.mutate('asset.add', { id, modelId: m.id, number, serial: '', ...where, notes: '', fromCount: one })
+      }).then((ok) => ok && onClaimed(id))
+    if (!ask(f.where, go)) go()
   }
 
   return (
@@ -530,11 +590,12 @@ export function ClaimLabel({
           placeholder="e.g. d&b Y10P"
           autoComplete="off"
           required
+          disabled={asking}
         />
       </label>
       <label>
         Where it's kept{' '}
-        <input list="where-choices" value={f.where} onChange={(e) => setF({ ...f, where: e.target.value })} placeholder="A place, or a case's number" />
+        <input list="where-choices" value={f.where} onChange={(e) => setF({ ...f, where: e.target.value })} placeholder="A place, or a case's number" disabled={asking} />
       </label>
       {countedThere > 0 && known && (
         <label className="wide tick">
@@ -545,9 +606,11 @@ export function ClaimLabel({
         </label>
       )}
       <Refusal error={error} className="wide" />
-      <button type="submit" className="primary wide">
-        Put {number} on it
-      </button>
+      {question ?? (
+        <button type="submit" className="primary wide">
+          Put {number} on it
+        </button>
+      )}
       <ProductChoices w={w} />
       <WhereChoices w={w} />
     </form>

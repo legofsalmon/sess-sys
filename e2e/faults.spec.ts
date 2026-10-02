@@ -32,6 +32,12 @@ async function ready(page: Page, hash = '#stock') {
   await expect(page.locator('.conn')).toHaveText('Up to date')
 }
 
+/** The question a place nobody has used yet brings up (audit finding 19), answered yes when it's asked. */
+async function makePlace(page: Page) {
+  const yes = page.getByRole('button', { name: 'Make the place' })
+  if (await yes.isVisible()) await yes.click()
+}
+
 async function newProduct(page: Page, name: string, counted?: number) {
   await page.goto('/#stock')
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
@@ -44,6 +50,7 @@ async function newProduct(page: Page, name: string, counted?: number) {
   await add.getByLabel('Counted at').fill('Warehouse')
   await add.getByLabel('How many').fill(String(counted))
   await add.getByRole('button', { name: 'Save count' }).click()
+  await makePlace(page)
   await expect(page.locator('.count', { hasText: 'Warehouse' })).toContainText(String(counted))
 }
 
@@ -54,6 +61,7 @@ async function newItems(page: Page, where: string, count: number) {
   for (let i = 0; i < count; i++) {
     await add.getByLabel("Where it's kept").fill(where)
     await add.getByRole('button', { name: 'Add item' }).click()
+    await makePlace(page)
     if (numbers.length) await expect(add.locator('.added')).not.toHaveText(`Added ${numbers.at(-1)}.`)
     await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
     const number = (await add.locator('.added').textContent())!.slice(6, -1)
@@ -186,10 +194,13 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await repairs.getByRole('link', { name: `${speakers[0]} ${speaker}` }).click()
   await expect(page.locator('.facts')).toContainText("FaultDamaged, can't go out: Blown driver")
   const faults = page.getByRole('region', { name: 'Faults' })
-  await faults.getByRole('button', { name: 'Repair notes' }).click()
+  await faults.getByRole('button', { name: 'Change details' }).click()
+  await faults.getByLabel("What's wrong").fill('Blown driver, rattles at high level')
   await faults.getByLabel('Repair notes').fill('New driver fitted, €180')
   await faults.getByRole('button', { name: 'Save' }).click()
+  await expect(faults.locator('.notes')).toHaveText('Blown driver, rattles at high level')
   await expect(faults.locator('.repair')).toHaveText('Repair notes: New driver fitted, €180')
+  await expect(page.locator('.facts')).toContainText("FaultDamaged, can't go out: Blown driver, rattles at high level")
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await page.screenshot(shot('faults-item'))
   await faults.getByRole('button', { name: 'Fixed' }).click()

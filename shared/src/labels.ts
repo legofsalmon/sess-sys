@@ -6,9 +6,11 @@ import { text, whole } from './plain.ts'
  * Printing labels (ADR 0015). Numbers are set aside a run at a time before
  * their labels are printed, here or by a label maker, so the next free
  * number the server gives out never lands on a label that isn't stuck on
- * yet. Each label carries a QR code and its number in large type; the QR
- * code holds just the number, which any scanner, and the Stock tab's
- * search, reads back.
+ * yet. A run nobody has used can be cancelled, which takes it off the
+ * list; its numbers are still never given out again, since its labels may
+ * be printed already. Each label carries a QR code and its number in large
+ * type; the QR code holds just the number, which any scanner, and the
+ * Stock tab's search, reads back.
  */
 
 const id = z.string().min(1).max(64)
@@ -30,6 +32,8 @@ export interface LabelRun {
   notes: string
   /** When they were set aside. */
   createdAt: string
+  /** Cancelled before any of its labels went on an item (audit finding 19): off the list, its numbers never given out again. */
+  cancelled: boolean
 }
 
 export interface LabelEntities {
@@ -47,6 +51,8 @@ export const labelCommandSchemas = {
   'labels.update': z
     .object({ id, name: name.optional(), notes: notes.optional() })
     .refine((u) => u.name !== undefined || u.notes !== undefined, { message: 'Nothing to change.' }),
+  /** A run set aside by mistake, taken off the list; its numbers are never given out again. Refused once any of them is on an item. */
+  'labels.cancel': z.object({ id }),
 } as const
 
 /** "SH-000123" from 123. */

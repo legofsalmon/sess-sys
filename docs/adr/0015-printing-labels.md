@@ -38,8 +38,10 @@ The [stock research](../research/stock-tracking.md) (§0, §5) recommends:
   gets one after every number used or set aside, never one waiting on a
   printed label.
 - **A run is kept for good.** Its labels may already be printed, so its
-  numbers never change and it can't be taken back; numbers never stuck on
-  just stay unused. What it's for and its notes can be changed.
+  numbers never change and are never given out again; numbers never stuck
+  on just stay unused. What it's for and its notes can be changed. One set
+  aside by mistake, none of whose labels is on an item yet, can be
+  cancelled, which only takes it off the list (audit finding 19).
 - **A label carries** the QR code, the number in large type and "Session
   Hire", plus the product's name when it's an item's own label. Black on
   white, for any printer.

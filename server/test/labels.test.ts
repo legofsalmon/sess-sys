@@ -21,8 +21,9 @@ import { readHistory } from '../src/history.ts'
 /**
  * Labels (ADR 0015): numbers set aside a run at a time for printing, which
  * the next free number for an item skips, so it never lands on a label
- * that isn't stuck on yet; and labels from a run claimed by typing or
- * scanning their number.
+ * that isn't stuck on yet; labels from a run claimed by typing or scanning
+ * their number; and a run nobody has used yet cancelled (audit finding 19),
+ * which takes it off the list but never gives its numbers out again.
  */
 
 let cleanup: (() => Promise<void>)[] = []
@@ -217,6 +218,66 @@ describe('labels', () => {
     expect(entries[2]?.what).toBe(
       "Changed the labels SH-000001 to SH-000500: what they're for to Polyester roll, arrived 9 Oct and the notes"
     )
+  })
+
+  it('can be cancelled while none of its labels is on an item, and its numbers are never given out again', async () => {
+    // A run cancelled may have been printed already, so a later run or item never gets its numbers: two labels never share one.
+    const { app, db, y10p } = await warehouse()
+    const roll = run(5, 'Roll')
+    const tags = run(3, 'Tags')
+    await ok(app, 'labels.reserve', roll)
+    await ok(app, 'labels.reserve', tags)
+    await ok(app, 'labels.cancel', { id: tags.id })
+    // Kept, marked cancelled, rather than deleted.
+    const res = await app.inject({ method: 'GET', url: '/api/sync/pull?after=0' })
+    expect((res.json() as PullResponse).changes.filter((c) => c.entity === 'labelRun').map((c) => [c.id, c.op, (c.data as LabelRun | null)?.cancelled])).toEqual([
+      [roll.id, 'put', false],
+      [tags.id, 'put', false],
+      [tags.id, 'put', true],
+    ])
+    // Set aside again, and an item given the next free number: neither gets SH-000006 to SH-000008.
+    const again = run(2, 'Again')
+    await ok(app, 'labels.reserve', again)
+    expect((await records(app)).runs.get(again.id)).toMatchObject({ first: 9, count: 2, cancelled: false })
+    const next = item(y10p.id, null)
+    await ok(app, 'asset.add', next)
+    expect((await records(app)).items.get(next.id)?.number).toBe('SH-000011')
+    // Cancelled again from another phone: cancelled already, so fine. Its details can't be changed any more.
+    await ok(app, 'labels.cancel', { id: tags.id })
+    expect(await refused(app, 'labels.update', { id: tags.id, name: 'Tags after all' })).toBe('Those labels are no longer on the list.')
+
+    // One label stuck on keeps the whole run, since the rest may be printed too.
+    await ok(app, 'asset.add', item(y10p.id, 'SH-000003'))
+    expect(await refused(app, 'labels.cancel', { id: roll.id })).toBe("One of the labels SH-000001 to SH-000005 is on an item, so the run can't be cancelled.")
+    await ok(app, 'asset.add', item(y10p.id, 'SH-000004'))
+    expect(await refused(app, 'labels.cancel', { id: roll.id })).toBe("2 of the labels SH-000001 to SH-000005 are on items, so the run can't be cancelled.")
+
+    const { entries } = await readHistory(db)
+    expect(entries.find((e) => e.command === 'labels.cancel' && e.outcome === 'done')?.what).toBe('Cancelled the labels SH-000006 to SH-000008')
+    expect(entries[0]).toMatchObject({ what: 'Cancelled the labels SH-000001 to SH-000005', outcome: 'turned-down' })
+  })
+
+  it('cancelled leave the list on a device, and the next free number there still counts them', async () => {
+    // As the device shows it before the server has answered and after: off the list, with no number of theirs offered again.
+    const { app } = await warehouse()
+    const phone = await device(app)
+    const roll = run(5, 'Roll')
+    const tags = run(3, 'Tags')
+    await phone.client.mutate('labels.reserve', roll)
+    await phone.client.mutate('labels.reserve', tags)
+    await phone.client.sync()
+    expect(phone.client.view().labels.next).toBe('SH-000009')
+    phone.signal.on = false
+    await phone.client.mutate('labels.cancel', { id: tags.id })
+    await phone.client.sync().catch(() => {})
+    let labels = phone.client.view().labels
+    expect(labels.runs.map((r) => r.name)).toEqual(['Roll'])
+    expect([labels.next, labels.runOf('SH-000007')]).toEqual(['SH-000009', undefined])
+    phone.signal.on = true
+    await phone.client.sync()
+    labels = phone.client.view().labels
+    expect(labels.runs.map((r) => [r.name, r.pending])).toEqual([['Roll', false]])
+    expect(labels.next).toBe('SH-000009')
   })
 
   it('never overlap when two devices set some aside with no signal', async () => {

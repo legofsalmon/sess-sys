@@ -7,6 +7,7 @@ import {
   normaliseNumber,
   parseEuro,
   plural,
+  RETIRED_LABELS,
   spanLabel,
   type Department,
   type ModelView,
@@ -20,7 +21,7 @@ import { App } from '../App.tsx'
 import { StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { client } from '../sync.ts'
-import { amountLabel, atLabel, numberLabel, Pending, TrackingChoice, whereLabel } from './common.tsx'
+import { amountLabel, atLabel, mistakeLabel, numberLabel, Pending, ScanResult, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
 import { InspectionsDue, TestingScreen } from './Inspections.tsx'
@@ -75,12 +76,15 @@ function Catalogue({ view }: { view: View }) {
   const memory = useRef<ClaimMemory>({ product: '', where: '' })
   const [claimed, setClaimed] = useState('')
   const [camera, setCamera] = useState(false)
+  // The item the camera last read, shown under it while it stays on for the next (audit finding 18).
+  const [scanned, setScanned] = useState('')
+  const lastRead = camera && scanned ? w.assets.get(scanned) : undefined
   const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
-  // Items by number or serial, once there's enough typed to mean something.
+  // Items by number or serial, once there's enough typed to mean something; one added by mistake only by its exact number.
   const items =
     q.length >= 3
       ? [...w.assets.values()]
-          .filter((a) => a !== exact && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
+          .filter((a) => a !== exact && a.retiredReason !== 'mistake' && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
           .sort((a, b) => a.number.localeCompare(b.number))
           .slice(0, 20)
       : []
@@ -106,13 +110,22 @@ function Catalogue({ view }: { view: View }) {
     setSearch('')
     if (!camera) searchField.current?.focus()
   }
-  // Read by the camera: an item's label or its maker's serial opens it; a label on nothing yet asks what it's on.
+  // Read by the camera: an item's label or its maker's serial shows it under the camera, which stays on; a label on nothing yet asks what it's on.
   const onRead = (code: string) => {
     const n = normaliseNumber(code)
     const serial = code.toLowerCase()
     const found = (n && w.byNumber.get(n)) || only([...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial))
-    if (found) location.hash = `#stock/item/${found.id}`
-    else setSearch(code)
+    if (found) {
+      setScanned(found.id)
+      setSearch('')
+    } else {
+      setScanned('')
+      setSearch(code)
+    }
+  }
+  const closeCamera = () => {
+    setCamera(false)
+    setScanned('')
   }
 
   return (
@@ -143,7 +156,20 @@ function Catalogue({ view }: { view: View }) {
             Scan
           </button>
         </form>
-        {camera && <CameraScanner onRead={onRead} onStop={() => setCamera(false)} small={!!unclaimed} />}
+        {camera && <CameraScanner onRead={onRead} onStop={closeCamera} small={!!unclaimed} />}
+        {lastRead && (
+          <ScanResult onClose={closeCamera}>
+            {lastRead.retiredReason === 'mistake' ? (
+              mistakeLabel(lastRead)
+            ) : (
+              <>
+                <a href={`#stock/item/${lastRead.id}`}>{numberLabel(lastRead)}</a> {lastRead.model?.name ?? 'an item'} ·{' '}
+                {lastRead.status === 'retired' ? `Retired${lastRead.retiredReason ? `: ${RETIRED_LABELS[lastRead.retiredReason].toLowerCase()}` : ''}` : whereLabel(lastRead, w)}
+                {lastRead.serial && ` · Serial ${lastRead.serial}`}. Scan the next label.
+              </>
+            )}
+          </ScanResult>
+        )}
         {justClaimed && (
           <p className="added" role="status">
             Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
@@ -169,7 +195,7 @@ function Catalogue({ view }: { view: View }) {
                   <div>
                     <b>{numberLabel(a)}</b> {a.model?.name}
                     <p>
-                      {a.status === 'retired' ? 'Retired' : whereLabel(a, w)}
+                      {a.retiredReason === 'mistake' ? 'Added by mistake' : a.status === 'retired' ? 'Retired' : whereLabel(a, w)}
                       {a.serial && ` · Serial ${a.serial}`}
                       {a.number !== number && number && a.formerNumbers.includes(number) && ` · Had ${number} before`}
                     </p>

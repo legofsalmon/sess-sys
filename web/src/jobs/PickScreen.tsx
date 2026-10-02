@@ -18,6 +18,7 @@ import {
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
+import { mistakeLabel } from '../stock/common.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
@@ -101,6 +102,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     const a = (n && w.byNumber.get(n)) || (bySerial.length === 1 ? bySerial[0] : undefined)
     if (!a) return say('warn', n ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
+    // Never stock, so nothing to scan out or back (audit finding 19).
+    if (a.retiredReason === 'mistake') return say('warn', `${mistakeLabel(a)} Nothing was recorded.`)
     const was = view.moves.outOf(a.id)
     const other = was && was.projectId !== job.id ? (view.jobs.jobs.find((j) => j.id === was.projectId)?.name ?? 'another job') : undefined
     const notes: string[] = []

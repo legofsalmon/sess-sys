@@ -17,14 +17,18 @@ import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText, InspectionsCard } from './Inspections.tsx'
 import { PrintLabels } from './Labels.tsx'
+import { CameraScanner, primeSound } from './Scanner.tsx'
 import {
   contentsLabel,
   CountHere,
   CountRow,
   itemNumbered,
   loopIn,
+  mistakeLabel,
   numberLabel,
   Pending,
+  ScanResult,
+  useNewPlace,
   whereLabel,
   WhereChoices,
   whereNamed,
@@ -56,8 +60,8 @@ export function ItemScreen({ view, id }: { view: View; id: string }) {
   return (
     <div className="app crew jobs warehouse">
       <Top view={view} title="Stock" />
-      <a className="back" href={a.model ? `#stock/product/${a.model.id}` : '#stock'}>
-        ‹ {a.model?.name ?? 'All stock'}
+      <a className="back" href={a.model && !a.model.mistake ? `#stock/product/${a.model.id}` : '#stock'}>
+        ‹ {a.model && !a.model.mistake ? a.model.name : 'All stock'}
       </a>
       <Summary a={a} w={w} view={view} />
       <FaultsCard faults={view.faults.ofAsset(a.id)}>
@@ -92,7 +96,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
       <dl className="facts">
         <div>
           <dt>Product</dt>
-          <dd>{a.model ? <a href={`#stock/product/${a.model.id}`}>{a.model.name}</a> : 'Removed'}</dd>
+          <dd>{a.model ? a.model.mistake ? a.model.name : <a href={`#stock/product/${a.model.id}`}>{a.model.name}</a> : 'Removed'}</dd>
         </div>
         <div>
           <dt>Serial</dt>
@@ -146,11 +150,15 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
       {a.notes && <p className="notes">{a.notes}</p>}
       <Refusal error={error} />
       {retired ? (
-        <div className="actions">
-          <button type="button" onClick={reinstate}>
-            Bring back
-          </button>
-        </div>
+        a.model?.mistake ? (
+          <p className="hint">{a.model.name} was marked as added by mistake, so this is kept for the history only.</p>
+        ) : (
+          <div className="actions">
+            <button type="button" onClick={reinstate}>
+              Bring back
+            </button>
+          </div>
+        )
       ) : (
         <div className="actions">
           {(['move', 'details', 'label', 'print', 'retire'] as const).map((m) => (
@@ -193,6 +201,7 @@ function WhereLink({ a }: { a: AssetView }) {
 function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
   const [to, setTo] = useState('')
   const { run, error, refuse } = useAct()
+  const { ask, question, asking } = useNewPlace(w)
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const typed = itemNumbered(to, w)
@@ -200,11 +209,13 @@ function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => 
       const loop = loopIn(a.id, typed.id, w)
       if (loop) return refuse(loop)
     }
-    void run(async () => {
-      const dest = (await whereNamed(to, w)) ?? { placeId: null, caseId: null }
-      if (dest.placeId === a.placeId && dest.caseId === a.caseId) return
-      await client.mutate('asset.move', { id: a.id, ...dest })
-    }).then((ok) => ok && onDone())
+    const go = () =>
+      void run(async () => {
+        const dest = (await whereNamed(to, w)) ?? { placeId: null, caseId: null }
+        if (dest.placeId === a.placeId && dest.caseId === a.caseId) return
+        await client.mutate('asset.move', { id: a.id, ...dest })
+      }).then((ok) => ok && onDone())
+    if (!ask(to, go)) go()
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -216,18 +227,21 @@ function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => 
           onChange={(e) => setTo(e.target.value)}
           placeholder="A place, or a case's number; empty if not known"
           autoFocus
+          disabled={asking}
         />
       </label>
       {a.model?.isCase && (a.items.length > 0 || a.counted.length > 0) && <p className="hint wide">Everything in it goes too.</p>}
       <Refusal error={error} className="wide" />
-      <div className="actions wide">
-        <button type="submit" className="primary">
-          Move {numberLabel(a)}
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
+      {question ?? (
+        <div className="actions wide">
+          <button type="submit" className="primary">
+            Move {numberLabel(a)}
+          </button>
+          <button type="button" onClick={onDone}>
+            Cancel
+          </button>
+        </div>
+      )}
     </form>
   )
 }
@@ -373,13 +387,14 @@ function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
   )
 }
 
-/** A case's contents: items in it, and what's counted in it. */
+/** A case's contents: items in it, and what's counted in it. Items go in by their number, scanned or typed, with the camera staying on for the next (audit finding 18). */
 function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
+  const [camera, setCamera] = useState(false)
+  const [putIn, setPutIn] = useState('')
   const { run, error, refuse } = useAct()
-  const put = (e: FormEvent) => {
-    e.preventDefault()
-    const t = number.trim()
+  const put = (t: string) => {
+    setPutIn('')
     if (!t) return
     const item = itemNumbered(t, w)
     if (!item)
@@ -389,12 +404,24 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
           : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`
       )
     if (item.number !== normaliseNumber(t)) return refuse(`${normaliseNumber(t)} was an old label. That item is ${numberLabel(item)} now.`)
+    if (item.retiredReason === 'mistake') return refuse(mistakeLabel(item))
     if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
     if (item.caseId === c.id) return refuse(`${item.number} is in here already.`)
     const loop = loopIn(item.id, c.id, w)
     if (loop) return refuse(loop)
-    void run(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id }))
+    void run(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id })).then(
+      (ok) => ok && setPutIn(`${item.number} (${item.model?.name ?? 'an item'}) is in ${numberLabel(c)} now.`)
+    )
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    put(number.trim())
     setNumber('')
+  }
+  const close = () => {
+    setCamera(false)
+    setPutIn('')
+    refuse('')
   }
   const empty = c.items.length === 0 && c.counted.length === 0
   return (
@@ -422,20 +449,44 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
           {s.model?.tracking === 'serialised' && <small>, not labelled yet</small>}
         </CountRow>
       ))}
-      <form className="grid-form" onSubmit={put}>
+      <form className="grid-form" onSubmit={submit}>
         <h3 className="wide">Put an item in</h3>
-        <label className="wide">
-          Its number
-          <input
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            placeholder="e.g. SH-000123"
-            autoComplete="off"
-            autoCapitalize="characters"
-            enterKeyHint="done"
-          />
-        </label>
+        <div className="wide scan-row">
+          <label>
+            Its number
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="e.g. SH-000123"
+              autoComplete="off"
+              autoCapitalize="characters"
+              enterKeyHint="done"
+            />
+          </label>
+          <button
+            type="button"
+            aria-pressed={camera}
+            onClick={() => {
+              if (!camera) primeSound()
+              if (camera) close()
+              else setCamera(true)
+            }}
+          >
+            Scan
+          </button>
+        </div>
+        {camera && (
+          <div className="wide">
+            <CameraScanner onRead={(code) => put(code.trim())} onStop={close} small />
+          </div>
+        )}
         <Refusal error={error} className="wide" />
+        {putIn && !error && (
+          <ScanResult label="Put in" onClose={camera ? close : undefined}>
+            {putIn}
+            {camera && ' Scan the next label.'}
+          </ScanResult>
+        )}
         <button type="submit" className="wide">
           Put it in {numberLabel(c)}
         </button>

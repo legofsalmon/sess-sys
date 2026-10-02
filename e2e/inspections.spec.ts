@@ -7,9 +7,11 @@ import { expect, test, type Page } from '@playwright/test'
  * it can't go out, and the Stock tab lists it. Then a batch is tested by
  * scanning, one with no signal: two pass and one fails. The one that
  * failed can't go out: its product says so, and scanning it out for a job
- * warns. The test server is shared with the other browser tests, so names
- * are this run's own and numbers are read off the screen. To refresh the
- * blueprint screenshots, run this file on its own with SHOTS=1.
+ * warns. In the batch each pass is held for five seconds with Undo first
+ * (audit finding 17; scanning.spec.ts has the Undo). The test server is
+ * shared with the other browser tests, so names are this run's own and
+ * numbers are read off the screen. To refresh the blueprint screenshots,
+ * run this file on its own with SHOTS=1.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -46,6 +48,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   for (let i = 0; i < 3; i++) {
     await add.getByLabel("Where it's kept").fill(bay)
     await add.getByRole('button', { name: 'Add item' }).click()
+    if (i === 0) await page.getByRole('button', { name: 'Make the place' }).click()
     if (speakers.length) await expect(add.locator('.added')).not.toHaveText(`Added ${speakers.at(-1)}.`)
     await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
     speakers.push((await add.locator('.added').textContent())!.slice(6, -1))
@@ -93,15 +96,20 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
     await page.getByLabel('Number or serial').fill(number)
     await page.getByLabel('Number or serial').press('Enter')
   }
+  // Each pass is held with Undo for five seconds, then recorded.
+  const held = page.getByRole('status', { name: 'Held' })
   await typeIn(speakers[0]!)
-  await expect(said).toHaveText(new RegExp(`^${speakers[0]} ${speaker}: passed, next due ${date}\\.$`))
+  await expect(held).toContainText(`Passed: ${speakers[0]}`)
+  await expect(said).toHaveText(new RegExp(`^${speakers[0]} ${speaker}: passed, next due ${date}\\.$`), { timeout: 8000 })
+  await expect(held).toHaveCount(0)
+  // Failed once its pass is recorded: the fail goes in after it. (Failing one while it's held is in scanning.spec.ts.)
   await typeIn(speakers[1]!)
-  await expect(said).toContainText(`${speakers[1]} ${speaker}: passed`)
+  await expect(said).toContainText(`${speakers[1]} ${speaker}: passed`, { timeout: 8000 })
   await page.getByRole('button', { name: 'It failed' }).click()
   await expect(said).toHaveText(`${speakers[1]} ${speaker}: failed. It can't go out until it passes. Report what's wrong on its page.`)
   await context.setOffline(true)
   await typeIn(speakers[2]!)
-  await expect(said).toContainText(`${speakers[2]} ${speaker}: passed, next due`)
+  await expect(said).toContainText(`${speakers[2]} ${speaker}: passed, next due`, { timeout: 8000 })
   await expect(page.getByRole('region', { name: 'Tested' })).toContainText('Tested here: 4')
   await expect(page.locator('.conn')).toContainText('No signal')
   await page.screenshot(shot('inspections-batch'))

@@ -3,12 +3,14 @@ import { useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemNumbered, numberLabel, Pending, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, itemNumbered, mistakeLabel, numberLabel, Pending, ScanResult, WhereChoices } from './common.tsx'
+import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
  * One place: what's kept there, cases and what's in them, and what's
  * counted there. Walking round with a phone, items are put here by their
- * number and counts taken as they're found.
+ * number, scanned with the camera or typed, and counts taken as they're
+ * found.
  */
 export function PlaceScreen({ view, id }: { view: View; id: string }) {
   const w = view.warehouse
@@ -175,47 +177,75 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
   )
 }
 
-/** Scan or type an item's number to say it's kept here. */
+/** Scan or type an item's number to say it's kept here. The camera stays on for the next one (audit finding 18). */
 function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
+  const [camera, setCamera] = useState(false)
   const { run, error, refuse } = useAct()
   const [moved, setMoved] = useState('')
-  const put = (e: FormEvent) => {
-    e.preventDefault()
+  const put = (t: string) => {
     setMoved('')
-    const t = number.trim()
     if (!t) return
     const item = itemNumbered(t, w)
     const typed = normaliseNumber(t)
     if (!item)
       return refuse(typed ? `No item has the number ${typed}.` : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
     if (item.number !== typed) return refuse(`${typed} was an old label. That item is ${numberLabel(item)} now.`)
+    if (item.retiredReason === 'mistake') return refuse(mistakeLabel(item))
     if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
     if (item.placeId === p.id) return refuse(`${item.number} is here already.`)
     void run(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
       (ok) => ok && setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`)
     )
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    put(number.trim())
     setNumber('')
   }
+  const close = () => {
+    setCamera(false)
+    setMoved('')
+    refuse('')
+  }
   return (
-    <form className="grid-form" onSubmit={put}>
+    <form className="grid-form" onSubmit={submit}>
       <h3 className="wide">Put an item here</h3>
-      <label className="wide">
-        Its number
-        <input
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          placeholder="e.g. SH-000123"
-          autoComplete="off"
-          autoCapitalize="characters"
-          enterKeyHint="done"
-        />
-      </label>
+      <div className="wide scan-row">
+        <label>
+          Its number
+          <input
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            placeholder="e.g. SH-000123"
+            autoComplete="off"
+            autoCapitalize="characters"
+            enterKeyHint="done"
+          />
+        </label>
+        <button
+          type="button"
+          aria-pressed={camera}
+          onClick={() => {
+            if (!camera) primeSound()
+            if (camera) close()
+            else setCamera(true)
+          }}
+        >
+          Scan
+        </button>
+      </div>
+      {camera && (
+        <div className="wide">
+          <CameraScanner onRead={(code) => put(code.trim())} onStop={close} small />
+        </div>
+      )}
       <Refusal error={error} className="wide" />
       {moved && !error && (
-        <p className="added wide" role="status">
+        <ScanResult label="Put here" onClose={camera ? close : undefined}>
           {moved}
-        </p>
+          {camera && ' Scan the next label.'}
+        </ScanResult>
       )}
       <button type="submit" className="wide">
         Put it here

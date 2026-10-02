@@ -232,12 +232,15 @@ describe('reports', () => {
   })
 
   it('are updated, and closed once, in a way that fits', async () => {
-    const { app, y10p, speakers } = await warehouse()
+    const { app, db, y10p, speakers } = await warehouse()
     const damaged = report('damaged', { assetId: speakers[0]!, modelId: y10p.id }, { note: 'Grille dented' })
     const missing = report('missing', { assetId: speakers[1]!, modelId: y10p.id })
     await ok(app, 'fault.report', damaged)
     await ok(app, 'fault.report', missing)
     await ok(app, 'fault.update', { id: damaged.id, usable: true, repair: 'Grille knocked back out; sounds fine.' })
+    // What's wrong, or where missing kit was last seen, can be put right afterwards too (audit finding 19).
+    await ok(app, 'fault.update', { id: damaged.id, note: ' Grille dented, rattles at high level ' })
+    await ok(app, 'fault.update', { id: missing.id, note: 'Last seen in the van' })
     expect(await refused(app, 'fault.update', { id: missing.id, usable: true })).toBe("Missing kit can't go out until it's found.")
     expect(await refused(app, 'fault.close', close(damaged.id, 'found'))).toBe('Damaged kit is fixed, not faulty, or written off, not found.')
     expect(await refused(app, 'fault.close', close(missing.id, 'fixed'))).toBe('Missing kit is found or written off, not fixed.')
@@ -249,9 +252,15 @@ describe('reports', () => {
     expect(await refused(app, 'fault.close', close(newId(), 'fixed'))).toBe('That fault was never saved.')
 
     const { faults, items } = await records(app)
-    expect(faults.get(damaged.id)).toMatchObject({ usable: true, repair: 'Grille knocked back out; sounds fine.', outcome: 'fixed' })
+    expect(faults.get(damaged.id)).toMatchObject({ usable: true, note: 'Grille dented, rattles at high level', repair: 'Grille knocked back out; sounds fine.', outcome: 'fixed' })
+    const { entries } = await readHistory(db)
+    expect(entries.filter((e) => e.command === 'fault.update' && e.outcome === 'done').map((e) => e.what)).toEqual([
+      'Changed the fault on SH-000002 (d&b Y10P): where it was last seen',
+      "Changed the fault on SH-000001 (d&b Y10P): what's wrong",
+      'Changed the fault on SH-000001 (d&b Y10P): fit to go out and the repair notes',
+    ])
     expect(faults.get(damaged.id)!.closedAt).toMatch(/Z$/)
-    expect(faults.get(missing.id)).toMatchObject({ usable: false, outcome: 'found' })
+    expect(faults.get(missing.id)).toMatchObject({ usable: false, note: 'Last seen in the van', outcome: 'found' })
     // Nothing written off, nothing retired.
     expect(items.get(speakers[0]!)!.status).toBe('active')
   })

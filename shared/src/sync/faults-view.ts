@@ -21,7 +21,11 @@ export interface FaultView extends Fault {
 }
 
 export interface FaultsView {
-  /** Every fault, newest first. */
+  /**
+   * Every fault, newest first, those of a product added by mistake too: the
+   * pick lists count a report of kit missing as the end of its time out,
+   * whatever became of the product since.
+   */
   all: FaultView[]
   /** Open ones, oldest first: the repair list. */
   open: FaultView[]
@@ -103,9 +107,11 @@ export function faultsView(
     })
     .sort(newest)
 
+  // A product added by mistake takes its faults out of sight with it (audit finding 19): off the repair list and every page.
+  const shown = all.filter((f) => !warehouse.mistakes.has(f.modelId))
   const group = (key: (f: FaultView) => string | null) => {
     const by = new Map<string, FaultView[]>()
-    for (const f of all) {
+    for (const f of shown) {
       const k = key(f)
       if (k === null) continue
       const list = by.get(k) ?? []
@@ -145,7 +151,7 @@ export function faultsView(
 
   return {
     all,
-    open: all.filter((f) => f.open).reverse(),
+    open: shown.filter((f) => f.open).reverse(),
     ofAsset: (id) => byAsset.get(id) ?? [],
     ofModel: (id) => byModel.get(id) ?? [],
     ofJob: (id) => byJob.get(id) ?? [],

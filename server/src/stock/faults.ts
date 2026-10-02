@@ -8,10 +8,11 @@ import { getAsset, getModel, whereOf } from './store.ts'
 /**
  * Faults and missing kit (ADR 0018). A report records something that
  * already happened, so it's kept whatever the plan says, as a scan is;
- * only one naming an item, product or job that was never saved, or an
- * item already retired, is turned down, and the answer says why. Closing
- * one decides how it ended: writing off retires an item (scrapped, or
- * lost) or takes counted kit off the count, in the same change.
+ * only one naming an item, product or job that was never saved, an item
+ * already retired, or a product added by mistake, is turned down, and the
+ * answer says why. Closing one decides how it ended: writing off retires
+ * an item (scrapped, or lost) or takes counted kit off the count, in the
+ * same change.
  */
 
 type Row = Record<string, any>
@@ -94,8 +95,10 @@ export const faultHandlers: { [N in FaultCommand]: Handler<N> } = {
     }
     // An item's product is the one it has now, whatever the phone thought.
     const modelId = asset?.modelId ?? a.modelId
-    if (!(await getModel(ctx.tx, modelId)))
-      throw new Refused({ code: 'not-found', message: 'The product reported is no longer in the stock list, so the report wasn\'t kept.' })
+    const m = await getModel(ctx.tx, modelId)
+    if (!m) throw new Refused({ code: 'not-found', message: 'The product reported is no longer in the stock list, so the report wasn\'t kept.' })
+    // Kept for the history only (audit finding 19): nothing more happens to it.
+    if (m.mistake) throw new Refused({ code: 'conflict', message: `${m.name} was added by mistake, so the report wasn't kept.` })
     if (a.projectId && !(await getProject(ctx.tx, a.projectId)))
       throw new Refused({
         code: 'not-found',

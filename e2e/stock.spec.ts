@@ -6,9 +6,11 @@ import { expect, test, type Page } from '@playwright/test'
  * free one; a case found by its number, an item put in it and cables
  * counted in it; the place showing it all; a new label and a retirement.
  * An item labelled with no signal gets its number once the signal is back.
- * The test server is shared with the other browser tests, so every name and
- * number here is this run's own. To refresh the blueprint screenshots, run
- * this file on its own with SHOTS=1: the names are then plain.
+ * A where that matches no place asks before making one, and a product
+ * added by mistake is hidden with its items (audit finding 19). The test
+ * server is shared with the other browser tests, so every name and number
+ * here is this run's own. To refresh the blueprint screenshots, run this
+ * file on its own with SHOTS=1: the names are then plain.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -52,11 +54,18 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await newProduct(page, rack, 'case')
   await newProduct(page, speaker, 'numbered')
 
-  // Six speakers counted at a new place before they have labels.
+  // Six speakers counted at a new place before they have labels: a slip of the thumb is asked about first.
   const count = part(page, 'Add a count')
-  await count.getByLabel('Counted at').fill(bay)
+  await count.getByLabel('Counted at').fill(`${bay}3`)
   await count.getByLabel('How many').fill('6')
   await count.getByRole('button', { name: 'Save count' }).click()
+  await expect(count.getByRole('group', { name: `Make a new place called “${bay}3”? It joins the places on the Stock tab.` })).toBeVisible()
+  await expect(count.getByLabel('Counted at')).toBeDisabled()
+  await count.getByRole('button', { name: 'Go back' }).click()
+  await expect(count.getByLabel('Counted at')).toHaveValue(`${bay}3`)
+  await count.getByLabel('Counted at').fill(bay)
+  await count.getByRole('button', { name: 'Save count' }).click()
+  await count.getByRole('button', { name: 'Make the place' }).click()
   const notLabelled = page.getByRole('region', { name: 'Not labelled yet' })
   await expect(notLabelled.locator('.count', { hasText: bay })).toContainText('6')
 
@@ -178,6 +187,7 @@ test('an item labelled with no signal gets its number when the signal is back', 
   const add = part(phone, 'Add an item')
   await add.getByLabel("Where it's kept").fill(cabinet)
   await add.getByRole('button', { name: 'Add item' }).click()
+  await add.getByRole('button', { name: 'Make the place' }).click()
   await expect(add.locator('.added')).toHaveText('Added. It gets the next free number when it syncs.')
   const row = phone.getByRole('region', { name: 'Items' }).locator('.item-row')
   await expect(row).toContainText('Number when synced')
@@ -190,4 +200,71 @@ test('an item labelled with no signal gets its number when the signal is back', 
   await expect(row).toHaveText(new RegExp(`^SH-\\d{6}${cabinet}$`))
   const number = (await row.locator('b').textContent()) ?? ''
   await expect(add.locator('.added')).toHaveText(`Added ${number}.`)
+})
+
+test('a product added by mistake is hidden with its items and counts, and its labels say so', async ({ browser }) => {
+  // Something made by mistake can be taken back, asked about first, with nothing of it left in a list or a count.
+  const id = tag()
+  const light = named('Martin MAC Aura', id)
+  const bay = named('Bay L1', id)
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await ready(page)
+  await newProduct(page, light, 'numbered')
+
+  // One labelled, two counted, so it can't simply be removed.
+  const add = part(page, 'Add an item')
+  await add.getByLabel("Where it's kept").fill(bay)
+  await add.getByRole('button', { name: 'Add item' }).click()
+  await add.getByRole('button', { name: 'Make the place' }).click()
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The question answered, the number field is ready for the next label.
+  await expect(add.getByLabel('Number', { exact: true })).toBeFocused()
+  const number = (await add.locator('.added').textContent())!.slice(6, -1)
+  const count = part(page, 'Add a count')
+  await count.getByLabel('Counted at').fill(bay)
+  await count.getByLabel('How many').fill('2')
+  await count.getByRole('button', { name: 'Save count' }).click()
+  await expect(page.locator('.facts')).toContainText('3: 1 labelled, 2 not yet')
+  await expect(page.getByRole('button', { name: 'Remove product' })).toHaveCount(0)
+
+  // Asked first, with what goes; then it's gone from the list, the place and the search, but its label still answers.
+  await page.getByRole('button', { name: 'Added by mistake' }).click()
+  await expect(
+    page.getByRole('group', {
+      name: `Mark ${light} as added by mistake? It leaves every list and count, with its 1 item and 2 counted, and is kept only in the history. This can't be undone.`,
+    })
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'It was a mistake' }).click()
+  await expect(page).toHaveURL(/#stock$/)
+  await expect(page.locator('.job-row', { hasText: light })).toHaveCount(0)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await expect(page.locator('.job-row', { hasText: light })).toHaveCount(0)
+  await expect(page.locator('.job-row', { hasText: bay })).toContainText('Nothing here yet')
+  await page.getByLabel('Find').fill(number)
+  await expect(page.getByRole('list', { name: 'Items found' }).locator('.item-row')).toHaveText(new RegExp(`^${number} ${light}Added by mistake`))
+  await page.locator('.job-row', { hasText: bay }).click()
+  const put = part(page, 'Put an item here')
+  await put.getByLabel('Its number').fill(number)
+  await put.getByRole('button', { name: 'Put it here' }).click()
+  await expect(put.locator('.alert')).toHaveText(`${number} (${light}) was added by mistake.`)
+
+  // A product whose only item was retired as added by mistake still has that item kept, so it's marked rather than removed, as the server has it.
+  const spot = named('Martin MAC Viper', id)
+  await newProduct(page, spot, 'numbered')
+  await add.getByLabel("Where it's kept").fill(bay)
+  await add.getByRole('button', { name: 'Add item' }).click()
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  await add.locator('.added a').click()
+  await page.getByRole('button', { name: 'Retire' }).click()
+  await page.getByRole('radio', { name: 'Added by mistake' }).check()
+  await page.getByRole('button', { name: /^Retire SH-/ }).click()
+  await expect(page.locator('.facts')).toContainText('RetiredAdded by mistake')
+  await page.getByRole('link', { name: `‹ ${spot}` }).click()
+  await expect(page.getByRole('button', { name: 'Remove product' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Added by mistake' }).click()
+  await page.getByRole('button', { name: 'It was a mistake' }).click()
+  await expect(page).toHaveURL(/#stock$/)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await expect(page.locator('.job-row', { hasText: spot })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '1 not done' })).toHaveCount(0)
 })

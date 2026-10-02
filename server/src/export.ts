@@ -184,7 +184,7 @@ function historyCsv(history: HistoryEntry[]): string {
 
 /** What each table holds, for the README. A table not described here is still exported. */
 const ABOUT: Record<string, string> = {
-  assets: 'Numbered items of stock: their product, serial, where they are kept, and whether they are retired.',
+  assets: 'Numbered items of stock: their product, serial, where they are kept, and whether they are retired (sold, scrapped, lost, stolen, or added by mistake).',
   backup_runs: 'The nightly backups: when each ran and how it went.',
   bookings: 'Stock booked for jobs (sync test).',
   calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
@@ -199,11 +199,11 @@ const ABOUT: Record<string, string> = {
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',
   issues: 'Things someone has to sort out, such as more scanned out than booked (sync test).',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
-  label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, and what they were for.',
+  label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, what they were for, and when one was cancelled before any of its labels went on an item. A cancelled run is off the list, but its numbers are never given out again.',
   leave_allowances: "Each staff member's annual leave for a year: the days, what was carried over, and a note; 20 days when none is set.",
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
   lieu_entries: 'Days staff worked that earn days in lieu, and whether each was approved.',
-  models: 'Products in the stock list: department, category, numbered or counted, and replacement value.',
+  models: 'Products in the stock list: department, category, numbered or counted, replacement value, and whether one was added by mistake and so hidden from the list.',
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',

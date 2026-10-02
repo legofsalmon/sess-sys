@@ -7,7 +7,7 @@ import { runMigrations, type Module } from '../migrations.ts'
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
  * the numbers set aside for printing labels (ADR 0015); kit scanned out
  * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
- * inspections (ADR 0020).
+ * inspections (ADR 0020); and what was added by mistake (audit finding 19).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -167,6 +167,18 @@ const MIGRATIONS: string[] = [
     recorded_at  timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS inspections_asset ON inspections (asset_id);
+  `,
+  // Added by mistake (audit finding 19): a product marked so is kept for the
+  // history and hidden everywhere else, leaving its name free for the product
+  // meant, and an item can be retired as one. A run of labels set aside by
+  // mistake is cancelled, not deleted, so its numbers are never given out again.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS mistake boolean NOT NULL DEFAULT false;
+  DROP INDEX IF EXISTS models_name;
+  CREATE UNIQUE INDEX IF NOT EXISTS models_name ON models (lower(name)) WHERE NOT mistake;
+  ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_retired_reason_check;
+  ALTER TABLE assets ADD CONSTRAINT assets_retired_reason_check CHECK (retired_reason IN ('sold', 'scrapped', 'lost', 'stolen', 'mistake'));
+  ALTER TABLE label_runs ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
   `,
 ]
 

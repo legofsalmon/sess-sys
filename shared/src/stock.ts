@@ -73,11 +73,18 @@ export const model = z.object({
   patMonths: months.default(null),
   liftingMonths: months.default(null),
 })
-export type Model = z.infer<typeof model>
+export type Model = z.infer<typeof model> & {
+  /**
+   * Marked as added by mistake (audit finding 19): kept for the history, with
+   * its items retired as `mistake` and its counts gone, and out of every list.
+   */
+  mistake: boolean
+}
 
-export const RETIRED_REASONS = ['sold', 'scrapped', 'lost', 'stolen'] as const
+/** Why an item is no longer stock. `mistake` is for one that never was: it's hidden everywhere but the history. */
+export const RETIRED_REASONS = ['sold', 'scrapped', 'lost', 'stolen', 'mistake'] as const
 export type RetiredReason = (typeof RETIRED_REASONS)[number]
-export const RETIRED_LABELS: Record<RetiredReason, string> = { sold: 'Sold', scrapped: 'Scrapped', lost: 'Lost', stolen: 'Stolen' }
+export const RETIRED_LABELS: Record<RetiredReason, string> = { sold: 'Sold', scrapped: 'Scrapped', lost: 'Lost', stolen: 'Stolen', mistake: 'Added by mistake' }
 
 /**
  * One numbered item. Its id is internal and never printed, so a worn label
@@ -189,6 +196,13 @@ export const stockCommandSchemas = {
     .refine(...caseIsNumbered),
   /** Refused while it has items, retired ones included, or counted stock. */
   'model.remove': z.object({ id }),
+  /**
+   * Added by mistake: the product and its items are hidden everywhere but
+   * the history, its items retired as `mistake` and its counts taken away.
+   * Refused while any of it is out on a job, on a job's kit, or in a case
+   * that still holds kit.
+   */
+  'model.mistake': z.object({ id }),
   'place.upsert': place,
   /** Refused while anything is at it. */
   'place.remove': z.object({ id }),
@@ -240,4 +254,18 @@ export function valueLabel(c: number): string {
 /** "1 item", "12 items". */
 export function plural(n: number, one: string, many: string = `${one}s`): string {
   return `${n.toLocaleString('en-IE')} ${n === 1 ? one : many}`
+}
+
+/**
+ * Why a product can't be marked as added by mistake while some of it is
+ * out with a job, in the same words on the phone and from the server:
+ * "d&b Y10P is out with Nissan launch (SH-000001 and 5 counted). Scan it
+ * back first."
+ */
+export function stillOutReason(product: string, out: readonly { what: string; job: string }[]): string {
+  const jobs = [...new Set(out.map((o) => o.job))].sort((a, b) => a.localeCompare(b))
+  const whats = out.length > 3 ? [...out.slice(0, 2).map((o) => o.what), `${out.length - 2} more`] : out.map((o) => o.what)
+  const listed = whats.length < 2 ? whats[0] : `${whats.slice(0, -1).join(', ')} and ${whats.at(-1)}`
+  const where = jobs.length === 1 ? `${jobs[0]} (${listed})` : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`
+  return `${product} is out with ${where}. Scan it back first.`
 }

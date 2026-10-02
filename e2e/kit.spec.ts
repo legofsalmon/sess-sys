@@ -37,6 +37,9 @@ async function newProduct(page: Page, name: string, how: 'numbered' | 'counted',
   await add.getByLabel('Counted at').fill('Warehouse')
   await add.getByLabel('How many').fill(String(count))
   await add.getByRole('button', { name: 'Save count' }).click()
+  // The first time the Warehouse is named on this server, it's asked about (audit finding 19).
+  const yes = page.getByRole('button', { name: 'Make the place' })
+  if (await yes.isVisible()) await yes.click()
   await expect(page.locator('.count', { hasText: 'Warehouse' })).toContainText(String(count))
 }
 

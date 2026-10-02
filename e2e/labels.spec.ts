@@ -11,8 +11,11 @@ import { createRequire } from 'node:module'
  * with its product's name. Every QR code is read back by a decoder. Numbers
  * set aside with no signal come once the signal is back. The test server is
  * shared with the other browser tests, so the numbers are read off the
- * screen rather than assumed. To refresh the blueprint screenshots, run
- * this file on its own with SHOTS=1: the names are then plain.
+ * screen rather than assumed. Setting numbers aside asks first with the
+ * count, and a run none of whose labels is on an item yet can be cancelled,
+ * its numbers never given out again (audit finding 19). To refresh the
+ * blueprint screenshots, run this file on its own with SHOTS=1: the names
+ * are then plain.
  */
 
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
@@ -44,6 +47,7 @@ async function newProduct(page: Page, name: string, at: string, count: number) {
   await add.getByLabel('Counted at').fill(at)
   await add.getByLabel('How many').fill(String(count))
   await add.getByRole('button', { name: 'Save count' }).click()
+  await add.getByRole('button', { name: 'Make the place' }).click()
   await expect(page.locator('.count', { hasText: at })).toContainText(String(count))
 }
 
@@ -105,6 +109,13 @@ test('set aside, printed, sent to a label maker, and put on items by scanning', 
   await form.getByLabel('How many labels').fill('12')
   await form.getByLabel('What for').fill(roll)
   await form.getByRole('button', { name: 'Set numbers aside' }).click()
+  // Asked first, with the count, so a slip of a zero isn't 120 labels.
+  await expect(form.getByRole('group', { name: /^Reserve 12 numbers\?/ })).toBeVisible()
+  await expect(form.getByLabel('How many labels')).toBeDisabled()
+  await form.getByRole('button', { name: 'Not yet' }).click()
+  await expect(form.getByLabel('How many labels')).toHaveValue('12')
+  await form.getByRole('button', { name: 'Set numbers aside' }).click()
+  await form.getByRole('button', { name: 'Reserve them' }).click()
   await expect(form.locator('.added')).toHaveText(/^Set aside SH-\d{6} to SH-\d{6}\.$/)
   const [firstText, lastText] = (await form.locator('.added a').textContent())!.split(' to ')
   const first = Number(firstText!.slice(3))
@@ -224,6 +235,30 @@ test('set aside, printed, sent to a label maker, and put on items by scanning', 
   await expect(add.locator('.added')).toHaveText(`Added ${sh(first + 12)}.`)
   await page.goto('/#stock/labels')
   await expect(page.getByRole('region', { name: 'Set aside' }).locator('.job-row', { hasText: roll })).toContainText('2 of 12 on items')
+
+  // A run with labels on items can't be cancelled; one set aside by mistake can, and its numbers are never given out again.
+  await page.getByRole('region', { name: 'Set aside' }).locator('.job-row', { hasText: roll }).click()
+  await expect(page.getByRole('button', { name: 'Cancel the run' })).toHaveCount(0)
+  await page.goto('/#stock/labels')
+  await form.getByLabel('How many labels').fill('40')
+  await form.getByLabel('What for').fill(`Typed by mistake ${id}`)
+  await form.getByRole('button', { name: 'Set numbers aside' }).click()
+  await form.getByRole('button', { name: 'Reserve them' }).click()
+  await expect(form.locator('.added')).toHaveText(`Set aside ${sh(first + 13)} to ${sh(first + 52)}.`)
+  await form.locator('.added a').click()
+  await expect(page.getByRole('heading', { level: 1, name: `${sh(first + 13)} to ${sh(first + 52)}` })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel the run' }).click()
+  await expect(
+    page.getByRole('group', { name: `Cancel the run ${sh(first + 13)} to ${sh(first + 52)}? It comes off the list, and its 40 numbers are never given out again.` })
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel the run' }).click()
+  await expect(page).toHaveURL(/#stock\/labels$/)
+  await expect(page.getByRole('region', { name: 'Set aside' }).locator('.job-row', { hasText: `Typed by mistake ${id}` })).toHaveCount(0)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await form.getByLabel('How many labels').fill('1')
+  await form.getByRole('button', { name: 'Set numbers aside' }).click()
+  await form.getByRole('button', { name: 'Reserve them' }).click()
+  await expect(form.locator('.added')).toHaveText(`Set aside ${sh(first + 53)}.`)
 })
 
 test('numbers set aside with no signal come once the signal is back', async ({ browser }) => {
@@ -237,6 +272,7 @@ test('numbers set aside with no signal come once the signal is back', async ({ b
   await form.getByLabel('How many labels').fill('5')
   await form.getByLabel('What for').fill(`Metal tags ${id}`)
   await form.getByRole('button', { name: 'Set numbers aside' }).click()
+  await form.getByRole('button', { name: 'Reserve them' }).click()
   await expect(form.locator('.added')).toHaveText('Set aside. The numbers come from the server when it syncs.')
   const row = phone.getByRole('region', { name: 'Set aside' }).locator('.job-row', { hasText: `Metal tags ${id}` })
   await expect(row).toContainText('Numbers when synced')

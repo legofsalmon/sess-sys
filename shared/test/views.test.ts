@@ -46,6 +46,7 @@ const model = (id: string, name: string, extra: Partial<Model> = {}): Model => (
   notes: '',
   patMonths: null,
   liftingMonths: null,
+  mistake: false,
   ...extra,
 })
 const asset = (id: string, modelId: string, placeId: string | null): Asset => ({

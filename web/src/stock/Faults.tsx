@@ -21,8 +21,9 @@ import { numberLabel, Pending } from './common.tsx'
  * Faults and missing kit (ADR 0018): reporting damage or kit that's
  * missing, on an item's page, a product's (for counted kit), or the pick
  * list as kit comes back; and the repair list, where each one is fixed,
- * found, found not faulty, or written off. Kit that can't go out comes off
- * what's free for jobs until then.
+ * found, found not faulty, or written off, and what's wrong, the repair
+ * notes and whether it can go out meanwhile are changed. Kit that can't
+ * go out comes off what's free for jobs until then.
  */
 
 /** "SH-000123 d&b Y10P", or "3 × XLR 10 m". */
@@ -201,7 +202,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
         </div>
         <Pending pending={f.pending} />
       </header>
-      {f.note && <p className="notes">{f.note}</p>}
+      {f.note && !editing && <p className="notes">{f.note}</p>}
       {f.repair && !editing && (
         <p className="repair">
           <b>Repair notes:</b> {f.repair}
@@ -225,7 +226,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
               </button>
             ))}
             <button type="button" onClick={() => setEditing(true)}>
-              Repair notes
+              Change details
             </button>
           </div>
         )
@@ -235,24 +236,31 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   )
 }
 
-/** Only what changed is sent. */
+/** Only what changed is sent: what's wrong (or where it was last seen), the repair notes, and whether it can go out. */
 function EditFault({ f, onDone }: { f: FaultView; onDone: () => void }) {
+  const [note, setNote] = useState(f.note)
   const [repair, setRepair] = useState(f.repair)
   const [usable, setUsable] = useState(f.usable)
-  const { run, error } = useAct()
+  const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const changes: CommandInput<'fault.update'> = { id: f.id }
+    if (note.trim() !== f.note) changes.note = note.trim()
     if (repair.trim() !== f.repair) changes.repair = repair.trim()
     if (usable !== f.usable) changes.usable = usable
+    if (f.kind === 'damaged' && changes.note === '') return refuse("Say what's wrong, for whoever repairs it.")
     if (Object.keys(changes).length === 1) return onDone()
     void run(() => client.mutate('fault.update', changes)).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={submit}>
       <label className="wide">
+        {f.kind === 'missing' ? 'Where it was last seen' : "What's wrong"}
+        <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} autoFocus />
+      </label>
+      <label className="wide">
         Repair notes
-        <textarea rows={3} value={repair} onChange={(e) => setRepair(e.target.value)} maxLength={4000} placeholder="e.g. Sent to d&b for a new driver, €180" autoFocus />
+        <textarea rows={3} value={repair} onChange={(e) => setRepair(e.target.value)} maxLength={4000} placeholder="e.g. Sent to d&b for a new driver, €180" />
       </label>
       {f.kind === 'damaged' && (
         <label className="tick wide">

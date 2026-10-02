@@ -89,7 +89,14 @@ async function newProduct(page: Page, name: string, counted?: number) {
   await add.getByLabel('Counted at').fill('Warehouse')
   await add.getByLabel('How many').fill(String(counted))
   await add.getByRole('button', { name: 'Save count' }).click()
+  await makePlace(page)
   await expect(page.locator('.count', { hasText: 'Warehouse' })).toContainText(String(counted))
+}
+
+/** The question a place nobody has used yet brings up (audit finding 19), answered yes when it's asked. */
+async function makePlace(page: Page) {
+  const yes = page.getByRole('button', { name: 'Make the place' })
+  if (await yes.isVisible()) await yes.click()
 }
 
 /** Items of the product whose page is open, kept at `where`, with the numbers the server gives them. */
@@ -99,6 +106,7 @@ async function newItems(page: Page, where: string, count: number) {
   for (let i = 0; i < count; i++) {
     await add.getByLabel("Where it's kept").fill(where)
     await add.getByRole('button', { name: 'Add item' }).click()
+    await makePlace(page)
     if (numbers.length) await expect(add.locator('.added')).not.toHaveText(`Added ${numbers.at(-1)}.`)
     await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
     const number = (await add.locator('.added').textContent())!.slice(6, -1)

@@ -5,6 +5,7 @@ import {
   newId,
   normaliseNumber,
   plural,
+  stillOutReason,
   stockId,
   type CommandArgs,
   type RetiredReason,
@@ -13,7 +14,7 @@ import {
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
-import { movementsOf } from './moves.ts'
+import { movementsOf, outWithJobs } from './moves.ts'
 import {
   atPlace,
   caseChain,
@@ -40,13 +41,18 @@ import {
  * - no moving more of a count than is there;
  * - a product with items or counts, a place with anything at it, and a
  *   case with anything in it can't be removed or retired, nor a product
- *   on a job's kit (ADR 0014).
+ *   on a job's kit (ADR 0014);
+ * - a product added by mistake (audit finding 19) is kept for the history
+ *   with its items retired as a mistake and its counts gone, and nothing
+ *   more can be done as it; it can't be marked so while any of it is on a
+ *   job's kit, out with a job, or a case still holding kit.
  */
 
 type StockCommand =
   | 'model.create'
   | 'model.update'
   | 'model.remove'
+  | 'model.mistake'
   | 'place.upsert'
   | 'place.remove'
   | 'asset.add'
@@ -77,10 +83,19 @@ const described = async (ctx: Ctx, assetId: string) => {
   return a ? `${a.number || 'That item'}${m ? ` (${m.name})` : ''}` : 'That item'
 }
 
+/** A product in the stock list: one marked as added by mistake is out of it for good. */
 async function mustModel(ctx: Ctx, id: string, lock = false) {
   const m = await getModel(ctx.tx, id, lock)
   if (!m) throw new Refused({ code: 'not-found', message: 'That product no longer exists.' })
+  if (m.mistake) throw new Refused({ code: 'conflict', message: `${m.name} was added by mistake, so nothing more can be done as it.` })
   return m
+}
+
+/** The jobs a product is on the kit for, as a refusal says them. */
+async function onKitFor(ctx: Ctx, modelId: string): Promise<string | undefined> {
+  const jobs = await jobsWithKit(ctx.tx, modelId)
+  if (jobs.length === 0) return undefined
+  return `${jobs.length === 1 ? jobs[0] : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`}. Take it off ${jobs.length === 1 ? 'that job' : 'those'} first.`
 }
 
 async function mustAsset(ctx: Ctx, id: string) {
@@ -243,18 +258,32 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (uses.items > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has numbered items, which are kept for their history, so it can't be removed.` })
     if (uses.counted > 0) throw new Refused({ code: 'conflict', message: `${m.name} still has ${uses.counted} counted. Count them as none first.` })
-    const jobs = await jobsWithKit(ctx.tx, a.id)
-    if (jobs.length)
-      throw new Refused({
-        code: 'conflict',
-        message: `${m.name} is on the kit for ${jobs.length === 1 ? jobs[0] : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`}. Take it off ${jobs.length === 1 ? 'that job' : 'those'} first.`,
-      })
+    const onKit = await onKitFor(ctx, a.id)
+    if (onKit) throw new Refused({ code: 'conflict', message: `${m.name} is on the kit for ${onKit}` })
     if ((await movementsOf(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has been out on jobs, which is kept for the record, so it can't be removed.` })
     if ((await faultsOf(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has had faults reported, which are kept for the record, so it can't be removed.` })
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
+  },
+
+  async 'model.mistake'(ctx, a) {
+    const m = await getModel(ctx.tx, a.id, true)
+    if (!m) throw new Refused({ code: 'not-found', message: 'That product no longer exists.' })
+    // Marked twice, by two phones: it's marked already.
+    if (m.mistake) return
+    const onKit = await onKitFor(ctx, a.id)
+    if (onKit) throw new Refused({ code: 'conflict', message: `${m.name} is on the kit for ${onKit}` })
+    const out = await outWithJobs(ctx.tx, a.id)
+    if (out.length) throw new Refused({ code: 'conflict', message: stillOutReason(m.name, out) })
+    // Its items go the way a retirement takes them, a case among them only once it's empty.
+    const { rows: items } = await ctx.tx.query<{ id: string }>(`SELECT id FROM assets WHERE model_id = $1 AND status = 'active' ORDER BY id`, [a.id])
+    for (const { id } of items) await retireItem(ctx, id, 'mistake', '')
+    const { rows: counts } = await ctx.tx.query<{ place_id: string | null; case_id: string | null }>('SELECT place_id, case_id FROM stock WHERE model_id = $1', [a.id])
+    for (const c of counts) await adjust(ctx, a.id, { placeId: c.place_id, caseId: c.case_id }, { to: 0 })
+    await ctx.tx.query('UPDATE models SET mistake = true WHERE id = $1', [a.id])
+    await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },
 
   async 'place.upsert'(ctx, a) {
@@ -344,6 +373,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
   async 'asset.reinstate'(ctx, a) {
     const asset = await mustAsset(ctx, a.id)
     if (asset.status === 'active') return
+    // Its product went with it, so there's nothing to bring it back as.
+    await mustModel(ctx, asset.modelId)
     await ctx.tx.query(`UPDATE assets SET status = 'active', retired_reason = NULL, retired_note = NULL WHERE id = $1`, [a.id])
     await emitAsset(ctx, a.id)
   },
