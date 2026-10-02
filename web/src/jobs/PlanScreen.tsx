@@ -260,7 +260,7 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
   const label = phases || (cell.stray ? 'No phase this day' : '')
   const crew = cell.needed > 0 ? `${cell.booked} of ${cell.needed} crew${cell.asked ? `, ${cell.asked} asked` : ''}` : ''
   const moved = phases && cell.stray ? 'Crew here from a phase that moved' : ''
-  const words = [label, crew, moved].filter(Boolean).join(', ')
+  const words = [label, crew, moved, ...(cell.late ?? [])].filter(Boolean).join(', ')
   const tone = cell.needed === 0 ? '' : cell.booked < cell.needed ? 'short' : 'full'
   const className = ['blk', lane.tentative ? 'dashed' : 'solid', tone, cell.stray && 'stray', lane.pending && 'pending'].filter(Boolean).join(' ')
   if (scale === 'month')
@@ -275,6 +275,12 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
       {label ? <b>{label}</b> : null}
       {crew && (label ? <small>{crew}</small> : <b>{crew}</b>)}
       {moved && <small>{moved}</small>}
+      {/* Said on their link today (ADR 0028), so whoever plans the day sees it where they look. */}
+      {cell.late?.map((l) => (
+        <small key={l} className="late">
+          {l}
+        </small>
+      ))}
     </div>
   )
 }
@@ -288,7 +294,7 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
     const first = cell.work.find((w) => w.booked) ?? cell.work[0]
     const words = [
       tag && `${tag}: ${cell.problem}`,
-      ...cell.work.map((w) => `${w.confirmed ? 'Booked on' : w.booked ? 'To confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}`),
+      ...cell.work.map((w) => `${w.confirmed ? 'Booked on' : w.booked ? 'To confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}${w.late ? `, ${w.late}` : ''}`),
       cell.away !== null && `Unavailable${cell.away ? ` (${cell.away})` : ''}`,
     ]
       .filter(Boolean)
@@ -309,6 +315,7 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
         <div key={w.callId} className={`item ${w.booked ? 'booked' : 'offered'}`}>
           {w.jobId ? <a href={`#jobs/${w.jobId}`}>{w.job}</a> : <b>{w.job}</b>}
           <small>{[!w.booked && 'Offered', w.phase, w.role].filter(Boolean).join(' · ')}</small>
+          {w.late && <small className="late">{w.late}</small>}
         </div>
       ))}
       {cell.away !== null && (

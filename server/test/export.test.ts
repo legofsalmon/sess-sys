@@ -14,8 +14,8 @@ import { IPHONE, onLink, server, staff } from './people.ts'
 async function company() {
   const { app, db } = await server()
   const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
-  await colly.send('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
-  await colly.send('booking.create', { id: 'b1', productId: 'y10p', project: 'Electric Picnic', qty: 2, start: '2026-10-02', end: '2026-10-04' })
+  await colly.send('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })
+  await colly.send('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
   await colly.send('person.upsert', {
     id: 'p1',
     name: 'Seán Ó Briain',
@@ -88,15 +88,18 @@ function table(text: string): Record<string, string>[] {
 describe('download everything', () => {
   it('holds every table as a spreadsheet and as JSON, the history, and a README', async () => {
     const { app, colly } = await company()
+    // An item brought in with the stock list (ADR 0026): its old tag and the PAT due day the list gave.
+    await colly.send('model.create', { id: 'k12', name: 'Corvo K12', department: 'audio', category: 'Speakers', tracking: 'serialised', isCase: false, valueCents: null, notes: '' })
+    await colly.send('asset.add', { id: 'k12-1', modelId: 'k12', number: null, serial: 'CK12-0101', placeId: 'a3', caseId: null, notes: '', fromCount: false, oldNumber: 'A-0101', patDue: '2027-09-30' })
     const { res, files } = await download(app, colly.cookies)
     expect(res.headers['content-type']).toBe('application/zip')
     expect(res.headers['content-disposition']).toBe(`attachment; filename="session-hire-${irishTime(new Date()).slice(0, 10)}.zip"`)
     expect(res.headers['cache-control']).toBe('no-store')
 
+    // Every table, running_late (ADR 0028) and erasures (ADR 0027) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
     const tables = [
       'assets',
       'backup_runs',
-      'bookings',
       'calendar_days',
       'calendar_guests',
       'calendar_imports',
@@ -104,10 +107,10 @@ describe('download everything', () => {
       'changes',
       'clients',
       'crew_calls',
+      'erasures',
       'faults',
       'identifiers',
       'inspections',
-      'issues',
       'kit_lines',
       'label_runs',
       'leave_allowances',
@@ -120,9 +123,8 @@ describe('download everything', () => {
       'people',
       'phases',
       'places',
-      'products',
       'projects',
-      'scans',
+      'running_late',
       'settings',
       'stock',
       'timesheets',
@@ -136,6 +138,7 @@ describe('download everything', () => {
     expect(Object.keys(json).sort()).toEqual(['exportedAt', ...tables].sort())
     expect(json.people).toEqual([expect.objectContaining({ name: 'Seán Ó Briain', phone: '+353 87 123 4567', skills: ['audio', 'rf'] })])
     expect(json.offers).toEqual([expect.objectContaining({ status: 'accepted', note: '=HYPERLINK("http://evil.example","Click")' })])
+    expect(json.assets).toEqual([expect.objectContaining({ serial: 'CK12-0101', old_number: 'A-0101', pat_due: '2027-09-30' })])
     // Exactly as the database has them: UTC, to the microsecond.
     expect(json.mutations[0].received_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+\+00:00$/)
 
@@ -144,6 +147,10 @@ describe('download everything', () => {
     expect(readme).toContain('by Colly Hewson (colly@sessionhire.com)')
     expect(readme).toMatch(/people +1 row +Staff and freelancers/)
     expect(readme).toMatch(/offers +1 row /)
+    // The tables the fourth round added say what they hold, the stock list's fields among them.
+    expect(readme).toMatch(/assets +1 row +Numbered items of stock: .*the old number they had before Session Hire's labels, and when the stock list said their next PAT is due\./)
+    expect(readme).toMatch(/running_late +0 rows +People saying on their private link that they're running late/)
+    expect(readme).toMatch(/erasures +0 rows +People whose details were erased on request: only their id/)
     expect(readme).toContain('Left out on purpose')
   })
 
@@ -207,8 +214,8 @@ describe('download everything', () => {
     const { files } = await download(app, colly.cookies)
     const history = table(files['history.csv']!)
     expect(history.map((h) => [h.Who, h.How, h.What])).toEqual([
-      ['Colly Hewson', 'App, device c0ffee', 'Set d&b Y10P to 4 in stock'],
-      ['Colly Hewson', 'App, device c0ffee', 'Booked 2 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct'],
+      ['Colly Hewson', 'App, device c0ffee', 'Added the product d&b Y10P (Audio, counted)'],
+      ['Colly Hewson', 'App, device c0ffee', 'Saved the place Bay A3'],
       ['Colly Hewson', 'App, device c0ffee', "Saved Seán Ó Briain's details"],
       ['Colly Hewson', 'App, device c0ffee', 'Gave Seán Ó Briain a new private link; the old one stopped working'],
       ['Colly Hewson', 'App, device c0ffee', 'Asked for 1 × Audio tech for Electric Picnic (Build), Fri 2 Oct to Sun 4 Oct'],

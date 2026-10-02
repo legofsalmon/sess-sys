@@ -2,6 +2,21 @@
 
 - **Status:** Accepted, 29 September 2026. Field test on real phones still to do once the app is hosted.
 - **Decides:** the open question "own sync or PowerSync" from [architecture.md](../architecture.md).
+- **Amended:** 2 October 2026, from the [audit](../audit-2026-09-30.md)'s
+  P3 list: the sync test this was decided with is gone. Its screen under
+  Stock, its `product.upsert`, `booking.create`, `booking.cancel` and
+  `scan.record` commands, and its products, bookings, scans and issues
+  tables went with it; each table was dropped only if it was empty, as
+  all four were on the live database. The evidence below is still proved
+  on every run, on the warehouse's counted stock instead: `stock.move`
+  carries the two devices moving the same four speakers (1, 3, 4, 5 and
+  8, with 7 against real Postgres), a batch judged change by change in
+  order stands in for 2, and `move.record` for 6, scans kept even beyond
+  the plan. A phone on an older version that still sends one of the old
+  commands has it turned down in plain words ("The app doesn't do this
+  any more, so it wasn't made."), with nothing kept, while the rest of
+  its outbox goes through; the old records in its copy sit unused.
+- **Amended:** 2 October 2026 by [ADR 0027](0027-erasing-a-person-on-request.md): erasing a person on request rewrites the earlier copies of their records in the change feed, which otherwise only ever grows, so a new device's first sync can't pull their old details.
 
 ## Context
 

@@ -1,5 +1,6 @@
-import { newId, type Mutation, type Person } from '@sh/shared'
+import { itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
@@ -19,21 +20,26 @@ import { IPHONE, onLink, staff } from './people.ts'
 const url = process.env.TEST_DATABASE_URL
 
 describe.skipIf(!url)('real Postgres, many devices at once', () => {
-  it('never overbooks and keeps the change feed gap-free under concurrent pushes', async () => {
+  it('never moves more than are counted, and keeps the change feed gap-free under concurrent pushes', async () => {
     const db = postgresDb(url!)
-    await db.exec('DROP TABLE IF EXISTS changes, mutations, bookings, scans, issues, products, schema_version CASCADE')
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
     const app = await buildApp({ db })
     try {
       const push = (clientId: string, mutations: Mutation[]) =>
         app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId, mutations } }).then((r) => r.json())
       const m = (name: Mutation['name'], args: object): Mutation => ({ id: newId(), name, args: args as never, createdAt: new Date().toISOString() })
 
-      await push('office', [m('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })])
+      await push('office', [
+        m('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: '', tracking: 'bulk', isCase: false, valueCents: null, notes: '' }),
+        m('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' }),
+        m('place.upsert', { id: 'van1', name: 'Van 1', notes: '' }),
+        m('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 4 }),
+      ])
 
-      // Twenty devices each try to book one speaker for the same day.
+      // Twenty devices each try to move one of the four speakers out of Bay A3 at the same moment.
       const answers = await Promise.all(
         Array.from({ length: 20 }, (_, i) =>
-          push(`phone-${i}`, [m('booking.create', { id: `b${i}`, productId: 'y10p', project: `Job ${i}`, qty: 1, start: '2026-10-05', end: '2026-10-05' })])
+          push(`phone-${i}`, [m('stock.move', { modelId: 'y10p', fromPlaceId: 'a3', fromCaseId: null, toPlaceId: 'van1', toCaseId: null, qty: 1 })])
         )
       )
       const statuses = answers.map((a) => a.results[0].status)
@@ -85,8 +91,9 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       const push = (...mutations: Mutation[]) => app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations } })
       const m = (name: Mutation['name'], args: object): Mutation => ({ id: newId(), name, args: args as never, createdAt: new Date().toISOString() })
       await push(
-        m('product.upsert', { id: 'y10p', name: 'd&b Y10P "line array"', quantity: 4 }),
-        m('booking.create', { id: 'b1', productId: 'y10p', project: 'Féile na nDéise 🎶', qty: 2, start: '2026-10-05', end: '2026-10-06' }),
+        m('model.create', { id: 'y10p', name: 'd&b Y10P "line array"', department: 'audio', category: '', tracking: 'bulk', isCase: false, valueCents: null, notes: '' }),
+        m('place.upsert', { id: 'a3', name: 'Féile na nDéise 🎶', notes: 'Tab\there' }),
+        m('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 2 }),
         m('person.upsert', { id: 'p1', name: 'Seán Ó Briain', kind: 'freelancer', email: null, phone: null, skills: ['audio'], dayRateCents: 25000, notes: 'Tab\there\nand a new line' })
       )
       await db.query(`UPDATE mutations SET received_at = '2026-09-29 19:36:08.123456+00'`)
@@ -100,7 +107,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       for (const table of backup.header.tables) expect(await contents(target, table)).toEqual(await contents(db, table))
 
       const restored = await buildApp({ db: target })
-      const next = await restored.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [m('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 })] } })
+      const next = await restored.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [m('place.upsert', { id: 'van1', name: 'Van 1', notes: '' })] } })
       expect(next.json().results[0]).toMatchObject({ status: 'applied', seq: head + 1 })
       await restored.close()
     } finally {
@@ -117,9 +124,9 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] } })
     try {
       const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
-      await colly.send('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
-      await colly.send('booking.create', { id: 'b1', productId: 'y10p', project: 'Electric Picnic', qty: 4, start: '2026-10-02', end: '2026-10-04' }, { hoursWaiting: 2 })
-      await colly.send('booking.create', { id: 'b2', productId: 'y10p', project: 'Body & Soul', qty: 1, start: '2026-10-03', end: '2026-10-03' })
+      await colly.send('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
+      await colly.send('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: '', tracking: 'bulk', isCase: false, valueCents: null, notes: '' }, { hoursWaiting: 2 })
+      expect((await colly.send('place.upsert', { id: 'a4', name: 'Bay A3', notes: '' })).status).toBe('rejected')
       await colly.send('person.upsert', { id: 'p1', name: 'Seán Ó Briain', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: 25000, notes: '' })
       await colly.send('call.create', {
         id: 'c1',
@@ -153,14 +160,14 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       ])
       const second = await colly.history(`?limit=4&before=${first.next}`)
       expect(second.entries.map((e) => [e.what, e.outcome, e.madeOffline])).toEqual([
-        ['Booked 1 × d&b Y10P for Body & Soul, Sat 3 Oct', 'turned-down', false],
-        ['Booked 4 × d&b Y10P for Electric Picnic, Fri 2 Oct to Sun 4 Oct', 'done', true],
-        ['Set d&b Y10P to 4 in stock', 'done', false],
+        ['Saved the place Bay A3', 'turned-down', false],
+        ['Added the product d&b Y10P (Audio, counted)', 'done', true],
+        ['Saved the place Bay A3', 'done', false],
       ])
       expect(second.next).toBeUndefined()
       expect(second.entries[1]).toMatchObject({ device: 'Safari on iPhone', deviceCode: 'c0ffee', waitedSeconds: 7200 })
       expect((await colly.history('?who=link:p1')).entries.map((e) => e.who)).toEqual([{ kind: 'link', name: 'Seán Ó Briain', key: 'link:p1' }])
-      expect((await colly.history('?id=b1&entity=booking')).entries.map((e) => e.id)).toEqual([second.entries[1]!.id])
+      expect((await colly.history('?id=y10p&entity=model')).entries.map((e) => e.id)).toEqual([second.entries[1]!.id])
 
       // Everything at one moment, with no link secret in it, and the download itself in the history:
       // the app records it as it asks for the file (audit finding 20), so the file holds the record too.
@@ -330,6 +337,45 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     }
   })
 
+  it('erases a person on request from their record, the change feed, the history and their account, as on PGlite (ADR 0027)', async () => {
+    // Proves: the rewrite of the feed and the history (jsonb, and regular expressions that match whole addresses only) does on Postgres what it does on PGlite.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const cian = await staff(app, db, 'Cian Ó Murchú', IPHONE, 'phone-c1an00')
+      const person = (id: string, name: string, email: string, phone: string | null, notes = '') =>
+        colly.send('person.upsert', { id, name, kind: 'staff', email, phone, skills: [], dayRateCents: null, notes, approvesLeave: id === 'colly' })
+      await person('colly', 'Colly Hewson', colly.email, null)
+      await person('cian', 'Cian Ó Murchú', cian.email, '+353 87 444 0909', 'Vegetarian')
+      await person('dara', 'Dara Quinn', 'dara.cian@sessionhire.com', '+353 87 444 09090')
+      await colly.send('person.contact', { id: 'cian', phone: '+353 87 444 1010' })
+      await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: '2031-03-03', end: '2031-03-04', note: 'Skiing in Andorra' })
+      await colly.send('person.archive', { id: 'cian', archived: true })
+      expect(await colly.send('person.level', { id: 'cian', level: 2 })).toMatchObject({ status: 'rejected' })
+      expect(await colly.send('person.erase', { id: 'cian' })).toMatchObject({ status: 'applied' })
+
+      const all = async (table: string) => (await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n')
+      for (const table of ['people', 'changes', 'mutations', 'users', 'leave_requests', 'sessions'])
+        for (const t of ['Murchú', '"cian@', '444 0909"', '444 1010', 'Vegetarian', 'Andorra']) expect(await all(table), `${table} still holds "${t}"`).not.toContain(t)
+      expect((await db.query(`SELECT name, email, disabled FROM users WHERE id = $1`, [cian.id])).rows[0]).toEqual({ name: 'Erased person', email: '', disabled: true })
+      expect((await db.query(`SELECT result->'reason'->>'message' AS said FROM mutations WHERE status = 'rejected'`)).rows).toEqual([
+        { said: 'Erased person has been archived. Bring them back on the Crew tab to change their level.' },
+      ])
+      // Dara's address and number, which hold Cian's inside them, are as they were.
+      expect((await db.query(`SELECT args->>'email' AS email, args->>'phone' AS phone FROM mutations WHERE args->>'id' = 'dara'`)).rows).toEqual([
+        { email: 'dara.cian@sessionhire.com', phone: '+353 87 444 09090' },
+      ])
+      const fresh = await app.inject({ url: '/api/sync/pull?after=0', cookies: colly.cookies })
+      expect(fresh.body).not.toContain('Murchú')
+      expect(fresh.json().changes.filter((c: { entity: string }) => c.entity === 'leaveRequest').map((c: { op: string }) => c.op)).toEqual(['delete', 'delete'])
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
   it('starts fresh while phones are sending, and leaves nothing from before (ADR 0019)', async () => {
     const db = postgresDb(url!)
     await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
@@ -344,7 +390,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
           payload: {
             clientId: `phone${i}`,
             generation,
-            mutations: [{ id: newId(), name: 'product.upsert', args: { id: `p${i}`, name: `Product ${i}`, quantity: 1 }, createdAt: new Date().toISOString() }],
+            mutations: [{ id: newId(), name: 'place.upsert', args: { id: `p${i}`, name: `Phone ${i}'s place`, notes: '' }, createdAt: new Date().toISOString() }],
           },
         })
 
@@ -355,15 +401,69 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       // Each went in before and was deleted with the rest, or was turned away after.
       for (const a of answers) expect(a.json().stale === true || a.json().results[0].status === 'applied').toBe(true)
       expect((await send(20)).json()).toEqual({ results: [], stale: true })
-      const { rows } = await db.query<{ products: number; changes: number; mutations: number }>(
-        `SELECT (SELECT count(*)::int FROM products) AS products, (SELECT count(*)::int FROM changes) AS changes, (SELECT count(*)::int FROM mutations) AS mutations`
+      const { rows } = await db.query<{ places: number; changes: number; mutations: number }>(
+        `SELECT (SELECT count(*)::int FROM places) AS places, (SELECT count(*)::int FROM changes) AS changes, (SELECT count(*)::int FROM mutations) AS mutations`
       )
-      expect(rows[0]).toEqual({ products: 0, changes: 0, mutations: 1 })
+      expect(rows[0]).toEqual({ places: 0, changes: 0, mutations: 1 })
 
       // Made-up data goes in again, numbered from the start.
       expect((await app.inject({ method: 'POST', url: '/api/data/made-up' })).statusCode).toBe(200)
       const { rows: numbers } = await db.query<{ first: string }>(`SELECT min(value) AS first FROM identifiers WHERE kind = 'sh'`)
       expect(numbers[0]!.first).toBe('SH-000001')
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('brings the stock list in a call at a time, and reads an item’s log a page at a time, as on PGlite (ADR 0026)', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] }, stockImport: { ms: 60_000, commands: 10 } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const text = readFileSync(new URL('../../docs/samples/stock-list.csv', import.meta.url), 'utf8').replace('09/30/2027', '30/09/2027')
+      const options = { make: true, defaultPlace: '' }
+      const preview = async () => (await app.inject({ method: 'POST', url: '/api/stock/import/preview', cookies: colly.cookies, payload: { text, options } })).json() as StockListReading
+      let rows = (await preview()).rows.map((r) => ({ row: r.row, cells: r.cells, skip: r.skip, does: r.does }))
+      for (let going = false; ; going = true) {
+        const res = await app.inject({ method: 'POST', url: '/api/stock/import', cookies: colly.cookies, payload: { rows, options, going } })
+        expect(res.statusCode, res.body).toBe(200)
+        const { left } = res.json() as StockListResult
+        if (!left) break
+        rows = rows.map((r) => ({ ...r, does: left.rows.find((x) => x.row === r.row)!.does }))
+      }
+      // The PAT due day read back as a day, and old numbers kept; the same file again finds everything as it says.
+      const { rows: k12 } = await db.query<{ id: string; old: string; due: string }>(
+        `SELECT a.id, a.old_number AS old, a.pat_due::text AS due FROM assets a JOIN identifiers i ON i.asset_id = a.id WHERE i.value = 'SH-000505'`
+      )
+      expect(k12[0]).toMatchObject({ old: 'A-0101', due: '2027-09-30' })
+      expect((await preview()).counts).toMatchObject({ rows: 10, unchanged: 10, problems: 0 })
+
+      // The amps' rack scanned out takes them along; a fault on one; then more than a page of changes to it.
+      const amp = (await db.query<{ id: string; rack: string }>(`SELECT a.id, a.case_id AS rack FROM assets a JOIN identifiers i ON i.asset_id = a.id WHERE i.value = 'SH-000501'`)).rows[0]!
+      await colly.send('project.create', { id: 'gig', name: 'Harbour gig', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+      await colly.send('move.record', { id: 'rack-out', projectId: 'gig', direction: 'out', assetId: amp.rack, modelId: 'x', qty: 1, at: new Date().toISOString() })
+      await colly.send('fault.report', { id: 'hum', kind: 'damaged', assetId: amp.id, modelId: 'x', qty: 1, projectId: 'gig', usable: true, note: 'Hums', at: new Date().toISOString() })
+      await colly.send('fault.update', { id: 'hum', repair: 'Earth lifted' })
+      for (let n = 1; n <= 100; n++) await colly.send('asset.update', { id: amp.id, notes: `Check ${n}` })
+      const log = async (before?: string) =>
+        (await app.inject({ url: `/api/stock/items/${amp.id}/log${before ? `?before=${encodeURIComponent(before)}` : ''}`, cookies: colly.cookies })).json() as ItemLogPage
+      const first = await log()
+      const second = await log(first.next)
+      expect(first.entries).toHaveLength(100)
+      expect(second.next).toBeUndefined()
+      const all = [...first.entries, ...second.entries]
+      // Added, put in the rack, out with it, the fault and its repair notes, and the hundred changes: each once.
+      expect(new Set(all.map((e) => e.key)).size).toBe(all.length)
+      expect(all).toHaveLength(105)
+      expect(second.entries.map((e) => itemLogWords(e.event))).toEqual([
+        'Repair notes: Earth lifted',
+        'Reported damaged back from Harbour gig, fit to go out: Hums',
+        'Out to Harbour gig, in SH-000503 (Amp rack 1)',
+        'Put in SH-000503 (Amp rack 1)',
+        'Added as SH-000501',
+      ])
     } finally {
       await app.close()
       await db.close()

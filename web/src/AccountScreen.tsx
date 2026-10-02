@@ -8,9 +8,11 @@ import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
 import { ImportPeopleCard } from './ImportPeopleCard.tsx'
+import { ImportStockCard } from './ImportStockCard.tsx'
 import { MadeUp, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { useNotDone } from './problems.tsx'
+import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { client, storage } from './sync.ts'
 import { useView } from './view.ts'
 
@@ -28,6 +30,8 @@ export function AccountScreen() {
   const notDone = useNotDone(view)
   // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
   if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
+  // And the stock list (ADR 0026).
+  if (hash === '#account/import-stock') return <ImportStockScreen view={view} />
 
   const out = async () => {
     setAsking(false)
@@ -117,6 +121,7 @@ export function AccountScreen() {
           <ExportCard />
           <DataCard view={view} />
           <ImportPeopleCard />
+          <ImportStockCard />
         </>
       )}
 

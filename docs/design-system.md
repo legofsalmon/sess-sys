@@ -219,6 +219,16 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   every area, with Dismiss. An "are you sure?" is a question in place: the
   consequence in words in a warn line, the safe button first and focused,
   the fields held still. Not in Figma yet.
+- The History tab ([ADR 0006](adr/0006-audit-trail-and-export.md)) is a
+  card per day, the day as its heading ("Today", "Thursday 1 October").
+  One person's changes one after another are one line in bold, after a
+  muted triangle like a fold's: whose, how many and when ("Colly Hewson,
+  14 changes, 09:12 to 09:40"), with the devices and how many were
+  turned down in muted small text under it. A tap opens the changes
+  under it, set in behind a line. One the server turned down stays on
+  show under the shut line, its reason in the **bad** tone. While
+  sign-in is off nobody has a name, so a line is a device's ("Device
+  c0ffee"), and the top of the tab says why once. Not in Figma yet.
 - The Leave screen ([ADR 0024](adr/0024-staff-leave.md)) is the Crew
   tab's facts layout for a person's year, three to a row (allowance,
   carried over, taken, booked, waiting, left, with "left" in bold and in
@@ -295,6 +305,22 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   list's scan field and answer box, with the kind as two filter buttons
   and the items tested as number pills, burnt orange for a fail. Not in
   Figma yet.
+- What a call needs ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md))
+  is a row of ticks that wrap as chips under "Certificates needed", and
+  "needs working at height and IPAF" in the call's facts. Anyone on a
+  call short of one is a warn line under the call's line at rest; not
+  known is a warn line against the offer. The Offer to… picker groups
+  people under the select's own headings (those who hold it, "Not known:
+  check first", "Missing a certificate"), each line marked ("· no
+  IPAF"), and Offer says why not in the alert line. Certificates running
+  out are a card of rows, the line in amber for soon and burnt orange
+  for run out, with "Ask for the new card" opening the Send panel.
+  Running late is a row in "Answers to check" with Ring and Noted, and a
+  bold amber line under the call ("Gráinne: about 30 minutes late,
+  “Traffic on the M50”"), green once they're there; on the freelancer's
+  page it's a "Today" card with a green edge at the top, the choices as
+  bordered radio rows, and on the contact's call sheet a card with an
+  amber edge under who to ring. Not in Figma yet.
 
 ## Accessibility
 

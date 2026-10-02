@@ -61,6 +61,8 @@ export interface SheetInput {
   kit: readonly SheetKitLine[]
   /** Who is reading, so their own line stands out; not for the office. */
   readerId?: string
+  /** Who said they're running late, with the line to show (ADR 0028), already narrowed to what's still showing. */
+  late?: readonly { personId: string; line: string }[]
 }
 
 export type CrewStatus = 'booked' | 'to confirm' | 'offered'
@@ -74,6 +76,8 @@ export interface SheetCrew {
   days?: string
   status: CrewStatus
   me: boolean
+  /** Running late, in the office's and the contact's words (ADR 0028); never on another crew member's sheet. */
+  late?: string
 }
 
 export interface SheetCallView {
@@ -102,6 +106,8 @@ export interface CallSheet {
   calls: SheetCallView[]
   /** By department; only for the office and the contact on the day. */
   kit?: { department: string; lines: { name: string; qty: number; note: string }[] }[]
+  /** Everyone on it running late, by name; only for the office and the contact on the day, and only when there's someone. */
+  late?: { name: string; phone: string | null; line: string }[]
 }
 
 const SHOWN: Record<SheetReader, readonly OfferStatus[]> = {
@@ -127,6 +133,10 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
   const end = input.phase?.end ?? last
   const days = start && end ? eachDay(start, end) : []
   const phones = reader !== 'crew'
+  // How late someone is, and why, is for the office and whoever runs the day, as numbers are.
+  // The soonest first, so today's beats tomorrow's said the evening before.
+  const lateBy = new Map<string, string>()
+  if (reader !== 'crew') for (const l of input.late ?? []) if (!lateBy.has(l.personId)) lateBy.set(l.personId, l.line)
 
   const views: SheetCallView[] = calls
     .map((c) => {
@@ -143,6 +153,7 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
             ...(own.length && own.length !== callDays.length ? { days: daysLabel(own) } : {}),
             status: statusOf(o.status),
             me: o.personId === input.readerId,
+            ...(lateBy.has(o.personId) && o.status !== 'offered' && o.status !== 'countered' ? { late: lateBy.get(o.personId) } : {}),
           }
         })
         .sort((a, b) => Number(b.me) - Number(a.me) || a.name.localeCompare(b.name, 'en-IE'))
@@ -174,6 +185,8 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
     notes: { job: input.job.notes.trim(), phase: input.phase?.notes.trim() ?? '' },
     calls: views,
   }
+  const late = new Map(views.flatMap((c) => c.crew.filter((p) => p.late).map((p) => [p.personId, { name: p.name, phone: p.phone ?? null, line: p.late! }])))
+  if (late.size) sheet.late = [...late.values()].sort((a, b) => a.name.localeCompare(b.name, 'en-IE'))
   if (reader !== 'crew') {
     const byDept = new Map<Department, { name: string; qty: number; note: string }[]>()
     for (const l of input.kit) {

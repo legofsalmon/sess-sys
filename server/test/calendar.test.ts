@@ -1073,6 +1073,20 @@ describe('crew invites (ADR 0009)', () => {
     expect(await offer(s, job.offers.niamh)).toMatchObject({ status: 'accepted' })
   })
 
+  it('takes someone erased on request off the days still to come, even when the calendar had not caught up', async () => {
+    // Proves: withdrawn, archived and erased before the calendar's next run, Niamh still comes off the events (ADR 0027), and then the app holds her address nowhere.
+    const s = await setup()
+    const job = await invited(s)
+    expect(s.google.guests(TEST_CAL, job.events.build1)).toContain('niamh@example.com needsAction')
+    await send(s, 'offer.cancel', { id: job.offers.niamh })
+    await send(s, 'person.archive', { id: job.people.niamh, archived: true })
+    await send(s, 'person.erase', { id: job.people.niamh })
+
+    await s.sync()
+    for (const event of [job.events.build1, job.events.build2]) expect(s.google.guests(TEST_CAL, event).join()).not.toContain('niamh')
+    expect((await s.db.query(`SELECT * FROM calendar_guests WHERE person_id = $1`, [job.people.niamh])).rows).toEqual([])
+  })
+
   it('an address changed in the app moves the invite to it', async () => {
     const s = await setup()
     const job = await invited(s)

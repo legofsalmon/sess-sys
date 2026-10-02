@@ -11,6 +11,11 @@
   ([backups.md](../backups.md)). The format stays open: AES-256-GCM with a
   short header, written down in `server/src/backup/crypto.ts`. Without a
   key the file stays plain, as below.
+- **Amended:** 2 October 2026 by [ADR 0027](0027-erasing-a-person-on-request.md):
+  backups can't be edited, so a person erased on request stays in the
+  older ones until they are thinned out. The list of erasures is kept in
+  the storage beside the backups, and a restore (and `new-generation`)
+  applies it again, so nobody comes back.
 
 ## Context
 

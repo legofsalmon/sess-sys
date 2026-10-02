@@ -629,10 +629,10 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <div class="grid2 now">
         <div class="panel latest" id="latest"><p class="small">Loading the latest entry…</p></div>
         <div class="panel shots">
-          <h3>The sync test app</h3>
+          <h3>Latest: on the day, and the certificates a job needs</h3>
           <div class="phones">
-            <figure><img src="img/demo-offline.png" alt="Phone with no signal: a booking for Fuel shows as waiting to sync" width="390" height="844" loading="lazy"><figcaption><b>No signal.</b> The booking waits on the phone.</figcaption></figure>
-            <figure><img src="img/demo-online.png" alt="Phone back online: the booking was turned down because the office booked the speakers first" width="390" height="844" loading="lazy"><figcaption><b>Signal back.</b> The office got there first, so the phone shows why.</figcaption></figure>
+            <figure><img src="img/late-link.png" alt="A freelancer's private link on the day of a shoot: they've told the office they'll be about 30 minutes late, with a button to say they're there now" width="390" height="844" loading="lazy"><figcaption><b>Running late.</b> Said from their link; the office and the contact on the day see it at once.</figcaption></figure>
+            <figure><img src="img/certificates-refused.png" alt="A rigger call that needs working at height and IPAF: the offer to someone with no IPAF is turned down, saying why" width="390" height="844" loading="lazy"><figcaption><b>Needs IPAF.</b> An offer to someone without it is turned down, saying why.</figcaption></figure>
           </div>
         </div>
       </div>
@@ -1200,7 +1200,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   // wait (built, waiting on a key); the note is the small word beside the name. The lines are code written
   // across the app, the server and what they share, counted on the date given.
   const JOURNEY = {
-    asOf: '2 October 2026', live: '30 September 2026', lines: 30000, tests: 17300, decisions: 25,
+    asOf: '2 October 2026', live: '30 September 2026', lines: 35000, tests: 20700, decisions: 28,
     stages: [
       { id: 'enquire', icon: 'enquire', name: 'Enquire and quote', place: 'The office', state: 'part', word: 'Partly built', next: 'quoting is planned',
         sum: 'Logged from the first call: client, venue and status.', toast: ['enquire', 'Enquiry logged'],
@@ -1212,20 +1212,20 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         parts: [['Jobs and phases', 'built'], ['The planner', 'built'], ['Google Calendar', 'wait', 'the key'], ['Calendar import', 'built']] },
       { id: 'crew', icon: 'crew', name: 'Crew it', place: 'Office and crew', state: 'built', word: 'Built', next: 'documents later',
         sum: 'Offers answered from a private link; no app, no login.', toast: ['mail', 'Offer out, answer back by the link'],
-        left: 'documents uploaded with expiry reminders, and more certificates such as Safe Pass (later).',
-        parts: [['Offers and links', 'built'], ['Call sheets', 'built'], ['Messages', 'built'], ['Staff leave', 'built'], ['Profiles and certificates', 'built'], ['Documents', 'plan', 'later']] },
+        left: 'documents uploaded with their own expiry reminders (later).',
+        parts: [['Offers and links', 'built'], ['Call sheets', 'built'], ['Messages', 'built'], ['Staff leave', 'built'], ['Profiles and certificates', 'built'], ['Running late', 'built'], ['Documents', 'plan', 'later']] },
       { id: 'prep', icon: 'case', name: 'Prep the kit', place: 'The warehouse', state: 'built', word: 'Built', next: 'label trial to come',
         sum: 'Catalogue, labels and pick lists; works with no signal.', toast: ['scan', 'Kit picked and labelled, no signal'],
         left: 'the label trial (a real-world pilot, not started), cycle counts, and RFID later.',
-        parts: [['Catalogue and items', 'built'], ['Kit on jobs', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built']] },
+        parts: [['Catalogue and items', 'built'], ['The stock list brought in', 'built'], ['Kit on jobs', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built']] },
       { id: 'deliver', icon: 'van', name: 'Deliver and run the show', place: 'Van and venue', state: 'built', word: 'Built', next: 'Crewbox planned',
         sum: 'Kit scanned out; the call sheet on a phone, offline.', toast: ['doc', "Call sheet on the crew chief's phone"],
         left: 'GPS in the vans and the Crewbox on site (phase 5, planned).',
         parts: [['Scanning out', 'built'], ['Call sheet on site', 'built'], ['Crewbox and GPS', 'plan', 'planned']] },
-      { id: 'return', icon: 'return', name: 'Return and repair', place: 'The warehouse', state: 'built', word: 'Built', next: 'item log later',
+      { id: 'return', icon: 'return', name: 'Return and repair', place: 'The warehouse', state: 'built', word: 'Built', next: 'GPS trackers later',
         sum: 'Scanned back in; faults, repairs and PAT testing.', toast: ['return', 'Scanned back in, one fault logged'],
-        left: 'a log on each item of where it has been and what was done to it, and GPS trackers on the costly kit (later).',
-        parts: [['Scanning in', 'built'], ['Faults and repairs', 'built'], ['PAT testing', 'built']] },
+        left: 'GPS trackers on the costly kit, their place shown in the item\'s log (later).',
+        parts: [['Scanning in', 'built'], ['Faults and repairs', 'built'], ['PAT testing', 'built'], ['Each item\'s log', 'built']] },
       { id: 'pay', icon: 'pay', name: 'Pay and invoice', place: 'Office, crew and client', state: 'part', word: 'Started', next: 'invoicing parked',
         sum: 'Timesheets from bookings, approved by the office.', toast: ['tick', 'Timesheet in, approved'],
         left: 'freelancer invoices from their timesheets, then client invoices, VAT and exports for the accountant: parked for now (phase 4).',
@@ -1233,7 +1233,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       { id: 'under', icon: 'under', under: true, name: 'Underneath it all', place: 'The cloud, in the EU', state: 'built', word: 'Built', next: 'three keys and a field test left',
         sum: 'Every phone keeps its own copy and works with no signal, then syncs. One copy of the data, every change kept with who and when.',
         left: 'each built and waiting on the owner: staff sign-in (the Google key), nightly backups (the bucket, and a key to encrypt them), error alerts (the Sentry key); and the phone field test.',
-        parts: [['Sync and offline', 'built'], ['History and export', 'built'], ['Sign-in, backups, alerts', 'wait', 'three keys'], ['Phone field test', 'plan', 'not started']] }
+        parts: [['Sync and offline', 'built'], ['History and export', 'built'], ['Erasure on request', 'built'], ['Sign-in, backups, alerts', 'wait', 'three keys'], ['Phone field test', 'plan', 'not started']] }
     ]
   };
   (function drawJourney() {
@@ -1336,8 +1336,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', 'Foundations', 'now', 'Built and live; three keys and a phone field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'now', 'Built; office trial on the real calendar left'],
-    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, labels, scanning, pick lists, repairs and inspections built; cycle counts and RFID later'],
-    ['3', 'Crew', 'now', 'Started early: offers, links, call sheets, timesheets, messages, staff leave, profiles and the crew list built, three audit rounds done; invoices parked, documents later'],
+    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, labels, scanning, pick lists, repairs, inspections, the stock list import and item logs built; cycle counts and RFID later'],
+    ['3', 'Crew', 'now', 'Started early: offers, links, call sheets, timesheets, messages, staff leave, profiles, certificates, running late and the crew list built, three audit rounds done; invoices parked, documents later'],
     ['4', 'Finance', 'todo', 'Parked for now'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
     ['6', 'Grow', 'todo', 'Planned']

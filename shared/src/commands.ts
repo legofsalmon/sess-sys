@@ -1,11 +1,12 @@
 import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
-import { day } from './day.ts'
+import { erasureCommandSchemas } from './erasure.ts'
 import { faultCommandSchemas } from './faults.ts'
 import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
 import { labelCommandSchemas } from './labels.ts'
+import { lateCommandSchemas } from './late.ts'
 import { leaveCommandSchemas } from './leave.ts'
 import { moveCommandSchemas } from './moves.ts'
 import { officeCommandSchemas } from './office.ts'
@@ -22,24 +23,6 @@ import { timesheetCommandSchemas } from './timesheets.ts'
 const id = z.string().min(1).max(64)
 
 export const commandSchemas = {
-  'product.upsert': z.object({ id, name: z.string().min(1).max(200), quantity: z.number().int().min(0) }),
-  'booking.create': z.object({
-    id,
-    productId: id,
-    project: z.string().min(1).max(200),
-    qty: z.number().int().min(1),
-    start: day,
-    end: day,
-  }).refine((b) => b.start <= b.end, { message: 'The booking ends before it starts.' }),
-  'booking.cancel': z.object({ id }),
-  /** Always accepted: the scan already happened. */
-  'scan.record': z.object({
-    id,
-    productId: id,
-    bookingId: id.nullable(),
-    direction: z.enum(['out', 'in']),
-    at: z.string().datetime({ offset: true }),
-  }),
   ...crewCommandSchemas,
   ...jobCommandSchemas,
   ...stockCommandSchemas,
@@ -51,6 +34,8 @@ export const commandSchemas = {
   ...timesheetCommandSchemas,
   ...officeCommandSchemas,
   ...leaveCommandSchemas,
+  ...lateCommandSchemas,
+  ...erasureCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas
@@ -73,7 +58,8 @@ export interface Mutation<N extends CommandName = CommandName> {
 
 export const mutationSchema = z.object({
   id,
-  name: z.enum(COMMAND_NAMES as [CommandName, ...CommandName[]]),
+  // Any name: one this version doesn't know, from a phone on an older one, is turned down on its own rather than with the whole push (server/src/commands.ts).
+  name: z.string().min(1).max(64),
   args: z.unknown(),
   createdAt: z.string().max(40),
 })

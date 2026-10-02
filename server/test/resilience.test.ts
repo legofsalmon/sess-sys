@@ -68,20 +68,20 @@ function push(app: FastifyInstance, mutations: Mutation[]) {
   return app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office-laptop', mutations } })
 }
 
-const Y10P = { id: 'y10p', name: 'd&b Y10P', quantity: 4 }
-const LS9 = { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }
-const SM58 = { id: 'sm58', name: 'Shure SM58', quantity: 6 }
+const A3 = { id: 'a3', name: 'Bay A3', notes: '' }
+const VAN1 = { id: 'van1', name: 'Van 1', notes: '' }
+const VAN2 = { id: 'van2', name: 'Van 2', notes: '' }
 
 describe('a fault the server did not expect', () => {
   it('drops that one change with a reason, reports it, and lets the device carry on', async () => {
     // Proves: a Postgres error inside a handler answers 200 with that change
     // turned down in plain words, the history says so, the same device's next
     // change applies, and a resend of the bad one gets the same answer back.
-    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO products'))
+    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO places'))
     const app = await server(db)
 
     db.failNext = true
-    const bad = mutation('product.upsert', Y10P)
+    const bad = mutation('place.upsert', A3)
     const res = await push(app, [bad])
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({
@@ -98,20 +98,20 @@ describe('a fault the server did not expect', () => {
     expect(reportError).toHaveBeenCalledTimes(1)
     const [err, tags] = vi.mocked(reportError).mock.calls[0]!
     expect((err as Error).message).toBe('division by zero')
-    expect(tags).toEqual({ area: 'commands', command: 'product.upsert' })
+    expect(tags).toEqual({ area: 'commands', command: 'place.upsert' })
 
     // Nothing of it was kept, but the answer was, as for any other refusal.
-    expect((await db.query('SELECT 1 FROM products')).rows).toHaveLength(0)
+    expect((await db.query('SELECT 1 FROM places')).rows).toHaveLength(0)
     const { rows } = await db.query<{ status: string; result: { reason: { code: string } } }>('SELECT status, result FROM mutations WHERE id = $1', [bad.id])
     expect(rows[0]).toMatchObject({ status: 'rejected', result: { reason: { code: 'invalid' } } })
     const history = (await app.inject('/api/history')).json()
-    expect(history.entries).toMatchObject([{ command: 'product.upsert', outcome: 'turned-down', reason: expect.stringContaining('dropped') }])
+    expect(history.entries).toMatchObject([{ command: 'place.upsert', outcome: 'turned-down', reason: expect.stringContaining('dropped') }])
 
     // The same device's next change goes through; a resend of the bad one is a duplicate, not a second try.
-    const next = mutation('product.upsert', LS9)
+    const next = mutation('place.upsert', VAN1)
     expect((await push(app, [next])).json().results).toMatchObject([{ id: next.id, status: 'applied' }])
     expect((await push(app, [bad])).json().results).toMatchObject([{ id: bad.id, status: 'rejected', duplicate: true, reason: { code: 'invalid' } }])
-    expect((await db.query('SELECT id FROM products')).rows).toEqual([{ id: 'ls9' }])
+    expect((await db.query('SELECT id FROM places')).rows).toEqual([{ id: 'van1' }])
   })
 
   it('takes a change whose time of making is not a time Postgres keeps, as made when it arrived', async () => {
@@ -119,9 +119,9 @@ describe('a fault the server did not expect', () => {
     // that one change its device-clock time, not the whole push.
     const db = await pgliteDb()
     const app = await server(db)
-    const good = mutation('product.upsert', Y10P)
-    const odd = mutation('product.upsert', LS9, 'not a date')
-    const yearNought = mutation('product.upsert', SM58, '0000-01-01T00:00:00Z')
+    const good = mutation('place.upsert', A3)
+    const odd = mutation('place.upsert', VAN1, 'not a date')
+    const yearNought = mutation('place.upsert', VAN2, '0000-01-01T00:00:00Z')
     const res = await push(app, [good, odd, yearNought])
     expect(res.statusCode).toBe(200)
     expect(res.json().results.map((r: { status: string }) => r.status)).toEqual(['applied', 'applied', 'applied'])
@@ -139,10 +139,10 @@ describe('a fault the server did not expect', () => {
 
   it('is left to the calendar sync, which tries again next round', async () => {
     // Proves: an answer from Google Calendar is not dropped for good; the fault goes up to the sync's own round.
-    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO products'))
+    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO places'))
     await server(db)
     db.failNext = true
-    const m = mutation('product.upsert', Y10P)
+    const m = mutation('place.upsert', A3)
     await expect(db.transaction((tx) => applyMutationIn(tx, 'calendar:someone', m, { via: 'calendar' }))).rejects.toThrow('division by zero')
     expect(reportError).not.toHaveBeenCalled()
     expect((await db.query('SELECT 1 FROM mutations')).rows).toHaveLength(0)
@@ -199,11 +199,11 @@ describe('telling devices about a change', () => {
     try {
       await vi.waitFor(() => expect(told).toHaveLength(1))
       fault.next = true
-      const m = mutation('product.upsert', Y10P)
+      const m = mutation('place.upsert', A3)
       expect((await push(app, [m])).json().results).toMatchObject([{ id: m.id, status: 'applied' }])
       await vi.waitFor(() => expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'division by zero' }), { area: 'poke' }))
       expect(told).toHaveLength(1)
-      expect((await db.query('SELECT id FROM products')).rows).toEqual([{ id: 'y10p' }])
+      expect((await db.query('SELECT id FROM places')).rows).toEqual([{ id: 'a3' }])
       expect((await app.inject({ method: 'GET', url: '/api/health' })).statusCode).toBe(200)
     } finally {
       ws.terminate()

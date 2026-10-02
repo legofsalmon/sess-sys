@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { plural, pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -21,11 +21,15 @@ import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
+import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
+import { keptSyncTestTables } from './schema.ts'
+import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
+import { registerItemLogRoutes } from './stock/log.ts'
 
 const PULL_LIMIT = 500
 
@@ -56,6 +60,8 @@ export interface AppOptions {
   calendar?: CalendarSetup
   /** How long calendar feeds are kept in memory at most (ADR 0012), and the clock, for tests. */
   feeds?: FeedsOptions
+  /** How much one call bringing in the stock list does (ADR 0026), for tests. */
+  stockImport?: StockImportRound
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs'> {
@@ -71,6 +77,8 @@ declare module 'fastify' {
     backups: Backups
     /** The calendar sync, when the Google key is set; the caller starts it once the server is listening. */
     calendar: CalendarSync | undefined
+    /** The list of erasures kept beside the backups (ADR 0027), when there is somewhere to keep them. */
+    erasures: ErasureList | undefined
   }
 }
 
@@ -90,6 +98,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     logger: logger && { serializers: { req: requestForLog }, ...(logTo && { stream: logTo }) },
     bodyLimit: 5 * 1024 * 1024,
   })
+  // The old sync test's tables go only when empty (schema.ts), so one still holding rows is said once, here at start.
+  const kept = await keptSyncTestTables(db)
+  if (kept.length > 0) {
+    const which = kept.map((k) => `${k.table} (${plural(k.rows, 'row')})`).join(', ')
+    app.log.warn({ tables: kept }, `Kept the old sync test's tables that still hold rows: ${which}. Nothing uses them now; drop them by hand once the rows are copied somewhere.`)
+  }
   const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch, key: backupKey }).load()
   app.decorate('backups', backups)
   await app.register(websocket)
@@ -127,10 +141,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         })
       : undefined
   app.decorate('calendar', calendarSync)
-  /** Something changed in the app: devices pull it, and the calendar catches up. */
+  // A restore must never bring back someone erased on request, so the list of erasures is kept beside the backups too (ADR 0027).
+  const erasures = backupStore ? new ErasureList(db, backupStore, app.log) : undefined
+  app.decorate('erasures', erasures)
+  /** Something changed in the app: devices pull it, the calendar catches up, and an erasure is written beside the backups. */
   const changed = () => {
     void poke()
     calendarSync?.kick()
+    void erasures?.keep()
   }
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
@@ -259,6 +277,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, onChange: changed })
   registerPeopleImportRoutes(app, { db, onChange: changed })
+  registerStockImportRoutes(app, { db, onChange: changed, round: options.stockImport })
+  registerItemLogRoutes(app, { db })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 

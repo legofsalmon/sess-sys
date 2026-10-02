@@ -2,6 +2,9 @@ import {
   callSheet,
   callSheetText,
   HOLDING,
+  irishToday,
+  lateDayWord,
+  lateLine,
   sheetMessage,
   type CallSheet,
   type CallView,
@@ -32,6 +35,7 @@ import { Top } from './common.tsx'
 
 export function sheetInput(view: View, job: JobView, phase: PhaseView): SheetInput {
   const people = new Map<string, SheetPerson>(view.crew.people.map((p) => [p.id, { id: p.id, name: p.name, phone: p.phone }]))
+  const today = irishToday()
   return {
     job: { name: job.name, notes: job.notes },
     client: job.client ? { name: job.client.name, contacts: job.client.contacts } : null,
@@ -43,6 +47,10 @@ export function sheetInput(view: View, job: JobView, phase: PhaseView): SheetInp
     kit: (view.kit.byJob.get(job.id) ?? [])
       .filter((l) => l.phaseId === null || l.phaseId === phase.id)
       .map((l) => ({ department: l.model?.department ?? 'other', name: l.model?.name ?? 'A product', qty: l.qty, subhireQty: l.subhireQty, supplier: l.supplier })),
+    // Who on it is running late (ADR 0028); one said the evening before, for tomorrow, says so.
+    late: view.late.current
+      .filter((l) => phase.calls.some((c) => c.id === l.callId))
+      .map((l) => ({ personId: l.personId, line: l.day === today ? lateLine(l) : `${lateLine(l)} (${lateDayWord(l.day, today)})` })),
   }
 }
 
@@ -261,6 +269,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
                       {p.days && <span className="muted"> {p.days}</span>}
                     </span>
                     {p.phone && (print ? <span> · {p.phone}</span> : <a href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a>)}
+                    {p.late && <span className="late-line">{p.late}</span>}
                     {print ? p.status === 'to confirm' && <span className="muted"> · to confirm</span> : <StatusPill tone={STATUS_PILL[p.status][0]}>{STATUS_PILL[p.status][1]}</StatusPill>}
                     {!print && onSend && call && p.status !== 'offered' && (
                       <button type="button" className="link" onClick={() => onSend(call, p.personId)} aria-label={`Send ${p.name} their call sheet`}>

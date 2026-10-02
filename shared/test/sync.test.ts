@@ -87,16 +87,21 @@ async function device(server: Transport, storage = new MemoryStorage()) {
   return new SyncClient({ storage, transport: server, clientId: 'phone' }).open()
 }
 
-const booking = (id: string, start = '2026-10-05', end = start) => ({ id, productId: 'y10p', project: 'Nissan', qty: 1, start, end })
+/** A phase of a job, for the changes with dates in them. */
+const phase = (id: string, start = '2026-10-05', end = start) => ({ id, projectId: 'j', name: 'Build', start, end, venueId: null, notes: '' })
+/** A place in the warehouse: the plainest change there is, for the tests that only need one. */
+const place = (id: string, name = `Bay ${id}`) => ({ id, name, notes: '' })
 
-describe('a big outbox', () => {
+// A thousand changes made one by one, each saved as it would be on a phone, take a second or two here and more on a busy
+// machine, close to the five seconds a test gets by default: the time allowed is generous so a slow run isn't taken for a fault.
+describe('a big outbox', { timeout: 30_000 }, () => {
   const many = PUSH_LIMIT * 2 + 1
 
   it(`sends more than ${PUSH_LIMIT} waiting changes in slices, in order, and all of them leave the outbox`, async () => {
     const server = new PretendServer()
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
-    for (let i = 0; i < many; i++) await phone.mutate('product.upsert', { id: `p${i}`, name: `Product ${i}`, quantity: i })
+    for (let i = 0; i < many; i++) await phone.mutate('place.upsert', place(`p${i}`))
     expect(phone.view().pendingCount).toBe(many)
 
     await phone.sync()
@@ -110,7 +115,7 @@ describe('a big outbox', () => {
     const server = new PretendServer()
     server.staleAt = 2
     const phone = await device(server)
-    for (let i = 0; i < many; i++) await phone.mutate('product.upsert', { id: `p${i}`, name: `Product ${i}`, quantity: i })
+    for (let i = 0; i < many; i++) await phone.mutate('place.upsert', place(`p${i}`))
 
     await phone.sync()
     expect(server.pushes.map((p) => p.mutations.length)).toEqual([PUSH_LIMIT, PUSH_LIMIT])
@@ -124,13 +129,13 @@ describe('a date that is not real', () => {
     const server = new PretendServer()
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
-    await expect(phone.mutate('booking.create', booking('b', '2026-02-31'))).rejects.toThrow("That isn't a real date.")
+    await expect(phone.mutate('phase.add', phase('b', '2026-02-31'))).rejects.toThrow("That isn't a real date.")
     await expect(phone.mutate('unavailability.add', { id: 'u', personId: 'aoife', start: '2026-13-01', end: '2026-13-01', note: '' })).rejects.toThrow(
       "That isn't a real date."
     )
     // A year the app could never be about is a slip, not a date.
-    await expect(phone.mutate('booking.create', booking('b', '0226-10-05'))).rejects.toThrow("That isn't a real date.")
-    await expect(phone.mutate('booking.create', booking('b', '9999-10-05'))).rejects.toThrow("That isn't a real date.")
+    await expect(phone.mutate('phase.add', phase('b', '0226-10-05'))).rejects.toThrow("That isn't a real date.")
+    await expect(phone.mutate('phase.add', phase('b', '9999-10-05'))).rejects.toThrow("That isn't a real date.")
     expect(phone.view().pendingCount).toBe(0)
     await phone.sync()
     expect(server.pushes).toEqual([])
@@ -146,12 +151,12 @@ describe('a change the view cannot show', () => {
     vi.spyOn(phone, 'view').mockImplementationOnce(() => {
       throw new RangeError('Invalid time value')
     })
-    await expect(phone.mutate('booking.create', booking('b'))).rejects.toThrow("This change can't be shown on this device, so it wasn't kept: Invalid time value")
+    await expect(phone.mutate('place.upsert', place('b'))).rejects.toThrow("This change can't be shown on this device, so it wasn't kept: Invalid time value")
     expect(phone.view().pendingCount).toBe(0)
     expect((await storage.load())?.outbox ?? []).toEqual([])
 
-    await phone.mutate('booking.create', booking('c'))
-    expect(phone.view().bookings).toMatchObject([{ id: 'c', pending: true }])
+    await phone.mutate('place.upsert', place('c'))
+    expect(phone.view().warehouse.places).toMatchObject([{ id: 'c', pending: true }])
   })
 
   it('is set aside as a problem when the app opens on a copy an older build saved it in, and the rest carries on', async () => {
@@ -169,7 +174,7 @@ describe('a change the view cannot show', () => {
       args: { id: 'c', projectId: 'j', phaseId: null, project: 'Nissan launch', phase: '', venue: '', role: 'Sound No.1', start: '2026-13-45', end: '2026-13-45', callTime: null, needed: 1, dayRateCents: null, details: '', replyBy: null },
       createdAt: '2026-10-01T09:00:00Z',
     } as never)
-    snapshot.outbox.push({ id: 'after', name: 'product.upsert', args: { id: 'p', name: 'Cable', quantity: 1 }, createdAt: '2026-10-01T09:01:00Z' } as never)
+    snapshot.outbox.push({ id: 'after', name: 'place.upsert', args: place('p'), createdAt: '2026-10-01T09:01:00Z' } as never)
     await storage.save(snapshot)
 
     const reopened = await device(server, storage)
@@ -189,9 +194,9 @@ describe('a change named after an object’s own insides', () => {
   it('is dropped rather than reaching every object', () => {
     const state = { ...emptySnapshot('phone') }
     applyChange(state, { seq: 1, entity: '__proto__' as EntityName, id: 'x', op: 'put', data: { polluted: true } })
-    applyChange(state, { seq: 2, entity: 'product' as EntityName, id: '__proto__', op: 'put', data: { polluted: true } })
+    applyChange(state, { seq: 2, entity: 'place', id: '__proto__', op: 'put', data: { polluted: true } })
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
-    expect(Object.keys(state.entities.product)).toEqual([])
+    expect(Object.keys(state.entities.place)).toEqual([])
   })
 })
 
@@ -222,17 +227,17 @@ describe('a change for a table this build does not know', () => {
   })
 })
 
-const product = (id: string, name: string): PullResponse['changes'][number] => ({ seq: 0, entity: 'product' as EntityName, id, op: 'put', data: { id, name, quantity: 4 } })
+const placed = (id: string, name: string): PullResponse['changes'][number] => ({ seq: 0, entity: 'place', id, op: 'put', data: { id, name, notes: '' } })
 
 describe('a round that finds nothing', () => {
   it('saves nothing and tells no screen, and the view is the same object before and after', async () => {
     const server = new PretendServer()
     server.seq = 1
-    server.changes = [{ ...product('y10p', 'd&b Y10P'), seq: 1 }]
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 1 }]
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
     await phone.sync()
-    expect(phone.view().products).toHaveLength(1)
+    expect(phone.view().warehouse.places).toHaveLength(1)
 
     const save = vi.spyOn(storage, 'save')
     const told = vi.fn()
@@ -312,7 +317,7 @@ describe('the view', () => {
     const v0 = phone.view()
     expect(phone.view()).toBe(v0)
 
-    await phone.mutate('product.upsert', { id: 'p', name: 'Cable', quantity: 1 })
+    await phone.mutate('place.upsert', place('p', 'Van 1'))
     const v1 = phone.view()
     expect(v1).not.toBe(v0)
     expect(v1.pendingCount).toBe(1)
@@ -326,14 +331,14 @@ describe('the view', () => {
     expect(phone.view()).toBe(v2)
 
     server.seq = 2
-    server.changes = [{ ...product('y10p', 'd&b Y10P'), seq: 2 }]
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 2 }]
     await phone.sync()
     const v3 = phone.view()
     expect(v3).not.toBe(v2)
-    expect(v3.products.map((p) => p.name)).toEqual(['d&b Y10P'])
+    expect(v3.warehouse.places.map((p) => p.name)).toEqual(['Bay A3'])
 
-    server.refuse = (m) => (m.name === 'booking.create' ? { code: 'short', message: 'Only 0 × d&b Y10P free' } : undefined)
-    await phone.mutate('booking.create', booking('b'))
+    server.refuse = (m) => (m.name === 'place.remove' ? { code: 'conflict', message: 'Bay A3 still has 4 counted. Move them first.' } : undefined)
+    await phone.mutate('place.remove', { id: 'a3' })
     await phone.sync()
     const v4 = phone.view()
     expect(v4.problems).toHaveLength(1)
@@ -369,15 +374,15 @@ describe('a device that cannot save', () => {
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
     vi.spyOn(storage, 'save').mockRejectedValue(new Error('This phone is out of storage. Free some space, then try again.'))
-    await expect(phone.mutate('product.upsert', { id: 'p', name: 'Cable', quantity: 1 })).rejects.toThrow('This phone is out of storage')
+    await expect(phone.mutate('place.upsert', place('p', 'Van 1'))).rejects.toThrow('This phone is out of storage')
     expect(phone.pendingCount).toBe(0)
-    expect(phone.view().products).toEqual([])
+    expect(phone.view().warehouse.places).toEqual([])
 
     // A pull whose save fails is not "no signal": the copy in memory is right, and the screens get it.
     server.seq = 1
-    server.changes = [{ ...product('y10p', 'd&b Y10P'), seq: 1 }]
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 1 }]
     await expect(phone.sync()).resolves.toBeUndefined()
-    expect(phone.view().products.map((p) => p.name)).toEqual(['d&b Y10P'])
+    expect(phone.view().warehouse.places.map((p) => p.name)).toEqual(['Bay A3'])
     expect(phone.view().connection).toBe('idle')
     expect(phone.cursor).toBe(1)
   })
@@ -389,14 +394,14 @@ describe('a long feed', () => {
     const server = new PretendServer()
     server.pageSize = 2
     server.seq = 5
-    server.changes = Array.from({ length: 5 }, (_, i) => ({ ...product(`p${i + 1}`, `Product ${i + 1}`), seq: i + 1 }))
+    server.changes = Array.from({ length: 5 }, (_, i) => ({ ...placed(`p${i + 1}`, `Bay ${i + 1}`), seq: i + 1 }))
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
     const save = vi.spyOn(storage, 'save')
     await phone.sync()
     expect(server.pulledAfter).toEqual([0, 2, 4])
     expect(save).toHaveBeenCalledTimes(3)
-    expect(phone.view().products.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5'])
+    expect(phone.view().warehouse.places.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5'])
     expect(phone.cursor).toBe(5)
     expect((await storage.load())?.cursor).toBe(5)
   })
@@ -409,16 +414,16 @@ describe('after the server is restored from a backup', () => {
     server.generation = 'before'
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
-    await phone.mutate('product.upsert', { id: 'p1', name: 'Cable', quantity: 1 })
+    await phone.mutate('place.upsert', place('p1'))
     await phone.sync()
     expect(phone.pendingCount).toBe(0)
-    expect(await storage.load()).toMatchObject({ generation: 'before', sent: [expect.objectContaining({ name: 'product.upsert' })] })
+    expect(await storage.load()).toMatchObject({ generation: 'before', sent: [expect.objectContaining({ name: 'place.upsert' })] })
 
     // Last night's backup is put back: another copy of the data, which knows nothing the phone sent today.
     server.generation = 'after'
     server.seq = 0
     server.answered.clear()
-    await phone.mutate('product.upsert', { id: 'p2', name: 'Stand', quantity: 2 })
+    await phone.mutate('place.upsert', place('p2'))
     await phone.sync()
     // The first push names no copy: the phone hadn't pulled yet, so it didn't know which it was on.
     const sent = server.pushes.map((p) => [p.generation, ...p.mutations.map((m) => (m.args as { id: string }).id)])
@@ -436,7 +441,7 @@ describe('after the server is restored from a backup', () => {
     // Proves: a server from before copies were named, wound back by hand, is noticed by its head being behind the phone, and the copy starts afresh.
     const server = new PretendServer()
     server.seq = 3
-    server.changes = [{ ...product('y10p', 'd&b Y10P'), seq: 3 }]
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 3 }]
     const phone = await device(server)
     await phone.sync()
     expect(phone.cursor).toBe(3)
@@ -444,7 +449,7 @@ describe('after the server is restored from a backup', () => {
     server.changes = []
     await phone.sync()
     expect(phone.cursor).toBe(1)
-    expect(phone.view().products).toEqual([])
+    expect(phone.view().warehouse.places).toEqual([])
   })
 
   it('drops what it did, and the problems it had, when the server was cleared on purpose', async () => {
@@ -453,10 +458,10 @@ describe('after the server is restored from a backup', () => {
     server.generation = 'g1'
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
-    await phone.mutate('product.upsert', { id: 'p1', name: 'Cable', quantity: 1 })
+    await phone.mutate('place.upsert', place('p1'))
     await phone.sync()
-    server.refuse = (m) => (m.name === 'booking.create' ? { code: 'short', message: 'Only 0 × Cable free' } : undefined)
-    await phone.mutate('booking.create', booking('b1'))
+    server.refuse = (m) => (m.name === 'place.remove' ? { code: 'conflict', message: 'Bay p1 still has 4 counted. Move them first.' } : undefined)
+    await phone.mutate('place.remove', { id: 'b1' })
     await phone.sync()
     expect(phone.view().problems).toHaveLength(1)
 
@@ -465,7 +470,7 @@ describe('after the server is restored from a backup', () => {
     server.cleared = true
     server.staleFor = 'g1'
     server.seq = 0
-    await phone.mutate('product.upsert', { id: 'p2', name: 'Stand', quantity: 2 })
+    await phone.mutate('place.upsert', place('p2'))
     await phone.sync()
     expect(server.pushes.map((p) => p.mutations.map((m) => (m.args as { id: string }).id))).toEqual([['p1'], ['b1'], ['p2']])
     expect(phone.pendingCount).toBe(0)
@@ -481,7 +486,7 @@ describe('a push the server calls stale', () => {
     server.generation = 'g1'
     const phone = await device(server)
     await phone.sync()
-    for (let i = 0; i < 3; i++) await phone.mutate('product.upsert', { id: `p${i}`, name: `Product ${i}`, quantity: i })
+    for (let i = 0; i < 3; i++) await phone.mutate('place.upsert', place(`p${i}`))
     server.generation = 'g2'
     server.cleared = true
     server.staleFor = 'g1'
@@ -489,6 +494,6 @@ describe('a push the server calls stale', () => {
     expect(server.pushes).toHaveLength(1)
     expect(server.pushes[0]!.generation).toBe('g1')
     expect(phone.pendingCount).toBe(0)
-    expect(phone.view().products).toEqual([])
+    expect(phone.view().warehouse.places).toEqual([])
   })
 })

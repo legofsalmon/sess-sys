@@ -1,6 +1,7 @@
-import { callSheet, HOLDING, type CallSheet, type OfficeDetails, type SheetKitLine, type SheetPerson } from '@sh/shared'
+import { callSheet, HOLDING, irishToday, lateDayWord, lateLine, type CallSheet, type OfficeDetails, type SheetKitLine, type SheetPerson } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { getClient, getPhase, getProject, getVenue } from '../projects/store.ts'
+import { lateOnOffers } from './late.ts'
 import { CSS, officeBlock } from './page.ts'
 import { getCall, getPerson, offersForCall, openCallsFor } from './store.ts'
 
@@ -35,6 +36,9 @@ export async function sheetFor(q: Queryable, personId: string, callId: string): 
   }
   const contact = (phase?.contactId && people.get(phase.contactId)) || null
   const reader = contact?.id === personId ? 'contact' : 'crew'
+  // Who's running late today (ADR 0028), for the contact on the day only: the rest of the crew never see it.
+  const today = irishToday()
+  const late = reader === 'contact' ? await lateOnOffers(q, [...offersOf.values()].flat().map((o) => o.id), today) : []
 
   return callSheet(
     {
@@ -47,6 +51,8 @@ export async function sheetFor(q: Queryable, personId: string, callId: string): 
       people,
       kit: reader === 'contact' && project ? await kitFor(q, project.id, phase?.id ?? null) : [],
       readerId: personId,
+      // One said the evening before, for tomorrow, says so.
+      late: late.map((l) => ({ personId: l.personId, line: l.day === today ? lateLine(l) : `${lateLine(l)} (${lateDayWord(l.day, today)})` })),
     },
     reader
   )
@@ -110,6 +116,15 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
   }
 
   ${
+    // Under who to ring, as it's what the contact on the day acts on first (ADR 0028).
+    s.late?.length
+      ? `<section class="late"><h2>Running late</h2><ul>${s.late
+          .map((l) => `<li><b>${h(l.name)}</b>: ${h(l.line)}${l.phone ? ` · ${tel(l.phone)}` : ''}</li>`)
+          .join('')}</ul></section>`
+      : ''
+  }
+
+  ${
     s.venue
       ? `<section><h2>Where</h2><p><b>${h(s.venue.name)}</b>${s.venue.address ? `<br>${lines(s.venue.address)}` : ''}</p>
     <p><a href="${h(s.venue.map)}">Open the map</a></p>${s.venue.notes ? `<p class="details">${lines(s.venue.notes)}</p>` : ''}</section>`
@@ -128,7 +143,7 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
           ? `<ul>${c.crew
               .map(
                 (p) =>
-                  `<li${p.me ? ' class="me"' : ''}>${h(p.name)}${p.me ? ' (you)' : ''}${p.days ? ` <small>${h(p.days)}</small>` : ''}${p.status === 'to confirm' && !p.me ? ' <small>to confirm</small>' : ''}${p.phone ? ` · ${tel(p.phone)}` : ''}</li>`
+                  `<li${p.me ? ' class="me"' : ''}>${h(p.name)}${p.me ? ' (you)' : ''}${p.days ? ` <small>${h(p.days)}</small>` : ''}${p.status === 'to confirm' && !p.me ? ' <small>to confirm</small>' : ''}${p.phone ? ` · ${tel(p.phone)}` : ''}${p.late ? ` <small class="late">${h(p.late)}</small>` : ''}</li>`
               )
               .join('')}</ul>`
           : '<p class="small">To be confirmed.</p>'
@@ -177,6 +192,7 @@ export const SHEET_CSS = `
 .call{display:grid;gap:4px;padding-top:8px;border-top:1px solid var(--line)}.call:first-of-type{border-top:0;padding-top:0}
 .call ul{margin:0;padding-left:1.1em;display:grid;gap:2px}.call small,.head small{color:var(--muted)}
 .call li.me{font-weight:600}
+.sheet section.late{border-left:4px solid var(--warn)!important}.sheet section.late ul{margin:0;padding-left:1.1em;display:grid;gap:2px}.call small.late{color:var(--warn);font-weight:600}
 a[href^="tel:"]{white-space:nowrap}
 @media print{
   :root{--bg:#fff;--panel:#fff;color-scheme:light}

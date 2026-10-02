@@ -104,7 +104,10 @@ also work for other companies, so the system bends to them instead:
   to them.
 - **Two-way.** Freelancers can tell the company things too: flag they're
   running late, add a note to the call sheet, swap a shift with another
-  approved freelancer if ops allow it.
+  approved freelancer if ops allow it. Running late is built
+  ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md)):
+  said from their link on the day, seen at once by the office and the
+  contact on the day.
 
 ## The shape of the system
 
@@ -319,7 +322,13 @@ says product and item; the code says model and asset.
 - **Documents**: Safe Pass, manual handling, working at height, IPAF/PASMA,
   driving licence, insurance for companies; with expiry dates and reminders.
   An expired required certificate blocks the assignment, the same way an
-  overdue PAT test blocks an asset.
+  overdue PAT test blocks an asset. Built for Safe Pass, working at height
+  and IPAF beside the first three
+  ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md)): a
+  crew call says which it needs, an offer to anyone without one, or whose
+  one runs out before the job ends, is refused by name, and the Crew tab
+  lists those running out in the next 30 days with a message asking for
+  the new card.
 - **Availability**: freelancers mark unavailable days; offers respect them.
 - **Leave and time in lieu**, for staff ([ADR 0024](adr/0024-staff-leave.md)):
   annual leave applied for and approved in whole days, counted in the
@@ -521,10 +530,21 @@ Crewbox.
 ## Security and GDPR
 
 - Roles: owner, ops, warehouse, crew chief, freelancer, accountant (read
-  finance only). Enforced on the server and in the sync scopes.
+  finance only). Enforced on the server and in the sync scopes. Not built
+  yet: they wait on staff sign-in being switched on.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
-  details, documents) kept in separate tables with tighter access and
-  deletion on request.
+  details, documents) kept in separate tables with tighter access. Not
+  built yet either, for the same reason.
+- **Deletion on request is built (2 October 2026,
+  [ADR 0027](adr/0027-erasing-a-person-on-request.md)).** Someone archived
+  is erased from their card on the Crew tab once nothing about them is
+  unsettled, and the app takes their details from everywhere they live:
+  their record, every earlier copy in the change feed, the history, the
+  export, each device's copy, their link, feed and sign-in account. Their
+  name and timesheets stay for six years if they were paid, for Revenue,
+  and bookings stay as records of work. Backups can't be edited, so old
+  copies age out on their own schedule (a year and a month at most); a
+  restore applies the list of erasures again, so nobody comes back.
 - Data stays in the EU. A processing record and retention rules are written
   before crew data goes in.
 

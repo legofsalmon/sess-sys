@@ -124,27 +124,24 @@ function describer(view: View): (m: Mutation) => string {
     return e ? `${e.person?.name ?? 'someone'}'s day in lieu for ${dayLabel(e.day)}` : "someone's day in lieu"
   }
 
+  const late = (id: unknown) => view.late.current.find((l) => l.id === id)?.person?.name ?? 'someone'
+
   return (m: Mutation) => {
     const a = m.args as Record<string, unknown>
     switch (m.name) {
-      case 'product.upsert':
-        return `Set ${str(a.name, 'a product')} to ${num(a.quantity)} in stock`
-      case 'booking.create':
-        return `Book ${num(a.qty)} × ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} for ${str(a.project, 'a job')}`
-      case 'booking.cancel':
-        return 'Cancel a booking'
-      case 'scan.record':
-        return `Scan ${view.products.find((p) => p.id === a.productId)?.name ?? 'a product'} ${a.direction === 'in' ? 'back in' : 'out'}`
       case 'person.upsert':
         return `Save ${str(a.name, 'someone')}'s details`
       case 'person.level':
-        return `Move ${person(a.id)} to ${levelLabel(typeof a.level === 'number' ? a.level : 1)}`
+        // An erased person's level went with the rest of their details (ADR 0027).
+        return `Move ${person(a.id)} to ${typeof a.level === 'number' ? levelLabel(a.level) : 'another level'}`
       case 'person.newLink':
         return `Give ${person(a.id)} a new private link`
       case 'person.archive':
         return a.archived ? `Archive ${person(a.id)}` : `Bring ${person(a.id)} back`
       case 'person.contact':
         return `Change ${person(a.id)}'s contact details`
+      case 'person.erase':
+        return `Erase ${person(a.id)}'s details`
       case 'unavailability.add':
         return `Mark ${person(a.personId)} away${span(a)}`
       case 'unavailability.remove': {
@@ -257,6 +254,16 @@ function describer(view: View): (m: Mutation) => string {
         return `${a.approved ? 'Approve' : 'Decline'} ${lieu(a.id)}`
       case 'leave.allowance':
         return `Set ${person(a.personId)}'s ${num(a.year)} allowance`
+      // Running late (ADR 0028): said on a link, noted here.
+      case 'late.say':
+        return `Say ${offer(a.offerId).who} is running late for ${offer(a.offerId).what}`
+      case 'late.arrived':
+        return `Say ${late(a.id)} is there now`
+      case 'late.seen':
+        return `Note that ${late(a.id)} is running late`
+      // Kept from an older version of the app, such as the old sync test's bookings. The server's reason says it's gone, so this only says where it came from.
+      default:
+        return 'A change from an older version of the app'
     }
   }
 }

@@ -1,4 +1,4 @@
-import { addDays, newId, venueLabel, type CommandInput, type CommandName, type Mutation } from '@sh/shared'
+import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, type CommandName, type Mutation } from '@sh/shared'
 
 /**
  * Made-up data (ADR 0019): enough of a small A/V company's weeks to try
@@ -36,7 +36,14 @@ import { addDays, newId, venueLabel, type CommandInput, type CommandName, type M
  *   and Orla's week last month approved, so her days off are in the planner;
  * - profiles (ADR 0025): departments and levels, a certificate in date and
  *   one run out, a freelancer trading through a VAT-registered company, and
- *   an applicant at Level 0.
+ *   an applicant at Level 0;
+ * - the certificates a call needs (ADR 0028): riggers needing working at
+ *   height and IPAF, someone with no IPAF to see marked in the picker, a
+ *   booked stagehand whose Safe Pass runs out before the job ends, and
+ *   certificates running out soon for the reminders; and a shoot today with
+ *   someone running late, said from their link, on the contact's call sheet;
+ * - a freelancer who has left and asked for their details to go, archived,
+ *   so erasing someone on request (ADR 0027) can be tried.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -97,6 +104,9 @@ export function madeUpData(today: string): Mutation[] {
   add('project.update', { id: showcase, status: 'cancelled' })
   const gala = job('Autumn Gala', brightwater, northbank.id, 'confirmed')
   const galaShow = phase(gala, 'Show', -10, -9)
+  // On today, so someone can be running late for it (ADR 0028).
+  const shoot = job('Liffey Brands Shoot', liffey, pier3.id, 'confirmed', 'Product shots for the launch.')
+  const shootDay = phase(shoot, 'Shoot', 0, 0, '08:00 Crew call\n09:00 First look\n13:00 Lunch\n17:00 Wrap')
 
   // Crew: staff, freelancers and an applicant, with their departments and levels (ADR 0025), and some days off.
   const person = (name: string, kind: 'staff' | 'freelancer', department: string, level: number, skills: string[], euroADay: number | null, more: Partial<CommandInput<'person.upsert'>> = {}) =>
@@ -113,7 +123,7 @@ export function madeUpData(today: string): Mutation[] {
       level,
       ...more,
     }).id
-  const held = (expires: string | null) => ({ held: true, expires, note: '' })
+  const held = (expires: string | null, note = '') => ({ held: true, expires, note })
   const aoife = person('Aoife Brennan', 'staff', 'Production', 3, ['Crew chief', 'Audio'], null, { approvesLeave: true })
   const cian = person('Cian Murphy', 'staff', 'Transport', 2, ['Warehouse', 'Driver'], null, { certificates: { 'driving-licence': held(null), 'manual-handling': held(day(400)) } })
   const orla = person('Orla Hayes', 'staff', 'LX', 2, ['Lighting'], null)
@@ -122,13 +132,24 @@ export function madeUpData(today: string): Mutation[] {
   const eimear = person('Eimear Nolan', 'freelancer', 'Audio', 2, ['Monitors', 'Audio'], 300, { knownAs: 'Eims' })
   const fionn = person('Fionn Gallagher', 'freelancer', 'LX', 3, ['LX op', 'Lighting'], 280)
   const grainne = person('Gráinne Power', 'freelancer', 'Video', 2, ['Video', 'Camera'], 300)
-  // Pádraig's first aid is in date; Tadhg's manual handling ran out last month, which his card warns about.
-  const padraig = person('Pádraig Kenny', 'freelancer', 'Rigger', 3, ['Rigger'], 290, { certificates: { 'first-aid': held(day(300)) } })
-  const roisin = person('Róisín Farrell', 'freelancer', 'Rigger', 2, ['Rigger'], 290)
-  const tadhg = person('Tadhg Brady', 'freelancer', 'Transport', 1, ['Stagehand', 'Driver'], 200, { certificates: { 'manual-handling': held(day(-30)), 'driving-licence': held(null) } })
-  const laoise = person('Laoise Keane', 'freelancer', 'Production', 1, ['Stagehand'], 200)
+  // Pádraig's first aid is in date; Tadhg's manual handling ran out last month, which his card warns about. The riggers hold
+  // what working at height needs (ADR 0028), Pádraig's IPAF and Róisín's Safe Pass running out soon; Laoise has no IPAF.
+  const padraig = person('Pádraig Kenny', 'freelancer', 'Rigger', 3, ['Rigger'], 290, {
+    certificates: { 'first-aid': held(day(300)), 'safe-pass': held(day(700)), 'working-at-height': held(day(200)), ipaf: held(day(20), '3a, 3b') },
+  })
+  const roisin = person('Róisín Farrell', 'freelancer', 'Rigger', 2, ['Rigger'], 290, {
+    certificates: { 'safe-pass': held(day(12)), 'working-at-height': held(day(500)), ipaf: held(day(400), '3b') },
+  })
+  // Tadhg's Safe Pass runs out the day before the load-in ends, which its call warns about once it needs one.
+  const tadhg = person('Tadhg Brady', 'freelancer', 'Transport', 1, ['Stagehand', 'Driver'], 200, {
+    certificates: { 'manual-handling': held(day(-30)), 'driving-licence': held(null), 'safe-pass': held(day(3)) },
+  })
+  const laoise = person('Laoise Keane', 'freelancer', 'Production', 1, ['Stagehand'], 200, { certificates: { ipaf: { held: false, expires: null, note: '' } } })
   // An applicant nobody has vetted: out of the Offer to… picker until "Show applicants" is ticked.
   person('Saoirse Daly', 'freelancer', 'Audio', 0, [], null, { notes: 'New applicant, CV received, not yet vetted.' })
+  // Rónán has left and asked for his details to go: archived, with nothing unsettled, so he can be erased (ADR 0027).
+  const ronan = person('Rónán Moran', 'freelancer', 'Audio', 2, ['Audio'], 260, { notes: 'Moved to Melbourne. Asked us to delete his details.' })
+  add('person.archive', { id: ronan, archived: true })
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
 
   // Staff leave (ADR 0024). A week counted from today, moved a week on when it would cross the year end, since a request belongs to one year.
@@ -148,7 +169,7 @@ export function madeUpData(today: string): Mutation[] {
 
   // Crew asked for from the jobs, and what each person said.
   const venues = new Map([riverside, northbank, granary, pier3, clonmore].map((v) => [v.id, venueLabel(v)]))
-  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number | null, callTime = '08:00') =>
+  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number | null, callTime = '08:00', needsCertificates: CertificateKind[] = []) =>
     add('call.create', {
       id: newId(),
       projectId: p.projectId,
@@ -164,6 +185,7 @@ export function madeUpData(today: string): Mutation[] {
       dayRateCents: euroADay === null ? null : euroADay * 100,
       details: 'Food on site. Blacks, please.',
       replyBy: null,
+      needsCertificates,
     }).id
   const offer = (callId: string, personId: string, override = false) => add('offer.send', { id: newId(), callId, personId, override }).id
   const booked = (callId: string, personId: string) => {
@@ -172,12 +194,14 @@ export function madeUpData(today: string): Mutation[] {
     add('offer.confirm', { id })
     return id
   }
-  const riggers = call(harbourIn, 'Harbour Lights Festival', riverside.id, 'Rigger', 2, 290, '07:00')
+  const riggers = call(harbourIn, 'Harbour Lights Festival', riverside.id, 'Rigger', 2, 290, '07:00', ['working-at-height', 'ipaf'])
   booked(riggers, padraig)
   offer(riggers, roisin)
   const hands = call(harbourIn, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '07:00')
   booked(hands, tadhg)
   add('offer.respond', { id: offer(hands, laoise), answer: 'decline', note: 'At a wedding that weekend.' })
+  // The site asked for Safe Passes after Tadhg was booked: his booking stands, and the call warns his runs out first (ADR 0028).
+  add('call.update', { id: hands, needsCertificates: ['safe-pass'] })
   booked(call(harbourShow, 'Harbour Lights Festival', riverside.id, 'Sound No.1', 1, 320, '12:00'), dara)
   booked(call(harbourShow, 'Harbour Lights Festival', riverside.id, 'Monitors', 1, 300, '12:00'), eimear)
   const lx = call(harbourShow, 'Harbour Lights Festival', riverside.id, 'LX op', 1, 280, '12:00')
@@ -193,6 +217,12 @@ export function madeUpData(today: string): Mutation[] {
   for (const p of [harbourIn, harbourShow, harbourOut]) add('phase.update', { id: p.id, contactId: aoife })
   add('phase.update', { id: summitShow.id, contactId: cian })
   add('phase.update', { id: launchShow.id, contactId: orla })
+
+  // Today's shoot: Aoife runs it, and Gráinne is running late, as she said from her link (ADR 0028).
+  const camera = booked(call(shootDay, 'Liffey Brands Shoot', pier3.id, 'Camera', 1, 300), grainne)
+  booked(call(shootDay, 'Liffey Brands Shoot', pier3.id, 'Crew chief', 1, null, '07:30'), aoife)
+  add('phase.update', { id: shootDay.id, contactId: aoife })
+  add('late.say', { id: newId(), offerId: camera, day: day(0), by: '30', arriveAt: null, note: 'Traffic on the M50' })
 
   // The gala's crew, and their timesheets, sent from their private links.
   const galaSound = call(galaShow, 'Autumn Gala', northbank.id, 'Sound No.1', 1, 320, '10:00')

@@ -10,10 +10,10 @@ import { decryptBackup, isEncrypted } from './crypto.ts'
  * The backup file: the whole database as text, one row per line, gzipped.
  *
  *     H<tab>{"format":"session-hire-backup","version":1,...}   header
- *     T<tab>products                                            a table starts
- *     {"id":"y10p","name":"d&b Y10P","quantity":4}              a row
+ *     T<tab>places                                              a table starts
+ *     {"id":"a3","name":"Bay A3","notes":""}                    a row
  *     ...
- *     E<tab>{"tables":{"products":{"rows":1,"sha256":"…"}}}      the end, with a checksum per table
+ *     E<tab>{"tables":{"places":{"rows":1,"sha256":"…"}}}        the end, with a checksum per table
  *
  * Each row is Postgres's own JSON for it (row_to_json), and a restore hands
  * that text straight back to Postgres, so dates, times to the microsecond
@@ -216,6 +216,9 @@ export async function restoreBackup(db: Db, data: Buffer, key?: Buffer): Promise
 
   await db.transaction(async (tx) => {
     // In one transaction with the rows, so a restore that fails part way leaves the database as empty as it found it.
+    // A migration that keeps a table only while it holds rows (the old sync test's, schema.ts) runs before the rows
+    // are back, so it's told which tables the backup holds, and leaves those for them.
+    await tx.query(`SELECT set_config('session_hire.restoring', $1, true)`, [header.tables.join(',')])
     await migrateAllTo(tx, header.schemas)
     for (const { table, rows } of sections) {
       for (let i = 0; i < rows.length; i += INSERT_BATCH) {

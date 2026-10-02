@@ -2,6 +2,7 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENTS,
   holdOf,
+  itemByCode,
   MAX_QTY,
   newId,
   normaliseNumber,
@@ -100,9 +101,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const onCode = async (code: string) => {
     const w = view.warehouse
     const n = normaliseNumber(code)
-    const serial = code.trim().toLowerCase()
-    const bySerial = [...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial)
-    const a = (n && w.byNumber.get(n)) || (bySerial.length === 1 ? bySerial[0] : undefined)
+    // An old tag from before Session Hire's labels works too (ADR 0026).
+    const a = itemByCode(w, code)
     if (!a) return say('warn', n ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
     // Never stock, so nothing to scan out or back (audit finding 19).

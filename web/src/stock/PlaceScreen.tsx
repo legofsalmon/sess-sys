@@ -1,11 +1,11 @@
-import { normaliseNumber, plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
+import { plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemNumbered, mistakeLabel, numberLabel, ScanResult, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, ScanResult, WhereChoices } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
@@ -185,13 +185,8 @@ function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const put = (t: string) => {
     setMoved('')
     if (!t) return
-    const item = itemNumbered(t, w)
-    const typed = normaliseNumber(t)
-    if (!item)
-      return refuse(typed ? `No item has the number ${typed}.` : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`)
-    if (item.number !== typed) return refuse(`${typed} was an old label. That item is ${numberLabel(item)} now.`)
-    if (item.retiredReason === 'mistake') return refuse(mistakeLabel(item))
-    if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
+    const { item, problem } = itemToPut(t, w)
+    if (!item) return refuse(problem)
     if (item.placeId === p.id) return refuse(`${item.number} is here already.`)
     void run(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
       (ok) => ok && setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`)

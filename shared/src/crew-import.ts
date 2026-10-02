@@ -158,6 +158,10 @@ const HEADERS = {
   firstAid: ['first aider', 'first aid'],
   manualHandling: ['manual handling cert', 'manual handling'],
   drivingLicence: ['driving licence', 'driving license'],
+  // Safe Pass, working at height and IPAF (ADR 0028), under the names a spreadsheet might give them.
+  safePass: ['safe pass', 'safepass', 'safe-pass', 'safe pass card'],
+  workingAtHeight: ['working at height', 'working at heights', 'wah'],
+  ipaf: ['ipaf', 'ipaf card', 'pal card', 'ipaf pal card'],
   dayRate: ['day rate (eur)', 'day rate', 'rate'],
   companyName: ['company name', 'company'],
   vatNumber: ['vat number', 'vat'],
@@ -242,6 +246,9 @@ export function readCrewList(text: string, officeDomain: string | null): { rows:
       ['first-aid', 'firstAid'],
       ['manual-handling', 'manualHandling'],
       ['driving-licence', 'drivingLicence'],
+      ['safe-pass', 'safePass'],
+      ['working-at-height', 'workingAtHeight'],
+      ['ipaf', 'ipaf'],
     ] as const) {
       const h = held(f)
       if (h !== null) certificates[kind] = { held: h, expires: null, note: '' }

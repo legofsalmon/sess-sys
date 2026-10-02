@@ -50,9 +50,6 @@
 .warehouse .reasons .tick input { margin: 0; }
 .warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
 
-/* The Phase 0 sync test, now under Stock. */
-.sync-test .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
-
 /* Labels (ADR 0015). Black on white whatever the screen's theme, at their real size in millimetres. */
 .label { box-sizing: border-box; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm; background: #fff; color: #000; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.15; }
 .label .qr { flex: none; display: block; }
@@ -151,3 +148,35 @@
 .warehouse .zoom { display: grid; grid-template-columns: auto 1fr; gap: var(--space-8); align-items: center; width: 100%; max-width: 420px; justify-self: center; font-size: var(--text-hint); color: var(--muted); }
 .warehouse .zoom input { width: 100%; min-height: 0; padding: 0; accent-color: var(--accent); }
 .warehouse .scanner .elsewhere input { justify-self: stretch; width: 100%; font-size: var(--text-hint); color: var(--muted); }
+
+/* Bringing in the stock list (ADR 0026), on the crew list's pattern: a card per row, its fields to fix, the one button stuck above the tabs. */
+.import-stock .field input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.import-stock .card > p { margin: 0; }
+.import-stock .links { display: flex; flex-wrap: wrap; gap: 0 var(--space-16); }
+.import-stock .stock-rows .head { justify-content: space-between; }
+.import-stock .stock-rows .head b { font-size: 1.05rem; }
+.import-stock .stock-rows .skip { display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
+.import-stock .stock-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.import-stock .stock-rows p.does { color: var(--ink); }
+.import-stock .stock-rows p.same { color: var(--good); }
+.import-stock .fix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-8); align-items: start; padding-top: var(--space-4); }
+.import-stock .fix label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.import-stock .fix input { width: 100%; }
+.import-stock .fix .warn-line { display: block; font-size: .8rem; }
+.import-stock .bring .hint { text-align: center; }
+.import-stock .columns-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.import-stock .columns-list li { padding: var(--space-10) 0; border-top: 1px solid var(--line); }
+.import-stock .columns-list li:first-child { border-top: 0; padding-top: 0; }
+.import-stock .columns-list label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 50%); gap: var(--space-10); align-items: center; }
+.import-stock .columns-list b, .import-stock .columns-list small { display: block; overflow-wrap: anywhere; }
+.import-stock .columns-list small { color: var(--muted); font-size: var(--text-hint); }
+.import-stock .columns-list select { width: 100%; }
+.account .import-stock-card a.button { justify-self: start; }
+
+/* An item's log (ADR 0026): what happened, then when and who, newest first. */
+.warehouse .log { list-style: none; margin: 0; padding: 0; display: grid; }
+.warehouse .log li { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-12); padding: var(--space-8) 0; border-top: 1px solid var(--line); }
+.warehouse .log li:first-child { border-top: 0; padding-top: 0; }
+.warehouse .log .what { display: block; overflow-wrap: anywhere; }
+.warehouse .log small { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--text-hint); }
+.warehouse .item-log > .link { justify-self: start; }

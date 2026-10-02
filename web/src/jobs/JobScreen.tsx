@@ -17,6 +17,7 @@ import {
   suggestedReplyBy,
   venueLabel,
   type CallView,
+  type CertificateKind,
   type CommandInput,
   type JobView,
   type PersonView,
@@ -27,6 +28,7 @@ import {
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { NeedsField } from '../crew/Certificates.tsx'
 import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
@@ -92,7 +94,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
         <h2>Crew</h2>
         {job.otherCalls.length > 0 && <p className="hint">Across phases:</p>}
         {job.otherCalls.map((c) => (
-          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} onShare={onShare(c)} onTell={setShare} inJob />
+          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} late={view.late} onShare={onShare(c)} onTell={setShare} inJob />
         ))}
         {stopped ? (
           <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p>
@@ -374,6 +376,7 @@ function Phase({
           call={c}
           crew={view.crew}
           calendar={view.calendar}
+          late={view.late}
           onShare={onShare(c)}
           onTell={onTell}
           inJob
@@ -561,7 +564,7 @@ function AddPhase({ job }: { job: JobView }) {
 /** A role the job needs, for one phase or across several. */
 function AskForCrew({ job }: { job: JobView }) {
   // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
-  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '', replyBy: undefined as string | undefined }
+  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '', replyBy: undefined as string | undefined, needs: [] as CertificateKind[] }
   const [f, setF] = useState(blank)
   // The phase picked ('' is across several), while the job still has it. Until then, the job's first phase as it is
   // now rather than when the page opened, so a job that had no phases then starts on the first one added.
@@ -603,6 +606,7 @@ function AskForCrew({ job }: { job: JobView }) {
         dayRateCents: rate.cents,
         details: f.details.trim(),
         replyBy: replyBy || null,
+        needsCertificates: f.needs,
       })
     ).then((ok) => {
       if (ok) return
@@ -660,6 +664,7 @@ function AskForCrew({ job }: { job: JobView }) {
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={(e) => setF({ ...f, details: e.target.value })} placeholder="Travel, food, parking, dress" />
       </label>
+      <NeedsField value={f.needs} onChange={(needs) => setF({ ...f, needs })} />
       <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Ask for crew

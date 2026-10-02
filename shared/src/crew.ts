@@ -50,13 +50,36 @@ export function tidyDepartment(typed: string): string | null {
 export const NOTES_LENGTH = 2000
 const level = whole(0, 5, 'The level')
 
-export const CERTIFICATE_KINDS = ['first-aid', 'manual-handling', 'driving-licence'] as const
+/** Safe Pass, working at height and IPAF came with what a call needs (ADR 0028). An IPAF card's categories, such as 3a, go in its note. */
+export const CERTIFICATE_KINDS = ['first-aid', 'manual-handling', 'driving-licence', 'safe-pass', 'working-at-height', 'ipaf'] as const
 export type CertificateKind = (typeof CERTIFICATE_KINDS)[number]
 export const CERTIFICATE_LABELS: Record<CertificateKind, string> = {
   'first-aid': 'First aid',
   'manual-handling': 'Manual handling',
   'driving-licence': 'Driving licence',
+  'safe-pass': 'Safe Pass',
+  'working-at-height': 'Working at height',
+  ipaf: 'IPAF',
 }
+/** Two are names, so they keep their capitals mid-sentence: "needs working at height and IPAF". */
+export const certificateName = (kind: CertificateKind) => (kind === 'safe-pass' || kind === 'ipaf' ? CERTIFICATE_LABELS[kind] : CERTIFICATE_LABELS[kind].toLowerCase())
+/** The thing itself, as a sentence says someone has it or not: "Tadhg Brady's manual handling certificate ran out". */
+export const CERTIFICATE_WORDS: Record<CertificateKind, string> = {
+  'first-aid': 'first aid certificate',
+  'manual-handling': 'manual handling certificate',
+  'driving-licence': 'driving licence',
+  'safe-pass': 'Safe Pass',
+  'working-at-height': 'working at height certificate',
+  ipaf: 'IPAF',
+}
+/** Each kind once, in the list's order, whatever order they were ticked or sent in. */
+export const tidyNeeds = (needs: readonly string[] | null | undefined): CertificateKind[] => CERTIFICATE_KINDS.filter((k) => needs?.includes(k))
+/** "working at height and IPAF". */
+export function needsLabel(needs: readonly CertificateKind[]): string {
+  const names = tidyNeeds(needs).map(certificateName)
+  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+}
+const needs = z.array(z.enum(CERTIFICATE_KINDS)).max(CERTIFICATE_KINDS.length)
 
 /** One certificate: held, not held, or unknown (null), with an expiry day where there is one. */
 export const certificate = z.object({ held: z.boolean().nullable(), expires: day.nullable(), note: text(200, 'The note') })
@@ -64,6 +87,21 @@ export type Certificate = z.infer<typeof certificate>
 /** By kind; a kind that isn't there is unknown. */
 export const certificates = z.record(z.enum(CERTIFICATE_KINDS), certificate)
 export type Certificates = z.infer<typeof certificates>
+
+/** The kinds that came with ADR 0028, which a version of the app from before can't send. */
+const LATER_KINDS: readonly CertificateKind[] = ['safe-pass', 'working-at-height', 'ipaf']
+
+/**
+ * A person's certificates after an edit, on the server and on a device
+ * alike. This version's form sends every kind. One from before sends only
+ * the three it knows, and leaves one out to clear it: so a kind left out
+ * is kept only if it came later, and an edit that sends none keeps them all.
+ */
+export function certificatesAfter(was: Certificates | undefined, sent: Certificates | undefined): Certificates {
+  if (!sent) return was ?? {}
+  const kept = LATER_KINDS.filter((k) => was?.[k] && !(k in sent)).map((k) => [k, was![k]] as const)
+  return { ...Object.fromEntries(kept), ...sent }
+}
 
 /** The company a freelancer trades through. VAT-registered is derived: a VAT number is held. */
 export const company = z.object({
@@ -180,8 +218,12 @@ export const crewCall = z.object({
   /** When offers stop being open, if ops set one. */
   replyBy: day.nullable(),
   status: z.enum(['open', 'cancelled']),
+  /** The certificates everyone on it must hold to the last day (ADR 0028). Missing on calls synced before, which need none. */
+  needsCertificates: needs.optional(),
 })
 export type CrewCall = z.infer<typeof crewCall>
+/** What a call needs, reading one synced before as needing nothing. */
+export const needsOf = (c: Pick<CrewCall, 'needsCertificates'>): CertificateKind[] => tidyNeeds(c.needsCertificates)
 
 export const OFFER_STATUSES = [
   /** Sent, waiting on the freelancer. */
@@ -309,6 +351,8 @@ export const crewCommandSchemas = {
       dayRateCents: cents.nullable(),
       details: text(4000, 'The details for crew'),
       replyBy: day.nullable(),
+      /** Optional so versions of the app from before it existed can still send it (ADR 0028). */
+      needsCertificates: needs.optional(),
     })
     .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' })
     // A day typed before the dates were changed can be left behind them; an answer asked for after the job is no use (audit finding 21).
@@ -335,6 +379,7 @@ export const crewCommandSchemas = {
       project: needed(200, "The job's name", "The job's name").optional(),
       phase: text(100, 'The phase').optional(),
       venue: text(300, 'The venue').optional(),
+      needsCertificates: needs.optional(),
     })
     .refine(...somethingToChange)
     .refine((c) => !c.start || !c.end || c.start <= c.end, { message: 'The call ends before it starts.' }),
@@ -487,6 +532,8 @@ export function offerMessage(p: Addressee, c: CrewCall, link: string): string {
     `${c.role}, ${daysLabel(eachDay(c.start, c.end))}${c.callTime ? `, call ${c.callTime}` : ''}`,
     c.venue ? `At ${c.venue}` : '',
     p.kind === 'staff' ? '' : rateLine(c),
+    // Said up front, so nobody says yes without the card (ADR 0028).
+    needsOf(c).length ? `Needs ${needsLabel(needsOf(c))}.` : '',
     c.replyBy ? `Please answer by ${dayLabel(c.replyBy)}.` : '',
     `Accept, decline or pick days here: ${link}`,
   ]

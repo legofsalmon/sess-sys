@@ -88,6 +88,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
 .warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
 .confirm { display: grid; gap: var(--space-8); }
+.confirm .more { display: grid; gap: var(--space-8); }
+.confirm .more p { margin: 0; }
 .signal { display: flex; gap: var(--space-12); align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-12) var(--space-14); cursor: pointer; }
 .signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--space-2); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-14); display: grid; gap: var(--space-10); }
@@ -110,19 +112,7 @@ button.primary { background: var(--accent-fill); border-color: var(--accent-fill
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
-.stock { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
-.stock li { display: flex; justify-content: space-between; gap: var(--space-10); }
-.free { color: var(--muted); font-variant-numeric: tabular-nums; }
-.free b { color: var(--good); }
-.free.none b { color: var(--bad); }
-.range { display: flex; gap: var(--space-10); flex-wrap: wrap; font-size: var(--text-hint); color: var(--muted); }
-.range label { display: grid; gap: var(--space-2); }
-.inline { display: grid; grid-template-columns: 1fr 72px auto; gap: var(--space-6); }
-.book { display: grid; grid-template-columns: 1fr 1fr 90px; gap: var(--space-8); align-items: end; }
-.book label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
-.book .hint, .book button { grid-column: 1 / -1; }
-.hint, .empty, .scans { margin: 0; color: var(--muted); font-size: var(--text-hint); }
-.foot { color: var(--muted); font-size: var(--text-footer); text-align: center; font-variant-numeric: tabular-nums; }
+.hint, .empty { margin: 0; color: var(--muted); font-size: var(--text-hint); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Getting about (audit finding 22): each move within the app lands on the screen's heading (Shell.tsx), which shows the same ring as a button. */
@@ -130,7 +120,6 @@ h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--acc
 /* The live region round the "not done" count is a box of its own: older Safari leaves a display: contents box out of what a screen reader is told. Empty, it's taken out of the row, so on a 320px phone it doesn't take a line of its own and push the sync pill down. */
 .not-done-live { display: flex; }
 .not-done-live:empty { position: absolute; }
-@media (max-width: 480px) { .book { grid-template-columns: 1fr 1fr; } .book label:first-child { grid-column: 1 / -1; } }
 
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
@@ -221,6 +210,14 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .entry p { margin: 0; }
 .entry .meta { color: var(--muted); font-size: var(--text-hint); }
 .history .card > button { justify-self: start; }
+/* A card for each day, and one person's changes one after another as one line that opens (ADR 0006, amended), with a triangle like the browser's own on a fold, kept out of what a screen reader says. */
+.history .run-line { display: grid; gap: var(--space-4); align-content: center; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.history .run-line .what { display: flex; font-weight: 600; }
+.history .run-line .chevron { flex: none; width: 1.1em; height: 1.5em; display: grid; place-items: center; color: var(--muted); transition: transform .15s; }
+.history .run-line[aria-expanded='true'] .chevron { transform: rotate(90deg); }
+.history .run-line .meta { padding-left: 1.1em; color: var(--muted); font-size: var(--text-hint); }
+.history .run > .entries { margin-left: .4em; padding-left: var(--space-12); border-left: 2px solid var(--line); }
+.history .older { display: grid; gap: var(--space-10); justify-items: start; }
 
 /* Two columns on a laptop (audit finding 25, Beside in jobs/common.tsx): the list down the left, kept in reach as the record beside it scrolls. Below 960px nothing changes: the list and the record are separate pages. */
 .app.beside { max-width: 1400px; }

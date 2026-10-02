@@ -1,4 +1,5 @@
 import {
+  inShForm,
   MAX_CASE_DEPTH,
   MAX_NUMBER,
   MAX_QTY,
@@ -28,6 +29,7 @@ import {
   nameTaken,
   nextNumber,
   numberUse,
+  oldNumberUse,
   usesOf,
 } from './store.ts'
 
@@ -132,6 +134,16 @@ async function numberFor(ctx: Ctx, typed: string | null): Promise<string> {
     })
   }
   return number
+}
+
+/** An old tag as typed, checked (ADR 0026): never a Session Hire number, and on one item only, so scanning it finds that item. */
+async function oldNumberFor(ctx: Ctx, typed: string, assetId: string): Promise<string> {
+  const old = typed.trim()
+  if (!old) return ''
+  if (inShForm(old)) throw new Refused({ code: 'invalid', message: `${old} is a Session Hire number. Put it on as the item's label, not as its old number.` })
+  const other = await oldNumberUse(ctx.tx, old, assetId)
+  if (other) throw new Refused({ code: 'conflict', message: `${old} is already the old number of ${await described(ctx, other)}.` })
+  return old
 }
 
 async function attachNumber(ctx: Ctx, assetId: string, number: string) {
@@ -316,14 +328,11 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       throw new Refused({ code: 'conflict', message: `${m.name} is counted, not numbered. Change it to numbered to label them one by one.` })
     await checkWhere(ctx, a)
     const number = await numberFor(ctx, a.number)
-    await ctx.tx.query(`INSERT INTO assets (id, model_id, serial, place_id, case_id, status, notes) VALUES ($1, $2, $3, $4, $5, 'active', $6)`, [
-      a.id,
-      a.modelId,
-      a.serial.trim(),
-      a.placeId,
-      a.caseId,
-      a.notes,
-    ])
+    const old = await oldNumberFor(ctx, a.oldNumber, a.id)
+    await ctx.tx.query(
+      `INSERT INTO assets (id, model_id, serial, place_id, case_id, status, notes, old_number, pat_due) VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8)`,
+      [a.id, a.modelId, a.serial.trim(), a.placeId, a.caseId, a.notes, old, a.patDue]
+    )
     await attachNumber(ctx, a.id, number)
     // Labelling one that was counted: the count goes down as the items go up.
     if (a.fromCount && (a.placeId || a.caseId) && (await getStock(ctx.tx, stockId(a.modelId, a)))) await adjust(ctx, a.modelId, a, { by: -1 })
@@ -346,6 +355,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (a.modelId !== undefined) set('model_id', a.modelId)
     if (a.serial !== undefined) set('serial', a.serial.trim())
     if (a.notes !== undefined) set('notes', a.notes)
+    if (a.oldNumber !== undefined) set('old_number', await oldNumberFor(ctx, a.oldNumber, a.id))
+    if (a.patDue !== undefined) set('pat_due', a.patDue)
     await ctx.tx.query(`UPDATE assets SET ${sets.join(', ')} WHERE id = $1`, values)
     await emitAsset(ctx, a.id)
   },

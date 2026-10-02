@@ -4,16 +4,21 @@ import {
   DEPARTMENT_LABELS,
   eachDay,
   euro,
+  fullDayLabel,
   invitesLabel,
   irishToday,
+  LATE_BY,
+  lateWords,
   leaveDays,
   levelLabel,
+  needsLabel,
   newId,
   normaliseNumber,
   numberText,
   OFFLINE_AFTER_SECONDS,
   RETIRED_LABELS,
   STATUS_LABELS,
+  tidyNeeds,
   timesheetSummary,
   valueLabel,
   type Department,
@@ -36,6 +41,10 @@ import type { Queryable } from './db.ts'
 export const EXPORT_COMMAND = 'data.export'
 /** What it records bringing in the crew list as (ADR 0025), likewise. */
 export const IMPORT_PEOPLE_ACTION = 'people.import'
+/** And bringing in the stock list (ADR 0026). */
+export const IMPORT_STOCK_ACTION = 'stock.import'
+/** What it records erasing someone again after a restore as (ADR 0027), likewise. */
+export const ERASED_AGAIN_ACTION = 'person.erase-again'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -212,8 +221,6 @@ type Look = (entity: string, id: unknown) => Data | undefined
 
 const REFERENCES = [
   'id',
-  'productId',
-  'bookingId',
   'personId',
   'callId',
   'projectId',
@@ -230,6 +237,7 @@ const REFERENCES = [
   'toCaseId',
   'contactId',
   'by',
+  'offerId',
 ] as const
 
 /**
@@ -296,7 +304,6 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
  * own link, for the few commands that read differently in their voice.
  */
 export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar'): string {
-  const product = (id: unknown) => text(look('product', id)?.name, 'an item')
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
     const c = look('crewCall', id)
@@ -351,28 +358,32 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     return by ? `${person(by)} ${verb}` : verb[0]!.toUpperCase() + verb.slice(1)
   }
   const why = (approved: unknown, reason: unknown) => (!approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
+  /** ", needing working at height and IPAF" (ADR 0028); nothing when a call needs nothing. */
+  const needsIn = (v: unknown) => tidyNeeds(Array.isArray(v) ? v : [])
+  const needing = (needs: unknown) => (needsIn(needs).length ? `, needing ${needsLabel(needsIn(needs))}` : '')
+  /** A running late (ADR 0028): whose, and the job and phase it's for, through its call. */
+  const lateOf = (id: unknown, offerId?: unknown) => {
+    const l = look('runningLate', id)
+    const o = look('offer', offerId ?? l?.offerId)
+    const c = look('crewCall', l?.callId ?? o?.callId)
+    return { who: person(l?.personId ?? o?.personId), job: c ? `${text(c.project, 'a job')}${typeof c.phase === 'string' && c.phase ? ` (${c.phase})` : ''}` : 'a job' }
+  }
 
   switch (command) {
-    case 'product.upsert':
-      return `Set ${text(a.name, 'an item')} to ${a.quantity} in stock`
-    case 'booking.create':
-      return `Booked ${a.qty} × ${product(a.productId)} for ${text(a.project, 'a job')}, ${dates(a.start, a.end)}`
-    case 'booking.cancel': {
-      const b = look('booking', a.id)
-      return b ? `Cancelled the booking of ${b.qty} × ${product(b.productId)} for ${text(b.project, 'a job')}, ${dates(b.start, b.end)}` : 'Cancelled a booking'
-    }
-    case 'scan.record': {
-      const b = look('booking', a.bookingId)
-      return `Scanned ${product(a.productId)} ${a.direction === 'in' ? 'back in' : 'out'}${b ? ` for ${text(b.project, 'a job')}` : ''}`
-    }
     case 'person.upsert':
       return `Saved ${text(a.name, 'someone')}'s details`
     case 'person.level':
-      return `Moved ${person(a.id)} to ${levelLabel(typeof a.level === 'number' ? a.level : 1)}`
+      // An erased person's level went with the rest of their details (ADR 0027).
+      return `Moved ${person(a.id)} to ${typeof a.level === 'number' ? levelLabel(a.level) : 'another level'}`
     case 'person.newLink':
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':
       return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
+    // No name: the history is read by every member of staff, and keeps this for good (ADR 0027).
+    case 'person.erase':
+      return "Erased a person's details on request"
+    case ERASED_AGAIN_ACTION:
+      return "Erased a person's details again, after the data was put back from a backup"
     case 'person.contact': {
       // Which details changed, never what they are now: the history is read by every member of staff.
       const parts: string[] = []
@@ -388,7 +399,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return u ? `Removed ${person(u.personId)}'s days off, ${dates(u.start, u.end)}` : 'Removed some days off'
     }
     case 'call.create':
-      return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}`
+      return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}${needing(a.needsCertificates)}`
     case 'call.cancel':
       return `Cancelled the call for ${call(a.id)}`
     case 'call.update': {
@@ -404,6 +415,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.project !== undefined) parts.push(`job to ${text(a.project, 'a job')}`)
       if (a.phase !== undefined) parts.push(typeof a.phase === 'string' && a.phase ? `phase to ${a.phase}` : 'no phase')
       if (a.venue !== undefined) parts.push(typeof a.venue === 'string' && a.venue ? `venue to ${clip(a.venue)}` : 'no venue')
+      if (a.needsCertificates !== undefined) parts.push(needsIn(a.needsCertificates).length ? `certificates needed to ${needsLabel(needsIn(a.needsCertificates))}` : 'no certificates needed')
       return `Changed the call for ${call(a.id)}: ${inWords(parts)}`
     }
     case 'offer.send':
@@ -483,6 +495,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (n(a.skipped) > 0) parts.push(`${n(a.skipped)} skipped`)
       return `Brought in the crew list: ${parts.join(', ')}`
     }
+    case IMPORT_STOCK_ACTION: {
+      const n = typeof a.rows === 'number' ? a.rows : 0
+      const skipped = typeof a.skipped === 'number' && a.skipped > 0 ? `, ${a.skipped.toLocaleString('en-IE')} skipped` : ''
+      return `Brought in the stock list (${n.toLocaleString('en-IE')} ${n === 1 ? 'row' : 'rows'}${skipped})`
+    }
     case 'calendar.import': {
       const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
       const some = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined)
@@ -527,6 +544,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.modelId !== undefined) parts.push(`product to ${model(a.modelId)}`)
       if (a.serial !== undefined) parts.push(typeof a.serial === 'string' && a.serial.trim() ? `serial to ${clip(a.serial.trim())}` : 'no serial')
       if (a.notes !== undefined) parts.push('the notes')
+      if (a.oldNumber !== undefined) parts.push(typeof a.oldNumber === 'string' && a.oldNumber.trim() ? `old number to ${clip(a.oldNumber.trim())}` : 'no old number')
+      if (a.patDue !== undefined) parts.push(typeof a.patDue === 'string' ? `PAT due ${fullDayLabel(a.patDue)}` : 'no PAT due day')
       return `Changed ${item(a.id)}: ${inWords(parts)}`
     }
     case 'asset.move':
@@ -627,7 +646,9 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'leave.request': {
       const n = typeof a.start === 'string' && typeof a.end === 'string' ? leaveDays(a.start, a.end) : 0
-      return `${person(a.personId)} asked for ${leaveWords(a.type, n)}, ${dates(a.start, a.end)} (${n} day${n === 1 ? '' : 's'})`
+      // An erased person's leave has no dates left to count (ADR 0027).
+      const count = typeof a.start === 'string' ? ` (${n} day${n === 1 ? '' : 's'})` : ''
+      return `${person(a.personId)} asked for ${leaveWords(a.type, n)}, ${dates(a.start, a.end)}${count}`
     }
     case 'leave.cancel': {
       const r = leaveOf(a.id)
@@ -647,8 +668,25 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const e = lieuOf(a.id)
       return `${decided(a.by, a.approved)} ${e.who}'s ${e.what}${why(a.approved, a.reason)}`
     }
-    case 'leave.allowance':
-      return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over`
+    case 'leave.allowance': {
+      // An erased person's allowance went with their leave (ADR 0027).
+      const to = typeof a.days === 'number' ? ` to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over` : ''
+      return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance${to}`
+    }
+    case 'late.say': {
+      const l = lateOf(a.id, a.offerId)
+      const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })
+      const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
+      return `${l.who} said they'll be ${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+    }
+    case 'late.arrived': {
+      const l = lateOf(a.id)
+      return `${l.who} said they're there now, at ${l.job}`
+    }
+    case 'late.seen': {
+      const l = lateOf(a.id)
+      return `Noted that ${l.who} is running late for ${l.job}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

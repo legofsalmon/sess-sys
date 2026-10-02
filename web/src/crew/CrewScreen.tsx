@@ -42,6 +42,7 @@ import {
   type TellEvent,
   type View,
 } from '@sh/shared'
+import { blocks, CERTIFICATE_SOON_DAYS, certificateGaps, certificateName, certificateRefusal, certificateUnknowns, daysBetween, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -50,7 +51,10 @@ import { Top, useHash } from '../jobs/common.tsx'
 import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
+import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
+import { ArchivedPerson } from './Erase.tsx'
 import { useFeedAddress } from './feed.ts'
+import { LateLines, LateRow } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
@@ -234,6 +238,8 @@ export function CrewScreen() {
         return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
       })
   )
+  // Running late, said on a link (ADR 0028): first in the queue, as it's about today.
+  const late = view.late.toCheck
   // What the device turned down, said in the card it was asked from.
   const answers = useAct()
   const roster = useAct()
@@ -251,13 +257,14 @@ export function CrewScreen() {
     <div className="app crew">
       <Top view={view} title="Crew" />
 
-      {(toCheck.length > 0 || toSortOut.length > 0) && (
+      {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0) && (
         <section className="card">
           {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
-          <h2>Answers to check ({toSortOut.length + toCheck.length})</h2>
+          <h2>Answers to check ({late.length + toSortOut.length + toCheck.length})</h2>
           <Refusal error={answers.error} />
           <ShowAll
             items={[
+              ...late.map((l) => <LateRow key={l.id} note={l} today={today} onNoted={() => void answers.run(() => client.mutate('late.seen', { id: l.id }))} />),
               ...toSortOut.map(({ c, o, text }) => (
                 <div className="row" key={o.id}>
                   <div>
@@ -337,6 +344,7 @@ export function CrewScreen() {
 
       <TimesheetsCard view={view} />
       <LeaveCard view={view} />
+      <CertificateReminders view={view} />
 
       <section className="card">
         <h2>Crew needed</h2>
@@ -358,7 +366,7 @@ export function CrewScreen() {
               <div className="call-date" key={when}>
                 <h3>{when}</h3>
                 {calls.map((c) => (
-                  <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+                  <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
                 ))}
               </div>
             ))}
@@ -401,20 +409,9 @@ export function CrewScreen() {
         {archived.length > 0 && (
           <details className="archived">
             <summary>Archived ({archived.length})</summary>
+            {/* Each with "Erase details…" for when they ask (ADR 0027). */}
             {archived.map((p) => (
-              <div className="row person" key={p.id}>
-                <span className="who">
-                  <b>{p.name}</b>
-                  <small>{[p.kind === 'staff' ? 'Staff' : null, p.skills.join(', ')].filter(Boolean).join(' · ')}</small>
-                </span>
-                {p.pending ? (
-                  <Pending pending />
-                ) : (
-                  <button type="button" onClick={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
-                    Bring back
-                  </button>
-                )}
-              </div>
+              <ArchivedPerson key={p.id} person={p} onBringBack={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))} />
             ))}
           </details>
         )}
@@ -448,6 +445,7 @@ export function CallCard({
   call,
   crew,
   calendar,
+  late,
   onShare,
   onTell,
   inJob = false,
@@ -456,6 +454,8 @@ export function CallCard({
   call: CallView
   crew: CrewView
   calendar: View['calendar']
+  /** Who on it is running late today (ADR 0028), said at rest under its line. */
+  late?: LateView
   onShare: (p: PersonView) => void
   /** Opens the message for whoever should hear about a withdrawal or a cancelled call; without it, nobody is prompted. */
   onTell?: (share: Share | undefined) => void
@@ -508,10 +508,19 @@ export function CallCard({
               ? `${call.days.filter((d) => call.heldByDay[d]! >= call.needed).length}/${call.days.length} days filled`
               : `${call.heldByDay[call.days[0]!]}/${call.needed}`}
       </StatusPill>
+      {/* Lines that need acting on stay out at rest (audit finding 16): anyone short of a certificate it needs, and anyone running late (ADR 0028). */}
+      {certificateWarnings(call, today).map((w) => (
+        <p key={w} className="warn-line">
+          {w}
+        </p>
+      ))}
+      <LateLines call={call} late={late} today={today} />
 
       {open && (
         <>
-          <p className="facts-line">{[daysLabel(call.days), call.callTime && `call ${call.callTime}`, euro(call.dayRateCents)].filter(Boolean).join(' · ')}</p>
+          <p className="facts-line">
+            {[daysLabel(call.days), call.callTime && `call ${call.callTime}`, euro(call.dayRateCents), needsOf(call).length && `needs ${needsLabel(needsOf(call))}`].filter(Boolean).join(' · ')}
+          </p>
           {call.offers.length > 0 && (
             <ul className="offers">
               {call.offers.map((o) => {
@@ -543,6 +552,12 @@ export function CallCard({
                     </span>
                     {cal && <small className="on-cal">{cal.line}</small>}
                     {cal?.warning && <small className="warn-line">{cal.warning}</small>}
+                    {/* Not known is allowed, and said on the offer (ADR 0028). */}
+                    {answering && o.person && certificateUnknowns(o.person, needsOf(call), o.days, today).map((w) => (
+                      <small key={w} className="warn-line">
+                        {w}
+                      </small>
+                    ))}
                     {!cal && invites && answering && o.person && !o.person.email?.trim() && <small className="on-cal">No email address, so no calendar invite.</small>}
                   </li>
                 )
@@ -639,6 +654,8 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     details: call.details,
     replyBy: call.replyBy ?? '',
   })
+  // What the call needs (ADR 0028): kept apart, as it's ticks rather than text.
+  const [needs, setNeeds] = useState(needsOf(call))
   const { run, error, refuse } = useAct()
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
   const booked = Math.max(0, ...call.days.map((d) => call.heldByDay[d] ?? 0))
@@ -662,6 +679,7 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     if (rateChanged) changes.dayRateCents = rate.cents
     if (f.details.trim() !== call.details) changes.details = f.details.trim()
     if ((f.replyBy || null) !== call.replyBy) changes.replyBy = f.replyBy || null
+    if (needs.join() !== needsOf(call).join()) changes.needsCertificates = needs
     if (!tied) {
       if (f.project.trim() !== call.project) changes.project = f.project.trim()
       if (f.phase.trim() !== call.phase) changes.phase = f.phase.trim()
@@ -714,6 +732,10 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
+      <NeedsField value={needs} onChange={setNeeds} />
+      {needs.some((k) => !needsOf(call).includes(k)) && agreed + call.offers.filter((o) => o.status === 'offered').length > 0 && (
+        <p className="hint wide">Nobody already on it is taken off: anyone without it is warned about on the call's line.</p>
+      )}
       {datesChanged && booked > 0 && (
         <p className="hint wide">
           {booked === 1 ? '1 person is' : `${booked} people are`} booked: the days they hold move with the call. Anyone who would be left with no days stops the
@@ -758,12 +780,36 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   const candidates = everyone.filter((p) => applicants || p.level !== APPLICANT_LEVEL).sort(byDepartmentThenLevel)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
-  const { run, error } = useAct()
+  const { run, error, refuse } = useAct()
+  // What the call needs (ADR 0028): those who hold it first, then those not known, then those missing one, each in the order above.
+  const today = useToday()
+  const needs = needsOf(call)
+  const gapsOf = (p: PersonView) => certificateGaps(p, needs, call.days, today)
+  const groups = needs.length
+    ? [
+        { label: `Hold ${needsLabel(needs)}`, people: candidates.filter((p) => gapsOf(p).length === 0) },
+        { label: 'Not known: check first', people: candidates.filter((p) => gapsOf(p).length > 0 && !gapsOf(p).some(blocks)) },
+        { label: 'Missing a certificate', people: candidates.filter((p) => gapsOf(p).some(blocks)) },
+      ].filter((g) => g.people.length)
+    : undefined
+  const option = (p: PersonView) => {
+    const marks = gapMarks(gapsOf(p))
+    return (
+      <option key={p.id} value={p.id}>
+        {pickerLabel(p)}
+        {marks && ` · ${marks}`}
+        {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
+      </option>
+    )
+  }
 
   const send = (e: FormEvent) => {
     e.preventDefault()
     if (!chosen) return
     const p = chosen
+    // Said here, in the server's own words, rather than after a round trip; "Offer anyway" doesn't pass it.
+    const short = certificateRefusal(p, needs, call.days, today)
+    if (short) return refuse(short)
     void run(() => client.mutate('offer.send', { id: newId(), callId: call.id, personId: p.id, override: conflicts.length > 0 && override })).then((ok) => {
       if (!ok) return
       setPersonId('')
@@ -784,14 +830,23 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
         placeholder="Name, department or skill"
         aria-label="Find someone"
       />
-      <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
+      <select
+        value={personId}
+        onChange={(e) => {
+          setPersonId(e.target.value)
+          // A reason given for someone else no longer applies.
+          refuse('')
+        }}
+        aria-label="Offer to"
+      >
         <option value="">{candidates.length || !words.length ? 'Offer to…' : 'Nobody matches'}</option>
-        {candidates.map((p) => (
-          <option key={p.id} value={p.id}>
-            {pickerLabel(p)}
-            {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
-          </option>
-        ))}
+        {groups
+          ? groups.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.people.map(option)}
+              </optgroup>
+            ))
+          : candidates.map(option)}
       </select>
       <button type="submit" disabled={!chosen || (conflicts.length > 0 && !override)}>
         Offer
@@ -810,13 +865,19 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
           </span>
         </label>
       )}
+      {chosen &&
+        certificateUnknowns(chosen, needs, call.days, today).map((w) => (
+          <p key={w} className="warn-line">
+            {w}
+          </p>
+        ))}
       <Refusal error={error} />
     </form>
   )
 }
 
 /** WhatsApp, a text or an email with the words filled in, or a copy of them. Nothing is sent for you. */
-function SendButtons({ person, text, subject }: { person: Pick<Person, 'phone' | 'email'>; text: string; subject: string }) {
+export function SendButtons({ person, text, subject }: { person: Pick<Person, 'phone' | 'email'>; text: string; subject: string }) {
   const [copied, setCopied] = useState(false)
   return (
     <>
@@ -1101,18 +1162,31 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   )
 }
 
-/** The certificates someone holds, and any that have run out (ADR 0025). Nothing for ones not held or not known. */
+/**
+ * The certificates someone holds, with any note such as an IPAF card's
+ * categories, any running out in the next 30 days in the warn tone (ADR
+ * 0028), and any run out in the bad tone (ADR 0025). Nothing for ones not
+ * held or not known.
+ */
 function CertificateLines({ person }: { person: PersonView }) {
   const today = useToday()
   const states = CERTIFICATE_KINDS.map((kind) => ({ kind, c: person.certificates[kind], state: certificateState(person.certificates[kind], today) }))
   const held = states.filter((x) => x.state === 'held')
   const expired = states.filter((x) => x.state === 'expired')
+  const soon = held.filter((x) => x.c?.expires && daysBetween(today, x.c.expires) <= CERTIFICATE_SOON_DAYS)
   if (!held.length && !expired.length) return null
   return (
     <>
       {held.length > 0 && (
-        <p className="muted">Holds {held.map((x) => `${CERTIFICATE_LABELS[x.kind].toLowerCase()}${x.c?.expires ? ` (to ${dateLabel(x.c.expires)})` : ''}`).join(', ')}</p>
+        <p className="muted">
+          Holds {held.map((x) => `${certificateName(x.kind)}${x.c?.note.trim() ? ` ${x.c.note.trim()}` : ''}${x.c?.expires ? ` (to ${dateLabel(x.c.expires)})` : ''}`).join(', ')}
+        </p>
       )}
+      {soon.map((x) => (
+        <p key={x.kind} className="warn-line">
+          {CERTIFICATE_LABELS[x.kind]} runs out on {dateLabel(x.c!.expires!)}.
+        </p>
+      ))}
       {expired.map((x) => (
         <p key={x.kind} className="alert">
           {CERTIFICATE_LABELS[x.kind]} ran out on {dateLabel(x.c!.expires!)}.
@@ -1144,10 +1218,10 @@ function Worked({ person }: { person: PersonView }) {
 function NewCall() {
   const today = useToday()
   // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
-  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '', replyBy: undefined as string | undefined }
+  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '', replyBy: undefined as string | undefined, needs: [] as CertificateKind[] }
   const [f, setF] = useState(blank)
   const { run, error, refuse } = useAct()
-  const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const set = (k: Exclude<keyof typeof blank, 'needs'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
   const replyBy = f.replyBy ?? suggestedReplyBy(f.start, f.end < f.start ? f.start : f.end, today) ?? ''
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -1171,6 +1245,7 @@ function NewCall() {
         dayRateCents: rate.cents,
         details: f.details.trim(),
         replyBy: replyBy || null,
+        needsCertificates: f.needs,
       })
     ).then((ok) => {
       if (!ok) setF((now) => (now === cleared ? f : now))
@@ -1212,6 +1287,7 @@ function NewCall() {
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
+      <NeedsField value={f.needs} onChange={(needs) => setF({ ...f, needs })} />
       <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Ask for crew
@@ -1241,29 +1317,27 @@ type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>
  * them (audit finding 7). A refused change says why under the fields and
  * keeps what was typed.
  */
-/** A certificate as the form holds it: yes, no or not known, and an expiry day or none. */
-type CertField = { held: '' | 'yes' | 'no'; expires: string }
+/** A certificate as the form holds it: yes, no or not known, an expiry day or none, and a note, such as an IPAF card's categories (ADR 0028). */
+type CertField = { held: '' | 'yes' | 'no'; expires: string; note: string }
 type CertFields = Record<CertificateKind, CertField>
 
-const blankCerts = (): CertFields => ({ 'first-aid': { held: '', expires: '' }, 'manual-handling': { held: '', expires: '' }, 'driving-licence': { held: '', expires: '' } })
+const blankCerts = (): CertFields => Object.fromEntries(CERTIFICATE_KINDS.map((kind) => [kind, { held: '', expires: '', note: '' }])) as CertFields
 
 function certFieldsOf(c: Certificates): CertFields {
   const out = blankCerts()
   for (const kind of CERTIFICATE_KINDS) {
     const x = c[kind]
-    if (x) out[kind] = { held: x.held === null ? '' : x.held ? 'yes' : 'no', expires: x.expires ?? '' }
+    if (x) out[kind] = { held: x.held === null ? '' : x.held ? 'yes' : 'no', expires: x.expires ?? '', note: x.note }
   }
   return out
 }
 
-/** Only the kinds that say something go back; a kind with nothing set stays unknown, keeping any note it had. */
-function certificatesOf(fields: CertFields, was: Certificates): Certificates {
+/** Every kind goes back, one not known as not known: the server keeps a newer kind that's left out, for a version of the app that doesn't know it (ADR 0028). */
+function certificatesOf(fields: CertFields): Certificates {
   const out: Certificates = {}
   for (const kind of CERTIFICATE_KINDS) {
     const f = fields[kind]
-    const note = was[kind]?.note ?? ''
-    if (f.held === '' && !f.expires && !note) continue
-    out[kind] = { held: f.held === '' ? null : f.held === 'yes', expires: f.expires || null, note }
+    out[kind] = { held: f.held === '' ? null : f.held === 'yes', expires: f.expires || null, note: f.note.trim() }
   }
   return out
 }
@@ -1305,7 +1379,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
   })
   const [f, setF] = useState(initial ? from(initial) : blank)
   // The profile (ADR 0025) folds away on a phone, open when any of it is set; once open or shut by hand it stays so.
-  const [moreOpen] = useState(() => !!initial && (!!initial.department || !!initial.knownAs || initial.level !== DEFAULT_LEVEL || !!initial.company || Object.keys(initial.certificates).length > 0))
+  const [moreOpen] = useState(() => !!initial && (!!initial.department || !!initial.knownAs || initial.level !== DEFAULT_LEVEL || !!initial.company || Object.values(initial.certificates).some((c) => c && (c.held !== null || !!c.expires || !!c.note))))
   const listId = useId()
   const { run, error, refuse } = useAct()
   const set = (k: Exclude<keyof typeof blank, 'approvesLeave' | 'certs'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -1333,7 +1407,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
         department: tidyDepartment(f.department),
         knownAs: f.knownAs.trim() || null,
         level: Number(f.level),
-        certificates: certificatesOf(f.certs, initial?.certificates ?? {}),
+        certificates: certificatesOf(f.certs),
         company: showCompany && company ? { name: f.companyName.trim(), vatNumber: f.vatNumber.trim() || null, croNumber: f.croNumber.trim() || null } : null,
       })
     ).then((taken) => {
@@ -1417,6 +1491,19 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
               <label>
                 Expires <input type="date" value={f.certs[kind].expires} onChange={(e) => setCert(kind, { expires: e.target.value })} aria-label={`${CERTIFICATE_LABELS[kind]} expires`} />
               </label>
+              {/* Only for one held, or one with a note already: a phone's form stays short. */}
+              {(f.certs[kind].held === 'yes' || !!f.certs[kind].note) && (
+                <label className="cert-note">
+                  Note
+                  <input
+                    value={f.certs[kind].note}
+                    onChange={(e) => setCert(kind, { note: e.target.value })}
+                    placeholder={kind === 'ipaf' ? 'Categories, e.g. 3a, 3b' : ''}
+                    maxLength={200}
+                    aria-label={`${CERTIFICATE_LABELS[kind]} note`}
+                  />
+                </label>
+              )}
             </div>
           ))}
           {showCompany && (

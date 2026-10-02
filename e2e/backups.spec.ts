@@ -16,6 +16,8 @@ test('says plainly when nothing is being backed up', async ({ page }) => {
   await page.goto('/#account')
   await expect(page.getByRole('heading', { name: 'Backups are off' })).toBeVisible()
   await expect(page.getByText('Nothing is being backed up yet.')).toBeVisible()
+  // And where the list of people erased on request lives meanwhile (ADR 0027).
+  await expect(page.getByText("the list of people whose details were erased on request is kept only with the app's own data")).toBeVisible()
 })
 
 test('shows the last backup, and backs up on request', async ({ page }) => {

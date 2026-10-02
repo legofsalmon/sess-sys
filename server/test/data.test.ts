@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  eraseRefusal,
   irishToday,
   MemoryStorage,
   START_FRESH_WORDS,
@@ -213,13 +214,24 @@ describe('made-up data', () => {
     expect(view.faults.open.map((f) => [f.kind, f.usable, f.note])).toEqual([['damaged', true, 'Rattles at high level. Fine for speech meanwhile.']])
     expect(view.problems).toEqual([])
 
-    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets as sent on the freelancers' links.
-    const history: HistoryPage = await aoife.history('?limit=500')
+    // Today's shoot (ADR 0028): Gráinne running late, said from her link, waiting in "Answers to check".
+    expect(view.late.toCheck.map((l) => [l.person?.name, l.by, l.note])).toEqual([['Gráinne Power', '30', 'Traffic on the M50']])
+    // Rónán has left and asked for his details to go: archived, with nothing in the way of erasing him (ADR 0027).
+    const ronan = view.crew.people.find((p) => p.name === 'Rónán Moran')!
+    expect(ronan).toMatchObject({ archived: true })
+    expect(eraseRefusal(ronan, view, irishToday())).toBeUndefined()
+
+    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets and running late as sent on the freelancers' links.
+    // More than a page of it, so read every page.
+    const history: HistoryPage = await aoife.history('?limit=200')
+    for (let page = history; page.next; ) history.entries.push(...(page = await aoife.history(`?limit=200&before=${page.next}`)).entries)
     expect(history.entries).toHaveLength(madeUpData('2026-10-01').length + 1)
     expect(history.entries.every((e) => e.outcome === 'done')).toBe(true)
-    const [sent, others] = [history.entries.filter((e) => e.command === 'timesheet.send'), history.entries.filter((e) => e.command !== 'timesheet.send')]
+    const fromLinks = new Set(['timesheet.send', 'late.say'])
+    const [sent, others] = [history.entries.filter((e) => fromLinks.has(e.command)), history.entries.filter((e) => !fromLinks.has(e.command))]
     expect(sent.map((e) => [e.who.kind, e.who.name]).sort()).toEqual([
       ['link', 'Dara Quinn'],
+      ['link', 'Gráinne Power'],
       ['link', 'Tadhg Brady'],
     ])
     expect(others.every((e) => e.who.name === 'Aoife Brennan')).toBe(true)
@@ -232,7 +244,7 @@ describe('made-up data', () => {
   it('only goes into an empty app', async () => {
     const { app } = await server()
     const office = await phone(app)
-    await office.client.mutate('product.upsert', { id: 'y10p', name: 'd&b Y10P', quantity: 4 })
+    await office.client.mutate('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
     await office.client.sync()
     const res = await putInMadeUpData(app)
     expect(res.statusCode).toBe(409)
@@ -249,7 +261,9 @@ describe('made-up data', () => {
     const jobs = madeUpData('2027-02-27').filter((m) => m.name === 'phase.add')
     const starts = jobs.map((m) => (m.args as { start: string }).start).sort()
     expect(starts[0]).toBe('2027-02-17')
-    expect(starts[1]).toBe('2027-03-02')
+    // The shoot is on the day it goes in (ADR 0028), so someone can be running late for it.
+    expect(starts[1]).toBe('2027-02-27')
+    expect(starts[2]).toBe('2027-03-02')
     // Fresh ids each time, so it can go in again after starting fresh.
     expect(madeUpData('2027-02-27')[0]!.id).not.toBe(madeUpData('2027-02-27')[0]!.id)
   })
@@ -272,9 +286,12 @@ describe('starting fresh', () => {
     const { app, db } = await signedInServer()
     const aoife = await staff(app, db, 'Aoife Brennan', IPHONE, CODE)
     await putInMadeUpData(app, aoife)
-    await aoife.send('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 })
+    await aoife.send('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
+    // Rónán erased on request (ADR 0027): the list of erasures goes with the rest, as does today's running late (ADR 0028).
+    const { rows: ronan } = await db.query<{ id: string }>(`SELECT id FROM people WHERE name = 'Rónán Moran'`)
+    expect(await aoife.send('person.erase', { id: ronan[0]!.id })).toMatchObject({ status: 'applied' })
     const before = await rowsLeft(db)
-    expect(before.projects).toBe(7)
+    expect(before).toMatchObject({ projects: 8, running_late: 1, erasures: 1 })
     const total = Object.values(before).reduce((a, b) => a + b, 0)
 
     const res = await startFresh(app, START_FRESH_WORDS, aoife)
@@ -313,10 +330,10 @@ describe('starting fresh', () => {
     await dara.client.sync()
     const job = dara.client.view().jobs.jobs.find((j) => j.name === 'Clonmore Wedding')!
 
-    // Dara, with no signal, moves a job on and adds a product; then the office starts fresh.
+    // Dara, with no signal, moves a job on and adds a place; then the office starts fresh.
     dara.link.online = false
     await dara.client.mutate('project.update', { id: job.id, status: 'confirmed' })
-    await dara.client.mutate('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 })
+    await dara.client.mutate('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
     await dara.client.sync().catch(() => {})
     expect(dara.client.view().pendingCount).toBe(2)
     expect((await startFresh(app)).statusCode).toBe(200)
@@ -331,15 +348,15 @@ describe('starting fresh', () => {
     expect((await pull(app)).changes).toEqual([])
     const view = dara.client.view()
     expect(view.jobs.jobs).toEqual([])
-    expect(view.products).toEqual([])
+    expect(view.warehouse.places).toEqual([])
     expect(view.pendingCount).toBe(0)
     expect(view.problems).toEqual([])
 
     // What's done after goes in as normal, from either phone.
-    await dara.client.mutate('product.upsert', { id: 'sm58', name: 'Shure SM58', quantity: 20 })
+    await dara.client.mutate('place.upsert', { id: 'van8', name: 'Van 8', notes: '' })
     await dara.client.sync()
     await office.client.sync()
-    expect(office.client.view().products.map((p) => p.id)).toEqual(['sm58'])
+    expect(office.client.view().warehouse.places.map((p) => p.id)).toEqual(['van8'])
     expect(dara.client.view().pendingCount).toBe(0)
   })
 
@@ -354,7 +371,7 @@ describe('starting fresh', () => {
       payload: {
         clientId: 'phone1',
         generation,
-        mutations: [{ id: 'm1', name: 'product.upsert', args: { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }, createdAt: new Date().toISOString() }],
+        mutations: [{ id: 'm1', name: 'place.upsert', args: { id: 'van9', name: 'Van 9', notes: '' }, createdAt: new Date().toISOString() }],
       },
     })
     expect(stale.json()).toEqual({ results: [], stale: true })
@@ -369,7 +386,7 @@ describe('starting fresh', () => {
       payload: {
         clientId: 'phone1',
         generation: now,
-        mutations: [{ id: 'm2', name: 'product.upsert', args: { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }, createdAt: new Date().toISOString() }],
+        mutations: [{ id: 'm2', name: 'place.upsert', args: { id: 'van9', name: 'Van 9', notes: '' }, createdAt: new Date().toISOString() }],
       },
     })
     expect(ok.json().results[0]).toMatchObject({ status: 'applied' })
@@ -402,7 +419,7 @@ describe('starting fresh', () => {
     const res = await startFresh(app)
     expect(res.statusCode).toBe(409)
     expect(res.json().error).toBe("The backup before starting fresh didn't work (The backup storage answered 403: Access denied), so nothing was deleted.")
-    expect((await rowsLeft(db)).projects).toBe(7)
+    expect((await rowsLeft(db)).projects).toBe(8)
     expect(await status(app)).toMatchObject({ empty: false, fresh: null })
   })
 })

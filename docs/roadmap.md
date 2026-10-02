@@ -128,6 +128,19 @@ faults, missing kit and repairs
   thorough examinations recorded per item or a batch by scanning, with
   when each is next due, and failed or overdue kit taken off what's
   free and warned about when scanned out).
+- Bringing in the existing stock list (built, 2 October 2026,
+  [ADR 0026](adr/0026-bringing-in-the-stock-list-and-item-logs.md): a
+  spreadsheet saved as CSV, its columns found by many names and the
+  unknown ones asked about, every row previewed with what it will add or
+  change, problems fixed in place or skipped; old asset numbers kept and
+  still found by scanning, the rest numbered from the label sequence;
+  new places and cases made only when ticked; the same file twice
+  changes nothing).
+- A page for each item with its log (built, 2 October 2026, the same
+  ADR: scans out and back, faults and repairs, tests, moves, labels and
+  changes, newest first, with who; what the phone holds shows with no
+  signal. Trackers' locations later, from trackers that offer a way to
+  read them).
 
 **Done when:** a job's kit is picked and returned by scanning, and
 availability for next week is trusted without walking the shelves.
@@ -164,10 +177,18 @@ over by rule are later.
   licence as held, not held or unknown with an expiry the card warns
   about, the company and VAT and CRO numbers a freelancer trades
   through, and the jobs they've worked from their bookings; the crew
-  list brought in from a spreadsheet, checked row by row first. Still
-  later: Safe Pass, working at height and IPAF; an expired required
-  certificate blocking an assignment; expiry reminders; the stock list
-  through the same step).
+  list brought in from a spreadsheet, checked row by row first; the stock
+  list came in through the same step later, ADR 0026).
+- Certificates a call needs, and running late (built, 2 October 2026,
+  [ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md):
+  Safe Pass, working at height and IPAF as certificate kinds, on the
+  person's card and from the crew list; a call says which it needs, and
+  an offer to anyone without one, or whose one runs out before the job
+  ends, is refused by name, not known being allowed with a warning; the
+  Crew tab lists certificates run out or running out in 30 days, each
+  with a message asking for the new card; and a freelancer says from
+  their link on the day that they're running late, which the office,
+  the planner and the contact on the day see at once).
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the

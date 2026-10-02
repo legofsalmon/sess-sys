@@ -29,9 +29,9 @@ import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toT
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
 import { CREW, migrateCrew } from '../src/crew/schema.ts'
 import { pgliteDb, type Db } from '../src/db.ts'
-import { moduleVersion } from '../src/migrations.ts'
+import { moduleVersion, runMigrations } from '../src/migrations.ts'
 import { PROJECTS } from '../src/projects/schema.ts'
-import { CORE, migrate } from '../src/schema.ts'
+import { CORE, keptSyncTestTables, migrate, SYNC_TEST_GONE } from '../src/schema.ts'
 
 /**
  * Backups (ADR 0004): the file, the restore, the nightly run, what phones
@@ -83,16 +83,15 @@ const pull = async (app: FastifyInstance, after = 0): Promise<PullResponse> =>
  * microsecond, a signed-in member of staff and a freelancer's link.
  */
 async function seed(app: FastifyInstance, db: Db) {
-  const first = m('product.upsert', { id: 'y10p', name: 'd&b Y10P "line array"', quantity: 4 })
-  await push(app, 'office', first, m('product.upsert', { id: 'sm58', name: 'Shure SM58\tvocal mic', quantity: 20 }))
-  await push(app, 'office', m('booking.create', { id: 'b1', productId: 'y10p', project: 'Féile na nDéise 🎶', qty: 2, start: '2026-10-05', end: '2026-10-06' }))
+  const first = m('model.create', { id: 'y10p', name: 'd&b Y10P "line array"', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: 1250000, notes: '' })
   await push(
     app,
-    'warehouse',
-    m('scan.record', { id: 's1', productId: 'y10p', bookingId: 'b1', direction: 'out', at: '2026-10-05T08:15:00.000Z' }),
-    // Scanned with no booking, which raises an issue.
-    m('scan.record', { id: 's2', productId: 'sm58', bookingId: null, direction: 'out', at: '2026-10-05T08:16:00.000Z' })
+    'office',
+    first,
+    m('place.upsert', { id: 'a3', name: 'Bay A3\tleft side', notes: 'Line one\nLine two' }),
+    m('place.upsert', { id: 'van1', name: 'Van 1', notes: '' })
   )
+  await push(app, 'office', m('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 4 }))
   await push(
     app,
     'office',
@@ -130,6 +129,7 @@ async function seed(app: FastifyInstance, db: Db) {
     m('venue.upsert', { id: 'v1', name: 'Dublin Castle', address: 'Dame St, Dublin 2\nD02 R590', notes: 'Load in via the Ship St gate.' }),
     m('project.create', { id: 'j1', name: 'Culture Night', clientId: 'cl1', venueId: 'v1', status: 'confirmed', notes: '' }),
     m('phase.add', { id: 'ph1', projectId: 'j1', name: 'Build', start: '2026-09-18', end: '2026-09-18', venueId: null, notes: '' }),
+    m('kit.add', { id: 'k1', projectId: 'j1', phaseId: 'ph1', modelId: 'y10p', qty: 2, subhireQty: 0, supplier: '', notes: 'Féile na nDéise 🎶' }),
     m('call.create', {
       id: 'c2',
       phaseId: 'ph1',
@@ -146,6 +146,8 @@ async function seed(app: FastifyInstance, db: Db) {
       replyBy: null,
     })
   )
+  // Scanned out on the warehouse phone: a time from the device, kept as it was.
+  await push(app, 'warehouse', m('move.record', { id: 's1', projectId: 'j1', direction: 'out', assetId: null, modelId: 'y10p', qty: 2, at: '2026-09-18T07:15:00.000Z' }))
   const user = await upsertUser(db, { subject: 'g-1', email: 'aoife@sessionhire.com', emailVerified: true, name: 'Aoife Byrne', hostedDomain: 'sessionhire.com' })
   await createSession(db, user.id, 'test')
   // A time to the microsecond, which JavaScript dates would round off.
@@ -176,11 +178,12 @@ describe('the backup file', () => {
 
     const backup = await writeBackup(db)
     const { tables } = backup.header
-    expect(tables).toEqual(expect.arrayContaining(['products', 'bookings', 'scans', 'issues', 'people', 'crew_calls', 'offers', 'users', 'mutations', 'changes']))
+    expect(tables).toEqual(expect.arrayContaining(['models', 'places', 'stock', 'kit_lines', 'movements', 'people', 'crew_calls', 'offers', 'users', 'mutations', 'changes']))
+    for (const gone of ['products', 'bookings', 'scans', 'issues']) expect(tables).not.toContain(gone)
     for (const left of ['sessions', 'server_meta', 'backup_runs', 'schema_version']) expect(tables).not.toContain(left)
     // Every table after the ones it refers to.
     expect(tables.indexOf('mutations')).toBeLessThan(tables.indexOf('changes'))
-    expect(tables.indexOf('products')).toBeLessThan(tables.indexOf('bookings'))
+    expect(tables.indexOf('models')).toBeLessThan(tables.indexOf('stock'))
     expect(tables.indexOf('people')).toBeLessThan(tables.indexOf('offers'))
     expect(tables.indexOf('crew_calls')).toBeLessThan(tables.indexOf('offers'))
     expect(tables.indexOf('projects')).toBeLessThan(tables.indexOf('phases'))
@@ -204,7 +207,7 @@ describe('the backup file', () => {
     const after = await pull(restored)
     expect(after.changes).toEqual(before.changes)
     expect(after.generation).not.toBe(before.generation)
-    const [next] = await push(restored, 'office', m('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }))
+    const [next] = await push(restored, 'office', m('place.upsert', { id: 'van2', name: 'Van 2', notes: '' }))
     expect(next).toMatchObject({ status: 'applied', seq: before.head! + 1 })
     // A command it already had is still recognised, so a phone sending it again changes nothing.
     const [again] = await push(restored, 'office', first)
@@ -257,8 +260,53 @@ describe('the backup file', () => {
     await restoreBackup(copy, backup.data)
     for (const mod of [CORE, PROJECTS, CREW]) expect(await moduleVersion(copy, mod)).toBe(mod.migrations.length)
     expect(await readGeneration(copy)).toMatch(/^[0-9a-f-]{36}$/)
+    // The sync test's products held a row, so they stay (schema.ts); its empty tables went.
     expect((await copy.query(`SELECT name FROM products`)).rows).toEqual([{ name: 'd&b Y10P' }])
+    expect(await keptSyncTestTables(copy)).toEqual([{ table: 'products', rows: 1 }])
     await server(copy)
+  })
+
+  it('restores a backup made the day before the sync test went, and its empty tables go', async () => {
+    // Proves: a backup taken before this version, holding the sync test's tables empty as the live database does,
+    // restores whole and comes up without them, and the server starts on it.
+    // Today's backups don't hold them at all.
+    const now = await database()
+    await server(now)
+    expect((await writeBackup(now)).header.tables).not.toContain('products')
+    // As a backup from the day before reads: the core tables as they were then, the sync test's four still in it, empty.
+    const before = await database()
+    await migrate(before, SYNC_TEST_GONE - 1)
+    for (const mod of [PROJECTS, CREW]) await runMigrations(before, mod)
+    await migrateAuth(before)
+    const dayBefore = await writeBackup(before)
+    expect(dayBefore.header.tables).toEqual(expect.arrayContaining(['products', 'bookings', 'scans', 'issues']))
+    expect(dayBefore.header.schemas.schema_version).toBe(SYNC_TEST_GONE - 1)
+
+    const copy = await database()
+    await restoreBackup(copy, dayBefore.data)
+    expect(await moduleVersion(copy, CORE)).toBe(CORE.migrations.length)
+    for (const gone of ['products', 'bookings', 'scans', 'issues']) expect(await tableNames(copy)).not.toContain(gone)
+    expect(await keptSyncTestTables(copy)).toEqual([])
+    await server(copy)
+  })
+
+  it('restores a later backup of a database that kept a sync test table, rows and all', async () => {
+    // Proves: a table kept because it held rows is in every backup after, and a restore keeps it for them, though the
+    // migration that would drop an empty one runs before the rows go back; the nightly test restore passes too.
+    const db = await database()
+    await migrate(db, SYNC_TEST_GONE - 1)
+    await db.query(`INSERT INTO products (id, name, quantity) VALUES ('y10p', 'd&b Y10P', 4)`)
+    await server(db)
+    const backup = await writeBackup(db)
+    expect(backup.header.schemas.schema_version).toBeGreaterThanOrEqual(SYNC_TEST_GONE)
+    expect(backup.header.tables).toContain('products')
+    expect(backup.header.tables).not.toContain('bookings')
+    expect((await checkRestores(backup.data)).rows).toBe(backup.rows)
+
+    const copy = await database()
+    await restoreBackup(copy, backup.data)
+    expect(await contents(copy, 'products')).toEqual(await contents(db, 'products'))
+    expect(await keptSyncTestTables(copy)).toEqual([{ table: 'products', rows: 1 }])
   })
 })
 
@@ -394,7 +442,7 @@ describe('putting the data back', () => {
     const app = await server(db, { backupStore: store })
     await seed(app, db)
     const older = await new Backups(db, store, { now: () => new Date('2026-09-28T02:00:00Z') }).run('nightly')
-    await push(app, 'office', m('product.upsert', { id: 'ls9', name: 'Yamaha LS9', quantity: 1 }))
+    await push(app, 'office', m('place.upsert', { id: 'van2', name: 'Van 2', notes: '' }))
     const newer = await new Backups(db, store, { now: () => new Date('2026-09-29T02:00:00Z') }).run('nightly')
     expect(await latestKey(store)).toBe(newer.key)
     expect(older.key).not.toBe(newer.key)
@@ -402,7 +450,7 @@ describe('putting the data back', () => {
     const fresh = await database()
     const restored = await restoreFrom(fresh, store, 'latest')
     expect(restored?.key).toBe(newer.key)
-    expect((await fresh.query(`SELECT id FROM products ORDER BY id`)).rows.map((r) => r.id)).toEqual(['ls9', 'sm58', 'y10p'])
+    expect((await fresh.query(`SELECT id FROM places ORDER BY id`)).rows.map((r) => r.id)).toEqual(['a3', 'van1', 'van2'])
     // Left set by mistake on the next deploy: nothing happens.
     expect(await restoreFrom(fresh, store, 'latest')).toBeUndefined()
     await expect(restoreFrom(await database(), undefined, 'latest')).rejects.toThrow('no backup storage')
@@ -431,32 +479,34 @@ async function phone(app: FastifyInstance, now?: () => Date) {
   return { link, client, storage }
 }
 
-const Y10P = { id: 'y10p', name: 'd&b Y10P', quantity: 4 }
-const day = { start: '2026-10-05', end: '2026-10-05' }
+const Y10P = { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: null, notes: '' } as const
+const place = (id: string, name: string) => ({ id, name, notes: '' })
+/** The places a phone has, by id. */
+const placeIds = (p: { client: SyncClient }) => p.client.view().warehouse.places.map((x) => x.id).sort()
 
 describe('phones, after the server is restored from a backup', () => {
   it('start their copy afresh and send again what the backup missed', async () => {
     const db = await database()
     const app = await server(db)
     const office = await phone(app)
-    await office.client.mutate('product.upsert', Y10P)
+    await office.client.mutate('model.create', Y10P)
     await office.client.sync()
     const aoife = await phone(app)
     const dara = await phone(app)
-    await aoife.client.mutate('booking.create', { id: 'b1', productId: 'y10p', project: 'Before the backup', qty: 1, ...day })
+    await aoife.client.mutate('place.upsert', place('b1', 'Before the backup'))
     await aoife.client.sync()
     await dara.client.sync()
 
     const backup = await writeBackup(db)
 
     // Work after the backup, which losing the database loses...
-    await aoife.client.mutate('booking.create', { id: 'b2', productId: 'y10p', project: 'After the backup', qty: 2, ...day })
+    await aoife.client.mutate('place.upsert', place('b2', 'After the backup'))
     await aoife.client.sync()
     await dara.client.sync()
-    expect(dara.client.view().bookings.map((b) => b.id)).toEqual(['b1', 'b2'])
-    // ...and a booking still waiting on a phone with no signal.
+    expect(placeIds(dara)).toEqual(['b1', 'b2'])
+    // ...and a place still waiting on a phone with no signal.
     dara.link.online = false
-    await dara.client.mutate('booking.create', { id: 'b3', productId: 'y10p', project: 'Made offline', qty: 1, ...day })
+    await dara.client.mutate('place.upsert', place('b3', 'Made offline'))
     await dara.client.sync().catch(() => {})
 
     // The database is lost, and a new one is restored from last night's backup.
@@ -469,11 +519,11 @@ describe('phones, after the server is restored from a backup', () => {
     }
     for (let round = 0; round < 2; round++) for (const p of [aoife, dara, office]) await p.client.sync()
 
-    const onServer = (await pull(restored)).changes.filter((c) => c.entity === 'booking').map((c) => c.id)
+    const onServer = (await pull(restored)).changes.filter((c) => c.entity === 'place').map((c) => c.id)
     expect(new Set(onServer)).toEqual(new Set(['b1', 'b2', 'b3']))
     for (const p of [office, aoife, dara]) {
       const view = p.client.view()
-      expect(view.bookings.map((b) => b.id)).toEqual(['b1', 'b2', 'b3'])
+      expect(placeIds(p)).toEqual(['b1', 'b2', 'b3'])
       expect(view.pendingCount).toBe(0)
       expect(view.problems).toEqual([])
     }
@@ -484,10 +534,10 @@ describe('phones, after the server is restored from a backup', () => {
     const db = await database()
     const app = await server(db)
     const office = await phone(app)
-    await office.client.mutate('product.upsert', Y10P)
+    await office.client.mutate('place.upsert', place('a3', 'Bay A3'))
     await office.client.sync()
     const backup = await writeBackup(db)
-    await office.client.mutate('product.upsert', { id: 'sm58', name: 'Shure SM58', quantity: 20 })
+    await office.client.mutate('place.upsert', place('van1', 'Van 1'))
     await office.client.sync()
 
     const fresh = await database()
@@ -496,8 +546,8 @@ describe('phones, after the server is restored from a backup', () => {
     office.link.app = await server(fresh)
     await office.client.sync()
 
-    expect(new Set((await pull(office.link.app)).changes.map((c) => c.id))).toEqual(new Set(['y10p', 'sm58']))
-    expect(office.client.view().products.map((p) => p.id)).toEqual(['y10p', 'sm58'])
+    expect(new Set((await pull(office.link.app)).changes.map((c) => c.id))).toEqual(new Set(['a3', 'van1']))
+    expect(placeIds(office)).toEqual(['a3', 'van1'])
   })
 
   it('start afresh when the running server is given a new generation', async () => {
@@ -507,33 +557,33 @@ describe('phones, after the server is restored from a backup', () => {
     const db = await database()
     const app = await server(db)
     const office = await phone(app)
-    await office.client.mutate('product.upsert', Y10P)
+    await office.client.mutate('place.upsert', place('a3', 'Bay A3'))
     await office.client.sync()
-    await db.exec(`TRUNCATE changes, products, mutations CASCADE; SELECT setval(pg_get_serial_sequence('changes', 'seq'), 1, false);`)
+    await db.exec(`TRUNCATE changes, places, mutations CASCADE; SELECT setval(pg_get_serial_sequence('changes', 'seq'), 1, false);`)
     const warehouse = await phone(app)
-    await warehouse.client.mutate('product.upsert', { id: 'sm58', name: 'Shure SM58', quantity: 20 })
+    await warehouse.client.mutate('place.upsert', place('van1', 'Van 1'))
     await warehouse.client.sync()
     await office.client.sync()
-    expect(office.client.view().products.map((p) => p.id)).toEqual(['y10p'])
+    expect(placeIds(office)).toEqual(['a3'])
 
     await newGeneration(db)
     for (let round = 0; round < 2; round++) for (const p of [office, warehouse]) await p.client.sync()
     const ids = (await pull(app)).changes.map((c) => c.id)
-    expect(new Set(ids)).toEqual(new Set(['y10p', 'sm58']))
-    for (const p of [office, warehouse]) expect(p.client.view().products.map((p) => p.id).sort()).toEqual(['sm58', 'y10p'])
+    expect(new Set(ids)).toEqual(new Set(['a3', 'van1']))
+    for (const p of [office, warehouse]) expect(placeIds(p)).toEqual(['a3', 'van1'])
   })
 
   it('remember what they sent for two weeks, no longer', async () => {
     const app = await server(await database())
     let now = new Date('2026-09-01T09:00:00Z')
     const p = await phone(app, () => now)
-    await p.client.mutate('product.upsert', Y10P)
+    await p.client.mutate('place.upsert', place('a3', 'Bay A3'))
     await p.client.sync()
     now = new Date('2026-09-16T09:00:00Z')
-    await p.client.mutate('product.upsert', { id: 'sm58', name: 'Shure SM58', quantity: 20 })
+    await p.client.mutate('place.upsert', place('van1', 'Van 1'))
     await p.client.sync()
     const kept = (await p.storage.load())!.sent!.map((s) => (s.args as { id: string }).id)
-    expect(kept).toEqual(['sm58'])
+    expect(kept).toEqual(['van1'])
   })
 })
 
@@ -655,7 +705,7 @@ describe('backups encrypted under BACKUP_KEY', () => {
     // Put back on start-up with the key; the newest file is still found by its name.
     const fresh = await database()
     expect((await restoreFrom(fresh, store, 'latest', key))?.key).toBe(run.key)
-    expect((await fresh.query(`SELECT id FROM products ORDER BY id`)).rows.map((r) => r.id)).toEqual(['sm58', 'y10p'])
+    expect((await fresh.query(`SELECT id FROM places ORDER BY id`)).rows.map((r) => r.id)).toEqual(['a3', 'van1'])
     await expect(restoreFrom(await database(), store, 'latest')).rejects.toThrow('This backup is encrypted')
 
     // The Account tab says so; and a plain backup from before the key still restores on a server that has one.

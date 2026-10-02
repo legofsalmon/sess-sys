@@ -1,9 +1,8 @@
-import type { Db } from './db.ts'
+import type { Db, Queryable } from './db.ts'
 import { runMigrations, type Module } from './migrations.ts'
 
 /**
- * Tables for the sync spike. Two of them are the sync machinery and will
- * stay as the real system grows:
+ * The sync machinery's tables, which every module's commands go through:
  *
  * - `mutations`: every command a device has sent, with the answer it got.
  *   A repeat of the same id gets the same answer and changes nothing, which
@@ -14,7 +13,8 @@ import { runMigrations, type Module } from './migrations.ts'
  * - `changes`: an append-only feed with a sequence number. Devices pull
  *   "everything after N".
  *
- * The rest (products, bookings, scans, issues) stand in for the real model.
+ * The sync spike's stand-ins for the real model (products, bookings, scans,
+ * issues) went with the sync test on 2 October 2026, in the fifth migration.
  */
 const MIGRATIONS: string[] = [
   `
@@ -106,10 +106,45 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS changes_entity_id ON changes (entity_id, seq);
   CREATE INDEX IF NOT EXISTS changes_mutation ON changes (mutation_id);
   `,
+  // The Phase 0 sync test is gone (ADR 0001), and with it the stand-ins it
+  // wrote to. Each goes only if it's empty, so nothing anyone saved is lost;
+  // one that isn't is left, and the server says so at start. A restore puts
+  // the rows back after the migrations, so it names the tables its backup
+  // holds (backup/format.ts), and those stay for their rows.
+  `
+  DO $$
+  DECLARE
+    t text;
+    has_rows boolean;
+  BEGIN
+    FOREACH t IN ARRAY ARRAY['issues', 'scans', 'bookings', 'products'] LOOP
+      CONTINUE WHEN to_regclass(t) IS NULL;
+      CONTINUE WHEN t = ANY (string_to_array(current_setting('session_hire.restoring', true), ','));
+      EXECUTE format('SELECT EXISTS (SELECT 1 FROM %I)', t) INTO has_rows;
+      CONTINUE WHEN has_rows;
+      EXECUTE format('DROP TABLE %I', t);
+    END LOOP;
+  END $$;
+  `,
 ]
 
 export const CORE: Module = { versionTable: 'schema_version', migrations: MIGRATIONS }
 
+/** The number of the migration that drops the sync test's tables: tests set a database up as it was before it. */
+export const SYNC_TEST_GONE = 5
+
 export function migrate(db: Db, upTo?: number) {
   return runMigrations(db, CORE, upTo)
+}
+
+/** The sync test's tables that migration left because they held rows, with how many each holds. */
+export async function keptSyncTestTables(q: Queryable): Promise<{ table: string; rows: number }[]> {
+  const kept: { table: string; rows: number }[] = []
+  for (const table of ['products', 'bookings', 'scans', 'issues']) {
+    const { rows: found } = await q.query<{ found: string | null }>('SELECT to_regclass($1)::text AS found', [table])
+    if (!found[0]?.found) continue
+    const { rows } = await q.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)
+    kept.push({ table, rows: Number(rows[0]!.n) })
+  }
+  return kept
 }

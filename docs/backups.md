@@ -121,6 +121,9 @@ one stays untouched until you're happy.
 
 After a restore:
 
+- Anyone erased on request since the backup was made is erased again
+  before the app opens ([Decision 0027](adr/0027-erasing-a-person-on-request.md)).
+  The deploy log says how many.
 - Everyone signs in again, once sign-in is on.
 - Each phone and laptop notices the next time it syncs. It reloads its copy
   from the server, then sends again everything it changed in the last two
@@ -142,6 +145,17 @@ After a restore:
   skip backups. Remove them all to switch backups off.
 - If the database is ever wound back with Neon's own history instead, run
   `new-generation` afterwards (below), so every device reloads its copy.
+- **People erased on request** ([Decision 0027](adr/0027-erasing-a-person-on-request.md)):
+  a backup can't be edited, so their details stay in the backups made
+  before, until those are thinned out: 35 days for the nightly ones, a
+  year for the monthly ones. So that no restore ever brings them back,
+  the list of who was erased (ids and dates, nothing else) is kept in the
+  bucket too, as `erasures/list.json`, and is only ever added to. A
+  restore, the `restore` command and `new-generation` all apply it again,
+  and so does the server each time it starts. Don't delete that file.
+  With backups off, the list is only in the database's `erasures` table,
+  and the server's log says so at every start: after a wind-back with
+  Neon's own history, archive and erase again anyone erased since.
 - For drills and emergencies, a developer can work with backups directly,
   using the same variables (and `BACKUP_KEY` for encrypted files):
   `npm run backup -w server -- list`, `check latest` (restores into memory

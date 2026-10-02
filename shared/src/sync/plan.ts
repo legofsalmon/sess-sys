@@ -1,8 +1,10 @@
-import { eachDay, HOLDING, OPEN } from '../crew.ts'
+import { eachDay, firstName, HOLDING, OPEN } from '../crew.ts'
 import { publicHolidaysAmong } from '../holidays.ts'
 import { STOPPED, type ProjectStatus } from '../jobs.ts'
+import { lateLine } from '../late.ts'
 import type { CallView, CrewView, PersonView } from './crew-view.ts'
 import type { JobsView } from './jobs-view.ts'
+import type { LateView } from './late-view.ts'
 
 /**
  * The planner (ADR 0010): a week or a month laid out by job and by person,
@@ -61,6 +63,8 @@ export interface JobCell {
   asked: number
   /** Crew asked for on a day their phase no longer covers: the phase moved and the crew didn't. */
   stray: boolean
+  /** Who said they're running late that day (ADR 0028): "Gráinne: about 30 minutes late". Only there when someone did. */
+  late?: string[]
 }
 
 export interface JobLane {
@@ -88,6 +92,8 @@ export interface PersonWork {
   booked: boolean
   /** Confirmed by the office: booked for real, not just accepted. */
   confirmed: boolean
+  /** What they said on their link about being late that day (ADR 0028), when they did. */
+  late?: string
 }
 
 export type Severity = 'clash' | 'check'
@@ -132,9 +138,14 @@ export interface Plan {
   holidays: Record<string, string>
 }
 
-export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly string[]): Plan {
+export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView }, days: readonly string[]): Plan {
   const range = new Set(days)
   const calls = view.crew.calls.filter((c) => c.status === 'open')
+  /** What a booking's person said about being late on a day, in the line the office reads. */
+  const lateOn = (offerId: string, day: string) => {
+    const l = view.late?.forOffer(offerId).find((x) => x.day === day)
+    return l && lateLine(l)
+  }
 
   const lanes = new Map<string, JobLane>()
   const cell = (lane: JobLane, day: string) => (lane.days[day] ??= { phases: [], needed: 0, booked: 0, asked: 0, stray: false })
@@ -146,6 +157,10 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
       x.booked += Math.min(c.needed, c.heldByDay[d] ?? 0)
       x.asked += c.offers.filter((o) => OPEN.includes(o.status) && o.days.includes(d)).length
       if (phaseDays && !phaseDays.has(d)) x.stray = true
+      for (const o of c.offers) {
+        const late = HOLDING.includes(o.status) && lateOn(o.id, d)
+        if (late) (x.late ??= []).push(`${o.person ? firstName(o.person) : 'Someone'}: ${late}`)
+      }
     }
   }
 
@@ -201,8 +216,11 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
       const booked = HOLDING.includes(o.status)
       const lane = byId.get(o.personId)
       if (!lane || (!booked && !OPEN.includes(o.status))) continue
-      for (const d of o.days)
-        if (range.has(d)) at(lane, d).work.push({ callId: c.id, jobId: c.projectId, job: c.project, phase: c.phase, role: c.role, booked, confirmed: o.status === 'confirmed' })
+      for (const d of o.days) {
+        if (!range.has(d)) continue
+        const late = booked && lateOn(o.id, d)
+        at(lane, d).work.push({ callId: c.id, jobId: c.projectId, job: c.project, phase: c.phase, role: c.role, booked, confirmed: o.status === 'confirmed', ...(late ? { late } : {}) })
+      }
     }
   }
   for (const u of view.crew.unavailability) {
