@@ -162,15 +162,27 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       expect((await colly.history('?who=link:p1')).entries.map((e) => e.who)).toEqual([{ kind: 'link', name: 'Seán Ó Briain', key: 'link:p1' }])
       expect((await colly.history('?id=b1&entity=booking')).entries.map((e) => e.id)).toEqual([second.entries[1]!.id])
 
-      // Everything at one moment, with no link secret in it, and the download itself in the history.
+      // Everything at one moment, with no link secret in it, and the download itself in the history:
+      // the app records it as it asks for the file (audit finding 20), so the file holds the record too.
+      const recorded = await app.inject({
+        method: 'POST',
+        url: '/api/export/record?client=phonec0ffee',
+        cookies: colly.cookies,
+        headers: { 'user-agent': IPHONE },
+        payload: { format: 'zip' },
+      })
+      expect(recorded.statusCode).toBe(200)
       const res = await app.inject({ url: '/api/export.zip?client=phonec0ffee', cookies: colly.cookies, headers: { 'user-agent': IPHONE } })
       expect(res.statusCode).toBe(200)
       const files = Object.fromEntries(Object.entries(unzipSync(new Uint8Array(res.rawPayload))).map(([name, data]) => [name, strFromU8(data)]))
+      const everything = JSON.parse(files['everything.json']!) as Record<string, unknown[]>
+      const rows = Object.entries(everything).reduce((n, [key, value]) => (key === 'exportedAt' ? n : n + value.length), 0)
+      expect(recorded.json()).toEqual({ rows })
       expect(files['history.csv']).toContain('Seán Ó Briain accepted Audio tech on Electric Picnic')
       for (const [name, text] of Object.entries(files)) expect(text, name).not.toContain(linkToken)
       expect(files['tables/people.csv']).not.toContain('link_token')
       expect(JSON.parse(files['everything.json']!).mutations[0].received_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+\+00:00$/)
-      expect((await colly.history('?limit=1')).entries[0]).toMatchObject({ what: expect.stringMatching(/^Downloaded everything \(\d+ rows\)$/), deviceCode: 'c0ffee' })
+      expect((await colly.history('?limit=1')).entries[0]).toMatchObject({ what: `Downloaded everything (${rows} rows)`, deviceCode: 'c0ffee' })
     } finally {
       await app.close()
       await db.close()
