@@ -305,6 +305,22 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   list's scan field and answer box, with the kind as two filter buttons
   and the items tested as number pills, burnt orange for a fail. Not in
   Figma yet.
+- What a call needs ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md))
+  is a row of ticks that wrap as chips under "Certificates needed", and
+  "needs working at height and IPAF" in the call's facts. Anyone on a
+  call short of one is a warn line under the call's line at rest; not
+  known is a warn line against the offer. The Offer to… picker groups
+  people under the select's own headings (those who hold it, "Not known:
+  check first", "Missing a certificate"), each line marked ("· no
+  IPAF"), and Offer says why not in the alert line. Certificates running
+  out are a card of rows, the line in amber for soon and burnt orange
+  for run out, with "Ask for the new card" opening the Send panel.
+  Running late is a row in "Answers to check" with Ring and Noted, and a
+  bold amber line under the call ("Gráinne: about 30 minutes late,
+  “Traffic on the M50”"), green once they're there; on the freelancer's
+  page it's a "Today" card with a green edge at the top, the choices as
+  bordered radio rows, and on the contact's call sheet a card with an
+  amber edge under who to ring. Not in Figma yet.
 
 ## Accessibility
 

@@ -101,8 +101,9 @@ export async function fillWithMadeUpData(db: Db, who: Who, now = new Date()): Pr
       throw new DataRefused('Disconnect Google Calendar first, above: the made-up jobs would go on it.')
     if (!(await isEmpty(tx))) throw new DataRefused('Made-up data only goes into an empty app. Start fresh first, then put it in.')
     for (const m of commands) {
-      // Timesheets come from freelancers' private links (ADR 0022), as they would.
-      const link = m.name === 'timesheet.send' ? await personOfOffer(tx, (m.args as { id: string }).id) : undefined
+      // Timesheets (ADR 0022) and running late (ADR 0028) come from freelancers' private links, as they would.
+      const offerId = m.name === 'timesheet.send' ? (m.args as { id: string }).id : m.name === 'late.say' ? (m.args as { offerId: string }).offerId : undefined
+      const link = offerId ? await personOfOffer(tx, offerId) : undefined
       const result = link
         ? await applyMutationIn(tx, `link:${link}`, m, { device: from.device, via: 'link' })
         : await applyMutationIn(tx, 'server', m, from)

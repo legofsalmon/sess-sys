@@ -6,6 +6,7 @@ import {
   type MutationResult,
 } from '@sh/shared'
 import { crewHandlers } from './crew/handlers.ts'
+import { lateHandlers } from './crew/late.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { Refused, type Ctx } from './kernel.ts'
@@ -42,6 +43,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...timesheetHandlers,
   ...officeHandlers,
   ...leaveHandlers,
+  ...lateHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */

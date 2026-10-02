@@ -1,5 +1,5 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
-import { officeContact, telHref, type OfficeDetails } from '@sh/shared'
+import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -20,7 +20,20 @@ export interface Flash {
   ok: boolean
   text: string
   offer?: string
-  section?: 'details'
+  /** Their details, or the running-late card for the offer (ADR 0028). */
+  section?: 'details' | 'late'
+}
+
+/** A booking on a day they can say they're running late for (ADR 0028): today, and tomorrow from 6pm. */
+export interface OnTheDay {
+  offer: Offer
+  call: CrewCall
+  /** The days it can be said for now, today first. */
+  days: string[]
+  /** What they've said for those days. */
+  said: RunningLate[]
+  /** Who's running the day, to ring if the page won't send; never themselves. */
+  contact: { name: string; phone: string | null } | null
 }
 
 /** The message after a post. A refusal is an alert, so it's read out and looks like one; a thank-you is a status. */
@@ -58,6 +71,8 @@ export interface PageData {
   timesheets: ReadonlyMap<string, Timesheet>
   /** The office's phone and email, once set. */
   office?: OfficeDetails | null
+  /** Bookings on today, or tomorrow from 6pm, for "Running late?" (ADR 0028). */
+  onTheDay?: OnTheDay[]
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -97,6 +112,7 @@ function facts(call: CrewCall, offer: Offer, staff: boolean) {
     <dt>Dates</dt><dd>${h(daysLabel(offer.status === 'offered' ? eachDay(call.start, call.end) : offer.days))}</dd>
     ${call.callTime ? `<dt>Call time</dt><dd>${h(call.callTime)}</dd>` : ''}
     ${call.venue ? `<dt>Venue</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.venue)}">${h(call.venue)}</a></dd>` : ''}
+    ${needsOf(call).length ? `<dt>Needs</dt><dd>${h(capital(needsLabel(needsOf(call))))}</dd>` : ''}
     ${staff ? '' : `<dt>Rate</dt><dd>${h(rate)}</dd>`}
     ${call.replyBy && offer.status === 'offered' ? `<dt>Reply by</dt><dd>${h(dayLabel(call.replyBy))}</dd>` : ''}
   </dl>
@@ -133,7 +149,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const staff = isStaff(d.person)
   // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
-    ${d.flash?.offer === offer.id ? flash(d.flash) : ''}
+    ${d.flash?.offer === offer.id && !d.flash.section ? flash(d.flash) : ''}
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
     ${facts(call, offer, staff)}
     ${clash}
@@ -157,6 +173,71 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
     }
     ${holding ? pullOut(d, action) : ''}
   </article>`
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/**
+ * Today's work (ADR 0028), or tomorrow's from 6pm: at the top, since on the
+ * day it's what they open the page for, with "Running late?" folded away
+ * as "Can't make it" is. Sending needs signal, so the form says who to
+ * ring if it won't go.
+ */
+function onTheDay(d: PageData): string {
+  const list = d.onTheDay ?? []
+  if (!list.length) return ''
+  const heading = list.some((t) => t.days.includes(d.today)) ? 'Today' : 'Tomorrow'
+  return `<section class="today"><h2>${heading}</h2>${list.map((t) => todayCard(d, t)).join('')}</section>`
+}
+
+function todayCard(d: PageData, t: OnTheDay): string {
+  const { offer, call } = t
+  const mine = d.flash?.section === 'late' && d.flash.offer === offer.id ? d.flash : undefined
+  const late = t.said.filter((l) => !l.arrivedAt)
+  const there = t.said.filter((l) => l.arrivedAt)
+  const facts = [call.role, call.callTime && `call ${call.callTime}`, call.venue].filter(Boolean).join(' · ')
+  const office = officeContact(d.office)
+  const ring = t.contact?.phone ? { name: t.contact.name, phone: t.contact.phone } : office?.phone ? { name: 'the office', phone: office.phone } : null
+  // With two days open (the evening of one booked day before another), each line says which day it's for.
+  const which = (day: string) => (t.days.length > 1 ? ` for ${h(lateDayWord(day, d.today))}` : '')
+  return `<article class="offer today-card" id="late-${h(offer.id)}">
+    ${mine ? flash(mine) : ''}
+    <header><h3>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</h3><span class="tag confirmed">${h(capital(t.days.map((x) => lateDayWord(x, d.today)).join(' and ')))}</span></header>
+    <p class="small">${h(facts)}</p>
+    <a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>
+    ${late
+      .map(
+        (l) => `<p class="late-said">You've told us${which(l.day)}: ${h(lateLine(l))}.</p>
+    <form method="post" action="${d.base}/late/here"><input type="hidden" name="id" value="${h(l.id)}"><button class="yes">I'm here now</button></form>`
+      )
+      .join('')}
+    ${there.map((l) => `<p class="small">You've told us you're there${which(l.day)}. Thanks.</p>`).join('')}
+    <details class="late"${mine && !mine.ok ? ' open' : ''}><summary>${late.length ? 'Change how late' : 'Running late?'}</summary>
+      ${lateForm(d, t, late.at(-1), ring)}
+    </details>
+  </article>`
+}
+
+/** Roughly how late, or the time they'll be there, and a note; filled in with what they said last, to change it. */
+function lateForm(d: PageData, t: OnTheDay, last: RunningLate | undefined, ring: { name: string; phone: string } | null): string {
+  const day =
+    t.days.length > 1
+      ? `<fieldset class="choice"><legend>Which day</legend>${t.days
+          .map((x, i) => `<label><input type="radio" name="day" value="${h(x)}"${i === 0 ? ' checked' : ''}> ${h(capital(lateDayWord(x, d.today)))}, ${h(dayLabel(x))}</label>`)
+          .join('')}</fieldset>`
+      : `<input type="hidden" name="day" value="${h(t.days[0])}">`
+  // Red marks the one thing to do next: with a late start already said, that's "I'm here now", so Send for a change is plain.
+  return `<form method="post" action="${d.base}/late">
+        <input type="hidden" name="offer" value="${h(t.offer.id)}">
+        ${day}
+        <fieldset class="choice"><legend>Roughly how late</legend>${LATE_BY.map(
+          (b) => `<label><input type="radio" name="by" value="${h(b)}"${last?.by === b ? ' checked' : ''}> ${h(LATE_BY_LABELS[b])}</label>`
+        ).join('')}</fieldset>
+        <label>Or the time you'll be there <input type="time" name="at" value="${h(last?.arriveAt ?? '')}"></label>
+        <label>Note, if you like <input name="note" maxlength="${LATE_NOTE_LENGTH}" value="${h(last?.note ?? '')}" placeholder="e.g. traffic on the M50"></label>
+        <p class="small">Sending this needs signal.${ring ? ` If it won't go, ring ${h(ring.name)} on <a href="${h(telHref(ring.phone))}">${h(ring.phone)}</a>.` : ''}</p>
+        <button${last ? '' : ' class="yes"'}>Send</button>
+      </form>`
 }
 
 /** How long an approved timesheet stays on the page. */
@@ -268,8 +349,11 @@ export function renderPage(d: PageData): string {
   const past = d.jobs.filter((j) => !booked.includes(j) && HOLDING.includes(j.offer.status)).slice(-8).reverse()
   const turned = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j) && !HOLDING.includes(j.offer.status)).slice(-8).reverse()
   const first = firstName(d.person)
-  // A message about an offer sits in that offer's card, one about their details in that section; any other at the top.
-  const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
+  // A message about an offer sits in that offer's card, one about their details in that section, one about running late in today's card; any other at the top.
+  const inCard =
+    d.flash?.section === 'late'
+      ? (d.onTheDay ?? []).some((t) => t.offer.id === d.flash?.offer)
+      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -287,6 +371,8 @@ export function renderPage(d: PageData): string {
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
   ${officeBlock(d.office)}
   ${d.flash && !inCard ? flash(d.flash) : ''}
+
+  ${onTheDay(d)}
 
   <section>
     <h2>Offers waiting on you</h2>
@@ -400,4 +486,9 @@ footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px s
 .ts-list a{display:grid;gap:2px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none}
 .ts-list a.to-send{border-left-color:var(--accent)}.ts-list a.sent{border-left-color:var(--warn)}.ts-list a.approved{border-left-color:var(--good)}
 .ts-list small{color:var(--muted)}.ts-list b span{font-weight:500;color:var(--muted)}.ts-list a>span{font-weight:600}
+.offer.today-card{border-left-color:var(--good)}
+.late-said{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+fieldset.choice{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}fieldset.choice legend{font-size:.85rem;color:var(--muted);margin-bottom:4px;padding:0}
+fieldset.choice label{display:flex;gap:6px;align-items:center;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+fieldset.choice input{width:20px;height:20px;accent-color:var(--accent)}
 `

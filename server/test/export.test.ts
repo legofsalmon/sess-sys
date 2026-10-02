@@ -119,6 +119,7 @@ describe('download everything', () => {
       'phases',
       'places',
       'projects',
+      'running_late',
       'settings',
       'stock',
       'timesheets',

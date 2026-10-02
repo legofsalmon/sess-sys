@@ -9,6 +9,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { lateView, type LateView } from './late-view.ts'
 import { leaveView, type LeaveView } from './leave-view.ts'
 import { officeView, type OfficeView } from './office-view.ts'
 import { movesView, type MovesView } from './pick-view.ts'
@@ -103,6 +104,8 @@ export interface View {
   office: OfficeView
   /** Staff leave and time in lieu: balances, requests and the approvers' queue (ADR 0024). */
   leave: LeaveView
+  /** Who is running late today, or tomorrow when said the evening before (ADR 0028). */
+  late: LateView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -348,6 +351,7 @@ export class SyncClient {
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
       office: officeView(entities, outbox, this.state.cursor),
       leave: leaveView(entities, outbox, this.state.cursor, crew, today),
+      late: lateView(entities, outbox, this.state.cursor, crew, today),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

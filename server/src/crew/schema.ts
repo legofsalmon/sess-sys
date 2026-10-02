@@ -113,6 +113,31 @@ const MIGRATIONS: string[] = [
   ALTER TABLE people ADD COLUMN IF NOT EXISTS company_vat_number text;
   ALTER TABLE people ADD COLUMN IF NOT EXISTS company_cro_number text;
   `,
+  // The certificates a call needs (ADR 0028), as a list of kinds. Older
+  // calls need none. A person's own certificates are JSON by kind already,
+  // so the new kinds need nothing there.
+  `ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS needs_certificates jsonb NOT NULL DEFAULT '[]';`,
+  // Running late (ADR 0028): one for a booking and a day, said on the
+  // person's link. It names the person and holds their words, so it's a
+  // table of its own that erasing them can clear.
+  `
+  CREATE TABLE IF NOT EXISTS running_late (
+    id          text PRIMARY KEY,
+    person_id   text NOT NULL REFERENCES people(id),
+    offer_id    text NOT NULL REFERENCES offers(id),
+    call_id     text NOT NULL REFERENCES crew_calls(id),
+    day         date NOT NULL,
+    late_by     text CHECK (late_by IN ('15', '30', '60', 'more')),
+    arrive_at   text,
+    note        text NOT NULL DEFAULT '',
+    said_at     timestamptz NOT NULL,
+    arrived_at  timestamptz,
+    seen_at     timestamptz,
+    UNIQUE (offer_id, day)
+  );
+  CREATE INDEX IF NOT EXISTS running_late_person ON running_late (person_id);
+  CREATE INDEX IF NOT EXISTS running_late_day ON running_late (day);
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

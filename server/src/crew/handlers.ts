@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
@@ -12,7 +12,9 @@ import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom
  * - a call never gets more people on a day than it needs, so with a
  *   shortlist the first to accept gets the place and the rest are told;
  * - an offer for a day someone marked off, or already holds elsewhere,
- *   needs an explicit override from ops, which is kept on the offer.
+ *   needs an explicit override from ops, which is kept on the offer;
+ * - an offer goes only to someone holding every certificate the call
+ *   needs, to its last day (ADR 0028), override or not.
  */
 
 type CrewCommand =
@@ -181,8 +183,8 @@ async function changeCall(ctx: Ctx, call: CrewCall, next: CrewCall, shift = 0) {
   }
   await ctx.tx.query(
     `UPDATE crew_calls SET project = $2, phase = $3, venue = $4, role = $5, start_day = $6, end_day = $7, call_time = $8,
-            needed = $9, day_rate_cents = $10, details = $11, reply_by = $12 WHERE id = $1`,
-    [call.id, next.project, next.phase, next.venue, next.role, next.start, next.end, next.callTime, next.needed, next.dayRateCents, next.details, next.replyBy]
+            needed = $9, day_rate_cents = $10, details = $11, reply_by = $12, needs_certificates = $13 WHERE id = $1`,
+    [call.id, next.project, next.phase, next.venue, next.role, next.start, next.end, next.callTime, next.needed, next.dayRateCents, next.details, next.replyBy, JSON.stringify(needsOf(next))]
   )
   await emit(ctx, 'crewCall', call.id, await getCall(ctx.tx, call.id))
   for (const [id, fields] of changes) await setOffer(ctx, id, fields)
@@ -240,7 +242,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const department = a.department !== undefined ? a.department : (was?.department ?? null)
     const level = a.level ?? was?.level ?? DEFAULT_LEVEL
     const knownAs = a.knownAs !== undefined ? a.knownAs : (was?.knownAs ?? null)
-    const certificates = a.certificates ?? was?.certificates ?? {}
+    // An edit from a version that knows fewer kinds keeps the newer ones, and can still clear one it knows (ADR 0028).
+    const certificates = certificatesAfter(was?.certificates, a.certificates)
     const company = a.company !== undefined ? a.company : (was?.company ?? null)
     await ctx.tx.query(
       `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave,
@@ -344,9 +347,9 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     if (await getCall(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This job already exists.' })
     const job = await callJob(ctx, a)
     await ctx.tx.query(
-      `INSERT INTO crew_calls (id, project_id, phase_id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open')`,
-      [a.id, job.projectId, job.phaseId, job.project, job.phase, job.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy]
+      `INSERT INTO crew_calls (id, project_id, phase_id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status, needs_certificates)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open', $15)`,
+      [a.id, job.projectId, job.phaseId, job.project, job.phase, job.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy, JSON.stringify(tidyNeeds(a.needsCertificates))]
     )
     await emit(ctx, 'crewCall', a.id, await getCall(ctx.tx, a.id))
   },
@@ -358,6 +361,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const next: CrewCall = { ...call }
     for (const k of ['role', 'start', 'end', 'callTime', 'needed', 'dayRateCents', 'details', 'replyBy', 'project', 'phase', 'venue'] as const)
       if (a[k] !== undefined) (next as Record<string, unknown>)[k] = a[k]
+    // Needing a certificate refuses nobody already on the call: anyone short of it is warned about on the call's line (ADR 0028).
+    if (a.needsCertificates !== undefined) next.needsCertificates = tidyNeeds(a.needsCertificates)
     // One end may have moved on another device, so check the call as it will be.
     if (next.start > next.end) throw new Refused({ code: 'invalid', message: `${next.role} on ${next.project} would end before it starts.` })
     // A reply-by day the change sets is asked for before the job is over, as when a call is made (audit finding 21). One a move of dates leaves behind is left to the office.
@@ -384,6 +389,9 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const held = heldByDay(call, offers)
     if (days.every((d) => held[d]! >= call.needed))
       throw new Refused({ code: 'filled', message: `${call.role} on ${call.project} is already filled.` })
+    // A condition of the work, not the office's judgement, so "Send anyway" doesn't pass it: the fix is the person's card (ADR 0028).
+    const short = certificateRefusal(person, needsOf(call), days, irishToday())
+    if (short) throw new Refused({ code: 'conflict', message: short })
     if (!a.override) {
       const reasons: string[] = []
       for (const { u, hit } of await awayOn(ctx.tx, person.id, days))

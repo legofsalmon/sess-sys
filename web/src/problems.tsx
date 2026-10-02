@@ -124,6 +124,8 @@ function describer(view: View): (m: Mutation) => string {
     return e ? `${e.person?.name ?? 'someone'}'s day in lieu for ${dayLabel(e.day)}` : "someone's day in lieu"
   }
 
+  const late = (id: unknown) => view.late.current.find((l) => l.id === id)?.person?.name ?? 'someone'
+
   return (m: Mutation) => {
     const a = m.args as Record<string, unknown>
     switch (m.name) {
@@ -249,6 +251,13 @@ function describer(view: View): (m: Mutation) => string {
         return `${a.approved ? 'Approve' : 'Decline'} ${lieu(a.id)}`
       case 'leave.allowance':
         return `Set ${person(a.personId)}'s ${num(a.year)} allowance`
+      // Running late (ADR 0028): said on a link, noted here.
+      case 'late.say':
+        return `Say ${offer(a.offerId).who} is running late for ${offer(a.offerId).what}`
+      case 'late.arrived':
+        return `Say ${late(a.id)} is there now`
+      case 'late.seen':
+        return `Note that ${late(a.id)} is running late`
       // Kept from an older version of the app, such as the old sync test's bookings. The server's reason says it's gone, so this only says where it came from.
       default:
         return 'A change from an older version of the app'

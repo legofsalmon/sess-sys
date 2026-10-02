@@ -213,13 +213,17 @@ describe('made-up data', () => {
     expect(view.faults.open.map((f) => [f.kind, f.usable, f.note])).toEqual([['damaged', true, 'Rattles at high level. Fine for speech meanwhile.']])
     expect(view.problems).toEqual([])
 
-    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets as sent on the freelancers' links.
-    const history: HistoryPage = await aoife.history('?limit=500')
+    // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets and running late as sent on the freelancers' links.
+    // More than a page of it, so read every page.
+    const history: HistoryPage = await aoife.history('?limit=200')
+    for (let page = history; page.next; ) history.entries.push(...(page = await aoife.history(`?limit=200&before=${page.next}`)).entries)
     expect(history.entries).toHaveLength(madeUpData('2026-10-01').length + 1)
     expect(history.entries.every((e) => e.outcome === 'done')).toBe(true)
-    const [sent, others] = [history.entries.filter((e) => e.command === 'timesheet.send'), history.entries.filter((e) => e.command !== 'timesheet.send')]
+    const fromLinks = new Set(['timesheet.send', 'late.say'])
+    const [sent, others] = [history.entries.filter((e) => fromLinks.has(e.command)), history.entries.filter((e) => !fromLinks.has(e.command))]
     expect(sent.map((e) => [e.who.kind, e.who.name]).sort()).toEqual([
       ['link', 'Dara Quinn'],
+      ['link', 'Gráinne Power'],
       ['link', 'Tadhg Brady'],
     ])
     expect(others.every((e) => e.who.name === 'Aoife Brennan')).toBe(true)
@@ -249,7 +253,9 @@ describe('made-up data', () => {
     const jobs = madeUpData('2027-02-27').filter((m) => m.name === 'phase.add')
     const starts = jobs.map((m) => (m.args as { start: string }).start).sort()
     expect(starts[0]).toBe('2027-02-17')
-    expect(starts[1]).toBe('2027-03-02')
+    // The shoot is on the day it goes in (ADR 0028), so someone can be running late for it.
+    expect(starts[1]).toBe('2027-02-27')
+    expect(starts[2]).toBe('2027-03-02')
     // Fresh ids each time, so it can go in again after starting fresh.
     expect(madeUpData('2027-02-27')[0]!.id).not.toBe(madeUpData('2027-02-27')[0]!.id)
   })
@@ -274,7 +280,7 @@ describe('starting fresh', () => {
     await putInMadeUpData(app, aoife)
     await aoife.send('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
     const before = await rowsLeft(db)
-    expect(before.projects).toBe(7)
+    expect(before.projects).toBe(8)
     const total = Object.values(before).reduce((a, b) => a + b, 0)
 
     const res = await startFresh(app, START_FRESH_WORDS, aoife)
@@ -402,7 +408,7 @@ describe('starting fresh', () => {
     const res = await startFresh(app)
     expect(res.statusCode).toBe(409)
     expect(res.json().error).toBe("The backup before starting fresh didn't work (The backup storage answered 403: Access denied), so nothing was deleted.")
-    expect((await rowsLeft(db)).projects).toBe(7)
+    expect((await rowsLeft(db)).projects).toBe(8)
     expect(await status(app)).toMatchObject({ empty: false, fresh: null })
   })
 })

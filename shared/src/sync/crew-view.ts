@@ -1,6 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { irishToday } from '../calendar.ts'
-import { daysBetween, DEFAULT_LEVEL, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { certificatesAfter, daysBetween, DEFAULT_LEVEL, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
 
@@ -128,7 +128,8 @@ export function crewView(
           department: a.department !== undefined ? a.department : (was?.department ?? null),
           level: a.level ?? was?.level ?? DEFAULT_LEVEL,
           knownAs: a.knownAs !== undefined ? a.knownAs : (was?.knownAs ?? null),
-          certificates: a.certificates ?? was?.certificates ?? {},
+          // As the server lays them (ADR 0028).
+          certificates: certificatesAfter(was?.certificates, a.certificates),
           company: a.company !== undefined ? a.company : (was?.company ?? null),
           pending: true,
           worked: was?.worked ?? [],

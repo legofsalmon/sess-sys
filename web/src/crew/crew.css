@@ -129,3 +129,24 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .call .facts-line { margin: 0; color: var(--muted); font-size: var(--text-small); }
 /* The picker (ADR 0025) narrowed as you type: the search over the select, the select and Offer side by side. */
 .crew .offer-form .find { grid-column: 1 / -1; }
+
+/* The certificates a call needs, and running late (ADR 0028). The ticks for what a call needs wrap as chips; a certificate's note sits beside its expiry, or under it on a phone. */
+.app .grid-form .needs > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.app .grid-form .needs label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
+.app .grid-form .needs input { width: 20px; height: 20px; accent-color: var(--accent); }
+.crew .more-grid .cert { grid-template-columns: 1fr 1fr 1.2fr; }
+.crew .offer-form .warn-line { grid-column: 1 / -1; }
+.crew .call > .warn-line { margin-top: calc(-1 * var(--space-4)); }
+/* Running late on a call's line: the warn tone while they're on their way, and quiet once they're there. */
+.crew .late-line { margin: 0; font-size: var(--text-hint); font-weight: 600; color: var(--warn); }
+.crew .late-line.there { color: var(--good); font-weight: 500; }
+.crew .reminders .reminder p { font-weight: 600; }
+.crew .reminders .reminder.soon p { color: var(--warn); }
+.crew .reminders .reminder.ran-out p { color: var(--bad); }
+.crew .late-row > div:first-child { flex: 1 1 14em; }
+.plan .timeline .blk small.late, .plan .timeline .item small.late { color: var(--warn); font-weight: 700; }
+.sheet-screen .sheet-call li .late-line { flex-basis: 100%; }
+@media (max-width: 480px) {
+  .crew .more-grid .cert { grid-template-columns: 1fr 1fr; }
+  .crew .more-grid .cert .cert-note { grid-column: 1 / -1; }
+}

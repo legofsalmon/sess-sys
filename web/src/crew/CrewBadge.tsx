@@ -5,8 +5,11 @@ import { useMe } from './Leave.tsx'
 /**
  * On the Crew tab: how many answers wait for the office (a yes to confirm,
  * a counter, a decline or a pull-out not yet noted), from this device's own
- * copy, so it's right with no signal too (audit finding 9); and, for
- * someone who can approve time off, the leave waiting on them (ADR 0024).
+ * copy, so it's right with no signal too (audit finding 9); anyone running
+ * late not yet noted (ADR 0028); and, for someone who can approve time
+ * off, the leave waiting on them (ADR 0024). Certificates running out
+ * aren't counted: they're known weeks ahead, and a badge always lit stops
+ * being read.
  * Nothing while there's nothing waiting. Not a status, so the top bar's
  * stays the one.
  */
@@ -14,7 +17,7 @@ export function CrewBadge() {
   const view = useView()
   const today = useToday()
   const { me } = useMe(view)
-  const n = answersToCheck(view.crew, today).length + (canApproveLeave(me) ? view.leave.queue.length : 0)
+  const n = answersToCheck(view.crew, today).length + view.late.toCheck.length + (canApproveLeave(me) ? view.leave.queue.length : 0)
   if (n === 0) return null
   return (
     <span className="badge">

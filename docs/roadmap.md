@@ -165,9 +165,17 @@ over by rule are later.
   about, the company and VAT and CRO numbers a freelancer trades
   through, and the jobs they've worked from their bookings; the crew
   list brought in from a spreadsheet, checked row by row first. Still
-  later: Safe Pass, working at height and IPAF; an expired required
-  certificate blocking an assignment; expiry reminders; the stock list
-  through the same step).
+  later: the stock list through the same step).
+- Certificates a call needs, and running late (built, 2 October 2026,
+  [ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md):
+  Safe Pass, working at height and IPAF as certificate kinds, on the
+  person's card and from the crew list; a call says which it needs, and
+  an offer to anyone without one, or whose one runs out before the job
+  ends, is refused by name, not known being allowed with a warning; the
+  Crew tab lists certificates run out or running out in 30 days, each
+  with a message asking for the new card; and a freelancer says from
+  their link on the day that they're running late, which the office,
+  the planner and the contact on the day see at once).
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the

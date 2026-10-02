@@ -5,6 +5,7 @@ import { INSPECTION_ENTITY_NAMES, type InspectionEntities } from './inspections.
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
 import { KIT_ENTITY_NAMES, type KitEntities } from './kit.ts'
 import { LABEL_ENTITY_NAMES, type LabelEntities } from './labels.ts'
+import { LATE_ENTITY_NAMES, type LateEntities } from './late.ts'
 import { LEAVE_ENTITY_NAMES, type LeaveEntities } from './leave.ts'
 import { MOVE_ENTITY_NAMES, type MoveEntities } from './moves.ts'
 import { SETTING_ENTITY_NAMES, type SettingEntities } from './office.ts'
@@ -24,7 +25,8 @@ export interface Entities
     InspectionEntities,
     TimesheetEntities,
     SettingEntities,
-    LeaveEntities {}
+    LeaveEntities,
+    LateEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -39,4 +41,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...TIMESHEET_ENTITY_NAMES,
   ...SETTING_ENTITY_NAMES,
   ...LEAVE_ENTITY_NAMES,
+  ...LATE_ENTITY_NAMES,
 ]

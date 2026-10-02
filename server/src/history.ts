@@ -6,14 +6,18 @@ import {
   euro,
   invitesLabel,
   irishToday,
+  LATE_BY,
+  lateWords,
   leaveDays,
   levelLabel,
+  needsLabel,
   newId,
   normaliseNumber,
   numberText,
   OFFLINE_AFTER_SECONDS,
   RETIRED_LABELS,
   STATUS_LABELS,
+  tidyNeeds,
   timesheetSummary,
   valueLabel,
   type Department,
@@ -228,6 +232,7 @@ const REFERENCES = [
   'toCaseId',
   'contactId',
   'by',
+  'offerId',
 ] as const
 
 /**
@@ -348,6 +353,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     return by ? `${person(by)} ${verb}` : verb[0]!.toUpperCase() + verb.slice(1)
   }
   const why = (approved: unknown, reason: unknown) => (!approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
+  /** ", needing working at height and IPAF" (ADR 0028); nothing when a call needs nothing. */
+  const needsIn = (v: unknown) => tidyNeeds(Array.isArray(v) ? v : [])
+  const needing = (needs: unknown) => (needsIn(needs).length ? `, needing ${needsLabel(needsIn(needs))}` : '')
+  /** A running late (ADR 0028): whose, and the job and phase it's for, through its call. */
+  const lateOf = (id: unknown, offerId?: unknown) => {
+    const l = look('runningLate', id)
+    const o = look('offer', offerId ?? l?.offerId)
+    const c = look('crewCall', l?.callId ?? o?.callId)
+    return { who: person(l?.personId ?? o?.personId), job: c ? `${text(c.project, 'a job')}${typeof c.phase === 'string' && c.phase ? ` (${c.phase})` : ''}` : 'a job' }
+  }
 
   switch (command) {
     case 'person.upsert':
@@ -373,7 +388,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return u ? `Removed ${person(u.personId)}'s days off, ${dates(u.start, u.end)}` : 'Removed some days off'
     }
     case 'call.create':
-      return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}`
+      return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}${needing(a.needsCertificates)}`
     case 'call.cancel':
       return `Cancelled the call for ${call(a.id)}`
     case 'call.update': {
@@ -389,6 +404,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.project !== undefined) parts.push(`job to ${text(a.project, 'a job')}`)
       if (a.phase !== undefined) parts.push(typeof a.phase === 'string' && a.phase ? `phase to ${a.phase}` : 'no phase')
       if (a.venue !== undefined) parts.push(typeof a.venue === 'string' && a.venue ? `venue to ${clip(a.venue)}` : 'no venue')
+      if (a.needsCertificates !== undefined) parts.push(needsIn(a.needsCertificates).length ? `certificates needed to ${needsLabel(needsIn(a.needsCertificates))}` : 'no certificates needed')
       return `Changed the call for ${call(a.id)}: ${inWords(parts)}`
     }
     case 'offer.send':
@@ -634,6 +650,20 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'leave.allowance':
       return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over`
+    case 'late.say': {
+      const l = lateOf(a.id, a.offerId)
+      const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })
+      const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
+      return `${l.who} said they'll be ${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+    }
+    case 'late.arrived': {
+      const l = lateOf(a.id)
+      return `${l.who} said they're there now, at ${l.job}`
+    }
+    case 'late.seen': {
+      const l = lateOf(a.id)
+      return `Noted that ${l.who} is running late for ${l.job}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:
