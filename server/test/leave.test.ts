@@ -21,7 +21,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
-import { IPHONE, server, staff, WINDOWS } from './people.ts'
+import { flashOf, IPHONE, server, staff, WINDOWS } from './people.ts'
 
 /**
  * Staff leave and time in lieu (ADR 0024): the rules the server keeps, one
@@ -192,8 +192,10 @@ describe('deciding', () => {
     const posted = await app.inject({ method: 'POST', url: `/f/${token}/away/r1/remove`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: '' })
     expect(posted.statusCode).toBe(303)
     const to = new URL(posted.headers.location as string, 'http://x')
-    expect(to.searchParams.get('ok')).toBe('0')
-    expect(to.searchParams.get('m')).toBe('These days off are approved leave: cancel the leave on the Leave screen instead.')
+    expect(flashOf((await app.inject({ url: to.pathname + to.search })).body)).toEqual({
+      ok: false,
+      message: 'These days off are approved leave: cancel the leave on the Leave screen instead.',
+    })
     expect(await colly.record<Unavailability>('unavailability', 'r1')).toMatchObject({ source: 'leave' })
 
     // Only Aoife cancels it, and the days off go with it. Signed in, she can't say she's someone else either.

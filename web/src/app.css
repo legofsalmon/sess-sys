@@ -4,6 +4,10 @@
   --ink: #16202b;
   --muted: #5a6776;
   --line: #d3dae2;
+  /* Round a field: a line is 1.4:1 on a card, so fields dissolved in daylight; this is 3.4:1 (audit finding 22). */
+  --field-line: #7f8c9a;
+  /* Text on a line-coloured surface, such as the grey pill: muted was 4.1:1 there, this is 5.1:1. */
+  --on-line: #4d5968;
   --accent: #ee3744;
   --accent-ink: #c8202e;
   /* Behind white text: the brand red is 4.0:1 with white, this is 5.7:1 (AA). */
@@ -50,6 +54,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f151c; --panel: #17202a; --ink: #e6ecf2; --muted: #9aa8b7; --line: #2b3745;
+    --field-line: #6b7684; --on-line: #9aa8b7;
     --accent-ink: #ff737d; --good: #5fd09a; --good-soft: #15352a; --warn: #f0b85a; --warn-soft: #3a2c12;
     --bad: #f0a064; --bad-soft: #3a2414;
     color-scheme: dark;
@@ -61,8 +66,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .top { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
 /* A new version arrived while the app was open: one line fixed at the top until they reload. The page and its sticky header move down under it, so it hides nothing. */
 .update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--space-12); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--space-16) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
-.update ~ .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
-.update ~ .app .top { top: calc(56px + env(safe-area-inset-top)); }
+.update ~ main .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
+.update ~ main .app .top { top: calc(56px + env(safe-area-inset-top)); }
 .brand { display: flex; gap: var(--space-10); align-items: center; }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
 .brand small, label small { display: block; color: var(--muted); font-size: var(--text-hint); }
@@ -97,14 +102,14 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .pill { font-size: var(--text-pill); font-weight: 700; padding: var(--space-2) var(--space-8); border-radius: var(--radius-full); white-space: nowrap; }
 .pill.pending { background: var(--warn-soft); color: var(--warn); }
 .pill.confirmed { background: var(--good-soft); color: var(--good); }
-.pill.cancelled { background: var(--line); color: var(--muted); }
+.pill.cancelled { background: var(--line); color: var(--on-line); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 /* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; }
+input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
 .stock { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
 .stock li { display: flex; justify-content: space-between; gap: var(--space-10); }
 .free { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -119,10 +124,17 @@ input, select { font: inherit; padding: var(--space-8) var(--space-10); border-r
 .hint, .empty, .scans { margin: 0; color: var(--muted); font-size: var(--text-hint); }
 .foot { color: var(--muted); font-size: var(--text-footer); text-align: center; font-variant-numeric: tabular-nums; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Getting about (audit finding 22): each move within the app lands on the screen's heading (Shell.tsx), which shows the same ring as a button. */
+h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The live region round the "not done" count is a box of its own: older Safari leaves a display: contents box out of what a screen reader is told. Empty, it's taken out of the row, so on a 320px phone it doesn't take a line of its own and push the sync pill down. */
+.not-done-live { display: flex; }
+.not-done-live:empty { position: absolute; }
 @media (max-width: 480px) { .book { grid-template-columns: 1fr 1fr; } .book label:first-child { grid-column: 1 / -1; } }
 
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
-.app .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
+/* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
+.app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
 .app .title { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
 .app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
@@ -155,7 +167,7 @@ input, select { font: inherit; padding: var(--space-8) var(--space-10); border-r
 .app .added a { color: inherit; font-weight: 700; }
 .app fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .app legend { padding: 0; font-size: var(--text-hint); color: var(--muted); margin-bottom: var(--space-4); }
-.app textarea { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
+.app textarea { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
 .app .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
 .app .grid-form label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
 .app .grid-form .wide { grid-column: 1 / -1; }

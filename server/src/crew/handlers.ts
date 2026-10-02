@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, STOPPED, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
@@ -360,6 +360,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       if (a[k] !== undefined) (next as Record<string, unknown>)[k] = a[k]
     // One end may have moved on another device, so check the call as it will be.
     if (next.start > next.end) throw new Refused({ code: 'invalid', message: `${next.role} on ${next.project} would end before it starts.` })
+    // A reply-by day the change sets is asked for before the job is over, as when a call is made (audit finding 21). One a move of dates leaves behind is left to the office.
+    if (a.replyBy && a.replyBy > next.end) throw new Refused({ code: 'invalid', message: REPLY_BY_AFTER })
     await changeCall(ctx, call, next)
   },
 

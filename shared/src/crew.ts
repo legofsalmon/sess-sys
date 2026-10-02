@@ -246,6 +246,9 @@ export const LIVE: readonly OfferStatus[] = ['offered', 'countered', 'accepted',
 /** A field-by-field change must name at least one field; shared with the job and phase changes. */
 export const somethingToChange = [(u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined), { message: 'Nothing to change.' }] as const
 
+/** A reply-by day after the call's last day, refused when a call is made or its reply-by changed. */
+export const REPLY_BY_AFTER = "The reply-by day is after the job's last day."
+
 /** The same checks wherever contact details are typed: the office's form, or the person's own link. */
 const contactEmail = z.string().email("That email address doesn't look right.").max(200, 'The email address can be up to 200 characters.').nullable()
 const contactPhone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.').nullable()
@@ -307,7 +310,9 @@ export const crewCommandSchemas = {
       details: text(4000, 'The details for crew'),
       replyBy: day.nullable(),
     })
-    .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' }),
+    .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' })
+    // A day typed before the dates were changed can be left behind them; an answer asked for after the job is no use (audit finding 21).
+    .refine((c) => c.replyBy === null || c.replyBy <= c.end, { message: REPLY_BY_AFTER }),
   /**
    * Only the fields the person changed, like a phase (ADR 0007). A change
    * of dates takes each offer's days along; a change of rate reaches only
@@ -382,6 +387,21 @@ export function daysBetween(from: string, to: string): number {
 }
 
 /**
+ * The day to ask for an answer by, offered when a call is made (audit
+ * finding 21): two days before the first day, or the day before when the
+ * job is close, so an answer comes before the job does; none for a job
+ * that's over, which a reply-by can't come after. The office can clear it
+ * or pick another.
+ */
+export function suggestedReplyBy(start: string, end: string, today: string): string | null {
+  if (end < today) return null
+  // Two days before only while that leaves a day to answer in; a job that starts today, or has started, wants its answers today.
+  const twoBefore = shiftDay(start, -2)
+  const day = twoBefore > today ? twoBefore : shiftDay(start, -1)
+  return day > today ? day : today
+}
+
+/**
  * Whether a phase's new span holds the whole of its old one: it got longer
  * at one end or both, but didn't move, so nothing on it needs to.
  */
@@ -449,16 +469,24 @@ export function euro(c: number | null | undefined): string {
 }
 
 /**
+ * Who a message is to. Staff are paid through payroll, so no message to
+ * them names a rate, as their page doesn't (audit finding 21).
+ */
+type Addressee = Pick<Person, 'name' | 'kind'> & Partial<Pick<Person, 'knownAs'>>
+
+const rateLine = (c: Pick<CrewCall, 'dayRateCents'>) => `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
+
+/**
  * The message ops paste into WhatsApp, SMS or email. Everything a freelancer
  * needs to decide is in it; the link is for answering.
  */
-export function offerMessage(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>, c: CrewCall, link: string): string {
+export function offerMessage(p: Addressee, c: CrewCall, link: string): string {
   const first = firstName(p)
   const lines = [
     `Hi ${first}, are you free for ${c.project}${c.phase ? ` (${c.phase})` : ''}?`,
     `${c.role}, ${daysLabel(eachDay(c.start, c.end))}${c.callTime ? `, call ${c.callTime}` : ''}`,
     c.venue ? `At ${c.venue}` : '',
-    `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`,
+    p.kind === 'staff' ? '' : rateLine(c),
     c.replyBy ? `Please answer by ${dayLabel(c.replyBy)}.` : '',
     `Accept, decline or pick days here: ${link}`,
   ]
@@ -534,12 +562,13 @@ export interface TellContext {
 const jobName = (c: TellContext['call']) => `${c.project}${c.phase ? ` (${c.phase})` : ''}`
 const whenLine = (c: TellContext['call'], days?: readonly string[]) =>
   `${daysLabel(days?.length ? [...days] : eachDay(c.start, c.end))}${c.callTime ? `, call ${c.callTime}` : ''}`
-const rateLine = (c: TellContext['call']) => `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
 
 /** The message, its subject for an email, and what it is, for the panel's name ("Send confirmation to …"). */
-export function tellMessage(event: TellEvent, p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>, ctx: TellContext, link: string): { text: string; subject: string; what: string } {
+export function tellMessage(event: TellEvent, p: Addressee, ctx: TellContext, link: string): { text: string; subject: string; what: string } {
   const first = firstName(p)
   const c = ctx.call
+  // Staff are paid through payroll, so their messages name no rate.
+  const rated = p.kind !== 'staff'
   const job = jobName(c)
   const when = whenLine(c, ctx.days)
   const next = "we'll be in touch about the next one."
@@ -552,7 +581,7 @@ export function tellMessage(event: TellEvent, p: Pick<Person, 'name'> & Partial<
           `Hi ${first}, you're confirmed for ${job}.`,
           `${c.role}, ${when}`,
           c.venue && `At ${c.venue}`,
-          c.dayRateCents !== null && rateLine(c),
+          rated && c.dayRateCents !== null && rateLine(c),
           `Your call sheet, with who's on and who to ring on the day, is here: ${link}/sheet/${c.id}`,
           'If anything changes on your side, let us know.',
         ]),
@@ -595,7 +624,7 @@ export function tellMessage(event: TellEvent, p: Pick<Person, 'name'> & Partial<
     case 'call-changed':
       return {
         text: lines([
-          `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}, ${rateLine(c)}.`,
+          `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}${rated ? `, ${rateLine(c)}` : ''}.`,
           `The details are on your page: ${link}`,
           'If that no longer suits, say so there or ring the office.',
         ]),

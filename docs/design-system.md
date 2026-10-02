@@ -29,9 +29,12 @@ and Figma gets updated. Every colour token carries its CSS name (for example
 
 - **Primitives**: the raw hex values from `app.css`, hidden from pickers.
 - **Color** (Light and Dark modes): `bg`, `panel`, `ink`, `muted`, `line`,
-  `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`, `warn`,
-  `bad` with a `-soft` background each. Dark follows the phone's setting, as
-  the app does.
+  `field-line` (the border round a field, dark enough to see against a
+  card), `on-line` (text on a line-coloured surface, such as the grey
+  pill), `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`,
+  `warn`, `bad` with a `-soft` background each. Dark follows the phone's
+  setting, as the app does. `field-line` and `on-line` aren't in Figma
+  yet; until they are, the code is the reference.
 - **Spacing**: 2, 4, 6, 8, 10, 12, 14, 16, 20, 40 px.
 - **Radius**: control 8, tab 10, card 12, full (pills).
 - **Type**: 13 text styles: page title 1.3rem, brand 1rem, section heading
@@ -139,7 +142,25 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   feed ([ADR 0012](adr/0012-personal-calendar-feeds.md)), is shown in full
   in a read-only field that selects itself when tapped, with its buttons
   under it (Subscribe, Copy address), so it can still be copied by hand
-  where a browser won't copy. Not in Figma yet.
+  where a browser won't copy. The freelancer's page does the same, with
+  Copy address hidden where there's no script to copy with. Not in Figma
+  yet.
+- Getting about: each move within the app lands on the screen's heading
+  (its h1, or its name in the top bar), which shows the same focus ring
+  as a button, and the browser tab is named after the screen ("Crew ·
+  Session Hire"). A screen whose heading depends on what it shows, such
+  as Leave before it knows whose leave it is, still has one. A toggle that
+  keeps its state in the address, such as the planner's Jobs and People,
+  isn't a move and keeps focus: it takes focus as it's pressed, since
+  Safari doesn't give a pressed button focus. The screen sits in one
+  `<main>` landmark. A link that is the way back ("‹ All jobs") is at
+  least 44px tall, like a button. The "not done" count is read out as it
+  changes, and takes no room in the top bar while there's none.
+- Every field has a name over it, so it's still there once something is
+  typed, and a placeholder only gives an example ("e.g. on tour"). Only a
+  field in a tight row (a phase beside its dates, a number beside Out), a
+  search box or a scan field has its name read out without it being
+  shown.
 - Stock ([ADR 0013](adr/0013-warehouse-catalogue.md)) shows an item's
   number in bold with even-width digits. On a place's page each number is
   a round chip that opens the item, dashed and amber while it waits to
@@ -281,11 +302,21 @@ app and in Figma:
 
 - White text sits on `accent-fill` (#c8202e), 5.7:1, instead of the brand
   red (4.0:1). That covers primary buttons in the app and the Accept button
-  and "Offered" tag on the freelancer page. The brand red stays for the mark,
-  the current tab and focus rings.
+  and "Offered" tag on the freelancer page. The brand red stays for the mark
+  and focus rings.
 - Warn text is #8a5800 in light mode, 5.3:1 on its pill.
 - Buttons and fields are at least 44px tall, which matters with gloves on in
   a dark venue.
 
-Still short: the grey pill is 4.1:1 at 12px, and the current tab is white on
-the brand red.
+On 1 October 2026 the two gaps left were closed, and a third found by the
+audit (finding 22):
+
+- The current tab is white on `accent-fill` too, 5.7:1, not on the brand
+  red.
+- The grey pill's text is `on-line` (#4d5968 in light, 5.1:1 on `line`;
+  `muted` in dark, 5.0:1), as is the text of a person's away day in the
+  planner. `muted` on `line` was 4.1:1.
+- A field's border is `field-line` (#7f8c9a in light, 3.4:1 on a card;
+  #6b7684 in dark, 3.6:1), not `line`, which at 1.4:1 let fields dissolve
+  in daylight. WCAG asks 3:1 of a control's edge. The same token is on the
+  freelancer's pages.

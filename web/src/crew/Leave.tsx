@@ -137,6 +137,12 @@ export function LeaveScreen({ view }: { view: View }) {
       <a className="back" href="#crew">
         ‹ Crew
       </a>
+      {/* Until it's someone's own leave, which their name heads, the screen says what it is, so the move here lands on that and names the tab (audit finding 22). */}
+      {me?.kind !== 'staff' && (
+        <header className="title">
+          <h1>Leave</h1>
+        </header>
+      )}
       {!me ? (
         <WhoAreYou view={view} signedIn={signedIn} email={email} onPick={pick} />
       ) : me.kind !== 'staff' ? (
@@ -166,7 +172,6 @@ function WhoAreYou({ view, signedIn, email, onPick }: { view: View; signedIn: bo
   if (signedIn)
     return (
       <section className="card">
-        <h2>Leave</h2>
         <p className="empty">Your account, {email}, isn't matched to anyone on the Crew tab. Put that email on your own person there, as staff, and come back.</p>
       </section>
     )

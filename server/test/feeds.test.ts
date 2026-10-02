@@ -89,7 +89,7 @@ async function answer(app: FastifyInstance, token: string, offerId: string, answ
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     payload: `answer=${answer}`,
   })
-  expect(res.headers.location).toContain('ok=1')
+  expect(new URL(res.headers.location as string, 'http://x').searchParams.get('m')).toBe(answer === 'accept' ? 'accepted' : 'declined')
 }
 
 const feedOf = async (p: Person) => feedPath(await feedCodeFor(p.linkToken))

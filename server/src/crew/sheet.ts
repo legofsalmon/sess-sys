@@ -167,7 +167,7 @@ export function renderNoSheet(base: string, what: 'call sheet' | 'timesheet' = '
 }
 
 export const SHEET_CSS = `
-.back{font-weight:600;text-decoration:none}
+.back{display:inline-flex;align-items:center;min-height:44px;justify-self:start;font-weight:600;text-decoration:none}
 .sheet h1{margin:0;font-size:1.4rem;line-height:1.2}.sheet h1 span{font-weight:500;color:var(--muted)}
 .head{gap:4px}.when{margin:0;font-weight:600}
 .sheet section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;gap:8px}

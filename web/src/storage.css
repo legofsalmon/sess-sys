@@ -4,4 +4,4 @@
 .keep button { min-height: 36px; padding-block: var(--space-4); }
 /* With the update bar fixed above it, the line moves down under that bar, and the page follows the line as usual. */
 .update ~ .keep { margin-top: calc(56px + env(safe-area-inset-top)); }
-.keep ~ .app { padding-top: max(var(--space-12), env(safe-area-inset-top)); }
+.keep ~ main .app { padding-top: max(var(--space-12), env(safe-area-inset-top)); }

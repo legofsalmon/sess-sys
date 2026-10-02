@@ -24,14 +24,18 @@ export function useNotDone(view: View): { count: ReactNode; list: ReactNode } {
   useEffect(() => {
     if (n === 0) setOpen(false)
   }, [n])
-  if (n === 0) return { count: null, list: null }
+  // The count sits in a live region that's there before any refusal arrives, which is what a screen reader needs to read the change out (audit finding 22).
   return {
     count: (
-      <button type="button" className="not-done" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {n} not done
-      </button>
+      <span className="not-done-live" aria-live="polite">
+        {n > 0 && (
+          <button type="button" className="not-done" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {n} not done
+          </button>
+        )}
+      </span>
     ),
-    list: open ? <NotDoneList view={view} /> : null,
+    list: open && n > 0 ? <NotDoneList view={view} /> : null,
   }
 }
 
@@ -40,7 +44,7 @@ function NotDoneList({ view }: { view: View }) {
   // Newest first: the one that just arrived is the one to read.
   const problems = [...view.problems].reverse()
   return (
-    <section className="card attention not-done-list" aria-label="Not done">
+    <section className="card attention not-done-list" aria-label="Not done" aria-live="polite">
       <h2>Not done</h2>
       <p className="hint">The server turned these down, so they weren't made. Sort out what each says and ask again, or dismiss it.</p>
       {problems.map((p) => {

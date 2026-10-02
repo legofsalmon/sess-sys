@@ -1,14 +1,27 @@
-import { dayLabel, daysLabel, eachDay, euro, firstName, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
+import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { officeContact, telHref, type OfficeDetails } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
  * forms: it works on any phone, in any in-app browser (WhatsApp, Gmail),
- * with no app, no login and no JavaScript.
+ * with no app, no login and no JavaScript. The one exception is the Copy
+ * button beside the calendar address, which needs a few lines of script
+ * and stays hidden without them.
  */
 
 const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+
+/** "Wed 30 Sep", in Ireland, from a timestamp. */
+const onDay = (iso: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }))
+
+/** The message after a post, and the offer it's about, when it's about one: it goes in that card. Or the section it's about. */
+export interface Flash {
+  ok: boolean
+  text: string
+  offer?: string
+  section?: 'details'
+}
 
 /** The message after a post. A refusal is an alert, so it's read out and looks like one; a thank-you is a status. */
 export const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.ok ? 'ok' : 'bad'}" role="${f.ok ? 'status' : 'alert'}">${h(f.text)}</p>`
@@ -31,14 +44,16 @@ export function officeBlock(o: OfficeDetails | null | undefined): string {
 
 export interface PageData {
   person: Person
-  jobs: { offer: Offer; call: CrewCall; openDays: string[] }[]
+  /** Each offer with its call, the days still open on it, and the days this person holds on another job, by the job's name. */
+  jobs: { offer: Offer; call: CrewCall; openDays: string[]; busy: Record<string, string> }[]
   away: Unavailability[]
   base: string
   /** The read-only calendar feed address (ADR 0012), safe to add to a shared calendar. */
   feed: string
-  /** The message after a post, and the offer it's about, when it's about one: it goes in that card. Or the section it's about. */
-  flash?: { ok: boolean; text: string; offer?: string; section?: 'details' }
+  flash?: Flash
   today: string
+  /** When each withdrawn or filled offer ended, by offer, for "Declined and withdrawn". */
+  ended: ReadonlyMap<string, string>
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
   /** The office's phone and email, once set. */
@@ -72,21 +87,24 @@ function pullOut(d: PageData, action: string) {
     </details>`
 }
 
-function facts(call: CrewCall, offer: Offer) {
+/** Staff are paid through payroll, so their page carries no rate (audit finding 21). */
+const isStaff = (p: Pick<Person, 'kind'>) => p.kind === 'staff'
+
+function facts(call: CrewCall, offer: Offer, staff: boolean) {
   const rate = offer.status === 'countered' ? `${euro(offer.counterRateCents)} a day asked (offered ${euro(call.dayRateCents)})` : `${euro(offer.dayRateCents)}${offer.dayRateCents !== null ? ' a day' : ''}`
   return `<dl class="facts">
     <dt>Role</dt><dd>${h(call.role)}</dd>
     <dt>Dates</dt><dd>${h(daysLabel(offer.status === 'offered' ? eachDay(call.start, call.end) : offer.days))}</dd>
-    ${call.callTime ? `<dt>Call</dt><dd>${h(call.callTime)}</dd>` : ''}
+    ${call.callTime ? `<dt>Call time</dt><dd>${h(call.callTime)}</dd>` : ''}
     ${call.venue ? `<dt>Venue</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.venue)}">${h(call.venue)}</a></dd>` : ''}
-    <dt>Rate</dt><dd>${h(rate)}</dd>
+    ${staff ? '' : `<dt>Rate</dt><dd>${h(rate)}</dd>`}
     ${call.replyBy && offer.status === 'offered' ? `<dt>Reply by</dt><dd>${h(dayLabel(call.replyBy))}</dd>` : ''}
   </dl>
   ${call.details ? `<p class="details">${h(call.details).replace(/\n/g, '<br>')}</p>` : ''}`
 }
 
 function offerCard(d: PageData, job: PageData['jobs'][number]) {
-  const { offer, call, openDays } = job
+  const { offer, call, openDays, busy } = job
   const days = eachDay(call.start, call.end)
   const action = `${d.base}/offers/${encodeURIComponent(offer.id)}`
   const title = `${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}`
@@ -94,24 +112,31 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const canAnswer = offer.status === 'offered' || offer.status === 'countered' || (offer.status === 'accepted' && days.length > 1)
   // Someone who said yes gives the place back with "Can't make it", not Decline.
   const holding = (offer.status === 'accepted' || offer.status === 'confirmed') && call.status === 'open'
+  // A day they hold on another job is never ticked for them, and says so (audit finding 21), so the clash is seen before the server refuses it.
   const dayPicker =
     days.length > 1
       ? `<input type="hidden" name="picker" value="1"><fieldset class="days"><legend>Your days</legend>${days
           .map((day) => {
             const open = openDays.includes(day) || (offer.status === 'accepted' && offer.days.includes(day))
-            const checked = offer.status === 'offered' ? open : offer.days.includes(day)
-            return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day))}${open ? '' : ' <small>filled</small>'}</label>`
+            const checked = (offer.status === 'offered' ? open : offer.days.includes(day)) && !busy[day]
+            const note = !open ? 'filled' : busy[day] ? `booked on ${h(busy[day])}` : ''
+            return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day))}${note ? ` <small>${note}</small>` : ''}</label>`
           })
           .join('')}</fieldset>`
       : ''
   // Enter (or a phone keyboard's Go) in the rate field presses the form's first button. This one, so it's never Accept: the server sends the rate, or asks for a tap.
   // Drawn out of sight rather than hidden: Safari before 16.4 passes over a hidden button and presses the next, which is Accept.
   const onEnter = `<button class="on-enter" name="answer" value="implicit" tabindex="-1" aria-hidden="true"></button>`
+  // A one-day job has no days to pick, so a clash with another job is said in words before the server has to say it.
+  const clash = days.length === 1 && canAnswer && busy[days[0]!] ? `<p class="clash">You're booked on ${h(busy[days[0]!])} that day.</p>` : ''
+  // Staff are paid through payroll (audit finding 21): no rate to ask for, only a note to go with the answer.
+  const staff = isStaff(d.person)
   // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
     ${d.flash?.offer === offer.id ? flash(d.flash) : ''}
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
-    ${facts(call, offer)}
+    ${facts(call, offer, staff)}
+    ${clash}
     ${holding ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
     ${
       canAnswer
@@ -122,10 +147,10 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
         <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
         ${holding ? '' : '<button class="no" name="answer" value="decline">Decline</button>'}
       </div>
-      <details${offer.status === 'countered' ? ' open' : ''}><summary>Ask for a different rate or add a note</summary>
-        <label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>
+      <details${offer.status === 'countered' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
+        ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>`}
         <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(offer.note)}</textarea></label>
-        <button name="answer" value="counter">Send rate</button>
+        ${staff ? '<p class="small">It goes with your answer.</p>' : '<button name="answer" value="counter">Send rate</button>'}
       </details>
     </form>`
         : ''
@@ -180,11 +205,68 @@ function details(d: PageData): string {
   </section>`
 }
 
+/** How an offer in "Declined and withdrawn" ended, and the day it did: when they answered, or when the office withdrew it or the place went. */
+function ended(o: Offer, endedAt: string | undefined): string {
+  const on = (iso: string | null | undefined) => (iso ? ` on ${onDay(iso)}` : '')
+  switch (o.status) {
+    case 'declined':
+      return `You declined${on(o.respondedAt)}`
+    case 'pulled-out':
+      return `You pulled out${on(o.respondedAt)}`
+    case 'cancelled':
+      return `Withdrawn${on(endedAt)}`
+    case 'filled':
+      return `Filled by someone else${on(endedAt)}`
+    // The job went by while the office still had their rate to decide on.
+    case 'countered':
+      return "Your rate wasn't agreed"
+    default:
+      return 'Not answered'
+  }
+}
+
+/** One line of "Past work" or "Declined and withdrawn": the job, the role, the days, and how it ended. */
+function earlierLine(j: PageData['jobs'][number], how: string): string {
+  const { call, offer } = j
+  const days = HOLDING.includes(offer.status) ? offer.days : eachDay(call.start, call.end)
+  return `<li>${h(call.project)}${call.phase ? ` (${h(call.phase)})` : ''} · ${h(call.role)} · ${h(daysLabel(days))} <small>${h(how)}</small></li>`
+}
+
+/**
+ * The calendar feed address (ADR 0012), in a field that can be copied by
+ * hand on any phone, with Subscribe for the calendar apps that take a
+ * webcal: link and Copy where the browser can copy. The Copy button is the
+ * page's one piece of script: it stays hidden until the script has run
+ * and found a clipboard to write to.
+ */
+function feedBlock(feed: string): string {
+  return `<div class="feed">
+      <p class="small">Your bookings in your own calendar, kept up to date. It only shows your bookings, so it's fine in a calendar you share. If our Google Calendar invites already reach you, you don't need it as well.</p>
+      <label>Calendar address <input id="feed" readonly value="${h(feed)}"></label>
+      <div class="feed-buttons"><a class="button" href="${h(feed.replace(/^https?:/, 'webcal:'))}">Subscribe</a><button type="button" class="copy" hidden>Copy address</button></div>
+      <p class="small">On a phone, Subscribe adds it to your calendar app. Google Calendar can't take it on a phone: copy the address and add it on a laptop, under Other calendars, From URL.</p>
+    </div>
+    <script>
+    (function () {
+      var field = document.getElementById('feed'), copy = document.querySelector('.copy')
+      field.addEventListener('focus', function () { field.select() })
+      if (!navigator.clipboard) return
+      copy.hidden = false
+      copy.addEventListener('click', function () {
+        // Where the browser won't copy after all, the address is selected for copying by hand.
+        navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
+      })
+    })()
+    </script>`
+}
+
 export function renderPage(d: PageData): string {
   const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
   const booked = current.filter((j) => j.offer.status === 'accepted' || j.offer.status === 'confirmed')
-  const closed = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j)).slice(-8).reverse()
+  // Jobs they held that are over, apart from offers that ended another way: declined, withdrawn, filled, pulled out of, or never answered.
+  const past = d.jobs.filter((j) => !booked.includes(j) && HOLDING.includes(j.offer.status)).slice(-8).reverse()
+  const turned = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j) && !HOLDING.includes(j.offer.status)).slice(-8).reverse()
   const first = firstName(d.person)
   // A message about an offer sits in that offer's card, one about their details in that section; any other at the top.
   const inCard = [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
@@ -216,7 +298,7 @@ export function renderPage(d: PageData): string {
   <section>
     <h2>Your bookings</h2>
     ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
-    <p class="small">Your bookings in your own calendar: <a href="${h(d.feed.replace(/^https?:/, 'webcal:'))}">subscribe</a> (iPhone, Mac, Outlook), or in Google Calendar add <code>${h(d.feed)}</code> under “From URL”. It only shows your bookings, so it's fine in a calendar you share. If our Google Calendar invites already reach you, you don't need it as well.</p>
+    ${feedBlock(d.feed)}
   </section>
 
   <section>
@@ -245,13 +327,9 @@ export function renderPage(d: PageData): string {
 
   ${details(d)}
 
-  ${
-    closed.length
-      ? `<section><h2>Earlier</h2><ul class="closed">${closed
-          .map((j) => `<li>${h(j.call.project)} · ${h(j.call.role)} · ${h(daysLabel(eachDay(j.call.start, j.call.end)))} <small>${STATUS_TEXT[j.offer.status]}</small></li>`)
-          .join('')}</ul></section>`
-      : ''
-  }
+  ${past.length ? `<section><h2>Past work</h2><ul class="closed">${past.map((j) => earlierLine(j, j.offer.status === 'confirmed' ? 'Confirmed' : 'Accepted, never confirmed')).join('')}</ul></section>` : ''}
+
+  ${turned.length ? `<section><h2>Declined and withdrawn</h2><ul class="closed">${turned.map((j) => earlierLine(j, ended(j.offer, d.ended.get(j.offer.id)))).join('')}</ul></section>` : ''}
 
   <footer>
     <a href="${d.base}/data.json">Download everything we hold on you</a>
@@ -270,8 +348,8 @@ export function renderGone(): string {
 }
 
 export const CSS = `
-:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;--bad:#a8480f;--bad-soft:#f9e4d6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;--bad:#f0a064;--bad-soft:#3a2414;color-scheme:dark}}
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--field-line:#7f8c9a;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;--bad:#a8480f;--bad-soft:#f9e4d6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--field-line:#6b7684;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;--bad:#f0a064;--bad-soft:#3a2414;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
@@ -300,11 +378,15 @@ button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;b
 button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
 details[open]{display:grid;gap:8px}
-label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
+label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--field-line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
 fieldset.days input{width:20px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
-.empty,.small{color:var(--muted);margin:0;font-size:.92rem}code{word-break:break-all;font-size:.8rem}
+.clash{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+.empty,.small{color:var(--muted);margin:0;font-size:.92rem}
+.feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}
+.feed-buttons{display:flex;gap:8px}.feed-buttons>*{flex:1}.feed-buttons .copy[hidden]{display:none}
+a.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;text-decoration:none}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
 .away li button{min-height:44px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}

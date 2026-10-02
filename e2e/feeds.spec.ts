@@ -34,12 +34,12 @@ test('the office copies a freelancer their calendar address, the same one their 
   expect(link).toMatch(/\/f\/[\w-]{24}$/)
   expect(office.url()).toContain('#crew')
 
-  // Her page, with no app and no JavaScript, gives the same address, and says what it's for.
+  // Her page, with no app and no JavaScript, gives the same address, in a field to copy it from (audit finding 21), and says what it's for.
   const phone = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()
   await phone.goto(link)
   const bookings = phone.locator('section').filter({ has: phone.getByRole('heading', { name: 'Your bookings' }) })
-  await expect(bookings.locator('code')).toHaveText(feed)
-  await expect(bookings.getByRole('link', { name: 'subscribe' })).toHaveAttribute('href', feed.replace(/^http:/, 'webcal:'))
+  await expect(bookings.getByLabel('Calendar address')).toHaveValue(feed)
+  await expect(bookings.getByRole('link', { name: 'Subscribe' })).toHaveAttribute('href', feed.replace(/^http:/, 'webcal:'))
   await expect(bookings).toContainText("It only shows your bookings, so it's fine in a calendar you share.")
   await bookings.scrollIntoViewIfNeeded()
   await phone.screenshot(shot('feed-freelancer'))

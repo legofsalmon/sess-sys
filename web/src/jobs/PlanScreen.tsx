@@ -18,7 +18,7 @@ import {
   type Plan,
   type View,
 } from '@sh/shared'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
@@ -79,6 +79,11 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
   const p = useMemo(() => plan(view, days), [view, days])
   const [everyone, setEveryone] = useState(false)
   const at = (changes: Partial<Place>) => hashOf({ ...place, ...changes })
+  // Jobs or people is a toggle, not a move, so it keeps focus (audit finding 22). Safari, and Firefox on a Mac, don't focus a button they press, so it takes focus itself: the Shell sees a toggle in focus and leaves it there.
+  const toggle = (to: Rows) => (e: MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.focus()
+    location.hash = at({ rows: to })
+  }
   const step = (n: number) => (scale === 'week' ? addDays(mondayOf(day), 7 * n) : addMonths(day, n))
   const title = scale === 'week' ? `${spanLabel({ start: days[0]!, end: days.at(-1)! })} ${days.at(-1)!.slice(0, 4)}` : monthLabel(day)
   const busy = p.people.filter((l) => Object.keys(l.days).length > 0)
@@ -105,10 +110,10 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
         <div className="plan-title">
           <h1>{title}</h1>
           <div className="filters" role="group" aria-label="Rows">
-            <button type="button" aria-pressed={rows === 'jobs'} onClick={() => (location.hash = at({ rows: 'jobs' }))}>
+            <button type="button" aria-pressed={rows === 'jobs'} onClick={toggle('jobs')}>
               Jobs
             </button>
-            <button type="button" aria-pressed={rows === 'people'} onClick={() => (location.hash = at({ rows: 'people' }))}>
+            <button type="button" aria-pressed={rows === 'people'} onClick={toggle('people')}>
               People
             </button>
           </div>

@@ -14,6 +14,7 @@ import {
   STATUS_LABELS,
   STOPPED,
   spanLabel,
+  suggestedReplyBy,
   venueLabel,
   type CallView,
   type CommandInput,
@@ -559,7 +560,8 @@ function AddPhase({ job }: { job: JobView }) {
 
 /** A role the job needs, for one phase or across several. */
 function AskForCrew({ job }: { job: JobView }) {
-  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '' }
+  // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
+  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '', replyBy: undefined as string | undefined }
   const [f, setF] = useState(blank)
   // The phase picked ('' is across several), while the job still has it. Until then, the job's first phase as it is
   // now rather than when the page opened, so a job that had no phases then starts on the first one added.
@@ -571,6 +573,8 @@ function AskForCrew({ job }: { job: JobView }) {
   const start = dates?.start ?? span?.start ?? ''
   const end = dates?.end ?? span?.end ?? ''
   const venue = phase?.venue ?? job.venue
+  const today = useToday()
+  const replyBy = f.replyBy ?? (start ? (suggestedReplyBy(start, end < start ? start : end, today) ?? '') : '')
   const { run, error, refuse } = useAct()
 
   if (!job.span) return <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
@@ -598,7 +602,7 @@ function AskForCrew({ job }: { job: JobView }) {
         needed: Math.max(1, f.needed),
         dayRateCents: rate.cents,
         details: f.details.trim(),
-        replyBy: null,
+        replyBy: replyBy || null,
       })
     ).then((ok) => {
       if (ok) return
@@ -649,6 +653,10 @@ function AskForCrew({ job }: { job: JobView }) {
       <label>
         Day rate € <input inputMode="decimal" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} placeholder="250" />
       </label>
+      <label className="wide">
+        Reply by <input type="date" value={replyBy} onChange={(e) => setF({ ...f, replyBy: e.target.value })} />
+      </label>
+      <p className="hint wide">Two days before the first day, or the day before when the job is close. Clear it if there's no hurry.</p>
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={(e) => setF({ ...f, details: e.target.value })} placeholder="Travel, food, parking, dress" />
       </label>

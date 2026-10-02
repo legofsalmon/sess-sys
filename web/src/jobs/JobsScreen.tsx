@@ -335,10 +335,19 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
           {f.contacts.map((x, i) => (
             <fieldset className="wide contact" key={i}>
               <legend>Contact {i + 1}</legend>
-              <input value={x.name} onChange={(e) => setContact(i, { name: e.target.value })} placeholder="Name" aria-label="Contact name" />
-              <input value={x.role} onChange={(e) => setContact(i, { role: e.target.value })} placeholder="Role, e.g. Producer" aria-label="Contact role" />
-              <input type="tel" value={x.phone ?? ''} onChange={(e) => setContact(i, { phone: e.target.value })} placeholder="Mobile" aria-label="Contact mobile" />
-              <input type="email" value={x.email ?? ''} onChange={(e) => setContact(i, { email: e.target.value })} placeholder="Email" aria-label="Contact email" />
+              {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
+              <label>
+                Name <input value={x.name} onChange={(e) => setContact(i, { name: e.target.value })} />
+              </label>
+              <label>
+                Role <input value={x.role} onChange={(e) => setContact(i, { role: e.target.value })} placeholder="e.g. Producer" />
+              </label>
+              <label>
+                Mobile <input type="tel" value={x.phone ?? ''} onChange={(e) => setContact(i, { phone: e.target.value })} />
+              </label>
+              <label>
+                Email <input type="email" value={x.email ?? ''} onChange={(e) => setContact(i, { email: e.target.value })} />
+              </label>
             </fieldset>
           ))}
           <button type="button" className="wide" onClick={() => setF({ ...f, contacts: [...f.contacts, blankContact()] })}>

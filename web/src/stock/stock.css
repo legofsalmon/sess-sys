@@ -51,7 +51,7 @@
 .warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
 
 /* The Phase 0 sync test, now under Stock. */
-.sync-test .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
+.sync-test .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
 
 /* Labels (ADR 0015). Black on white whatever the screen's theme, at their real size in millimetres. */
 .label { box-sizing: border-box; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm; background: #fff; color: #000; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.15; }

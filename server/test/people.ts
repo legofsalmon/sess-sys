@@ -78,6 +78,17 @@ export async function staff(app: FastifyInstance, db: Db, name: string, userAgen
   }
 }
 
+/**
+ * The message a page shows after a post, in words, and whether it's a
+ * thank-you: read from the page, since the address carries only a code
+ * (audit finding 21).
+ */
+export function flashOf(html: string): { ok: boolean; message: string } {
+  const found = /<p class="flash (\w+)"[^>]*>(.*?)<\/p>/.exec(html)
+  const message = found ? found[2]!.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') : ''
+  return { ok: found?.[1] === 'ok', message }
+}
+
 /** Post a form from a freelancer's private link page, from their phone. */
 export async function onLink(app: FastifyInstance, path: string, fields: Record<string, string>) {
   const res = await app.inject({
@@ -87,5 +98,6 @@ export async function onLink(app: FastifyInstance, path: string, fields: Record<
     payload: new URLSearchParams(fields).toString(),
   })
   expect(res.statusCode).toBe(303)
-  expect(new URL(res.headers.location as string, 'http://x').searchParams.get('ok')).toBe('1')
+  const to = new URL(res.headers.location as string, 'http://x')
+  expect(flashOf((await app.inject({ url: to.pathname + to.search })).body).ok).toBe(true)
 }

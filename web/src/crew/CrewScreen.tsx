@@ -22,6 +22,8 @@ import {
   OPEN,
   parseEuro,
   personConflicts,
+  REPLY_BY_AFTER,
+  suggestedReplyBy,
   tellMessage,
   tidyDepartment,
   venueLabel,
@@ -653,6 +655,8 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     if (f.start !== call.start) changes.start = f.start
     const end = f.end < f.start ? f.start : f.end
     if (end !== call.end) changes.end = end
+    // Dates moved earlier can leave the reply-by day after the job; it's here to fix, as when a call is made (audit finding 21).
+    if (f.replyBy && f.replyBy > end) return refuse(REPLY_BY_AFTER)
     if ((f.callTime || null) !== call.callTime) changes.callTime = f.callTime || null
     if (Math.max(1, f.needed) !== call.needed) changes.needed = Math.max(1, f.needed)
     if (rateChanged) changes.dayRateCents = rate.cents
@@ -1036,9 +1040,16 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
             }}
           >
-            <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} aria-label="Off from" />
-            <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} aria-label="Off until" />
-            <input placeholder="Note" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+            {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
+            <label className="field">
+              Off from <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} />
+            </label>
+            <label className="field">
+              Off until <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} />
+            </label>
+            <label className="field wide">
+              Note <input placeholder="e.g. on tour" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+            </label>
             <button type="submit">Mark days off</button>
           </form>
           <div className="actions">
@@ -1132,10 +1143,12 @@ function Worked({ person }: { person: PersonView }) {
 
 function NewCall() {
   const today = useToday()
-  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
+  // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
+  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '', replyBy: undefined as string | undefined }
   const [f, setF] = useState(blank)
   const { run, error, refuse } = useAct()
   const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const replyBy = f.replyBy ?? suggestedReplyBy(f.start, f.end < f.start ? f.start : f.end, today) ?? ''
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.project.trim() || !f.role.trim()) return
@@ -1157,7 +1170,7 @@ function NewCall() {
         needed: Math.max(1, f.needed),
         dayRateCents: rate.cents,
         details: f.details.trim(),
-        replyBy: null,
+        replyBy: replyBy || null,
       })
     ).then((ok) => {
       if (!ok) setF((now) => (now === cleared ? f : now))
@@ -1192,6 +1205,10 @@ function NewCall() {
       <label>
         Venue <input value={f.venue} onChange={set('venue')} />
       </label>
+      <label className="wide">
+        Reply by <input type="date" value={replyBy} onChange={set('replyBy')} />
+      </label>
+      <p className="hint wide">Two days before the first day, or the day before when the job is close. Clear it if there's no hurry.</p>
       <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
