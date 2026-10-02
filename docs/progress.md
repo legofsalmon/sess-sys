@@ -72,6 +72,14 @@ waiting on someone.
   the layout, scanning, accessibility and a deploy while the app is
   open; and screenshots of every area at phone and laptop widths, light
   and dark.
+- Merged into `main` at 10:07 UTC once GitHub's checks passed, and live
+  by 10:14: Railway waited for main's checks, then deployed it on its
+  own. The live database has the stock schema at version 7: a label run
+  can be marked cancelled, a product as added by mistake, and a
+  product's name need only be unique among those not marked. Every
+  answer from the live server carries the security headers, hashed
+  files are kept for a year, and another site's preflight gets a 404
+  with no CORS header. The Blueprint rebuilt itself from `main`.
 
 **Next**
 
