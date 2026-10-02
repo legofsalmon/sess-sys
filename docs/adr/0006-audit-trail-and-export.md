@@ -3,6 +3,11 @@
 - **Status:** Accepted, 29 September 2026. Built and on; nothing to set up.
 - **Decides:** what the app records about each change, how people read it,
   and what "export everything" gives the company.
+- **Amended:** 2 October 2026 by the [audit](../audit-2026-09-30.md), finding
+  20: fetching the export writes nothing. The app records the download in
+  the history with a post as it asks for the file, so an address opened on
+  its own (a link checked by a browser, say) never puts a download in the
+  history; a script's download is recorded only if it posts too.
 
 ## Context
 

@@ -3,6 +3,80 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 2 October 2026: audit round three
+
+**Done**
+
+- The audit's P2 list, findings 16 to 27, in four streams built side by
+  side, each read by a reviewer trying to break it and corrected, then
+  brought together by hand. Under each finding the audit says how it was
+  fixed, and anything left.
+- **Screens that fit the device** (findings 16, 24, 25 and 26). The Crew
+  tab groups the open calls by job and day, each call one line until
+  it's tapped, with offers and forms behind buttons. People are found by
+  name, department or skill, with or without fadas, in the offer picker
+  and in the people list, which folds to its first ten. Stock and a
+  job's page fold their long lists. On a laptop, from 960 px wide, Jobs
+  and Stock show the list beside what's open. One status pill, one
+  "Waiting to sync", one clock for the Irish day that turns at midnight
+  (the clocks going back on 25 October included), one empty line, and
+  the text styles throughout; and icons for adding the app to a phone's
+  home screen.
+- **Mistakes that can be taken back, and scanning finished** (17, 18 and
+  19). Testing a batch holds each read for five seconds with Undo before
+  it counts. Putting kit away works by camera, the camera stays open
+  from one item to the next, a link opened inside WhatsApp or Gmail says
+  to open it in Safari or Chrome, codes are only read inside the frame,
+  and a camera that can zoom gets a slider. A product can be marked
+  "added by mistake", which frees its name. Setting label numbers aside
+  asks first, and a run with none of its labels used can be cancelled;
+  its numbers are never given out again. A fault's details can be
+  changed, and a place that doesn't exist is asked about before it's
+  made.
+- **The server hardened, and devices true to it** (20, 23 and 27). Files
+  with their hash in their names are kept for a year; every answer
+  carries the security headers, with HSTS over https; the CORS plugin is
+  gone, since nothing on another site calls the app. A database
+  connection dropping in the middle of a change no longer stops the
+  server. A calendar sync that fails tries again after one, five and
+  twenty-five minutes. Downloading everything writes nothing until the
+  app records it. With `BACKUP_KEY` set, backups are encrypted. A device
+  with changes waiting shows what the server will do with them, and
+  every device lists things in the same order. New tests for the sync
+  client, each view on its own, a deploy while the app is open, and
+  every command and server action having its words in the history.
+- **The freelancer's page and accessibility** (21 and 22). The office
+  can set a reply-by day, suggested from the job's dates and never after
+  them. A day the person is booked on another job is shown as such and
+  never ticked for them. The calendar address has Copy and Subscribe.
+  Staff are never shown or sent a rate. Past work and declined or
+  withdrawn offers are listed apart, with dates. Nothing typed into the
+  page's address ever appears on the page. Field borders show in
+  daylight; focus and the tab's title follow every move; one main area;
+  back links big enough to tap; the current tab and the grey pill
+  readable; the "not done" count read out; a label on every field.
+- The reviewers found and fixed, among others: a cancelled label run's
+  numbers being given out again, so two labels could carry one number;
+  a database connection dropping mid-change stopping the server; an
+  offer made with no signal showing nothing on its call line; Enter in
+  the picker's search sending the offer; a reply-by after the job being
+  accepted; and staff being named a rate in messages.
+- Checked with all four streams together: the typecheck; the shared
+  tests (110); the server tests (313 on PGlite, and the real-Postgres
+  file); the web build; the full browser suite (62), with new specs for
+  the layout, scanning, accessibility and a deploy while the app is
+  open; and screenshots of every area at phone and laptop widths, light
+  and dark.
+
+**Next**
+
+- Finding 1 still waits on Colly's keys: the Google key for sign-in, the
+  backups bucket (and now a `BACKUP_KEY` to encrypt them, made once with
+  `openssl rand -hex 32`), and the Sentry key.
+- Invoicing is parked for now (Colly, 1 October); its plan stays in the
+  roadmap.
+- The audit's P3 list is what's left of it.
+
 ## 1 October 2026: crew profiles and bringing in the list
 
 **Done**
