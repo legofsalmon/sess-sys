@@ -363,7 +363,7 @@ export class SyncClient {
       }
     }
 
-    const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id)
+    const byName = <T extends { name?: string; id: string }>(a: T, b: T) => (a.name ?? a.id).localeCompare(b.name ?? b.id) || a.id.localeCompare(b.id)
     const crew = crewView(entities, outbox, this.state.cursor, today)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
@@ -373,7 +373,7 @@ export class SyncClient {
     return {
       products: Object.values(entities.product).sort(byName),
       bookings: [...bookings.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
-      scans: [...scans.values()].sort((a, b) => b.at.localeCompare(a.at)),
+      scans: [...scans.values()].sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)),
       issues: Object.values(entities.issue).filter((i) => !i.resolved),
       problems: [...this.state.problems],
       crew,

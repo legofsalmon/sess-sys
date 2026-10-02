@@ -98,7 +98,10 @@ export function BackupsCard() {
         </p>
       )}
       <p className="hint">
-        Every night{status.next ? `; next ${when(status.next)}` : ''}. Kept for 35 days, then one a month for a year.
+        Every night{status.next ? `; next ${when(status.next)}` : ''}. Kept for 35 days, then one a month for a year.{' '}
+        {status.encrypted
+          ? "Each file is encrypted, so it can't be read without the server's backup key."
+          : 'The files are not encrypted, so each holds every private link in plain text; set BACKUP_KEY on the server to encrypt them.'}
       </p>
     </section>
   )

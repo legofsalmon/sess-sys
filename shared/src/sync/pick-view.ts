@@ -280,7 +280,7 @@ export function movesView(
     const onKit = [...rows.values()].filter((r) => r.lines.length > 0)
     const extra = [...rows.values()]
       .filter((r) => r.lines.length === 0)
-      .sort((a, b) => department(a) - department(b) || (a.model?.name ?? '').localeCompare(b.model?.name ?? ''))
+      .sort((a, b) => department(a) - department(b) || (a.model?.name ?? '').localeCompare(b.model?.name ?? '') || a.modelId.localeCompare(b.modelId))
     const list: PickList = {
       job,
       rows: [...onKit, ...extra],
@@ -299,14 +299,14 @@ export function movesView(
     .filter((j) => holdOf(j.status) === 'held' && j.span && j.span.end >= today && j.span.start <= until && kit.byJob.has(j.id))
     .map((j) => pickList(j.id)!)
     .filter((p) => p.need > 0)
-    .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name))
+    .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   const withKitOut = new Set([...outByJob.keys(), ...[...counted].filter(([, byModel]) => [...byModel.values()].some((c) => c.out > c.back + c.missing)).map(([id]) => id)])
   const over = (j: JobView) => STOPPED.includes(j.status) || !j.span || j.span.end < today
   const stillOut = [...withKitOut]
     .map((id) => pickList(id))
     .filter((p): p is PickList => !!p && over(p.job) && p.stillOut > 0)
-    .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name))
+    .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   return { outOf: (id) => outState.get(id), pickList, soon, stillOut }
 }

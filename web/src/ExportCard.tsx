@@ -6,7 +6,8 @@ import { client } from './sync.ts'
 /**
  * "Download everything" (ADR 0006): every table as a spreadsheet and as
  * JSON, and the history, in one file, so the company's data is never locked
- * in. The server records each download in the history.
+ * in. Each download goes in the history: the app records it as it asks for
+ * the file, so the file's address alone never writes one.
  */
 
 const base = import.meta.env.VITE_API_BASE ?? ''
@@ -19,11 +20,16 @@ export function ExportCard() {
     setBusy(true)
     setNote(undefined)
     try {
-      // The device code goes in the history beside the download.
-      const res = await fetch(`${base}/api/export.zip?client=${encodeURIComponent(client.clientId)}`, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(120_000),
+      // The device code goes in the history beside the download, before the file comes: a download nobody saw arrive still counts.
+      const record = await fetch(`${base}/api/export/record?client=${encodeURIComponent(client.clientId)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ format: 'zip' }),
+        signal: AbortSignal.timeout(30_000),
       })
+      if (record.status === 401) return markSignedOut()
+      if (!record.ok) return setNote({ ok: false, text: `That didn't work: the server answered ${record.status}. Try again in a minute.` })
+      const res = await fetch(`${base}/api/export.zip`, { cache: 'no-store', signal: AbortSignal.timeout(120_000) })
       if (res.status === 401) return markSignedOut()
       if (!res.ok) return setNote({ ok: false, text: `That didn't work: the server answered ${res.status}. Try again in a minute.` })
       const file = await res.blob()

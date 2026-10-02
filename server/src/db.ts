@@ -1,5 +1,6 @@
 import { PGlite } from '@electric-sql/pglite'
 import pg from 'pg'
+import { reportError } from './monitoring.ts'
 
 /**
  * The two ways the server reaches Postgres. Production uses a real server
@@ -40,14 +41,25 @@ export async function pgliteDb(dataDir?: string): Promise<Db> {
   }
 }
 
-export function postgresDb(connectionString: string): Db {
+export function postgresDb(connectionString: string, onError: (err: Error) => void = idleConnectionFailed): Db {
   const pool = new pg.Pool({ connectionString, max: 10 })
+  // A connection sitting idle in the pool can fail on its own (the database
+  // restarting, say). The pool raises that as an event, and an event nobody
+  // listens to stops the whole process; the pool drops the connection anyway.
+  pool.on('error', onError)
   return {
     kind: 'postgres',
     query: (sql, params) => pool.query(sql, params as unknown[]) as never,
     exec: async (sql) => void (await pool.query(sql)),
     async transaction(fn) {
       const client = await pool.connect()
+      // Out of the pool, a connection that fails raises the same event with
+      // nobody listening, which would stop the process. The statement it cut
+      // off, or the next, fails too, so whoever asked hears of it; the
+      // connection is then thrown away rather than handed out again.
+      let lost: Error | undefined
+      const failed = (err: Error) => void (lost = err)
+      client.on('error', failed)
       try {
         await client.query('BEGIN')
         const result = await fn({
@@ -60,11 +72,17 @@ export function postgresDb(connectionString: string): Db {
         await client.query('ROLLBACK').catch(() => {})
         throw err
       } finally {
-        client.release()
+        client.off('error', failed)
+        client.release(lost)
       }
     },
     close: () => pool.end(),
   }
+}
+
+function idleConnectionFailed(err: Error) {
+  console.error('A database connection failed while idle; the pool will open another.', err.message)
+  reportError(err, { area: 'database' })
 }
 
 /**

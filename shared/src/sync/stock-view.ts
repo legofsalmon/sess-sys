@@ -78,7 +78,7 @@ function patch<T extends object>(target: T, changes: object): T {
 
 /** One collator, not one made for every comparison: with a few hundred products that was most of what a rebuild cost. */
 const irishNames = new Intl.Collator('en-IE', { sensitivity: 'base' })
-const byName = (a: { name: string }, b: { name: string }) => irishNames.compare(a.name, b.name) || a.name.localeCompare(b.name)
+const byName = (a: { id: string; name: string }, b: { id: string; name: string }) => irishNames.compare(a.name, b.name) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
 /** By number; items still waiting for one last, in the order they were added. */
 const byNumber = (a: Asset, b: Asset) => (a.number ? 0 : 1) - (b.number ? 0 : 1) || a.number.localeCompare(b.number) || a.id.localeCompare(b.id)
 
@@ -242,16 +242,16 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
   for (const m of modelViews.values()) {
     m.items.sort(byNumber)
     m.retired.sort(byNumber)
-    m.counted.sort((a, b) => whereName(a).localeCompare(whereName(b)))
+    m.counted.sort((a, b) => whereName(a).localeCompare(whereName(b)) || a.id.localeCompare(b.id))
     m.total = m.items.length + m.countedTotal
   }
   for (const p of placeViews.values()) {
     p.items.sort(byNumber)
-    p.counted.sort((a, b) => (a.model?.name ?? '').localeCompare(b.model?.name ?? ''))
+    p.counted.sort((a, b) => (a.model?.name ?? '').localeCompare(b.model?.name ?? '') || a.id.localeCompare(b.id))
   }
   for (const a of assetViews.values()) {
     a.items.sort(byNumber)
-    a.counted.sort((x, y) => (x.model?.name ?? '').localeCompare(y.model?.name ?? ''))
+    a.counted.sort((x, y) => (x.model?.name ?? '').localeCompare(y.model?.name ?? '') || x.id.localeCompare(y.id))
   }
 
   const numbers = new Map<string, AssetView>()

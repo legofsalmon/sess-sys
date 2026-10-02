@@ -808,3 +808,36 @@ describe('correcting people (audit finding 7)', () => {
     expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353871234567', email: 'aoife.byrne@example.com' })
   })
 })
+
+describe("a freelancer's page", () => {
+  it('reads the offers twice however many jobs they were ever offered, and still says which days are filled', async () => {
+    // Proves: the places still open on each call come from one query for all the calls, not one per job (audit finding 20).
+    const db = await pgliteDb()
+    const sql: string[] = []
+    const app = await buildApp({ db: { ...db, query: (s, p) => (sql.push(s), db.query(s, p)) } })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    const aoife = await person(app, 'Aoife Byrne')
+    const brian = await person(app, 'Brian Walsh')
+    const mine: string[] = []
+    let first = ''
+    for (let i = 1; i <= 4; i++) {
+      const c = await call(app, { start: `2026-11-0${i}`, end: `2026-11-0${i + 1}` })
+      if (i === 1) first = c
+      mine.push((await offer(app, c, aoife.id)).id)
+    }
+    // Brian holds the first call's first day, so for Aoife that day is filled.
+    const { id: brians } = await offer(app, first, brian.id, true)
+    await send(app, 'offer.respond', { id: brians, answer: 'accept', days: ['2026-11-01'], note: '' })
+
+    sql.length = 0
+    const page = await app.inject({ url: `/f/${aoife.linkToken}` })
+    expect(page.statusCode).toBe(200)
+    expect(sql.filter((s) => s.includes('FROM offers'))).toHaveLength(2)
+    const card = cardOf(page.body, mine[0]!)
+    expect(card).toContain('value="2026-11-01" disabled')
+    expect(card).toContain('value="2026-11-02" checked')
+  })
+})

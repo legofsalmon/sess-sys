@@ -181,7 +181,7 @@ export function kitView(
       if (found) found.qty += o.own
       else byJob.set(o.projectId, { jobId: o.projectId, name: o.job?.name ?? 'Another job', qty: o.own, hold: o.hold, same: o.projectId === v.projectId })
     }
-    return [...byJob.values()].sort((a, b) => (a.hold === b.hold ? 0 : a.hold === 'held' ? -1 : 1) || b.qty - a.qty || a.name.localeCompare(b.name))
+    return [...byJob.values()].sort((a, b) => (a.hold === b.hold ? 0 : a.hold === 'held' ? -1 : 1) || b.qty - a.qty || a.name.localeCompare(b.name) || a.jobId.localeCompare(b.jobId))
   }
 
   for (const v of views) {
@@ -231,7 +231,10 @@ export function kitView(
 
   const coming = (v: KitLineView) => v.hold !== 'none' && (!v.span || v.span.end >= today)
   const soonest = (a: KitLineView, b: KitLineView) =>
-    (a.span ? 0 : 1) - (b.span ? 0 : 1) || (a.span?.start ?? '').localeCompare(b.span?.start ?? '') || (a.job?.name ?? '').localeCompare(b.job?.name ?? '')
+    (a.span ? 0 : 1) - (b.span ? 0 : 1) ||
+    (a.span?.start ?? '').localeCompare(b.span?.start ?? '') ||
+    (a.job?.name ?? '').localeCompare(b.job?.name ?? '') ||
+    a.id.localeCompare(b.id)
   const byModel = new Map<string, KitLineView[]>()
   for (const v of views.filter(coming).sort(soonest)) {
     const list = byModel.get(v.modelId) ?? []
@@ -242,7 +245,8 @@ export function kitView(
   const short = views
     .filter((v) => v.short > 0)
     .sort(
-      (a, b) => a.shortDay!.localeCompare(b.shortDay!) || (a.job?.name ?? '').localeCompare(b.job?.name ?? '') || productName(a).localeCompare(productName(b))
+      (a, b) =>
+        a.shortDay!.localeCompare(b.shortDay!) || (a.job?.name ?? '').localeCompare(b.job?.name ?? '') || productName(a).localeCompare(productName(b)) || a.id.localeCompare(b.id)
     )
 
   const suppliers = new Map<string, string>()

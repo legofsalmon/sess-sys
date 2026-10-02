@@ -86,6 +86,14 @@ export function crewView(
   const away = new Map<string, UnavailabilityView>()
   for (const u of Object.values(entities.unavailability ?? {})) away.set(u.id, { ...u, pending: false })
 
+  /** A call cancelled takes every offer still live on it, as the server withdraws them: the office sees it at once, not after the sync. */
+  const cancelCall = (id: string) => {
+    const c = calls.get(id)
+    if (!c) return
+    calls.set(c.id, { ...c, status: 'cancelled', pending: true })
+    for (const o of offers.values()) if (o.callId === c.id && LIVE.includes(o.status)) offers.set(o.id, { ...o, status: 'cancelled', pending: true })
+  }
+
   // Phases' dates, followed through this device's own changes, for calls that move with their phase.
   const phaseDates = new Map<string, { start: string; end: string }>()
   for (const p of Object.values(entities.phase ?? {})) phaseDates.set(p.id, { start: p.start, end: p.end })
@@ -155,14 +163,12 @@ export function crewView(
         // A job being stopped takes its crew calls with it (ADR 0007).
         const a = m.args as CommandArgs<'project.update'>
         if (!a.status || !STOPPED.includes(a.status)) break
-        for (const c of calls.values()) if (c.projectId === a.id && c.status === 'open') calls.set(c.id, { ...c, status: 'cancelled', pending: true })
+        for (const c of [...calls.values()]) if (c.projectId === a.id && c.status === 'open') cancelCall(c.id)
         break
       }
-      case 'call.cancel': {
-        const c = calls.get((m.args as CommandArgs<'call.cancel'>).id)
-        if (c) calls.set(c.id, { ...c, status: 'cancelled', pending: true })
+      case 'call.cancel':
+        cancelCall((m.args as CommandArgs<'call.cancel'>).id)
         break
-      }
       case 'call.update': {
         const a = m.args as CommandArgs<'call.update'>
         const c = calls.get(a.id)
@@ -228,10 +234,17 @@ export function crewView(
         offers.set(o.id, { ...o, status, days, note: a.note, seenAt: null, pending: true })
         break
       }
-      case 'offer.confirm':
+      case 'offer.confirm': {
+        const o = offers.get((m.args as CommandArgs<'offer.confirm'>).id)
+        // Agreeing a counter makes its rate the rate, as the server does, so the timesheet's total follows at once.
+        const agreed = o?.status === 'countered' && o.counterRateCents !== null ? { dayRateCents: o.counterRateCents } : {}
+        if (o) offers.set(o.id, { ...o, status: 'confirmed', ...agreed, pending: true })
+        break
+      }
       case 'offer.cancel': {
-        const o = offers.get((m.args as { id: string }).id)
-        if (o) offers.set(o.id, { ...o, status: m.name === 'offer.confirm' ? 'confirmed' : 'cancelled', pending: true })
+        const o = offers.get((m.args as CommandArgs<'offer.cancel'>).id)
+        // An offer that is over stays as it ended, as on the server: a Withdraw queued offline never rewrites a decline.
+        if (o && LIVE.includes(o.status)) offers.set(o.id, { ...o, status: 'cancelled', pending: true })
         break
       }
       case 'offer.seen': {
@@ -271,7 +284,7 @@ export function crewView(
   const callViews: CallView[] = [...calls.values()].map((c) => {
     const days = eachDay(c.start, c.end)
     const own = (byCall.get(c.id) ?? []).sort(
-      (a, b) => statusRank(a.status) - statusRank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '')
+      (a, b) => statusRank(a.status) - statusRank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '') || a.id.localeCompare(b.id)
     )
     const heldByDay: Record<string, number> = {}
     for (const d of days) heldByDay[d] = own.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
@@ -279,8 +292,7 @@ export function crewView(
   })
 
   // What each person has worked (ADR 0025): a place held on a call that stands, from the person's own first day on it, newest first.
-  // The job's name as it is today, where the call is part of one; the call's own name otherwise. A cancelled call's
-  // offers are cancelled too once the server has it; skipping the call shows the same while that's still pending.
+  // The job's name as it is today, where the call is part of one; the call's own name otherwise.
   for (const c of callViews) {
     if (c.status === 'cancelled') continue
     const name = (c.projectId && entities.project?.[c.projectId]?.name) || c.project
@@ -293,12 +305,13 @@ export function crewView(
       p.worked.push({ callId: c.id, projectId: c.projectId, name, phase: c.phase, start: days[0]!, end: days[days.length - 1]! })
     }
   }
-  for (const p of people.values()) p.worked.sort((a, b) => b.start.localeCompare(a.start) || a.name.localeCompare(b.name))
+  for (const p of people.values()) p.worked.sort((a, b) => b.start.localeCompare(a.start) || a.name.localeCompare(b.name) || a.callId.localeCompare(b.callId))
 
+  // Every order ends on the id, so two devices holding the same data show the same order whatever order it arrived in.
   return {
-    people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    calls: callViews.sort((a, b) => a.start.localeCompare(b.start) || a.project.localeCompare(b.project)),
-    unavailability: [...away.values()].sort((a, b) => a.start.localeCompare(b.start)),
+    people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
+    calls: callViews.sort((a, b) => a.start.localeCompare(b.start) || a.project.localeCompare(b.project) || a.id.localeCompare(b.id)),
+    unavailability: [...away.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)),
   }
 }
 
@@ -337,7 +350,9 @@ export function answersToCheck(crew: CrewView, today: string): AnswerToCheck[] {
       out.push({ call, offer, kind, short })
     }
   }
-  return out.sort((a, b) => ANSWER_ORDER.indexOf(a.kind) - ANSWER_ORDER.indexOf(b.kind) || a.call.start.localeCompare(b.call.start))
+  return out.sort(
+    (a, b) => ANSWER_ORDER.indexOf(a.kind) - ANSWER_ORDER.indexOf(b.kind) || a.call.start.localeCompare(b.call.start) || a.call.id.localeCompare(b.call.id) || a.offer.id.localeCompare(b.offer.id)
+  )
 }
 
 /**

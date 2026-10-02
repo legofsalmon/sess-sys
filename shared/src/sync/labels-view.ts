@@ -82,7 +82,7 @@ export function labelsView(
   for (const r of placed) highest = Math.max(highest, r.first! + r.count - 1)
 
   return {
-    runs: views.sort((a, b) => Number(b.pending) - Number(a.pending) || b.createdAt.localeCompare(a.createdAt) || (b.first ?? 0) - (a.first ?? 0)),
+    runs: views.sort((a, b) => Number(b.pending) - Number(a.pending) || b.createdAt.localeCompare(a.createdAt) || (b.first ?? 0) - (a.first ?? 0) || a.id.localeCompare(b.id)),
     next: highest < MAX_NUMBER ? numberText(highest + 1) : '',
     runOf: (number: string) => runAt(numberValue(number)),
   }

@@ -1,4 +1,4 @@
-import { eachDay, feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, parseEuro, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
+import { feedCodeFor, feedPath, MAX_EXTRAS, newId, noTimesheetReason, parseEuro, type CommandArgs, type CommandName, type MutationResult, type TimesheetExtra } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
@@ -8,7 +8,7 @@ import { officeFor } from '../office/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { renderGone, renderPage } from './page.ts'
 import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
-import { awayFor, getAway, getCall, getOffer, offersFor, offersForCall, personByToken } from './store.ts'
+import { awayFor, getAway, getCall, getOffer, heldByCall, offersFor, personByToken } from './store.ts'
 import { renderTimesheet } from './timesheet-page.ts'
 import { getTimesheet, timesheetsFor } from './timesheets.ts'
 
@@ -62,14 +62,11 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const person = await personByToken(db, req.params.token)
     if (!person) return reply.code(404).type('text/html').send(renderGone())
     const rows = await offersFor(db, person.id)
-    const jobs = []
-    for (const { offer, call } of rows) {
-      const held: Record<string, number> = {}
-      for (const d of eachDay(call.start, call.end)) held[d] = 0
-      for (const o of await offersForCall(db, call.id))
-        if (o.status === 'accepted' || o.status === 'confirmed') for (const d of o.days) if (d in held) held[d]!++
-      jobs.push({ offer, call, openDays: Object.keys(held).filter((d) => held[d]! < call.needed) })
-    }
+    const held = await heldByCall(db, rows.map((r) => r.call))
+    const jobs = rows.map(({ offer, call }) => {
+      const byDay = held.get(call.id)!
+      return { offer, call, openDays: Object.keys(byDay).filter((d) => byDay[d]! < call.needed) }
+    })
     const flash = req.query.m
       ? { ok: req.query.ok === '1', text: req.query.m.slice(0, 300), offer: req.query.o, ...(req.query.s === 'details' ? { section: 'details' as const } : {}) }
       : undefined

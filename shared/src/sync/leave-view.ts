@@ -139,8 +139,8 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
     }
   }
 
-  const allRequests = [...requests.values()].sort((a, b) => a.start.localeCompare(b.start) || a.requestedAt.localeCompare(b.requestedAt))
-  const allEntries = [...entries.values()].sort((a, b) => a.day.localeCompare(b.day) || a.loggedAt.localeCompare(b.loggedAt))
+  const allRequests = [...requests.values()].sort((a, b) => a.start.localeCompare(b.start) || a.requestedAt.localeCompare(b.requestedAt) || a.id.localeCompare(b.id))
+  const allEntries = [...entries.values()].sort((a, b) => a.day.localeCompare(b.day) || a.loggedAt.localeCompare(b.loggedAt) || a.id.localeCompare(b.id))
   const staff = crew.people.filter((p) => p.kind === 'staff' && !p.archived)
   const inYear = (d: string, year: number) => Number(d.slice(0, 4)) === year
 
@@ -173,7 +173,7 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
       .filter((r) => r.status === 'waiting')
       .map((r): LeaveQueueItem => ({ kind: 'request', request: r, person: r.person, warnings: warningsFor(r.personId, r, r.id), at: r.requestedAt })),
     ...allEntries.filter((e) => e.status === 'waiting').map((e): LeaveQueueItem => ({ kind: 'entry', entry: e, person: e.person, warnings: workedOn(crew, e), at: e.loggedAt })),
-  ].sort((a, b) => a.at.localeCompare(b.at))
+  ].sort((a, b) => a.at.localeCompare(b.at) || Number(a.kind === 'entry') - Number(b.kind === 'entry') || queueId(a).localeCompare(queueId(b)))
 
   return {
     requests: allRequests,
@@ -187,6 +187,9 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
     approvers: staff.filter(canApproveLeave),
   }
 }
+
+/** The last word in the queue's order, so two devices agree on it. */
+const queueId = (q: LeaveQueueItem) => (q.kind === 'request' ? q.request.id : q.entry.id)
 
 /** For a lieu entry: the job the person held that day, which says whether the day was worked for us. */
 function workedOn(crew: CrewView, e: LieuEntry): string[] {

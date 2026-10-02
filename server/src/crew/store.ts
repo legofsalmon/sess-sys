@@ -1,4 +1,4 @@
-import { DEFAULT_LEVEL, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
+import { DEFAULT_LEVEL, eachDay, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
@@ -97,6 +97,26 @@ export async function getOffer(q: Queryable, id: string) {
 export async function offersForCall(q: Queryable, callId: string) {
   const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE call_id = $1`, [callId])
   return rows.map(toOffer)
+}
+/**
+ * How many people hold each day of each of these calls (accepted or
+ * confirmed), in one query for all of them: a freelancer's page needs it for
+ * every call they were ever offered, which would otherwise be a query each.
+ */
+export async function heldByCall(q: Queryable, calls: readonly CrewCall[]): Promise<Map<string, Record<string, number>>> {
+  const held = new Map<string, Record<string, number>>()
+  for (const c of calls) if (!held.has(c.id)) held.set(c.id, Object.fromEntries(eachDay(c.start, c.end).map((d) => [d, 0])))
+  const ids = [...held.keys()]
+  if (ids.length === 0) return held
+  const { rows } = await q.query<{ call_id: string; days: string[] }>(
+    `SELECT call_id, days FROM offers WHERE status IN ('accepted', 'confirmed') AND call_id = ANY($1::text[])`,
+    [ids]
+  )
+  for (const r of rows) {
+    const byDay = held.get(r.call_id)!
+    for (const d of r.days) if (d in byDay) byDay[d]!++
+  }
+  return held
 }
 export async function getAway(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${AWAY} FROM unavailability WHERE id = $1`, [id])

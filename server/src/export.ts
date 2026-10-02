@@ -3,7 +3,7 @@ import { strToU8, zipSync } from 'fflate'
 import type { Db } from './db.ts'
 import { readAllHistory } from './history.ts'
 import { MODULES } from './modules.ts'
-import { columnsOf, forEachRow, tablesInOrder, useCanonicalOutput } from './tables.ts'
+import { columnsOf, forEachRow, ident, tablesInOrder, useCanonicalOutput } from './tables.ts'
 
 /**
  * Everything the company has in the app, in one file it can open without the
@@ -75,7 +75,13 @@ function withoutSecretFields(change: Row) {
   for (const f of fields) delete (data as Row)[f]
 }
 
-export const rowCount = (e: Everything) => e.tables.reduce((n, t) => n + t.rows.length, 0)
+/** How many rows a download would hold right now, counted without reading them: for the history's record of a download. */
+export async function exportRowCount(db: Db): Promise<number> {
+  const tables = (await tablesInOrder(db)).filter((t) => !NOT_EXPORTED.has(t))
+  if (tables.length === 0) return 0
+  const { rows } = await db.query<{ n: string | number }>(`SELECT ${tables.map((t) => `(SELECT count(*) FROM ${ident(t)})`).join(' + ')} AS n`)
+  return Number(rows[0]?.n ?? 0)
+}
 
 /** For scripts: every table exactly, by name. The same as `everything.json` in the file. */
 export function everythingJson(e: Everything) {

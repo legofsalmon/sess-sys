@@ -327,13 +327,13 @@ function Phase({
           {ownVenue && <p>At {venueLabel(ownVenue)}</p>}
           {phase.notes && <p>{phase.notes}</p>}
         </div>
-        {phase.pending ? (
-          <span className="pill pending">Waiting to sync</span>
-        ) : (
+        {/* A phase still waiting to sync can be changed too: the change waits behind it, in order. */}
+        <div className="actions">
+          {phase.pending && <span className="pill pending">Waiting to sync</span>}
           <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
             Change
           </button>
-        )}
+        </div>
       </header>
       <CalendarLine job={job} phase={phase} view={view} />
       <div className="pick-link">
@@ -530,10 +530,13 @@ function AddPhase({ job }: { job: JobView }) {
 
 /** A role the job needs, for one phase or across several. */
 function AskForCrew({ job }: { job: JobView }) {
-  const firstPhase = job.phases[0]
-  const blank = { phaseId: firstPhase?.id ?? '', across: '', role: '', needed: 1, callTime: '', rate: '', details: '' }
+  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '' }
   const [f, setF] = useState(blank)
-  const phase = job.phases.find((p) => p.id === f.phaseId)
+  // The phase picked ('' is across several), while the job still has it. Until then, the job's first phase as it is
+  // now rather than when the page opened, so a job that had no phases then starts on the first one added.
+  const picked = f.phaseId === '' || job.phases.some((p) => p.id === f.phaseId) ? f.phaseId : undefined
+  const phaseId = picked ?? job.phases[0]?.id ?? ''
+  const phase = job.phases.find((p) => p.id === phaseId)
   const span = phase ?? job.span
   const [dates, setDates] = useState<{ start: string; end: string } | undefined>()
   const start = dates?.start ?? span?.start ?? ''
@@ -580,7 +583,7 @@ function AskForCrew({ job }: { job: JobView }) {
         For
         <select
           aria-label="For which phase"
-          value={f.phaseId}
+          value={phaseId}
           onChange={(e) => {
             setF({ ...f, phaseId: e.target.value })
             setDates(undefined)

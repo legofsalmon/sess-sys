@@ -91,7 +91,8 @@ export function jobsView(
       }
       case 'phase.add': {
         const a = m.args as CommandArgs<'phase.add'>
-        if (!phases.has(a.id)) phases.set(a.id, { ...a, pending: true })
+        // The whole shape of a synced phase, so the screens treat it as one: its Change form reads every field.
+        if (!phases.has(a.id)) phases.set(a.id, { ...a, contactId: a.contactId ?? null, pending: true })
         break
       }
       case 'phase.update': {
@@ -140,9 +141,10 @@ export function jobsView(
       otherCalls: own.filter((c) => !c.phaseId || !phaseIds.has(c.phaseId)),
     }
   })
-  jobs.sort((a, b) => (a.span ? 1 : 0) - (b.span ? 1 : 0) || (a.span?.start ?? '').localeCompare(b.span?.start ?? '') || a.name.localeCompare(b.name))
+  // Every order ends on the id, so two devices holding the same data show the same order whatever order it arrived in.
+  jobs.sort((a, b) => (a.span ? 1 : 0) - (b.span ? 1 : 0) || (a.span?.start ?? '').localeCompare(b.span?.start ?? '') || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
 
-  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
+  const byName = (a: { id: string; name: string }, b: { id: string; name: string }) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
   return { jobs, clients: [...clients.values()].sort(byName), venues: [...venues.values()].sort(byName) }
 }
 

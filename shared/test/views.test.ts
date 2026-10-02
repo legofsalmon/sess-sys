@@ -20,7 +20,8 @@ import { warehouseView } from '../src/sync/stock-view.ts'
  * gathered by call once, against looking through every offer for every
  * call; one date formatter, against one made per inspection; one collator,
  * against one made per comparison, on the names that tell them apart
- * (case, accents and numbers).
+ * (case, accents and numbers). And a product's kit lines come in an order
+ * every device agrees on.
  */
 
 /** A small fixed pseudo-random source, so the fixture is the same every run. */
@@ -121,7 +122,7 @@ describe('crew: each call’s offers, gathered once', () => {
       const plain = offers
         .filter((o) => o.callId === c.id)
         .map((o) => ({ ...o, pending: false, person: person.get(o.personId) }))
-        .sort((a, b) => rank(a.status) - rank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? ''))
+        .sort((a, b) => rank(a.status) - rank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '') || a.id.localeCompare(b.id))
       expect(c.offers).toEqual(plain)
       const heldByDay: Record<string, number> = {}
       for (const d of c.days) heldByDay[d] = plain.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
@@ -232,5 +233,18 @@ describe('kit and pick lists: one collator', () => {
     expect(from).toEqual([...wheres].sort((a, b) => a.localeCompare(b, 'en-IE', { numeric: true })))
     expect(from.indexOf('Bay 2')).toBeLessThan(from.indexOf('Bay 10'))
     expect(from.indexOf('Shelf 9')).toBeLessThan(from.indexOf('Shelf 10'))
+  })
+})
+
+describe('kit: an order every device agrees on', () => {
+  it("lists a product's lines still to come the same whichever order they arrived in", () => {
+    // Proves: lines of one product on one job and the same days fall to their id, not to the order they arrived in (audit finding 23).
+    const warehouse = warehouseView({ model: table([model('m1', 'd&b Y10P')]) }, [], 0)
+    const jobs = jobsView({ project: table([project('j1', 'Harbour Lights')]), phase: table([phase('ph1', 'j1', 'Show', '2026-10-05', '2026-10-06')]) }, [], 0, [])
+    const line = (id: string, phaseId: string | null): KitLine => ({ id, projectId: 'j1', phaseId, modelId: 'm1', qty: 1, subhireQty: 0, supplier: '', notes: '' })
+    const lines = [line('k3', 'ph1'), line('k1', null), line('k2', 'ph1')]
+    const order = (rows: KitLine[]) => kitView({ kitLine: table(rows) }, [], 0, jobs, warehouse, '2026-10-01').byModel.get('m1')!.map((l) => l.id)
+    expect(order(lines)).toEqual(['k1', 'k2', 'k3'])
+    expect(order([...lines].reverse())).toEqual(['k1', 'k2', 'k3'])
   })
 })

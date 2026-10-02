@@ -2,13 +2,15 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { dbFromEnv } from '../db.ts'
 import { migrateAll } from '../modules.ts'
+import { backupKeyFromEnv } from './crypto.ts'
 import { newGeneration, readBackup, restoreBackup } from './format.ts'
 import { checkRestores, latestKey, PREFIX } from './service.ts'
 import { storeFromEnv, type BackupStore } from './store.ts'
 
 /**
  * Backups by hand, for drills and disasters. Uses the same settings as the
- * server: DATABASE_URL for the database, BACKUP_S3_... for the storage.
+ * server: DATABASE_URL for the database, BACKUP_S3_... for the storage, and
+ * BACKUP_KEY to read a backup that was encrypted.
  *
  *   npm run backup -w server -- list                 the backups in storage
  *   npm run backup -w server -- check latest         test-restore one into memory (touches no database)
@@ -30,6 +32,7 @@ async function load(store: BackupStore | undefined, source: string): Promise<{ n
 
 async function main() {
   const store = storeFromEnv()
+  const key = backupKeyFromEnv()
   switch (command) {
     case 'list': {
       if (!store) throw new Error('No backup storage is set up (BACKUP_S3_... or BACKUP_DIR).')
@@ -40,14 +43,14 @@ async function main() {
     }
     case 'check': {
       const { name, data } = await load(store, from)
-      const report = await checkRestores(data)
+      const report = await checkRestores(data, key)
       console.log(`${name}: restores cleanly. Made ${report.header.createdAt}, ${report.rows} rows:`)
       for (const [table, rows] of Object.entries(report.tables)) console.log(`  ${table}: ${rows}`)
       return
     }
     case 'download': {
       const { name, data } = await load(store, from)
-      readBackup(data)
+      readBackup(data, key)
       // npm runs this in the server folder; save where the command was typed.
       const file = join(process.env.INIT_CWD ?? process.cwd(), basename(name))
       writeFileSync(file, data)
@@ -58,7 +61,7 @@ async function main() {
       const { name, data } = await load(store, from)
       const db = await dbFromEnv()
       try {
-        const report = await restoreBackup(db, data)
+        const report = await restoreBackup(db, data, key)
         console.log(`Restored ${name} (made ${report.header.createdAt}): ${report.rows} rows.`)
       } finally {
         await db.close()

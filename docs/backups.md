@@ -56,6 +56,29 @@ buckets do), also add `BACKUP_S3_PATH_STYLE=true`.
    the last backup was made and how big it was, with a **Back up now**
    button.
 
+## Encrypting the backups
+
+A backup holds everything, every freelancer's private link included, so
+it's best kept encrypted. With a key set, the server encrypts each file
+(AES-256-GCM) before it goes to the bucket, and nothing can read or
+restore it without the key.
+
+1. Make a key, once: on a laptop, `openssl rand -hex 32` prints 64 hex
+   characters. Keep it in the company's password manager as well as in
+   Railway. A backup can't be read without it, so a lost key is a lost
+   backup.
+2. In Railway, open **shserver**, **Variables**, and add `BACKUP_KEY` with
+   that value. Let Railway deploy.
+3. The Backups card on the Account tab now says each file is encrypted,
+   and new files in the bucket end in `.backup.gz.enc`.
+
+Backups made before the key was set stay as they were, plain text inside,
+and still restore on a server that has the key. Restoring an encrypted
+backup needs the same `BACKUP_KEY`, on the server or wherever the backup
+command runs; with a different one it says so and restores nothing. The
+start-up log says whether backups are encrypted, and warns when they
+aren't.
+
 ## What happens each night
 
 - At 02:00 UTC (3am in Ireland in summer, 2am in winter) the server copies
@@ -87,6 +110,8 @@ one stays untouched until you're happy.
    - Add `RESTORE_FROM` with the value `latest`. To go back to a particular
      night instead, use that file's name as the bucket lists it, such as
      `backups/2026/09/session-hire-2026-09-29T020014Z.backup.gz`.
+   - If the backups are encrypted, `BACKUP_KEY` must be the key they were
+     made with.
 3. Let Railway deploy. The deploy log says **Restored the database from a
    backup**, with the file and the number of rows. If the file fails its
    checks, nothing is restored and the server doesn't start; the log says
@@ -106,8 +131,9 @@ After a restore:
 ## Good to know
 
 - A backup holds everything, including freelancers' contact details and
-  private links. The file is plain text once unzipped, so treat a
-  downloaded copy like the database itself.
+  private links. Without `BACKUP_KEY` the file is plain text once
+  unzipped, so treat a downloaded copy like the database itself; with it,
+  the file can't be read without the key (above).
 - Any S3-compatible storage works instead of a Railway bucket (Backblaze
   B2, Cloudflare R2, Amazon S3): set the same variables to its address,
   bucket and keys.
@@ -117,7 +143,7 @@ After a restore:
 - If the database is ever wound back with Neon's own history instead, run
   `new-generation` afterwards (below), so every device reloads its copy.
 - For drills and emergencies, a developer can work with backups directly,
-  using the same variables:
+  using the same variables (and `BACKUP_KEY` for encrypted files):
   `npm run backup -w server -- list`, `check latest` (restores into memory
   and touches no database), `download latest`, `restore latest` (into an
   empty `DATABASE_URL`) and `new-generation`.

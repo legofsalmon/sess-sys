@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Rejection } from '../src/commands.ts'
 import type { EntityName } from '../src/model.ts'
-import { PUSH_LIMIT, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
+import { PUSH_LIMIT, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
 import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 
 /**
@@ -11,18 +11,34 @@ import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport }
  * view can't show is taken back; a change for a table this build doesn't
  * know is kept for the build that will; a round that finds nothing saves
  * nothing and wakes nobody, unless a screen opened mid-round or the day has
- * turned, and the view is the same object until something changes; and a
- * device that can't save still works.
+ * turned, and the view is the same object until something changes; a
+ * device that can't save still works; a long feed is pulled a page at a
+ * time; after the server is restored from a backup the device starts its
+ * copy afresh and sends again what it did lately, unless the server was
+ * cleared on purpose, when it drops it; and a push the server calls stale
+ * is followed by just such a fresh start.
  */
 
 /** A server that applies everything it's sent, in order, and remembers each push. */
 class PretendServer implements Transport {
   pushes: PushRequest[] = []
   pulls = 0
+  /** Where each pull asked to start from. */
+  pulledAfter: number[] = []
   seq = 0
   changes: PullResponse['changes'] = []
   /** Answer the push with this number (counting from 1) as stale. */
   staleAt?: number
+  /** Answer any push made against this copy of the data as stale, as the real server does once someone has started fresh. */
+  staleFor?: string
+  /** Which copy of the data this is; undefined plays a server from before copies were named. */
+  generation?: string
+  /** This copy began empty on purpose. */
+  cleared = false
+  /** Hand out at most this many changes per pull, saying there are more. */
+  pageSize?: number
+  /** Each change's answer, by its id: one sent again gets the same answer, as from the real server. */
+  answered = new Map<string, MutationResult>()
   /** Turn a change down, with this reason. */
   refuse?: (m: { name: string }) => Rejection | undefined
   /** No signal. */
@@ -35,10 +51,15 @@ class PretendServer implements Transport {
     if (this.down) throw new Error('No signal')
     this.pushes.push(req)
     if (this.pushes.length === this.staleAt) return { results: [], stale: true }
+    if (this.staleFor !== undefined && req.generation === this.staleFor) return { results: [], stale: true }
     return {
-      results: req.mutations.map((m) => {
+      results: req.mutations.map((m): MutationResult => {
+        const before = this.answered.get(m.id)
+        if (before) return { ...before, duplicate: true }
         const reason = this.refuse?.(m)
-        return reason ? { id: m.id, status: 'rejected', reason } : { id: m.id, status: 'applied', seq: ++this.seq }
+        const result: MutationResult = reason ? { id: m.id, status: 'rejected', reason } : { id: m.id, status: 'applied', seq: ++this.seq }
+        this.answered.set(m.id, result)
+        return result
       }),
     }
   }
@@ -47,8 +68,18 @@ class PretendServer implements Transport {
     await this.wait
     if (this.down) throw new Error('No signal')
     this.pulls++
-    const changes = this.changes.filter((c) => c.seq > after)
-    return { changes, cursor: Math.max(after, this.seq, ...changes.map((c) => c.seq)), more: false }
+    this.pulledAfter.push(after)
+    const all = this.changes.filter((c) => c.seq > after)
+    const changes = this.pageSize ? all.slice(0, this.pageSize) : all
+    const more = changes.length < all.length
+    return {
+      changes,
+      cursor: more ? changes[changes.length - 1]!.seq : Math.max(after, this.seq, ...changes.map((c) => c.seq)),
+      more,
+      head: this.seq,
+      ...(this.generation !== undefined ? { generation: this.generation } : {}),
+      ...(this.cleared ? { cleared: true } : {}),
+    }
   }
 }
 
@@ -349,5 +380,115 @@ describe('a device that cannot save', () => {
     expect(phone.view().products.map((p) => p.name)).toEqual(['d&b Y10P'])
     expect(phone.view().connection).toBe('idle')
     expect(phone.cursor).toBe(1)
+  })
+})
+
+describe('a long feed', () => {
+  it('is pulled a page at a time until the server says there is no more, each page kept before the next is asked for', async () => {
+    // Proves: a feed longer than a page comes in pages, each saved before the next is asked for.
+    const server = new PretendServer()
+    server.pageSize = 2
+    server.seq = 5
+    server.changes = Array.from({ length: 5 }, (_, i) => ({ ...product(`p${i + 1}`, `Product ${i + 1}`), seq: i + 1 }))
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    const save = vi.spyOn(storage, 'save')
+    await phone.sync()
+    expect(server.pulledAfter).toEqual([0, 2, 4])
+    expect(save).toHaveBeenCalledTimes(3)
+    expect(phone.view().products.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5'])
+    expect(phone.cursor).toBe(5)
+    expect((await storage.load())?.cursor).toBe(5)
+  })
+})
+
+describe('after the server is restored from a backup', () => {
+  it('starts its copy afresh and sends again what it did lately, in order, against the new copy', async () => {
+    // Proves: a device that finds the server on another copy of the data starts afresh and sends again what it did lately.
+    const server = new PretendServer()
+    server.generation = 'before'
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    await phone.mutate('product.upsert', { id: 'p1', name: 'Cable', quantity: 1 })
+    await phone.sync()
+    expect(phone.pendingCount).toBe(0)
+    expect(await storage.load()).toMatchObject({ generation: 'before', sent: [expect.objectContaining({ name: 'product.upsert' })] })
+
+    // Last night's backup is put back: another copy of the data, which knows nothing the phone sent today.
+    server.generation = 'after'
+    server.seq = 0
+    server.answered.clear()
+    await phone.mutate('product.upsert', { id: 'p2', name: 'Stand', quantity: 2 })
+    await phone.sync()
+    // The first push names no copy: the phone hadn't pulled yet, so it didn't know which it was on.
+    const sent = server.pushes.map((p) => [p.generation, ...p.mutations.map((m) => (m.args as { id: string }).id)])
+    expect(sent).toEqual([
+      [undefined, 'p1'],
+      ['before', 'p2'],
+      ['after', 'p1', 'p2'],
+    ])
+    // p2 reached the new copy before the phone knew of it, so sent again it is a duplicate; p1 is new there. The phone ends at the new copy's head.
+    expect(phone.pendingCount).toBe(0)
+    expect(await storage.load()).toMatchObject({ generation: 'after', cursor: 2, outbox: [] })
+  })
+
+  it('notices the server has gone back in time even when it does not say so', async () => {
+    // Proves: a server from before copies were named, wound back by hand, is noticed by its head being behind the phone, and the copy starts afresh.
+    const server = new PretendServer()
+    server.seq = 3
+    server.changes = [{ ...product('y10p', 'd&b Y10P'), seq: 3 }]
+    const phone = await device(server)
+    await phone.sync()
+    expect(phone.cursor).toBe(3)
+    server.seq = 1
+    server.changes = []
+    await phone.sync()
+    expect(phone.cursor).toBe(1)
+    expect(phone.view().products).toEqual([])
+  })
+
+  it('drops what it did, and the problems it had, when the server was cleared on purpose', async () => {
+    // Proves: after someone starts fresh, the device drops its waiting changes and old problems rather than sending them again.
+    const server = new PretendServer()
+    server.generation = 'g1'
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    await phone.mutate('product.upsert', { id: 'p1', name: 'Cable', quantity: 1 })
+    await phone.sync()
+    server.refuse = (m) => (m.name === 'booking.create' ? { code: 'short', message: 'Only 0 × Cable free' } : undefined)
+    await phone.mutate('booking.create', booking('b1'))
+    await phone.sync()
+    expect(phone.view().problems).toHaveLength(1)
+
+    // Someone started fresh (ADR 0019): the next push is stale, and the pull says the copy was cleared.
+    server.generation = 'g2'
+    server.cleared = true
+    server.staleFor = 'g1'
+    server.seq = 0
+    await phone.mutate('product.upsert', { id: 'p2', name: 'Stand', quantity: 2 })
+    await phone.sync()
+    expect(server.pushes.map((p) => p.mutations.map((m) => (m.args as { id: string }).id))).toEqual([['p1'], ['b1'], ['p2']])
+    expect(phone.pendingCount).toBe(0)
+    expect(phone.view().problems).toEqual([])
+    expect(await storage.load()).toMatchObject({ generation: 'g2', outbox: [], problems: [] })
+  })
+})
+
+describe('a push the server calls stale', () => {
+  it('sends nothing more, and the pull that follows starts the copy afresh', async () => {
+    // Proves: a push answered as stale stops the sending, and the next pull starts the copy afresh.
+    const server = new PretendServer()
+    server.generation = 'g1'
+    const phone = await device(server)
+    await phone.sync()
+    for (let i = 0; i < 3; i++) await phone.mutate('product.upsert', { id: `p${i}`, name: `Product ${i}`, quantity: i })
+    server.generation = 'g2'
+    server.cleared = true
+    server.staleFor = 'g1'
+    await phone.sync()
+    expect(server.pushes).toHaveLength(1)
+    expect(server.pushes[0]!.generation).toBe('g1')
+    expect(phone.pendingCount).toBe(0)
+    expect(phone.view().products).toEqual([])
   })
 })

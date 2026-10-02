@@ -1,6 +1,7 @@
 import { newId, type BackupRun, type BackupStatus } from '@sh/shared'
 import type { Db } from '../db.ts'
 import { pgliteDb } from '../db.ts'
+import { encryptBackup } from './crypto.ts'
 import { BackupError, isEmptyDatabase, restoreBackup, writeBackup, type RestoreReport } from './format.ts'
 import type { BackupStore, StoredFile } from './store.ts'
 
@@ -57,6 +58,8 @@ export interface BackupsOptions {
   /** Which code is running, recorded in each file. */
   commit?: string
   retention?: Retention
+  /** Encrypts each file before it goes to the store (crypto.ts). Without it, the files are plain text inside. */
+  key?: Buffer
 }
 
 export class Busy extends Error {}
@@ -93,6 +96,7 @@ export class Backups {
     return {
       configured: true,
       where: this.store.where,
+      encrypted: this.options.key !== undefined,
       last: this.last,
       lastOk: this.lastOk,
       fresh: finished !== undefined && this.now().getTime() - finished < FRESH_FOR,
@@ -134,12 +138,14 @@ export class Backups {
     let run: BackupRun
     try {
       const backup = await writeBackup(this.db, { now: at, commit: this.options.commit })
-      const key = backupKey(at)
-      await store.put(key, backup.data)
-      await checkRestores(backup.data)
+      const key = backupKey(at, this.options.key !== undefined)
+      // What goes to the store is what the test restore proves, so an encrypted file is shown to unlock and restore.
+      const file = this.options.key ? encryptBackup(backup.data, this.options.key) : backup.data
+      await store.put(key, file)
+      await checkRestores(file, this.options.key)
       await this.thin(store)
-      run = await this.finish(id, { status: 'ok', key, bytes: backup.data.length, rows: backup.rows })
-      log?.info({ key, bytes: backup.data.length, rows: backup.rows }, 'Backup made and checked by a test restore')
+      run = await this.finish(id, { status: 'ok', key, bytes: file.length, rows: backup.rows })
+      log?.info({ key, bytes: file.length, rows: backup.rows, encrypted: this.options.key !== undefined }, 'Backup made and checked by a test restore')
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
       run = await this.finish(id, { status: 'failed', error })
@@ -229,10 +235,10 @@ export class Backups {
 }
 
 /** Prove a backup file restores: load it into a throwaway database in memory and check every table. */
-export async function checkRestores(data: Buffer): Promise<RestoreReport> {
+export async function checkRestores(data: Buffer, key?: Buffer): Promise<RestoreReport> {
   const scratch = await pgliteDb()
   try {
-    return await restoreBackup(scratch, data)
+    return await restoreBackup(scratch, data, key)
   } catch (err) {
     throw new BackupError(`The test restore failed: ${err instanceof Error ? err.message : String(err)}`)
   } finally {
@@ -246,11 +252,11 @@ export async function checkRestores(data: Buffer): Promise<RestoreReport> {
  * already has tables it does nothing, so leaving the setting in place by
  * mistake can't overwrite anything.
  */
-export async function restoreFrom(db: Db, store: BackupStore | undefined, from: string): Promise<{ key: string; report: RestoreReport } | undefined> {
+export async function restoreFrom(db: Db, store: BackupStore | undefined, from: string, withKey?: Buffer): Promise<{ key: string; report: RestoreReport } | undefined> {
   if (!(await isEmptyDatabase(db))) return undefined
   if (!store) throw new BackupError('RESTORE_FROM is set, but there is no backup storage to restore from. Set the BACKUP_S3_ settings too.')
   const key = from === 'latest' ? await latestKey(store) : from
-  const report = await restoreBackup(db, await store.get(key))
+  const report = await restoreBackup(db, await store.get(key), withKey)
   return { key, report }
 }
 
@@ -261,16 +267,16 @@ export async function latestKey(store: BackupStore): Promise<string> {
   return newest.key
 }
 
-/** backups/2026/09/session-hire-2026-09-30T020014Z.backup.gz */
-export function backupKey(at: Date): string {
+/** backups/2026/09/session-hire-2026-09-30T020014Z.backup.gz, ending .enc when the file is encrypted. */
+export function backupKey(at: Date, encrypted = false): string {
   const iso = at.toISOString()
   const stamp = `${iso.slice(0, 10)}T${iso.slice(11, 19).replace(/:/g, '')}Z`
-  return `${PREFIX}${iso.slice(0, 4)}/${iso.slice(5, 7)}/session-hire-${stamp}.backup.gz`
+  return `${PREFIX}${iso.slice(0, 4)}/${iso.slice(5, 7)}/session-hire-${stamp}.backup.gz${encrypted ? '.enc' : ''}`
 }
 
 /** When a backup was made, from its name; undefined for any file this app didn't name. */
 export function keyDate(key: string): Date | undefined {
-  const m = key.match(/(?:^|\/)session-hire-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})Z\.backup\.gz$/)
+  const m = key.match(/(?:^|\/)session-hire-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})Z\.backup\.gz(?:\.enc)?$/)
   if (!m) return undefined
   const [, y, mo, d, h, mi, s] = m.map(Number) as [number, number, number, number, number, number, number]
   return new Date(Date.UTC(y, mo - 1, d, h, mi, s))

@@ -63,10 +63,14 @@ export interface CalendarSyncOptions {
   nightly?: { hour: number; minute: number }
   /** How often to ask Google for crew's answers while invites are on; 0 never asks by itself. */
   pollMs?: number
+  /** How long to wait before each try again after a run fails on something unexpected; for tests. */
+  retryMs?: readonly number[]
 }
 
 /** After Google was busy: a minute, five, a quarter of an hour, then hourly. */
 const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000]
+/** After a run failed on something unexpected (the database, say): a minute, five, then twenty-five; after that, the next change. */
+const FAULT_RETRY_MS = [60_000, 5 * 60_000, 25 * 60_000]
 
 const problems = {
   revoked: (account: string | null) =>
@@ -134,6 +138,8 @@ export class CalendarSync {
   private nightlyTimer: NodeJS.Timeout | undefined
   private pollTimer: NodeJS.Timeout | undefined
   private failures = 0
+  /** Runs in a row that failed on something unexpected, for the backoff. */
+  private faults = 0
   private access: { token: string; until: number; key: string } | undefined
   private stopped = false
   /** The connection as last read, so looking for answers needn't wake the database. */
@@ -179,6 +185,7 @@ export class CalendarSync {
     this.active = link.state === 'on' || link.state === 'stopping'
     this.blocked = false
     this.failures = 0
+    this.faults = 0
     this.access = undefined
     this.forget()
     clearTimeout(this.retryTimer)
@@ -387,6 +394,7 @@ export class CalendarSync {
       this.scheduleNightly()
       // Each night gives a calendar someone has to fix another go, in case they have.
       this.blocked = false
+      this.faults = 0
       if (this.active) void this.run(true).catch(() => {})
     }, next.getTime() - now.getTime())
     this.nightlyTimer.unref()
@@ -399,7 +407,8 @@ export class CalendarSync {
     const result: CalendarCheck = { written: 0, removed: 0, failed: 0 }
     const { db } = this.options
     const started = this.now()
-    const link = await readLink(db)
+    // The database failing even this early is tried again like any other fault.
+    const link = await readLink(db).catch((err: unknown) => this.fault(err, check))
     this.link = link
     this.active = link?.state === 'on' || link?.state === 'stopping'
     if (!link || !this.active) {
@@ -495,6 +504,7 @@ export class CalendarSync {
       }
 
       this.failures = 0
+      this.faults = 0
       this.blocked = false
       if (link.state === 'stopping') {
         await this.finishDisconnect(link)
@@ -504,11 +514,7 @@ export class CalendarSync {
         changed = true
       }
     } catch (err) {
-      if (!(err instanceof Halt)) {
-        this.options.report?.(err)
-        this.options.log?.error({ err }, 'Calendar sync failed')
-        throw err
-      }
+      if (!(err instanceof Halt)) this.fault(err, check)
       result.problem = err.problem ?? undefined
       changed = (await this.halted(link, err)) || changed
     } finally {
@@ -779,6 +785,28 @@ export class CalendarSync {
       if (err.problem === 'busy') throw new Halt('busy', null)
       throw err
     }
+  }
+
+  /**
+   * A run failed on something unexpected (the database, say): it is reported,
+   * and tried again by itself a few times, further apart each time, rather
+   * than waiting for the next change in the app, which on a quiet day could
+   * be hours off. A check that failed is tried again as a check, so the
+   * nightly one isn't lost. The fault still goes up to whoever asked.
+   */
+  private fault(err: unknown, check: boolean): never {
+    this.options.report?.(err)
+    const wait = (this.options.retryMs ?? FAULT_RETRY_MS)[this.faults]
+    this.faults++
+    if (wait === undefined || this.stopped) {
+      this.options.log?.error({ err, failures: this.faults }, 'Calendar sync failed again; it waits for the next change now')
+      throw err
+    }
+    clearTimeout(this.retryTimer)
+    this.retryTimer = setTimeout(() => void this.run(check).catch(() => {}), wait)
+    this.retryTimer.unref()
+    this.options.log?.error({ err, retryInSeconds: wait / 1000 }, 'Calendar sync failed; trying again later')
+    throw err
   }
 
   /** A run stopped: say why where people will see it, and try again later if that will help. Returns whether anything changed. */

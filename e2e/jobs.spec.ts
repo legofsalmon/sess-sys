@@ -4,7 +4,8 @@ import { expect, test, type Page } from '@playwright/test'
  * Jobs end to end (ADR 0007): the office adds a job with its client, venue
  * and phases, sees how each day will read on the calendar, and asks for crew
  * for a phase; renaming the job renames it for the crew too. A job added
- * with no signal waits on the phone and goes through once the signal is back.
+ * with no signal waits on the phone, its phase can be changed meanwhile, and
+ * both go through once the signal is back.
  * The test server is shared with the other browser tests, so every name here
  * is this run's own. To refresh the blueprint screenshots, run this file on
  * its own with SHOTS=1: the names are then plain, as the office would type them.
@@ -108,6 +109,14 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await expect(phone.locator('.title .pill')).toHaveText('Waiting to sync')
   await expect(phone.getByRole('status')).toContainText('No signal')
 
+  // Its phase can be changed while it waits too; the change goes up after it (audit finding 23).
+  const phase = phone.getByRole('article', { name: 'Show', exact: true })
+  await expect(phase.locator('.pill')).toHaveText('Waiting to sync')
+  await phase.getByRole('button', { name: 'Change', exact: true }).click()
+  await phase.getByLabel('To', { exact: true }).fill('2030-11-03')
+  await phase.getByRole('button', { name: 'Save' }).click()
+  await expect(phase.locator('header')).toContainText('Sat 2 Nov to Sun 3 Nov')
+
   await context.setOffline(false)
   await phone.evaluate(() => dispatchEvent(new Event('online')))
   await expect(phone.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
@@ -117,5 +126,5 @@ test('a job added with no signal waits on the phone, then goes through', async (
   const laptop = await (await browser.newContext()).newPage()
   await ready(laptop)
   await laptop.getByLabel('Find').fill(job)
-  await expect(laptop.locator('.job-row', { hasText: job })).toContainText('Sat 2 Nov · Show')
+  await expect(laptop.locator('.job-row', { hasText: job })).toContainText('Sat 2 Nov to Sun 3 Nov · Show')
 })
