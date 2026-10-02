@@ -152,7 +152,9 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   as Leave before it knows whose leave it is, still has one. A toggle that
   keeps its state in the address, such as the planner's Jobs and People,
   isn't a move and keeps focus: it takes focus as it's pressed, since
-  Safari doesn't give a pressed button focus. The screen sits in one
+  Safari doesn't give a pressed button focus. Someone already typing in
+  a field on the new screen, its search say, keeps the focus there too,
+  so what they type and their Enter still land. The screen sits in one
   `<main>` landmark. A link that is the way back ("‹ All jobs") is at
   least 44px tall, like a button. The "not done" count is read out as it
   changes, and takes no room in the top bar while there's none.

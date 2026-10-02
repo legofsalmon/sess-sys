@@ -41,6 +41,9 @@ function headingIn(root: HTMLElement | null): { el: HTMLElement; name: string } 
   return undefined
 }
 
+/** Fields a person types into, as against buttons, ticks and links. */
+const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=checkbox], [type=radio], [type=file], [type=range]), textarea, select, [contenteditable]'
+
 export function Shell() {
   const auth = useAuth()
   const [hash, setHash] = useState(location.hash)
@@ -62,8 +65,12 @@ export function Shell() {
       const heading = headingIn(main.current)
       document.title = `${heading?.name || area.label} · Session Hire`
       // A toggle that keeps its state in the address, such as the planner's jobs or people, changes what's shown, not the screen, so it keeps focus.
-      const toggled = document.activeElement?.matches('[aria-pressed]') ?? false
-      if (movedTo.current !== undefined && movedTo.current !== hash && heading && !toggled) {
+      const active = document.activeElement
+      const toggled = active?.matches('[aria-pressed]') ?? false
+      // Someone already typing on the new screen, in its search say, keeps their place: this runs a frame after the move, and a quick
+      // hand can be in a field by then. Taking the focus away would send the rest of what they type, and their Enter, nowhere.
+      const typing = !!active && !!main.current?.contains(active) && active.matches(TYPED_INTO)
+      if (movedTo.current !== undefined && movedTo.current !== hash && heading && !toggled && !typing) {
         heading.el.tabIndex = -1
         heading.el.focus({ preventScroll: true })
       }

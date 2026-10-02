@@ -187,6 +187,34 @@ test('each move lands on the heading and names the tab, inside one main landmark
   await expect(heading).toBeFocused()
 })
 
+test('someone already typing on the new screen keeps the focus', async ({ browser }) => {
+  // Proves: the move to the new screen's heading, which waits a frame after the address changes, never takes the focus from a field the person is already typing in, so a search typed straight away still answers Enter.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  // Hold the frame the Shell waits for, to be in the search before it, as a quick hand or a slow phone can be.
+  type Held = { held: FrameRequestCallback[]; raf: typeof requestAnimationFrame }
+  await page.evaluate(() => {
+    const w = window as unknown as Held
+    w.held = []
+    w.raf = window.requestAnimationFrame
+    window.requestAnimationFrame = (cb) => w.held.push(cb)
+  })
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Stock' }).click()
+  // Stock's own search: for a moment the Jobs screen, with a search of its own, is still there.
+  const find = page.getByRole('region', { name: 'Stock' }).getByLabel('Find')
+  await find.fill('SH-000001')
+  await page.evaluate(() => {
+    const w = window as unknown as Held
+    window.requestAnimationFrame = w.raf
+    for (const cb of w.held.splice(0)) cb(performance.now())
+  })
+  await expect(page).toHaveTitle('Stock · Session Hire')
+  await expect(find).toBeFocused()
+  await find.press('Enter')
+  await expect(page.getByRole('heading', { level: 1, name: 'SH-000001' })).toBeVisible()
+})
+
 test('every field on every screen has a name, and the not-done list is a live region', async ({ browser }) => {
   // Proves: no field is named by its placeholder alone, and a refusal from the server is read out where it's counted and listed, from a live region that takes no room in the top bar while it's empty, even at 320px.
   const id = Math.random().toString(36).slice(2, 8)
