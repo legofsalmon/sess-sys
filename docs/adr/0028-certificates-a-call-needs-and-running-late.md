@@ -183,8 +183,8 @@ it's in their own download from their link.
 only until its day is over: the devices by the Irish day, the link page
 and call sheet by the server's. The row stays, as an answer to an offer
 does, for the history, the export and the person's own download, and it
-will go with the person when erasing someone is built (ADR 0023 left
-it for later).
+goes with the person when they're erased on request
+([ADR 0027](0027-erasing-a-person-on-request.md)).
 
 **The office sees it at once.** It joins "Answers to check" at the top
 ("Gráinne Power is running late", with Ring and Noted), counted on the

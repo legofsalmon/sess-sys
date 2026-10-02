@@ -63,11 +63,13 @@ obligation (Article 17(3)(b)).
 
 The person's phone, email, notes, skills, department, level (back to
 the default, Level 1, which says nothing about them), the name they go
-by, every certificate (the whole record, so kinds added later are
-covered with no change here), the company they trade through with its
-VAT and CRO numbers, their day rate, "can approve time off", their days
-off, their staff leave (requests, days in lieu and allowances), their
-private link (it then says the link doesn't work any more), their
+by, every certificate (the whole record, so kinds added later, as Safe
+Pass, working at height and IPAF were, go with no change here), the
+company they trade through with its VAT and CRO numbers, their day rate,
+"can approve time off", their days off, their staff leave (requests,
+days in lieu and allowances), what they said on their link about running
+late ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)),
+their private link (it then says the link doesn't work any more), their
 calendar feed (it stops answering) and their staff account, if they sign
 in. Their name becomes **"Erased person"**. They stay archived and can't
 be brought back: once erased, nothing more is put on record about them
@@ -120,6 +122,7 @@ holds a person's details goes in one of them:
 | --- | --- |
 | `people`, their row | Every field above cleared; the name "Erased person" or kept; a new random link secret, so the old link and feed address match nothing, and devices are sent none; archived. |
 | `unavailability`, their days off | Deleted, approved leave's days with them. |
+| `running_late`, what they said on their link about running late ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)) | Deleted, before anything else, as its rows point at their offers and calls. The office's queue, the call's line, the planner and the contact on the day's call sheet lose the note with it. |
 | `leave_requests`, `lieu_entries`, `leave_allowances` | Theirs deleted. Requests they decided for others keep them as the one who decided. |
 | `offers`, their offers and bookings | Kept; their own note on each answer cleared. |
 | `timesheets`, for their bookings | Kept with the figures; their own note cleared. |
@@ -127,11 +130,11 @@ holds a person's details goes in one of them:
 | `calendar_guests`, their address on Google Calendar invites | Past days' rows deleted. While invites are on, a day still to come keeps theirs until the calendar's next run (seconds later, or once it is reconnected) takes them off that day's event, as for any withdrawn offer, and that run removes the row: deleted first, the app would take them for a guest added by hand in Google and leave them on. The app only writes days from today on, so past events in Google keep their guest list as Google has it; Colly removes them there by hand if asked. |
 | `calendar_link` | Refused while their account is the connected one. Its earlier copies in the change feed, and the history's "Connected Google Calendar as…", lose their address, and "connected by" names "Erased person". |
 | `users` and `sessions`, if they sign in | Their accounts are the ones that sign in with an address on their record, now or before, so one made before they changed it is found too. Every session ended at once. The account's name becomes "Erased person", even while their name is kept with their timesheets, which is all Revenue needs; its email, picture and Google id go; it is switched off, so signing in again starts a new account, not this one. The history then calls them "Erased person" too. An address another person in the app still has (a second record for the same person, or a shared one) is left to them, account and all: erase that record too, and the last erasure takes it. |
-| `changes`, the change feed | Every earlier copy of their person record becomes the erased one; earlier copies of their days off and leave become deletions; earlier copies of their offers and timesheets lose their notes. A new device's first sync finds nothing older. |
-| `mutations`, the history | Each stored command about them keeps only what isn't about them (`PERSON_COMMANDS` in `shared/src/erasure.ts`): `person.upsert` keeps its id, kind and the name as it now is; `person.contact` says which details changed, never what to; days off keep no dates or note; answers and timesheets lose their notes; leave keeps no dates, notes or reasons. A decision on their leave that arrives after the erasure is still known to be about them, by the request that made it, so it is refused and kept without its reason. Every refusal's reason that named them names "Erased person" instead, as a whole name, so "Mary Kelly-Byrne" and "Seán Ó'Brien Smith" are left alone when "Mary Kelly" or "Brien Smith" is erased. Every email address and phone number on their record, now or before, goes from anything stored, as a whole address or number, so "jordan@gmail.com" and a rate of 1000000 are left alone when "dan@gmail.com" or "000000" goes; one another person in the app still has stays, as above. The device their link was used from is cleared. |
+| `changes`, the change feed | Every earlier copy of their person record becomes the erased one; earlier copies of their days off, leave and running late become deletions; earlier copies of their offers and timesheets lose their notes. A new device's first sync finds nothing older. |
+| `mutations`, the history | Each stored command about them keeps only what isn't about them (`PERSON_COMMANDS` in `shared/src/erasure.ts`): `person.upsert` keeps its id, kind and the name as it now is; `person.contact` says which details changed, never what to; days off keep no dates or note; answers, timesheets and running late lose their notes, running late keeping its booking and day; saying they're there, and the office noting it, carry only the record's id, so once it has gone they are refused as not found and keep nothing about them; leave keeps no dates, notes or reasons. A decision on their leave that arrives after the erasure is still known to be about them, by the request that made it, so it is refused and kept without its reason. Every refusal's reason that named them names "Erased person" instead, as a whole name, so "Mary Kelly-Byrne" and "Seán Ó'Brien Smith" are left alone when "Mary Kelly" or "Brien Smith" is erased. Every email address and phone number on their record, now or before, goes from anything stored, as a whole address or number, so "jordan@gmail.com" and a rate of 1000000 are left alone when "dan@gmail.com" or "000000" goes; one another person in the app still has stays, as above. The device their link was used from is cleared. |
 | The history's words | Read from the records as they are now, so they say "Erased person". The erasure itself says "Erased a person's details on request", with no name. |
 | The export | Reads the tables, so it holds only what is left. The new `erasures` table says who was erased when, by id. |
-| Every device | The erasure reaches each device first in the feed, before the records it changes. The device then sets aside anything waiting to send about them as a problem with the reason ("their details were erased on request"), and strips the same details from its problems and from what it remembers having sent, as the server does. The records themselves arrive erased. Its saved copy is one record, written whole, so the next save holds nothing older. |
+| Every device | The erasure reaches each device first in the feed, before the records it changes. The device then sets aside anything waiting to send about them as a problem with the reason ("their details were erased on request"), and strips the same details from its problems and from what it remembers having sent, as the server does. The records themselves arrive erased. An erasure still to send shows them erased at once, their running late gone from every screen with it. Its saved copy is one record, written whole, so the next save holds nothing older. |
 | Backups | Can't be edited: see below. |
 
 **Not in reach of the app**, and said in the confirm or here: messages
@@ -197,6 +200,15 @@ offer, reopening and approving a timesheet, and "Erase the name now".
 with them, so its tables never collide with the crew migrations. The
 command `person.erase` carries only the person's id, and runs again to
 take a kept name once its six years are up.
+
+### Made-up data
+
+Rónán Moran, a freelancer who has left and asked for his details to go,
+is archived with nothing unsettled, so erasing someone can be tried on
+the made-up data ([ADR 0019](0019-made-up-data-and-starting-fresh.md)).
+Starting fresh empties the `erasures` table with the rest; the list kept
+beside the backups stays, as it only ever grows, and names nobody the
+fresh copy has.
 
 ## Consequences
 

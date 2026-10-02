@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   addDays,
+  dayLabel,
   ERASED_NAME,
   feedCodeFor,
   irishToday,
@@ -89,9 +90,10 @@ const CIARA = {
   company: { name: 'Mhurchú Rigging Ltd', vatNumber: 'IE9988776Q', croNumber: '7654321' },
   dayOff: 'At a wedding in Galway',
   answer: 'Bringing my own harness',
+  late: 'Stuck in traffic on the M50',
 }
 /** None of these may be left anywhere once she's erased. */
-const TRACES = ['Ciara', 'Mhurch', '555 01', '555 02', 'ciara.nm', 'Allergic', 'Kiki B', 'IE9988776Q', '7654321', 'Rope access', 'Red Cross', 'wedding', 'harness']
+const TRACES = ['Ciara', 'Mhurch', '555 01', '555 02', 'ciara.nm', 'Allergic', 'Kiki B', 'IE9988776Q', '7654321', 'Rope access', 'Red Cross', 'IPAF 3b', 'wedding', 'harness', 'M50']
 
 const ciara = (over: Partial<CommandInput<'person.upsert'>> = {}): CommandInput<'person.upsert'> => ({
   id: 'p7',
@@ -105,7 +107,13 @@ const ciara = (over: Partial<CommandInput<'person.upsert'>> = {}): CommandInput<
   department: 'Rope access',
   level: 3,
   knownAs: CIARA.knownAs,
-  certificates: { 'first-aid': { held: true, expires: '2027-05-01', note: 'Red Cross' } },
+  // Every kind, the three that came with ADR 0028 among them.
+  certificates: {
+    'first-aid': { held: true, expires: '2027-05-01', note: 'Red Cross' },
+    'safe-pass': { held: true, expires: '2027-06-01', note: '' },
+    'working-at-height': { held: true, expires: '2027-07-01', note: '' },
+    ipaf: { held: true, expires: '2027-08-01', note: 'IPAF 3b' },
+  },
   company: CIARA.company,
   ...over,
 })
@@ -157,7 +165,9 @@ function noTraces(text: string, where: string) {
 /**
  * Ciara, a freelancer: her details, changed once so the feed holds an
  * older phone; days off with a note; an answer on her link with a note; a
- * refusal that names her; then archived. The job she worked is over.
+ * note on her link that she's running late today, which the office
+ * noted; a refusal that names her; then archived. The job she worked is
+ * over, and she was let go from today's.
  */
 async function ciaraOnRecord(app: FastifyInstance) {
   await ok(app, m('person.upsert', ciara()), m('person.contact', { id: 'p7', phone: CIARA.newPhone }))
@@ -172,18 +182,31 @@ async function ciaraOnRecord(app: FastifyInstance) {
   })
   expect(answered.statusCode).toBe(303)
   await ok(app, m('offer.confirm', { id: 'o-past' }))
-  // A future offer stops the archive, in words that name her; withdrawn, it doesn't.
+  // Booked today, she says on her link she's running late (ADR 0028), and the office notes it.
+  await ok(app, call('today', 0, 0), m('offer.send', { id: 'o-today', callId: 'today', personId: 'p7', override: false }))
+  await ok(app, m('offer.respond', { id: 'o-today', answer: 'accept', days: null, note: '' }), m('offer.confirm', { id: 'o-today' }))
+  const late = await app.inject({
+    method: 'POST',
+    url: `/f/${token}/late`,
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': IPHONE },
+    payload: new URLSearchParams({ offer: 'o-today', day: day(0), by: '30', at: '', note: CIARA.late }).toString(),
+  })
+  expect(late.statusCode).toBe(303)
+  const said = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.findLast((c: { entity: string }) => c.entity === 'runningLate').data
+  expect(said).toMatchObject({ personId: 'p7', offerId: 'o-today', note: CIARA.late })
+  await ok(app, m('late.seen', { id: said.id }))
+  // A future offer stops the archive, in words that name her; withdrawn, it doesn't. Today's booking is let go too.
   await ok(app, call('next', 30, 31), m('offer.send', { id: 'o-next', callId: 'next', personId: 'p7', override: false }))
   expect(await refusal(app, m('person.archive', { id: 'p7', archived: true }))).toContain(CIARA.name)
-  await ok(app, m('offer.cancel', { id: 'o-next' }), m('person.archive', { id: 'p7', archived: true }))
-  return token as string
+  await ok(app, m('offer.cancel', { id: 'o-next' }), m('offer.cancel', { id: 'o-today' }), m('person.archive', { id: 'p7', archived: true }))
+  return { token: token as string, late: said.id as string }
 }
 
 describe('erasing someone with no paid work', () => {
   it('takes their details from their row, the feed, the history, the export and a new device, and their link and feed stop', async () => {
     // Proves: every place the search found that held Ciara's details holds none of them once she is erased, and her link and feed answer "gone".
     const { app, db } = await server()
-    const token = await ciaraOnRecord(app)
+    const { token, late } = await ciaraOnRecord(app)
     const feed = await feedCodeFor(token)
     const before = await (await app.inject({ url: '/api/export' })).json()
     expect(JSON.stringify(before)).toContain('Allergic to nuts')
@@ -214,9 +237,13 @@ describe('erasing someone with no paid work', () => {
     expect((await db.query(`SELECT id, status, note FROM offers WHERE person_id = 'p7' ORDER BY id`)).rows).toEqual([
       { id: 'o-next', status: 'cancelled', note: '' },
       { id: 'o-past', status: 'confirmed', note: '' },
+      { id: 'o-today', status: 'cancelled', note: '' },
     ])
+    // What she said about running late goes, so the office's queue and the contact's call sheet lose it, and every earlier copy in the feed is a deletion.
+    expect((await db.query(`SELECT * FROM running_late`)).rows).toEqual([])
+    expect((await db.query(`SELECT op FROM changes WHERE entity = 'runningLate'`)).rows.map((r) => r.op)).toEqual(['delete', 'delete', 'delete'])
 
-    for (const table of ['people', 'unavailability', 'offers', 'changes', 'mutations']) noTraces(await everything(db, table), table)
+    for (const table of ['people', 'unavailability', 'offers', 'running_late', 'changes', 'mutations']) noTraces(await everything(db, table), table)
     noTraces(JSON.stringify(await (await app.inject({ url: '/api/export' })).json()), 'the export')
 
     const history: HistoryPage = (await app.inject({ url: '/api/history?limit=200' })).json()
@@ -224,6 +251,8 @@ describe('erasing someone with no paid work', () => {
     expect(history.entries[0]!.what).toBe("Erased a person's details on request")
     expect(history.entries.map((e) => e.what)).toContain(`Saved ${ERASED_NAME}'s details`)
     expect(history.entries.map((e) => e.what)).toContain(`Marked ${ERASED_NAME} away on dates since removed`)
+    // Running late keeps its booking and day, for the words, without what she wrote.
+    expect(history.entries.map((e) => e.what)).toContain(`${ERASED_NAME} said they'll be about 30 minutes late for Body & Soul (Build), ${dayLabel(day(0))}`)
     // The answer on her link is still hers, by the name she now has, but not from her phone.
     const onLink = history.entries.find((e) => e.who.kind === 'link')!
     expect(onLink).toMatchObject({ who: { name: ERASED_NAME } })
@@ -244,6 +273,15 @@ describe('erasing someone with no paid work', () => {
     expect((await app.inject({ url: `/cal/${feed}.ics` })).statusCode).toBe(404)
     expect((await app.inject({ url: `/f/${token}/calendar.ics` })).statusCode).toBe(404)
     expect((await app.inject({ url: `/f/${token}/data.json` })).statusCode).toBe(404)
+
+    // Saying she's there, or noting it, sent late from a phone: they carry only the record's id, which went with her, so
+    // they're turned down as not found, in words that don't name her, and keep nothing of hers.
+    const [there, noted] = [m('late.arrived', { id: late }), m('late.seen', { id: late })]
+    expect(await refusal(app, there)).toBe("There's nothing to say you're there for.")
+    expect(await refusal(app, noted)).toBe('That running late is no longer there.')
+    const { rows: stored } = await db.query(`SELECT args FROM mutations WHERE id = ANY($1::text[]) ORDER BY name`, [[there.id, noted.id]])
+    expect(stored.map((r) => r.args)).toEqual([{ id: late }, { id: late }])
+    noTraces(await everything(db, 'mutations'), 'the history after a late Noted')
   })
 
   it('reaches a device that held her before, and what it was still holding about her', async () => {
@@ -252,7 +290,7 @@ describe('erasing someone with no paid work', () => {
     await ciaraOnRecord(app)
     const office = await device(app)
     await office.client.sync()
-    expect(JSON.stringify(await office.storage.load())).toContain(CIARA.notes)
+    for (const held of [CIARA.notes, CIARA.late]) expect(JSON.stringify(await office.storage.load())).toContain(held)
     // An edit made with no signal, still waiting, and the erasure from another laptop meanwhile.
     const storage = office.storage
     const away = await new SyncClient({ storage, transport: offline }).open()
@@ -266,6 +304,7 @@ describe('erasing someone with no paid work', () => {
     expect(kept!.outbox).toEqual([])
     expect(kept!.problems.map((p) => p.reason.message)).toEqual(["This person's details were erased on request, so nothing more can be recorded for them."])
     expect(client.view().crew.people.find((p) => p.id === 'p7')!.name).toBe(ERASED_NAME)
+    expect(client.view().late.current).toEqual([])
   })
 
   it('records nothing more about her, and keeps only what erasing keeps of a change that arrives late', async () => {
@@ -278,7 +317,17 @@ describe('erasing someone with no paid work', () => {
     expect(await refusal(app, m('person.contact', { id: 'p7', phone: CIARA.phone }))).toBe(said)
     expect(await refusal(app, m('unavailability.add', { id: 'away2', personId: 'p7', start: day(40), end: day(40), note: CIARA.dayOff }))).toBe(said)
     expect(await refusal(app, m('person.archive', { id: 'p7', archived: false }))).toBe(said)
-    for (const table of ['people', 'changes', 'mutations']) noTraces(await everything(db, table), table)
+    // From the version before ADR 0028, an edit sends only the three kinds it knows, and one with none keeps them all: refused,
+    // so nothing lays the later kinds back over a record that holds none.
+    const { certificates, ...before } = ciara()
+    expect(await refusal(app, m('person.upsert', { ...before, certificates: { 'first-aid': certificates!['first-aid']! } }))).toBe(said)
+    expect(await refusal(app, m('person.upsert', before))).toBe(said)
+    expect((await db.query(`SELECT certificates FROM people WHERE id = 'p7'`)).rows).toEqual([{ certificates: {} }])
+    // Running late again, on the booking she was let go from: refused, and stored without her words.
+    const late = m('late.say', { id: 'late2', offerId: 'o-today', day: day(0), by: '60', arriveAt: null, note: CIARA.late })
+    expect(await refusal(app, late)).toBe(said)
+    expect((await db.query(`SELECT args->>'note' AS note FROM mutations WHERE id = $1`, [late.id])).rows).toEqual([{ note: '' }])
+    for (const table of ['people', 'running_late', 'changes', 'mutations']) noTraces(await everything(db, table), table)
     // Sent again, it changes nothing and says nothing more.
     expect(await refusal(app, m('person.erase', { id: 'p7' }))).toBe('applied')
   })
@@ -518,7 +567,7 @@ describe('a restore from a backup taken before an erasure', () => {
     const restored = await restoreFrom(fresh, store, 'latest')
     expect(restored).toMatchObject({ key: backup.key, erasedAgain: 1 })
     expect((await fresh.query(`SELECT name, phone FROM people WHERE id = 'p7'`)).rows[0]).toEqual({ name: ERASED_NAME, phone: null })
-    for (const table of ['people', 'unavailability', 'offers', 'changes', 'mutations']) noTraces(await everything(fresh, table), `${table} after the restore`)
+    for (const table of ['people', 'unavailability', 'offers', 'running_late', 'changes', 'mutations']) noTraces(await everything(fresh, table), `${table} after the restore`)
 
     const again = await server(fresh, store)
     const history: HistoryPage = (await again.app.inject({ url: '/api/history?limit=5' })).json()

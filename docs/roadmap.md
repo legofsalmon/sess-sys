@@ -177,8 +177,8 @@ over by rule are later.
   licence as held, not held or unknown with an expiry the card warns
   about, the company and VAT and CRO numbers a freelancer trades
   through, and the jobs they've worked from their bookings; the crew
-  list brought in from a spreadsheet, checked row by row first. Still
-  later: the stock list through the same step).
+  list brought in from a spreadsheet, checked row by row first; the stock
+  list came in through the same step later, ADR 0026).
 - Certificates a call needs, and running late (built, 2 October 2026,
   [ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md):
   Safe Pass, working at height and IPAF as certificate kinds, on the

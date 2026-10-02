@@ -39,6 +39,7 @@ test('archived, then erased through the question in place: the card says so and 
   const row = people.locator('details.archived .row', { hasText: name })
   await row.getByRole('button', { name: 'Erase details…' }).click()
   const question = row.getByRole('group', { name: `Erase ${name}'s details? This can't be undone.` })
+  await expect(question).toContainText('days off, staff leave and what they said about running late')
   await expect(question).toContainText('Their name becomes “Erased person”.')
   await expect(question).toContainText('their bookings, offers and timesheets, as records of work')
   await expect(question).toContainText("they can't be edited, so any made before now keep copies of their details until they age out")
@@ -60,7 +61,9 @@ test('archived, then erased through the question in place: the card says so and 
   expect(gone?.status()).toBe(404)
   await expect(phone.getByText("This link doesn't work any more. Ask the office to send you a new one.")).toBeVisible()
 
-  // The history says it happened, with no name.
+  // The history says it happened, with no name. It's grouped (ADR 0006): this laptop's changes one after another are one line, the newest, opened on a tap.
   await office.goto('/#history')
-  await expect(office.getByText("Erased a person's details on request").first()).toBeVisible()
+  const run = office.locator('section.day').first().locator('.entries > li').first()
+  await run.getByRole('button').click()
+  await expect(run.locator('.entries .entry .what').first()).toHaveText("Erased a person's details on request")
 })

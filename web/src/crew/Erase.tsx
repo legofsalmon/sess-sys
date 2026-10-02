@@ -116,7 +116,7 @@ export function ArchivedPerson({ person, onBringBack }: { person: PersonView; on
             >
               <p>
                 <b>Goes:</b> their phone, email, notes, skills, department, level, the name they go by, certificates, company with its VAT and CRO numbers, day rate,
-                days off and staff leave. Their private link stops working and their calendar feed stops.{' '}
+                days off, staff leave and what they said about running late. Their private link stops working and their calendar feed stops.{' '}
                 {person.kind === 'staff' && 'If they sign in to the app, they are signed out and their account is switched off. '}
                 {keptUntil ? 'Everything but their name goes.' : `Their name becomes “${ERASED_NAME}”.`}
               </p>

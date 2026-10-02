@@ -152,6 +152,9 @@ export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
   'lieu.cancel': { names: { field: 'id', via: 'lieuEntry' }, refused: true, keep: as },
   'lieu.decide': { names: { field: 'id', via: 'lieuEntry' }, refused: true, keep: (a) => ({ ...a, reason: '' }) },
   'leave.allowance': { names: { field: 'personId' }, refused: true, keep: only('personId', 'year', 'by') },
+  // Running late (ADR 0028): the booking and the day stay, for the history's words; what they wrote goes. Saying they're
+  // there, and the office noting it, carry only the record's id, and the record is deleted, so those are refused as not found.
+  'late.say': { names: { field: 'offerId', via: 'offer' }, refused: true, keep: (a) => ({ ...a, note: '' }) },
 }
 
 /**

@@ -49,6 +49,10 @@ interface Gone {
  * rows still here, so ones removed before (days off taken back, say) go too.
  */
 export const GONE: readonly Gone[] = [
+  // What they said on their link about running late, in their own words (ADR 0028). First, since its rows point at their
+  // offers and calls: nothing that clears those later can trip on them. The office's queue and the contact's call sheet
+  // lose the note with it.
+  { table: 'running_late', entity: 'runningLate' },
   // Days off, approved leave's included: those have the request's id.
   { table: 'unavailability', entity: 'unavailability' },
   { table: 'leave_requests', entity: 'leaveRequest' },

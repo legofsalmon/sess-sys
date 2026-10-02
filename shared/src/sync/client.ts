@@ -362,7 +362,7 @@ export class SyncClient {
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
       office: officeView(entities, outbox, this.state.cursor),
       leave: leaveView(entities, outbox, this.state.cursor, crew, today),
-      late: lateView(entities, outbox, this.state.cursor, crew, today),
+      late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
       erasures,
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

@@ -92,7 +92,9 @@ const phase = (id: string, start = '2026-10-05', end = start) => ({ id, projectI
 /** A place in the warehouse: the plainest change there is, for the tests that only need one. */
 const place = (id: string, name = `Bay ${id}`) => ({ id, name, notes: '' })
 
-describe('a big outbox', () => {
+// A thousand changes made one by one, each saved as it would be on a phone, take a second or two here and more on a busy
+// machine, close to the five seconds a test gets by default: the time allowed is generous so a slow run isn't taken for a fault.
+describe('a big outbox', { timeout: 30_000 }, () => {
   const many = PUSH_LIMIT * 2 + 1
 
   it(`sends more than ${PUSH_LIMIT} waiting changes in slices, in order, and all of them leave the outbox`, async () => {

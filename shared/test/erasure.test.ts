@@ -3,6 +3,7 @@ import { COMMAND_NAMES, commandSchemas, type Mutation } from '../src/commands.ts
 import type { CrewCall, Offer, Person } from '../src/crew.ts'
 import { ERASED_NAME, ERASED_REFUSAL, erasedPerson, nameKeptUntil, PERSON_COMMANDS, type Erasure } from '../src/erasure.ts'
 import type { Phase, Project } from '../src/jobs.ts'
+import type { RunningLate } from '../src/late.ts'
 import type { Change, PullResponse } from '../src/protocol.ts'
 import { emptySnapshot, MemoryStorage, SyncClient, type Snapshot, type Transport } from '../src/sync/client.ts'
 import { eraseRefusal, forgetErased } from '../src/sync/erasure-view.ts'
@@ -113,6 +114,33 @@ describe('an erasure waiting to send', () => {
     expect(view.crew.unavailability).toEqual([])
     expect(view.crew.calls[0]!.offers[0]).toMatchObject({ note: '', person: { name: ERASED_NAME } })
     expect(JSON.stringify(view.crew)).not.toContain('Mhurch')
+  })
+
+  it('takes what they said about running late off every screen at once (ADR 0028)', async () => {
+    // Proves: let go from today's job after saying she'd be late, then erased, her note goes from the device's running late as the server deletes it.
+    const late: RunningLate = {
+      id: 'l1',
+      personId: 'p7',
+      offerId: 'o2',
+      callId: 'now',
+      day: TODAY,
+      by: '30',
+      arriveAt: null,
+      note: 'Traffic on the M50',
+      saidAt: '2026-10-02T07:10:00.000Z',
+      arrivedAt: null,
+      seenAt: '2026-10-02T07:20:00.000Z',
+    }
+    const client = await device({
+      person: { p7: ciara },
+      crewCall: { now: call('now', TODAY, TODAY) },
+      offer: { o2: offer('o2', 'now', 'cancelled', [TODAY]) },
+      runningLate: { l1: late },
+    })
+    expect(client.view().late.current.map((l) => l.note)).toEqual(['Traffic on the M50'])
+    await client.mutate('person.erase', { id: 'p7' })
+    expect(client.view().late.current).toEqual([])
+    expect(JSON.stringify(client.view().crew)).not.toContain('M50')
   })
 
   it("keeps the name, and says until when, for someone with paid work in the last six years", async () => {
@@ -238,6 +266,47 @@ describe('when the server says someone was erased', () => {
   })
 })
 
+describe('the certificate kinds that came later (ADR 0028)', () => {
+  it('all go, and an edit from a version that knows only the first three cannot bring one back', async () => {
+    // Proves: an older edit keeps the later kinds only while her record holds them. The erasure sets that edit aside, as the
+    // server refuses it, and her record arrives holding none, so nothing is laid back over it.
+    const six: Person['certificates'] = {
+      'first-aid': { held: true, expires: '2027-05-01', note: '' },
+      'manual-handling': { held: true, expires: '2027-01-01', note: '' },
+      'driving-licence': { held: true, expires: null, note: '' },
+      'safe-pass': { held: true, expires: '2027-02-01', note: '' },
+      'working-at-height': { held: true, expires: '2027-03-01', note: 'Harness course' },
+      ipaf: { held: true, expires: '2027-04-01', note: '3a, 3b' },
+    }
+    const changes: Change[] = [{ seq: 1, entity: 'person', id: 'p7', op: 'put', data: { ...ciara, certificates: six } }]
+    const served = (after: number): PullResponse => {
+      const rest = changes.filter((c) => c.seq > after)
+      return { changes: rest, cursor: rest.at(-1)?.seq ?? after, more: false, generation: 'g1', head: changes.at(-1)!.seq }
+    }
+    const storage = new MemoryStorage()
+    // A push the server never answers, so the edit is still waiting when the erasure comes down.
+    const transport: Transport = { push: async () => ({ results: [] }), pull: async (after) => served(after) }
+    const client = await new SyncClient({ storage, transport, clientId: 'laptop', now: () => at }).open()
+    await client.sync()
+
+    // The version before sends only the kinds it knows: the later three are kept, on the device as on the server.
+    const { id, name, kind, email, phone, skills, dayRateCents, notes } = ciara
+    await client.mutate('person.upsert', { id, name, kind, email, phone, skills, dayRateCents, notes, certificates: { 'first-aid': six['first-aid']! } })
+    expect(Object.keys(client.view().crew.people[0]!.certificates).sort()).toEqual(['first-aid', 'ipaf', 'safe-pass', 'working-at-height'])
+
+    changes.push(
+      { seq: 2, entity: 'erasure', id: 'p7', op: 'put', data: { id: 'p7', erasedAt: at.toISOString(), nameKeptUntil: null } },
+      { seq: 3, entity: 'person', id: 'p7', op: 'put', data: erasedPerson(ciara, false) }
+    )
+    await client.sync()
+    expect(client.view().crew.people[0]).toMatchObject({ name: ERASED_NAME, certificates: {}, pending: false })
+    expect(client.view().pendingCount).toBe(0)
+    expect(client.view().problems.map((p) => [p.mutation.name, p.reason.message])).toEqual([['person.upsert', ERASED_REFUSAL]])
+    const kept = JSON.stringify(await storage.load())
+    for (const t of ['3a, 3b', 'Harness course', '2027-04-01']) expect(kept, t).not.toContain(t)
+  })
+})
+
 describe('the rules the server and devices share', () => {
   it('keep a name for six whole years after the year of the latest approval, and no longer', () => {
     // Proves: as Revenue counts, from the end of the year the latest approved timesheet falls in, by Ireland's day.
@@ -251,13 +320,18 @@ describe('the rules the server and devices share', () => {
   })
 
   it('name every command that names a person, so none keeps their details after they are erased', () => {
-    // Proves: a command added later with a personId, or about a person, fails here until erasing knows what to keep of it.
+    // Proves: a command added later with a personId, or one of their bookings by its offerId (running late, ADR 0028), or about a
+    // person, fails here until erasing knows what to keep of it.
     const kept = new Set(['person.erase'])
+    const about: string[] = []
     for (const name of COMMAND_NAMES) {
       const schema = commandSchemas[name] as unknown as { _def: { schema?: { shape?: Record<string, unknown> } }; shape?: Record<string, unknown> }
       const shape = schema.shape ?? schema._def.schema?.shape ?? {}
-      const aboutSomeone = 'personId' in shape || name.startsWith('person.')
+      const aboutSomeone = 'personId' in shape || 'offerId' in shape || name.startsWith('person.')
+      if (aboutSomeone) about.push(name)
       if (aboutSomeone && !kept.has(name)) expect(PERSON_COMMANDS[name], name).toBeDefined()
     }
+    // Running late's schema is refined, so its fields sit a level down: found all the same.
+    expect(about).toContain('late.say')
   })
 })

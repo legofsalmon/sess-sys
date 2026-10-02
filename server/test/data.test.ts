@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  eraseRefusal,
   irishToday,
   MemoryStorage,
   START_FRESH_WORDS,
@@ -213,6 +214,13 @@ describe('made-up data', () => {
     expect(view.faults.open.map((f) => [f.kind, f.usable, f.note])).toEqual([['damaged', true, 'Rattles at high level. Fine for speech meanwhile.']])
     expect(view.problems).toEqual([])
 
+    // Today's shoot (ADR 0028): Gráinne running late, said from her link, waiting in "Answers to check".
+    expect(view.late.toCheck.map((l) => [l.person?.name, l.by, l.note])).toEqual([['Gráinne Power', '30', 'Traffic on the M50']])
+    // Rónán has left and asked for his details to go: archived, with nothing in the way of erasing him (ADR 0027).
+    const ronan = view.crew.people.find((p) => p.name === 'Rónán Moran')!
+    expect(ronan).toMatchObject({ archived: true })
+    expect(eraseRefusal(ronan, view, irishToday())).toBeUndefined()
+
     // In the history as Aoife's, from "Made-up data", and one entry saying she put it in; timesheets and running late as sent on the freelancers' links.
     // More than a page of it, so read every page.
     const history: HistoryPage = await aoife.history('?limit=200')
@@ -279,8 +287,11 @@ describe('starting fresh', () => {
     const aoife = await staff(app, db, 'Aoife Brennan', IPHONE, CODE)
     await putInMadeUpData(app, aoife)
     await aoife.send('place.upsert', { id: 'van9', name: 'Van 9', notes: '' })
+    // Rónán erased on request (ADR 0027): the list of erasures goes with the rest, as does today's running late (ADR 0028).
+    const { rows: ronan } = await db.query<{ id: string }>(`SELECT id FROM people WHERE name = 'Rónán Moran'`)
+    expect(await aoife.send('person.erase', { id: ronan[0]!.id })).toMatchObject({ status: 'applied' })
     const before = await rowsLeft(db)
-    expect(before.projects).toBe(8)
+    expect(before).toMatchObject({ projects: 8, running_late: 1, erasures: 1 })
     const total = Object.values(before).reduce((a, b) => a + b, 0)
 
     const res = await startFresh(app, START_FRESH_WORDS, aoife)

@@ -29,7 +29,9 @@ export function lateView(
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number,
   crew: CrewView,
-  today: string
+  today: string,
+  /** People erased on request, an erasure still to send included: theirs go at once, as the server deletes them (ADR 0027). */
+  erased: Readonly<Record<string, unknown>> = {}
 ): LateView {
   const all = new Map<string, RunningLate & { pending: boolean }>()
   // Snapshots saved before running late existed have no table for it.
@@ -79,7 +81,7 @@ export function lateView(
 
   const people = new Map(crew.people.map((p) => [p.id, p]))
   const current: LateNote[] = [...all.values()]
-    .filter((l) => lateShown(l, today))
+    .filter((l) => lateShown(l, today) && !erased[l.personId])
     .map((l) => ({ ...l, person: people.get(l.personId), call: offers.get(l.offerId)?.call, offer: offers.get(l.offerId)?.offer }))
     // Every order ends on the id, so two devices agree.
     .sort((a, b) => a.day.localeCompare(b.day) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '') || a.id.localeCompare(b.id))

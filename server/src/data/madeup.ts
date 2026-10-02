@@ -41,7 +41,9 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *   height and IPAF, someone with no IPAF to see marked in the picker, a
  *   booked stagehand whose Safe Pass runs out before the job ends, and
  *   certificates running out soon for the reminders; and a shoot today with
- *   someone running late, said from their link, on the contact's call sheet.
+ *   someone running late, said from their link, on the contact's call sheet;
+ * - a freelancer who has left and asked for their details to go, archived,
+ *   so erasing someone on request (ADR 0027) can be tried.
  */
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
@@ -145,6 +147,9 @@ export function madeUpData(today: string): Mutation[] {
   const laoise = person('Laoise Keane', 'freelancer', 'Production', 1, ['Stagehand'], 200, { certificates: { ipaf: { held: false, expires: null, note: '' } } })
   // An applicant nobody has vetted: out of the Offer to… picker until "Show applicants" is ticked.
   person('Saoirse Daly', 'freelancer', 'Audio', 0, [], null, { notes: 'New applicant, CV received, not yet vetted.' })
+  // Rónán has left and asked for his details to go: archived, with nothing unsettled, so he can be erased (ADR 0027).
+  const ronan = person('Rónán Moran', 'freelancer', 'Audio', 2, ['Audio'], 260, { notes: 'Moved to Melbourne. Asked us to delete his details.' })
+  add('person.archive', { id: ronan, archived: true })
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
 
   // Staff leave (ADR 0024). A week counted from today, moved a week on when it would cross the year end, since a request belongs to one year.
