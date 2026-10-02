@@ -136,6 +136,8 @@ export interface BackupStatus {
   configured: boolean
   /** Where they go, without any secret: "bucket … at …". */
   where?: string
+  /** Each file is encrypted under the server's BACKUP_KEY, so it can't be read without it. Missing from older servers, which means no. */
+  encrypted?: boolean
   last?: BackupRun
   /** The last run that made a file and proved it by a test restore. */
   lastOk?: BackupRun

@@ -1,5 +1,5 @@
 import { answersToCheck, canApproveLeave } from '@sh/shared'
-import { today, useView } from '../jobs/common.tsx'
+import { useToday, useView } from '../view.ts'
 import { useMe } from './Leave.tsx'
 
 /**
@@ -12,8 +12,9 @@ import { useMe } from './Leave.tsx'
  */
 export function CrewBadge() {
   const view = useView()
+  const today = useToday()
   const { me } = useMe(view)
-  const n = answersToCheck(view.crew, today()).length + (canApproveLeave(me) ? view.leave.queue.length : 0)
+  const n = answersToCheck(view.crew, today).length + (canApproveLeave(me) ? view.leave.queue.length : 0)
   if (n === 0) return null
   return (
     <span className="badge">

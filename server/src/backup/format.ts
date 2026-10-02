@@ -4,6 +4,7 @@ import type { Db, Queryable } from '../db.ts'
 import { moduleVersion } from '../migrations.ts'
 import { MODULES, migrateAll, migrateAllTo } from '../modules.ts'
 import { forEachRow, ident, tablesInOrder as listTables, useCanonicalOutput } from '../tables.ts'
+import { decryptBackup, isEncrypted } from './crypto.ts'
 
 /**
  * The backup file: the whole database as text, one row per line, gzipped.
@@ -18,7 +19,9 @@ import { forEachRow, ident, tablesInOrder as listTables, useCanonicalOutput } fr
  * that text straight back to Postgres, so dates, times to the microsecond
  * and JSON columns come back exactly. The file is plain text inside, so it
  * can be read without this app, which keeps the "your data is never locked
- * in" promise. A file that was cut short has no end line and is refused.
+ * in" promise; with BACKUP_KEY set it is then encrypted whole (crypto.ts),
+ * and reading it needs the key. A file that was cut short has no end line
+ * and is refused.
  *
  * Everything is held in memory while it is made or read. At Session Hire's
  * size that is a few megabytes; streaming can come if it ever isn't.
@@ -120,13 +123,23 @@ interface Parsed {
   summary: BackupSummary
 }
 
-/** Unpack and sanity-check a backup file without touching any database. */
-export function readBackup(data: Buffer): Parsed {
+/** Unpack and sanity-check a backup file without touching any database. An encrypted file needs the key it was made with. */
+export function readBackup(data: Buffer, key?: Buffer): Parsed {
   try {
-    return parse(data)
+    return parse(unlock(data, key))
   } catch (err) {
     if (err instanceof BackupError) throw err
     throw new BackupError(`The backup is damaged: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+function unlock(data: Buffer, key: Buffer | undefined): Buffer {
+  if (!isEncrypted(data)) return data
+  if (!key) throw new BackupError('This backup is encrypted. Set BACKUP_KEY to the key it was made with, then try again.')
+  try {
+    return decryptBackup(data, key)
+  } catch (err) {
+    throw new BackupError(err instanceof Error ? err.message : String(err))
   }
 }
 
@@ -188,8 +201,8 @@ function parse(data: Buffer): Parsed {
  * generation, so devices know to start their own copy afresh (see the sync
  * client).
  */
-export async function restoreBackup(db: Db, data: Buffer): Promise<RestoreReport> {
-  const { header, sections, summary } = readBackup(data)
+export async function restoreBackup(db: Db, data: Buffer, key?: Buffer): Promise<RestoreReport> {
+  const { header, sections, summary } = readBackup(data, key)
   const known = new Map(MODULES.map((m) => [m.versionTable, m]))
   for (const [versionTable, version] of Object.entries(header.schemas)) {
     const mod = known.get(versionTable)

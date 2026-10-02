@@ -13,7 +13,7 @@ import {
   type Project,
 } from '@sh/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
 import { seal } from '../src/calendar/crypto.ts'
@@ -41,16 +41,25 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean } = {}) {
+async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean; retryMs?: number[] } = {}) {
   const db = await pgliteDb()
   const google = new FakeGoogle()
   let now = new Date(`${TODAY}T10:00:00Z`)
   google.clock = () => now
   // Counts what reaches the database, to show looking for answers leaves it asleep.
   const queries = { count: 0 }
+  // Made to fail on the next few reads of the connection, to play the database faltering as a run starts.
+  const fault = { times: 0 }
   const counted: Db = {
     ...db,
-    query: (sql, params) => (queries.count++, db.query(sql, params)),
+    query: (sql, params) => {
+      queries.count++
+      if (fault.times > 0 && sql.includes('FROM calendar_link')) {
+        fault.times--
+        return db.query('SELECT 1/0')
+      }
+      return db.query(sql, params)
+    },
     transaction: (fn) => (queries.count++, db.transaction(fn)),
   }
   const app = await buildApp({
@@ -67,6 +76,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
             // Runs and looks for answers happen when a test asks, unless it is testing the automatic ones.
             settleMs: opts.settleMs ?? 3_600_000,
             pollMs: opts.pollMs ?? 0,
+            retryMs: opts.retryMs,
             now: () => now,
           },
         }),
@@ -82,6 +92,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
     google,
     colly,
     queries,
+    fault,
     sync: () => app.calendar!.run(),
     check: () => app.calendar!.run(true),
     poll: () => app.calendar!.poll(),
@@ -483,6 +494,43 @@ describe('when the calendar and the app disagree', () => {
     await s.sync()
     expect(titles(s.google)).toHaveLength(3)
     expect((await feed(s)).link!.problem).toBeNull()
+  })
+
+  it('a run that fails on something unexpected tries again by itself a little later, without waiting for the next change', async () => {
+    // Proves: nothing is written by the run that failed, and a retry on the sync's own timer finishes the job with nobody asking.
+    const s = await setup({ retryMs: [40, 40, 40] })
+    const { phases } = await nissan(s)
+    await connectTo(s)
+    expect(titles(s.google)).toHaveLength(3)
+    await send(s, 'phase.update', { id: phases.show, end: '2030-03-05' })
+    s.fault.times = 1
+    await expect(s.sync()).rejects.toThrow('division by zero')
+    expect(titles(s.google)).toHaveLength(3)
+    await expect.poll(() => titles(s.google).length, { timeout: 5_000 }).toBe(4)
+  })
+
+  it('tries again three times at most, saying so in the log each time, then waits for the next change', async () => {
+    // Proves: a fault that lasts is not tried for ever on the sync's own timer, and no failure goes unlogged.
+    const s = await setup({ retryMs: [20, 20, 20] })
+    await nissan(s)
+    await connectTo(s)
+    const logged = vi.spyOn(s.app.log, 'error')
+    try {
+      s.fault.times = 10
+      await expect(s.sync()).rejects.toThrow('division by zero')
+      await expect.poll(() => logged.mock.calls.length, { timeout: 5_000 }).toBe(4)
+      // Time enough for a fifth try, had one been coming.
+      await new Promise((r) => setTimeout(r, 200))
+      expect(s.fault.times).toBe(6)
+      expect(logged.mock.calls.map((c) => c[1])).toEqual([
+        'Calendar sync failed; trying again later',
+        'Calendar sync failed; trying again later',
+        'Calendar sync failed; trying again later',
+        'Calendar sync failed again; it waits for the next change now',
+      ])
+    } finally {
+      logged.mockRestore()
+    }
   })
 
   it('a day Google turns down shows on the job page, and the rest still go on', async () => {

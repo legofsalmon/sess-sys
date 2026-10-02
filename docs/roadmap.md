@@ -180,7 +180,7 @@ over by rule are later.
   can cover one job or several over a period, as the freelancer likes;
   the office records each invoice as it arrives against the timesheets
   it covers, checks the figures, and marks it paid, with the status
-  visible to the freelancer.
+  visible to the freelancer. *Parked for now (Colly, 1 October 2026).*
 - Offers by app, email, SMS or WhatsApp: send a role to one person or a
   shortlist, first to accept gets it;
   accept and decline in the app or by the calendar invite.

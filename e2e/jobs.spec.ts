@@ -4,7 +4,8 @@ import { expect, test, type Page } from '@playwright/test'
  * Jobs end to end (ADR 0007): the office adds a job with its client, venue
  * and phases, sees how each day will read on the calendar, and asks for crew
  * for a phase; renaming the job renames it for the crew too. A job added
- * with no signal waits on the phone and goes through once the signal is back.
+ * with no signal waits on the phone, its phase can be changed meanwhile, and
+ * both go through once the signal is back.
  * The test server is shared with the other browser tests, so every name here
  * is this run's own. To refresh the blueprint screenshots, run this file on
  * its own with SHOTS=1: the names are then plain, as the office would type them.
@@ -50,10 +51,13 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.locator('.title .pill')).toHaveText('Confirmed')
   await expect(office.locator('.facts')).toContainText(named('Nissan Ireland', id))
   await expect(office.locator('.facts')).toContainText('Mon 7 Oct to Wed 9 Oct')
+  // A phase's call sheet and calendar line wait behind a tap on its details (audit finding 16).
+  for (const phase of ['Build', 'Show']) await office.getByRole('article', { name: phase }).locator('summary').click()
   await expect(office.getByText(`Goes on the calendar as “${job} - Build 1/2” and “${job} - Build 2/2” once one is connected on the Account tab.`)).toBeVisible()
   await expect(office.getByText(`Goes on the calendar as “${job} - Show” once one is connected on the Account tab.`)).toBeVisible()
 
   // Crew for the build.
+  await office.getByRole('button', { name: 'Ask for crew' }).click()
   const ask = office.getByRole('form', { name: 'Ask for crew' })
   await ask.getByLabel('For which phase').selectOption({ label: 'Build, Mon 7 Oct to Tue 8 Oct' })
   await ask.getByLabel('Role').fill('Audio tech')
@@ -62,6 +66,8 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await ask.getByRole('button', { name: 'Ask for crew' }).click()
   const build = office.getByRole('article', { name: 'Build' })
   await expect(build.locator('.job b')).toHaveText('2 × Audio tech')
+  // The call is one line under its phase (audit finding 16); a tap opens its days and rate.
+  await build.getByRole('button', { name: '2 × Audio tech' }).click()
   await expect(build.locator('.job p').first()).toHaveText('Mon 7 Oct to Tue 8 Oct · €250')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await expect(office.locator('.facts')).toContainText('0 of 2 booked')
@@ -75,9 +81,11 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.getByRole('heading', { name: renamed })).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
-  const call = office.locator('.job', { hasText: '2 × Audio tech' }).filter({ hasText: renamed })
-  await expect(call).toContainText(`${renamed} · Build`)
-  await expect(call.getByRole('link', { name: 'Open job' })).toBeVisible()
+  // Grouped by job (audit finding 16): the job's name and Open job on the group, the call as one line under it.
+  const group = office.locator('.call-group', { hasText: renamed })
+  await expect(group.locator('header b')).toHaveText(renamed)
+  await expect(group.locator('.job', { hasText: '2 × Audio tech' })).toContainText('Build')
+  await expect(group.getByRole('link', { name: 'Open job' })).toBeVisible()
 
   // Back on the list, the job shows its crew still to find.
   await office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
@@ -108,6 +116,14 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await expect(phone.locator('.title .pill')).toHaveText('Waiting to sync')
   await expect(phone.getByRole('status')).toContainText('No signal')
 
+  // Its phase can be changed while it waits too; the change goes up after it (audit finding 23).
+  const phase = phone.getByRole('article', { name: 'Show', exact: true })
+  await expect(phase.locator('.pill')).toHaveText('Waiting to sync')
+  await phase.getByRole('button', { name: 'Change', exact: true }).click()
+  await phase.getByLabel('To', { exact: true }).fill('2030-11-03')
+  await phase.getByRole('button', { name: 'Save' }).click()
+  await expect(phase.locator('header')).toContainText('Sat 2 Nov to Sun 3 Nov')
+
   await context.setOffline(false)
   await phone.evaluate(() => dispatchEvent(new Event('online')))
   await expect(phone.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
@@ -117,5 +133,5 @@ test('a job added with no signal waits on the phone, then goes through', async (
   const laptop = await (await browser.newContext()).newPage()
   await ready(laptop)
   await laptop.getByLabel('Find').fill(job)
-  await expect(laptop.locator('.job-row', { hasText: job })).toContainText('Sat 2 Nov · Show')
+  await expect(laptop.locator('.job-row', { hasText: job })).toContainText('Sat 2 Nov to Sun 3 Nov · Show')
 })

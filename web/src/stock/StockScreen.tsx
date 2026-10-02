@@ -7,6 +7,7 @@ import {
   normaliseNumber,
   parseEuro,
   plural,
+  RETIRED_LABELS,
   spanLabel,
   type Department,
   type ModelView,
@@ -17,10 +18,14 @@ import {
 import { useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { App } from '../App.tsx'
-import { StatusPill, Top, useHash, useView } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { Fold, ShowAll } from '../Fold.tsx'
+import { Beside, JobStatusPill, Top, useHash } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { amountLabel, atLabel, numberLabel, Pending, TrackingChoice, whereLabel } from './common.tsx'
+import { useView, useWide } from '../view.ts'
+import { amountLabel, atLabel, mistakeLabel, numberLabel, ScanResult, TrackingChoice, whereLabel } from './common.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
 import { InspectionsDue, TestingScreen } from './Inspections.tsx'
@@ -46,6 +51,7 @@ import './stock.css'
 export function StockScreen() {
   const view = useView()
   const hash = useHash()
+  const wide = useWide()
   if (hash === '#stock/sync-test') return <App />
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
   if (hash === '#stock/testing') return <TestingScreen view={view} />
@@ -54,13 +60,67 @@ export function StockScreen() {
   const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
   const open = id ? decodeURIComponent(id) : ''
   // Keyed by the record, so a form left open on one page isn't still open on the next.
-  if (kind === 'product') return <ProductScreen key={open} view={view} id={open} />
-  if (kind === 'item') return <ItemScreen key={open} view={view} id={open} />
-  if (kind === 'place') return <PlaceScreen key={open} view={view} id={open} />
-  return <Catalogue view={view} />
+  const record =
+    kind === 'product' ? (
+      <ProductScreen key={open} view={view} id={open} bare={wide} />
+    ) : kind === 'item' ? (
+      <ItemScreen key={open} view={view} id={open} bare={wide} />
+    ) : kind === 'place' ? (
+      <PlaceScreen key={open} view={view} id={open} bare={wide} />
+    ) : undefined
+  // On a laptop the catalogue keeps a column of its own (audit finding 25), with its search, beside the open record or the rest of the tab; on a phone the record is a page of its own.
+  if (wide) {
+    const product = kind === 'product' ? open : kind === 'item' ? view.warehouse.assets.get(open)?.modelId : undefined
+    return (
+      <Beside view={view} title="Stock" className="warehouse" list={<StockCard view={view} current={product} />} open={kind && `${kind}/${open}`}>
+        {record ?? <StockRest view={view} />}
+      </Beside>
+    )
+  }
+  return record ?? <Catalogue view={view} />
 }
 
 function Catalogue({ view }: { view: View }) {
+  return (
+    <div className="app warehouse">
+      <Top view={view} title="Stock" />
+
+      <StockCard view={view} />
+
+      <StockRest view={view} />
+    </div>
+  )
+}
+
+/** What the warehouse has to do, the labels and the places: under the catalogue on a phone, beside it on a laptop. */
+function StockRest({ view }: { view: View }) {
+  return (
+    <>
+      <PickLists view={view} />
+
+      <RepairList view={view} />
+
+      <InspectionsDue view={view} />
+
+      <ShortKit view={view} />
+
+      <LabelsCard labels={view.labels} />
+
+      <Places view={view} />
+
+      <section className="card">
+        <h2>Sync test</h2>
+        <p className="hint">The Phase 0 phone field test: book speakers with no signal and watch the server sort it out.</p>
+        <a className="button" href="#stock/sync-test">
+          Open the sync test
+        </a>
+      </section>
+    </>
+  )
+}
+
+/** The catalogue: the search, the camera, the department filters, the products and adding one; `current` marks the one open beside it. */
+function StockCard({ view, current }: { view: View; current?: string }) {
   const w = view.warehouse
   const [department, setDepartment] = useState<Department | 'all'>('all')
   const [search, setSearch] = useState('')
@@ -75,12 +135,15 @@ function Catalogue({ view }: { view: View }) {
   const memory = useRef<ClaimMemory>({ product: '', where: '' })
   const [claimed, setClaimed] = useState('')
   const [camera, setCamera] = useState(false)
+  // The item the camera last read, shown under it while it stays on for the next (audit finding 18).
+  const [scanned, setScanned] = useState('')
+  const lastRead = camera && scanned ? w.assets.get(scanned) : undefined
   const justClaimed = claimed && !search.trim() ? w.assets.get(claimed) : undefined
-  // Items by number or serial, once there's enough typed to mean something.
+  // Items by number or serial, once there's enough typed to mean something; one added by mistake only by its exact number.
   const items =
     q.length >= 3
       ? [...w.assets.values()]
-          .filter((a) => a !== exact && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
+          .filter((a) => a !== exact && a.retiredReason !== 'mistake' && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
           .sort((a, b) => a.number.localeCompare(b.number))
           .slice(0, 20)
       : []
@@ -106,126 +169,125 @@ function Catalogue({ view }: { view: View }) {
     setSearch('')
     if (!camera) searchField.current?.focus()
   }
-  // Read by the camera: an item's label or its maker's serial opens it; a label on nothing yet asks what it's on.
+  // Read by the camera: an item's label or its maker's serial shows it under the camera, which stays on; a label on nothing yet asks what it's on.
   const onRead = (code: string) => {
     const n = normaliseNumber(code)
     const serial = code.toLowerCase()
     const found = (n && w.byNumber.get(n)) || only([...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial))
-    if (found) location.hash = `#stock/item/${found.id}`
-    else setSearch(code)
+    if (found) {
+      setScanned(found.id)
+      setSearch('')
+    } else {
+      setScanned('')
+      setSearch(code)
+    }
+  }
+  const closeCamera = () => {
+    setCamera(false)
+    setScanned('')
   }
 
   return (
-    <div className="app crew jobs warehouse">
-      <Top view={view} title="Stock" />
-
-      <section className="card">
-        <h2>Stock</h2>
-        <form role="search" className="scan-row" onSubmit={go}>
-          <input
-            ref={searchField}
-            className="search"
-            type="search"
-            enterKeyHint="go"
-            placeholder="Find a product, number or serial"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Find"
-          />
-          <button
-            type="button"
-            aria-pressed={camera}
-            onClick={() => {
-              if (!camera) primeSound()
-              setCamera(!camera)
-            }}
-          >
-            Scan
+    <section className="card" aria-label="Stock">
+      <h2>Stock</h2>
+      <form role="search" className="scan-row" onSubmit={go}>
+        <input
+          ref={searchField}
+          className="search"
+          type="search"
+          enterKeyHint="go"
+          placeholder="Find a product, number or serial"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Find"
+        />
+        <button
+          type="button"
+          aria-pressed={camera}
+          onClick={() => {
+            if (!camera) primeSound()
+            setCamera(!camera)
+          }}
+        >
+          Scan
+        </button>
+      </form>
+      {camera && <CameraScanner onRead={onRead} onStop={closeCamera} small={!!unclaimed} />}
+      {lastRead && (
+        <ScanResult onClose={closeCamera}>
+          {lastRead.retiredReason === 'mistake' ? (
+            mistakeLabel(lastRead)
+          ) : (
+            <>
+              <a href={`#stock/item/${lastRead.id}`}>{numberLabel(lastRead)}</a> {lastRead.model?.name ?? 'an item'} ·{' '}
+              {lastRead.status === 'retired' ? `Retired${lastRead.retiredReason ? `: ${RETIRED_LABELS[lastRead.retiredReason].toLowerCase()}` : ''}` : whereLabel(lastRead, w)}
+              {lastRead.serial && ` · Serial ${lastRead.serial}`}. Scan the next label.
+            </>
+          )}
+        </ScanResult>
+      )}
+      {justClaimed && (
+        <p className="added" role="status">
+          Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
+          {(justClaimed.placeId || justClaimed.caseId) && ` ${atLabel(justClaimed, w)}`}. Scan the next label.
+        </p>
+      )}
+      {unclaimed && <ClaimLabel key={unclaimed} number={unclaimed} view={view} memory={memory} productField={claimField} onClaimed={onClaimed} />}
+      <div className="filters" role="group" aria-label="Department">
+        <button type="button" aria-pressed={department === 'all'} onClick={() => setDepartment('all')}>
+          All ({w.models.length})
+        </button>
+        {DEPARTMENTS.filter((d) => count(d) > 0).map((d) => (
+          <button key={d} type="button" aria-pressed={department === d} onClick={() => setDepartment(d)}>
+            {DEPARTMENT_LABELS[d]} ({count(d)})
           </button>
-        </form>
-        {camera && <CameraScanner onRead={onRead} onStop={() => setCamera(false)} small={!!unclaimed} />}
-        {justClaimed && (
-          <p className="added" role="status">
-            Added <a href={`#stock/item/${justClaimed.id}`}>{justClaimed.number}</a> ({justClaimed.model?.name ?? 'an item'})
-            {(justClaimed.placeId || justClaimed.caseId) && ` ${atLabel(justClaimed, w)}`}. Scan the next label.
-          </p>
-        )}
-        {unclaimed && <ClaimLabel key={unclaimed} number={unclaimed} view={view} memory={memory} productField={claimField} onClaimed={onClaimed} />}
-        <div className="filters" role="group" aria-label="Department">
-          <button type="button" aria-pressed={department === 'all'} onClick={() => setDepartment('all')}>
-            All ({w.models.length})
-          </button>
-          {DEPARTMENTS.filter((d) => count(d) > 0).map((d) => (
-            <button key={d} type="button" aria-pressed={department === d} onClick={() => setDepartment(d)}>
-              {DEPARTMENT_LABELS[d]} ({count(d)})
-            </button>
+        ))}
+      </div>
+      {(exact || items.length > 0) && (
+        <ul className="item-list" aria-label="Items found">
+          {[...(exact ? [exact] : []), ...items].map((a) => (
+            <li key={a.id}>
+              <a className="item-row" href={`#stock/item/${a.id}`}>
+                <div>
+                  <b>{numberLabel(a)}</b> {a.model?.name}
+                  <p>
+                    {a.retiredReason === 'mistake' ? 'Added by mistake' : a.status === 'retired' ? 'Retired' : whereLabel(a, w)}
+                    {a.serial && ` · Serial ${a.serial}`}
+                    {a.number !== number && number && a.formerNumbers.includes(number) && ` · Had ${number} before`}
+                  </p>
+                </div>
+                <Pending pending={a.pending} />
+              </a>
+            </li>
           ))}
-        </div>
-        {(exact || items.length > 0) && (
-          <ul className="item-list" aria-label="Items found">
-            {[...(exact ? [exact] : []), ...items].map((a) => (
-              <li key={a.id}>
-                <a className="item-row" href={`#stock/item/${a.id}`}>
+        </ul>
+      )}
+      {shown.length === 0 && !exact && !unclaimed && items.length === 0 && <Empty>{w.models.length === 0 && 'Add the first product below.'}</Empty>}
+      <ShowAll items={shown} limit={5} what="products" keep={(m) => m.id === current}>
+        {(rows) => (
+          <ul className="job-list">
+            {rows.map((m) => (
+              <li key={m.id}>
+                <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
                   <div>
-                    <b>{numberLabel(a)}</b> {a.model?.name}
-                    <p>
-                      {a.status === 'retired' ? 'Retired' : whereLabel(a, w)}
-                      {a.serial && ` · Serial ${a.serial}`}
-                      {a.number !== number && number && a.formerNumbers.includes(number) && ` · Had ${number} before`}
-                    </p>
+                    <b>{m.name}</b>
+                    <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
                   </div>
-                  <Pending pending={a.pending} />
+                  <div className="side">
+                    <Pending pending={m.pending} />
+                    <small>{amountLabel(m)}</small>
+                  </div>
                 </a>
               </li>
             ))}
           </ul>
         )}
-        {shown.length === 0 && !exact && !unclaimed && items.length === 0 && (
-          <p className="empty">{w.models.length === 0 ? 'No products yet. Add the first one below.' : 'Nothing here.'}</p>
-        )}
-        <ul className="job-list">
-          {shown.map((m) => (
-            <li key={m.id}>
-              <a className="job-row" href={`#stock/product/${m.id}`}>
-                <div>
-                  <b>{m.name}</b>
-                  <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
-                </div>
-                <div className="side">
-                  <Pending pending={m.pending} />
-                  <small>{amountLabel(m)}</small>
-                </div>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <PickLists view={view} />
-
-      <RepairList view={view} />
-
-      <InspectionsDue view={view} />
-
-      <ShortKit view={view} />
-
-      <LabelsCard labels={view.labels} />
-
-      <section className="card">
-        <h2>New product</h2>
+      </ShowAll>
+      {/* A new product starts in the department the list is narrowed to. */}
+      <Fold label="Add product">
         <NewProduct view={view} department={department === 'all' ? 'audio' : department} />
-      </section>
-
-      <Places view={view} />
-
-      <section className="card">
-        <h2>Sync test</h2>
-        <p className="hint">The Phase 0 phone field test: book speakers with no signal and watch the server sort it out.</p>
-        <a className="button" href="#stock/sync-test">
-          Open the sync test
-        </a>
-      </section>
-    </div>
+      </Fold>
+    </section>
   )
 }
 
@@ -245,7 +307,7 @@ function ShortKit({ view }: { view: View }) {
             {l.shortDays > 1 && ` and ${plural(l.shortDays - 1, 'more day')}`}
           </p>
         </div>
-        <div className="side">{l.job && <StatusPill status={l.job.status} pending={l.pending} />}</div>
+        <div className="side">{l.job && <JobStatusPill status={l.job.status} pending={l.pending} />}</div>
       </a>
     </li>
   )
@@ -380,6 +442,8 @@ function NewProduct({ view, department }: { view: View; department: Department }
 function Places({ view }: { view: View }) {
   const w = view.warehouse
   const [name, setName] = useState('')
+  // Said in a green line, with the way to it, as the list may be folded past it.
+  const [added, setAdded] = useState<{ id: string; name: string }>()
   const { run, error, refuse } = useAct()
   const add = (e: FormEvent) => {
     e.preventDefault()
@@ -387,39 +451,50 @@ function Places({ view }: { view: View }) {
     if (!n) return
     const taken = w.places.find((p) => p.name.trim().toLowerCase() === n.toLowerCase())
     if (taken) return refuse(`There's already a place called ${taken.name}.`)
-    void run(() => client.mutate('place.upsert', { id: newId(), name: n, notes: '' }))
+    const id = newId()
+    setAdded(undefined)
+    void run(() => client.mutate('place.upsert', { id, name: n, notes: '' })).then((ok) => ok && setAdded({ id, name: n }))
     setName('')
   }
   return (
     <section className="card">
       <h2>Places</h2>
-      {w.places.length === 0 && (
-        <p className="empty">Where kit is kept: the warehouse, its bays and shelves, the vans. Places are also added as you type them in.</p>
-      )}
-      <ul className="job-list">
-        {w.places.map((p) => (
-          <li key={p.id}>
-            <a className="job-row" href={`#stock/place/${p.id}`}>
-              <div>
-                <b>{p.name}</b>
-                <p>
-                  {[p.itemTotal > 0 && plural(p.itemTotal, 'item'), p.countedTotal > 0 && `${p.countedTotal.toLocaleString('en-IE')} counted`]
-                    .filter(Boolean)
-                    .join(' · ') || 'Nothing here yet'}
-                </p>
-              </div>
-              <div className="side">
-                <Pending pending={p.pending} />
-              </div>
-            </a>
-          </li>
-        ))}
-      </ul>
-      <form className="inline-add" onSubmit={add}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bay A3, Van 1" aria-label="New place" />
-        <button type="submit">Add place</button>
-      </form>
-      <Refusal error={error} />
+      {w.places.length === 0 && <Empty>Where kit is kept: the warehouse, its bays and shelves, the vans. Places are also added as you type them in.</Empty>}
+      <ShowAll items={w.places} limit={5} what="places">
+        {(rows) => (
+          <ul className="job-list">
+            {rows.map((p) => (
+              <li key={p.id}>
+                <a className="job-row" href={`#stock/place/${p.id}`}>
+                  <div>
+                    <b>{p.name}</b>
+                    <p>
+                      {[p.itemTotal > 0 && plural(p.itemTotal, 'item'), p.countedTotal > 0 && `${p.countedTotal.toLocaleString('en-IE')} counted`]
+                        .filter(Boolean)
+                        .join(' · ') || 'Nothing here yet'}
+                    </p>
+                  </div>
+                  <div className="side">
+                    <Pending pending={p.pending} />
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ShowAll>
+      <Fold label="Add place">
+        <form className="inline-add" onSubmit={add}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bay A3, Van 1" aria-label="New place" />
+          <button type="submit">Add place</button>
+        </form>
+        {added && (
+          <p className="added" role="status">
+            Added <a href={`#stock/place/${added.id}`}>{added.name}</a>.
+          </p>
+        )}
+        <Refusal error={error} />
+      </Fold>
     </section>
   )
 }

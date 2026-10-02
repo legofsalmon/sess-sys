@@ -29,39 +29,110 @@ and Figma gets updated. Every colour token carries its CSS name (for example
 
 - **Primitives**: the raw hex values from `app.css`, hidden from pickers.
 - **Color** (Light and Dark modes): `bg`, `panel`, `ink`, `muted`, `line`,
-  `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`, `warn`,
-  `bad` with a `-soft` background each. Dark follows the phone's setting, as
-  the app does.
+  `field-line` (the border round a field, dark enough to see against a
+  card), `on-line` (text on a line-coloured surface, such as the grey
+  pill), `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`,
+  `warn`, `bad` with a `-soft` background each. Dark follows the phone's
+  setting, as the app does. `field-line` and `on-line` aren't in Figma
+  yet; until they are, the code is the reference.
 - **Spacing**: 2, 4, 6, 8, 10, 12, 14, 16, 20, 40 px.
 - **Radius**: control 8, tab 10, card 12, full (pills).
-- **Type**: 13 text styles (page title, brand, section heading, body, small,
-  hint, button, link, tab, status, pill, footer). The app uses the phone's
-  own font (`system-ui`: SF on iPhone, Roboto on Android); Inter stands in
-  inside Figma.
+- **Type**: 13 text styles: page title 1.3rem, brand 1rem, section heading
+  1rem, subheading .95rem, body 1rem, small .9rem, hint .85rem, button
+  .9rem, link .9rem, tab 1rem, status .82rem, pill .75rem and footer .75rem.
+  The app uses the phone's own font (`system-ui`: SF on iPhone, Roboto on
+  Android); Inter stands in inside Figma.
 
-Spacing and radius carry their CSS names the same way: `space/8` is
-`var(--space-8)` and `radius/card` is `var(--radius-card)`, set on `:root` in
-`app.css` next to the colours. The web app's stylesheets use them wherever a
-value is on the scale, and anything off it, such as a 1px line or a 3px
-nudge, stays in px. A radius is named for what it's on, so a 10px corner
-that isn't on a tab, such as the box round a crew call on a job's page, stays
-in px too.
+Spacing, radius and type carry their CSS names the same way: `space/8` is
+`var(--space-8)`, `radius/card` is `var(--radius-card)` and the hint style is
+`var(--text-hint)`, set on `:root` in `app.css` next to the colours. The web
+app's stylesheets use them wherever a value is on the scale, and anything off
+it, such as a 1px line or a 3px nudge, stays in px. A radius is named for
+what it's on, so a 10px corner that isn't on a tab, such as the box round a
+crew call on a job's page, stays in px too. A size off the type scale moves
+to the style that does its job when its rule is next changed (a muted .8rem
+line is the hint style); rules not changed since still carry a few of their
+own.
+
+What every area's pages share (the way back, a record's title and facts,
+lists of rows, filters, the grid form, a row that opens) is styled once
+under `.app`, and each area adds a class of its own (`crew`, `jobs`,
+`warehouse`) for what's only its.
 
 ## Rules the components encode
 
 - Phone first: one column, 640px wide at most, 16px side margins.
+- On a laptop, from 960px wide, Jobs and Stock are two columns
+  ([audit finding 25](audit-2026-09-30.md)): the list (the jobs, or the
+  catalogue) takes two fifths on the left, stuck under the top bar and
+  scrolling on its own, and the open job, product, item or place takes the
+  rest, with no way back as the list is beside it, starting at its top
+  however far down the last one the window was; with nothing open, the
+  right-hand column holds the rest of the tab. The two together are 1400px
+  wide at most. The open one is marked in the list by a red bar down its
+  left, and the list keeps its search, filter and scroll as things are
+  opened from it. Below 960px nothing changes: a record is a page of its
+  own with "‹ All jobs" or "‹ All stock". The other screens stay one
+  column on a laptop. Not in Figma yet.
 - The connection badge is always on screen, and anything saved on the phone
-  but not yet on the server says **Waiting to sync**.
+  but not yet on the server says **Waiting to sync**: one amber pill, the
+  same words everywhere, whatever the status under it.
+- Every status is the one pill ([audit finding 24](audit-2026-09-30.md)):
+  amber when someone has to act (offered, accepted, waiting, to confirm, an
+  enquiry or a quote), green when it's settled (confirmed, booked, filled,
+  approved), grey when it's off (declined, cancelled, retired, offered on a
+  call sheet), and the **bad** tone for a clash in the planner.
+- An empty list says "Nothing here yet." in the hint style, then the
+  screen's own line: what to do about it, or where its things come from
+  ("Nothing here yet. Add your crew below."). A record that isn't on the
+  device says so in its own words. Not in Figma yet.
 - Red marks the one thing to do next and the current tab. Errors use the
   burnt-orange **bad** tone, never the brand red, so red never means "broken".
-- Areas live in a tab bar at the bottom, where a thumb reaches.
-- The planner ([ADR 0010](adr/0010-planner.md)) is the one screen wider
-  than 640px: it uses a laptop's full width, and on a phone its days scroll
-  sideways with the names kept in view. It keeps the same colour language:
-  a job's day is solid when confirmed and dashed when pencilled in, green
-  once its crew are booked and amber while some are still to find; a
-  clash is the **bad** tone and a check is amber. The planner isn't in the
-  Figma file yet; until it is, the code is the reference.
+- Areas live in a tab bar at the bottom, where a thumb reaches, on a laptop
+  as well: the office's phone and laptop work the same way, and the top bar
+  keeps to the screen's name and what's waiting.
+- A screen stays short on a phone ([audit finding 16](audit-2026-09-30.md)):
+  a form waits behind a button that names it ("Add person", "Ask for crew",
+  "Add phase", "Add kit", "Add product", "Add place") and opens in place
+  with the cursor in its first field and Close under it; a long list shows
+  its first few with "Show all 9 products" as a link, keeping in view
+  anything to act on, such as kit that's short or the product open beside
+  the catalogue. Lists of things to act on ("Answers to check", each kind
+  of timesheet) show their first three with the whole count in their
+  heading ("Not in yet (7)"). The people list shows its first ten under a
+  search that works as the picker's, and anyone just added stays in view
+  until the tab is next opened. A form that adds to a folded list says in
+  a green line what was added, with the way to it ("Added Bay A3.").
+  Details that are only sometimes wanted, such as a phase's running order,
+  calendar line, call sheet and contact, fold under the browser's own
+  triangle, named for what's in them; a line that needs acting on stays
+  out. Not in Figma yet.
+- A crew call at rest is one line: the role in bold, then its phase, or on a
+  job's page its days where they aren't the phase's, and under it who's on
+  it, with any answer short of booked in brackets ("Dara Quinn, Niamh Kelly
+  (offered)"). Its pill sits on the right ("Filled", "1/2", "0/3 days
+  filled", "Cancelled" for one kept on a job's page for the record, and
+  **Waiting to sync** while a change to the call or an offer on it is on
+  its way), with "Offer…" under it while there are places to fill. A tap
+  on the line opens its days, call time and rate, each offer with its pill
+  and Send or Withdraw, and Change and Cancel crew call. On the Crew tab
+  the calls are grouped by job, its name in bold with the job's venue and
+  Open job, then by days under small grey capitals, with the venue beside
+  the days where a phase is somewhere else. Not in Figma yet.
+- The Offer to… picker has a search over it that narrows the list by name,
+  the name they go by, department or skill as each word is typed, with or
+  without fadas, keeping the order and "Show applicants" of
+  [ADR 0025](adr/0025-crew-profiles-and-bringing-in-the-list.md); with
+  nothing matching, the select says "Nobody matches". Enter in its search
+  only searches: it never sends the offer. Not in Figma yet.
+- The planner ([ADR 0010](adr/0010-planner.md)) is the one screen that
+  uses a laptop's full width, rather than two columns, and on a phone its
+  days scroll sideways with the names kept in view. It keeps the same
+  colour language: a job's day is solid when confirmed and dashed when
+  pencilled in, green once its crew are booked and amber while some are
+  still to find; a clash is the **bad** tone and a check is amber. The
+  planner isn't in the Figma file yet; until it is, the code is the
+  reference.
 - A long list checked before anything is saved, such as bringing jobs in
   from Google Calendar ([ADR 0011](adr/0011-calendar-import.md)), keeps its
   one button in a bar stuck just above the tabs, so it's in reach however
@@ -71,7 +142,27 @@ in px too.
   feed ([ADR 0012](adr/0012-personal-calendar-feeds.md)), is shown in full
   in a read-only field that selects itself when tapped, with its buttons
   under it (Subscribe, Copy address), so it can still be copied by hand
-  where a browser won't copy. Not in Figma yet.
+  where a browser won't copy. The freelancer's page does the same, with
+  Copy address hidden where there's no script to copy with. Not in Figma
+  yet.
+- Getting about: each move within the app lands on the screen's heading
+  (its h1, or its name in the top bar), which shows the same focus ring
+  as a button, and the browser tab is named after the screen ("Crew ·
+  Session Hire"). A screen whose heading depends on what it shows, such
+  as Leave before it knows whose leave it is, still has one. A toggle that
+  keeps its state in the address, such as the planner's Jobs and People,
+  isn't a move and keeps focus: it takes focus as it's pressed, since
+  Safari doesn't give a pressed button focus. Someone already typing in
+  a field on the new screen, its search say, keeps the focus there too,
+  so what they type and their Enter still land. The screen sits in one
+  `<main>` landmark. A link that is the way back ("‹ All jobs") is at
+  least 44px tall, like a button. The "not done" count is read out as it
+  changes, and takes no room in the top bar while there's none.
+- Every field has a name over it, so it's still there once something is
+  typed, and a placeholder only gives an example ("e.g. on tour"). Only a
+  field in a tight row (a phase beside its dates, a number beside Out), a
+  search box or a scan field has its name read out without it being
+  shown.
 - Stock ([ADR 0013](adr/0013-warehouse-catalogue.md)) shows an item's
   number in bold with even-width digits. On a place's page each number is
   a round chip that opens the item, dashed and amber while it waits to
@@ -213,11 +304,21 @@ app and in Figma:
 
 - White text sits on `accent-fill` (#c8202e), 5.7:1, instead of the brand
   red (4.0:1). That covers primary buttons in the app and the Accept button
-  and "Offered" tag on the freelancer page. The brand red stays for the mark,
-  the current tab and focus rings.
+  and "Offered" tag on the freelancer page. The brand red stays for the mark
+  and focus rings.
 - Warn text is #8a5800 in light mode, 5.3:1 on its pill.
 - Buttons and fields are at least 44px tall, which matters with gloves on in
   a dark venue.
 
-Still short: the grey pill is 4.1:1 at 12px, and the current tab is white on
-the brand red.
+On 1 October 2026 the two gaps left were closed, and a third found by the
+audit (finding 22):
+
+- The current tab is white on `accent-fill` too, 5.7:1, not on the brand
+  red.
+- The grey pill's text is `on-line` (#4d5968 in light, 5.1:1 on `line`;
+  `muted` in dark, 5.0:1), as is the text of a person's away day in the
+  planner. `muted` on `line` was 4.1:1.
+- A field's border is `field-line` (#7f8c9a in light, 3.4:1 on a card;
+  #6b7684 in dark, 3.6:1), not `line`, which at 1.4:1 let fields dissolve
+  in daylight. WCAG asks 3:1 of a control's edge. The same token is on the
+  freelancer's pages.

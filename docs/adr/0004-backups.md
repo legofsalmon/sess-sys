@@ -4,6 +4,13 @@
   app server is given somewhere to keep the backups ([how](../backups.md)).
 - **Decides:** how the company's data is backed up, how it is put back, and
   what phones do after it has been put back.
+- **Amended:** 2 October 2026 by the [audit](../audit-2026-09-30.md), finding
+  20: with `BACKUP_KEY` set, each backup is encrypted (AES-256-GCM) before
+  it is stored, since it holds every freelancer's private link. Restoring
+  one then needs the same key, on the server or with the backup command
+  ([backups.md](../backups.md)). The format stays open: AES-256-GCM with a
+  short header, written down in `server/src/backup/crypto.ts`. Without a
+  key the file stays plain, as below.
 
 ## Context
 

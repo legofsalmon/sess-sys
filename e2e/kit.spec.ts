@@ -27,6 +27,7 @@ async function ready(page: Page, hash = '#jobs') {
 /** A product, with how many are counted in the warehouse. */
 async function newProduct(page: Page, name: string, how: 'numbered' | 'counted', count: number, department = 'Audio') {
   await page.goto('/#stock')
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
   await form.getByLabel('Department').selectOption({ label: department })
@@ -37,6 +38,9 @@ async function newProduct(page: Page, name: string, how: 'numbered' | 'counted',
   await add.getByLabel('Counted at').fill('Warehouse')
   await add.getByLabel('How many').fill(String(count))
   await add.getByRole('button', { name: 'Save count' }).click()
+  // The first time the Warehouse is named on this server, it's asked about (audit finding 19).
+  const yes = page.getByRole('button', { name: 'Make the place' })
+  if (await yes.isVisible()) await yes.click()
   await expect(page.locator('.count', { hasText: 'Warehouse' })).toContainText(String(count))
 }
 
@@ -57,6 +61,9 @@ async function newJob(page: Page, name: string, status: 'Confirmed' | 'Quoted' |
 }
 
 async function addKit(page: Page, product: string, qty: number, days = 'Whole job') {
+  // Behind its button until the first line; it stays open for the next.
+  const opener = page.getByRole('button', { name: 'Add kit' })
+  if (await opener.count()) await opener.click()
   const form = page.getByRole('form', { name: 'Add kit' })
   await form.getByLabel('Product').fill(product)
   await form.getByLabel('How many').fill(String(qty))
@@ -87,7 +94,7 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
     ['Show', '2030-09-06', '2030-09-07'],
   ])
   const kit = page.getByRole('region', { name: 'Kit' })
-  await expect(kit.locator('.empty')).toHaveText('No kit yet. Add what the job needs from the stock list below, for the whole job or one phase.')
+  await expect(kit.locator('.empty')).toHaveText('Nothing here yet. Add what the job needs from the stock list, for the whole job or one phase.')
   await addKit(page, speaker, 8)
   const pa = kit.getByRole('article', { name: `8 × ${speaker}` })
   await expect(pa.locator('header p')).toHaveText('Whole job · Mon 2 Sep to Sat 7 Sep')

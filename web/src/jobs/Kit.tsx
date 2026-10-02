@@ -2,7 +2,6 @@ import {
   dayLabel,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
-  irishToday,
   MAX_QTY,
   newId,
   plural,
@@ -17,8 +16,12 @@ import {
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
-import { Pending, ProductChoices } from '../stock/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { Fold, ShowAll } from '../Fold.tsx'
+import { ProductChoices } from '../stock/common.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday } from '../view.ts'
 
 /**
  * Kit on jobs (ADR 0014): what a job needs from the stock list, for the
@@ -97,27 +100,37 @@ export function kitShort(lines: readonly KitLineView[] | undefined): Tone | unde
 /** The job page's Kit card. */
 export function KitCard({ job, view }: { job: JobView; view: View }) {
   const lines = view.kit.byJob.get(job.id) ?? []
-  const today = irishToday()
-  const byDepartment = new Map<Department, KitLineView[]>()
-  for (const l of lines) {
-    const d = l.model?.department ?? 'other'
-    byDepartment.set(d, [...(byDepartment.get(d) ?? []), l])
+  const today = useToday()
+  const department = (l: KitLineView): Department => l.model?.department ?? 'other'
+  // In the order they're shown, so "Show all" adds to the end, not in among them; a line short or at risk stays in view.
+  const byDepartment = DEPARTMENTS.flatMap((d) => lines.filter((l) => department(l) === d))
+  const toAct = (l: KitLineView) => {
+    const tone = kitState(l, today)?.tone
+    return tone === 'bad' || tone === 'warn'
   }
   return (
     <section className="card kit" aria-label="Kit">
       <h2>Kit</h2>
       <PickLink job={job} view={view} lines={lines} />
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
-      {lines.length === 0 && <p className="empty">No kit yet. Add what the job needs from the stock list below, for the whole job or one phase.</p>}
-      {DEPARTMENTS.filter((d) => byDepartment.has(d)).map((d) => (
-        <div className="kit-group" key={d}>
-          <h3>{DEPARTMENT_LABELS[d]}</h3>
-          {byDepartment.get(d)!.map((l) => (
-            <KitLine key={l.id} line={l} job={job} today={today} />
-          ))}
-        </div>
-      ))}
-      <AddKit job={job} view={view} lines={lines} />
+      {lines.length === 0 && <Empty>Add what the job needs from the stock list, for the whole job or one phase.</Empty>}
+      <ShowAll items={byDepartment} limit={3} what="lines" keep={toAct}>
+        {(shown) =>
+          DEPARTMENTS.filter((d) => shown.some((l) => department(l) === d)).map((d) => (
+            <div className="kit-group" key={d}>
+              <h3>{DEPARTMENT_LABELS[d]}</h3>
+              {shown
+                .filter((l) => department(l) === d)
+                .map((l) => (
+                  <KitLine key={l.id} line={l} job={job} today={today} />
+                ))}
+            </div>
+          ))
+        }
+      </ShowAll>
+      <Fold label="Add kit">
+        <AddKit job={job} view={view} lines={lines} />
+      </Fold>
       <ProductChoices w={view.warehouse} />
       <datalist id="supplier-names">
         {view.kit.suppliers.map((s) => (

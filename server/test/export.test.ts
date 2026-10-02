@@ -218,9 +218,22 @@ describe('download everything', () => {
     expect(history[0]).toMatchObject({ Device: 'Safari on iPhone', Outcome: 'Done', 'Made offline': 'no', 'Waited on the device': 'under a minute' })
     expect(history[6]).toMatchObject({ Device: 'Chrome on Android', 'Made offline': '' })
 
-    // The download itself is now in the history, and in the next download.
-    const json = JSON.parse(files['everything.json']!) as Record<string, unknown[]>
+    // Fetching the file writes nothing: the app records the download as it asks for it, so an
+    // address alone (a browser warming up a link, say) never puts a download in the history.
+    expect((await colly.history()).entries.map((e) => e.command)).not.toContain('data.export')
+    const recorded = await app.inject({
+      method: 'POST',
+      url: '/api/export/record?client=phonec0ffee',
+      cookies: colly.cookies,
+      headers: { 'user-agent': IPHONE },
+      payload: { format: 'zip' },
+    })
+    expect(recorded.statusCode).toBe(200)
+    // The count is of the file the app then fetches, which holds the record itself.
+    const again = await download(app, colly.cookies)
+    const json = JSON.parse(again.files['everything.json']!) as Record<string, unknown[]>
     const rows = Object.entries(json).reduce((n, [key, value]) => (key === 'exportedAt' ? n : n + value.length), 0)
+    expect(recorded.json()).toEqual({ rows })
     const page: HistoryPage = await colly.history()
     expect(page.entries[0]).toMatchObject({
       what: `Downloaded everything (${rows} rows)`,
@@ -228,10 +241,9 @@ describe('download everything', () => {
       device: 'Safari on iPhone',
       deviceCode: 'c0ffee',
     })
-    const again = await download(app, colly.cookies)
-    expect(table(again.files['history.csv']!).at(-1)).toMatchObject({ Who: 'Colly Hewson', What: expect.stringMatching(/^Downloaded everything \(\d+ rows\)$/) })
+    expect(table(again.files['history.csv']!).at(-1)).toMatchObject({ Who: 'Colly Hewson', What: `Downloaded everything (${rows} rows)` })
 
-    await app.inject({ url: '/api/export', cookies: colly.cookies })
+    await app.inject({ method: 'POST', url: '/api/export/record', cookies: colly.cookies, payload: { format: 'json' } })
     expect((await colly.history()).entries[0]!.what).toMatch(/^Downloaded everything as JSON \(\d+ rows\)$/)
   })
 
@@ -239,6 +251,7 @@ describe('download everything', () => {
     const { app } = await server()
     expect((await app.inject('/api/export.zip')).statusCode).toBe(401)
     expect((await app.inject('/api/export')).statusCode).toBe(401)
+    expect((await app.inject({ method: 'POST', url: '/api/export/record', payload: { format: 'zip' } })).statusCode).toBe(401)
   })
 })
 

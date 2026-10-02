@@ -1,28 +1,7 @@
-/* Jobs. The screens also carry the crew class, so crew call cards and forms look the same here. */
-.jobs .search { width: 100%; }
-.jobs .filters { display: flex; gap: var(--space-6); flex-wrap: wrap; }
-.jobs .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.jobs .job-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.jobs .job-row { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
-.jobs .job-list li:first-child .job-row { border-top: 0; padding-top: 0; }
-.jobs .job-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
-.jobs .job-row .side { display: grid; justify-items: end; align-content: start; gap: var(--space-4); text-align: right; }
-.jobs .job-row small { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-.jobs .job-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-.jobs fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
-.jobs legend { padding: 0; font-size: .85rem; color: var(--muted); margin-bottom: var(--space-4); }
+/* Jobs. The screens also carry the crew class, so crew call cards and forms look the same here; what every area shares (the way back, titles, facts, rows, forms) is in app.css. */
 .jobs .phase-rows { display: grid; gap: var(--space-6); }
 .jobs .phase-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: var(--space-6); align-items: center; }
 .jobs .contact { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
-.jobs .back { color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
-.jobs .title { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
-.jobs h1 { margin: 0; font-size: 1.3rem; line-height: 1.25; }
-.jobs .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
-.jobs .facts dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.jobs .facts dd { margin: 0; }
-.jobs .facts a { color: var(--accent-ink); font-weight: 600; }
-.jobs .notes { margin: 0; white-space: pre-line; color: var(--muted); font-size: .9rem; }
-.jobs .card > button { justify-self: start; }
 .jobs .phase { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
 .jobs .phase:first-of-type { border-top: 0; padding-top: 0; }
 .jobs .phase > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
@@ -30,11 +9,10 @@
 .jobs .phase .job { padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-radius: 10px; }
 .jobs .cal { margin: 0; font-size: .82rem; color: var(--muted); }
 .jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
-.jobs .warn-line { margin: 0; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
 .jobs .add-phase { padding-top: var(--space-12); border-top: 1px solid var(--line); }
-/* Something just added: kit here, items and counts on Stock. */
-.jobs .added { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); background: var(--good-soft); color: var(--good); font-size: .9rem; }
-.jobs .added a { color: inherit; font-weight: 700; }
+/* A phase's running order, calendar line, call sheet and contact wait folded under its name (audit finding 16), behind the browser's own triangle; a calendar line to act on stays out. */
+.jobs .phase-details summary { padding: var(--space-12) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.jobs .phase-details > div { display: grid; gap: var(--space-8); }
 
 /* Kit on jobs (ADR 0014): lines by department, each saying whether there's enough; red when short on a confirmed job, amber when pencilled in. */
 .jobs .kit-group { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
@@ -52,14 +30,7 @@
 .jobs .kit-state.quiet { color: var(--muted); }
 .jobs .add-kit { padding-top: var(--space-12); border-top: 1px solid var(--line); }
 .jobs .kit > h2 + .add-kit, .jobs .kit > .empty + .add-kit { padding-top: 0; border-top: 0; }
-.jobs .add-kit h3 { margin: 0; font-size: .95rem; }
-.jobs .job-row .kit-note { font-size: .85rem; }
-.jobs .job-row .kit-note.bad, .jobs .job-row small.flag.bad { color: var(--bad); }
-.jobs .job-row .kit-note.warn, .jobs .job-row small.flag.warn { color: var(--warn); }
-.jobs .job-row .kit-note.ok { color: var(--good); }
-.jobs .job-row small.flag { font-weight: 700; }
-.jobs .kit-short { border-color: var(--warn); }
-.jobs .kit-short h2 { color: var(--warn); }
+.jobs .add-kit h3 { margin: 0; font-size: var(--text-subheading); }
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
 .jobs .views { display: flex; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); }
@@ -74,8 +45,6 @@
 .plan .actions .button { flex: 1 1 auto; max-width: 180px; }
 .plan .checks { border-color: var(--warn); }
 .plan .checks h2 { color: var(--warn); }
-.plan .pill.clash { background: var(--bad-soft); color: var(--bad); }
-.plan .pill.check { background: var(--warn-soft); color: var(--warn); }
 .plan .problem > div { flex: 1; min-width: 60%; }
 .plan .problem p { color: var(--ink); }
 /* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. */
@@ -125,7 +94,7 @@
 .plan .item small { color: var(--muted); }
 .plan .item.booked, .plan .code.booked { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
 .plan .item.offered, .plan .code.offered { border: 1px dashed var(--muted); }
-.plan .item.away, .plan .code.away { background: var(--line); color: var(--muted); }
+.plan .item.away, .plan .code.away { background: var(--line); color: var(--on-line); }
 .plan .timeline td.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .timeline td.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
 .plan .tag { display: block; margin-bottom: 3px; font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
@@ -194,8 +163,6 @@
 .pick .count-row { display: grid; grid-template-columns: 1fr 7.5rem auto; gap: var(--space-6); align-items: center; }
 .pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; }
 .pick .count-row .alert { grid-column: 1 / -1; }
-.jobs .pick-lists h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.jobs .job-row small.flag.ok { color: var(--good); }
 
 /* Call sheets (ADR 0021): the office's, and a plain one on paper. */
 .jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
@@ -211,7 +178,6 @@
 .sheet-screen .sheet-call button.link { min-height: 36px; padding: var(--space-2) var(--space-6); }
 .sheet-screen .card a:not(.button) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 .sheet-screen a[href^='tel:'] { white-space: nowrap; }
-.pill.offered { background: var(--line); color: var(--muted); }
 @media print {
   .print-sheet.call-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
   .call-sheet h1 { font-size: 17pt; margin: 2pt 0; }

@@ -12,10 +12,16 @@ import {
   type Where,
 } from '@sh/shared'
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 
-/** What the Stock screens share: names for where things are, and picking a place or case by typing (ADR 0013). */
+/**
+ * What the Stock screens share: names for where things are, picking a place
+ * or case by typing (ADR 0013), the question before a name nobody has used
+ * makes a new place, and what the last scan did, under the camera.
+ */
 
 /** An item's number, or what it will have. */
 export const numberLabel = (a: { number: string }) => a.number || 'Number when synced'
@@ -107,8 +113,63 @@ export function whereProblem(text: string, w: WarehouseView): string | undefined
   if (!number || findWhere(t, w)) return undefined
   const found = w.byNumber.get(number)
   if (!found) return `No case has the number ${number}.`
+  if (found.retiredReason === 'mistake') return `${number} was added by mistake.`
   return found.model?.isCase ? `${number} is retired, so nothing can go in it.` : `${number} (${found.model?.name ?? 'an item'}) doesn't hold other kit.`
 }
+
+/**
+ * The question before a where that matches no place makes a new one (audit
+ * finding 19), so a slip of the thumb doesn't leave a "Bay A4" beside the
+ * "Bay A3" meant. `ask` answers whether the question is now on screen: if
+ * so, `go` runs once it's answered yes, and the form shows `question` in
+ * the button's place with its fields held still (`asking`).
+ */
+export function useNewPlace(w: WarehouseView) {
+  const [asking, setAsking] = useState<{ name: string; go: () => void }>()
+  const ask = (text: string, go: () => void): boolean => {
+    const t = text.trim()
+    if (!t || findWhere(t, w) || whereProblem(t, w)) return false
+    setAsking({ name: t, go })
+    return true
+  }
+  const question = asking ? (
+    <Confirm
+      className="wide"
+      question={`Make a new place called “${asking.name}”? It joins the places on the Stock tab.`}
+      yes="Make the place"
+      no="Go back"
+      onYes={() => {
+        // The fields are back before the form goes on, so the number field can take the focus for the next label.
+        flushSync(() => setAsking(undefined))
+        asking.go()
+      }}
+      onNo={() => setAsking(undefined)}
+    />
+  ) : null
+  return { ask, question, asking: !!asking }
+}
+
+/**
+ * What the last scan or put-away did, in a row under the camera, which
+ * stays on for the next label (audit finding 18); Close ends the session.
+ */
+export function ScanResult({ children, onClose, label = 'Last scan' }: { children: ReactNode; onClose?: () => void; label?: string }) {
+  return (
+    <div className="scan-result wide">
+      <div className="added" role="status" aria-label={label}>
+        {children}
+      </div>
+      {onClose && (
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** "SH-000123 (d&b Y10P) was added by mistake.", for a label that's on nothing real. */
+export const mistakeLabel = (a: AssetView) => `${numberLabel(a)} (${a.model?.name ?? 'an item'}) was added by mistake.`
 
 /** Why an item can't go into a case, when it can't: it's that case, or the case is already inside it. The server says the same. */
 export function loopIn(itemId: string, caseId: string, w: WarehouseView): string | undefined {
@@ -139,10 +200,6 @@ export function WhereChoices({ w }: { w: WarehouseView }) {
   )
 }
 
-export function Pending({ pending }: { pending: boolean }) {
-  return pending ? <span className="pill pending">Waiting to sync</span> : null
-}
-
 /** Products to pick from as you type. */
 export function ProductChoices({ w }: { w: WarehouseView }) {
   return (
@@ -164,6 +221,7 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
   const [qty, setQty] = useState('')
   const [to, setTo] = useState('')
   const { run, error, refuse } = useAct()
+  const { ask, question, asking } = useNewPlace(w)
   const name = s.model?.name ?? 'them'
   const open = (next: 'count' | 'move') => {
     refuse('')
@@ -182,22 +240,24 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
     if (n > s.qty) return refuse(`Only ${s.qty.toLocaleString('en-IE')} counted ${atLabel(s, w)}.`)
     const known = findWhere(to, w)
     if (known && stockId(s.modelId, known) === s.id) return refuse("That's where they are already.")
-    void run(async () => {
-      const dest = await whereNamed(to, w)
-      if (!dest) throw new Error('Where to?')
-      await client.mutate('stock.move', {
-        modelId: s.modelId,
-        fromPlaceId: s.placeId,
-        fromCaseId: s.caseId,
-        toPlaceId: dest.placeId,
-        toCaseId: dest.caseId,
-        qty: n,
+    const go = () =>
+      void run(async () => {
+        const dest = await whereNamed(to, w)
+        if (!dest) throw new Error('Where to?')
+        await client.mutate('stock.move', {
+          modelId: s.modelId,
+          fromPlaceId: s.placeId,
+          fromCaseId: s.caseId,
+          toPlaceId: dest.placeId,
+          toCaseId: dest.caseId,
+          qty: n,
+        })
+      }).then((ok) => {
+        if (!ok) return
+        setMode(undefined)
+        setTo('')
       })
-    }).then((ok) => {
-      if (!ok) return
-      setMode(undefined)
-      setTo('')
-    })
+    if (!ask(to, go)) go()
   }
   return (
     <div className="row count">
@@ -217,17 +277,19 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
         <form className="detail grid-form" onSubmit={submit}>
           <label className={mode === 'count' ? 'wide' : undefined}>
             {mode === 'count' ? `How many ${name} are there now` : 'How many'}
-            <input type="number" inputMode="numeric" min={0} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required />
+            <input type="number" inputMode="numeric" min={0} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required disabled={asking} />
           </label>
           {mode === 'move' && (
             <label>
-              To <input list="where-choices" value={to} onChange={(e) => setTo(e.target.value)} placeholder="A place, or a case's number" required />
+              To <input list="where-choices" value={to} onChange={(e) => setTo(e.target.value)} placeholder="A place, or a case's number" required disabled={asking} />
             </label>
           )}
           <Refusal error={error} className="wide" />
-          <button type="submit" className="primary wide">
-            {mode === 'count' ? 'Save count' : `Move ${name}`}
-          </button>
+          {question ?? (
+            <button type="submit" className="primary wide">
+              {mode === 'count' ? 'Save count' : `Move ${name}`}
+            </button>
+          )}
         </form>
       )}
     </div>

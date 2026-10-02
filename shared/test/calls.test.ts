@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Mutation } from '../src/commands.ts'
-import { movedCallSpan, offerDaysAfter, type CrewCall, type Offer } from '../src/crew.ts'
+import { commandSchemas, type Mutation } from '../src/commands.ts'
+import { movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, suggestedReplyBy, type CrewCall, type Offer } from '../src/crew.ts'
 import type { Phase } from '../src/jobs.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import { crewFill } from '../src/sync/jobs-view.ts'
@@ -149,5 +149,29 @@ describe("a job's crew count", () => {
     expect(crewFill(full.calls)).toEqual({ needed: 2, booked: 1, toConfirm: 1 })
     const confirmed = crewView({ ...entities, offer: { ...entities.offer, dara: offer('dara', 'p2', 'confirmed', ['2026-10-07', '2026-10-08']) } }, [], 0)
     expect(crewFill(confirmed.calls)).toEqual({ needed: 2, booked: 2, toConfirm: 0 })
+  })
+})
+
+describe('the reply-by day when asking for crew (audit finding 21)', () => {
+  it('is suggested as two days before the first day, or the day before when the job is close, never a day already gone, and not at all once the job is over', () => {
+    // Proves: the day both office forms suggest comes before the job, a job tomorrow included, unless it starts today or has started; a job that's over gets none, so the suggestion is never one the rules turn down.
+    expect(suggestedReplyBy('2026-10-24', '2026-10-25', '2026-10-01')).toBe('2026-10-22')
+    expect(suggestedReplyBy('2026-10-04', '2026-10-04', '2026-10-01')).toBe('2026-10-02')
+    expect(suggestedReplyBy('2026-10-03', '2026-10-04', '2026-10-01')).toBe('2026-10-02')
+    expect(suggestedReplyBy('2026-10-02', '2026-10-02', '2026-10-01')).toBe('2026-10-01')
+    expect(suggestedReplyBy('2026-10-01', '2026-10-01', '2026-10-01')).toBe('2026-10-01')
+    expect(suggestedReplyBy('2026-09-28', '2026-10-03', '2026-10-01')).toBe('2026-10-01')
+    expect(suggestedReplyBy('2026-09-28', '2026-09-30', '2026-10-01')).toBeNull()
+  })
+
+  it("is turned down after the job's last day, in words, before the call is kept", () => {
+    // Proves: a reply-by day left behind when the dates were changed is refused on the device, which checks a new call as the server does; up to the last day, or none, is fine.
+    const create = (replyBy: string | null) =>
+      commandSchemas['call.create'].safeParse({ ...call, id: 'c2', start: '2026-10-10', end: '2026-10-12', replyBy })
+    const refused = create('2026-10-13')
+    expect(refused.success).toBe(false)
+    expect(refused.error?.issues[0]?.message).toBe(REPLY_BY_AFTER)
+    expect(create('2026-10-12').success).toBe(true)
+    expect(create(null).success).toBe(true)
   })
 })

@@ -20,3 +20,8 @@ export function isDay(s: string): boolean {
 }
 
 export const day = z.string().refine(isDay, "That isn't a real date.")
+
+/** Today in Ireland, as 2026-10-05: the one place the app and the server read the day from. */
+export function irishToday(now = new Date()): string {
+  return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
+}

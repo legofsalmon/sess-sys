@@ -1,5 +1,4 @@
-import type { View } from '@sh/shared'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Confirm } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
@@ -13,14 +12,9 @@ import { MadeUp, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { useNotDone } from './problems.tsx'
 import { client, storage } from './sync.ts'
+import { useView } from './view.ts'
 
 /** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, bringing in the crew list, and the device's own sync state. */
-
-function useView(): View {
-  const [view, setView] = useState(() => client.view())
-  useEffect(() => client.subscribe(setView), [])
-  return view
-}
 
 export function AccountScreen() {
   const auth = useAuth()

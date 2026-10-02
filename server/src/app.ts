@@ -1,8 +1,8 @@
-import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
-import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify'
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
+import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
@@ -21,9 +21,9 @@ import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
-import { everythingJson, everythingZip, readEverything, rowCount, zipName } from './export.ts'
+import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
-import { requestForLog } from './http.ts'
+import { publicOrigin, requestForLog } from './http.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 
@@ -41,6 +41,8 @@ export interface AppOptions {
   auth?: AuthConfig
   /** Where nightly backups go (ADR 0004). Without it there are none. */
   backupStore?: BackupStore
+  /** Encrypts each backup file (docs/backups.md). Without it they are plain text inside. */
+  backupKey?: Buffer
   /** Which code is running, recorded in each backup. */
   commit?: string
   /** Where errors are reported (ADR 0005), which the app on each device needs to know too. */
@@ -56,7 +58,7 @@ export interface AppOptions {
   feeds?: FeedsOptions
 }
 
-export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs'> {
+export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs'> {
   clientId: string
   clientSecret: string
   /** Stands in for the network in tests. */
@@ -81,16 +83,15 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, backupStore, commit, errorReporting, backupWatch, calendar } = options
+  const { db, logger = false, logTo, webRoot, auth, backupStore, backupKey, commit, errorReporting, backupWatch, calendar } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
     logger: logger && { serializers: { req: requestForLog }, ...(logTo && { stream: logTo }) },
     bodyLimit: 5 * 1024 * 1024,
   })
-  const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch }).load()
+  const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch, key: backupKey }).load()
   app.decorate('backups', backups)
-  await app.register(cors, { origin: true })
   await app.register(websocket)
 
   const sockets = new Set<WebSocket>()
@@ -150,6 +151,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     req.log.error({ req, res: reply, err }, err.message)
     reply.code(status).send({ error: 'Something went wrong on the server.' })
+  })
+
+  // On every answer, files and faults included: a browser never guesses a file's
+  // type, never shows the app inside another site's frame, and tells other sites
+  // only where a link came from, not which page. Browsers remember the https
+  // rule for a year, so it goes out only on https (Railway says so in the
+  // forwarded protocol), never from a local server on http.
+  app.addHook('onSend', async (req, reply) => {
+    reply.header('x-content-type-options', 'nosniff')
+    reply.header('content-security-policy', "frame-ancestors 'none'")
+    reply.header('referrer-policy', 'strict-origin-when-cross-origin')
+    if (publicOrigin(req).startsWith('https:')) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains')
   })
 
   registerAuth(app, db, auth)
@@ -260,9 +273,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   // Everything, from one moment (ADR 0006). It holds everyone's details, so each download
-  // goes in the history: who, when and on what device. `client` is the app's device code.
-  const exported = async (req: FastifyRequest<{ Querystring: { client?: string } }>, format: 'zip' | 'json', rows: number) => {
+  // goes in the history: who, when and on what device. The app records it with this
+  // post as it asks for the file, so a fetch of the address alone (a browser warming
+  // up a link, say) writes nothing. `client` is the app's device code.
+  app.post<{ Querystring: { client?: string }; Body: { format?: unknown } }>('/api/export/record', async (req, reply) => {
+    const format = req.body?.format === 'json' ? 'json' : 'zip'
     const client = req.query.client ?? ''
+    // The file is fetched after this, with this record in it, so the count includes it.
+    const rows = (await exportRowCount(db)) + 1
     await recordExport(db, {
       clientId: /^[a-z0-9]{1,64}$/.test(client) ? client : 'server',
       userId: req.user?.id,
@@ -270,12 +288,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       format,
       rows,
     })
-  }
+    return reply.header('cache-control', 'no-store').send({ rows })
+  })
 
-  app.get<{ Querystring: { client?: string } }>('/api/export.zip', async (req, reply) => {
+  app.get('/api/export.zip', async (req, reply) => {
     const everything = await readEverything(db)
     const zip = everythingZip(everything, req.user ?? undefined)
-    await exported(req, 'zip', rowCount(everything))
     return reply
       .type('application/zip')
       .header('content-disposition', `attachment; filename="${zipName(everything)}"`)
@@ -283,15 +301,23 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       .send(Buffer.from(zip.buffer, zip.byteOffset, zip.byteLength))
   })
 
-  // The same, as JSON, for scripts.
-  app.get<{ Querystring: { client?: string } }>('/api/export', async (req, reply) => {
+  // The same, as JSON, for scripts. A script that wants its download in the history posts to /api/export/record first.
+  app.get('/api/export', async (_req, reply) => {
     const everything = await readEverything(db)
-    await exported(req, 'json', rowCount(everything))
     return reply.header('cache-control', 'no-store').send(everythingJson(everything))
   })
 
   if (webRoot) {
-    await app.register(fastifyStatic, { root: webRoot })
+    // A file under /assets/ has its content's hash in its name, so a new build never
+    // reuses a name: browsers can keep it for a year without asking. The page, the
+    // service worker and the manifest keep their names, so they are checked every time.
+    // Judged from the web root, so a checkout in a folder that happens to be called assets changes nothing.
+    const assets = join(webRoot, 'assets') + sep
+    await app.register(fastifyStatic, {
+      root: webRoot,
+      cacheControl: false,
+      setHeaders: (reply, path) => reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+    })
     // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.
     // A missing file under /assets/ is a plain 404, never the page: a page from before a deploy
     // asking for a file that's gone should see it fail (and reload), not get HTML as its script.

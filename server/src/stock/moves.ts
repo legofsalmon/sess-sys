@@ -1,4 +1,4 @@
-import type { CommandArgs, Movement } from '@sh/shared'
+import { MAX_CASE_DEPTH, type CommandArgs, type Movement } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { emit, Refused, type Ctx } from '../kernel.ts'
 import { getProject } from '../projects/store.ts'
@@ -39,6 +39,53 @@ async function getMovement(q: Queryable, id: string) {
 export async function movementsOf(q: Queryable, modelId: string): Promise<number> {
   const { rows } = await q.query<{ n: string }>('SELECT count(*) AS n FROM movements WHERE model_id = $1', [modelId])
   return Number(rows[0]!.n)
+}
+
+/**
+ * What of a product is out with a job now, by the same rules a device's
+ * pick lists use (sync/pick-view.ts), so the server never turns down what
+ * the phone shows as back: an item is out when the latest scan of it, or
+ * of a case it's in, was out, and a report of it missing from a job ends
+ * its time out as a scan back would; counted kit is out while more went
+ * out with a job than came back or was reported missing. Nothing when
+ * it's all in.
+ */
+export async function outWithJobs(q: Queryable, modelId: string): Promise<{ what: string; job: string }[]> {
+  const { rows: items } = await q.query<{ number: string | null; job: string }>(
+    `WITH RECURSIVE holders AS (
+       SELECT a.id AS item, a.id AS holder, 0 AS depth FROM assets a WHERE a.model_id = $1 AND a.status = 'active'
+       UNION ALL
+       SELECT h.item, c.case_id, h.depth + 1 FROM holders h JOIN assets c ON c.id = h.holder
+        WHERE c.case_id IS NOT NULL AND h.depth < ${MAX_CASE_DEPTH}
+     ),
+     events AS (
+       SELECT asset_id, project_id, direction, at, id FROM movements WHERE asset_id IN (SELECT holder FROM holders)
+       UNION ALL
+       SELECT asset_id, project_id, 'in', at, id FROM faults
+        WHERE kind = 'missing' AND project_id IS NOT NULL AND asset_id IN (SELECT holder FROM holders)
+     ),
+     latest AS (
+       SELECT DISTINCT ON (h.item) h.item, e.direction, e.project_id
+         FROM holders h JOIN events e ON e.asset_id = h.holder
+        ORDER BY h.item, e.at DESC, e.id DESC
+     )
+     SELECT (SELECT i.value FROM identifiers i WHERE i.asset_id = l.item AND i.kind = 'sh' AND i.retired_at IS NULL) AS number, p.name AS job
+       FROM latest l JOIN projects p ON p.id = l.project_id
+      WHERE l.direction = 'out'
+      ORDER BY number`,
+    [modelId]
+  )
+  const { rows: counted } = await q.query<{ job: string; out: number }>(
+    `SELECT p.name AS job, sum(t.n)::int AS out
+       FROM (SELECT project_id, CASE WHEN direction = 'out' THEN qty ELSE -qty END AS n FROM movements WHERE model_id = $1 AND asset_id IS NULL
+             UNION ALL
+             SELECT project_id, -qty FROM faults WHERE model_id = $1 AND asset_id IS NULL AND kind = 'missing' AND project_id IS NOT NULL) t
+       JOIN projects p ON p.id = t.project_id
+      GROUP BY p.id, p.name HAVING sum(t.n) > 0
+      ORDER BY p.name`,
+    [modelId]
+  )
+  return [...items.map((r) => ({ what: r.number ?? 'an item', job: r.job })), ...counted.map((r) => ({ what: `${r.out.toLocaleString('en-IE')} counted`, job: r.job }))]
 }
 
 type MoveCommand = 'move.record'

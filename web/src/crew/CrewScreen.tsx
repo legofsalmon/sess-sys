@@ -22,8 +22,11 @@ import {
   OPEN,
   parseEuro,
   personConflicts,
+  REPLY_BY_AFTER,
+  suggestedReplyBy,
   tellMessage,
   tidyDepartment,
+  venueLabel,
   whatsappNumber,
   type AnswerKind,
   type CallView,
@@ -31,6 +34,7 @@ import {
   type Certificates,
   type CommandInput,
   type CrewView,
+  type JobView,
   type OfferView,
   type Person,
   type PersonView,
@@ -38,10 +42,14 @@ import {
   type TellEvent,
   type View,
 } from '@sh/shared'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { Empty } from '../Empty.tsx'
+import { Fold, ShowAll } from '../Fold.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
+import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday, useView } from '../view.ts'
 import { useFeedAddress } from './feed.ts'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
@@ -62,12 +70,10 @@ import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
  * turns down is counted in the top bar with every other screen's.
  */
 
-const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
-
-const STATUS: Record<OfferView['status'], [string, string]> = {
+const STATUS: Record<OfferView['status'], [string, PillTone]> = {
   offered: ['Offered', 'pending'],
   countered: ['Asked for more', 'pending'],
-  accepted: ['Accepted', 'accepted'],
+  accepted: ['Accepted', 'pending'],
   confirmed: ['Confirmed', 'confirmed'],
   declined: ['Declined', 'cancelled'],
   filled: ['Filled', 'cancelled'],
@@ -96,15 +102,25 @@ function byDepartmentThenLevel(a: PersonView, b: PersonView): number {
   return b.level - a.level || a.name.localeCompare(b.name)
 }
 
+/** Lower case with the fadas off, so "padraig" finds Pádraig and "sean" finds Seán: names are often typed without them. */
+const plain = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+/** The words typed into a search for someone. */
+const wordsOf = (typed: string) => plain(typed).split(/\s+/).filter(Boolean)
+
+/**
+ * Whether every word typed is in someone's name, the name they go by, their
+ * department or a skill (audit finding 16): the picker's search and the
+ * people list's find people the same way.
+ */
+function found(p: PersonView, words: readonly string[]): boolean {
+  const text = plain([p.name, p.knownAs, p.department, ...p.skills].filter(Boolean).join(' '))
+  return words.every((w) => text.includes(w))
+}
+
 /** "Dara Quinn · Audio · Level 3 (Sound No.1, Audio)", as the picker lists someone. */
 function pickerLabel(p: PersonView): string {
   return `${p.name}${p.department ? ` · ${p.department}` : ''} · ${levelLabel(p.level)}${p.skills.length ? ` (${p.skills.join(', ')})` : ''}`
-}
-
-function useView(): View {
-  const [view, setView] = useState(() => client.view())
-  useEffect(() => client.subscribe(setView), [])
-  return view
 }
 
 /** One person to tell, with the call it's about and whatever else the message needs. */
@@ -163,9 +179,27 @@ function whatItNeeds(kind: AnswerKind, offer: OfferView, short: number): string 
   return `The call is ${needs}`
 }
 
+/** The calls still open, by job and then by days (audit finding 16), jobs in the order of their first day. */
+function groupCalls(calls: readonly CallView[], inJobs: readonly JobView[]) {
+  // A job's own venue heads its group, whichever phase comes first; one not on this device yet goes by its first call's.
+  const venueOf = new Map(inJobs.map((j) => [j.id, j.venue ? venueLabel(j.venue) : '']))
+  const jobs = new Map<string, { key: string; project: string; venue: string; projectId: string | null; dates: Map<string, CallView[]> }>()
+  for (const c of calls) {
+    // A call made on the Crew tab has no job; its project's name stands in.
+    const key = c.projectId ?? `~${c.project.trim().toLowerCase()}`
+    let job = jobs.get(key)
+    if (!job) jobs.set(key, (job = { key, project: c.project, venue: (c.projectId && venueOf.get(c.projectId)) ?? c.venue, projectId: c.projectId, dates: new Map() }))
+    // A phase somewhere other than the job's venue says where, beside its days.
+    const when = [daysLabel(c.days), c.venue !== job.venue && c.venue].filter(Boolean).join(' · ')
+    job.dates.set(when, [...(job.dates.get(when) ?? []), c])
+  }
+  return [...jobs.values()]
+}
+
 export function CrewScreen() {
   const view = useView()
   const hash = useHash()
+  const today = useToday()
   const crew = view.crew
   const [share, setShare] = useState<Share | undefined>()
   const people = new Map(crew.people.map((p) => [p.id, p]))
@@ -180,7 +214,13 @@ export function CrewScreen() {
   // A department whose last person was edited or archived away narrows to nobody, so it's no filter at all until it's back.
   const chosen =
     department === NO_DEPARTMENT ? (active.some((p) => !p.department) ? department : '') : departments.some((d) => d.toLowerCase() === department.toLowerCase()) ? department : ''
-  const shown = active.filter((p) => !chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase()))
+  // Found as in the picker, and folded to the first ten (audit finding 16). Whoever is added stays in view, whatever the
+  // search, filter or fold, until the tab is next opened: on a phone the form pushes the list out of sight, so it says so too.
+  const [find, setFind] = useState('')
+  const [added, setAdded] = useState<readonly { id: string; name: string }[]>([])
+  const justAdded = (p: PersonView) => added.some((a) => a.id === p.id)
+  const words = wordsOf(find)
+  const shown = active.filter((p) => justAdded(p) || ((!chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase())) && found(p, words)))
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
@@ -213,74 +253,85 @@ export function CrewScreen() {
 
       {(toCheck.length > 0 || toSortOut.length > 0) && (
         <section className="card">
-          <h2>Answers to check</h2>
+          {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
+          <h2>Answers to check ({toSortOut.length + toCheck.length})</h2>
           <Refusal error={answers.error} />
-          {toSortOut.map(({ c, o, text }) => (
-            <div className="row" key={o.id}>
-              <div>
-                <b>{o.person?.name ?? 'Someone'}</b> answered on Google Calendar
-                <p>
-                  {c.project} · {c.role} · {o.status === 'confirmed' ? 'booked' : 'offered'} {daysLabel(o.days)}
-                  <br />
-                  {text}
-                </p>
-              </div>
-              {c.projectId && (
-                <div className="actions">
-                  <a className="link" href={`#jobs/${c.projectId}`}>
-                    Open job
-                  </a>
+          <ShowAll
+            items={[
+              ...toSortOut.map(({ c, o, text }) => (
+                <div className="row" key={o.id}>
+                  <div>
+                    <b>{o.person?.name ?? 'Someone'}</b> answered on Google Calendar
+                    <p>
+                      {c.project} · {c.role} · {o.status === 'confirmed' ? 'booked' : 'offered'} {daysLabel(o.days)}
+                      <br />
+                      {text}
+                    </p>
+                  </div>
+                  {c.projectId && (
+                    <div className="actions">
+                      <a className="link" href={`#jobs/${c.projectId}`}>
+                        Open job
+                      </a>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-          {toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
-            <div className="row" key={o.id}>
-              <div>
-                <b>{o.person?.name ?? 'Someone'}</b>{' '}
-                {kind === 'accepted'
-                  ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
-                  : kind === 'countered'
-                    ? `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`
-                    : kind === 'declined'
-                      ? 'declined'
-                      : "can't make it any more"}
-                <p>
-                  {c.project} · {c.role} · {daysLabel(o.days)}
-                  {(kind === 'declined' || kind === 'pulled-out') && <><br />{whatItNeeds(kind, o, short)}</>}
-                  {o.note && <><br />“{o.note}”</>}
-                  {warning && <><br />{warning}</>}
-                </p>
-              </div>
-              {kind === 'accepted' || kind === 'countered' ? (
-                <div className="actions">
-                  <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
-                    {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
-                  </button>
-                  <button type="button" onClick={() => settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')}>
-                    {kind === 'countered' ? 'Say no' : 'Release'}
-                  </button>
+              )),
+              ...toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
+                <div className="row" key={o.id}>
+                  <div>
+                    <b>{o.person?.name ?? 'Someone'}</b>{' '}
+                    {kind === 'accepted'
+                      ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
+                      : kind === 'countered'
+                        ? `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`
+                        : kind === 'declined'
+                          ? 'declined'
+                          : "can't make it any more"}
+                    <p>
+                      {c.project} · {c.role} · {daysLabel(o.days)}
+                      {(kind === 'declined' || kind === 'pulled-out') && <><br />{whatItNeeds(kind, o, short)}</>}
+                      {o.note && <><br />“{o.note}”</>}
+                      {warning && <><br />{warning}</>}
+                    </p>
+                  </div>
+                  {kind === 'accepted' || kind === 'countered' ? (
+                    <div className="actions">
+                      <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
+                        {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
+                      </button>
+                      <button type="button" onClick={() => settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')}>
+                        {kind === 'countered' ? 'Say no' : 'Release'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="actions">
+                      <button type="button" onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
+                        Noted
+                      </button>
+                      {c.openDays.length > 0 && (
+                        <Fold label="Offer…">
+                          <OfferForm
+                            call={c}
+                            crew={crew}
+                            onShare={(person) => {
+                              // Offering the call to someone else is acting on the answer, so it's noted without another tap.
+                              void answers.run(() => client.mutate('offer.seen', { id: o.id }))
+                              setShare({ kind: 'offer', person, call: c })
+                            }}
+                          />
+                        </Fold>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="actions">
-                  <button type="button" onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
-                    Noted
-                  </button>
-                </div>
-              )}
-              {(kind === 'declined' || kind === 'pulled-out') && c.openDays.length > 0 && (
-                <OfferForm
-                  call={c}
-                  crew={crew}
-                  onShare={(person) => {
-                    // Offering the call to someone else is acting on the answer, so it's noted without another tap.
-                    void answers.run(() => client.mutate('offer.seen', { id: o.id }))
-                    setShare({ kind: 'offer', person, call: c })
-                  }}
-                />
-              )}
-            </div>
-          ))}
+              )),
+            ]}
+            limit={3}
+            what="answers"
+          >
+            {(rows) => rows}
+          </ShowAll>
         </section>
       )}
 
@@ -289,9 +340,29 @@ export function CrewScreen() {
 
       <section className="card">
         <h2>Crew needed</h2>
-        {upcoming.length === 0 && <p className="empty">No crew needed yet. Ask for crew from a job in Jobs, or below.</p>}
-        {upcoming.map((c) => (
-          <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+        {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
+        {groupCalls(upcoming, view.jobs.jobs).map((g) => (
+          <div className="call-group" key={g.key}>
+            <header>
+              <div>
+                <b>{g.project}</b>
+                {g.venue && <p>{g.venue}</p>}
+              </div>
+              {g.projectId && (
+                <a className="link" href={`#jobs/${g.projectId}`}>
+                  Open job
+                </a>
+              )}
+            </header>
+            {[...g.dates].map(([when, calls]) => (
+              <div className="call-date" key={when}>
+                <h3>{when}</h3>
+                {calls.map((c) => (
+                  <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+                ))}
+              </div>
+            ))}
+          </div>
         ))}
       </section>
 
@@ -300,13 +371,18 @@ export function CrewScreen() {
       <section className="card">
         <h2>Crew for something not in Jobs</h2>
         <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
-        <NewCall />
+        <Fold label="Ask for crew">
+          <NewCall />
+        </Fold>
       </section>
 
-      <section className="card">
+      <section className="card" aria-label="People">
         <h2>People</h2>
         <Refusal error={roster.error} />
-        {active.length === 0 && archived.length === 0 && <p className="empty">Nobody yet. Add your crew below.</p>}
+        {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
+        {active.length > 0 && (
+          <input className="search" type="search" placeholder="Name, department or skill" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a person" />
+        )}
         {departments.length > 0 && (
           <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
             <option value="">All departments</option>
@@ -318,9 +394,10 @@ export function CrewScreen() {
             {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
           </select>
         )}
-        {shown.map((p) => (
-          <PersonRow key={p.id} person={p} crew={crew} />
-        ))}
+        {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
+        <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
+          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
+        </ShowAll>
         {archived.length > 0 && (
           <details className="archived">
             <summary>Archived ({archived.length})</summary>
@@ -331,7 +408,7 @@ export function CrewScreen() {
                   <small>{[p.kind === 'staff' ? 'Staff' : null, p.skills.join(', ')].filter(Boolean).join(' · ')}</small>
                 </span>
                 {p.pending ? (
-                  <span className="pill pending">Waiting to sync</span>
+                  <Pending pending />
                 ) : (
                   <button type="button" onClick={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
                     Bring back
@@ -341,7 +418,11 @@ export function CrewScreen() {
             ))}
           </details>
         )}
-        <NewPerson />
+        <Fold label="Add person">
+          <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
+          {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
+          <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
+        </Fold>
       </section>
 
       <p className="hint">
@@ -352,7 +433,17 @@ export function CrewScreen() {
   )
 }
 
-/** One crew call: who's been offered it and how they answered, on their link or on Google Calendar, and offering it to someone else. */
+/** Offered, holding or booked: the people a call's one line names. */
+const ON_CALL: readonly OfferView['status'][] = [...OPEN, ...HOLDING]
+
+/**
+ * One crew call. At rest it's one line (audit finding 16): the role, its
+ * phase or days and who's on it, with where it stands as a pill beside it
+ * and "Offer…" under that while there are places to fill, the picker behind
+ * it until it's wanted. A tap on the line opens its days, call time and rate,
+ * who's been offered it and how they answered, on their link or on Google
+ * Calendar, and changing or cancelling the call.
+ */
 export function CallCard({
   call,
   crew,
@@ -360,6 +451,7 @@ export function CallCard({
   onShare,
   onTell,
   inJob = false,
+  phaseDays = false,
 }: {
   call: CallView
   crew: CrewView
@@ -368,13 +460,22 @@ export function CallCard({
   /** Opens the message for whoever should hear about a withdrawal or a cancelled call; without it, nobody is prompted. */
   onTell?: (share: Share | undefined) => void
   inJob?: boolean
+  /** Under a phase on the job's page, for the phase's own days, which its header says already. */
+  phaseDays?: boolean
 }) {
+  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const { run, error } = useAct()
+  const today = useToday()
   const filled = call.openDays.length === 0
-  const open = call.status === 'open'
+  const live = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
+  // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn, Niamh Kelly (offered)".
+  const who = call.offers
+    .filter((o) => o.person && ON_CALL.includes(o.status))
+    .map((o) => `${o.person!.name}${o.status === 'confirmed' ? '' : ` (${STATUS[o.status][0].toLowerCase()})`}`)
+    .join(', ')
 
   const withdraw = (o: OfferView) => {
     void run(() => client.mutate('offer.cancel', { id: o.id })).then(
@@ -387,98 +488,103 @@ export function CallCard({
   }
 
   return (
-    <article className={`job ${call.pending ? 'is-pending' : ''}`}>
-      <header>
-        <div>
-          {inJob ? (
-            // On the job's own page the job needs no saying, and the phase shows only for a call across phases.
-            <b>
-              {call.needed} × {call.role}
-              {!call.phaseId && call.phase && <span className="muted"> · {call.phase}</span>}
-            </b>
-          ) : (
-            <b>
-              {call.project}
-              {call.phase && <span className="muted"> · {call.phase}</span>}
-            </b>
-          )}
-          <p>
-            {!inJob && `${call.needed} × ${call.role} · `}
-            {daysLabel(call.days)}
-            {call.callTime && ` · call ${call.callTime}`} · {euro(call.dayRateCents)}
-            {call.venue && !inJob && <><br />{call.venue}</>}
-          </p>
-        </div>
-        <span className={`pill ${filled ? 'confirmed' : 'pending'}`}>
-          {filled ? 'Filled' : call.days.length > 1 ? `${call.days.filter((d) => call.heldByDay[d]! >= call.needed).length}/${call.days.length} days filled` : `${call.heldByDay[call.days[0]!]}/${call.needed}`}
-        </span>
-      </header>
+    <article className={`job call${call.pending ? ' is-pending' : ''}`} aria-label={`${call.needed} × ${call.role}`}>
+      <button type="button" className="call-line" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <b>
+          {call.needed} × {call.role}
+          {/* On the Crew tab the days are the heading over it. On the job's page the phase shows only for a call across phases, and the days unless they're the phase's. */}
+          {(!inJob || !call.phaseId) && call.phase && <span className="muted"> · {call.phase}</span>}
+          {inJob && !phaseDays && <span className="muted"> · {daysLabel(call.days)}</span>}
+        </b>
+        {who && <span className="who-line">{who}</span>}
+      </button>
+      {/* The one word at rest on where it stands: a cancelled call kept for the record says so, and a change to it or an offer on it still on its way says that. */}
+      <StatusPill tone={!live ? 'cancelled' : filled ? 'confirmed' : 'pending'} pending={call.pending || call.offers.some((o) => o.pending)}>
+        {!live
+          ? 'Cancelled'
+          : filled
+            ? 'Filled'
+            : call.days.length > 1
+              ? `${call.days.filter((d) => call.heldByDay[d]! >= call.needed).length}/${call.days.length} days filled`
+              : `${call.heldByDay[call.days[0]!]}/${call.needed}`}
+      </StatusPill>
 
-      {call.offers.length > 0 && (
-        <ul className="offers">
-          {call.offers.map((o) => {
-            const [label, tone] = STATUS[o.status]
-            const partial = o.days.length < call.days.length && (o.status === 'accepted' || o.status === 'confirmed' || o.status === 'countered')
-            const cal = offerOnCalendar(o, calendar.days, today)
-            const live = o.status === 'offered' || o.status === 'countered' || o.status === 'accepted' || o.status === 'confirmed'
-            return (
-              <li key={o.id}>
-                <span>
-                  {o.person?.name ?? 'Unknown'}
-                  {partial && <small> {daysLabel(o.days)}</small>}
-                  {o.override && <small> (override)</small>}
-                </span>
-                <span className="actions">
-                  <span className={`pill ${o.pending ? 'pending' : tone}`}>{o.pending ? 'Waiting to sync' : label}</span>
-                  {o.status === 'offered' && o.person && (
-                    <button type="button" className="link" onClick={() => onShare(o.person as PersonView)}>
-                      Send
-                    </button>
-                  )}
-                  {(o.status === 'offered' || o.status === 'confirmed') && (
-                    <button type="button" className="link" onClick={() => withdraw(o)}>
-                      Withdraw
-                    </button>
-                  )}
-                </span>
-                {cal && <small className="on-cal">{cal.line}</small>}
-                {cal?.warning && <small className="warn-line">{cal.warning}</small>}
-                {!cal && invites && live && o.person && !o.person.email?.trim() && <small className="on-cal">No email address, so no calendar invite.</small>}
-              </li>
-            )
-          })}
-        </ul>
+      {open && (
+        <>
+          <p className="facts-line">{[daysLabel(call.days), call.callTime && `call ${call.callTime}`, euro(call.dayRateCents)].filter(Boolean).join(' · ')}</p>
+          {call.offers.length > 0 && (
+            <ul className="offers">
+              {call.offers.map((o) => {
+                const [label, tone] = STATUS[o.status]
+                const partial = o.days.length < call.days.length && (o.status === 'accepted' || o.status === 'confirmed' || o.status === 'countered')
+                const cal = offerOnCalendar(o, calendar.days, today)
+                const answering = o.status === 'offered' || o.status === 'countered' || o.status === 'accepted' || o.status === 'confirmed'
+                return (
+                  <li key={o.id}>
+                    <span>
+                      {o.person?.name ?? 'Unknown'}
+                      {partial && <small> {daysLabel(o.days)}</small>}
+                      {o.override && <small> (override)</small>}
+                    </span>
+                    <span className="actions">
+                      <StatusPill tone={tone} pending={o.pending}>
+                        {label}
+                      </StatusPill>
+                      {o.status === 'offered' && o.person && (
+                        <button type="button" className="link" onClick={() => onShare(o.person as PersonView)}>
+                          Send
+                        </button>
+                      )}
+                      {(o.status === 'offered' || o.status === 'confirmed') && (
+                        <button type="button" className="link" onClick={() => withdraw(o)}>
+                          Withdraw
+                        </button>
+                      )}
+                    </span>
+                    {cal && <small className="on-cal">{cal.line}</small>}
+                    {cal?.warning && <small className="warn-line">{cal.warning}</small>}
+                    {!cal && invites && answering && o.person && !o.person.email?.trim() && <small className="on-cal">No email address, so no calendar invite.</small>}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
 
-      {open && !filled && <OfferForm call={call} crew={crew} onShare={onShare} />}
-      {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
-      <Refusal error={error} />
-      {cancelling ? (
-        <Confirm
-          question={`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`}
-          yes="Cancel it"
-          onYes={cancel}
-          onNo={() => setCancelling(false)}
-        />
-      ) : (
-        <div className="actions end">
-          {call.projectId && !inJob && (
-            <a className="link" href={`#jobs/${call.projectId}`}>
-              Open job
-            </a>
+      {live && !filled && (
+        <Fold label="Offer…" className="offer">
+          <OfferForm call={call} crew={crew} onShare={onShare} />
+        </Fold>
+      )}
+
+      {open && (
+        <>
+          {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
+          <Refusal error={error} />
+          {cancelling ? (
+            <Confirm
+              question={`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`}
+              yes="Cancel it"
+              onYes={cancel}
+              onNo={() => setCancelling(false)}
+            />
+          ) : (
+            <div className="actions end">
+              {/* A cancelled call, kept on the job's page for the record, can't be changed or cancelled again. */}
+              {live && !call.pending && (
+                <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+                  Change
+                </button>
+              )}
+              {live && (
+                <button type="button" className="link" onClick={() => setCancelling(true)}>
+                  Cancel crew call
+                </button>
+              )}
+            </div>
           )}
-          {/* A cancelled call, kept on the job's page for the record, can't be changed or cancelled again. */}
-          {open && !call.pending && (
-            <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
-              Change
-            </button>
-          )}
-          {open && (
-            <button type="button" className="link" onClick={() => setCancelling(true)}>
-              Cancel crew call
-            </button>
-          )}
-        </div>
+        </>
       )}
     </article>
   )
@@ -549,6 +655,8 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     if (f.start !== call.start) changes.start = f.start
     const end = f.end < f.start ? f.start : f.end
     if (end !== call.end) changes.end = end
+    // Dates moved earlier can leave the reply-by day after the job; it's here to fix, as when a call is made (audit finding 21).
+    if (f.replyBy && f.replyBy > end) return refuse(REPLY_BY_AFTER)
     if ((f.callTime || null) !== call.callTime) changes.callTime = f.callTime || null
     if (Math.max(1, f.needed) !== call.needed) changes.needed = Math.max(1, f.needed)
     if (rateChanged) changes.dayRateCents = rate.cents
@@ -639,9 +747,12 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   const [personId, setPersonId] = useState('')
   const [override, setOverride] = useState(false)
   const [applicants, setApplicants] = useState(false)
+  const [find, setFind] = useState('')
   // Someone who declined, pulled out or was told it's filled can be offered it again.
   const offered = new Set(call.offers.filter((o) => !['declined', 'filled', 'cancelled', 'pulled-out'].includes(o.status)).map((o) => o.personId))
-  const everyone = crew.people.filter((p) => !offered.has(p.id) && !p.archived)
+  // Narrowed as you type (audit finding 16), as the people list is.
+  const words = wordsOf(find)
+  const everyone = crew.people.filter((p) => !offered.has(p.id) && !p.archived && found(p, words))
   // Applicants nobody has vetted (Level 0) stay out of the way unless asked for (ADR 0025).
   const hidden = everyone.filter((p) => p.level === APPLICANT_LEVEL).length
   const candidates = everyone.filter((p) => applicants || p.level !== APPLICANT_LEVEL).sort(byDepartmentThenLevel)
@@ -663,8 +774,18 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
 
   return (
     <form className="offer-form" onSubmit={send}>
+      <input
+        type="search"
+        className="find"
+        value={find}
+        onChange={(e) => setFind(e.target.value)}
+        // Enter in a search box only searches: it mustn't send the offer to whoever is picked below, the trap of audit finding 5.
+        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+        placeholder="Name, department or skill"
+        aria-label="Find someone"
+      />
       <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Offer to">
-        <option value="">Offer to…</option>
+        <option value="">{candidates.length || !words.length ? 'Offer to…' : 'Nobody matches'}</option>
         {candidates.map((p) => (
           <option key={p.id} value={p.id}>
             {pickerLabel(p)}
@@ -810,6 +931,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   const [editing, setEditing] = useState(false)
   const [relinking, setRelinking] = useState(false)
   const { run, error, refuse } = useAct()
+  const today = useToday()
   const [away, setAway] = useState({ start: today, end: today, note: '' })
   const booked = crew.calls.flatMap((c) =>
     c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')).map((o) => ({ c, o })) : []
@@ -859,7 +981,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
           {off.length > 0 && ' · has days off'}
         </small>
       </button>
-      {person.pending && <span className="pill pending">Waiting to sync</span>}
+      <Pending pending={person.pending} />
       {open && editing && (
         <div className="detail">
           <PersonForm initial={person} submitLabel="Save" onSubmit={(fields) => client.mutate('person.upsert', { id: person.id, ...fields })} onDone={() => setEditing(false)} />
@@ -918,9 +1040,16 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
             }}
           >
-            <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} aria-label="Off from" />
-            <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} aria-label="Off until" />
-            <input placeholder="Note" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+            {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
+            <label className="field">
+              Off from <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} />
+            </label>
+            <label className="field">
+              Off until <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} />
+            </label>
+            <label className="field wide">
+              Note <input placeholder="e.g. on tour" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+            </label>
             <button type="submit">Mark days off</button>
           </form>
           <div className="actions">
@@ -974,6 +1103,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
 
 /** The certificates someone holds, and any that have run out (ADR 0025). Nothing for ones not held or not known. */
 function CertificateLines({ person }: { person: PersonView }) {
+  const today = useToday()
   const states = CERTIFICATE_KINDS.map((kind) => ({ kind, c: person.certificates[kind], state: certificateState(person.certificates[kind], today) }))
   const held = states.filter((x) => x.state === 'held')
   const expired = states.filter((x) => x.state === 'expired')
@@ -1012,10 +1142,13 @@ function Worked({ person }: { person: PersonView }) {
 }
 
 function NewCall() {
-  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '' }
+  const today = useToday()
+  // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
+  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '', replyBy: undefined as string | undefined }
   const [f, setF] = useState(blank)
   const { run, error, refuse } = useAct()
   const set = (k: keyof typeof blank) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const replyBy = f.replyBy ?? suggestedReplyBy(f.start, f.end < f.start ? f.start : f.end, today) ?? ''
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.project.trim() || !f.role.trim()) return
@@ -1037,7 +1170,7 @@ function NewCall() {
         needed: Math.max(1, f.needed),
         dayRateCents: rate.cents,
         details: f.details.trim(),
-        replyBy: null,
+        replyBy: replyBy || null,
       })
     ).then((ok) => {
       if (!ok) setF((now) => (now === cleared ? f : now))
@@ -1073,6 +1206,10 @@ function NewCall() {
         Venue <input value={f.venue} onChange={set('venue')} />
       </label>
       <label className="wide">
+        Reply by <input type="date" value={replyBy} onChange={set('replyBy')} />
+      </label>
+      <p className="hint wide">Two days before the first day, or the day before when the job is close. Clear it if there's no hurry.</p>
+      <label className="wide">
         Details for crew <textarea rows={2} value={f.details} onChange={set('details')} placeholder="Travel, food, parking, dress" />
       </label>
       <Refusal error={error} className="wide" />
@@ -1083,8 +1220,18 @@ function NewCall() {
   )
 }
 
-function NewPerson() {
-  return <PersonForm submitLabel="Add person" onSubmit={(fields) => client.mutate('person.upsert', { id: newId(), ...fields })} />
+/** Adding someone; `onAdded` hears who once the device has them, so the list can keep them in view. */
+function NewPerson({ onAdded }: { onAdded: (p: { id: string; name: string }) => void }) {
+  return (
+    <PersonForm
+      submitLabel="Add person"
+      onSubmit={async (fields) => {
+        const id = newId()
+        await client.mutate('person.upsert', { id, ...fields })
+        onAdded({ id, name: fields.name })
+      }}
+    />
+  )
 }
 
 type PersonFields = Omit<CommandInput<'person.upsert'>, 'id'>

@@ -9,8 +9,9 @@ import { reportError } from '../src/monitoring.ts'
 /**
  * One bad change must never strand a phone (audit of 30 September 2026, P0
  * 2). A fault the server didn't expect drops that one change with a reason,
- * is reported, and the device carries on; and what a device or browser is
- * told about a failed request never carries the fault's own words.
+ * is reported, and the device carries on; what a device or browser is
+ * told about a failed request never carries the fault's own words; and a
+ * fault while telling devices about a change never stops the server.
  */
 
 // Reporting is stood in for, so a test can see what was reported, and with what.
@@ -161,6 +162,8 @@ describe('a request that fails on the server', () => {
     expect(res.statusCode).toBe(500)
     expect(res.json()).toEqual({ error: 'Something went wrong on the server.' })
     expect(res.body).not.toContain('PGlite')
+    // With the headers every answer carries (audit finding 20).
+    expect(res.headers['x-content-type-options']).toBe('nosniff')
     expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'PGlite is closed' }), { route: '/api/health', method: 'GET' })
   })
 
@@ -171,5 +174,39 @@ describe('a request that fails on the server', () => {
     expect(res.statusCode).toBe(400)
     expect(res.json()).toMatchObject({ statusCode: 400, error: 'Bad Request', message: expect.any(String) })
     expect(reportError).not.toHaveBeenCalled()
+  })
+})
+
+describe('telling devices about a change', () => {
+  it('can fail without stopping the server: the change stands, and the fault is reported', async () => {
+    // Proves: a database hiccup right after a push, as the devices listening are told, is caught and
+    // reported rather than left as an unhandled rejection, which would end the process (audit finding 20).
+    const db = await pgliteDb()
+    const fault = { next: false }
+    const app = await server({
+      ...db,
+      query: (sql, params) => {
+        if (fault.next && sql.includes('max(seq)')) {
+          fault.next = false
+          return db.query('SELECT 1/0')
+        }
+        return db.query(sql, params)
+      },
+    })
+    await app.ready()
+    const told: string[] = []
+    const ws = await app.injectWS('/api/sync/live', {}, { onInit: (socket) => socket.on('message', (data) => told.push(String(data))) })
+    try {
+      await vi.waitFor(() => expect(told).toHaveLength(1))
+      fault.next = true
+      const m = mutation('product.upsert', Y10P)
+      expect((await push(app, [m])).json().results).toMatchObject([{ id: m.id, status: 'applied' }])
+      await vi.waitFor(() => expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'division by zero' }), { area: 'poke' }))
+      expect(told).toHaveLength(1)
+      expect((await db.query('SELECT id FROM products')).rows).toEqual([{ id: 'y10p' }])
+      expect((await app.inject({ method: 'GET', url: '/api/health' })).statusCode).toBe(200)
+    } finally {
+      ws.terminate()
+    }
   })
 })

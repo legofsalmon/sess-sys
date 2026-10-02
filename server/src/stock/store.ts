@@ -3,7 +3,7 @@ import type { Queryable } from '../db.ts'
 
 /** Reading warehouse rows back as the records devices see (ADR 0013). */
 
-const MODEL = `id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months`
+const MODEL = `id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, mistake`
 const PLACE = `id, name, notes`
 const STOCK = `id, model_id, place_id, case_id, qty`
 // An item with its current number and the ones it had before, oldest first.
@@ -25,6 +25,7 @@ export const toModel = (r: Row): Model => ({
   notes: r.notes,
   patMonths: r.pat_months,
   liftingMonths: r.lifting_months,
+  mistake: r.mistake,
 })
 export const toPlace = (r: Row): Place => ({ id: r.id, name: r.name, notes: r.notes })
 export const toStock = (r: Row): Stock => ({ id: r.id, modelId: r.model_id, placeId: r.place_id, caseId: r.case_id, qty: r.qty })
@@ -59,9 +60,12 @@ export async function getStock(q: Queryable, id: string) {
   return rows[0] ? toStock(rows[0]) : undefined
 }
 
-/** Another product or place already called this, whatever the capitals. */
+/** Another product or place already called this, whatever the capitals. A product added by mistake has given its name up. */
 export async function nameTaken(q: Queryable, table: 'models' | 'places', name: string, except: string) {
-  const { rows } = await q.query<{ name: string }>(`SELECT name FROM ${table} WHERE lower(name) = lower($1) AND id <> $2`, [name, except])
+  const { rows } = await q.query<{ name: string }>(
+    `SELECT name FROM ${table} WHERE lower(name) = lower($1) AND id <> $2${table === 'models' ? ' AND NOT mistake' : ''}`,
+    [name, except]
+  )
   return rows[0]?.name
 }
 
@@ -77,7 +81,8 @@ export async function numberUse(q: Queryable, number: string) {
 /**
  * One more than the highest number ever used or set aside for printing
  * (ADR 0015), so none is given out twice and none lands on a label that
- * isn't stuck on yet.
+ * isn't stuck on yet: a cancelled run's numbers among them, since its
+ * labels may be printed.
  */
 export async function nextNumber(q: Queryable): Promise<number> {
   const { rows } = await q.query<{ n: number }>(
@@ -88,13 +93,32 @@ export async function nextNumber(q: Queryable): Promise<number> {
   return rows[0]!.n
 }
 
-const LABEL_RUN = `id, first_number, count, name, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
+const LABEL_RUN = `id, first_number, count, name, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+  cancelled_at IS NOT NULL AS cancelled`
 
-export const toLabelRun = (r: Row): LabelRun => ({ id: r.id, first: r.first_number, count: r.count, name: r.name, notes: r.notes, createdAt: r.created_at })
+export const toLabelRun = (r: Row): LabelRun => ({
+  id: r.id,
+  first: r.first_number,
+  count: r.count,
+  name: r.name,
+  notes: r.notes,
+  createdAt: r.created_at,
+  cancelled: r.cancelled,
+})
 
 export async function getLabelRun(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${LABEL_RUN} FROM label_runs WHERE id = $1`, [id])
   return rows[0] ? toLabelRun(rows[0]) : undefined
+}
+
+/** How many of a run's numbers are on items, or were before a new label replaced them. */
+export async function runNumbersUsed(q: Queryable, run: Pick<LabelRun, 'first' | 'count'>): Promise<number> {
+  if (run.first === null) return 0
+  const { rows } = await q.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM identifiers WHERE kind = 'sh' AND substr(value, 4)::int BETWEEN $1 AND $2`,
+    [run.first, run.first + run.count - 1]
+  )
+  return rows[0]!.n
 }
 
 /** The cases a case is in, starting with itself and working outwards. */

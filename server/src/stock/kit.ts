@@ -71,6 +71,7 @@ async function checkPhase(ctx: Ctx, projectId: string, phaseId: string | null) {
 async function mustModel(ctx: Ctx, modelId: string) {
   const m = await getModel(ctx.tx, modelId)
   if (!m) throw new Refused({ code: 'not-found', message: 'That product is no longer in the stock list.' })
+  if (m.mistake) throw new Refused({ code: 'conflict', message: `${m.name} was added by mistake, so it can't go on a job's kit.` })
   return m
 }
 

@@ -514,6 +514,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'model.remove':
       return `Removed the product ${model(a.id)}`
+    case 'model.mistake':
+      return `Marked the product ${model(a.id)} as added by mistake`
     case 'place.upsert':
       return `Saved the place ${text(a.name, 'a place')}`
     case 'place.remove':
@@ -573,6 +575,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.notes !== undefined) parts.push('the notes')
       return `Changed the labels ${runRange(look('labelRun', a.id)) ?? 'set aside'}: ${inWords(parts)}`
     }
+    case 'labels.cancel':
+      return `Cancelled the labels ${runRange(look('labelRun', a.id)) ?? 'set aside'}`
     case 'move.record': {
       const way = a.direction === 'in' ? 'back in from' : 'out to'
       if (a.assetId) return `Scanned ${item(a.assetId)} ${way} ${job(a.projectId)}`
@@ -588,7 +592,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'fault.update': {
       const parts: string[] = []
       if (a.usable !== undefined) parts.push(a.usable ? 'fit to go out' : "can't go out")
-      if (a.note !== undefined) parts.push("what's wrong")
+      if (a.note !== undefined) parts.push(look('fault', a.id)?.kind === 'missing' ? 'where it was last seen' : "what's wrong")
       if (a.repair !== undefined) parts.push('the repair notes')
       return `Changed the fault on ${faultOn(a.id)}: ${inWords(parts)}`
     }

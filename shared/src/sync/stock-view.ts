@@ -53,13 +53,15 @@ export interface PlaceView extends Place {
 }
 
 export interface WarehouseView {
-  /** By name. */
+  /** By name, leaving out products marked as added by mistake. */
   models: ModelView[]
+  /** Products marked as added by mistake, by id: out of every list, kept for the history. */
+  mistakes: ReadonlyMap<string, ModelView>
   /** By name. */
   places: PlaceView[]
   /** Every item, retired ones too, by id. */
   assets: ReadonlyMap<string, AssetView>
-  /** Every item by its number, and by any number it had before. */
+  /** Every item by its number, and by any number it had before; one added by mistake says so when scanned. */
   byNumber: ReadonlyMap<string, AssetView>
   /** Cases in stock, by number. */
   cases: AssetView[]
@@ -78,14 +80,14 @@ function patch<T extends object>(target: T, changes: object): T {
 
 /** One collator, not one made for every comparison: with a few hundred products that was most of what a rebuild cost. */
 const irishNames = new Intl.Collator('en-IE', { sensitivity: 'base' })
-const byName = (a: { name: string }, b: { name: string }) => irishNames.compare(a.name, b.name) || a.name.localeCompare(b.name)
+const byName = (a: { id: string; name: string }, b: { id: string; name: string }) => irishNames.compare(a.name, b.name) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
 /** By number; items still waiting for one last, in the order they were added. */
 const byNumber = (a: Asset, b: Asset) => (a.number ? 0 : 1) - (b.number ? 0 : 1) || a.number.localeCompare(b.number) || a.id.localeCompare(b.id)
 
 export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number): WarehouseView {
   const models = new Map<string, Model & { pending: boolean }>()
-  // Products saved before inspections (ADR 0020) have no intervals yet.
-  const checks = (m: Partial<Model>) => ({ patMonths: m.patMonths ?? null, liftingMonths: m.liftingMonths ?? null })
+  // Products saved before inspections (ADR 0020) have no intervals yet, and before audit finding 19 no mistake flag.
+  const checks = (m: Partial<Model>) => ({ patMonths: m.patMonths ?? null, liftingMonths: m.liftingMonths ?? null, mistake: m.mistake ?? false })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })
   const places = new Map<string, Place & { pending: boolean }>()
   for (const p of Object.values(entities.place ?? {})) places.set(p.id, { ...p, pending: false })
@@ -118,6 +120,18 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
       case 'model.remove':
         models.delete((m.args as CommandArgs<'model.remove'>).id)
         break
+      case 'model.mistake': {
+        // As the server will leave it: the product flagged, its items retired as a mistake, its counts gone.
+        const a = m.args as CommandArgs<'model.mistake'>
+        const found = models.get(a.id)
+        if (!found) break
+        models.set(a.id, { ...found, mistake: true, pending: true })
+        for (const x of assets.values())
+          if (x.modelId === a.id && x.status === 'active')
+            assets.set(x.id, { ...x, status: 'retired', retiredReason: 'mistake', retiredNote: null, placeId: null, caseId: null, pending: true })
+        for (const s of stock.values()) if (s.modelId === a.id) stock.delete(s.id)
+        break
+      }
       case 'place.upsert': {
         const a = m.args as CommandArgs<'place.upsert'>
         places.set(a.id, { ...a, pending: true })
@@ -217,7 +231,8 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
   for (const a of assetViews.values()) {
     const m = modelViews.get(a.modelId)
     if (a.status !== 'active') {
-      m?.retired.push(a)
+      // One added by mistake is only ever found by its number.
+      if (a.retiredReason !== 'mistake') m?.retired.push(a)
       continue
     }
     m?.items.push(a)
@@ -242,16 +257,16 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
   for (const m of modelViews.values()) {
     m.items.sort(byNumber)
     m.retired.sort(byNumber)
-    m.counted.sort((a, b) => whereName(a).localeCompare(whereName(b)))
+    m.counted.sort((a, b) => whereName(a).localeCompare(whereName(b)) || a.id.localeCompare(b.id))
     m.total = m.items.length + m.countedTotal
   }
   for (const p of placeViews.values()) {
     p.items.sort(byNumber)
-    p.counted.sort((a, b) => (a.model?.name ?? '').localeCompare(b.model?.name ?? ''))
+    p.counted.sort((a, b) => (a.model?.name ?? '').localeCompare(b.model?.name ?? '') || a.id.localeCompare(b.id))
   }
   for (const a of assetViews.values()) {
     a.items.sort(byNumber)
-    a.counted.sort((x, y) => (x.model?.name ?? '').localeCompare(y.model?.name ?? ''))
+    a.counted.sort((x, y) => (x.model?.name ?? '').localeCompare(y.model?.name ?? '') || x.id.localeCompare(y.id))
   }
 
   const numbers = new Map<string, AssetView>()
@@ -260,12 +275,17 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
 
   const categories = new Map<string, string>()
   for (const m of models.values()) {
+    if (m.mistake) continue
     const c = m.category.trim()
     if (c && !categories.has(c.toLowerCase())) categories.set(c.toLowerCase(), c)
   }
 
+  const mistakes = new Map<string, ModelView>()
+  for (const m of modelViews.values()) if (m.mistake) mistakes.set(m.id, m)
+
   return {
-    models: [...modelViews.values()].sort(byName),
+    models: [...modelViews.values()].filter((m) => !m.mistake).sort(byName),
+    mistakes,
     places: [...placeViews.values()].sort(byName),
     assets: assetViews,
     byNumber: numbers,

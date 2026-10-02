@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
 import { assertSignInKept, authFromEnv, googleClientFromEnv } from './auth/config.ts'
+import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
 import { storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
@@ -25,12 +26,13 @@ async function main() {
   const auth = authFromEnv()
   const google = googleClientFromEnv()
   const backupStore = storeFromEnv()
+  const backupKey = backupKeyFromEnv()
   const commit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12)
   const db = await dbFromEnv()
 
   // Putting the data back after a disaster (ADR 0004): deploy against a new,
   // empty database with RESTORE_FROM set. Ignored once the database has tables.
-  const restored = process.env.RESTORE_FROM ? await restoreFrom(db, backupStore, process.env.RESTORE_FROM.trim()) : undefined
+  const restored = process.env.RESTORE_FROM ? await restoreFrom(db, backupStore, process.env.RESTORE_FROM.trim(), backupKey) : undefined
 
   const app = await buildApp({
     db,
@@ -38,6 +40,7 @@ async function main() {
     webRoot: existsSync(webDist) ? webDist : undefined,
     auth,
     backupStore,
+    backupKey,
     commit,
     errorReporting,
     backupWatch: errorReporting ? backupWatch() : undefined,
@@ -53,7 +56,8 @@ async function main() {
   else if (process.env.RESTORE_FROM) app.log.info('RESTORE_FROM is set but the database already has data, so nothing was restored. It can be removed.')
   if (backupStore) {
     app.backups.start()
-    app.log.info({ where: backupStore.where, next: app.backups.status().next }, 'Backups: nightly, each checked by a test restore')
+    app.log.info({ where: backupStore.where, next: app.backups.status().next, encrypted: !!backupKey }, 'Backups: nightly, each checked by a test restore')
+    if (!backupKey) app.log.warn('Backups are not encrypted: each file holds every private link in plain text. Set BACKUP_KEY to encrypt them (docs/backups.md).')
   } else app.log.warn('Backups are off: set the BACKUP_S3_ settings to switch them on (docs/backups.md).')
   if (errorReporting) app.log.info({ environment: errorReporting.environment }, 'Errors: reported to Sentry, with no personal details')
   else app.log.warn('Error reporting is off: set SENTRY_DSN to switch it on (docs/monitoring.md).')

@@ -133,7 +133,7 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await expect(request).toContainText('“Long weekend away”')
   await request.getByRole('button', { name: `Approve Nora Walsh ${id}'s request` }).click()
   await expect(eoin.getByRole('status')).toHaveText('Up to date')
-  await expect(queue).toContainText('Nothing waiting.')
+  await expect(queue).toContainText('Nothing here yet.')
   // Nora sees it approved without doing anything.
   await expect(mine.locator('.pill')).toHaveText('Approved')
 
@@ -161,7 +161,8 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   // An offer to her for those days warns, and needs "Offer anyway".
   await eoin.goto('/#crew')
   await expect(eoin.getByRole('status')).toHaveText('Up to date')
-  const call = eoin.getByRole('article').filter({ hasText: `Leave check ${id}` })
+  const call = eoin.locator('.call-group', { hasText: `Leave check ${id}` }).getByRole('article', { name: 'Driver' })
+  await call.getByRole('button', { name: 'Offer…' }).click()
   await call.getByLabel('Offer to').selectOption({ label: `Nora Walsh ${id} · Level 1 ⚠` })
   await expect(call.locator('.warn')).toContainText(`Marked unavailable ${FROM} to ${MIDDLE} (Annual leave)`)
   await expect(call.getByRole('button', { name: 'Offer', exact: true })).toBeDisabled()

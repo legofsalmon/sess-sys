@@ -1,4 +1,4 @@
-import { DEFAULT_LEVEL, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
+import { DEFAULT_LEVEL, eachDay, HOLDING, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
@@ -98,6 +98,26 @@ export async function offersForCall(q: Queryable, callId: string) {
   const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE call_id = $1`, [callId])
   return rows.map(toOffer)
 }
+/**
+ * How many people hold each day of each of these calls (accepted or
+ * confirmed), in one query for all of them: a freelancer's page needs it for
+ * every call they were ever offered, which would otherwise be a query each.
+ */
+export async function heldByCall(q: Queryable, calls: readonly CrewCall[]): Promise<Map<string, Record<string, number>>> {
+  const held = new Map<string, Record<string, number>>()
+  for (const c of calls) if (!held.has(c.id)) held.set(c.id, Object.fromEntries(eachDay(c.start, c.end).map((d) => [d, 0])))
+  const ids = [...held.keys()]
+  if (ids.length === 0) return held
+  const { rows } = await q.query<{ call_id: string; days: string[] }>(
+    `SELECT call_id, days FROM offers WHERE status IN ('accepted', 'confirmed') AND call_id = ANY($1::text[])`,
+    [ids]
+  )
+  for (const r of rows) {
+    const byDay = held.get(r.call_id)!
+    for (const d of r.days) if (d in byDay) byDay[d]!++
+  }
+  return held
+}
 export async function getAway(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${AWAY} FROM unavailability WHERE id = $1`, [id])
   return rows[0] ? toAway(rows[0]) : undefined
@@ -134,6 +154,27 @@ export async function offersFor(q: Queryable, personId: string) {
   return withCalls(rows)
 }
 
+/**
+ * When each of these offers ended, if it was withdrawn or filled, by offer,
+ * from the change log: the offer keeps when its person answered, but not
+ * when the office withdrew it or someone else took the place. The first
+ * change to give it the status it has now. Read from the change log alone,
+ * for offers the page has already read, so the page reads the offers table
+ * no more for it.
+ */
+export async function endedOn(q: Queryable, offers: readonly Pick<Offer, 'id' | 'status'>[]): Promise<Map<string, string>> {
+  const status = new Map(offers.filter((o) => o.status === 'cancelled' || o.status === 'filled').map((o) => [o.id, o.status]))
+  if (status.size === 0) return new Map()
+  const { rows } = await q.query<{ id: string; status: string; at: Date | string }>(
+    `SELECT entity_id AS id, data->>'status' AS status, min(at) AS at
+       FROM changes
+      WHERE entity = 'offer' AND entity_id = ANY($1::text[]) AND data->>'status' IN ('cancelled', 'filled')
+      GROUP BY entity_id, data->>'status'`,
+    [[...status.keys()]]
+  )
+  return new Map(rows.filter((r) => status.get(r.id) === r.status).map((r) => [r.id, new Date(r.at).toISOString()]))
+}
+
 /** Everyone, and every job anyone holds, for building all the calendar feeds at once (ADR 0012). */
 export async function everyonesBookings(q: Queryable) {
   const people = await q.query(`SELECT ${PERSON} FROM people ORDER BY id`)
@@ -153,19 +194,25 @@ export async function openCallsFor(q: Queryable, by: { projectId: string } | { p
   return rows.map(toCall)
 }
 
-/** Offers, other than one, that hold any of these days for a person. */
-export async function heldElsewhere(q: Queryable, personId: string, days: string[], exceptCallId: string) {
-  const { rows } = await q.query<Row>(
-    `SELECT o.days, c.project, c.phase FROM offers o JOIN crew_calls c ON c.id = o.call_id
-      WHERE o.person_id = $1 AND o.call_id <> $2 AND o.status IN ('accepted', 'confirmed') AND c.status = 'open'`,
-    [personId, exceptCallId]
-  )
+/**
+ * Of these days, the ones a person holds on calls other than one, with the
+ * job holding them: a yes, or a booking, on a call still going ahead. From
+ * their offers with their calls (offersFor), so the rules, which read them
+ * for it, and the freelancer's page, which has them already, always agree.
+ */
+export function heldElsewhereIn(theirs: readonly { offer: Offer; call: CrewCall }[], days: readonly string[], exceptCallId: string) {
   const out: { project: string; days: string[] }[] = []
-  for (const r of rows) {
-    const hit = (r.days as string[]).filter((d) => days.includes(d))
-    if (hit.length) out.push({ project: r.phase ? `${r.project} (${r.phase})` : r.project, days: hit })
+  for (const { offer, call } of theirs) {
+    if (call.id === exceptCallId || !HOLDING.includes(offer.status) || call.status !== 'open') continue
+    const hit = offer.days.filter((d) => days.includes(d))
+    if (hit.length) out.push({ project: call.phase ? `${call.project} (${call.phase})` : call.project, days: hit })
   }
   return out
+}
+
+/** Offers, other than one, that hold any of these days for a person. */
+export async function heldElsewhere(q: Queryable, personId: string, days: string[], exceptCallId: string) {
+  return heldElsewhereIn(await offersFor(q, personId), days, exceptCallId)
 }
 
 /**

@@ -25,8 +25,11 @@ import {
 import { useEffect, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { useAuth } from '../auth.ts'
-import { today, Top } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { Top } from '../jobs/common.tsx'
+import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday } from '../view.ts'
 
 /**
  * Staff leave and time in lieu (ADR 0024), at #crew/leave: my year's
@@ -78,18 +81,22 @@ export function useMe(view: View): { me: PersonView | undefined; signedIn: boole
   return { me, signedIn, email, pick: choose, clear: () => choose('') }
 }
 
-const thisYear = () => Number(today().slice(0, 4))
+const yearOf = (day: string) => Number(day.slice(0, 4))
 
-const STATUS: Record<LeaveStatus, [string, string]> = {
+const STATUS: Record<LeaveStatus, [string, PillTone]> = {
   waiting: ['Waiting', 'pending'],
   approved: ['Approved', 'confirmed'],
   declined: ['Declined', 'cancelled'],
   cancelled: ['Cancelled', 'cancelled'],
 }
 
-function StatusPill({ status, pending }: { status: LeaveStatus; pending: boolean }) {
+function LeavePill({ status, pending }: { status: LeaveStatus; pending: boolean }) {
   const [label, tone] = STATUS[status]
-  return <span className={`pill ${pending ? 'pending' : tone}`}>{pending ? 'Waiting to sync' : label}</span>
+  return (
+    <StatusPill tone={tone} pending={pending}>
+      {label}
+    </StatusPill>
+  )
 }
 
 const days = (n: number) => leaveDaysLabel(n)
@@ -97,8 +104,9 @@ const days = (n: number) => leaveDaysLabel(n)
 /** On the Crew tab: the way in, with what's waiting for an approver. */
 export function LeaveCard({ view }: { view: View }) {
   const { me } = useMe(view)
+  const today = useToday()
   const waiting = me && canApproveLeave(me) ? view.leave.queue.length : 0
-  const balance = me?.kind === 'staff' ? view.leave.balance(me.id, thisYear()) : undefined
+  const balance = me?.kind === 'staff' ? view.leave.balance(me.id, yearOf(today)) : undefined
   return (
     <section className="card leave-card" aria-label="Leave">
       <h2>Leave</h2>
@@ -120,7 +128,8 @@ export function LeaveCard({ view }: { view: View }) {
 
 export function LeaveScreen({ view }: { view: View }) {
   const { me, signedIn, email, pick, clear } = useMe(view)
-  const [year, setYear] = useState(thisYear)
+  const today = useToday()
+  const [year, setYear] = useState(() => yearOf(today))
   const approver = canApproveLeave(me)
   return (
     <div className="app crew jobs leave-screen">
@@ -128,6 +137,12 @@ export function LeaveScreen({ view }: { view: View }) {
       <a className="back" href="#crew">
         ‹ Crew
       </a>
+      {/* Until it's someone's own leave, which their name heads, the screen says what it is, so the move here lands on that and names the tab (audit finding 22). */}
+      {me?.kind !== 'staff' && (
+        <header className="title">
+          <h1>Leave</h1>
+        </header>
+      )}
       {!me ? (
         <WhoAreYou view={view} signedIn={signedIn} email={email} onPick={pick} />
       ) : me.kind !== 'staff' ? (
@@ -157,7 +172,6 @@ function WhoAreYou({ view, signedIn, email, onPick }: { view: View; signedIn: bo
   if (signedIn)
     return (
       <section className="card">
-        <h2>Leave</h2>
         <p className="empty">Your account, {email}, isn't matched to anyone on the Crew tab. Put that email on your own person there, as staff, and come back.</p>
       </section>
     )
@@ -165,7 +179,7 @@ function WhoAreYou({ view, signedIn, email, onPick }: { view: View; signedIn: bo
     <section className="card">
       <h2>Who are you?</h2>
       {staff.length === 0 ? (
-        <p className="empty">Nobody is down as staff yet. Add them on the Crew tab, with Type set to Staff.</p>
+        <Empty>Add staff on the Crew tab, with Type set to Staff.</Empty>
       ) : (
         <form
           className="who-form"
@@ -268,7 +282,7 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
   const b = view.leave.balance(me.id, year)
   const requests = view.leave.requestsFor(me.id, year)
   const entries = view.leave.entriesFor(me.id, year)
-  const now = thisYear()
+  const now = yearOf(useToday())
   return (
     <>
       <section className="card">
@@ -308,7 +322,7 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
 
       <section className="card" aria-label={`My requests, ${year}`}>
         <h2>My requests, {year}</h2>
-        {requests.length === 0 && entries.length === 0 && <p className="empty">Nothing asked for in {year} yet.</p>}
+        {requests.length === 0 && entries.length === 0 && <Empty>Ask for leave or log a day in lieu above.</Empty>}
         {requests.map((r) => (
           <RequestRow key={r.id} r={r} me={me} />
         ))}
@@ -321,7 +335,8 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
 }
 
 function Apply({ view, me }: { view: View; me: PersonView }) {
-  const blank = { type: 'annual' as LeaveType, start: today(), end: today(), note: '' }
+  const today = useToday()
+  const blank = { type: 'annual' as LeaveType, start: today, end: today, note: '' }
   const [f, setF] = useState(blank)
   const { run, error, refuse } = useAct()
   const end = f.end < f.start ? f.start : f.end
@@ -373,7 +388,8 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
 }
 
 function LogLieu({ me }: { me: PersonView }) {
-  const blank = { day: today(), days: 1, note: '' }
+  const today = useToday()
+  const blank = { day: today, days: 1, note: '' }
   const [f, setF] = useState(blank)
   const { run, error } = useAct()
   const submit = (e: FormEvent) => {
@@ -385,7 +401,7 @@ function LogLieu({ me }: { me: PersonView }) {
   return (
     <form className="grid-form" onSubmit={submit}>
       <label>
-        Day worked <input type="date" value={f.day} max={today()} onChange={(e) => setF({ ...f, day: e.target.value })} required />
+        Day worked <input type="date" value={f.day} max={today} onChange={(e) => setF({ ...f, day: e.target.value })} required />
       </label>
       <label>
         How many days <input type="number" min={1} max={5} value={f.days} onChange={(e) => setF({ ...f, days: Number(e.target.value) })} />
@@ -403,7 +419,8 @@ function LogLieu({ me }: { me: PersonView }) {
 
 function RequestRow({ r, me }: { r: LeaveRequestView; me: PersonView }) {
   const { run, error } = useAct()
-  const canCancel = !r.pending && noCancelReason(r, today()) === null
+  const today = useToday()
+  const canCancel = !r.pending && noCancelReason(r, today) === null
   return (
     <div className="row leave-row">
       <div>
@@ -418,7 +435,7 @@ function RequestRow({ r, me }: { r: LeaveRequestView; me: PersonView }) {
         <Refusal error={error} />
       </div>
       <div className="actions">
-        <StatusPill status={r.status} pending={r.pending} />
+        <LeavePill status={r.status} pending={r.pending} />
         {canCancel && (
           <button type="button" className="link" onClick={() => void run(() => client.mutate('leave.cancel', { id: r.id, by: me.id }))} aria-label={`Cancel ${leaveLabel(r.type, r.days).toLowerCase()}, ${leaveSpanLabel(r)}`}>
             Cancel
@@ -445,7 +462,7 @@ function EntryRow({ e, me }: { e: LieuEntryView; me: PersonView }) {
         <Refusal error={error} />
       </div>
       <div className="actions">
-        <StatusPill status={e.status} pending={e.pending} />
+        <LeavePill status={e.status} pending={e.pending} />
         {canCancel && (
           <button type="button" className="link" onClick={() => void run(() => client.mutate('lieu.cancel', { id: e.id, by: me.id }))} aria-label={`Cancel the day in lieu for ${dayLabel(e.day)}`}>
             Cancel
@@ -462,7 +479,7 @@ function ToApprove({ view, me }: { view: View; me: PersonView }) {
   return (
     <section className="card" aria-label="To approve">
       <h2>To approve</h2>
-      {queue.length === 0 && <p className="empty">Nothing waiting.</p>}
+      {queue.length === 0 && <Empty />}
       {queue.map((item) => (
         <QueueRow key={item.kind === 'request' ? item.request.id : item.entry.id} item={item} me={me} />
       ))}
@@ -504,7 +521,7 @@ function QueueRow({ item, me }: { item: LeaveQueueItem; me: PersonView }) {
         <Refusal error={error} />
       </div>
       {pending ? (
-        <span className="pill pending">Waiting to sync</span>
+        <Pending pending />
       ) : own ? (
         <p className="hint">Yours: another approver decides it.</p>
       ) : declining ? (

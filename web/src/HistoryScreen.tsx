@@ -1,9 +1,11 @@
 import { waitLabel, type HistoryEntry, type HistoryPage } from '@sh/shared'
 import { useEffect, useRef, useState } from 'react'
 import { markSignedOut } from './auth.ts'
+import { Empty } from './Empty.tsx'
 import { when } from './format.ts'
-import { MadeUp, useView } from './jobs/common.tsx'
+import { MadeUp } from './jobs/common.tsx'
 import { useNotDone } from './problems.tsx'
+import { useView } from './view.ts'
 
 /**
  * The history (ADR 0006): who did what, when, on which device, whether it
@@ -123,7 +125,7 @@ export function HistoryScreen() {
           </>
         )}
         {loaded.state === 'ready' && loaded.entries.length === 0 && (
-          <p className="hint">Nothing yet. Every change anyone makes shows up here, with who made it and when.</p>
+          <Empty>Every change anyone makes shows up here, with who made it and when.</Empty>
         )}
         {loaded.state === 'ready' && loaded.entries.length > 0 && (
           <ol className="entries">

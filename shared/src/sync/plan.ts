@@ -190,7 +190,7 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
   }
 
   const first = (days: object) => Object.keys(days).sort()[0] ?? ''
-  const jobs = [...lanes.values()].sort((a, b) => first(a.days).localeCompare(first(b.days)) || a.name.localeCompare(b.name))
+  const jobs = [...lanes.values()].sort((a, b) => first(a.days).localeCompare(first(b.days)) || a.name.localeCompare(b.name) || a.key.localeCompare(b.key))
 
   // Archived people have left: no lane, even with "Show everyone".
   const people = view.crew.people.filter((p) => !p.archived).map((person): PersonLane => ({ person, days: {} }))
@@ -243,7 +243,11 @@ export function plan(view: { jobs: JobsView; crew: CrewView }, days: readonly st
     }
   }
   problems.sort(
-    (a, b) => (a.severity === b.severity ? 0 : a.severity === 'clash' ? -1 : 1) || a.day.localeCompare(b.day) || a.person.name.localeCompare(b.person.name)
+    (a, b) =>
+      (a.severity === b.severity ? 0 : a.severity === 'clash' ? -1 : 1) ||
+      a.day.localeCompare(b.day) ||
+      a.person.name.localeCompare(b.person.name) ||
+      a.person.id.localeCompare(b.person.id)
   )
 
   let short = 0

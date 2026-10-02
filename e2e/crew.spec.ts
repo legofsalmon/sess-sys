@@ -15,6 +15,8 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await office.goto('/#crew')
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
+  // The forms sit behind their buttons until wanted (audit finding 16).
+  await office.getByRole('button', { name: 'Add person' }).click()
   const person = office.locator('form').filter({ has: office.getByRole('button', { name: 'Add person' }) })
   await person.getByLabel('Name').fill('Aoife Byrne')
   await person.getByLabel('Mobile').fill('+353 87 123 4567')
@@ -24,6 +26,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await expect(office.getByRole('button', { name: 'Aoife Byrne' })).toBeVisible()
 
   // A one-off, not in Jobs: the crew screen still takes the job's details as typed.
+  await office.getByRole('button', { name: 'Ask for crew' }).click()
   const job = office.locator('form').filter({ has: office.getByRole('button', { name: 'Ask for crew' }) })
   await job.getByLabel('Project').fill('Electric Picnic')
   await job.getByLabel('Phase').fill('Build')
@@ -38,7 +41,10 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await expect(office.getByText('Electric Picnic').first()).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  const call = office.getByRole('article').filter({ hasText: 'Electric Picnic' })
+  // The call is one line under its job until it's opened, and the picker is behind "Offer…".
+  const call = office.locator('.call-group', { hasText: 'Electric Picnic' }).getByRole('article', { name: '1 × Audio tech' })
+  await call.getByRole('button', { name: '1 × Audio tech' }).click()
+  await call.getByRole('button', { name: 'Offer…' }).click()
   await call.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne · Level 1 (audio, monitors)' })
   await call.getByRole('button', { name: 'Offer', exact: true }).click()
   const share = office.getByRole('region', { name: 'Send offer to Aoife Byrne' })

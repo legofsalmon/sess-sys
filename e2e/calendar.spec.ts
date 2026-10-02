@@ -257,6 +257,8 @@ test('each phase of a job says how it stands on the calendar', async ({ browser 
 
   const build = page.getByRole('article', { name: 'Build' })
   const show = page.getByRole('article', { name: 'Show' })
+  // The calendar line is with the phase's details, behind a tap (audit finding 16); one that needs acting on stays in view.
+  await build.locator('summary').click()
   await expect(build.locator('.cal')).toHaveText(`On Test calendar as “${job} - Build 1/2” and “${job} - Build 2/2”. Open it`)
   await expect(build.getByRole('link', { name: 'Open it' })).toHaveAttribute('href', 'https://www.google.com/calendar/event?eid=abc')
   await expect(show.locator('.warn-line')).toHaveText(
@@ -286,6 +288,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   // Three freelancers, one with no email address, offered the build.
   await page.goto('/#crew')
   await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
   for (const [name, email] of [[niamh, 'niamh@example.com'], [conor, 'conor@example.ie'], [sean, '']] as const) {
     await person.getByLabel('Name').fill(name)
@@ -301,15 +304,20 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   await form.getByLabel('Phase 1 to').fill('2030-10-15')
   await form.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { name: job })).toBeVisible()
+  await page.getByRole('button', { name: 'Ask for crew' }).click()
   const ask = page.getByRole('form', { name: 'Ask for crew' })
   await ask.getByLabel('Role').fill('Audio tech')
   await ask.getByLabel('How many').fill('2')
   await ask.getByLabel('Day rate €').fill('250')
   await ask.getByRole('button', { name: 'Ask for crew' }).click()
   const build = page.getByRole('article', { name: 'Build' })
+  // The call is one line until it's opened (audit finding 16), and the picker is behind "Offer…".
+  const call = build.getByRole('article', { name: '2 × Audio tech' })
+  await call.getByRole('button', { name: '2 × Audio tech' }).click()
+  await call.getByRole('button', { name: 'Offer…' }).click()
   for (const name of [niamh, conor, sean]) {
-    await build.getByLabel('Offer to').selectOption({ label: `${name} · Level 1` })
-    await build.getByRole('button', { name: 'Offer', exact: true }).click()
+    await call.getByLabel('Offer to').selectOption({ label: `${name} · Level 1` })
+    await call.getByRole('button', { name: 'Offer', exact: true }).click()
     await expect(build.locator('.offers')).toContainText(name)
   }
   await expect(page.getByRole('status')).toHaveText('Up to date')
@@ -355,6 +363,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   await page.goto(jobPage)
   await page.reload()
   await expect(page.getByRole('status')).toHaveText('Up to date')
+  await call.getByRole('button', { name: '2 × Audio tech' }).click()
   const row = (name: string) => build.locator('.offers li', { hasText: name })
   await expect(row(niamh).locator('.on-cal')).toHaveText('On Google Calendar: yes to Mon 14 Oct; no to Tue 15 Oct.')
   await expect(row(niamh).locator('.warn-line')).toHaveText('Said no to Tue 15 Oct on Google Calendar, but is booked for it. Call them to sort it out.')

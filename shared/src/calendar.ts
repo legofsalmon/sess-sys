@@ -116,10 +116,8 @@ export interface CalendarInvites {
 export const invitesLabel = (invites: number, people: number) =>
   `${invites} ${invites === 1 ? 'invite' : 'invites'} to ${people} ${people === 1 ? 'person' : 'people'}`
 
-/** Today in Ireland, YYYY-MM-DD: days before it are never changed on the calendar. */
-export function irishToday(now = new Date()): string {
-  return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
-}
+// Today in Ireland lives with the day itself; days before it are never changed on the calendar.
+export { irishToday } from './day.ts'
 
 /**
  * Where a phase stands with the calendar, for the job page:

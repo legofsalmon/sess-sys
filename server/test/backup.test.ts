@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { migrateAuth } from '../src/auth/schema.ts'
 import { createSession, upsertUser } from '../src/auth/sessions.ts'
+import { backupKeyFromEnv, isEncrypted } from '../src/backup/crypto.ts'
 import { newGeneration, readGeneration, restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toThin } from '../src/backup/service.ts'
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
@@ -33,8 +34,9 @@ import { PROJECTS } from '../src/projects/schema.ts'
 import { CORE, migrate } from '../src/schema.ts'
 
 /**
- * Backups (ADR 0004): the file, the restore, the nightly run, and what
- * phones do when the server's data has been put back from a backup.
+ * Backups (ADR 0004): the file, the restore, the nightly run, what phones
+ * do when the server's data has been put back from a backup, and the files
+ * encrypted under BACKUP_KEY (audit finding 20).
  */
 
 let cleanup: (() => Promise<void> | void)[] = []
@@ -51,7 +53,7 @@ async function database() {
   return db
 }
 
-async function server(db: Db, options: { backupStore?: BackupStore } = {}) {
+async function server(db: Db, options: { backupStore?: BackupStore; backupKey?: Buffer } = {}) {
   const app = await buildApp({ db, ...options })
   cleanup.push(() => app.close())
   return app
@@ -378,6 +380,8 @@ describe('the nightly backup', () => {
     const at = new Date('2026-09-30T02:00:14.512Z')
     expect(backupKey(at)).toBe('backups/2026/09/session-hire-2026-09-30T020014Z.backup.gz')
     expect(keyDate(backupKey(at))?.toISOString()).toBe('2026-09-30T02:00:14.000Z')
+    expect(backupKey(at, true)).toBe('backups/2026/09/session-hire-2026-09-30T020014Z.backup.gz.enc')
+    expect(keyDate(backupKey(at, true))?.toISOString()).toBe('2026-09-30T02:00:14.000Z')
     expect(keyDate('backups/notes.txt')).toBeUndefined()
   })
 })
@@ -625,3 +629,48 @@ async function fakeS3() {
   cleanup.push(() => new Promise<void>((resolve) => srv.close(() => resolve())))
   return { objects, seen, endpoint: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` }
 }
+
+describe('backups encrypted under BACKUP_KEY', () => {
+  it('go to the store unreadable, prove themselves by a test restore, and come back only with the key', async () => {
+    // Proves: with BACKUP_KEY each file is encrypted in storage, checked by a test restore, and readable only with the same key.
+    const key = backupKeyFromEnv({ BACKUP_KEY: 'ab'.repeat(32) })!
+    const dir = folder()
+    const store = dirStore(dir)
+    const db = await database()
+    const app = await server(db, { backupStore: store, backupKey: key })
+    await seed(app, db)
+    const run = await app.backups.run('nightly')
+    expect(run.status).toBe('ok')
+    expect(run.key).toMatch(/\.backup\.gz\.enc$/)
+    const file = readFileSync(join(dir, ...run.key!.split('/')))
+    expect(isEncrypted(file)).toBe(true)
+    expect(() => gunzipSync(file)).toThrow()
+    expect(file.toString('latin1')).not.toContain('Briain')
+    expect(run.bytes).toBe(file.length)
+
+    await expect(checkRestores(file)).rejects.toThrow('This backup is encrypted. Set BACKUP_KEY to the key it was made with')
+    await expect(checkRestores(file, backupKeyFromEnv({ BACKUP_KEY: 'cd'.repeat(32) }))).rejects.toThrow("can't be unlocked with BACKUP_KEY")
+    expect((await checkRestores(file, key)).rows).toBe(run.rows)
+
+    // Put back on start-up with the key; the newest file is still found by its name.
+    const fresh = await database()
+    expect((await restoreFrom(fresh, store, 'latest', key))?.key).toBe(run.key)
+    expect((await fresh.query(`SELECT id FROM products ORDER BY id`)).rows.map((r) => r.id)).toEqual(['sm58', 'y10p'])
+    await expect(restoreFrom(await database(), store, 'latest')).rejects.toThrow('This backup is encrypted')
+
+    // The Account tab says so; and a plain backup from before the key still restores on a server that has one.
+    expect((await app.inject({ method: 'GET', url: '/api/backups' })).json()).toMatchObject({ configured: true, encrypted: true })
+    const plain = await writeBackup(db)
+    expect((await checkRestores(plain.data, key)).rows).toBe(plain.rows)
+  })
+
+  it('take a key that is one, and nothing else', () => {
+    // Proves: BACKUP_KEY must be 64 hex characters, and a wrong one is never repeated back.
+    expect(backupKeyFromEnv({})).toBeUndefined()
+    expect(backupKeyFromEnv({ BACKUP_KEY: '  ' })).toBeUndefined()
+    expect(backupKeyFromEnv({ BACKUP_KEY: 'AB'.repeat(32) })).toHaveLength(32)
+    expect(() => backupKeyFromEnv({ BACKUP_KEY: 'hunter2' })).toThrow('64 hex characters')
+    // Never repeated back: it could be a secret pasted in by mistake.
+    expect(() => backupKeyFromEnv({ BACKUP_KEY: 'hunter2' })).not.toThrow('hunter2')
+  })
+})

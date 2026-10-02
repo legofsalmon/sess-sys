@@ -18,7 +18,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Confirm } from '../act.tsx'
 import { ask, post } from '../server.ts'
 import { syncSoon } from '../sync.ts'
-import { today, Top } from './common.tsx'
+import { StatusPill } from '../StatusPill.tsx'
+import { useToday } from '../view.ts'
+import { Top } from './common.tsx'
 
 /**
  * Bringing in the jobs already on a Google calendar (ADR 0011): choose one
@@ -46,8 +48,9 @@ function span(s: { start: string; end: string }, year: string) {
 export function ImportScreen({ view }: { view: View }) {
   const link = view.calendar.link
   const connected = link !== undefined && (link.state === 'on' || link.state === 'choosing')
+  const today = useToday()
   const [calendarId, setCalendarId] = useState('')
-  const [from, setFrom] = useState(() => importFromDefault(today()))
+  const [from, setFrom] = useState(() => importFromDefault(today))
   const [step, setStep] = useState<Step>({ at: 'choose' })
   const heading = useRef<HTMLHeadingElement>(null)
   const offline = view.connection === 'offline'
@@ -214,7 +217,7 @@ function Look(p: {
   onBring: (preview: ImportPreview, choices: ImportChoices) => void
 }) {
   const { preview } = p
-  const year = today().slice(0, 4)
+  const year = useToday().slice(0, 4)
   const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(preview.jobs.map((j) => [j.key, j.name])))
   const [skip, setSkip] = useState<ReadonlySet<string>>(new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
@@ -369,7 +372,7 @@ function Found(p: { job: ImportJob; year: string; on: boolean; name: string; onT
         ) : (
           <input className="name" value={p.name} onChange={(e) => p.onName(e.target.value)} aria-label={`Name for ${j.name}`} maxLength={200} disabled={!p.on} />
         )}
-        <span className={`pill ${j.status === 'confirmed' ? 'confirmed' : 'pending'}`}>{j.status === 'confirmed' ? 'Confirmed' : 'Pencilled in'}</span>
+        <StatusPill tone={j.status === 'confirmed' ? 'confirmed' : 'pending'}>{j.status === 'confirmed' ? 'Confirmed' : 'Pencilled in'}</StatusPill>
       </div>
       <p>
         {span(j, p.year)}
@@ -430,7 +433,8 @@ function Done({ preview, result, onAgain }: { preview: ImportPreview; result: Im
     result.people && plural(result.people, 'new person', 'new people'),
     result.venues && plural(result.venues, 'new venue', 'new venues'),
   ].filter(Boolean)
-  const first = preview.jobs.map((j) => j.start).sort()[0] ?? today()
+  const today = useToday()
+  const first = preview.jobs.map((j) => j.start).sort()[0] ?? today
   return (
     <section className="card" aria-label="Brought in">
       {brought.length ? (

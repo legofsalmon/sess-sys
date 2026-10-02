@@ -125,12 +125,14 @@ export function timesheetsView(
   return {
     of: (offerId) => sheets.get(offerId),
     row: rowOf,
-    toApprove: all.filter((r) => r.state === 'sent').sort((a, b) => a.timesheet!.sentAt.localeCompare(b.timesheet!.sentAt)),
-    notIn: all.filter((r) => r.state === 'not-in' && r.finished).sort((a, b) => lastDay(a).localeCompare(lastDay(b)) || byName(a, b)),
+    toApprove: all.filter((r) => r.state === 'sent').sort((a, b) => a.timesheet!.sentAt.localeCompare(b.timesheet!.sentAt) || byId(a, b)),
+    notIn: all.filter((r) => r.state === 'not-in' && r.finished).sort((a, b) => lastDay(a).localeCompare(lastDay(b)) || byName(a, b) || byId(a, b)),
     approved: all
       .filter((r) => r.state === 'approved')
-      .sort((a, b) => (b.timesheet!.approvedAt ?? '').localeCompare(a.timesheet!.approvedAt ?? '') || byName(a, b)),
+      .sort((a, b) => (b.timesheet!.approvedAt ?? '').localeCompare(a.timesheet!.approvedAt ?? '') || byName(a, b) || byId(a, b)),
   }
 }
 
 const byName = (a: TimesheetRow, b: TimesheetRow) => (a.person?.name ?? '').localeCompare(b.person?.name ?? '')
+/** The last word in every order, so two devices agree on it. */
+const byId = (a: TimesheetRow, b: TimesheetRow) => a.offer.id.localeCompare(b.offer.id)

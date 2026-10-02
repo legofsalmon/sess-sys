@@ -24,14 +24,18 @@ export function useNotDone(view: View): { count: ReactNode; list: ReactNode } {
   useEffect(() => {
     if (n === 0) setOpen(false)
   }, [n])
-  if (n === 0) return { count: null, list: null }
+  // The count sits in a live region that's there before any refusal arrives, which is what a screen reader needs to read the change out (audit finding 22).
   return {
     count: (
-      <button type="button" className="not-done" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {n} not done
-      </button>
+      <span className="not-done-live" aria-live="polite">
+        {n > 0 && (
+          <button type="button" className="not-done" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {n} not done
+          </button>
+        )}
+      </span>
     ),
-    list: open ? <NotDoneList view={view} /> : null,
+    list: open && n > 0 ? <NotDoneList view={view} /> : null,
   }
 }
 
@@ -40,7 +44,7 @@ function NotDoneList({ view }: { view: View }) {
   // Newest first: the one that just arrived is the one to read.
   const problems = [...view.problems].reverse()
   return (
-    <section className="card attention not-done-list" aria-label="Not done">
+    <section className="card attention not-done-list" aria-label="Not done" aria-live="polite">
       <h2>Not done</h2>
       <p className="hint">The server turned these down, so they weren't made. Sort out what each says and ask again, or dismiss it.</p>
       {problems.map((p) => {
@@ -93,7 +97,8 @@ function describer(view: View): (m: Mutation) => string {
     }
     return { name: 'a phase', job: 'a job' }
   }
-  const model = (id: unknown) => w.models.find((m) => m.id === id)?.name ?? 'a product'
+  // A product marked as added by mistake since is still named.
+  const model = (id: unknown) => (w.models.find((m) => m.id === id) ?? (typeof id === 'string' ? w.mistakes.get(id) : undefined))?.name ?? 'a product'
   const item = (id: unknown) => {
     const a = typeof id === 'string' ? w.assets.get(id) : undefined
     return a ? `${a.number || 'an item'} (${a.model?.name ?? 'a product'})` : 'an item'
@@ -184,6 +189,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Change the product ${model(a.id)}`
       case 'model.remove':
         return `Remove the product ${model(a.id)}`
+      case 'model.mistake':
+        return `Mark the product ${model(a.id)} as added by mistake`
       case 'place.upsert':
         return `Save the place ${str(a.name, 'a place')}`
       case 'place.remove':
@@ -214,6 +221,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Set aside ${num(a.count)} numbers for labels`
       case 'labels.update':
         return 'Change what some labels are for'
+      case 'labels.cancel':
+        return 'Cancel a run of labels set aside'
       case 'move.record': {
         const way = a.direction === 'in' ? 'back in from' : 'out to'
         return a.assetId ? `Scan ${item(a.assetId)} ${way} ${job(a.projectId)}` : `Count ${num(a.qty)} × ${model(a.modelId)} ${way} ${job(a.projectId)}`

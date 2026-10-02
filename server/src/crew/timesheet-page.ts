@@ -23,6 +23,8 @@ export interface TimesheetPage {
   timesheet: Timesheet | undefined
   /** Why there's no timesheet to send, when there isn't. */
   why: string | null
+  /** Staff are paid through payroll, so their page carries no rate (audit finding 21). */
+  staff: boolean
   base: string
   flash?: { ok: boolean; text: string }
   /** The office's phone and email, once set. */
@@ -53,7 +55,7 @@ export function renderTimesheet(d: TimesheetPage): string {
   <section class="head">
     <h1>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</h1>
     <p class="when">${h(call.role)}, ${h(daysLabel(offer.days))}</p>
-    <p class="small">${rate === null ? 'Day rate to agree with the office.' : `${h(euro(rate))} a day${t && t.dayRateCents !== offer.dayRateCents ? '' : ', as agreed'}.`}</p>
+    ${d.staff ? '' : `<p class="small">${rate === null ? 'Day rate to agree with the office.' : `${h(euro(rate))} a day${t && t.dayRateCents !== offer.dayRateCents ? '' : ', as agreed'}.`}</p>`}
   </section>
   ${!t && d.why ? `<p class="flash warn">${h(d.why)}</p>` : t?.status === 'approved' ? approved(t) : form(d, action)}
   <footer>

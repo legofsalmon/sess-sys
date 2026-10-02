@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
+import { flashOf } from './people.ts'
 
 /**
  * Timesheets (ADR 0022): a freelancer sends the days they worked on a
@@ -103,7 +104,9 @@ async function post(app: FastifyInstance, url: string, fields: [string, string][
   })
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
-  return { ok: to.searchParams.get('ok') === '1', message: to.searchParams.get('m') ?? '', back: await page(app, `${to.pathname}${to.search}`) }
+  const back = await page(app, `${to.pathname}${to.search}`)
+  // The message is read from the page: the address carries only a code (audit finding 21).
+  return { ...flashOf(back.html), back }
 }
 
 describe('a timesheet from a private link', () => {
@@ -174,8 +177,9 @@ describe('a timesheet from a private link', () => {
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-3)]])).message).toContain("wasn't one of your booked days")
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['picker', '1']])).message).toBe('Tick at least one day you worked.')
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', ''], ['euro', '12']])).message).toBe('Say what each extra is for.')
+    // The message is one of the page's own, so it can't name the extra typed (audit finding 21).
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', 'Tolls'], ['euro', 'lots']])).message).toBe(
-      'Put in the amount for Tolls, in euro.'
+      'Put in the amount for each extra, in euro.'
     )
     expect(await timesheet('dara-sound')).toBeUndefined()
   })

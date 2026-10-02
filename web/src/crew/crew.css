@@ -2,49 +2,29 @@
 body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .tabs { position: fixed; inset: auto 0 0 0; display: flex; justify-content: center; gap: var(--space-4); padding: var(--space-6) var(--space-12) calc(var(--space-6) + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); z-index: 5; }
 .tabs a { flex: 1; max-width: 200px; text-align: center; padding: var(--space-10); border-radius: var(--radius-tab); font-weight: 700; color: var(--muted); text-decoration: none; }
-.tabs a[aria-current='page'] { background: var(--accent); color: var(--on-accent); }
+/* The current tab is white on accent-fill, 5.7:1; on the brand red it was 4.0:1 (audit finding 22). */
+.tabs a[aria-current='page'] { background: var(--accent-fill); color: var(--on-accent); }
 /* Answers waiting for the office, on the Crew tab (audit finding 9). */
 .tabs .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: var(--space-6); padding: 0 var(--space-6); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; vertical-align: 2px; }
 .tabs a[aria-current='page'] .badge { background: var(--on-accent); color: var(--accent-fill); }
 
-.crew .muted { color: var(--muted); font-weight: 500; }
-.crew textarea { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
 .crew .job { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
 .crew .job:first-of-type { border-top: 0; padding-top: 0; }
 .crew .job.is-pending { opacity: .8; }
-.crew .job header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
-.crew .job header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
 .crew .offers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
 .crew .offers li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-8); flex-wrap: wrap; padding: var(--space-4) 0; }
 .crew .offers small, .crew .who small { color: var(--muted); }
 .crew .offers .on-cal { flex-basis: 100%; margin-top: -4px; font-size: .82rem; }
 .crew .offers .warn-line { flex-basis: 100%; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
-.crew .pill { white-space: nowrap; }
-.crew .pill.accepted { background: var(--warn-soft); color: var(--warn); }
 .crew .offer-form { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
 .crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--space-8); align-items: flex-start; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); }
 .crew .offer-form .warn input { accent-color: var(--accent); margin-top: 3px; }
 .crew .offer-form .alert { grid-column: 1 / -1; }
-/* "Offer to…" beside a decline or a pull-out in Answers to check: on its own line under the answer. */
-.crew .row > .offer-form { flex-basis: 100%; }
-.crew button:disabled { opacity: .5; cursor: not-allowed; }
-.crew button.link { border: 0; background: none; padding: var(--space-4) var(--space-6); color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.crew a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) var(--space-6); color: var(--muted); font: 600 .9rem system-ui, sans-serif; text-underline-offset: 2px; }
-.crew .end { justify-content: flex-end; }
-.crew a.button { font: 600 .9rem system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
-.crew a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
+/* "Offer…" beside a decline or a pull-out in Answers to check: opened, the picker takes its own line under the answer. */
+.crew .actions > .fold, .crew .row > .fold { flex-basis: 100%; }
 .crew .share { border-color: var(--accent); }
-.crew .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
-.crew .grid-form label { display: grid; gap: var(--space-4); font-size: .85rem; color: var(--muted); }
-.crew .grid-form .wide { grid-column: 1 / -1; }
-.crew .person { align-items: center; }
-.crew .who { border: 0; background: none; padding: 0; text-align: left; font-weight: 400; flex: 1; min-width: 60%; }
-.crew .who b { display: block; }
-.crew .who small { display: block; font-size: .82rem; }
-.crew .detail { flex-basis: 100%; display: grid; gap: var(--space-6); font-size: .9rem; }
-.crew .detail p { margin: 0; color: var(--ink); }
 .crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
-.crew .away-form input:nth-child(3), .crew .away-form button { grid-column: 1 / -1; }
+.crew .away-form .wide, .crew .away-form button { grid-column: 1 / -1; }
 /* Leavers, folded away under the list (audit finding 7). */
 .crew details.archived { padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .crew details.archived summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
@@ -56,17 +36,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .account .office-form .wide { grid-column: 1 / -1; }
 .account .office-form button { justify-self: start; }
 
-/* A yes-or-no on the person form, such as "Can approve time off" (ADR 0024). */
-.crew .grid-form label.tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; color: var(--ink); cursor: pointer; }
-.crew .grid-form label.tick input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
-.crew .grid-form label.tick small { display: block; color: var(--muted); font-size: .8rem; }
-
 /* The profile (ADR 0025): the department filter over the list, the level on a card, what they've worked, the form's "More", and the picker's applicants tick. */
 .crew .dept-filter { justify-self: start; }
 .crew .detail .level-pick { display: flex; gap: var(--space-8); align-items: center; font-size: .85rem; color: var(--muted); }
 .crew .detail .level-pick select { min-width: 9em; }
 .crew .detail .worked { display: grid; gap: var(--space-2); }
-.crew .detail .alert { font-size: .85rem; }
 .crew .grid-form details.more summary { display: flex; align-items: center; min-height: 44px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; padding-top: var(--space-4); }
 .crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
@@ -136,3 +110,22 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .timesheet-screen .ts-lines li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .timesheet-screen .ts-changes { margin: var(--space-4) 0 0; padding-left: 1.2em; }
 .timesheet-screen .ts-total { margin: 0; font-weight: 700; }
+
+/* A crew call at rest is one line (audit finding 16): a button with the role and who's on it that opens the rest of the call under it, and on the right its state as a pill, with "Offer…" under that while there are places to fill. On the Crew tab the calls are grouped by job and then by days. */
+.crew .call-group { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.crew .card > h2 + .call-group { padding-top: 0; border-top: 0; }
+.crew .call-group > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
+.crew .call-group > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.crew .call-date { display: grid; gap: var(--space-6); }
+.crew .call-date h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.crew .call-date .job { padding: var(--space-4) var(--space-12) var(--space-8); border: 1px solid var(--line); border-radius: 10px; }
+.crew .job.call { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-10); align-items: start; }
+.crew .call > * { grid-column: 1 / -1; }
+.crew .call > .call-line { grid-column: 1; grid-row: 1 / span 2; }
+.crew .call > .pill { grid-column: 2; grid-row: 1; justify-self: end; margin-top: var(--space-8); }
+.crew .call > button.offer { grid-column: 2; grid-row: 2; justify-self: end; }
+.crew .call-line { display: grid; gap: var(--space-2); justify-items: start; width: 100%; min-height: 44px; padding: var(--space-6) 0; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; font: inherit; }
+.crew .call-line .who-line { font-size: var(--text-small); }
+.crew .call .facts-line { margin: 0; color: var(--muted); font-size: var(--text-small); }
+/* The picker (ADR 0025) narrowed as you type: the search over the select, the select and Offer side by side. */
+.crew .offer-form .find { grid-column: 1 / -1; }

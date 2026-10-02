@@ -4,7 +4,6 @@ import {
   DEPARTMENTS,
   euroText,
   INSPECTION_MONTHS,
-  irishToday,
   MAX_MONTHS,
   MAX_QTY,
   newId,
@@ -12,6 +11,7 @@ import {
   parseEuro,
   plural,
   RETIRED_LABELS,
+  stillOutReason,
   stockId,
   valueLabel,
   type CommandInput,
@@ -25,17 +25,20 @@ import {
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
-import { StatusPill, Top } from '../jobs/common.tsx'
+import { Empty } from '../Empty.tsx'
+import { JobStatusPill, Page } from '../jobs/common.tsx'
 import { forLabel, kitState } from '../jobs/Kit.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday } from '../view.ts'
 import {
   amountLabel,
   atLabel,
   CountRow,
   findWhere,
   numberLabel,
-  Pending,
   TrackingChoice,
+  useNewPlace,
   whereLabel,
   WhereChoices,
   whereNamed,
@@ -50,29 +53,33 @@ import { dueText } from './Inspections.tsx'
  * and where it's counted, faults in what's counted (ADR 0018), and how
  * often its items need testing (ADR 0020). Items are added one after another while
  * labelling: the number field is ready for the next label as soon as one is
- * added, and where stays put.
+ * added, and where stays put. One that should never have been added is
+ * marked as a mistake, which hides it and its items everywhere but the
+ * history (audit finding 19).
  */
-export function ProductScreen({ view, id }: { view: View; id: string }) {
+export function ProductScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
   const m = w.models.find((x) => x.id === id)
+  const mistake = w.mistakes.get(id)
+  const back = (
+    <a className="back" href="#stock">
+      ‹ All stock
+    </a>
+  )
   if (!m)
     return (
-      <div className="app crew jobs warehouse">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock">
-          ‹ All stock
-        </a>
+      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
         <section className="card">
-          <p className="empty">This product isn't on this device. It may still be on its way, or it was removed: check again once it says “Up to date”.</p>
+          <p className="empty">
+            {mistake
+              ? `${mistake.name} was marked as added by mistake, so it's kept only in the history.`
+              : "This product isn't on this device. It may still be on its way, or it was removed: check again once it says “Up to date”."}
+          </p>
         </section>
-      </div>
+      </Page>
     )
   return (
-    <div className="app crew jobs warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
@@ -83,24 +90,53 @@ export function ProductScreen({ view, id }: { view: View; id: string }) {
         </FaultsCard>
       )}
       <WhereChoices w={w} />
-    </div>
+    </Page>
   )
 }
 
 function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View }) {
   const [editing, setEditing] = useState(false)
   const [removing, setRemoving] = useState(false)
-  const { run, error } = useAct()
-  const onKit = view.kit.lines.some((l) => l.modelId === m.id)
+  const [mistaking, setMistaking] = useState(false)
+  const { run, error, refuse } = useAct()
+  const onKit = view.kit.lines.filter((l) => l.modelId === m.id)
   const unusable = view.faults.unusable(m.id)
+  // What stops a plain Remove on the server stops it here, so "Added by mistake" is offered instead: any item ever labelled as it,
+  // even one retired as added by mistake and so in no list here, and any time it went out with a job.
+  const hadItems = [...w.assets.values()].some((a) => a.modelId === m.id)
   const removable =
-    m.items.length === 0 && m.retired.length === 0 && m.countedTotal === 0 && !onKit && !view.faults.all.some((f) => f.modelId === m.id)
+    !hadItems && m.countedTotal === 0 && onKit.length === 0 && !view.moves.everMoved(m.id) && !view.faults.all.some((f) => f.modelId === m.id)
   const remove = () => {
     setRemoving(false)
     void run(() => client.mutate('model.remove', { id: m.id })).then((ok) => {
       if (ok) location.hash = '#stock'
     })
   }
+  // What the server would turn down, said now in its words: kit on a job, out with one, or a case still holding kit.
+  const askMistake = () => {
+    refuse('')
+    const jobs = [...new Set(onKit.map((l) => l.job?.name ?? 'a job'))].sort((a, b) => a.localeCompare(b))
+    if (jobs.length) {
+      const which = jobs.length === 1 ? jobs[0] : `${jobs.length} jobs (${jobs.slice(0, 3).join(', ')}${jobs.length > 3 ? '…' : ''})`
+      return refuse(`${m.name} is on the kit for ${which}. Take it off ${jobs.length === 1 ? 'that job' : 'those'} first.`)
+    }
+    // Out as the pick lists have it, which is how the server works it out too.
+    const out = view.moves.outWith(m.id)
+    if (out.length) return refuse(stillOutReason(m.name, out))
+    for (const a of m.items) {
+      const counted = a.counted.reduce((n, s) => n + s.qty, 0)
+      const holding = [a.items.length > 0 && plural(a.items.length, 'item'), counted > 0 && `${counted.toLocaleString('en-IE')} counted`].filter(Boolean)
+      if (holding.length) return refuse(`${numberLabel(a)} still holds ${holding.join(' and ')}. Empty it first.`)
+    }
+    setMistaking(true)
+  }
+  const mistake = () => {
+    setMistaking(false)
+    void run(() => client.mutate('model.mistake', { id: m.id })).then((ok) => {
+      if (ok) location.hash = '#stock'
+    })
+  }
+  const hidden = [m.items.length > 0 && plural(m.items.length, 'item'), m.countedTotal > 0 && `${m.countedTotal.toLocaleString('en-IE')} counted`].filter(Boolean)
   return (
     <section className="card">
       <header className="title">
@@ -147,14 +183,25 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
         <EditProduct m={m} w={w} onDone={() => setEditing(false)} />
       ) : removing ? (
         <Confirm question={`Remove ${m.name} from the stock list? Nothing is counted or labelled as it, so nothing else changes.`} yes="Remove it" onYes={remove} onNo={() => setRemoving(false)} />
+      ) : mistaking ? (
+        <Confirm
+          question={`Mark ${m.name} as added by mistake? It leaves every list and count${hidden.length ? `, with its ${hidden.join(' and ')}` : ''}, and is kept only in the history. This can't be undone.`}
+          yes="It was a mistake"
+          onYes={mistake}
+          onNo={() => setMistaking(false)}
+        />
       ) : (
         <div className="actions">
           <button type="button" onClick={() => setEditing(true)}>
             Change details
           </button>
-          {removable && (
+          {removable ? (
             <button type="button" className="link" onClick={() => setRemoving(true)}>
               Remove product
+            </button>
+          ) : (
+            <button type="button" className="link" onClick={askMistake}>
+              Added by mistake
             </button>
           )}
         </div>
@@ -165,7 +212,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
 
 /** The jobs it's on from today on, soonest first, each with whether there's enough; the first few, then the rest on request. */
 function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
-  const today = irishToday()
+  const today = useToday()
   const row = (l: KitLineView) => {
     const state = kitState(l, today)
     return (
@@ -177,7 +224,7 @@ function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
             {state && <p className={`kit-note ${state.tone}`}>{state.text}</p>}
           </div>
           <div className="side">
-            {l.job && <StatusPill status={l.job.status} pending={l.pending} />}
+            {l.job && <JobStatusPill status={l.job.status} pending={l.pending} />}
             <small>{l.qty.toLocaleString('en-IE')} needed</small>
           </div>
         </a>
@@ -338,7 +385,7 @@ function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; 
   return (
     <section className="card" aria-label="Items">
       <h2>Items</h2>
-      {m.items.length === 0 && <p className="empty">None labelled yet.</p>}
+      {m.items.length === 0 && <Empty />}
       <ul className="item-list">
         {m.items.map((a) => (
           <li key={a.id}>
@@ -384,6 +431,7 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
   const [f, setF] = useState({ number: '', serial: '', where: m.counted.length === 1 ? whereText(m.counted[0]!, w) : '' })
   const [fromCount, setFromCount] = useState(true)
   const { run, error, refuse } = useAct()
+  const { ask, question, asking } = useNewPlace(w)
   const [lastId, setLastId] = useState('')
   const numberField = useRef<HTMLInputElement>(null)
   const known = findWhere(f.where, w)
@@ -408,17 +456,20 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
     if (problem) return refuse(problem)
     const id = newId()
     const one = countedThere > 0 && fromCount
-    // Ready for the next label, in the same place; a refusal brings what was typed back, unless the next label has been typed since.
-    const cleared = { ...f, number: '', serial: '' }
-    setF(cleared)
-    numberField.current?.focus()
-    void run(async () => {
-      const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
-      await client.mutate('asset.add', { id, modelId: m.id, number, serial: f.serial.trim(), ...where, notes: '', fromCount: one })
-    }).then((ok) => {
-      if (ok) setLastId(id)
-      else setF((now) => (now === cleared ? f : now))
-    })
+    const go = () => {
+      // Ready for the next label, in the same place; a refusal brings what was typed back, unless the next label has been typed since.
+      const cleared = { ...f, number: '', serial: '' }
+      setF(cleared)
+      numberField.current?.focus()
+      void run(async () => {
+        const where = (await whereNamed(f.where, w)) ?? { placeId: null, caseId: null }
+        await client.mutate('asset.add', { id, modelId: m.id, number, serial: f.serial.trim(), ...where, notes: '', fromCount: one })
+      }).then((ok) => {
+        if (ok) setLastId(id)
+        else setF((now) => (now === cleared ? f : now))
+      })
+    }
+    if (!ask(f.where, go)) go()
   }
 
   return (
@@ -434,14 +485,15 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
           autoComplete="off"
           autoCapitalize="characters"
           enterKeyHint="done"
+          disabled={asking}
         />
       </label>
       <label>
-        Serial <input value={f.serial} onChange={(e) => setF({ ...f, serial: e.target.value })} placeholder="The maker's, if any" autoComplete="off" />
+        Serial <input value={f.serial} onChange={(e) => setF({ ...f, serial: e.target.value })} placeholder="The maker's, if any" autoComplete="off" disabled={asking} />
       </label>
       <label>
         Where it's kept{' '}
-        <input list="where-choices" value={f.where} onChange={(e) => setF({ ...f, where: e.target.value })} placeholder="A place, or a case's number" />
+        <input list="where-choices" value={f.where} onChange={(e) => setF({ ...f, where: e.target.value })} placeholder="A place, or a case's number" disabled={asking} />
       </label>
       {countedThere > 0 && known && (
         <label className="wide tick">
@@ -463,9 +515,11 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
           )}
         </p>
       )}
-      <button type="submit" className="primary wide">
-        Add item
-      </button>
+      {question ?? (
+        <button type="submit" className="primary wide">
+          Add item
+        </button>
+      )}
     </form>
   )
 }
@@ -476,7 +530,7 @@ function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
     <section className="card" aria-label={numbered ? 'Not labelled yet' : 'Counted'}>
       <h2>{numbered ? 'Not labelled yet' : 'Counted'}</h2>
       {numbered && <p className="hint">How many are here but not labelled yet. Adding an item where some are counted takes one off.</p>}
-      {m.counted.length === 0 && <p className="empty">{numbered ? 'None counted.' : 'None counted yet.'}</p>}
+      {m.counted.length === 0 && <Empty />}
       {m.counted.map((s) => (
         <CountRow key={s.id} s={s} w={w}>
           {whereLabel(s, w)}
@@ -495,6 +549,7 @@ function NewCount({ m, w }: { m: ModelView; w: WarehouseView }) {
   // A count that would replace one already made waits here until the office says so.
   const [asking, setAsking] = useState<{ n: number; already: number; at: string } | undefined>()
   const { run, error, refuse } = useAct()
+  const place = useNewPlace(w)
   const save = (n: number) => {
     setAsking(undefined)
     void run(async () => {
@@ -511,22 +566,28 @@ function NewCount({ m, w }: { m: ModelView; w: WarehouseView }) {
     e.preventDefault()
     const n = Number(qty)
     if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many are there? A whole number, please.')
+    const problem = whereProblem(where, w)
+    if (problem) return refuse(problem)
+    if (place.ask(where, () => save(n))) return
     const known = findWhere(where, w)
     const already = known && m.counted.find((s) => s.id === stockId(m.id, known))
     if (known && already) return setAsking({ n, already: already.qty, at: atLabel(known, w) })
     save(n)
   }
+  const held = !!asking || place.asking
   return (
     <form className="grid-form" onSubmit={submit}>
       <h3 className="wide">Add a count</h3>
       <label>
-        Counted at <input list="where-choices" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="A place, or a case's number" required disabled={!!asking} />
+        Counted at <input list="where-choices" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="A place, or a case's number" required disabled={held} />
       </label>
       <label>
-        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required disabled={!!asking} />
+        How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} required disabled={held} />
       </label>
       <Refusal error={error} className="wide" />
-      {asking ? (
+      {place.question ? (
+        place.question
+      ) : asking ? (
         <Confirm
           className="wide"
           question={`${asking.already.toLocaleString('en-IE')} are counted ${asking.at} already. Make it ${asking.n.toLocaleString('en-IE')}?`}

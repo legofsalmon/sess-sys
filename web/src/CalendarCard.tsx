@@ -1,9 +1,10 @@
-import { invitesLabel, irishToday, type CalendarCheck, type CalendarChoice, type CalendarInvites, type CalendarLink, type View } from '@sh/shared'
+import { invitesLabel, type CalendarCheck, type CalendarChoice, type CalendarInvites, type CalendarLink, type View } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Confirm } from './act.tsx'
 import { when } from './format.ts'
 import { ask, post, serverUrl } from './server.ts'
 import { client, syncSoon } from './sync.ts'
+import { useToday } from './view.ts'
 
 /**
  * Google Calendar (ADR 0008), as the Account tab shows it: connecting the
@@ -90,7 +91,7 @@ export function CalendarCard({ view, available }: { view: View; available: boole
     }
   }
 
-  const today = irishToday()
+  const today = useToday()
   const onIt = Object.values(view.calendar.days).filter((d) => d.state === 'on' && d.day >= today && d.calendarId === link?.calendarId).length
 
   const invites = link?.state === 'on' && link.invites === true

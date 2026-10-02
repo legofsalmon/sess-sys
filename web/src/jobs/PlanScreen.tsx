@@ -18,8 +18,10 @@ import {
   type Plan,
   type View,
 } from '@sh/shared'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { today, Top } from './common.tsx'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
+import { useToday } from '../view.ts'
+import { Top } from './common.tsx'
 
 /**
  * The planner (ADR 0010): a week or a month of jobs, or of people, with the
@@ -49,7 +51,7 @@ const daysOf = (scale: Scale, day: string) => (scale === 'week' ? weekOf(day) : 
 
 /** List, Week and Month: the same jobs three ways. From the planner, the other scale opens on the same days. */
 export function JobViews({ place }: { place?: Place }) {
-  const now = today()
+  const now = useToday()
   const days = place && daysOf(place.scale, place.day)
   const day = days && !days.includes(now) ? days[0]! : now
   const rows = place?.rows ?? 'jobs'
@@ -70,13 +72,18 @@ export function JobViews({ place }: { place?: Place }) {
 }
 
 export function PlanScreen({ view, hash }: { view: View; hash: string }) {
-  const now = today()
+  const now = useToday()
   const place = placeOf(hash, now)
   const { scale, day, rows } = place
   const days = useMemo(() => daysOf(scale, day), [scale, day])
   const p = useMemo(() => plan(view, days), [view, days])
   const [everyone, setEveryone] = useState(false)
   const at = (changes: Partial<Place>) => hashOf({ ...place, ...changes })
+  // Jobs or people is a toggle, not a move, so it keeps focus (audit finding 22). Safari, and Firefox on a Mac, don't focus a button they press, so it takes focus itself: the Shell sees a toggle in focus and leaves it there.
+  const toggle = (to: Rows) => (e: MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.focus()
+    location.hash = at({ rows: to })
+  }
   const step = (n: number) => (scale === 'week' ? addDays(mondayOf(day), 7 * n) : addMonths(day, n))
   const title = scale === 'week' ? `${spanLabel({ start: days[0]!, end: days.at(-1)! })} ${days.at(-1)!.slice(0, 4)}` : monthLabel(day)
   const busy = p.people.filter((l) => Object.keys(l.days).length > 0)
@@ -103,10 +110,10 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
         <div className="plan-title">
           <h1>{title}</h1>
           <div className="filters" role="group" aria-label="Rows">
-            <button type="button" aria-pressed={rows === 'jobs'} onClick={() => (location.hash = at({ rows: 'jobs' }))}>
+            <button type="button" aria-pressed={rows === 'jobs'} onClick={toggle('jobs')}>
               Jobs
             </button>
-            <button type="button" aria-pressed={rows === 'people'} onClick={() => (location.hash = at({ rows: 'people' }))}>
+            <button type="button" aria-pressed={rows === 'people'} onClick={toggle('people')}>
               People
             </button>
           </div>
@@ -131,7 +138,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
           {p.problems.map((x) => (
             <div className="row problem" key={`${x.person.id} ${x.day}`}>
               <div>
-                <b>{x.person.name}</b> <span className={`pill ${x.severity}`}>{x.severity === 'clash' ? 'Clash' : 'Check'}</span>
+                <b>{x.person.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
                 <p>
                   {dayLabel(x.day)}: {x.text}
                 </p>
@@ -240,7 +247,7 @@ function JobName({ lane }: { lane: JobLane }) {
   return (
     <th scope="row">
       <a href={lane.jobId ? `#jobs/${lane.jobId}` : '#crew'}>{lane.name}</a>
-      {lane.pending ? <small>Waiting to sync</small> : lane.tentative && lane.status && <small>{STATUS_LABELS[lane.status]}</small>}
+      {lane.pending ? <small>{WAITING_TO_SYNC}</small> : lane.tentative && lane.status && <small>{STATUS_LABELS[lane.status]}</small>}
       {!lane.jobId && <small>On the Crew tab</small>}
     </th>
   )

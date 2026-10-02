@@ -88,6 +88,15 @@ export interface PickList {
 export interface MovesView {
   /** Which job a numbered item is out with, if any. */
   outOf(assetId: string): OutState | undefined
+  /**
+   * What of a product is out with a job now, by these same rules: its items
+   * in stock by number, then counted kit job by job. The server works it out
+   * the same way (server/src/stock/moves.ts) before a product is marked as
+   * added by mistake, so the phone says first what the server would.
+   */
+  outWith(modelId: string): { what: string; job: string }[]
+  /** Whether a product has ever been scanned or counted out or back, which keeps it in the stock list for the record, as on the server. */
+  everMoved(modelId: string): boolean
   pickList(jobId: string): PickList | undefined
   /** Confirmed jobs on now or starting in the next 14 days, with kit to go out; soonest first. */
   soon: PickList[]
@@ -205,6 +214,20 @@ export function movesView(
 
   const jobById = new Map(jobs.jobs.map((j) => [j.id, j]))
   const modelById = new Map(warehouse.models.map((m) => [m.id, m]))
+  const jobName = (id: string) => jobById.get(id)?.name ?? 'a job'
+  const outWith = (modelId: string) => [
+    ...[...warehouse.assets.values()]
+      .filter((a) => a.modelId === modelId && a.status === 'active' && outState.has(a.id))
+      .sort((a, b) => a.number.localeCompare(b.number))
+      .map((a) => ({ what: a.number || 'an item', job: jobName(outState.get(a.id)!.projectId) })),
+    ...[...counted]
+      .flatMap(([projectId, byModel]) => {
+        const c = byModel.get(modelId)
+        const n = c ? c.out - c.back - c.missing : 0
+        return n > 0 ? [{ what: `${n.toLocaleString('en-IE')} counted`, job: jobName(projectId) }] : []
+      })
+      .sort((a, b) => a.job.localeCompare(b.job)),
+  ]
   const department = (r: PickRow) => {
     const i = r.model ? DEPARTMENTS.indexOf(r.model.department) : -1
     return i < 0 ? DEPARTMENTS.length : i
@@ -280,7 +303,7 @@ export function movesView(
     const onKit = [...rows.values()].filter((r) => r.lines.length > 0)
     const extra = [...rows.values()]
       .filter((r) => r.lines.length === 0)
-      .sort((a, b) => department(a) - department(b) || (a.model?.name ?? '').localeCompare(b.model?.name ?? ''))
+      .sort((a, b) => department(a) - department(b) || (a.model?.name ?? '').localeCompare(b.model?.name ?? '') || a.modelId.localeCompare(b.modelId))
     const list: PickList = {
       job,
       rows: [...onKit, ...extra],
@@ -299,14 +322,16 @@ export function movesView(
     .filter((j) => holdOf(j.status) === 'held' && j.span && j.span.end >= today && j.span.start <= until && kit.byJob.has(j.id))
     .map((j) => pickList(j.id)!)
     .filter((p) => p.need > 0)
-    .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name))
+    .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   const withKitOut = new Set([...outByJob.keys(), ...[...counted].filter(([, byModel]) => [...byModel.values()].some((c) => c.out > c.back + c.missing)).map(([id]) => id)])
   const over = (j: JobView) => STOPPED.includes(j.status) || !j.span || j.span.end < today
   const stillOut = [...withKitOut]
     .map((id) => pickList(id))
     .filter((p): p is PickList => !!p && over(p.job) && p.stillOut > 0)
-    .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name))
+    .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
-  return { outOf: (id) => outState.get(id), pickList, soon, stillOut }
+  const moved = new Set([...moves.values()].map((m) => m.modelId))
+
+  return { outOf: (id) => outState.get(id), outWith, everMoved: (id) => moved.has(id), pickList, soon, stillOut }
 }

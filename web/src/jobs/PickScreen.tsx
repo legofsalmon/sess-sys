@@ -18,11 +18,14 @@ import {
 } from '@sh/shared'
 import { useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
+import { Empty } from '../Empty.tsx'
+import { mistakeLabel } from '../stock/common.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
 import { client } from '../sync.ts'
-import { StatusPill, today, Top } from './common.tsx'
+import { useToday } from '../view.ts'
+import { JobStatusPill, Top } from './common.tsx'
 
 /**
  * A job's pick list (ADR 0017): what its kit needs from Session Hire's
@@ -67,7 +70,7 @@ export function PickScreen({ view, id }: { view: View; id: string }) {
   const job = view.jobs.jobs.find((j) => j.id === id)
   if (!job)
     return (
-      <div className="app crew jobs warehouse pick">
+      <div className="app jobs warehouse pick">
         <Top view={view} />
         <a className="back" href="#jobs">
           ‹ All jobs
@@ -81,7 +84,8 @@ export function PickScreen({ view, id }: { view: View; id: string }) {
 }
 
 function Pick({ view, job }: { view: View; job: JobView }) {
-  const over = !!job.span && job.span.end < today()
+  const today = useToday()
+  const over = !!job.span && job.span.end < today
   const [mode, setMode] = useState<Direction>(over ? 'in' : 'out')
   const [camera, setCamera] = useState(false)
   const [typed, setTyped] = useState('')
@@ -101,6 +105,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     const a = (n && w.byNumber.get(n)) || (bySerial.length === 1 ? bySerial[0] : undefined)
     if (!a) return say('warn', n ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
+    // Never stock, so nothing to scan out or back (audit finding 19).
+    if (a.retiredReason === 'mistake') return say('warn', `${mistakeLabel(a)} Nothing was recorded.`)
     const was = view.moves.outOf(a.id)
     const other = was && was.projectId !== job.id ? (view.jobs.jobs.find((j) => j.id === was.projectId)?.name ?? 'another job') : undefined
     const notes: string[] = []
@@ -158,7 +164,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const shown = mode === 'in' ? rows.filter((r) => r.out > 0 || r.back > 0 || r.missing > 0) : rows.filter((r) => r.lines.length > 0 || r.out > 0)
 
   return (
-    <div className="app crew jobs warehouse pick">
+    <div className="app jobs warehouse pick">
       <Top view={view} />
       <a className="back" href={`#jobs/${job.id}`}>
         ‹ {job.name}
@@ -167,7 +173,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
       <section className="card" aria-label="Scanning">
         <header className="title">
           <h1>Pick list</h1>
-          <StatusPill status={job.status} pending={job.pending} />
+          <JobStatusPill status={job.status} pending={job.pending} />
         </header>
         <p className="hint">
           {job.name} · {job.span ? spanLabel(job.span) : 'No dates yet'}
@@ -224,11 +230,11 @@ function Pick({ view, job }: { view: View; job: JobView }) {
       <section className="card pick-list" aria-label="Kit">
         <h2>{mode === 'out' ? 'Kit to go out' : 'Kit coming back'}</h2>
         {rows.length === 0 && (
-          <p className="empty">
-            No kit on this job yet. Add it on <a href={`#jobs/${job.id}`}>the job's page</a>.
-          </p>
+          <Empty>
+            Add the job's kit on <a href={`#jobs/${job.id}`}>its page</a>.
+          </Empty>
         )}
-        {mode === 'in' && rows.length > 0 && shown.length === 0 && <p className="empty">Nothing has gone out with this job yet.</p>}
+        {mode === 'in' && rows.length > 0 && shown.length === 0 && <Empty>Kit shows here once it has gone out with this job.</Empty>}
         {groups
           .filter(([d]) => byDepartment.get(d)?.some((r) => shown.includes(r)))
           .map(([d, label]) => (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Mutation } from '../src/commands.ts'
-import { tellMessage, type CrewCall, type Offer, type Person } from '../src/crew.ts'
+import { offerMessage, tellMessage, type CrewCall, type Offer, type Person } from '../src/crew.ts'
 import { officeContact, officeLine, telHref } from '../src/office.ts'
 import { answersToCheck, crewView } from '../src/sync/crew-view.ts'
 import { officeView } from '../src/sync/office-view.ts'
@@ -156,6 +156,31 @@ describe('the message after what the office did', () => {
     )
     const reopened = tellMessage('timesheet-reopened', aoife, { call: show, offerId: 'o1' }, link)
     expect(reopened.text).toBe(`Hi Aoife, we've reopened your timesheet for Harbour Lights Festival (Show) to sort something out. You can change it again until we approve it: ${link}/timesheet/o1`)
+  })
+
+  it('names no rate to staff, who are paid through payroll', () => {
+    // Proves: the offer and every message the office is prompted with leave the rate out for a member of staff, as their page does (audit finding 21), and still say it to a freelancer.
+    const orla = { ...person('orla', 'Orla Hayes'), kind: 'staff' as const }
+    const offered = offerMessage(orla, { ...show, replyBy: '2026-10-08' }, link)
+    expect(offered).toBe(
+      [
+        'Hi Orla, are you free for Harbour Lights Festival (Show)?',
+        'Sound No.1, Sat 10 Oct to Sun 11 Oct, call 12:00',
+        'At Riverside Park, Limerick',
+        'Please answer by Thu 8 Oct.',
+        `Accept, decline or pick days here: ${link}`,
+      ].join('\n')
+    )
+    expect(offerMessage(orla, { ...show, dayRateCents: null }, link)).not.toContain('rate to agree')
+    const events = ['confirmed', 'withdrawn', 'released', 'job-stopped', 'call-cancelled', 'call-changed', 'phase-moved'] as const
+    for (const event of events) {
+      const said = tellMessage(event, orla, { call: show, offerId: 'o1' }, link)
+      expect(said.text, event).not.toMatch(/€|a day\b|\brate\b/)
+      expect(said.subject, event).not.toContain('€')
+    }
+    expect(tellMessage('call-changed', orla, { call: show }, link).text).toContain('Sound No.1 is now Sat 10 Oct to Sun 11 Oct, call 12:00, at Riverside Park, Limerick.')
+    // A freelancer still hears the rate.
+    expect(offerMessage(aoife, show, link)).toContain('€320 a day')
   })
 })
 

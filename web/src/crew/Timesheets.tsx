@@ -18,8 +18,11 @@ import {
 } from '@sh/shared'
 import { useState, type ReactNode } from 'react'
 import { Refusal, useAct } from '../act.tsx'
-import { today, Top } from '../jobs/common.tsx'
+import { ShowAll } from '../Fold.tsx'
+import { Top } from '../jobs/common.tsx'
+import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { useToday } from '../view.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
 
 /**
@@ -42,44 +45,51 @@ export function TimesheetsCard({ view }: { view: View }) {
   return (
     <section className="card timesheets" aria-label="Timesheets">
       <h2>Timesheets</h2>
+      {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
         <div className="ts-group" role="group" aria-label="To approve">
-          <h3>To approve</h3>
-          {toApprove.map((r) => (
-            <Row key={r.offer.id} r={r} action={<a className="button primary" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>Check</a>} />
-          ))}
+          <h3>To approve ({toApprove.length})</h3>
+          <ShowAll items={toApprove} limit={3} what="timesheets">
+            {(rows) =>
+              rows.map((r) => <Row key={r.offer.id} r={r} action={<a className="button primary" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>Check</a>} />)
+            }
+          </ShowAll>
         </div>
       )}
       {notIn.length > 0 && (
         <div className="ts-group" role="group" aria-label="Not in yet">
-          <h3>Not in yet</h3>
-          {notIn.map((r) => (
-            <Row
-              key={r.offer.id}
-              r={r}
-              action={
-                <>
-                  {r.person && (
-                    <button type="button" onClick={() => setRemind(r)} aria-label={`Ask ${r.person.name} for their timesheet`}>
-                      Ask
-                    </button>
-                  )}
-                  <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
-                    Fill in
-                  </a>
-                </>
-              }
-            />
-          ))}
+          <h3>Not in yet ({notIn.length})</h3>
+          <ShowAll items={notIn} limit={3} what="bookings">
+            {(rows) =>
+              rows.map((r) => (
+                <Row
+                  key={r.offer.id}
+                  r={r}
+                  action={
+                    <>
+                      {r.person && (
+                        <button type="button" onClick={() => setRemind(r)} aria-label={`Ask ${r.person.name} for their timesheet`}>
+                          Ask
+                        </button>
+                      )}
+                      <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                        Fill in
+                      </a>
+                    </>
+                  }
+                />
+              ))
+            }
+          </ShowAll>
         </div>
       )}
       {remind?.person && <Ask r={remind} person={remind.person} onClose={() => setRemind(undefined)} />}
       {lately.length > 0 && (
         <div className="ts-group" role="group" aria-label="Approved lately">
-          <h3>Approved lately</h3>
-          {lately.map((r) => (
-            <Row key={r.offer.id} r={r} action={<a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>Open</a>} />
-          ))}
+          <h3>Approved lately ({lately.length})</h3>
+          <ShowAll items={lately} limit={3} what="timesheets">
+            {(rows) => rows.map((r) => <Row key={r.offer.id} r={r} action={<a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>Open</a>} />)}
+          </ShowAll>
         </div>
       )}
     </section>
@@ -97,7 +107,7 @@ function Row({ r, action }: { r: TimesheetRow; action: ReactNode }) {
       </div>
       <div className="actions">
         {r.timesheet && <span className="amount">{r.timesheet.dayRateCents === null ? 'Rate to agree' : euro(r.total.total)}</span>}
-        {r.timesheet?.pending && <span className="pill pending">Waiting to sync</span>}
+        <Pending pending={!!r.timesheet?.pending} />
         {action}
       </div>
     </div>
@@ -146,8 +156,9 @@ function Timesheet({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: O
   const t = r.timesheet
   const first = r.person?.name.split(' ')[0] ?? 'them'
   const [asking, setAsking] = useState(false)
+  const today = useToday()
   // Staff, a booking not confirmed or not started, or a cancelled job: nothing to fill in.
-  const why = t ? null : noTimesheetReason(r.offer, r.call, r.person, today())
+  const why = t ? null : noTimesheetReason(r.offer, r.call, r.person, today)
   return (
     <>
       <section className="card">
@@ -220,7 +231,7 @@ function Approved({ r, onTell }: { r: TimesheetRow; onTell: OnTell }) {
         </>
       )}
       {t.officeNote && <p className="lines">{t.officeNote}</p>}
-      {t.pending && <span className="pill pending">Waiting to sync</span>}
+      <Pending pending={t.pending} />
       <Refusal error={error} />
       <div className="actions">
         <button type="button" onClick={reopen}>
