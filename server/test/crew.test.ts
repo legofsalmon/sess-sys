@@ -982,7 +982,7 @@ describe('correcting people (audit finding 7)', () => {
 })
 
 describe("a freelancer's page", () => {
-  it('reads the offers twice however many jobs they were ever offered, and still says which days are filled', async () => {
+  it('reads the offers table three times however many jobs they were ever offered, and still says which days are filled', async () => {
     // Proves: the places still open on each call come from one query for all the calls, not one per job (audit finding 20).
     const db = await pgliteDb()
     const sql: string[] = []
@@ -1007,7 +1007,9 @@ describe("a freelancer's page", () => {
     sql.length = 0
     const page = await app.inject({ url: `/f/${aoife.linkToken}` })
     expect(page.statusCode).toBe(200)
-    expect(sql.filter((s) => s.includes('FROM offers'))).toHaveLength(2)
+    // Every query that names the table, a join included, as the five-jobs test above counts them: their offers with the calls, the places
+    // held on all of those calls, and their timesheets. The days they hold on other jobs come from the first, so they cost no read of their own.
+    expect(sql.filter((s) => /\boffers\b/.test(s))).toHaveLength(3)
     const card = cardOf(page.body, mine[0]!)
     expect(card).toContain('value="2026-11-01" disabled')
     expect(card).toContain('value="2026-11-02" checked')

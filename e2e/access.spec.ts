@@ -87,8 +87,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const page = await (await browser.newContext({ viewport: phoneSize, colorScheme })).newPage()
     await page.goto('/#crew')
     await expect(page.getByRole('status')).toHaveText('Up to date')
-    // Dara's card opens the days-off form and the level picker, which the list alone doesn't show.
-    await page.getByRole('button', { name: 'Dara Quinn' }).click()
+    // Dara's card opens the days-off form and the level picker, which the list alone doesn't show. Her name heads her row; a call's line names her after its role.
+    await page.getByRole('button', { name: /^Dara Quinn/ }).click()
     await expect(page.getByLabel('Off from')).toBeVisible()
 
     for (const hash of ['#crew', '#jobs', '#stock', '#account']) {
@@ -97,13 +97,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
       expect(fields.length, `${hash} has fields`).toBeGreaterThan(0)
       for (const f of fields) expect(contrast(f.border, f.behind), `${hash}: ${f.field} border ${f.border} on ${f.behind}`).toBeGreaterThanOrEqual(3)
     }
-    // A job's page, with Ask for crew and its reply-by day.
+    // A job's page, with Ask for crew and its reply-by day, behind its button (audit finding 16).
     await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
     await page.getByRole('link', { name: /Harbour Lights Festival/ }).first().click()
+    await page.getByRole('button', { name: 'Ask for crew' }).click()
     await expect(page.getByRole('form', { name: 'Ask for crew' }).getByLabel('Reply by')).toBeVisible()
     for (const f of await fieldBorders(page)) expect(contrast(f.border, f.behind), `a job: ${f.field} border ${f.border} on ${f.behind}`).toBeGreaterThanOrEqual(3)
     expect(await textContrast(page, '.tabs a[aria-current="page"]')).toBeGreaterThanOrEqual(4.5)
+    // A call shows its answers once its line is opened (audit finding 16): the load-in stagehands, which Laoise declined.
     await page.goto('/#crew')
+    await page.locator('.call-group', { hasText: 'Harbour Lights Festival' }).getByRole('button', { name: /× Stagehand · Load in/ }).click()
     await expect(page.locator('.pill.cancelled').first()).toBeVisible()
     expect(await textContrast(page, '.pill.cancelled')).toBeGreaterThanOrEqual(4.5)
 
@@ -190,7 +193,7 @@ test('every field on every screen has a name, and the not-done list is a live re
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await page.goto('/#crew')
   await expect(page.getByRole('status')).toHaveText('Up to date')
-  await page.getByRole('button', { name: 'Dara Quinn' }).click()
+  await page.getByRole('button', { name: /^Dara Quinn/ }).click()
   await expect(page.getByLabel('Off from')).toBeVisible()
   expect(await unnamedFields(page), '#crew').toEqual([])
   for (const hash of ['#jobs', '#stock', '#account', '#history', '#crew/leave']) {
@@ -217,6 +220,7 @@ test('every field on every screen has a name, and the not-done list is a live re
     const { mutations } = route.request().postDataJSON() as { mutations: { id: string }[] }
     await route.fulfill({ json: { results: mutations.map((m) => ({ id: m.id, status: 'rejected', reason: { code: 'conflict', message: 'Pretend the server said no.' } })) } })
   })
+  await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
   await person.getByLabel('Name').fill(`Nora Walsh ${id}`)
   await person.getByRole('button', { name: 'Add person' }).click()

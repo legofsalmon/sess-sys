@@ -145,6 +145,8 @@ async function ready(page: Page, hash = '#stock') {
 /** A numbered product, opened on its own page. */
 async function newProduct(page: Page, name: string, how: 'numbered' | 'case' = 'numbered') {
   await page.goto('/#stock')
+  // The form waits behind its button (audit finding 16).
+  await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
   if (how === 'case') await form.getByRole('checkbox', { name: /^Holds other kit/ }).check()
@@ -283,9 +285,11 @@ test('an item is put at a place or in a case by camera, and the camera stays on 
 
   // A new shelf, and two speakers put on it one after the other without touching the screen between.
   await page.goto('/#stock')
+  // The form waits behind its button, and the line saying the place was added leads to it, wherever the folded list has it (audit finding 16).
+  await page.getByRole('button', { name: 'Add place' }).click()
   await page.getByLabel('New place').fill(shelf)
   await page.getByRole('button', { name: 'Add place' }).click()
-  await page.getByRole('link', { name: shelf }).click()
+  await page.locator('.added').getByRole('link', { name: shelf }).click()
   await expect(page.getByRole('heading', { level: 1, name: shelf })).toBeVisible()
   const put = part(page, 'Put an item here')
   await put.getByRole('button', { name: 'Scan' }).click()

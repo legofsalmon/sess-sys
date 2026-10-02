@@ -28,6 +28,15 @@ async function ready(page: Page, hash = '#stock') {
 
 const part = (page: Page, heading: string) => page.locator('form').filter({ has: page.getByRole('heading', { name: heading, exact: true }) })
 
+/** Every product and place on the Stock tab, past the first five of each it shows (audit finding 16), so one missing from either is missing. */
+async function showAll(page: Page) {
+  await expect(page.getByRole('region', { name: 'Stock', exact: true })).toBeVisible()
+  for (const what of ['products', 'places']) {
+    const all = page.getByRole('button', { name: new RegExp(`^Show all \\d+ ${what}$`) })
+    if (await all.count()) await all.click()
+  }
+}
+
 async function newProduct(page: Page, name: string, how: 'numbered' | 'counted' | 'case') {
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Add product' }).click()
@@ -240,6 +249,7 @@ test('a product added by mistake is hidden with its items and counts, and its la
   ).toBeVisible()
   await page.getByRole('button', { name: 'It was a mistake' }).click()
   await expect(page).toHaveURL(/#stock$/)
+  await showAll(page)
   await expect(page.locator('.job-row', { hasText: light })).toHaveCount(0)
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await expect(page.locator('.job-row', { hasText: light })).toHaveCount(0)
@@ -269,6 +279,7 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await page.getByRole('button', { name: 'It was a mistake' }).click()
   await expect(page).toHaveURL(/#stock$/)
   await expect(page.locator('.conn')).toHaveText('Up to date')
+  await showAll(page)
   await expect(page.locator('.job-row', { hasText: spot })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '1 not done' })).toHaveCount(0)
 })
