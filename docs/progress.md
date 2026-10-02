@@ -3,6 +3,91 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 2 October 2026: the stock list, item logs, erasure, certificates and running late
+
+**Done**
+
+- Everything that could be built without waiting on the keys, in four
+  streams built side by side, each read by a reviewer trying to break it
+  and corrected, then brought together and checked as one.
+- **Bringing in the stock list**
+  ([Decision 0026](adr/0026-bringing-in-the-stock-list-and-item-logs.md)).
+  Colly's list arrives next week and nobody here has seen it, so the
+  reader doesn't depend on one layout. Columns are found by their names,
+  and a column the reader doesn't know is asked about, never guessed at.
+  Rows become products and numbered items or counted stock. A Session
+  Hire number on the list is kept when it's free; any other tag is kept
+  as the item's old number, and scanning it still finds the item. New
+  numbers are never ones used before. Places and cases the list names
+  are only made when the office ticks to make them. Every row is checked
+  first, fixed in place or skipped, and nothing is saved until the
+  office says so. Bringing the same file in twice changes nothing the
+  second time. A long list goes in a part at a time, each part saved,
+  so it never holds up the phones; choosing the file again carries on
+  where it stopped. A made-up sample is in `docs/samples`, and the
+  decision says how to shape the sheet.
+- **A log on each item's page** (the same decision): out to a job and
+  back, faults and repairs, missing and found, PAT tests, moves and
+  changes, newest first, with who did it. What the phone knows shows
+  with no signal, and the rest fills in from the server when there is
+  signal. GPS trackers would add to the same log later. AirTags can't,
+  because other apps can't read where they are.
+- **Erasing a person on request**
+  ([Decision 0027](adr/0027-erasing-a-person-on-request.md)). This is
+  GDPR's right to erasure. It's done from an archived person's card, and
+  refused while they have work still to come. Their details go from
+  everywhere they're held: the card, every earlier copy in the change
+  feed, the history's stored commands, the export, every device, and a
+  staff member's sign-in. Someone with paid work in the last six years
+  keeps their name and timesheets, because Revenue needs the records.
+  Backups can't be edited and age out within a year; putting one back
+  never brings an erased person back.
+- **Certificates a job needs**
+  ([Decision 0028](adr/0028-certificates-a-call-needs-and-running-late.md)).
+  Safe Pass, working at height and IPAF join first aid, manual handling
+  and the driving licence, and the crew list reads them. A crew call can
+  say which it needs. An offer to someone without one, or whose card
+  runs out before the job ends, is turned down, saying why; not known is
+  allowed with a warning. A list on the Crew tab shows cards that have
+  run out or run out in the next 30 days, each with a message ready
+  asking for the new card.
+- **Running late** (the same decision). On the day, a freelancer's link
+  lets them say how late they'll be, with a note, and then that they're
+  there. The office sees it at once on the Crew tab, on the call and on
+  the planner; the contact on the day sees it on their call sheet.
+- **The History tab** is grouped by day, and within a day by person,
+  with a run of changes folded to one line that opens on a tap. While
+  sign-in is off it groups by device and says why once, at the top.
+  **The old sync test** is gone from the app, with its commands and its
+  four empty tables. Its tests now run on real commands, and a phone on
+  an older version is told plainly that something it held isn't done
+  any more.
+- The reviewers found and fixed, among others: a long stock list going
+  in at once, holding every phone's sync for minutes and timing out; a
+  sheet split by semicolons read as one column; a totals row becoming a
+  product; a month-first date read the wrong way round; old tags not
+  working for packing a case; erasing an old record switching off a live
+  staff account with the same email; erasure damaging other people's
+  stored history; an erased person staying a guest on future calendar
+  events; an older version of the app unable to clear a certificate; and
+  a card that ran out after a job was over still counted against it.
+- Checked with all four together: the typecheck; the shared tests (161);
+  the server tests (356 on PGlite, and the real-Postgres file, 9); the
+  web build; the Blueprint build; the full browser suite (72), with the
+  new specs run three more times; and screenshots of each new screen at
+  phone and laptop widths, light and dark.
+
+**Next**
+
+- Colly to confirm erasure's defaults: archive first, and the name and
+  timesheets kept for six years where there's paid work. Staff leave
+  records go with the rest; Irish working-time rules may want them kept
+  for three years instead.
+- The stock list next week. On the live server, a list of 1,500 rows is
+  expected to take about 8 to 10 minutes with the page left open.
+- The keys, as before: the Google key, the backups bucket (and a
+  `BACKUP_KEY`), and the Sentry key.
+
 ## 2 October 2026: audit round three
 
 **Done**
