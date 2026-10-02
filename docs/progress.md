@@ -86,13 +86,32 @@ waiting on someone.
   erasures is kept while backups are off, and nothing went wrong. The
   Blueprint rebuilt itself from `main`.
 
+- **Records kept for their recommended time, then let go** (Colly, 2
+  October: "Keep all records for the recommended timeframes"; ADR 0027
+  amended). Erasing someone now keeps their staff leave records (leave
+  asked for, days in lieu and allowances) for three years, as the
+  Organisation of Working Time Act asks, with their notes and the
+  approver's reasons cleared. Pay records keep their six years for
+  Revenue, as before. The name stays only while a kept record needs it.
+  The server goes through what erasures kept once a day, after Irish
+  midnight, and lets each record and name go on its day, so nobody has
+  to remember; the "Erase the name now" button is gone. Erasing waits
+  while someone's leave waits for a decision, so nothing is left that
+  can never be decided. The decision has a table of how long each kind
+  of record is kept, and why.
+- Found and fixed in review: a staff member's older leave would have
+  stayed until their newest leave's day rather than its own, and a
+  restore could bring back a request still waiting for a decision that
+  could no longer be made.
+- Checked: the typecheck; the shared tests (168); the server tests (366
+  on PGlite, and the real-Postgres file, 11, with two servers running
+  the daily look at once); the web build; the full browser suite (73).
+
 **Next**
 
-- Colly confirmed erasure's defaults and asked for every record to be
-  kept for its recommended time (2 October). Pay records already keep
-  their six years for Revenue. Staff leave records, which erasure
-  deletes at once today, are next: they will be kept for three years
-  under the Organisation of Working Time Act, with their notes cleared.
+- A leave year typed far in the future would keep the name until three
+  years after it. The erase confirm shows that day before anything is
+  erased, so it would be seen; Colly can say if it should be capped.
 - The stock list next week. On the live server, a list of 1,500 rows is
   expected to take about 8 to 10 minutes with the page left open.
 - The keys, as before: the Google key, the backups bucket (and a
