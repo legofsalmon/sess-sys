@@ -28,6 +28,8 @@ import { publicOrigin, requestForLog } from './http.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
+import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
+import { registerItemLogRoutes } from './stock/log.ts'
 
 const PULL_LIMIT = 500
 
@@ -58,6 +60,8 @@ export interface AppOptions {
   calendar?: CalendarSetup
   /** How long calendar feeds are kept in memory at most (ADR 0012), and the clock, for tests. */
   feeds?: FeedsOptions
+  /** How much one call bringing in the stock list does (ADR 0026), for tests. */
+  stockImport?: StockImportRound
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs'> {
@@ -273,6 +277,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, onChange: changed })
   registerPeopleImportRoutes(app, { db, onChange: changed })
+  registerStockImportRoutes(app, { db, onChange: changed, round: options.stockImport })
+  registerItemLogRoutes(app, { db })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 

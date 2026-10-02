@@ -7,7 +7,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
  * the numbers set aside for printing labels (ADR 0015); kit scanned out
  * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
- * inspections (ADR 0020); and what was added by mistake (audit finding 19).
+ * inspections (ADR 0020); what was added by mistake (audit finding 19); and
+ * what the stock list brings in that items didn't hold before (ADR 0026).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -179,6 +180,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_retired_reason_check;
   ALTER TABLE assets ADD CONSTRAINT assets_retired_reason_check CHECK (retired_reason IN ('sold', 'scrapped', 'lost', 'stolen', 'mistake'));
   ALTER TABLE label_runs ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+  `,
+  // The stock list (ADR 0026): a tag an item had before Session Hire's
+  // labels, kept so scanning it still finds the item, one item to a tag;
+  // and when the list said its next PAT is due, until a test is recorded.
+  // And an item's labels found by the item: reading an item looks up the
+  // labels it had before, which without this read every label there is,
+  // for every item, as a list of thousands goes in.
+  `
+  ALTER TABLE assets ADD COLUMN IF NOT EXISTS old_number text NOT NULL DEFAULT '';
+  ALTER TABLE assets ADD COLUMN IF NOT EXISTS pat_due date;
+  CREATE UNIQUE INDEX IF NOT EXISTS assets_old_number ON assets (lower(old_number)) WHERE old_number <> '';
+  CREATE INDEX IF NOT EXISTS identifiers_asset ON identifiers (asset_id);
   `,
 ]
 

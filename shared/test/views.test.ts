@@ -55,6 +55,8 @@ const asset = (id: string, modelId: string, placeId: string | null): Asset => ({
   number: `SH-${id.padStart(6, '0')}`,
   formerNumbers: [],
   serial: '',
+  oldNumber: '',
+  patDue: null,
   placeId,
   caseId: null,
   status: 'active',

@@ -184,7 +184,8 @@ function historyCsv(history: HistoryEntry[]): string {
 
 /** What each table holds, for the README. A table not described here is still exported. */
 const ABOUT: Record<string, string> = {
-  assets: 'Numbered items of stock: their product, serial, where they are kept, and whether they are retired (sold, scrapped, lost, stolen, or added by mistake).',
+  assets:
+    'Numbered items of stock: their product, serial, where they are kept, whether they are retired (sold, scrapped, lost, stolen, or added by mistake), the old number they had before Session Hire\'s labels, and when the stock list said their next PAT is due.',
   backup_runs: 'The nightly backups: when each ran and how it went.',
   calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
   calendar_guests: 'Crew the app has invited to those days in Google Calendar because of their offers, with the address used and their answer.',

@@ -34,6 +34,8 @@ export interface Due {
   /** The day it's next due; undefined when never recorded, or failed. */
   due: string | undefined
   state: DueState
+  /** Due on the day the stock list gave, with no test recorded here yet (ADR 0026). */
+  fromList?: boolean
 }
 
 export interface InspectionsView {
@@ -103,9 +105,11 @@ export function inspectionsView(
         const months = monthsFor(asset.model, kind)
         if (!months) continue
         const last = byAsset.get(assetId)?.find((i) => i.kind === kind)
-        const due = last?.passed ? monthsLater(last.day, months) : undefined
-        const state: DueState = !last ? 'unrecorded' : !last.passed ? 'failed' : due! < today ? 'overdue' : due! <= soon ? 'soon' : 'ok'
-        list.push({ asset, kind, months, last, due, state })
+        // The stock list's day for its next PAT stands until a test is recorded here (ADR 0026).
+        const listed = !last && kind === 'pat' ? (asset.patDue ?? undefined) : undefined
+        const due = last?.passed ? monthsLater(last.day, months) : listed
+        const state: DueState = !last && !listed ? 'unrecorded' : last && !last.passed ? 'failed' : due! < today ? 'overdue' : due! <= soon ? 'soon' : 'ok'
+        list.push({ asset, kind, months, last, due, state, ...(listed ? { fromList: true } : {}) })
       }
     }
     dues.set(assetId, list)

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { day } from './day.ts'
 import { months } from './inspections.ts'
 import { euroCents, needed, text, whole } from './plain.ts'
 
@@ -100,6 +101,14 @@ export interface Asset {
   formerNumbers: string[]
   /** The manufacturer's serial. */
   serial: string
+  /**
+   * A tag it had before Session Hire's labels, such as an old asset number or
+   * a maker's barcode, brought in with the stock list (ADR 0026), so scanning
+   * it still finds the item. Empty for none; never one in Session Hire's form.
+   */
+  oldNumber: string
+  /** When the stock list said its next PAT is due, used until a test is recorded here (ADR 0026); null for none. */
+  patDue: string | null
   placeId: string | null
   caseId: string | null
   status: 'active' | 'retired'
@@ -161,6 +170,9 @@ export function normaliseNumber(text: string): string | undefined {
   return `SH-${m[1]!.padStart(6, '0')}`
 }
 
+/** Written in Session Hire's own form, "SH-000123" or "sh 123", as against digits alone, which could be any old tag (ADR 0026). */
+export const inShForm = (text: string) => /^\s*sh[\s-]*\d{1,6}\s*$/i.test(text) && normaliseNumber(text) !== undefined
+
 const oneOrNone = [(w: Where) => !(w.placeId && w.caseId), { message: 'Something lives at a place or in a case, not both.' }] as const
 const exactlyOne = [(w: Where) => !!w.placeId !== !!w.caseId, { message: 'Say where: a place or a case.' }] as const
 const caseIsNumbered = [
@@ -175,6 +187,9 @@ const somethingToChange = [
 const where = { placeId: id.nullable(), caseId: id.nullable() }
 /** As typed or scanned; the server reads it as `normaliseNumber` does. Null: the next free number. */
 const typedNumber = text(100, 'The number').nullable()
+/** An old tag kept on an item (ADR 0026); left out by an older app, so optional. */
+const oldNumber = text(100, 'The old number')
+const patDue = day.nullable()
 
 export const stockCommandSchemas = {
   'model.create': model.refine(...caseIsNumbered),
@@ -216,11 +231,20 @@ export const stockCommandSchemas = {
       notes: text(2000, 'The notes'),
       /** One of those counted where it's going, not labelled until now: take one off the count. */
       fromCount: z.boolean(),
+      oldNumber: oldNumber.default(''),
+      patDue: patDue.default(null),
     })
     .refine(...oneOrNone),
   /** Field by field. A new product must be numbered, and a case if this holds anything. */
   'asset.update': z
-    .object({ id, modelId: id.optional(), serial: text(100, 'The serial').optional(), notes: text(2000, 'The notes').optional() })
+    .object({
+      id,
+      modelId: id.optional(),
+      serial: text(100, 'The serial').optional(),
+      notes: text(2000, 'The notes').optional(),
+      oldNumber: oldNumber.optional(),
+      patDue: patDue.optional(),
+    })
     .refine(...somethingToChange),
   /** Where it lives. A case takes everything in it along. */
   'asset.move': z.object({ id, ...where }).refine(...oneOrNone),
@@ -246,9 +270,13 @@ export const stockCommandSchemas = {
     .refine((m) => (m.fromPlaceId ?? m.fromCaseId) !== (m.toPlaceId ?? m.toCaseId), { message: "That's where they are already." }),
 } as const
 
+// Made once: making one for every value was most of what checking a long stock list again cost (ADR 0026).
+const WHOLE_EUROS = new Intl.NumberFormat('en-IE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const EUROS_AND_CENTS = new Intl.NumberFormat('en-IE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 /** "€1,250", or "€12.50". */
 export function valueLabel(c: number): string {
-  return `€${(c / 100).toLocaleString('en-IE', { minimumFractionDigits: c % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`
+  return `€${(c % 100 === 0 ? WHOLE_EUROS : EUROS_AND_CENTS).format(c / 100)}`
 }
 
 /** "1 item", "12 items". */

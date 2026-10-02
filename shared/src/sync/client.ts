@@ -233,6 +233,11 @@ export class SyncClient {
     return this.state.cursor
   }
 
+  /** This device's own changes the server hasn't been heard to apply yet, oldest first: an item's log shows them before they sync (ADR 0026). */
+  get waiting(): readonly Mutation[] {
+    return this.state.outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > this.state.cursor)
+  }
+
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
     return this.state.outbox.filter((m) => m.appliedSeq === undefined).length

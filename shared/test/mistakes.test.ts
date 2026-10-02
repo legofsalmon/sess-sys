@@ -36,6 +36,8 @@ const asset = (id: string, modelId: string, number: string, placeId: string | nu
   number,
   formerNumbers: [],
   serial: '',
+  oldNumber: '',
+  patDue: null,
   placeId,
   caseId: null,
   status: 'active',

@@ -3,6 +3,7 @@ import {
   dayLabel,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
+  itemByCode,
   newId,
   normaliseNumber,
   parseEuro,
@@ -116,7 +117,8 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   const q = search.trim().toLowerCase()
   const words = q.split(/\s+/).filter(Boolean)
   const number = normaliseNumber(search)
-  const exact = number ? w.byNumber.get(number) : undefined
+  // An old tag from before Session Hire's labels first, as a scan reads it (ADR 0026).
+  const exact = w.byOldNumber.get(q) ?? (number ? w.byNumber.get(number) : undefined)
   // A label that isn't on anything yet (ADR 0015): one from a run, or anything typed as a label rather than a bare number.
   const unclaimed = number && !exact && (view.labels.runOf(number) || /^\s*sh|\/a\//i.test(search)) ? number : undefined
   const searchField = useRef<HTMLInputElement>(null)
@@ -132,7 +134,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   const items =
     q.length >= 3
       ? [...w.assets.values()]
-          .filter((a) => a !== exact && a.retiredReason !== 'mistake' && [a.number, a.serial, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
+          .filter((a) => a !== exact && a.retiredReason !== 'mistake' && [a.number, a.serial, a.oldNumber, ...a.formerNumbers].some((t) => t.toLowerCase().includes(q)))
           .sort((a, b) => a.number.localeCompare(b.number))
           .slice(0, 20)
       : []
@@ -160,9 +162,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   }
   // Read by the camera: an item's label or its maker's serial shows it under the camera, which stays on; a label on nothing yet asks what it's on.
   const onRead = (code: string) => {
-    const n = normaliseNumber(code)
-    const serial = code.toLowerCase()
-    const found = (n && w.byNumber.get(n)) || only([...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === serial))
+    const found = itemByCode(w, code)
     if (found) {
       setScanned(found.id)
       setSearch('')
@@ -251,7 +251,15 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           ))}
         </ul>
       )}
-      {shown.length === 0 && !exact && !unclaimed && items.length === 0 && <Empty>{w.models.length === 0 && 'Add the first product below.'}</Empty>}
+      {shown.length === 0 && !exact && !unclaimed && items.length === 0 && (
+        <Empty>
+          {w.models.length === 0 && (
+            <>
+              Add the first product below, or <a href="#account/import-stock">bring in the stock list</a>.
+            </>
+          )}
+        </Empty>
+      )}
       <ShowAll items={shown} limit={5} what="products" keep={(m) => m.id === current}>
         {(rows) => (
           <ul className="job-list">
@@ -487,6 +495,3 @@ function Places({ view }: { view: View }) {
     </section>
   )
 }
-
-/** The one thing in a list, if there's exactly one. */
-const only = <T,>(list: T[]) => (list.length === 1 ? list[0] : undefined)

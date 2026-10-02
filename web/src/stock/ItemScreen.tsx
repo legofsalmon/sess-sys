@@ -1,4 +1,5 @@
 import {
+  inShForm,
   normaliseNumber,
   plural,
   RETIRED_LABELS,
@@ -18,6 +19,7 @@ import { Pending, StatusPill } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText, InspectionsCard } from './Inspections.tsx'
+import { ItemLog } from './ItemLog.tsx'
 import { PrintLabels } from './Labels.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import {
@@ -25,8 +27,8 @@ import {
   CountHere,
   CountRow,
   itemNumbered,
+  itemToPut,
   loopIn,
-  mistakeLabel,
   numberLabel,
   ScanResult,
   useNewPlace,
@@ -41,7 +43,8 @@ import {
  * here (ADR 0015). Retiring keeps it and its number for the record; it can
  * be brought back. Damage, or its going missing, is reported here, and
  * each fault is fixed, found or written off here too (ADR 0018), and its
- * electrical tests and thorough examinations are recorded (ADR 0020).
+ * electrical tests and thorough examinations are recorded (ADR 0020). Its
+ * log says everything that happened to it (ADR 0026).
  */
 export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
@@ -82,6 +85,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
       </FaultsCard>
       <InspectionsCard view={view} a={a} />
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
+      <ItemLog view={view} a={a} />
       <WhereChoices w={w} />
     </Page>
   )
@@ -115,6 +119,12 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
           <dt>Serial</dt>
           <dd>{a.serial || 'None'}</dd>
         </div>
+        {a.oldNumber && (
+          <div>
+            <dt>Old number</dt>
+            <dd>{a.oldNumber}</dd>
+          </div>
+        )}
         {retired ? (
           <div className="wide">
             <dt>Retired</dt>
@@ -261,7 +271,7 @@ function Move({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => 
 
 /** Only what changed is sent, as for products and jobs. */
 function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
-  const [f, setF] = useState({ modelId: a.modelId, serial: a.serial, notes: a.notes })
+  const [f, setF] = useState({ modelId: a.modelId, serial: a.serial, oldNumber: a.oldNumber, notes: a.notes })
   const { run, error, refuse } = useAct()
   // Another numbered product, when it was put down as the wrong one.
   const products = w.models.filter((m) => m.tracking === 'serialised')
@@ -275,6 +285,10 @@ function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
       changes.modelId = f.modelId
     }
     if (f.serial.trim() !== a.serial) changes.serial = f.serial.trim()
+    if (f.oldNumber.trim() !== a.oldNumber) {
+      if (inShForm(f.oldNumber)) return refuse(`${f.oldNumber.trim()} is a Session Hire number. Put it on as the item's label, with New label, not as its old number.`)
+      changes.oldNumber = f.oldNumber.trim()
+    }
     if (f.notes.trim() !== a.notes) changes.notes = f.notes.trim()
     if (Object.keys(changes).length === 1) return onDone()
     void run(() => client.mutate('asset.update', changes)).then((ok) => ok && onDone())
@@ -293,6 +307,15 @@ function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
       </label>
       <label className="wide">
         Serial <input value={f.serial} onChange={(e) => setF({ ...f, serial: e.target.value })} autoComplete="off" />
+      </label>
+      <label className="wide">
+        Old number{' '}
+        <input
+          value={f.oldNumber}
+          onChange={(e) => setF({ ...f, oldNumber: e.target.value })}
+          placeholder="A tag it had before Session Hire's label, if any"
+          autoComplete="off"
+        />
       </label>
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
@@ -409,16 +432,8 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
   const put = (t: string) => {
     setPutIn('')
     if (!t) return
-    const item = itemNumbered(t, w)
-    if (!item)
-      return refuse(
-        normaliseNumber(t)
-          ? `No item has the number ${normaliseNumber(t)}.`
-          : `“${t}” isn't a Session Hire number: they're SH- and six digits, such as SH-000123.`
-      )
-    if (item.number !== normaliseNumber(t)) return refuse(`${normaliseNumber(t)} was an old label. That item is ${numberLabel(item)} now.`)
-    if (item.retiredReason === 'mistake') return refuse(mistakeLabel(item))
-    if (item.status !== 'active') return refuse(`${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.`)
+    const { item, problem } = itemToPut(t, w)
+    if (!item) return refuse(problem)
     if (item.caseId === c.id) return refuse(`${item.number} is in here already.`)
     const loop = loopIn(item.id, c.id, w)
     if (loop) return refuse(loop)

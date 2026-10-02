@@ -1,4 +1,5 @@
 import {
+  itemByCode,
   MAX_QTY,
   newId,
   normaliseNumber,
@@ -74,6 +75,22 @@ export function whereText(x: Where, w: WarehouseView): string {
 export function itemNumbered(text: string, w: WarehouseView): AssetView | undefined {
   const number = normaliseNumber(text)
   return number ? w.byNumber.get(number) : undefined
+}
+
+/**
+ * The item a scanned or typed code names, to put somewhere, or why not:
+ * its number, an old tag (ADR 0026) or its maker's serial, as a scan reads
+ * them. A number it had before is turned down, so an old label still on it
+ * is noticed.
+ */
+export function itemToPut(code: string, w: WarehouseView): { item: AssetView; problem?: undefined } | { item?: undefined; problem: string } {
+  const item = itemByCode(w, code)
+  const typed = normaliseNumber(code)
+  if (!item) return { problem: typed ? `No item has the number ${typed}.` : `Nothing has the code ${code.trim()}.` }
+  if (typed && item.number !== typed && item.formerNumbers.includes(typed)) return { problem: `${typed} was an old label. That item is ${numberLabel(item)} now.` }
+  if (item.retiredReason === 'mistake') return { problem: mistakeLabel(item) }
+  if (item.status !== 'active') return { problem: `${item.number} (${item.model?.name ?? 'an item'}) is retired. Bring it back first.` }
+  return { item }
 }
 
 /**

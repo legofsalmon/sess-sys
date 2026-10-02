@@ -7,7 +7,7 @@ const MODEL = `id, name, department, category, tracking, is_case, value_cents, n
 const PLACE = `id, name, notes`
 const STOCK = `id, model_id, place_id, case_id, qty`
 // An item with its current number and the ones it had before, oldest first.
-const ASSET = `a.id, a.model_id, a.serial, a.place_id, a.case_id, a.status, a.retired_reason, a.retired_note, a.notes,
+const ASSET = `a.id, a.model_id, a.serial, a.place_id, a.case_id, a.status, a.retired_reason, a.retired_note, a.notes, a.old_number, a.pat_due::text AS pat_due,
   (SELECT i.value FROM identifiers i WHERE i.asset_id = a.id AND i.kind = 'sh' AND i.retired_at IS NULL) AS number,
   coalesce((SELECT json_agg(i.value ORDER BY i.retired_at, i.value) FROM identifiers i
              WHERE i.asset_id = a.id AND i.kind = 'sh' AND i.retired_at IS NOT NULL), '[]') AS former`
@@ -35,6 +35,8 @@ export const toAsset = (r: Row): Asset => ({
   number: r.number ?? '',
   formerNumbers: r.former,
   serial: r.serial,
+  oldNumber: r.old_number,
+  patDue: r.pat_due,
   placeId: r.place_id,
   caseId: r.case_id,
   status: r.status,
@@ -67,6 +69,18 @@ export async function nameTaken(q: Queryable, table: 'models' | 'places', name: 
     [name, except]
   )
   return rows[0]?.name
+}
+
+/** Every item, retired ones too: what the stock list's rows are matched against (ADR 0026). */
+export async function everyAsset(q: Queryable) {
+  const { rows } = await q.query(`SELECT ${ASSET} FROM assets a ORDER BY a.id`)
+  return rows.map(toAsset)
+}
+
+/** Which other item has this old tag, whatever the capitals (ADR 0026). */
+export async function oldNumberUse(q: Queryable, old: string, except: string) {
+  const { rows } = await q.query<{ id: string }>(`SELECT id FROM assets WHERE lower(old_number) = lower($1) AND old_number <> '' AND id <> $2`, [old, except])
+  return rows[0]?.id
 }
 
 /** Which item has had this number, now or before. */

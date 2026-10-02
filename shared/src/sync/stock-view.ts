@@ -63,6 +63,8 @@ export interface WarehouseView {
   assets: ReadonlyMap<string, AssetView>
   /** Every item by its number, and by any number it had before; one added by mistake says so when scanned. */
   byNumber: ReadonlyMap<string, AssetView>
+  /** Items by an old tag kept from before Session Hire's labels (ADR 0026), lower-cased. */
+  byOldNumber: ReadonlyMap<string, AssetView>
   /** Cases in stock, by number. */
   cases: AssetView[]
   /** Categories in use, alphabetically. */
@@ -92,7 +94,8 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
   const places = new Map<string, Place & { pending: boolean }>()
   for (const p of Object.values(entities.place ?? {})) places.set(p.id, { ...p, pending: false })
   const assets = new Map<string, Asset & { pending: boolean }>()
-  for (const a of Object.values(entities.asset ?? {})) assets.set(a.id, { ...a, pending: false })
+  // Items saved before the stock list's import (ADR 0026) have no old number or PAT due day.
+  for (const a of Object.values(entities.asset ?? {})) assets.set(a.id, { ...a, oldNumber: a.oldNumber ?? '', patDue: a.patDue ?? null, pending: false })
   const stock = new Map<string, Stock & { pending: boolean }>()
   for (const s of Object.values(entities.stock ?? {})) stock.set(s.id, { ...s, pending: false })
 
@@ -149,6 +152,8 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
           number: (a.number !== null && normaliseNumber(a.number)) || '',
           formerNumbers: [],
           serial: a.serial,
+          oldNumber: a.oldNumber,
+          patDue: a.patDue,
           placeId: a.placeId,
           caseId: a.caseId,
           status: 'active',
@@ -272,6 +277,8 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
   const numbers = new Map<string, AssetView>()
   for (const a of assetViews.values()) if (a.number) numbers.set(a.number, a)
   for (const a of assetViews.values()) for (const n of a.formerNumbers) if (!numbers.has(n)) numbers.set(n, a)
+  const oldNumbers = new Map<string, AssetView>()
+  for (const a of assetViews.values()) if (a.oldNumber) oldNumbers.set(a.oldNumber.trim().toLowerCase(), a)
 
   const categories = new Map<string, string>()
   for (const m of models.values()) {
@@ -289,7 +296,27 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     places: [...placeViews.values()].sort(byName),
     assets: assetViews,
     byNumber: numbers,
+    byOldNumber: oldNumbers,
     cases: [...assetViews.values()].filter((a) => a.status === 'active' && a.model?.isCase).sort(byNumber),
     categories: [...categories.values()].sort((a, b) => a.localeCompare(b)),
   }
+}
+
+/**
+ * The item a scanner read or a person typed (ADR 0026): an old tag exactly,
+ * first, since the short way of typing a Session Hire number ("123") could
+ * be an old tag too, while a Session Hire label always carries "SH-"; then
+ * a Session Hire number, now or before; then a maker's serial that only
+ * one item has.
+ */
+export function itemByCode(w: WarehouseView, code: string): AssetView | undefined {
+  const typed = code.trim().toLowerCase()
+  if (!typed) return undefined
+  const old = w.byOldNumber.get(typed)
+  if (old) return old
+  const n = normaliseNumber(code)
+  const numbered = n && w.byNumber.get(n)
+  if (numbered) return numbered
+  const serials = [...w.assets.values()].filter((a) => a.serial && a.serial.toLowerCase() === typed)
+  return serials.length === 1 ? serials[0] : undefined
 }

@@ -4,6 +4,7 @@ import {
   DEPARTMENT_LABELS,
   eachDay,
   euro,
+  fullDayLabel,
   invitesLabel,
   irishToday,
   LATE_BY,
@@ -40,6 +41,8 @@ import type { Queryable } from './db.ts'
 export const EXPORT_COMMAND = 'data.export'
 /** What it records bringing in the crew list as (ADR 0025), likewise. */
 export const IMPORT_PEOPLE_ACTION = 'people.import'
+/** And bringing in the stock list (ADR 0026). */
+export const IMPORT_STOCK_ACTION = 'stock.import'
 /** What it records erasing someone again after a restore as (ADR 0027), likewise. */
 export const ERASED_AGAIN_ACTION = 'person.erase-again'
 
@@ -492,6 +495,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (n(a.skipped) > 0) parts.push(`${n(a.skipped)} skipped`)
       return `Brought in the crew list: ${parts.join(', ')}`
     }
+    case IMPORT_STOCK_ACTION: {
+      const n = typeof a.rows === 'number' ? a.rows : 0
+      const skipped = typeof a.skipped === 'number' && a.skipped > 0 ? `, ${a.skipped.toLocaleString('en-IE')} skipped` : ''
+      return `Brought in the stock list (${n.toLocaleString('en-IE')} ${n === 1 ? 'row' : 'rows'}${skipped})`
+    }
     case 'calendar.import': {
       const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
       const some = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined)
@@ -536,6 +544,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.modelId !== undefined) parts.push(`product to ${model(a.modelId)}`)
       if (a.serial !== undefined) parts.push(typeof a.serial === 'string' && a.serial.trim() ? `serial to ${clip(a.serial.trim())}` : 'no serial')
       if (a.notes !== undefined) parts.push('the notes')
+      if (a.oldNumber !== undefined) parts.push(typeof a.oldNumber === 'string' && a.oldNumber.trim() ? `old number to ${clip(a.oldNumber.trim())}` : 'no old number')
+      if (a.patDue !== undefined) parts.push(typeof a.patDue === 'string' ? `PAT due ${fullDayLabel(a.patDue)}` : 'no PAT due day')
       return `Changed ${item(a.id)}: ${inWords(parts)}`
     }
     case 'asset.move':

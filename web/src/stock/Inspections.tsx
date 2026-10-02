@@ -2,6 +2,7 @@ import {
   INSPECTION_KINDS,
   INSPECTION_LABELS,
   INSPECTION_SHORT,
+  itemByCode,
   newId,
   normaliseNumber,
   type AssetView,
@@ -32,18 +33,19 @@ import { CameraScanner, primeSound } from './Scanner.tsx'
 export const dateLabel = (day: string) =>
   new Date(`${day}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
-/** "PAT overdue since 2 Oct 2026", "PAT failed on 1 Sep 2026", "PAT due 2 Oct 2026". */
+/** "PAT overdue since 2 Oct 2026", "PAT failed on 1 Sep 2026", "PAT due 2 Oct 2026"; a day the stock list gave says so, as no test here set it. */
 export function dueText(d: Due): string {
   const what = d.kind === 'pat' ? 'PAT' : 'Thorough examination'
+  const listed = d.fromList ? ', as the stock list says' : ''
   switch (d.state) {
     case 'failed':
       return `${what} failed on ${dateLabel(d.last!.day)}`
     case 'overdue':
-      return `${what} overdue since ${dateLabel(d.due!)}`
+      return `${what} overdue since ${dateLabel(d.due!)}${listed}`
     case 'unrecorded':
       return `${what} not recorded yet`
     default:
-      return `${what} due ${dateLabel(d.due!)}`
+      return `${what} due ${dateLabel(d.due!)}${listed}`
   }
 }
 
@@ -96,7 +98,9 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
                   ? "Can't go out until it passes."
                   : d.state === 'unrecorded'
                     ? 'Record the last one, if it was done on paper.'
-                    : `Every ${d.months === 1 ? 'month' : `${d.months} months`}; last passed ${dateLabel(d.last!.day)}.`}
+                    : d.fromList
+                      ? `None recorded here yet; then every ${d.months === 1 ? 'month' : `${d.months} months`}.`
+                      : `Every ${d.months === 1 ? 'month' : `${d.months} months`}; last passed ${dateLabel(d.last!.day)}.`}
               </span>
             </li>
           ))}
@@ -360,9 +364,8 @@ export function TestingScreen({ view }: { view: View }) {
   const onCode = async (code: string) => {
     const w = client.view().warehouse
     const n = normaliseNumber(code)
-    const serial = code.trim().toLowerCase()
-    const bySerial = [...w.assets.values()].filter((x) => x.serial && x.serial.toLowerCase() === serial)
-    const a = (n && w.byNumber.get(n)) || (bySerial.length === 1 ? bySerial[0] : undefined)
+    // An old tag from before Session Hire's labels works too (ADR 0026).
+    const a = itemByCode(w, code)
     if (!a) return say('warn', n ? `${n} isn't on anything yet.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
     if (a.retiredReason === 'mistake') return say('warn', `${mistakeLabel(a)} Nothing was recorded.`)

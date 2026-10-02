@@ -97,6 +97,12 @@ export interface MovesView {
   outWith(modelId: string): { what: string; job: string }[]
   /** Whether a product has ever been scanned or counted out or back, which keeps it in the stock list for the record, as on the server. */
   everMoved(modelId: string): boolean
+  /**
+   * An item's scans out and back, and its cases' (the ones it's in now),
+   * newest first, for its log (ADR 0026). A case's scan took what's in it
+   * along, as far as the stock list says what's in it.
+   */
+  ofItem(assetId: string): MovementView[]
   pickList(jobId: string): PickList | undefined
   /** Confirmed jobs on now or starting in the next 14 days, with kit to go out; soonest first. */
   soon: PickList[]
@@ -333,5 +339,11 @@ export function movesView(
 
   const moved = new Set([...moves.values()].map((m) => m.modelId))
 
-  return { outOf: (id) => outState.get(id), outWith, everMoved: (id) => moved.has(id), pickList, soon, stillOut }
+  const ofItem = (assetId: string) => {
+    const ids = new Set([assetId])
+    for (let c = warehouse.assets.get(assetId)?.inCase; c && !ids.has(c.id); c = c.inCase) ids.add(c.id)
+    return [...moves.values()].filter((m) => m.assetId && ids.has(m.assetId)).sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id))
+  }
+
+  return { outOf: (id) => outState.get(id), outWith, everMoved: (id) => moved.has(id), ofItem, pickList, soon, stillOut }
 }

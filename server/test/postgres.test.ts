@@ -1,5 +1,6 @@
-import { newId, type Mutation, type Person } from '@sh/shared'
+import { itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
@@ -409,6 +410,60 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       expect((await app.inject({ method: 'POST', url: '/api/data/made-up' })).statusCode).toBe(200)
       const { rows: numbers } = await db.query<{ first: string }>(`SELECT min(value) AS first FROM identifiers WHERE kind = 'sh'`)
       expect(numbers[0]!.first).toBe('SH-000001')
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('brings the stock list in a call at a time, and reads an item’s log a page at a time, as on PGlite (ADR 0026)', async () => {
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] }, stockImport: { ms: 60_000, commands: 10 } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const text = readFileSync(new URL('../../docs/samples/stock-list.csv', import.meta.url), 'utf8').replace('09/30/2027', '30/09/2027')
+      const options = { make: true, defaultPlace: '' }
+      const preview = async () => (await app.inject({ method: 'POST', url: '/api/stock/import/preview', cookies: colly.cookies, payload: { text, options } })).json() as StockListReading
+      let rows = (await preview()).rows.map((r) => ({ row: r.row, cells: r.cells, skip: r.skip, does: r.does }))
+      for (let going = false; ; going = true) {
+        const res = await app.inject({ method: 'POST', url: '/api/stock/import', cookies: colly.cookies, payload: { rows, options, going } })
+        expect(res.statusCode, res.body).toBe(200)
+        const { left } = res.json() as StockListResult
+        if (!left) break
+        rows = rows.map((r) => ({ ...r, does: left.rows.find((x) => x.row === r.row)!.does }))
+      }
+      // The PAT due day read back as a day, and old numbers kept; the same file again finds everything as it says.
+      const { rows: k12 } = await db.query<{ id: string; old: string; due: string }>(
+        `SELECT a.id, a.old_number AS old, a.pat_due::text AS due FROM assets a JOIN identifiers i ON i.asset_id = a.id WHERE i.value = 'SH-000505'`
+      )
+      expect(k12[0]).toMatchObject({ old: 'A-0101', due: '2027-09-30' })
+      expect((await preview()).counts).toMatchObject({ rows: 10, unchanged: 10, problems: 0 })
+
+      // The amps' rack scanned out takes them along; a fault on one; then more than a page of changes to it.
+      const amp = (await db.query<{ id: string; rack: string }>(`SELECT a.id, a.case_id AS rack FROM assets a JOIN identifiers i ON i.asset_id = a.id WHERE i.value = 'SH-000501'`)).rows[0]!
+      await colly.send('project.create', { id: 'gig', name: 'Harbour gig', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+      await colly.send('move.record', { id: 'rack-out', projectId: 'gig', direction: 'out', assetId: amp.rack, modelId: 'x', qty: 1, at: new Date().toISOString() })
+      await colly.send('fault.report', { id: 'hum', kind: 'damaged', assetId: amp.id, modelId: 'x', qty: 1, projectId: 'gig', usable: true, note: 'Hums', at: new Date().toISOString() })
+      await colly.send('fault.update', { id: 'hum', repair: 'Earth lifted' })
+      for (let n = 1; n <= 100; n++) await colly.send('asset.update', { id: amp.id, notes: `Check ${n}` })
+      const log = async (before?: string) =>
+        (await app.inject({ url: `/api/stock/items/${amp.id}/log${before ? `?before=${encodeURIComponent(before)}` : ''}`, cookies: colly.cookies })).json() as ItemLogPage
+      const first = await log()
+      const second = await log(first.next)
+      expect(first.entries).toHaveLength(100)
+      expect(second.next).toBeUndefined()
+      const all = [...first.entries, ...second.entries]
+      // Added, put in the rack, out with it, the fault and its repair notes, and the hundred changes: each once.
+      expect(new Set(all.map((e) => e.key)).size).toBe(all.length)
+      expect(all).toHaveLength(105)
+      expect(second.entries.map((e) => itemLogWords(e.event))).toEqual([
+        'Repair notes: Earth lifted',
+        'Reported damaged back from Harbour gig, fit to go out: Hums',
+        'Out to Harbour gig, in SH-000503 (Amp rack 1)',
+        'Put in SH-000503 (Amp rack 1)',
+        'Added as SH-000501',
+      ])
     } finally {
       await app.close()
       await db.close()

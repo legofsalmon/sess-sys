@@ -3,7 +3,8 @@
  * in double quotes can hold commas, line breaks and doubled quotes, lines
  * end in a line feed or a carriage return and line feed, and a spreadsheet
  * saving UTF-8 may put a byte-order mark first. Used to bring the crew list
- * in (ADR 0025), and the stock list after it.
+ * in (ADR 0025), and the stock list after it, which may come split by
+ * semicolons instead: Excel saves them so where a comma is the decimal mark.
  */
 
 /**
@@ -11,7 +12,7 @@
  * line comes back as one empty field, so a record's index is its line in
  * the file and a reader can say "row 4" and mean line 4.
  */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, separator: ',' | ';' = ','): string[][] {
   const rows: string[][] = []
   let row: string[] = []
   let field = ''
@@ -40,7 +41,7 @@ export function parseCsv(text: string): string[][] {
       continue
     }
     if (ch === '"') quoted = true
-    else if (ch === ',') {
+    else if (ch === separator) {
       row.push(field)
       field = ''
     } else if (ch === '\n') endRow()
