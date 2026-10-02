@@ -24,6 +24,11 @@
   runs are worked out afresh from every page loaded, so "Show older"
   joins up a day or a run that a page cut in two. The export's
   `history.csv` is as it was, a line per change.
+- **Amended:** 2 October 2026 by [ADR 0027](0027-erasing-a-person-on-request.md):
+  erasing a person on request strips their details from the commands the
+  history keeps (and from any about them that arrive later), and refusals
+  that named them name "Erased person". The history still says what was
+  done and when, of "Erased person" rather than by name.
 
 ## Context
 

@@ -336,6 +336,45 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     }
   })
 
+  it('erases a person on request from their record, the change feed, the history and their account, as on PGlite (ADR 0027)', async () => {
+    // Proves: the rewrite of the feed and the history (jsonb, and regular expressions that match whole addresses only) does on Postgres what it does on PGlite.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] } })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const cian = await staff(app, db, 'Cian Ó Murchú', IPHONE, 'phone-c1an00')
+      const person = (id: string, name: string, email: string, phone: string | null, notes = '') =>
+        colly.send('person.upsert', { id, name, kind: 'staff', email, phone, skills: [], dayRateCents: null, notes, approvesLeave: id === 'colly' })
+      await person('colly', 'Colly Hewson', colly.email, null)
+      await person('cian', 'Cian Ó Murchú', cian.email, '+353 87 444 0909', 'Vegetarian')
+      await person('dara', 'Dara Quinn', 'dara.cian@sessionhire.com', '+353 87 444 09090')
+      await colly.send('person.contact', { id: 'cian', phone: '+353 87 444 1010' })
+      await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: '2031-03-03', end: '2031-03-04', note: 'Skiing in Andorra' })
+      await colly.send('person.archive', { id: 'cian', archived: true })
+      expect(await colly.send('person.level', { id: 'cian', level: 2 })).toMatchObject({ status: 'rejected' })
+      expect(await colly.send('person.erase', { id: 'cian' })).toMatchObject({ status: 'applied' })
+
+      const all = async (table: string) => (await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n')
+      for (const table of ['people', 'changes', 'mutations', 'users', 'leave_requests', 'sessions'])
+        for (const t of ['Murchú', '"cian@', '444 0909"', '444 1010', 'Vegetarian', 'Andorra']) expect(await all(table), `${table} still holds "${t}"`).not.toContain(t)
+      expect((await db.query(`SELECT name, email, disabled FROM users WHERE id = $1`, [cian.id])).rows[0]).toEqual({ name: 'Erased person', email: '', disabled: true })
+      expect((await db.query(`SELECT result->'reason'->>'message' AS said FROM mutations WHERE status = 'rejected'`)).rows).toEqual([
+        { said: 'Erased person has been archived. Bring them back on the Crew tab to change their level.' },
+      ])
+      // Dara's address and number, which hold Cian's inside them, are as they were.
+      expect((await db.query(`SELECT args->>'email' AS email, args->>'phone' AS phone FROM mutations WHERE args->>'id' = 'dara'`)).rows).toEqual([
+        { email: 'dara.cian@sessionhire.com', phone: '+353 87 444 09090' },
+      ])
+      const fresh = await app.inject({ url: '/api/sync/pull?after=0', cookies: colly.cookies })
+      expect(fresh.body).not.toContain('Murchú')
+      expect(fresh.json().changes.filter((c: { entity: string }) => c.entity === 'leaveRequest').map((c: { op: string }) => c.op)).toEqual(['delete', 'delete'])
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
   it('starts fresh while phones are sending, and leaves nothing from before (ADR 0019)', async () => {
     const db = postgresDb(url!)
     await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')

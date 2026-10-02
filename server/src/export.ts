@@ -193,6 +193,7 @@ const ABOUT: Record<string, string> = {
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, and the certificates each needs, such as IPAF.',
+  erasures: 'People whose details were erased on request: only their id, when, and the day a name kept for Revenue can go. Nothing else about them.',
   faults: 'Faults and missing kit: the item, or the product and how many, damaged or missing, the job it came back from, what was wrong, the repair notes, and how it ended.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',

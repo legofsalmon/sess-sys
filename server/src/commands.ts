@@ -9,6 +9,7 @@ import { crewHandlers } from './crew/handlers.ts'
 import { lateHandlers } from './crew/late.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
+import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers.ts'
 import { Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
@@ -44,6 +45,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...officeHandlers,
   ...leaveHandlers,
   ...lateHandlers,
+  ...erasureHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */
@@ -89,10 +91,12 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   let result: MutationResult
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
+  // About someone erased on request, only what erasing keeps is stored, even of a change turned down (ADR 0027).
+  const stored = await argsToStore(tx, m.name, m.args)
   await tx.query(
     `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
      VALUES ($1, $2, $3, $4, $5, coalesce($6::timestamptz, clock_timestamp()), $7, $8, clock_timestamp(), 'applied', '{}')`,
-    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(m.args), timestampOrNull(m.createdAt), from.sentAt ?? null, from.device ?? null]
+    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(stored), timestampOrNull(m.createdAt), from.sentAt ?? null, from.device ?? null]
   )
   const parsed = commandSchemas[m.name].safeParse(m.args)
   if (!parsed.success) {
@@ -100,6 +104,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   } else {
     try {
       await tx.query('SAVEPOINT cmd')
+      await refuseIfErased(tx, m.name, parsed.data)
       await (handlers[m.name] as Handler<CommandName>)(ctx, parsed.data as never)
       await tx.query('RELEASE SAVEPOINT cmd')
       if (ctx.seq === 0) ctx.seq = await currentSeq(tx)

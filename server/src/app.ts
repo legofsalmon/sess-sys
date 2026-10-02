@@ -21,6 +21,7 @@ import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
+import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
@@ -72,6 +73,8 @@ declare module 'fastify' {
     backups: Backups
     /** The calendar sync, when the Google key is set; the caller starts it once the server is listening. */
     calendar: CalendarSync | undefined
+    /** The list of erasures kept beside the backups (ADR 0027), when there is somewhere to keep them. */
+    erasures: ErasureList | undefined
   }
 }
 
@@ -134,10 +137,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         })
       : undefined
   app.decorate('calendar', calendarSync)
-  /** Something changed in the app: devices pull it, and the calendar catches up. */
+  // A restore must never bring back someone erased on request, so the list of erasures is kept beside the backups too (ADR 0027).
+  const erasures = backupStore ? new ErasureList(db, backupStore, app.log) : undefined
+  app.decorate('erasures', erasures)
+  /** Something changed in the app: devices pull it, the calendar catches up, and an erasure is written beside the backups. */
   const changed = () => {
     void poke()
     calendarSync?.kick()
+    void erasures?.keep()
   }
 
   // A request that failed on the server is reported (ADR 0005) by the route as the

@@ -1,9 +1,11 @@
 import { CALENDAR_LINK_ID, irishToday, type CalendarDay, type CalendarLink } from '../calendar.ts'
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
+import type { Erasure } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
 import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
+import { erasuresView, forgetErased, withErasures, type ErasuresView } from './erasure-view.ts'
 import { faultsView, type FaultsView } from './faults-view.ts'
 import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
@@ -106,6 +108,8 @@ export interface View {
   leave: LeaveView
   /** Who is running late today, or tomorrow when said the evening before (ADR 0028). */
   late: LateView
+  /** People erased on request, by person, and an erasure still to send laid over them (ADR 0027). */
+  erasures: ErasuresView
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -332,7 +336,9 @@ export class SyncClient {
   /** The device's data model, built from scratch. Throws if a change can't be laid over the rest. */
   private build(today = irishToday(this.now())): Omit<View, 'connection'> {
     const { entities, outbox } = this.state
-    const crew = crewView(entities, outbox, this.state.cursor, today)
+    // Someone erased on this device is shown erased at once, everywhere the crew reaches (ADR 0027).
+    const erasures = erasuresView(entities, outbox, this.state.cursor, today)
+    const crew = withErasures(crewView(entities, outbox, this.state.cursor, today), erasures)
     const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
     const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)
@@ -352,6 +358,7 @@ export class SyncClient {
       office: officeView(entities, outbox, this.state.cursor),
       leave: leaveView(entities, outbox, this.state.cursor, crew, today),
       late: lateView(entities, outbox, this.state.cursor, crew, today),
+      erasures,
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
@@ -418,7 +425,11 @@ export class SyncClient {
       if (res.generation && res.generation !== this.state.generation) [this.state.generation, changed] = [res.generation, true]
       // Copies saved before made-up data existed have no flag, which means no.
       if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]
-      for (const change of res.changes) applyChange(this.state, change)
+      for (const change of res.changes) {
+        // An erasure arrives before the records it changes, so whose each change still held here is can be told (ADR 0027).
+        if (change.entity === 'erasure' && change.op === 'put') forgetErased(this.state, change.data as Erasure, this.now().toISOString())
+        applyChange(this.state, change)
+      }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
       // Applied mutations leave the outbox once their result has arrived.
       const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)

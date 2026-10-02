@@ -1,6 +1,7 @@
 import { newId, type BackupRun, type BackupStatus } from '@sh/shared'
 import type { Db } from '../db.ts'
 import { pgliteDb } from '../db.ts'
+import { eraseAgainFromStore } from '../erasure/list.ts'
 import { encryptBackup } from './crypto.ts'
 import { BackupError, isEmptyDatabase, restoreBackup, writeBackup, type RestoreReport } from './format.ts'
 import type { BackupStore, StoredFile } from './store.ts'
@@ -250,14 +251,21 @@ export async function checkRestores(data: Buffer, key?: Buffer): Promise<Restore
  * Restore on start-up, for a new, empty database: the server is deployed
  * with RESTORE_FROM set to `latest` or a file's name. On a database that
  * already has tables it does nothing, so leaving the setting in place by
- * mistake can't overwrite anything.
+ * mistake can't overwrite anything. Everyone erased on request since the
+ * backup was made is erased again before anyone can use it (ADR 0027).
  */
-export async function restoreFrom(db: Db, store: BackupStore | undefined, from: string, withKey?: Buffer): Promise<{ key: string; report: RestoreReport } | undefined> {
+export async function restoreFrom(
+  db: Db,
+  store: BackupStore | undefined,
+  from: string,
+  withKey?: Buffer
+): Promise<{ key: string; report: RestoreReport; erasedAgain: number } | undefined> {
   if (!(await isEmptyDatabase(db))) return undefined
   if (!store) throw new BackupError('RESTORE_FROM is set, but there is no backup storage to restore from. Set the BACKUP_S3_ settings too.')
   const key = from === 'latest' ? await latestKey(store) : from
   const report = await restoreBackup(db, await store.get(key), withKey)
-  return { key, report }
+  const erasedAgain = await eraseAgainFromStore(db, store, { everyone: true })
+  return { key, report, erasedAgain }
 }
 
 export async function latestKey(store: BackupStore): Promise<string> {

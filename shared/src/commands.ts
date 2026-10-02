@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { crewCommandSchemas } from './crew.ts'
+import { erasureCommandSchemas } from './erasure.ts'
 import { faultCommandSchemas } from './faults.ts'
 import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
@@ -34,6 +35,7 @@ export const commandSchemas = {
   ...officeCommandSchemas,
   ...leaveCommandSchemas,
   ...lateCommandSchemas,
+  ...erasureCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

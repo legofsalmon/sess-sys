@@ -132,13 +132,16 @@ function describer(view: View): (m: Mutation) => string {
       case 'person.upsert':
         return `Save ${str(a.name, 'someone')}'s details`
       case 'person.level':
-        return `Move ${person(a.id)} to ${levelLabel(typeof a.level === 'number' ? a.level : 1)}`
+        // An erased person's level went with the rest of their details (ADR 0027).
+        return `Move ${person(a.id)} to ${typeof a.level === 'number' ? levelLabel(a.level) : 'another level'}`
       case 'person.newLink':
         return `Give ${person(a.id)} a new private link`
       case 'person.archive':
         return a.archived ? `Archive ${person(a.id)}` : `Bring ${person(a.id)} back`
       case 'person.contact':
         return `Change ${person(a.id)}'s contact details`
+      case 'person.erase':
+        return `Erase ${person(a.id)}'s details`
       case 'unavailability.add':
         return `Mark ${person(a.personId)} away${span(a)}`
       case 'unavailability.remove': {

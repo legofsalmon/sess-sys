@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { dbFromEnv } from '../db.ts'
+import { dbFromEnv, type Db } from '../db.ts'
+import { eraseAgainFromStore } from '../erasure/list.ts'
 import { migrateAll } from '../modules.ts'
 import { backupKeyFromEnv } from './crypto.ts'
 import { newGeneration, readBackup, restoreBackup } from './format.ts'
@@ -28,6 +29,18 @@ async function load(store: BackupStore | undefined, source: string): Promise<{ n
   if (!store) throw new Error(`${source} isn't a file here, and no backup storage is set up (BACKUP_S3_... or BACKUP_DIR).`)
   const key = source === 'latest' ? await latestKey(store) : source
   return { name: key, data: await store.get(key) }
+}
+
+/** A copy put back must never bring back someone erased on request (ADR 0027): the list beside the backups is applied again. */
+async function eraseAgainAfter(db: Db, store: BackupStore | undefined, everyone: boolean) {
+  if (!store) {
+    console.log(
+      'No backup storage is set up, so the only list of people erased on request is the one in this copy of the data. Anyone erased after the moment it comes from is back: archive and erase them again on the Crew tab.'
+    )
+    return
+  }
+  const again = await eraseAgainFromStore(db, store, { everyone })
+  console.log(again ? `Erased ${again} ${again === 1 ? 'person' : 'people'} again, as they had asked.` : 'Nobody erased on request is back in this copy.')
 }
 
 async function main() {
@@ -63,6 +76,7 @@ async function main() {
       try {
         const report = await restoreBackup(db, data, key)
         console.log(`Restored ${name} (made ${report.header.createdAt}): ${report.rows} rows.`)
+        await eraseAgainAfter(db, store, true)
       } finally {
         await db.close()
       }
@@ -72,6 +86,7 @@ async function main() {
       const db = await dbFromEnv()
       try {
         await migrateAll(db)
+        await eraseAgainAfter(db, store, false)
         console.log(`New generation ${await newGeneration(db)}: every device will start its copy afresh on its next sync.`)
       } finally {
         await db.close()

@@ -16,6 +16,7 @@
   commands has it turned down in plain words ("The app doesn't do this
   any more, so it wasn't made."), with nothing kept, while the rest of
   its outbox goes through; the old records in its copy sit unused.
+- **Amended:** 2 October 2026 by [ADR 0027](0027-erasing-a-person-on-request.md): erasing a person on request rewrites the earlier copies of their records in the change feed, which otherwise only ever grows, so a new device's first sync can't pull their old details.
 
 ## Context
 

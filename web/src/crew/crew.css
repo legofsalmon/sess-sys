@@ -29,6 +29,8 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew details.archived { padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .crew details.archived summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
 .crew details.archived .row { padding-top: var(--space-8); }
+/* Bring back and "Erase details…" beside the name where there's room (ADR 0027); under it on a phone. */
+.crew details.archived .row > .who { min-width: 50%; }
 
 /* The office's details on the Account tab (audit finding 10), laid out like the crew forms. */
 .account .office-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }

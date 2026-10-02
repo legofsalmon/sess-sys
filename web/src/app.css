@@ -88,6 +88,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
 .warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
 .confirm { display: grid; gap: var(--space-8); }
+.confirm .more { display: grid; gap: var(--space-8); }
+.confirm .more p { margin: 0; }
 .signal { display: flex; gap: var(--space-12); align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-12) var(--space-14); cursor: pointer; }
 .signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--space-2); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-14); display: grid; gap: var(--space-10); }

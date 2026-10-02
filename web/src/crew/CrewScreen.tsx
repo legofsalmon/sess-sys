@@ -52,6 +52,7 @@ import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
+import { ArchivedPerson } from './Erase.tsx'
 import { useFeedAddress } from './feed.ts'
 import { LateLines, LateRow } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
@@ -408,20 +409,9 @@ export function CrewScreen() {
         {archived.length > 0 && (
           <details className="archived">
             <summary>Archived ({archived.length})</summary>
+            {/* Each with "Erase details…" for when they ask (ADR 0027). */}
             {archived.map((p) => (
-              <div className="row person" key={p.id}>
-                <span className="who">
-                  <b>{p.name}</b>
-                  <small>{[p.kind === 'staff' ? 'Staff' : null, p.skills.join(', ')].filter(Boolean).join(' · ')}</small>
-                </span>
-                {p.pending ? (
-                  <Pending pending />
-                ) : (
-                  <button type="button" onClick={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))}>
-                    Bring back
-                  </button>
-                )}
-              </div>
+              <ArchivedPerson key={p.id} person={p} onBringBack={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))} />
             ))}
           </details>
         )}

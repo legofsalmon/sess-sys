@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { syncSoon } from './sync.ts'
 
 /**
@@ -88,6 +88,7 @@ export function Confirm({
   onYes,
   onNo,
   className,
+  children,
 }: {
   question: string
   yes: string
@@ -95,8 +96,11 @@ export function Confirm({
   onYes: () => void
   onNo: () => void
   className?: string
+  /** More to know before answering, under the question: what goes and what stays, say. */
+  children?: ReactNode
 }) {
   const safe = useRef<HTMLButtonElement>(null)
+  const more = useId()
   useEffect(() => {
     const button = safe.current
     const home = button?.closest('.confirm')?.parentElement
@@ -107,8 +111,14 @@ export function Confirm({
     }
   }, [])
   return (
-    <div className={['confirm', className].filter(Boolean).join(' ')} role="group" aria-label={question}>
+    // What more there is to know is read out with the question, as the focus lands on the safe way out.
+    <div className={['confirm', className].filter(Boolean).join(' ')} role="group" aria-label={question} aria-describedby={children ? more : undefined}>
       <p className="warn-line">{question}</p>
+      {children && (
+        <div className="more" id={more}>
+          {children}
+        </div>
+      )}
       <div className="actions">
         <button type="button" className="primary" onClick={onYes}>
           {yes}

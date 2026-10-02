@@ -103,6 +103,7 @@ describe('download everything', () => {
       'changes',
       'clients',
       'crew_calls',
+      'erasures',
       'faults',
       'identifiers',
       'inspections',

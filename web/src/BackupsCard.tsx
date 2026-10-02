@@ -68,6 +68,7 @@ export function BackupsCard() {
       <section className="card attention">
         <h2>Backups are off</h2>
         <p>Nothing is being backed up yet. Backups start once there is somewhere to keep them, set up on the server.</p>
+        <p className="hint">Until then, the list of people whose details were erased on request is kept only with the app's own data.</p>
       </section>
     )
   }

@@ -530,10 +530,21 @@ Crewbox.
 ## Security and GDPR
 
 - Roles: owner, ops, warehouse, crew chief, freelancer, accountant (read
-  finance only). Enforced on the server and in the sync scopes.
+  finance only). Enforced on the server and in the sync scopes. Not built
+  yet: they wait on staff sign-in being switched on.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
-  details, documents) kept in separate tables with tighter access and
-  deletion on request.
+  details, documents) kept in separate tables with tighter access. Not
+  built yet either, for the same reason.
+- **Deletion on request is built (2 October 2026,
+  [ADR 0027](adr/0027-erasing-a-person-on-request.md)).** Someone archived
+  is erased from their card on the Crew tab once nothing about them is
+  unsettled, and the app takes their details from everywhere they live:
+  their record, every earlier copy in the change feed, the history, the
+  export, each device's copy, their link, feed and sign-in account. Their
+  name and timesheets stay for six years if they were paid, for Revenue,
+  and bookings stay as records of work. Backups can't be edited, so old
+  copies age out on their own schedule (a year and a month at most); a
+  restore applies the list of erasures again, so nobody comes back.
 - Data stays in the EU. A processing record and retention rules are written
   before crew data goes in.
 
