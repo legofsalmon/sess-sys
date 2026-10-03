@@ -13,10 +13,10 @@ waiting on someone.
   for leave from the Leave screen, this year or next only, and an open
   year stays open. Staff can only ask for leave in an open year, and are
   told plainly when the next one isn't open yet; allowances can be set
-  for this year or next. On the live server the update opens this year,
-  and any earlier year that already holds leave. Since no leave can now
-  be put in a year far ahead, a slip can't keep an erased person's name
-  for decades.
+  for this year or next. On a server already in use, the update opens
+  this year and any earlier year that already holds leave. Since no
+  leave can now be put in a year far ahead, a slip can't keep an erased
+  person's name for decades.
 - Colly confirmed that erasure keeps declined and cancelled leave for
   three years along with approved leave, and that a kept name lasts as
   long as the records it's kept for. Both were already so; ADR 0027
@@ -31,10 +31,16 @@ waiting on someone.
   on PGlite, twice, and the real-Postgres file, 11); the web build; the
   full browser suite (74), and the history spec five more times.
 
+- Merged into `main` at 10:45 UTC (Colly: "Finish off that PR") and
+  live by 10:54 once main's checks passed. The live database has the
+  leave module at version 2 with its `leave_years` table, and nothing
+  went wrong. No year is open there yet: the live database is still
+  empty, and the update opens years only on a server already in use, so
+  made-up data and a restore start clean. When the real staff are in,
+  an approver opens 2026 on the Leave screen with one tap.
+
 **Next**
 
-- Merge (Colly: "Finish off that PR"), then check the update on the
-  live server.
 - The small items, being built: the office recording running late for
   someone who rang in, old running-late notes cleared after their day,
   the call-changed message naming a change to the certificates a call
