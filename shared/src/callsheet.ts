@@ -1,4 +1,4 @@
-import { daysLabel, eachDay, firstName, type OfferStatus } from './crew.ts'
+import { daysLabel, eachDay, firstName, needsLabel, tidyNeeds, type CertificateKind, type OfferStatus } from './crew.ts'
 import { mapLink, type Contact, type Venue } from './jobs.ts'
 import { DEPARTMENTS, DEPARTMENT_LABELS, type Department } from './stock.ts'
 
@@ -38,6 +38,8 @@ export interface SheetCall {
   details: string
   status: 'open' | 'cancelled'
   offers: readonly { personId: string; status: OfferStatus; days: readonly string[] }[]
+  /** The certificates it needs (ADR 0028); missing on a call that needs none. */
+  needsCertificates?: readonly CertificateKind[]
 }
 
 export interface SheetKitLine {
@@ -87,6 +89,8 @@ export interface SheetCallView {
   /** Only when not the phase's days. */
   days?: string
   details: string
+  /** "working at height and IPAF", as it is now; for everyone, as the offer said it. Only when it needs any. */
+  needs?: string
   crew: SheetCrew[]
   /** Places still to fill on its busiest day; not shown to crew. */
   toFind?: number
@@ -165,6 +169,7 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
         callTime: c.callTime,
         ...(c.start !== start || c.end !== end ? { days: daysLabel(callDays) } : {}),
         details: c.details.trim(),
+        ...(tidyNeeds(c.needsCertificates).length ? { needs: needsLabel(tidyNeeds(c.needsCertificates)) } : {}),
         crew,
         ...(reader !== 'crew' ? { toFind } : {}),
       }
@@ -219,7 +224,7 @@ export function callSheetText(s: CallSheet): string {
   lines.push('')
   for (const c of s.calls) {
     const booked = c.crew.filter((p) => p.status === 'booked')
-    lines.push(`${c.callTime ? `${c.callTime} ` : ''}${c.role}${c.days ? ` (${c.days})` : ''}: ${booked.length ? booked.map((p) => p.name).join(', ') : 'to be confirmed'}`)
+    lines.push(`${c.callTime ? `${c.callTime} ` : ''}${c.role}${c.days ? ` (${c.days})` : ''}${c.needs ? `, needs ${c.needs}` : ''}: ${booked.length ? booked.map((p) => p.name).join(', ') : 'to be confirmed'}`)
   }
   if (s.notes.phase) lines.push('', s.notes.phase)
   if (s.notes.job) lines.push('', s.notes.job)

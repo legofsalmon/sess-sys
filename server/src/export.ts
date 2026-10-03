@@ -212,7 +212,7 @@ const ABOUT: Record<string, string> = {
   phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
-  running_late: "People saying on their private link that they're running late on a day they're booked: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over.",
+  running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages.",
   stock: 'Counted stock: how many of a product are at a place or in a case.',
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",

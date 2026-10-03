@@ -101,7 +101,8 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
   ${mine
     .map((c) => {
       const me = c.crew.find((p) => p.me)!
-      return `<section class="you"><h2>You</h2><p><b>${h(c.role)}</b>${c.callTime ? `, call <b>${h(c.callTime)}</b>` : ''}${me.days || c.days ? `, ${h(me.days ?? c.days)}` : ''}${me.status === 'to confirm' ? ' <small>(the office will confirm)</small>' : ''}</p>${c.details ? `<p class="details">${lines(c.details)}</p>` : ''}</section>`
+      // What the call needs as it is now (ADR 0028), so a card asked for since the offer isn't missed on the day.
+      return `<section class="you"><h2>You</h2><p><b>${h(c.role)}</b>${c.callTime ? `, call <b>${h(c.callTime)}</b>` : ''}${me.days || c.days ? `, ${h(me.days ?? c.days)}` : ''}${me.status === 'to confirm' ? ' <small>(the office will confirm)</small>' : ''}</p>${c.needs ? `<p>Needs ${h(c.needs)}.</p>` : ''}${c.details ? `<p class="details">${lines(c.details)}</p>` : ''}</section>`
     })
     .join('')}
 
@@ -137,7 +138,7 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
   <section><h2>Crew</h2>
     ${s.calls
       .map(
-        (c) => `<article class="call"><p><b>${c.callTime ? `${h(c.callTime)} · ` : ''}${h(c.role)}</b>${c.days ? ` <small>${h(c.days)}</small>` : ''}</p>
+        (c) => `<article class="call"><p><b>${c.callTime ? `${h(c.callTime)} · ` : ''}${h(c.role)}</b>${c.days ? ` <small>${h(c.days)}</small>` : ''}${c.needs ? ` <small>needs ${h(c.needs)}</small>` : ''}</p>
       ${
         c.crew.length
           ? `<ul>${c.crew

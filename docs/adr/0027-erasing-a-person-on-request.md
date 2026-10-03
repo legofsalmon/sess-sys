@@ -173,10 +173,12 @@ to: one constant each in `shared/src/erasure.ts` (`PAID_WORK_YEARS`,
 | Their name | Until the later of the above can go | A record has to say whose it is | The name, on their person (never on their staff account) | Everything else on their person, at once |
 | Bookings and offers | No end set, like the jobs they belong to | Records of the business's work | The job, the days, the rates and the answer | The person's note on each answer |
 | Contact details, notes, skills, certificates, company details, day rate, days off (approved leave's too), running late | Not kept | No law asks for them | Nothing | All of it, at once |
+| Running late, anyone's, erased or not ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)) | 30 days after its day; at once when they're erased | No law asks for it, and it holds their own words; a month covers their timesheet for the day | In the history: who, how late, the job and the day | The record, every copy in the change feed, and the note in the history |
 
-Each goes on the day its time is up, always a 1 January: at once when
-the person is erased, if that day has passed, and otherwise when the
-server looks that day.
+Each kept for years goes on the day its time is up, always a 1 January:
+at once when the person is erased, if that day has passed, and otherwise
+when the server looks that day. Running late goes on the server's same
+daily look.
 
 A leave record for a year typed far ahead would have kept the name for
 three years after that year. Since 3 October 2026 no new one can be

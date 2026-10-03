@@ -54,7 +54,7 @@ import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
 import { ArchivedPerson } from './Erase.tsx'
 import { useFeedAddress } from './feed.ts'
-import { LateLines, LateRow } from './Late.tsx'
+import { LateLines, LateRow, NoteLate } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
@@ -515,6 +515,8 @@ export function CallCard({
         </p>
       ))}
       <LateLines call={call} late={late} today={today} />
+      {/* Someone booked who rang to say they're late, noted where their line is (ADR 0028). */}
+      <NoteLate call={call} late={late} />
 
       {open && (
         <>
@@ -575,7 +577,13 @@ export function CallCard({
 
       {open && (
         <>
-          {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
+          {editing && (
+            <EditCall
+              call={call}
+              onDone={() => setEditing(false)}
+              onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => neededBefore(datesMoved ? forCallDays(t) : t, call))))}
+            />
+          )}
           <Refusal error={error} />
           {cancelling ? (
             <Confirm
@@ -617,7 +625,10 @@ export function CallCard({
 const forCallDays = (t: TellTo): TellTo => ({ ...t, context: { ...t.context, days: undefined } })
 
 /** What the crew would notice; how many are needed and the reply-by date aren't worth a message. */
-const NOTICED = ['role', 'start', 'end', 'callTime', 'dayRateCents', 'details', 'project', 'phase', 'venue'] as const
+const NOTICED = ['role', 'start', 'end', 'callTime', 'dayRateCents', 'details', 'project', 'phase', 'venue', 'needsCertificates'] as const
+
+/** The same person, told what the call needed before, so the message says what it needs now (ADR 0028). */
+const neededBefore = (t: TellTo, call: CallView): TellTo => ({ ...t, context: { ...t.context, neededBefore: needsOf(call) } })
 
 /** The call as the change leaves it, for the message to the people on it; undefined when nobody would notice. */
 function afterChange(call: CallView, changes: CommandInput<'call.update'>): CallView | undefined {
@@ -636,6 +647,7 @@ function afterChange(call: CallView, changes: CommandInput<'call.update'>): Call
     project: changes.project ?? call.project,
     phase: changes.phase ?? call.phase,
     venue: changes.venue ?? call.venue,
+    needsCertificates: changes.needsCertificates ?? call.needsCertificates,
   }
 }
 

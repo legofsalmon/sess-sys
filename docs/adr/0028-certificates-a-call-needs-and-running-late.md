@@ -2,10 +2,14 @@
 
 - **Status:** Accepted, 2 October 2026. Built in the fourth round, after
   crew profiles ([ADR 0025](0025-crew-profiles-and-bringing-in-the-list.md)).
+  Amended 3 October 2026 (below): the office notes running late for
+  someone who rings instead, a running late goes 30 days after its day,
+  and the message after a call's certificates change says so.
 - **Decides:** which certificates the app knows, how a crew call says
   which ones it needs and what that does to an offer, how the office is
-  reminded before a certificate runs out, and how a freelancer says from
-  their private link that they're running late on the day.
+  reminded before a certificate runs out, how a freelancer says from
+  their private link that they're running late on the day, or the office
+  notes it when they ring, and how long that is kept.
 
 ## Context
 
@@ -181,10 +185,10 @@ it's in their own download from their link.
 
 **It clears itself after the day.** Every screen and page shows a record
 only until its day is over: the devices by the Irish day, the link page
-and call sheet by the server's. The row stays, as an answer to an offer
-does, for the history, the export and the person's own download, and it
-goes with the person when they're erased on request
-([ADR 0027](0027-erasing-a-person-on-request.md)).
+and call sheet by the server's. The row stays for 30 days after its day
+(amended 3 October 2026, below), for the history, the export and the
+person's own download, and it goes at once with the person when they're
+erased on request ([ADR 0027](0027-erasing-a-person-on-request.md)).
 
 **The office sees it at once.** It joins "Answers to check" at the top
 ("Gráinne Power is running late", with Ring and Noted), counted on the
@@ -216,6 +220,122 @@ warns. A shoot today for Liffey Brands has Gráinne on camera, running
 about 30 minutes late with traffic on the M50, said from her link, and
 Aoife as crew chief and contact on the day, whose call sheet shows it.
 
+## Amended 3 October 2026
+
+Three things the first round left out or left for later.
+
+### The office notes running late for someone who rang
+
+Most people who are late ring, as they always have. Until now the
+office could only tell the crew chief by phone, and the call's line, the
+planner and the contact's call sheet didn't know.
+
+**Where.** On a crew call's line, at rest, "Running late…" opens a form
+for anyone on it who has accepted or is booked, on a day running late
+can be said for now: today, and tomorrow from 6pm, as on their link. The
+same line is on the job's page, so it's there too. The choices are the
+link's: roughly how late, or the time they'll be there, and a note; and
+who rang, or which day, when there's more than one. It's filled in with
+what's on record, to change it, and "Mark as there" says they've
+arrived, as their "I'm here now" does.
+
+**The same record, by the same command.** The form sends `late.say` and
+`late.arrived`, as the link does, into the one record for the booking
+and the day. So it's everywhere theirs is: "Answers to check" and the
+Crew badge, the call's line, the planner, the contact on the day's call
+sheet, and the person's own link page, whose "You've told us" is still
+true: they told the office by ringing. The device already lays a
+`late.say` from its own outbox over its copy, so it shows at once,
+waiting to sync, with no signal. No new command or column: the server
+tells the link from the app by where the command came from, as it does
+for answers and timesheets, and who noted it is the history's, as for
+any change the office makes.
+
+**It still waits in the queue.** Noting it doesn't mark it noted.
+Whoever takes the call isn't always whoever is watching the day, and the
+queue is the one list of the day's lates with Ring beside each; Noted is
+one tap.
+
+**The same refusals, said about them by name.** "Dara Quinn isn't booked
+on Sat 3 Oct.", "Dara Quinn isn't booked on this one any more, so
+there's nothing to be late for.", and "Running late can be noted from
+6pm the evening before a day they're booked." The same shared function
+says them on the device as Save is pressed, with no round trip, and on
+the server, so a note made offline that arrives after the day is refused
+in the same words. A day's window is the same as the link's, so there's
+one rule for when a late start can be known.
+
+**The history** says it was the office, with the member of staff who
+noted it as the entry's who once sign-in is on (until then, the
+device): "Noted that Dara Quinn rang to say they'll be about 30 minutes
+late for Liffey Brands Shoot (Shoot), Fri 2 Oct: Stuck behind a
+tractor", and "Marked Dara Quinn as there now, at Liffey Brands Shoot
+(Shoot)". Said on the link, the words are as before.
+
+**Not on the planner.** The planner only shows (ADR 0010): changes are
+made on the job's page or the Crew tab, a tap away. A form in a day's
+cell would be the first change made there.
+
+### Running late goes 30 days after its day
+
+A running late was kept for good, with the person's own words in it
+(often why they're late: a car, a child, a hospital), though no law
+asks for it. Keeping it longer than it's useful has no reason, and
+GDPR's storage limitation applies.
+
+**30 days** (`LATE_KEPT_DAYS` in `shared/src/late.ts`). Long enough for
+the day's timesheet to come in and be approved, where a late start can
+matter to a day's pay, and to look back on the day if a client asks.
+30 days is also the app's "soon" for inspections and certificates, and
+how far back the architecture has the office's devices hold jobs. A
+device keeps what it sent for two weeks, so by then no device holds the
+note in what it sent either.
+
+**What goes**, on the 30th day after its day in Ireland: the record;
+every earlier copy of it in the change feed, made a deletion, so a new
+device's first sync finds nothing; each device's copy, by a deletion in
+the feed; and the note from every stored `late.say` for that day, one
+turned down included. None can be said further ahead than the day after
+it came in, so one turned down for a day further off, or for no real
+day, counts as for that day after, rather than keeping its note for
+years. The history's words then read without the note, as they do after
+erasure, still saying who, how late, and for which job and day. Saying
+they're there, and the office noting it, carry only the record's id, so
+as the record goes each is given the booking's id, and the history still
+says whose it was and which job. The export and the person's own
+download hold only what's left. ADR 0027's table of how long records are
+kept has the row.
+
+**When.** On the server's daily look, `DueErasures` in
+`server/src/erasure/due.ts`, which runs `clearOldLate`
+(`server/src/crew/late.ts`) after `eraseWhatIsDue`: at start, then
+within the hour after midnight in Ireland. The same look rather than a
+second timer, so the database is still woken once a day. A day with
+nothing to clear costs one read, with no lock and no history entry.
+Otherwise it's one server change under the lock every change takes,
+looked at again under it, so a second run, or another copy of the server
+at the same moment, finds nothing and changes nothing. The history says
+"Cleared running late more than 30 days after its day, notes and all",
+naming nobody, and devices are told. Backups keep copies until they age
+out, a year and a month at most, as for erasure; a restore brings old
+ones back, and the server clears them again as it starts.
+
+### The "call changed" message names certificates
+
+When Change on a call changes what it needs, the message the office is
+prompted to send to everyone on the call says so in its own lines, after
+the call as it now is: "This call now needs IPAF." and "This call no
+longer needs working at height." A change to what a call needs, and
+nothing else, now opens that message too; before, it was among the
+changes not thought worth one. The device builds it from what the call
+needed before and needs now.
+
+The offer card on the link already read the call's needs as they are
+now. The call sheet now says them too, for every reader, since the offer
+said them anyway: "Needs Safe Pass and IPAF." under "You" on the link's
+sheet, beside each call in its crew list and on the office's sheet, and
+in the copy for a crew's WhatsApp group.
+
 ## Consequences
 
 - An offer can't go to someone the record says can't do the work, and
@@ -226,13 +346,15 @@ Aoife as crew chief and contact on the day, whose call sheet shows it.
   and can still clear one of the first three. Devices that haven't heard of `needsCertificates` or
   `runningLate` keep working: a call reads as needing nothing and the
   records go unshown.
-- Running late is kept after its day, like every answer. If the office
-  would rather it went, a nightly clear-out of rows past their day is a
-  small change.
+- Running late is kept for 30 days after its day, then the server clears
+  it, notes and all (amended 3 October 2026). The history still says who
+  was late, how late and for which job.
+- A late start the office hears about by phone is where a late start
+  said on the link is, the contact's call sheet included; only the
+  history tells the two apart.
 - Left for later and written here so it isn't lost: a freelancer
   uploading a photo of their renewed card from their link, which needs
-  file storage; the office recording "running late" for someone who
-  rang in; a needed certificate per role as a default, so a rigging call
-  ticks itself; reminders sent on a schedule rather than prompted; and
-  PASMA, manual handling for lifting gear, and other kinds as the office
-  asks for them.
+  file storage; a needed certificate per role as a default, so a
+  rigging call ticks itself; reminders sent on a schedule rather than
+  prompted; and PASMA, manual handling for lifting gear, and other kinds
+  as the office asks for them.

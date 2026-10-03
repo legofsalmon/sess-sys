@@ -1,4 +1,5 @@
 import { irishToday, leaveRecordKept } from '@sh/shared'
+import { clearOldLate } from '../crew/late.ts'
 import { getPerson } from '../crew/store.ts'
 import type { Db, Queryable } from '../db.ts'
 import { ERASED_WHEN_DUE_ACTION } from '../history.ts'
@@ -66,7 +67,8 @@ interface Log {
 const HOUR = 60 * 60 * 1000
 
 /**
- * Runs `eraseWhatIsDue` at start, then once each day in Ireland. It looks
+ * Runs `eraseWhatIsDue`, and the clear-out of old running late
+ * (`clearOldLate`), at start, then once each day in Ireland. It looks
  * every hour but goes to the database only on a new Irish day, so it runs
  * within the hour after midnight, whatever the clock change, without
  * waking the database at other times; one that fails is tried an hour
@@ -102,16 +104,17 @@ export class DueErasures {
       if (this.doneFor === today) return undefined
       try {
         const n = await eraseWhatIsDue(this.db, today)
+        // Running late 30 days after its day goes on the same look (ADR 0028), so the database is still woken once a day.
+        const late = await clearOldLate(this.db, today)
         this.doneFor = today
-        if (n) {
-          this.options.changed()
-          this.options.log?.info({ people: n }, 'Erased what the law no longer asks to keep of people erased on request')
-        }
+        if (n || late) this.options.changed()
+        if (n) this.options.log?.info({ people: n }, 'Erased what the law no longer asks to keep of people erased on request')
+        if (late) this.options.log?.info({ records: late }, 'Cleared running late more than 30 days after its day')
         return n
       } catch (err) {
         // Some may have gone before it failed: devices are told of those.
         this.options.changed()
-        this.options.log?.warn({ err }, 'Could not erase what was due of people erased on request; trying again in an hour')
+        this.options.log?.warn({ err }, 'Could not erase what was due of people erased on request, or clear old running late; trying again in an hour')
         this.options.report?.(err)
         return undefined
       }

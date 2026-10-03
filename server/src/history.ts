@@ -8,6 +8,7 @@ import {
   invitesLabel,
   irishToday,
   LATE_BY,
+  LATE_KEPT_DAYS,
   lateWords,
   leaveDays,
   levelLabel,
@@ -47,6 +48,8 @@ export const IMPORT_STOCK_ACTION = 'stock.import'
 export const ERASED_AGAIN_ACTION = 'person.erase-again'
 /** And taking what an erasure kept, once the law no longer asks for it (ADR 0027). */
 export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
+/** And clearing running late 30 days after its day (ADR 0028). */
+export const LATE_CLEARED_ACTION = 'late.clear-old'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -692,16 +695,22 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const l = lateOf(a.id, a.offerId)
       const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })
       const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
-      return `${l.who} said they'll be ${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+      const what = `${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+      // From the app it's the office noting someone who rang; the entry's own who names whoever noted it.
+      return from === 'app' ? `Noted that ${l.who} rang to say they'll be ${what}` : `${l.who} said they'll be ${what}`
     }
+    // Both carry the booking once the record has gone 30 days after its day, so they still say whose it was.
     case 'late.arrived': {
-      const l = lateOf(a.id)
-      return `${l.who} said they're there now, at ${l.job}`
+      const l = lateOf(a.id, a.offerId)
+      return from === 'app' ? `Marked ${l.who} as there now, at ${l.job}` : `${l.who} said they're there now, at ${l.job}`
     }
     case 'late.seen': {
-      const l = lateOf(a.id)
+      const l = lateOf(a.id, a.offerId)
       return `Noted that ${l.who} is running late for ${l.job}`
     }
+    // No name, as for erasing: it's about everyone whose went that day.
+    case LATE_CLEARED_ACTION:
+      return `Cleared running late more than ${LATE_KEPT_DAYS} days after its day, notes and all`
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

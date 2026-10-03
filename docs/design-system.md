@@ -323,7 +323,11 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   “Traffic on the M50”"), green once they're there; on the freelancer's
   page it's a "Today" card with a green edge at the top, the choices as
   bordered radio rows, and on the contact's call sheet a card with an
-  amber edge under who to ring. Not in Figma yet.
+  amber edge under who to ring. For someone who rang, "Running late…" is
+  a link under the call's line on their day, opening the same choices
+  as chips, the grid form's fields, Save, and "Mark as there", with a
+  green line saying what was noted. A call sheet says what each call
+  needs in muted text beside it. Not in Figma yet.
 
 ## Accessibility
 

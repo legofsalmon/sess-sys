@@ -106,8 +106,9 @@ also work for other companies, so the system bends to them instead:
   running late, add a note to the call sheet, swap a shift with another
   approved freelancer if ops allow it. Running late is built
   ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md)):
-  said from their link on the day, seen at once by the office and the
-  contact on the day.
+  said from their link on the day, or noted by the office when they
+  ring, seen at once by the office and the contact on the day, and
+  cleared 30 days after.
 
 ## The shape of the system
 

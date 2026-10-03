@@ -257,7 +257,7 @@ function describer(view: View): (m: Mutation) => string {
         return `Set ${person(a.personId)}'s ${typeof a.year === 'number' ? `${a.year} ` : ''}allowance`
       case 'leave.open':
         return `Open ${typeof a.year === 'number' ? a.year : 'a year'} for leave`
-      // Running late (ADR 0028): said on a link, noted here.
+      // Running late (ADR 0028): said here for someone who rang, marked there, or noted.
       case 'late.say':
         return `Say ${offer(a.offerId).who} is running late for ${offer(a.offerId).what}`
       case 'late.arrived':

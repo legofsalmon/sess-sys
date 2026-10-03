@@ -133,9 +133,9 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .offer-form .find { grid-column: 1 / -1; }
 
 /* The certificates a call needs, and running late (ADR 0028). The ticks for what a call needs wrap as chips; a certificate's note sits beside its expiry, or under it on a phone. */
-.app .grid-form .needs > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.app .grid-form .needs label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
-.app .grid-form .needs input { width: 20px; height: 20px; accent-color: var(--accent); }
+.app .grid-form .needs > div, .app .grid-form .chips > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.app .grid-form .needs label, .app .grid-form .chips label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
+.app .grid-form .needs input, .app .grid-form .chips input { width: 20px; height: 20px; accent-color: var(--accent); }
 .crew .more-grid .cert { grid-template-columns: 1fr 1fr 1.2fr; }
 .crew .offer-form .warn-line { grid-column: 1 / -1; }
 .crew .call > .warn-line { margin-top: calc(-1 * var(--space-4)); }
@@ -146,6 +146,8 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .reminders .reminder.soon p { color: var(--warn); }
 .crew .reminders .reminder.ran-out p { color: var(--bad); }
 .crew .late-row > div:first-child { flex: 1 1 14em; }
+/* The office noting it for someone who rang: a link under the line at rest, opening the same choices as the link page as chips. */
+.crew .call > button.late-open { justify-self: start; }
 .plan .timeline .blk small.late, .plan .timeline .item small.late { color: var(--warn); font-weight: 700; }
 .sheet-screen .sheet-call li .late-line { flex-basis: 100%; }
 @media (max-width: 480px) {

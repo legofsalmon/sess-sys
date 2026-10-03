@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { IMPORT_ACTION } from '../src/calendar/import.ts'
 import { CALENDAR_ACTIONS } from '../src/calendar/routes.ts'
 import { DATA_ACTIONS } from '../src/data/fresh.ts'
-import { describe as inWords, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION } from '../src/history.ts'
+import { describe as inWords, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION, LATE_CLEARED_ACTION } from '../src/history.ts'
 import { IPHONE, onLink, server, staff, WINDOWS } from './people.ts'
 
 /**
@@ -193,7 +193,7 @@ describe('every command', () => {
   it('has its words in the history, so one added without any fails here before it ships', () => {
     // Proves: no command, nor anything the server records itself, falls to the default, which shows a person the command's own name.
     const nothing = () => undefined
-    const recorded = [EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, IMPORT_ACTION, ...Object.values(CALENDAR_ACTIONS), ...Object.values(DATA_ACTIONS)]
+    const recorded = [EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, LATE_CLEARED_ACTION, IMPORT_ACTION, ...Object.values(CALENDAR_ACTIONS), ...Object.values(DATA_ACTIONS)]
     for (const name of [...COMMAND_NAMES, ...recorded]) {
       const what = inWords(name, {}, nothing)
       expect(what, name).not.toBe(name)
