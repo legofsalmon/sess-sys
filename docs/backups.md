@@ -65,7 +65,10 @@ day it runs out, and says a file has to wait for the bucket. With
 `BACKUP_KEY` set (below), each file is encrypted the same way as the
 backups. Leave `documents/` to the app: it deletes files there that no
 document has any more, and its log says when it finds a file there that
-no document knows.
+no document knows. For the same reason, never point a second server at
+the live bucket, not even to practise putting a backup back: it would
+work through its own list of files to delete. Practise with a bucket of
+its own.
 
 ## Encrypting the backups
 

@@ -35,6 +35,8 @@ import { registerStockImportRoutes, type StockImportRound } from './stock/import
 import { registerItemLogRoutes } from './stock/log.ts'
 
 const PULL_LIMIT = 500
+/** The longest the server waits for a whole request to arrive. */
+export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000
 
 export interface AppOptions {
   db: Db
@@ -44,6 +46,8 @@ export interface AppOptions {
   logTo?: { write(line: string): void }
   /** Built web app to serve alongside the API (web/dist), if any. */
   webRoot?: string
+  /** The longest to wait for a whole request; REQUEST_TIMEOUT_MS unless a test wants it shorter. */
+  requestTimeoutMs?: number
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
   /** Where nightly backups go (ADR 0004). Without it there are none. */
@@ -103,12 +107,15 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, backupStore, backupKey, commit, errorReporting, backupWatch, calendar } = options
+  const { db, logger = false, logTo, webRoot, auth, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
     logger: logger && { serializers: { req: requestForLog }, ...(logTo && { stream: logTo }) },
     bodyLimit: 5 * 1024 * 1024,
+    // Without a limit, someone sending a request a byte at a time could hold a connection open for ever; the freelancer's
+    // link takes posts from anyone. Five minutes still lets a 10 MB photo through on a poor mobile signal (ADR 0029).
+    requestTimeout: requestTimeoutMs,
   })
   // The old sync test's tables go only when empty (schema.ts), so one still holding rows is said once, here at start.
   const kept = await keptSyncTestTables(db)

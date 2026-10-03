@@ -194,7 +194,10 @@ is already capped and in memory, and the reader takes only what the
 page's own form sends (a few short fields and one file), ignoring the
 file's name. `@fastify/multipart` was the other choice: a dependency to
 install, audit and keep up to date, streaming the server doesn't need at
-10 MB, for one form.
+10 MB, for one form. A whole request has five minutes to arrive, on every
+route (`REQUEST_TIMEOUT_MS` in `server/src/app.ts`): long enough for a
+10 MB photo on a poor signal, and someone sending a post a byte at a time
+can't hold a connection open for ever.
 
 ### Commands and server actions
 

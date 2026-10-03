@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildApp } from '../src/app.ts'
+import { buildApp, REQUEST_TIMEOUT_MS } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
 
 /**
@@ -84,6 +84,22 @@ describe('every answer', () => {
     // Railway says which protocol the request came in on.
     const https = await app.inject({ method: 'GET', url: '/api/health', headers: { 'x-forwarded-proto': 'https' } })
     expect(https.headers['strict-transport-security']).toBe('max-age=31536000; includeSubDomains')
+  })
+
+  it('is not waited for for ever: the server has a time limit for a whole request to arrive', async () => {
+    // Proves: someone sending a post to a private link a byte at a time can't hold a connection open for ever, as Node's
+    // own default would let them. The limit reaches the server itself, and it is five minutes, long enough for a 10 MB
+    // photo on a poor signal. (Node looks for overdue requests every 30 seconds, so one is cut off within 5½ minutes.)
+    expect(REQUEST_TIMEOUT_MS).toBe(5 * 60 * 1000)
+    const app = await serving()
+    expect(app.server.requestTimeout).toBe(REQUEST_TIMEOUT_MS)
+    const db = await pgliteDb()
+    const shorter = await buildApp({ db, requestTimeoutMs: 300 })
+    cleanup.push(async () => {
+      await shorter.close()
+      await db.close()
+    })
+    expect(shorter.server.requestTimeout).toBe(300)
   })
 
   it('is for the app itself: another site asking from a browser is given no leave to read it', async () => {
