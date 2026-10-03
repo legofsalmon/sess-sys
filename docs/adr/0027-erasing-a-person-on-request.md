@@ -6,7 +6,11 @@
   had deleted at once: "Keep all records for the recommended
   timeframes." Staff leave is now kept for the three years the Working
   Time Act asks, and the name with it, and what is kept goes by itself
-  on the day its time is up (below).
+  on the day its time is up (below). Amended 3 October 2026: Colly
+  confirmed that declined and cancelled leave is kept for the three
+  years, as approved leave is, and that a name kept for records lasts
+  exactly as long as they do. Leave years are now opened by the office,
+  so no new leave record is for a year after next (below).
 - **Decides:** how someone's details are erased when they ask (GDPR's
   right to erasure, Article 17), what is kept and why, where a person's
   details live and what erasing does to each place, and how a restore
@@ -162,8 +166,8 @@ to: one constant each in `shared/src/erasure.ts` (`PAID_WORK_YEARS`,
 | Record | How long | Why | Kept | Goes |
 | --- | --- | --- | --- | --- |
 | Approved timesheets | Under their name for six years after the year of the latest approval; then under "Erased person", as records of work | Revenue: Taxes Consolidation Act 1997, section 886 | The days, rate, extras, the approval, and the office's note | The person's own note |
-| Leave requests, decided | Three years after the year of the request's last day | Organisation of Working Time Act 1997, section 25, and the Organisation of Working Time (Records) (Prescribed Form and Exemptions) Regulations 2001 | Type, dates, days, status, when it was asked for, who decided it and when | The person's note and the approver's reason |
-| Days in lieu, decided | Three years after the year of the day worked | The same | The day, how many days, status, who decided it and when | The person's note and the approver's reason |
+| Leave requests, decided or cancelled | Three years after the year of the request's last day | Organisation of Working Time Act 1997, section 25, and the Organisation of Working Time (Records) (Prescribed Form and Exemptions) Regulations 2001 | Type, dates, days, status, when it was asked for, who decided it and when | The person's note and the approver's reason |
+| Days in lieu, decided or cancelled | Three years after the year of the day worked | The same | The day, how many days, status, who decided it and when | The person's note and the approver's reason |
 | Leave allowances | Three years after their year | The same | The year, the days and the days carried over | The note |
 | A request or a day in lieu still waiting for a decision | Not kept | It records no leave, and nothing more can be decided for them | Nothing | All of it, at once |
 | Their name | Until the later of the above can go | A record has to say whose it is | The name, on their person (never on their staff account) | Everything else on their person, at once |
@@ -173,6 +177,15 @@ to: one constant each in `shared/src/erasure.ts` (`PAID_WORK_YEARS`,
 Each goes on the day its time is up, always a 1 January: at once when
 the person is erased, if that day has passed, and otherwise when the
 server looks that day.
+
+A leave record for a year typed far ahead would have kept the name for
+three years after that year. Since 3 October 2026 no new one can be
+([ADR 0024](0024-staff-leave.md), amended): leave is asked for only in a
+year the office has opened, and no year after next is ever open; an
+allowance is set only for this year or next; and a day in lieu is for a
+day already worked. Nothing in erasing looks at whether a year is open:
+what is kept, anything typed further ahead before then included, stays
+and goes on its day either way.
 
 ### Everywhere a person lives
 

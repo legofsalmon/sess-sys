@@ -8,9 +8,12 @@ import {
   leaveDaysLabel,
   leaveLabel,
   leaveSpanLabel,
+  nearYears,
   newId,
+  noAllowanceReason,
   noCancelReason,
   notEnoughLeft,
+  notOpenReason,
   personByEmail,
   requestsOverlap,
   type LeaveBalance,
@@ -23,7 +26,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Refusal, useAct } from '../act.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { useAuth } from '../auth.ts'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
@@ -312,6 +315,7 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
 
       <section className="card" aria-label="Apply for leave">
         <h2>Apply for leave</h2>
+        <OpenYears view={view} me={me} />
         <Apply view={view} me={me} />
       </section>
 
@@ -334,6 +338,36 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
   )
 }
 
+/** The years leave can be asked for in, and for an approver, the next to open, asked in place first. */
+function OpenYears({ view, me }: { view: View; me: PersonView }) {
+  const near = nearYears(useToday())
+  const [asking, setAsking] = useState(false)
+  const { run, error } = useAct()
+  const open = near.filter((y) => view.leave.isOpen(y))
+  const shut = near.filter((y) => !view.leave.isOpen(y))
+  const next = view.leave.toOpen
+  const openIt = (year: number) => void run(() => client.mutate('leave.open', { year, by: me.id })).then(() => setAsking(false))
+  return (
+    <>
+      <p className="hint">
+        {open.length > 0 && `Open for leave: ${open.join(' and ')}. `}
+        {shut.length > 0 && `${shut.join(' and ')} ${shut.length === 1 ? "isn't" : "aren't"} open yet: the office opens each year when it's ready.`}{' '}
+        <Pending pending={view.leave.years.some((y) => y.pending)} />
+      </p>
+      {canApproveLeave(me) &&
+        next !== undefined &&
+        (asking ? (
+          <Confirm question={`Open ${next} for leave? Staff can ask for leave in ${next} from then on, and it can't be closed again.`} yes={`Open ${next}`} no="Not yet" onYes={() => openIt(next)} onNo={() => setAsking(false)} />
+        ) : (
+          <button type="button" onClick={() => setAsking(true)}>
+            Open {next} for leave
+          </button>
+        ))}
+      <Refusal error={error} />
+    </>
+  )
+}
+
 function Apply({ view, me }: { view: View; me: PersonView }) {
   const today = useToday()
   const blank = { type: 'annual' as LeaveType, start: today, end: today, note: '' }
@@ -347,6 +381,8 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
     e.preventDefault()
     // The same checks as the server's, said here first so nothing waits on a sync to be refused.
     if (crossesYear) return refuse("A request can't cross the year end: ask for December and January separately.")
+    const shut = notOpenReason(year, view.leave.isOpen, today)
+    if (shut) return refuse(shut)
     if (count === 0) return refuse("There are no working days in those dates: it's all weekend or public holidays.")
     const mine = view.leave.requestsFor(me.id, year).find((r) => HOLDS_DAYS.includes(r.status) && requestsOverlap(r, { start: f.start, end }))
     if (mine) return refuse(`That overlaps the ${leaveLabel(mine.type, mine.days).toLowerCase()} ${mine.status === 'approved' ? 'approved' : 'asked'} for ${leaveSpanLabel(mine)}.`)
@@ -559,18 +595,20 @@ const isWhole = (typed: string) => typed.trim() !== '' && Number.isInteger(Numbe
 
 /** Each staff member's year, for an approver to set. */
 function Allowances({ view, me, year }: { view: View; me: PersonView; year: number }) {
+  // Only this year's and next year's can be set, so another year's are shown as they stand.
+  const fixed = noAllowanceReason(year, useToday())
   return (
     <section className="card" aria-label={`Allowances, ${year}`}>
       <h2>Allowances, {year}</h2>
-      <p className="hint">Days of annual leave for the year, and any carried over from the year before. {days(DEFAULT_ALLOWANCE_DAYS)} until one is set.</p>
+      <p className="hint">{fixed ?? `Days of annual leave for the year, and any carried over from the year before. ${days(DEFAULT_ALLOWANCE_DAYS)} until one is set.`}</p>
       {view.leave.staff.map((p) => (
-        <AllowanceRow key={p.id} person={p} year={year} view={view} me={me} />
+        <AllowanceRow key={p.id} person={p} year={year} view={view} me={me} fixed={fixed !== null} />
       ))}
     </section>
   )
 }
 
-function AllowanceRow({ person, year, view, me }: { person: PersonView; year: number; view: View; me: PersonView }) {
+function AllowanceRow({ person, year, view, me, fixed }: { person: PersonView; year: number; view: View; me: PersonView; fixed: boolean }) {
   const set = view.leave.allowance(person.id, year)
   const b = view.leave.balance(person.id, year)
   const [f, setF] = useState({ days: String(b.allowance), carried: String(b.carriedOver) })
@@ -601,15 +639,17 @@ function AllowanceRow({ person, year, view, me }: { person: PersonView; year: nu
       <div className="actions">
         <label className="field">
           Days
-          <input type="number" min={0} max={366} value={f.days} onChange={(e) => (setTouched(true), setF({ ...f, days: e.target.value }))} />
+          <input type="number" min={0} max={366} value={f.days} disabled={fixed} onChange={(e) => (setTouched(true), setF({ ...f, days: e.target.value }))} />
         </label>
         <label className="field">
           Carried over
-          <input type="number" min={0} max={366} value={f.carried} onChange={(e) => (setTouched(true), setF({ ...f, carried: e.target.value }))} />
+          <input type="number" min={0} max={366} value={f.carried} disabled={fixed} onChange={(e) => (setTouched(true), setF({ ...f, carried: e.target.value }))} />
         </label>
-        <button type="submit" disabled={!touched}>
-          Save
-        </button>
+        {!fixed && (
+          <button type="submit" disabled={!touched}>
+            Save
+          </button>
+        )}
       </div>
       <Refusal error={error} />
     </form>

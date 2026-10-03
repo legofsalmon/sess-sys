@@ -3,9 +3,14 @@
 - **Status:** Accepted, 1 October 2026. Built after round two of the
   audit ([ADR 0023](0023-audit-round-two-the-loops.md)), as the first
   part of the app that is for the staff rather than for the jobs.
+  Amended 3 October 2026 with Colly's words on how far ahead staff can
+  ask: "the office have to manually open the years for leave. So staff
+  can't apply for leave very far in advance." Leave is now asked for
+  only in a year the office has opened (below).
 - **Decides:** what annual leave and time in lieu are in the app, who
-  applies and who approves, how the balances are worked out, and how
-  the planner and offers respect leave once it's approved.
+  applies and who approves, how the balances are worked out, how the
+  planner and offers respect leave once it's approved, and which years
+  staff can ask for leave in.
 
 ## Context
 
@@ -75,11 +80,54 @@ A person gains `approvesLeave`, which starts off and is set on the Crew
 tab's person form as "Can approve time off", for staff only. Older rows
 and device snapshots read it as off.
 
+**Years the office opens** (amended 3 October 2026). Colly: "the office
+have to manually open the years for leave. So staff can't apply for
+leave very far in advance."
+
+- A leave year is open or not, for the whole company: a fourth record,
+  `leaveYear`, one for each year opened, with when, in a table of the
+  module's own (`leave_years`). Who opened it is in the history.
+- An approver opens a year with `leave.open`. Only this year in Ireland
+  or the next can be opened, so a slip can't open 2062 ("Only this year
+  or next can be opened for leave: 2026 or 2027."). Opening a year
+  already open changes nothing, as a phone sending twice does.
+- An open year can't be closed again. Closing one with requests in it
+  would leave leave on record in a year nobody can ask in. Closing one
+  with none would undo little: only next year can be opened early, after
+  a question in place, and anything asked for in it waits for an
+  approver, who can decline it. Open stays open is one rule, for staff
+  and for the history.
+- A request in a year that isn't open is refused, on the device before
+  sending and on the server, in the same words: "Leave for 2027 isn't
+  open yet. The office opens each year when it's ready." A year gone
+  that was never opened can't be now ("Leave for 2025 isn't open, and
+  only this year and next can be opened."). An open year stays open
+  after it ends, so December's leave can still go in for the record in
+  January.
+- A day in lieu is logged for a day already worked, never ahead, so it
+  needs no open year. Taking one is a request, so that does.
+- An allowance is set for this year or next only, open or not, so the
+  office can set next year's before opening it ("Allowances are set for
+  this year or next only: 2026 or 2027."). Another year's show on the
+  Leave screen as they stand.
+- The migration that brings the table opens, on a server already in
+  use, this year in Ireland and every year up to next that already
+  holds a request, a day in lieu or an allowance, so nothing that
+  worked stops. A year further ahead stays shut until it is next year
+  and an approver opens it, as for any year: what is in it stays, and
+  can still be decided or cancelled, but nobody asks for more leave
+  that far ahead. Devices
+  hear of the years opened through the feed. A new, empty database
+  opens none, and starting fresh empties the table with the rest, so
+  the office opens the year once the real crew list is in.
+
 **Commands.** `leave.request`, `leave.cancel`, `leave.decide`,
-`lieu.log`, `lieu.cancel`, `lieu.decide` and `leave.allowance`. The
-server refuses in plain words:
+`lieu.log`, `lieu.cancel`, `lieu.decide`, `leave.allowance` and
+`leave.open`. The server refuses in plain words:
 
 - only staff have leave;
+- leave only in an open year, a year opened only this year or next, and
+  an allowance only for this year or next (above);
 - a request can't overlap the person's own waiting or approved
   requests, and a day in lieu can't be logged twice for the same day,
   or for a day that hasn't come yet;
@@ -90,8 +138,8 @@ server refuses in plain words:
 - deciding needs "Can approve time off", and nobody decides their own
   request or lieu entry; nothing is approved for someone archived since
   they asked, so no days off are written for someone who has left
-  (declining still clears the queue); allowances are set by approvers
-  only;
+  (declining still clears the queue); allowances are set, and years
+  opened, by approvers only;
 - cancelling is the requester's, while the request is waiting or
   approved and hasn't started.
 
@@ -152,7 +200,10 @@ tab:
 - *To approve*, for people with the flag: the queue with its warnings,
   and Approve and Decline in place, the reason optional.
 - *Allowances*, for approvers: each staff member's year, with days and
-  carried over to edit.
+  carried over to edit, for this year and next.
+- Over Apply, which of this year and next are open, and that the other
+  isn't yet; for an approver, "Open 2027 for leave", asked in place
+  first.
 - The Crew tab's badge adds the waiting count for an approver to the
   answers to check.
 
@@ -165,18 +216,22 @@ the history writes them: "Aoife Byrne asked for annual leave, Mon 5 Oct
 to Fri 9 Oct (5 days)"; "Colly Hewson approved Aoife Byrne's annual
 leave, Mon 5 Oct to Fri 9 Oct", or "declined …: too many away that
 week"; "Cian Murphy logged a day in lieu for Sat 3 Oct"; "Colly Hewson
-set Aoife Byrne's 2026 allowance to 22 days, 2 carried over". The
+set Aoife Byrne's 2026 allowance to 22 days, 2 carried over"; "Colly
+Hewson opened 2027 for leave". The
 decider's name comes from the `by` the device sends; without one the
 label starts with the verb ("Approved Aoife Byrne's annual leave, …"),
 and the entry's own "who" names them. The export has the three new
 tables with a line each, and the people table's line says who can
-approve time off.
+approve time off; the open years' table has a line too.
 
 **Made-up data.** The staff have allowances for this year; Aoife
 Brennan can approve time off; Cian Murphy is waiting on a week's leave;
 Orla Hayes had a week approved last month, so her days off are in the
 planner; and Cian has a day in lieu waiting for the gala's last show
-day.
+day. This year is open for leave and next year isn't, so opening it can
+be tried, and the made-up weeks are kept inside this year: early in
+January Orla's comes after today, and late in December Cian's before
+it.
 
 ## Consequences
 
@@ -185,6 +240,11 @@ day.
 - Three new statuses and one new flag to know. A device that hasn't
   heard of them keeps working: the unknown source on a days-off row is
   shown as any other days off, and a missing flag reads as off.
+- Staff can't ask for next year until the office opens it, and after
+  starting fresh not even this year: the approver's Open is on the
+  Leave screen for that. No new leave record is for a year after next,
+  which also closes an edge in erasing
+  ([ADR 0027](0027-erasing-a-person-on-request.md)).
 - Until sign-in is on, the screen trusts who a device says it is, as
   the rest of the app does today. That is written here so nobody
   mistakes it for a check.

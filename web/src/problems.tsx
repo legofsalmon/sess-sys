@@ -253,7 +253,10 @@ function describer(view: View): (m: Mutation) => string {
       case 'lieu.decide':
         return `${a.approved ? 'Approve' : 'Decline'} ${lieu(a.id)}`
       case 'leave.allowance':
-        return `Set ${person(a.personId)}'s ${num(a.year)} allowance`
+        // A year is written as a year: "2026", never "2,026".
+        return `Set ${person(a.personId)}'s ${typeof a.year === 'number' ? `${a.year} ` : ''}allowance`
+      case 'leave.open':
+        return `Open ${typeof a.year === 'number' ? a.year : 'a year'} for leave`
       // Running late (ADR 0028): said on a link, noted here.
       case 'late.say':
         return `Say ${offer(a.offerId).who} is running late for ${offer(a.offerId).what}`

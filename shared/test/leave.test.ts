@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import type { Mutation } from '../src/commands.ts'
 import type { CrewCall, Offer, Person, Unavailability } from '../src/crew.ts'
-import { leaveBalance, leaveDays, leaveLabel, noCancelReason, notEnoughLeft, requestsOverlap, type LeaveRequest, type LieuEntry } from '../src/leave.ts'
+import { irishToday } from '../src/day.ts'
+import {
+  leaveBalance,
+  leaveDays,
+  leaveLabel,
+  noAllowanceReason,
+  noCancelReason,
+  noOpenReason,
+  notEnoughLeft,
+  notOpenReason,
+  requestsOverlap,
+  type LeaveRequest,
+  type LieuEntry,
+} from '../src/leave.ts'
+import { emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import { leaveView } from '../src/sync/leave-view.ts'
 import { plan } from '../src/sync/plan.ts'
@@ -11,7 +25,7 @@ import { jobsView } from '../src/sync/jobs-view.ts'
  * Staff leave (ADR 0024): a request counted in working days, the balances
  * with and without an allowance set, overlaps, and the device's view with
  * its own changes laid over, including approved leave as days off that the
- * planner shows.
+ * planner shows; and the years open for leave, by Ireland's clock.
  */
 
 const person = (id: string, name: string, extra: Partial<Person> = {}): Person => ({
@@ -203,5 +217,50 @@ describe("the device's view of leave", () => {
     ])
     // The planner names the public holidays among its days.
     expect(plan({ jobs, crew }, ['2026-10-26', '2026-10-27']).holidays).toEqual({ '2026-10-26': 'October bank holiday' })
+  })
+})
+
+describe('the years open for leave', () => {
+  it('follow the day in Ireland across New Year: this year and next can be opened, and leave is asked for only in an open year', async () => {
+    // Proves: the rule the Leave screen checks before sending, in the server's words. A minute before midnight on New
+    // Year's Eve in Ireland, with 2026 open, 2027 is next year: offered to open, and not yet open to ask in; 2028 is too
+    // far. At midnight 2027 is this year, still to open, 2028 can be opened, 2026 can't any more, and 2026, open, still
+    // takes leave put in for the record. The device lays its own Open over at once, as the server will have it.
+    let at = new Date('2026-12-31T23:59:00Z')
+    const snapshot = emptySnapshot('phone')
+    Object.assign(snapshot.entities, {
+      person: { colly: person('colly', 'Colly Hewson', { approvesLeave: true }), aoife: person('aoife', 'Aoife Byrne') },
+      leaveYear: { '2026': { id: '2026', year: 2026, openedAt: '2026-01-05T09:00:00.000Z' } },
+    })
+    const storage = new MemoryStorage()
+    await storage.save(snapshot)
+    const offline: Transport = { push: () => Promise.reject(new Error('offline')), pull: () => Promise.reject(new Error('offline')) }
+    const client = await new SyncClient({ storage, transport: offline, now: () => at }).open()
+    const rule = (year: number) => notOpenReason(year, client.view().leave.isOpen, irishToday(at))
+
+    expect(client.view().leave.years.map((y) => y.year)).toEqual([2026])
+    expect(client.view().leave.toOpen).toBe(2027)
+    expect(rule(2026)).toBeNull()
+    expect(rule(2027)).toBe("Leave for 2027 isn't open yet. The office opens each year when it's ready.")
+    expect(noOpenReason(2027, irishToday(at))).toBeNull()
+    expect(noOpenReason(2028, irishToday(at))).toBe('Only this year or next can be opened for leave: 2026 or 2027.')
+    expect(noAllowanceReason(2028, irishToday(at))).toBe('Allowances are set for this year or next only: 2026 or 2027.')
+
+    at = new Date('2027-01-01T00:00:00Z')
+    expect(client.view().leave.toOpen).toBe(2027)
+    expect(rule(2026)).toBeNull()
+    expect(rule(2025)).toBe("Leave for 2025 isn't open, and only this year and next can be opened.")
+    expect(noOpenReason(2028, irishToday(at))).toBeNull()
+    expect(noOpenReason(2026, irishToday(at))).toBe('Only this year or next can be opened for leave: 2027 or 2028.')
+    expect(noAllowanceReason(2026, irishToday(at))).toBe('Allowances are set for this year or next only: 2027 or 2028.')
+
+    await client.mutate('leave.open', { year: 2027, by: 'colly' })
+    await client.mutate('leave.open', { year: 2030, by: 'colly' })
+    expect(client.view().leave.years.map((y) => [y.year, y.pending])).toEqual([
+      [2026, false],
+      [2027, true],
+    ])
+    expect(rule(2027)).toBeNull()
+    expect(client.view().leave.toOpen).toBe(2028)
   })
 })

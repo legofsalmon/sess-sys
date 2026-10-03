@@ -8,11 +8,14 @@ import {
   leaveDays,
   leaveLabel,
   leaveSpanLabel,
+  nearYears,
+  noOpenReason,
   requestsOverlap,
   type LeaveAllowance,
   type LeaveBalance,
   type LeaveEntities,
   type LeaveRequest,
+  type LeaveYear,
   type LieuEntry,
 } from '../leave.ts'
 import type { CrewView, PersonView } from './crew-view.ts'
@@ -33,6 +36,9 @@ export interface LieuEntryView extends LieuEntry {
   person: PersonView | undefined
 }
 export interface LeaveAllowanceView extends LeaveAllowance {
+  pending: boolean
+}
+export interface LeaveYearView extends LeaveYear {
   pending: boolean
 }
 
@@ -61,6 +67,11 @@ export interface LeaveView {
   staff: PersonView[]
   /** Staff who can approve time off. */
   approvers: PersonView[]
+  /** The years open for leave, by year. */
+  years: LeaveYearView[]
+  isOpen(year: number): boolean
+  /** This year, or else next, while it isn't open: what an approver is offered to open. */
+  toOpen: number | undefined
 }
 
 type Tables = { [E in keyof LeaveEntities]: Record<string, LeaveEntities[E]> }
@@ -82,6 +93,8 @@ export function leaveView(
   for (const e of Object.values(entities.lieuEntry ?? {})) entries.set(e.id, { ...e, pending: false, person: people.get(e.personId) })
   const allowances = new Map<string, LeaveAllowanceView>()
   for (const a of Object.values(entities.leaveAllowance ?? {})) allowances.set(a.id, { ...a, pending: false })
+  const years = new Map<number, LeaveYearView>()
+  for (const y of Object.values(entities.leaveYear ?? {})) years.set(y.year, { ...y, pending: false })
 
   const decided = (status: 'approved' | 'declined', a: { reason: string; by?: string }, at: string) => ({
     status,
@@ -143,6 +156,12 @@ export function leaveView(
         const a = m.args as CommandArgs<'leave.allowance'>
         const id = allowanceId(a.personId, a.year)
         allowances.set(id, { id, personId: a.personId, year: a.year, days: a.days, carriedOver: a.carriedOver, note: a.note, pending: true })
+        break
+      }
+      case 'leave.open': {
+        const { year } = m.args as CommandArgs<'leave.open'>
+        // As the server will have it: opening again changes nothing, and only this year or next opens.
+        if (!years.has(year) && noOpenReason(year, today) === null) years.set(year, { id: String(year), year, openedAt: m.createdAt, pending: true })
         break
       }
     }
@@ -209,6 +228,9 @@ export function leaveView(
     queue,
     staff,
     approvers: staff.filter(canApproveLeave),
+    years: [...years.values()].sort((a, b) => a.year - b.year),
+    isOpen: (year) => years.has(year),
+    toOpen: nearYears(today).find((y) => !years.has(y)),
   }
 }
 

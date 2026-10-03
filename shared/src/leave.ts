@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { dayLabel, daysLabel, eachDay, type Person } from './crew.ts'
 import { day } from './day.ts'
 import { workingDays } from './holidays.ts'
-import { text, whole } from './plain.ts'
+import { text, whole, wholeYear } from './plain.ts'
 
 /**
  * Staff leave and time in lieu (ADR 0024): annual leave applied for and
@@ -10,7 +10,8 @@ import { text, whole } from './plain.ts'
  * Staff only; freelancers mark days off on their link. The leave year is
  * the calendar year, and a request is counted in the weekdays it holds
  * that aren't Irish public holidays. Approved leave is days off: the
- * planner shows it and offers warn, as for any days off.
+ * planner shows it and offers warn, as for any days off. Leave is asked
+ * for only in a year the office has opened.
  */
 
 const id = z.string().min(1).max(64)
@@ -68,12 +69,25 @@ export interface LieuEntry {
   reason: string
 }
 
+/**
+ * A leave year the office has opened, for the whole company (Colly, 3
+ * October 2026): staff ask for leave only in an open year, so nobody books
+ * far ahead before the office is ready. Once open, it stays open.
+ */
+export interface LeaveYear {
+  /** The year as text, as every record's id is. */
+  id: string
+  year: number
+  openedAt: string
+}
+
 export interface LeaveEntities {
   leaveAllowance: LeaveAllowance
   leaveRequest: LeaveRequest
   lieuEntry: LieuEntry
+  leaveYear: LeaveYear
 }
-export const LEAVE_ENTITY_NAMES = ['leaveAllowance', 'leaveRequest', 'lieuEntry'] as const
+export const LEAVE_ENTITY_NAMES = ['leaveAllowance', 'leaveRequest', 'lieuEntry', 'leaveYear'] as const
 
 export const allowanceId = (personId: string, year: number) => `${personId}-${year}`
 
@@ -98,16 +112,46 @@ export const leaveCommandSchemas = {
   'lieu.log': z.object({ id, personId: id, day, days: whole(1, 5, 'How many days'), note }),
   'lieu.cancel': z.object({ id, by }),
   'lieu.decide': z.object({ id, approved: z.boolean(), reason, by }),
+  /** A year opened for leave, by an approver. */
+  'leave.open': z.object({ year: wholeYear(2000, 2999, 'The year'), by }),
   /** A person's allowance for a year, set by an approver. */
   'leave.allowance': z.object({
     personId: id,
-    year: whole(2000, 2999, 'The year'),
+    year: wholeYear(2000, 2999, 'The year'),
     days: whole(0, 366, 'The allowance'),
     carriedOver: whole(0, 366, 'Carried over'),
     note,
     by,
   }),
 } as const
+
+/** This year in Ireland and the next: the only years that can be opened or have an allowance set, so a slip can't reach 2062. */
+export function nearYears(today: string): [number, number] {
+  const year = yearOf(today)
+  return [year, year + 1]
+}
+
+const near = (year: number, today: string) => nearYears(today).includes(year)
+
+/** Why a year can't be opened for leave, or null when it can. */
+export function noOpenReason(year: number, today: string): string | null {
+  const [now, next] = nearYears(today)
+  return near(year, today) ? null : `Only this year or next can be opened for leave: ${now} or ${next}.`
+}
+
+/** Why an allowance can't be set for a year, or null when it can, whether or not the year is open yet. */
+export function noAllowanceReason(year: number, today: string): string | null {
+  const [now, next] = nearYears(today)
+  return near(year, today) ? null : `Allowances are set for this year or next only: ${now} or ${next}.`
+}
+
+/** Why leave can't be asked for in a year, or null when it's open: the same words on the device and the server. */
+export function notOpenReason(year: number, isOpen: (year: number) => boolean, today: string): string | null {
+  if (isOpen(year)) return null
+  // A year gone can't be opened any more, so "yet" would promise what can't happen.
+  if (year < yearOf(today)) return `Leave for ${year} isn't open, and only this year and next can be opened.`
+  return `Leave for ${year} isn't open yet. The office opens each year when it's ready.`
+}
 
 /** How many days a span counts as: its weekdays that aren't public holidays. */
 export function leaveDays(start: string, end: string): number {

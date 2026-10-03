@@ -686,6 +686,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const to = typeof a.days === 'number' ? ` to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over` : ''
       return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance${to}`
     }
+    case 'leave.open':
+      return `${a.by ? `${person(a.by)} opened` : 'Opened'} ${typeof a.year === 'number' ? a.year : 'a year'} for leave`
     case 'late.say': {
       const l = lateOf(a.id, a.offerId)
       const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })

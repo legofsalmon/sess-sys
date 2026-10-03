@@ -93,6 +93,8 @@ test('for a member of staff with leave records, the question keeps their leave, 
   const mutations: [string, Record<string, unknown>][] = [
     ['person.upsert', person('eoin', `Eoin Approver ${id}`, true)],
     ['person.upsert', person('nora', staffName, false)],
+    // Leave is asked for only in a year the office has opened; opening it again, as another test may have, changes nothing.
+    ['leave.open', { year, by: k('eoin') }],
     ['leave.allowance', { personId: k('nora'), year, days: 22, carriedOver: 2, note: 'Agreed at interview', by: k('eoin') }],
     ['leave.request', { id: k('week'), personId: k('nora'), type: 'annual', start: `${year}-02-09`, end: `${year}-02-13`, note: 'Family wedding in Kerry' }],
     ['leave.decide', { id: k('week'), approved: true, reason: '', by: k('eoin') }],

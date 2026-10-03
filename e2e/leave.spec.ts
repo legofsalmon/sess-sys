@@ -1,13 +1,16 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 /**
- * Staff leave (ADR 0024) end to end, with sign-in off: a member of staff
- * says who they are, applies for three days and sees the count; an
- * approver on another phone sees the Crew tab's badge count it the moment
- * he says who he is, approves it, and has a blanked allowance turned down
- * in place; the planner shows the days off; and an offer to that person
- * for those days warns. The two staff and the crew call are made through
- * the sync API with this run's own names, since the test server is shared.
+ * Staff leave (ADR 0024) end to end, with sign-in off: an approver opens
+ * next year in place, and a request in it, turned down before, goes in; a
+ * member of staff says who they are, applies for three days and sees the
+ * count; an approver on another phone sees the Crew tab's badge count it
+ * the moment he says who he is, approves it, and has a blanked allowance
+ * turned down in place, and one the server turns down listed as not done
+ * with its year as a year; the planner shows the days off; and an offer to
+ * that person for those days warns. The staff and the crew call are made
+ * through the sync API with this run's own names, since the test server is
+ * shared, and this year is opened there too.
  */
 
 const phoneSize = { width: 390, height: 844 }
@@ -39,6 +42,25 @@ function threeDays(): [string, string] {
 }
 const [FROM, TO] = threeDays()
 const MIDDLE = addDays(FROM, 1)
+const YEAR = Number(today.slice(0, 4))
+const NEXT = YEAR + 1
+
+/** The first Wednesday in February next year: a working day in any year, as no Irish public holiday falls on one then. */
+function firstWednesday(): string {
+  let d = `${NEXT}-02-01`
+  while (new Date(`${d}T12:00:00Z`).getUTCDay() !== 3) d = addDays(d, 1)
+  return d
+}
+const WEDNESDAY = firstWednesday()
+
+/** Changes made through the sync API, as a phone would send them, each of which has to go in. */
+async function push(request: APIRequestContext, mutations: [string, Record<string, unknown>][]) {
+  const res = await request.post('/api/sync/push', {
+    data: { clientId: `leave-${id}`, mutations: mutations.map(([name, args]) => ({ id: `${k('m')}-${Math.random().toString(36).slice(2, 10)}`, name, args, createdAt: new Date().toISOString() })) },
+  })
+  const { results } = await res.json()
+  expect(results.map((r: { status: string; reason?: { message: string } }) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
+}
 
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext()
@@ -56,6 +78,9 @@ test.beforeAll(async ({ browser }) => {
   const mutations: [string, Record<string, unknown>][] = [
     ['person.upsert', person('nora', 'Nora Walsh', false)],
     ['person.upsert', person('eoin', 'Eoin Byrne', true)],
+    ['person.upsert', person('siun', 'Siún Keogh', false)],
+    // This year is open, as on the live server; opening it again, as another test may have, changes nothing.
+    ['leave.open', { year: YEAR, by: k('eoin') }],
     // A one-off crew call on two of the days, so an offer to Nora for it has to warn.
     [
       'call.create',
@@ -75,11 +100,7 @@ test.beforeAll(async ({ browser }) => {
       },
     ],
   ]
-  const res = await context.request.post('/api/sync/push', {
-    data: { clientId: `leave-${id}`, mutations: mutations.map(([name, args], i) => ({ id: `${k('m')}-${i}`, name, args, createdAt: new Date().toISOString() })) },
-  })
-  const { results } = await res.json()
-  expect(results.map((r: { status: string; reason?: { message: string } }) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
+  await push(context.request, mutations)
   await context.close()
 })
 
@@ -88,7 +109,56 @@ function row(page: Page, name: string) {
   return page.locator('tbody tr', { has: page.getByRole('rowheader', { name: new RegExp(`^${name}`) }) }).getByRole('cell')
 }
 
+test('an approver opens next year in place, and a request in it, turned down until then, goes in', async ({ browser }) => {
+  // Proves: Colly's decision (3 October 2026), at a phone's width. Siún is told next year isn't open, and asking for a day
+  // in it is turned down on her phone in the server's words. Eoin, who approves time off, opens it with a question in
+  // place, the safe answer first. Her phone hears of it without a reload, the same request goes in, and he approves it.
+  const siun = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await siun.goto('/#crew/leave')
+  await expect(siun.getByRole('status')).toHaveText('Up to date')
+  await siun.getByLabel('Your name').selectOption({ label: `Siún Keogh ${id}` })
+  await siun.getByRole('button', { name: "That's me" }).click()
+  const apply = siun.getByRole('region', { name: 'Apply for leave' })
+  await expect(apply).toContainText(`Open for leave: ${YEAR}. ${NEXT} isn't open yet: the office opens each year when it's ready.`)
+  await expect(apply.getByRole('button', { name: `Open ${NEXT} for leave` })).toHaveCount(0)
+  await apply.getByLabel('From').fill(WEDNESDAY)
+  await apply.getByLabel('To', { exact: true }).fill(WEDNESDAY)
+  await apply.getByRole('button', { name: 'Apply' }).click()
+  await expect(apply.getByRole('alert')).toHaveText(`Leave for ${NEXT} isn't open yet. The office opens each year when it's ready.`)
+
+  const eoin = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await eoin.goto('/#crew/leave')
+  await expect(eoin.getByRole('status')).toHaveText('Up to date')
+  await eoin.getByLabel('Your name').selectOption({ label: `Eoin Byrne ${id}` })
+  await eoin.getByRole('button', { name: "That's me" }).click()
+  const his = eoin.getByRole('region', { name: 'Apply for leave' })
+  await his.getByRole('button', { name: `Open ${NEXT} for leave` }).click()
+  const question = his.getByRole('group', { name: `Open ${NEXT} for leave? Staff can ask for leave in ${NEXT} from then on, and it can't be closed again.` })
+  await expect(question.getByRole('button', { name: 'Not yet' })).toBeFocused()
+  expect(await eoin.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneSize.width)
+  await question.getByRole('button', { name: `Open ${NEXT}` }).click()
+  await expect(eoin.getByRole('status')).toHaveText('Up to date')
+  await expect(his).toContainText(`Open for leave: ${YEAR} and ${NEXT}.`)
+  await expect(his.getByRole('button', { name: `Open ${NEXT} for leave` })).toHaveCount(0)
+
+  // Siún's phone hears of it by itself; the same request goes in, under next year.
+  await expect(apply).toContainText(`Open for leave: ${YEAR} and ${NEXT}.`)
+  await apply.getByRole('button', { name: 'Apply' }).click()
+  await expect(siun.getByRole('status')).toHaveText('Up to date')
+  await expect(apply.getByRole('alert')).toHaveCount(0)
+  await siun.getByRole('button', { name: `${NEXT}, the year after` }).click()
+  const mine = siun.getByRole('region', { name: `My requests, ${NEXT}` })
+  await expect(mine).toContainText('1 day')
+  await expect(mine.locator('.pill')).toHaveText('Waiting')
+  await eoin.getByRole('region', { name: 'To approve' }).getByRole('button', { name: `Approve Siún Keogh ${id}'s request` }).click()
+  await expect(mine.locator('.pill')).toHaveText('Approved')
+})
+
 test('staff apply for leave, an approver approves it, and the planner and offers respect it', async ({ browser }) => {
+  // Late in December the three days fall in next year, so it's opened first, as Eoin would; once open, that changes nothing.
+  const setup = await browser.newContext()
+  await push(setup.request, [['leave.open', { year: Number(FROM.slice(0, 4)), by: k('eoin') }]])
+  await setup.close()
   // Nora, on her phone: the Leave screen asks who she is, once.
   const nora = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await nora.goto('/#crew/leave')
@@ -143,6 +213,18 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await allowance.getByRole('button', { name: 'Save' }).click()
   await expect(allowance.getByRole('alert')).toHaveText('The allowance is a whole number from 0 to 366.')
   await expect(allowance.getByLabel('Days')).toHaveValue('')
+  // Turned down by the server, it's listed as not done, with the year written as a year.
+  await eoin.route(/\/api\/sync\/push/, async (route) => {
+    const { mutations } = route.request().postDataJSON() as { mutations: { id: string }[] }
+    await route.fulfill({ json: { results: mutations.map((m) => ({ id: m.id, status: 'rejected', reason: { code: 'conflict', message: 'Pretend the server said no.' } })) } })
+  })
+  await allowance.getByLabel('Days').fill('22')
+  await allowance.getByRole('button', { name: 'Save' }).click()
+  await eoin.getByRole('button', { name: '1 not done' }).click()
+  const notDone = eoin.getByRole('region', { name: 'Not done' })
+  await expect(notDone.locator('.row')).toContainText(`Set Nora Walsh ${id}'s ${YEAR} allowance`)
+  await notDone.getByRole('button', { name: 'Dismiss' }).click()
+  await eoin.unroute(/\/api\/sync\/push/)
   await allowance.getByLabel('Days').fill('22')
   await allowance.getByRole('button', { name: 'Save' }).click()
   await expect(eoin.getByRole('status')).toHaveText('Up to date')

@@ -168,6 +168,8 @@ describe('made-up data', () => {
       ['request', 'Cian Murphy'],
       ['entry', 'Cian Murphy'],
     ])
+    // Only this year is open for leave, so opening next year can be tried.
+    expect([view.leave.years.map((y) => y.year), view.leave.toOpen]).toEqual([[year], year + 1])
 
     // Timesheets for the gala that's over: Dara's to approve, Tadhg's approved without his dinner, and Laoise's not in yet.
     const ts = view.timesheets

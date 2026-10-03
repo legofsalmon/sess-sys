@@ -12,7 +12,7 @@ import { postgresDb, type Db } from '../src/db.ts'
 import { eraseWhatIsDue } from '../src/erasure/due.ts'
 import { ERASED_WHEN_DUE_ACTION } from '../src/history.ts'
 import { FakeGoogle } from './fake-google-calendar.ts'
-import { IPHONE, onLink, staff } from './people.ts'
+import { IPHONE, onLink, staff, typedOnly } from './people.ts'
 
 /**
  * PGlite runs one query at a time, so it cannot show what happens when
@@ -20,6 +20,12 @@ import { IPHONE, onLink, staff } from './people.ts'
  * Postgres when TEST_DATABASE_URL is set (CI sets it).
  */
 const url = process.env.TEST_DATABASE_URL
+
+/**
+ * Years opened for leave in a test's setup, straight into the table as the migration opens a year with leave in it:
+ * these tests keep leave from years long gone, which no approver can open today (ADR 0024).
+ */
+const openYears = (db: Db, ...years: number[]) => db.query(`INSERT INTO leave_years (year) SELECT unnest($1::int[]) ON CONFLICT DO NOTHING`, [years])
 
 describe.skipIf(!url)('real Postgres, many devices at once', () => {
   it('never moves more than are counted, and keeps the change feed gap-free under concurrent pushes', async () => {
@@ -356,13 +362,14 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       // Leave from four years ago, whose three years are up, so it goes and his name with it (Colly's decision, 2 October
       // 2026, keeps anything newer); declined first, as leave still waiting stops an erasure.
       const old = Number(irishToday().slice(0, 4)) - 4
+      await openYears(db, old)
       await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: `${old}-03-02`, end: `${old}-03-06`, note: 'Skiing in Andorra' })
       expect(await colly.send('leave.decide', { id: 'r1', approved: false, reason: '' })).toMatchObject({ status: 'applied' })
       await colly.send('person.archive', { id: 'cian', archived: true })
       expect(await colly.send('person.level', { id: 'cian', level: 2 })).toMatchObject({ status: 'rejected' })
       expect(await colly.send('person.erase', { id: 'cian' })).toMatchObject({ status: 'applied' })
 
-      const all = async (table: string) => (await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n')
+      const all = async (table: string) => typedOnly((await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n'))
       for (const table of ['people', 'changes', 'mutations', 'users', 'leave_requests', 'sessions'])
         for (const t of ['Murchú', '"cian@', '444 0909"', '444 1010', 'Vegetarian', 'Andorra']) expect(await all(table), `${table} still holds "${t}"`).not.toContain(t)
       expect((await db.query(`SELECT name, email, disabled FROM users WHERE id = $1`, [cian.id])).rows[0]).toEqual({ name: 'Erased person', email: '', disabled: true })
@@ -396,6 +403,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await person('colly', 'Colly Hewson', colly.email)
       await person('aoife', 'Aoife Byrne', aoife.email)
       const year = Number(irishToday().slice(0, 4))
+      await openYears(db, year, year - 4)
       for (const [id, y, note] of [['now', year, 'Family wedding in Kerry'], ['old', year - 4, 'Lanzarote with the girls']] as const) {
         expect(await aoife.send('leave.request', { id, personId: 'aoife', type: 'annual', start: `${y}-02-09`, end: `${y}-02-13`, note })).toMatchObject({ status: 'applied' })
         expect(await colly.send('leave.decide', { id, approved: true, reason: 'Covered by Cian' })).toMatchObject({ status: 'applied' })
@@ -431,6 +439,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       const person = (id: string, name: string) =>
         m('person.upsert', { id, name, kind: 'staff', email: null, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: id === 'colly' })
       const year = Number(irishToday().slice(0, 4))
+      await openYears(db, year, year - 2)
       const mutations = [person('colly', 'Colly Hewson'), person('aoife', 'Aoife Byrne')]
       for (const [id, y] of [['then', year - 2], ['now', year]] as const)
         mutations.push(

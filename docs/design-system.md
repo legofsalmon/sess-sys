@@ -237,7 +237,10 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   under it before anything is sent ("3 days"); each request is a list row
   with its status pill (Waiting amber, Approved green, Declined or
   Cancelled grey, and "Waiting to sync" amber while this device's own
-  change is still on its way) and Cancel as a link; the approvers' queue
+  change is still on its way) and Cancel as a link; over Apply a hint
+  line says which of this year and next are open for leave and that the
+  other isn't yet, with "Open 2027 for leave" under it for an approver,
+  a question in place before it's done; the approvers' queue
   puts what to weigh up in warn lines under the request, with Approve as
   the primary button and Decline opening a reason field in place. In the
   planner a public holiday is a faint band in the off tone, a shade
