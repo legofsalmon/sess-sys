@@ -9,7 +9,7 @@ import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needs
  * and stays hidden without them.
  */
 
-const h = (s: unknown) =>
+export const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
 /** "Wed 30 Sep", in Ireland, from a timestamp. */
@@ -20,8 +20,8 @@ export interface Flash {
   ok: boolean
   text: string
   offer?: string
-  /** Their details, or the running-late card for the offer (ADR 0028). */
-  section?: 'details' | 'late'
+  /** Their details, the running-late card for the offer (ADR 0028), or their documents (ADR 0029). */
+  section?: 'details' | 'late' | 'documents'
 }
 
 /** A booking on a day they can say they're running late for (ADR 0028): today, and tomorrow from 6pm. */
@@ -73,6 +73,8 @@ export interface PageData {
   office?: OfficeDetails | null
   /** Bookings on today, or tomorrow from 6pm, for "Running late?" (ADR 0028). */
   onTheDay?: OnTheDay[]
+  /** "Your documents" (ADR 0029), drawn by server/src/documents/page.ts. */
+  documents?: string
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -353,7 +355,7 @@ export function renderPage(d: PageData): string {
   const inCard =
     d.flash?.section === 'late'
       ? (d.onTheDay ?? []).some((t) => t.offer.id === d.flash?.offer)
-      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details'
+      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details' || d.flash?.section === 'documents'
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -411,6 +413,8 @@ export function renderPage(d: PageData): string {
     </form>
   </section>
 
+  ${d.documents ?? ''}
+
   ${details(d)}
 
   ${past.length ? `<section><h2>Past work</h2><ul class="closed">${past.map((j) => earlierLine(j, j.offer.status === 'confirmed' ? 'Confirmed' : 'Accepted, never confirmed')).join('')}</ul></section>` : ''}
@@ -464,7 +468,7 @@ button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;b
 button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
 details[open]{display:grid;gap:8px}
-label{display:grid;gap:4px;font-size:.9rem}input,textarea{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--field-line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
+label{display:grid;gap:4px;font-size:.9rem}input,textarea,select{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--field-line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
 fieldset.days input{width:20px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
@@ -491,4 +495,5 @@ footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px s
 fieldset.choice{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}fieldset.choice legend{font-size:.85rem;color:var(--muted);margin-bottom:4px;padding:0}
 fieldset.choice label{display:flex;gap:6px;align-items:center;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 fieldset.choice input{width:20px;height:20px;accent-color:var(--accent)}
+.doc h3{overflow-wrap:anywhere}
 `

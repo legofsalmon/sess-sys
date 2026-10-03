@@ -28,6 +28,7 @@ import {
   type ProjectStatus,
   type RetiredReason,
 } from '@sh/shared'
+import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -711,9 +712,52 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     // No name, as for erasing: it's about everyone whose went that day.
     case LATE_CLEARED_ACTION:
       return `Cleared running late more than ${LATE_KEPT_DAYS} days after its day, notes and all`
+    // People's documents (ADR 0029). Once their person is erased, a command keeps no title or date, so the kind names it.
+    case 'document.save':
+    case 'document.check':
+    case 'document.remove':
+    case DOCUMENT_ACTIONS.file:
+    case DOCUMENT_ACTIONS.send:
+      return documentWords(command, a, look, person)
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:
       return command
+  }
+}
+
+/** "Thu 3 Nov 2027": a document's day wants its year. */
+const fullDay = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
+
+/**
+ * A document's change in words (ADR 0029): whose, and its title as it
+ * reads mid-sentence ("Dara Quinn's public liability insurance"), from the
+ * command or the record as it is now; a certificate's card says what it
+ * set the certificate to.
+ */
+function documentWords(command: string, a: Data, look: Look, person: (id: unknown) => string): string {
+  const d = look('document', a.id)
+  const kind = DOCUMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
+  const title = titleInSentence(text(a.title ?? d?.title, (kind && DOCUMENT_TITLES[kind]) || 'document'))
+  const whose = `${person(a.personId ?? d?.personId)}'s ${title}`
+  const cert = kind && certificateOf(kind)
+  const on = (v: unknown) => (typeof v === 'string' ? fullDay(v) : undefined)
+  const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
+  switch (command) {
+    case 'document.save':
+      if (cert && a.expires !== undefined) return `Saved ${whose}, with their ${certificateName(cert)} ${on(a.expires) ? `running out on ${on(a.expires)}` : 'held, with no expiry'}`
+      return `Saved ${whose}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}`
+    case 'document.check': {
+      const instead = d?.renews ? ', in place of the one before' : ''
+      if (cert && a.expires !== undefined) return `Checked ${whose}${instead}, and set their ${certificateName(cert)} to ${on(a.expires) ? `run out on ${on(a.expires)}` : 'no expiry'}`
+      return `Checked ${whose}${instead}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}`
+    }
+    case 'document.remove':
+      return d ? `Removed ${whose}` : 'Removed a document'
+    case DOCUMENT_ACTIONS.file:
+      if (a.added) return `Added ${whose}, with its file${file}`
+      return `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
+    default:
+      return `${person(a.personId ?? d?.personId)} sent ${a.renews ? 'a renewed' : 'a new'} ${title}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}${file}`
   }
 }

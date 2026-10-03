@@ -64,6 +64,8 @@ export interface ServerAction {
   clientId?: string
   userId?: string
   device?: string
+  /** The person whose private link it was done on (ADR 0029): the history says it's theirs, as for their answers. */
+  link?: string
 }
 
 /**
@@ -78,13 +80,13 @@ export async function serverChange<T>(db: Db, action: ServerAction | undefined, 
     await tx.query('SELECT pg_advisory_xact_lock(7331)')
     const mutationId = action ? newId() : null
     if (action) {
-      const clientId = action.clientId && /^[a-z0-9]{1,64}$/.test(action.clientId) ? action.clientId : 'server'
+      const clientId = action.link ? `link:${action.link}` : action.clientId && /^[a-z0-9]{1,64}$/.test(action.clientId) ? action.clientId : 'server'
       await tx.query(
         `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, device, received_at, status, result)
          VALUES ($1, $2, $3, $4, $5, now(), $6, clock_timestamp(), 'applied', '{}')`,
         [mutationId, clientId, action.userId ?? null, action.name, JSON.stringify(action.args), action.device ?? null]
       )
     }
-    return fn({ tx, mutationId, seq: 0, via: 'app' })
+    return fn({ tx, mutationId, seq: 0, via: action?.link ? 'link' : 'app' })
   })
 }

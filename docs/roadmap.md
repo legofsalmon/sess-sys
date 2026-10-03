@@ -189,6 +189,13 @@ over by rule are later.
   with a message asking for the new card; and a freelancer says from
   their link on the day that they're running late, which the office,
   the planner and the contact on the day see at once).
+- Documents uploaded with expiry reminders (built, 3 October 2026,
+  [ADR 0029](adr/0029-documents.md): insurance, certificates' cards and
+  anything else on the person's card, each with the day it runs out and
+  a file; a freelancer sends a new or renewed one from their link and the
+  office checks it, a card's certificate taking its date; their expiries
+  join the list of what's running out; the files wait on the backups'
+  bucket being set up, while the details work now).
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the

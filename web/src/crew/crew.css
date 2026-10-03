@@ -154,3 +154,15 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
   .crew .more-grid .cert { grid-template-columns: 1fr 1fr; }
   .crew .more-grid .cert .cert-note { grid-column: 1 / -1; }
 }
+
+/* People's documents (ADR 0029): a line each on the person's card, in the warn tone when one runs out soon and the bad tone once it has, the form to add or change one, and one sent from a link in "Answers to check". */
+.crew .detail .documents { display: grid; gap: var(--space-6); }
+/* A card's detail sets its lines in ink; what's only a hint here keeps the hint's tone. */
+.crew .documents .hint, .crew .documents .row.doc p { color: var(--muted); }
+/* A title typed as one long word, such as a file's name, wraps rather than pushing the card wider than a phone. */
+.crew .documents .row.doc > div:first-child, .crew .doc-check > div:first-child { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
+.crew .documents .row.doc .warn { color: var(--warn); font-weight: 600; }
+.crew .documents .row.doc .bad { color: var(--bad); font-weight: 600; }
+.crew .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.crew .doc-form small { color: var(--muted); }
+.crew .doc-check .field { display: flex; gap: var(--space-6); align-items: center; font-size: var(--text-hint); color: var(--muted); }

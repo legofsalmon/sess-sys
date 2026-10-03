@@ -56,6 +56,17 @@ buckets do), also add `BACKUP_S3_PATH_STYLE=true`.
    the last backup was made and how big it was, with a **Back up now**
    button.
 
+## Documents' files
+
+People's documents ([Decision 0029](adr/0029-documents.md)) keep their
+files in the same bucket, under `documents/`, so the steps above switch
+them on too. Until then the app records each document's details and the
+day it runs out, and says a file has to wait for the bucket. With
+`BACKUP_KEY` set (below), each file is encrypted the same way as the
+backups. Leave `documents/` to the app: it deletes files there that no
+document has any more, and its log says when it finds a file there that
+no document knows.
+
 ## Encrypting the backups
 
 A backup holds everything, every freelancer's private link included, so

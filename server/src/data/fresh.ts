@@ -3,6 +3,7 @@ import { newGeneration, readGeneration } from '../backup/format.ts'
 import { readLink } from '../calendar/store.ts'
 import { applyMutationIn, type From } from '../commands.ts'
 import type { Db, Queryable } from '../db.ts'
+import { queueAllFiles } from '../documents/store.ts'
 import { ident, tablesInOrder } from '../tables.ts'
 import { madeUpData } from './madeup.ts'
 
@@ -14,8 +15,11 @@ import { madeUpData } from './madeup.ts'
  * copy of the data.
  */
 
-/** Kept when starting fresh: who can sign in, the server's own bookkeeping, and which version each table is at. */
-const KEPT = /^(users|sessions|server_meta|backup_runs|(\w+_)?schema_version)$/
+/**
+ * Kept when starting fresh: who can sign in, the server's own bookkeeping, which version each table is at, and the
+ * list of documents' files to delete (ADR 0029), which the files of everything deleted here go on first.
+ */
+const KEPT = /^(users|sessions|server_meta|backup_runs|document_files_to_delete|(\w+_)?schema_version)$/
 
 /** What the history calls them. Not commands, so no device can send them. */
 export const DATA_ACTIONS = { madeUp: 'data.made-up', fresh: 'data.fresh' } as const
@@ -137,6 +141,7 @@ export async function startFresh(db: Db, who: Who, now = new Date()): Promise<{ 
       const { rows: counted } = await tx.query<{ n: string }>(`SELECT count(*) AS n FROM ${ident(t)}`)
       rows += Number(counted[0]!.n)
     }
+    await queueAllFiles(tx)
     await tx.query(`TRUNCATE ${tables.map(ident).join(', ')} RESTART IDENTITY`)
     const generation = await newGeneration(tx)
     await tx.query(`DELETE FROM server_meta WHERE key = 'made_up'`)

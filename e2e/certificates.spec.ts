@@ -4,7 +4,8 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
  * The certificates a call needs, and running late (ADR 0028), end to end
  * on a phone: the riggers' call needs IPAF, so the picker marks someone
  * without it and Offer says why, in place; the Crew tab lists the
- * certificates running out, each with a message asking for the new card;
+ * certificates running out, with documents' expiries among them (ADR
+ * 0029), each with a message asking for the new card;
  * and a running late sent from a freelancer's link, with no app and no
  * script, shows on the Crew tab at once and on the badge, as one the
  * office notes from the call's line for someone who rang does on the
@@ -63,16 +64,16 @@ test('a call needing IPAF marks who lacks it in the picker, and Offer says why i
 })
 
 test('the Crew tab lists certificates running out, soonest first, each with a message asking for the new card', async ({ browser }) => {
-  // Proves: the reminders card counts them all, shows the longest run out first, and opens a message to send by WhatsApp, text or email.
+  // Proves: the reminders card counts them all, insurance among them (ADR 0029), shows the longest run out first, and opens a message to send by WhatsApp, text or email.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await office.goto('/#crew')
   await expect(office.getByRole('status')).toHaveText('Up to date')
-  const reminders = office.getByRole('region', { name: 'Certificates running out' })
-  await expect(reminders.getByRole('heading')).toHaveText('Certificates running out (4)')
+  const reminders = office.getByRole('region', { name: 'Certificates and documents running out' })
+  await expect(reminders.getByRole('heading')).toHaveText('Running out (6)')
   const rows = reminders.locator('.reminder')
   await expect(rows).toHaveCount(3)
   await expect(rows.first()).toContainText(/^Tadhg BradyManual handling ran out on \w{3} \d{1,2} \w{3}/)
-  await reminders.getByRole('button', { name: 'Show all 4 certificates' }).click()
+  await reminders.getByRole('button', { name: 'Show all 6 certificates and documents' }).click()
   await expect(rows.last()).toContainText(/^Pádraig KennyIPAF runs out on/)
 
   await rows.last().getByRole('button', { name: "Ask for the new card: Pádraig Kenny's IPAF" }).click()

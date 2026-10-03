@@ -149,6 +149,9 @@ export function reminderLine(r: Pick<CertificateReminder<unknown>, 'kind' | 'exp
   return `${what} ${r.ranOut ? 'ran' : 'runs'} out on ${dayLabel(r.expires)}${r.expires.slice(0, 4) === today.slice(0, 4) ? '' : ` ${r.expires.slice(0, 4)}`}`
 }
 
+/** Where to send the new one, once files can be sent from the link (ADR 0029): their own page. */
+export const sendItFrom = (link: string) => `You can send it from your page, under Your documents: ${link}`
+
 /**
  * Asking for the renewed card, for WhatsApp, a text or an email, in the
  * voice of the other prompted messages. The app sends nothing itself.
@@ -156,7 +159,9 @@ export function reminderLine(r: Pick<CertificateReminder<unknown>, 'kind' | 'exp
 export function renewalMessage(
   p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>,
   r: Pick<CertificateReminder<unknown>, 'kind' | 'expires' | 'ranOut'>,
-  today: string
+  today: string,
+  /** Their private link, once photos can be sent from it (ADR 0029). */
+  link?: string
 ): { text: string; subject: string; what: string } {
   const words = CERTIFICATE_WORDS[r.kind]
   const when = r.ranOut ? `ran out on ${longDate(r.expires, today)}` : r.expires === today ? 'runs out today' : `runs out on ${longDate(r.expires, today)}`
@@ -166,8 +171,11 @@ export function renewalMessage(
       r.ranOut
         ? "If you've renewed it, could you send us a photo of the new card? We need it to offer you work that asks for it."
         : "When you've renewed it, could you send us a photo of the new card? We need it to offer you work that asks for it.",
+      link ? sendItFrom(link) : '',
       'Thanks.',
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     subject: `Your ${words}`,
     what: `reminder about ${words}`,
   }

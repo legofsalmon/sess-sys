@@ -1,4 +1,5 @@
 import { dayLabel, levelLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
+import { titleInSentence } from '@sh/shared'
 import { useEffect, useState, type ReactNode } from 'react'
 import { reasonOf } from './act.tsx'
 import { when } from './format.ts'
@@ -125,6 +126,11 @@ function describer(view: View): (m: Mutation) => string {
   }
 
   const late = (id: unknown) => view.late.current.find((l) => l.id === id)?.person?.name ?? 'someone'
+  /** "Pádraig Kenny's IPAF card" (ADR 0029). */
+  const docOf = (id: unknown) => {
+    const d = view.documents.all.find((x) => x.id === id)
+    return d ? `${d.person?.name ?? 'someone'}'s ${titleInSentence(d.title)}` : 'a document'
+  }
 
   return (m: Mutation) => {
     const a = m.args as Record<string, unknown>
@@ -264,6 +270,13 @@ function describer(view: View): (m: Mutation) => string {
         return `Say ${late(a.id)} is there now`
       case 'late.seen':
         return `Note that ${late(a.id)} is running late`
+      // People's documents (ADR 0029). A file goes straight to the server, so only details wait here.
+      case 'document.save':
+        return `Save ${person(a.personId)}'s ${titleInSentence(str(a.title, 'document'))}`
+      case 'document.check':
+        return `Check ${docOf(a.id)}`
+      case 'document.remove':
+        return `Remove ${docOf(a.id)}`
       // Kept from an older version of the app, such as the old sync test's bookings. The server's reason says it's gone, so this only says where it came from.
       default:
         return 'A change from an older version of the app'

@@ -21,6 +21,8 @@ import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
+import { DocumentFiles } from './documents/files.ts'
+import { registerDocumentRoutes } from './documents/routes.ts'
 import { DueErasures } from './erasure/due.ts'
 import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
@@ -48,6 +50,11 @@ export interface AppOptions {
   backupStore?: BackupStore
   /** Encrypts each backup file (docs/backups.md). Without it they are plain text inside. */
   backupKey?: Buffer
+  /**
+   * Where documents' files go (ADR 0029) when there are no backups: a folder, for local use and the browser tests
+   * (DOCUMENTS_DIR). With backups, the backups' storage, under documents/. Encrypted with the backup key.
+   */
+  documentStore?: BackupStore
   /** Which code is running, recorded in each backup. */
   commit?: string
   /** Where errors are reported (ADR 0005), which the app on each device needs to know too. */
@@ -82,6 +89,8 @@ declare module 'fastify' {
     erasures: ErasureList | undefined
     /** What erasures kept, taken on the day the law stops asking for it (ADR 0027); the caller starts it. */
     dueErasures: DueErasures
+    /** Documents' files (ADR 0029): where they're kept, and the list of files to delete; the caller starts its daily look. */
+    documents: DocumentFiles
   }
 }
 
@@ -147,11 +156,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // A restore must never bring back someone erased on request, so the list of erasures is kept beside the backups too (ADR 0027).
   const erasures = backupStore ? new ErasureList(db, backupStore, app.log) : undefined
   app.decorate('erasures', erasures)
-  /** Something changed in the app: devices pull it, the calendar catches up, and an erasure is written beside the backups. */
+  // Documents' files go in the same storage as the backups, under a prefix of their own (ADR 0029).
+  const documents = new DocumentFiles(db, options.documentStore ?? backupStore, { key: backupKey, log: app.log, report: (err) => reportError(err, { area: 'documents' }) })
+  app.decorate('documents', documents)
+  /** Something changed in the app: devices pull it, the calendar catches up, an erasure is written beside the backups, and files no document has any more are deleted. */
   const changed = () => {
     void poke()
     calendarSync?.kick()
     void erasures?.keep()
+    void documents.tidy()
   }
   app.decorate('dueErasures', new DueErasures(db, { changed, log: app.log, report: (err) => reportError(err, { area: 'erasure' }) }))
 
@@ -182,7 +195,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // forwarded protocol), never from a local server on http.
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff')
-    reply.header('content-security-policy', "frame-ancestors 'none'")
+    // A document's file sets a stricter one of its own (ADR 0029), which already holds this.
+    if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', "frame-ancestors 'none'")
     reply.header('referrer-policy', 'strict-origin-when-cross-origin')
     if (publicOrigin(req).startsWith('https:')) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains')
   })
@@ -278,8 +292,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // Freelancers' private links: no app or login needed to answer an offer.
   registerCrewLinks(app, db, changed, feeds)
+  registerDocumentRoutes(app, { db, files: documents, onChange: changed })
   registerBackupRoutes(app, backups)
-  registerDataRoutes(app, { db, backups, onChange: changed })
+  registerDataRoutes(app, { db, backups, documents, onChange: changed })
   registerPeopleImportRoutes(app, { db, onChange: changed })
   registerStockImportRoutes(app, { db, onChange: changed, round: options.stockImport })
   registerItemLogRoutes(app, { db })
@@ -354,6 +369,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook('onClose', async () => {
     backups.stop()
     app.dueErasures.stop()
+    documents.stop()
     calendarSync?.stop()
     for (const ws of sockets) ws.close()
   })

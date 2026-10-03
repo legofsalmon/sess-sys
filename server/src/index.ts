@@ -4,7 +4,7 @@ import { buildApp } from './app.ts'
 import { assertSignInKept, authFromEnv, googleClientFromEnv } from './auth/config.ts'
 import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
-import { storeFromEnv } from './backup/store.ts'
+import { dirStore, storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
 import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting } from './monitoring.ts'
@@ -28,6 +28,8 @@ async function main() {
   const google = googleClientFromEnv()
   const backupStore = storeFromEnv()
   const backupKey = backupKeyFromEnv()
+  // Documents' files go with the backups (ADR 0029); with none, a folder for local use and the browser tests.
+  const documentStore = backupStore ?? (process.env.DOCUMENTS_DIR ? dirStore(process.env.DOCUMENTS_DIR) : undefined)
   const commit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12)
   const db = await dbFromEnv()
 
@@ -42,6 +44,7 @@ async function main() {
     auth,
     backupStore,
     backupKey,
+    documentStore,
     commit,
     errorReporting,
     backupWatch: errorReporting ? backupWatch() : undefined,
@@ -63,6 +66,9 @@ async function main() {
   await app.dueErasures.start()
   const port = Number(process.env.PORT ?? 3030)
   await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
+  // Documents' files no document has any more, deleted, as each day from now on (ADR 0029). Not waited for: it talks to
+  // the bucket, which mustn't hold up the server starting, and it says in the log what it couldn't do.
+  void app.documents.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
   else app.log.warn('Sign-in is off: anyone who can reach the app can use it. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to switch it on.')
@@ -81,6 +87,8 @@ async function main() {
     // Said plainly, since a wind-back with Neon's own history to before an erasure would bring that person back (ADR 0027).
     app.log.warn('The list of people erased on request is kept only in the database, in its erasures table, until backups are on.')
   }
+  if (!documentStore) app.log.warn("Documents' files are off: they go in the backups' storage, so set the BACKUP_S3_ settings (docs/backups.md). Their details and expiry dates are kept meanwhile.")
+  else if (!backupKey) app.log.warn("Documents' files are not encrypted: set BACKUP_KEY to encrypt them, as for backups (docs/backups.md).")
   if (errorReporting) app.log.info({ environment: errorReporting.environment }, 'Errors: reported to Sentry, with no personal details')
   else app.log.warn('Error reporting is off: set SENTRY_DSN to switch it on (docs/monitoring.md).')
   if (app.calendar) {

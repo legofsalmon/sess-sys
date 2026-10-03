@@ -1,8 +1,11 @@
 import { eachDay, EURO_HINT, feedCodeFor, feedPath, HOLDING, isDay, LATE_BY, lateDays, MAX_EXTRAS, newId, noTimesheetReason, OPEN, parseEuro, type CommandArgs, type CommandName, type LateBy, type MutationResult, type TimesheetExtra } from '@sh/shared'
+import { FILE_TOO_BIG, NO_FILE, WEB_FILE, WRONG_FILE } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
+import { documentsSection } from '../documents/page.ts'
+import { documentsOf } from '../documents/store.ts'
 import { publicOrigin } from '../http.ts'
 import { officeFor } from '../office/store.ts'
 import { getPhase } from '../projects/store.ts'
@@ -34,8 +37,8 @@ type Form = URLSearchParams
  */
 type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; r?: string; o?: string; s?: string } }>
 
-/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), or else the offer's card. */
-const SECTIONS = ['details', 'late'] as const
+/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), their documents (ADR 0029), or else the offer's card. */
+const SECTIONS = ['details', 'late', 'documents'] as const
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -77,6 +80,15 @@ const SAID = {
   'late-sent': { ok: true, text: "Thanks. The office, and whoever's running the day, can see it now." },
   'late-how': { ok: false, text: "Tap roughly how late you'll be, or put in the time you'll be there." },
   'late-here': { ok: true, text: "Thanks. The office can see you're there." },
+  // Sending a document (ADR 0029), from server/src/documents/routes.ts.
+  'doc-sent': { ok: true, text: "Thanks, it's gone to the office. They'll check it, and it's on your list meanwhile." },
+  'doc-no-file': { ok: false, text: NO_FILE },
+  'doc-too-big': { ok: false, text: FILE_TOO_BIG },
+  'doc-web-page': { ok: false, text: WEB_FILE },
+  'doc-not-a-file': { ok: false, text: WRONG_FILE },
+  'doc-not-on': { ok: false, text: "Sending documents here isn't switched on yet. For now, send a photo or a PDF of it to the office by WhatsApp or email." },
+  'doc-not-yours': { ok: false, text: "That document isn't one of yours." },
+  'doc-not-kept': { ok: false, text: "The file couldn't be kept just now, so nothing was sent. Try again in a minute." },
 } satisfies Record<string, { ok: boolean; text: string }>
 type Said = keyof typeof SAID
 type Refusal = Extract<MutationResult, { status: 'rejected' }>
@@ -151,6 +163,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       return { offer, call, openDays: Object.keys(byDay).filter((d) => byDay[d]! < call.needed), busy }
     })
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
+    const flash = await flashFor(person.id, req.query)
     // A day they hold, from 6pm the evening before (ADR 0028): what they've said about being late, and who to ring if it won't send.
     const onTheDay: OnTheDay[] = []
     for (const { offer, call } of rows) {
@@ -171,12 +184,14 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
           away: await awayFor(db, person.id),
           base: base(req, person.linkToken),
           feed,
-          flash: await flashFor(person.id, req.query),
+          flash,
           today: now,
           ended: await endedOn(db, rows.map((r) => r.offer)),
           timesheets: await timesheetsFor(db, person.id),
           office: await officeFor(db),
           onTheDay,
+          // Their documents (ADR 0029), with forms to send a new one where the server can keep files.
+          documents: documentsSection({ person, list: await documentsOf(db, person.id), files: app.documents.on, base: base(req, person.linkToken), today: now, flash }),
         })
       )
   })
@@ -387,6 +402,8 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       jobs: await offersFor(db, person.id),
       timesheets: [...(await timesheetsFor(db, person.id)).values()],
       runningLate: await lateOf(db, person.id),
+      // The details; each file is on their page (ADR 0029).
+      documents: await documentsOf(db, person.id),
     })
   })
 }

@@ -329,6 +329,24 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   green line saying what was noted. A call sheet says what each call
   needs in muted text beside it. Not in Figma yet.
 
+- Documents ([ADR 0029](adr/0029-documents.md)) sit on the person's card
+  under the certificates, under a muted bold "Documents": a row each, the
+  title in bold, then when it runs out (the warn tone within 30 days, the
+  **bad** tone once run out, as the certificates), the file's type and
+  size, and "waiting for you to check" for one sent from their link; Open,
+  then Change and Remove as links, Remove a question in place. "Add
+  document" folds the grid form: what it is and when it runs out side by
+  side, the title, a hint saying what saving a certificate's card does to
+  the certificate, and the file. With no storage on the server, a hint
+  says files wait on the bucket and the file field isn't shown. One sent
+  from a link is a row in "Answers to check" with Open, the day as a field
+  to correct, Checked as the primary button, and Not right. What's running
+  out is one card, "Running out (6)", certificates and documents together.
+  On the freelancer's page, "Your documents" is a card each, as an offer
+  is, with a tag ("With the office to check" amber, "Runs out soon" amber,
+  "Ran out" in the bad tone), View the file, and "Send a new one" folded
+  under it. Not in Figma yet.
+
 ## Accessibility
 
 Checked against WCAG AA (4.5:1 for normal text). Dark mode passes everywhere.
