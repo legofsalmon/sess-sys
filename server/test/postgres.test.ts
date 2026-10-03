@@ -1,16 +1,17 @@
 import { irishToday, itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
 import { migrateAuth } from '../src/auth/schema.ts'
 import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/sessions.ts'
 import { restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { checkRestores } from '../src/backup/service.ts'
+import { clearOldLate } from '../src/crew/late.ts'
 import { postgresDb, type Db } from '../src/db.ts'
 import { eraseWhatIsDue } from '../src/erasure/due.ts'
-import { ERASED_WHEN_DUE_ACTION } from '../src/history.ts'
+import { ERASED_WHEN_DUE_ACTION, LATE_CLEARED_ACTION } from '../src/history.ts'
 import { FakeGoogle } from './fake-google-calendar.ts'
 import { IPHONE, onLink, staff, typedOnly } from './people.ts'
 
@@ -459,6 +460,44 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       ])
       expect(sent.rows).toEqual([{ id: 'then', op: 'delete' }])
     } finally {
+      await app.close()
+      await other.close()
+      await db.close()
+    }
+  })
+
+  it('clears running late 30 days after its day once, with two copies of the server looking at the same moment (ADR 0028)', async () => {
+    // Proves: the clear-out looks again under the lock every change takes, so two servers on one database, each looking
+    // twice, delete the record once, make its copies deletions and take the note from the history, in one entry.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db })
+    const other = postgresDb(url!)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      // 9am in Ireland on the day of the shoot.
+      vi.setSystemTime(new Date('2027-06-01T08:00:00Z'))
+      const day = '2027-06-01'
+      const m = (name: Mutation['name'], args: object): Mutation => ({ id: newId(), name, args: args as never, createdAt: new Date().toISOString() })
+      const mutations = [
+        m('person.upsert', { id: 'dara', name: 'Dara Quinn', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: 30000, notes: '' }),
+        m('call.create', { id: 'sound', project: 'Liffey Brands Shoot', phase: 'Shoot', venue: '', role: 'Sound No.1', start: day, end: day, callTime: '08:00', needed: 1, dayRateCents: 30000, details: '', replyBy: null }),
+        m('offer.send', { id: 'o-dara', callId: 'sound', personId: 'dara', override: false }),
+        m('offer.respond', { id: 'o-dara', answer: 'accept', days: null, note: '' }),
+        m('offer.confirm', { id: 'o-dara' }),
+        m('late.say', { id: 'l-dara', offerId: 'o-dara', day, by: '30', arriveAt: null, note: 'Rang from the M50' }),
+      ]
+      const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations } })
+      expect(res.json().results.map((r: { status: string }) => r.status)).toEqual(mutations.map(() => 'applied'))
+
+      const due = '2027-07-01'
+      expect((await Promise.all([clearOldLate(db, due), clearOldLate(other, due), clearOldLate(db, due), clearOldLate(other, due)])).sort()).toEqual([0, 0, 0, 1])
+      expect((await db.query(`SELECT id FROM running_late`)).rows).toEqual([])
+      expect((await db.query(`SELECT count(*)::int AS n FROM mutations WHERE name = $1`, [LATE_CLEARED_ACTION])).rows).toEqual([{ n: 1 }])
+      expect((await db.query(`SELECT DISTINCT op FROM changes WHERE entity = 'runningLate'`)).rows).toEqual([{ op: 'delete' }])
+      expect((await db.query(`SELECT args->>'note' AS note FROM mutations WHERE name = 'late.say'`)).rows).toEqual([{ note: '' }])
+    } finally {
+      vi.useRealTimers()
       await app.close()
       await other.close()
       await db.close()

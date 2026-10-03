@@ -4,9 +4,12 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
  * The certificates a call needs, and running late (ADR 0028), end to end
  * on a phone: the riggers' call needs IPAF, so the picker marks someone
  * without it and Offer says why, in place; the Crew tab lists the
- * certificates running out, each with a message asking for the new card;
+ * certificates running out, with documents' expiries among them (ADR
+ * 0029), each with a message asking for the new card;
  * and a running late sent from a freelancer's link, with no app and no
- * script, shows on the Crew tab at once and on the badge. Uses the made-up
+ * script, shows on the Crew tab at once and on the badge, as one the
+ * office notes from the call's line for someone who rang does on the
+ * contact's call sheet. Uses the made-up
  * data (ADR 0019), so it starts fresh before and after: the other tests
  * share this server.
  */
@@ -61,16 +64,16 @@ test('a call needing IPAF marks who lacks it in the picker, and Offer says why i
 })
 
 test('the Crew tab lists certificates running out, soonest first, each with a message asking for the new card', async ({ browser }) => {
-  // Proves: the reminders card counts them all, shows the longest run out first, and opens a message to send by WhatsApp, text or email.
+  // Proves: the reminders card counts them all, insurance among them (ADR 0029), shows the longest run out first, and opens a message to send by WhatsApp, text or email.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await office.goto('/#crew')
   await expect(office.getByRole('status')).toHaveText('Up to date')
-  const reminders = office.getByRole('region', { name: 'Certificates running out' })
-  await expect(reminders.getByRole('heading')).toHaveText('Certificates running out (4)')
+  const reminders = office.getByRole('region', { name: 'Certificates and documents running out' })
+  await expect(reminders.getByRole('heading')).toHaveText('Running out (6)')
   const rows = reminders.locator('.reminder')
   await expect(rows).toHaveCount(3)
   await expect(rows.first()).toContainText(/^Tadhg BradyManual handling ran out on \w{3} \d{1,2} \w{3}/)
-  await reminders.getByRole('button', { name: 'Show all 4 certificates' }).click()
+  await reminders.getByRole('button', { name: 'Show all 6 certificates and documents' }).click()
   await expect(rows.last()).toContainText(/^Pádraig KennyIPAF runs out on/)
 
   await rows.last().getByRole('button', { name: "Ask for the new card: Pádraig Kenny's IPAF" }).click()
@@ -127,3 +130,59 @@ test('a running late sent from the link shows on the Crew tab at once, and on it
   await expect(phone.getByRole('status')).toHaveText("Thanks. The office can see you're there.")
   await expect(shoot.getByRole('article', { name: '1 × Crew chief' }).locator('.late-line')).toHaveText('Aoife: there now')
 })
+
+test('the office notes a running late from the call line for someone who rang, and the contact sees it on their sheet', async ({ browser, request }) => {
+  // Proves: Dara, booked on today's shoot, rings instead of using his link; the office notes it under his call's line with the link's choices, it's on the line, in the queue and on the badge at once, on Aoife's call sheet as contact with no script, and "Mark as there" says he's there in both places.
+  const { changes } = (await (await request.get('/api/sync/pull?after=0')).json()) as { changes: { entity: string; data: Record<string, string> }[] }
+  const camera = changes.findLast((c) => c.entity === 'crewCall' && c.data.project === 'Liffey Brands Shoot' && c.data.role === 'Camera')!.data
+  const dara = changes.findLast((c) => c.entity === 'person' && c.data.name === 'Dara Quinn')!.data
+  const send = [
+    ['call.create', { ...pick(camera, 'projectId', 'phaseId', 'project', 'phase', 'venue', 'start', 'end'), id: 'e2e-sound', role: 'Sound No.1', callTime: '08:00', needed: 1, dayRateCents: 30000, details: '', replyBy: null }],
+    ['offer.send', { id: 'e2e-dara', callId: 'e2e-sound', personId: dara.id, override: false }],
+    ['offer.respond', { id: 'e2e-dara', answer: 'accept', days: null, note: '' }],
+    ['offer.confirm', { id: 'e2e-dara' }],
+  ] as const
+  const res = await request.post('/api/sync/push', { data: { clientId: 'e2e-late', mutations: send.map(([name, args], i) => ({ id: `e2e-late-${i}`, name, args, createdAt: new Date().toISOString() })) } })
+  expect(((await res.json()) as { results: { status: string }[] }).results.map((r) => r.status)).toEqual(send.map(() => 'applied'))
+
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await office.goto('/#crew')
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  const badge = office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: /^Crew/ }).locator('.badge [aria-hidden="true"]')
+  const before = Number(await badge.textContent())
+  const call = office.locator('.call-group', { hasText: 'Liffey Brands Shoot' }).getByRole('article', { name: '1 × Sound No.1' })
+  await call.getByRole('button', { name: 'Running late…' }).click()
+  const form = call.getByRole('form', { name: 'Dara Quinn running late' })
+  // Nothing chosen: said in place, in the office's words, and nothing is sent.
+  await form.getByRole('button', { name: 'Save' }).click()
+  await expect(form.getByRole('alert')).toHaveText("Say roughly how late they'll be, or the time they'll be there.")
+  await form.getByLabel('About 30 minutes').check()
+  await form.getByLabel('Note, if you like').fill('Rang: stuck behind a tractor')
+  await form.getByRole('button', { name: 'Save' }).click()
+  await expect(form.locator('.added')).toHaveText('Noted: Dara, about 30 minutes late, “Rang: stuck behind a tractor”.')
+  await expect(call.locator('.late-line')).toHaveText('Dara: about 30 minutes late, “Rang: stuck behind a tractor”')
+  const answers = office.locator('section').filter({ has: office.getByRole('heading', { name: /^Answers to check/ }) })
+  await expect(answers.locator('.late-row', { hasText: 'Dara Quinn' })).toContainText('Liffey Brands Shoot · Sound No.1 · today, call 08:00')
+  await expect(badge).toHaveText(String(before + 1))
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+
+  // Aoife runs the day: her call sheet, on her link with no script, has it under who to ring and against Dara.
+  const phone = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()
+  await phone.goto(await linkOf(request, 'Aoife Brennan'))
+  await phone.locator('section.today').getByRole('link', { name: /^Call sheet/ }).click()
+  const late = phone.locator('section.late')
+  await expect(late.getByRole('heading', { name: 'Running late' })).toBeVisible()
+  await expect(late.locator('li', { hasText: 'Dara Quinn' })).toContainText('Dara Quinn: about 30 minutes late, “Rang: stuck behind a tractor”')
+
+  // He turns up: the office marks him there, and the line and the sheet say so.
+  // Its name starts with the words on it, so someone using voice control can say what they see.
+  await form.getByRole('button', { name: 'Mark as there: Dara Quinn', exact: true }).click()
+  await expect(call.locator('.late-line')).toHaveText('Dara: there now')
+  await expect(badge).toHaveText(String(before))
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await phone.reload()
+  await expect(phone.locator('section.late li', { hasText: 'Dara Quinn' })).toContainText('Dara Quinn: there now')
+})
+
+/** Some fields of a record, as they are. */
+const pick = (data: Record<string, string>, ...keys: string[]) => Object.fromEntries(keys.map((k) => [k, data[k]]))

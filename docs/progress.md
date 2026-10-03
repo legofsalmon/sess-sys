@@ -3,6 +3,56 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 3 October 2026: the small items
+
+**Done**
+
+- The small items Colly asked for ("you can start on those small
+  items"), each built, then read by a reviewer trying to break it and
+  corrected.
+- **Running late from the office**
+  ([Decision 0028](adr/0028-certificates-a-call-needs-and-running-late.md),
+  amended). Someone who rings in to say they're late can be noted from
+  the call's line, with the same choices as their link, and marked as
+  there. It shows everywhere the link's does, and the history says who
+  noted it.
+- **Old running-late notes cleared.** Thirty days after its day, a
+  running late goes, with every copy of it and the words in the
+  history, since no law asks for it; the server does it on its daily
+  look.
+- **The call-changed message** says when a call starts or stops
+  needing a certificate, and call sheets show what each call needs.
+- **Documents** ([Decision 0029](adr/0029-documents.md)). A person's
+  insurance, certificate cards and other documents, each with a day it
+  runs out, on their card; a freelancer sends a renewed one from their
+  link and the office checks it, which sets that certificate's date, so
+  there is only ever one. Documents running out join certificates in
+  one list, with a message ready. Files go in the backups' bucket,
+  encrypted with `BACKUP_KEY`; until the bucket is set up the details
+  and dates work and the file waits. Erasing a person deletes theirs at
+  once.
+- Every request now has five minutes to arrive, so nobody can hold a
+  connection open for ever by sending a post a byte at a time.
+- Found and fixed in review: a running late turned down for a day far
+  off, or no real day, would have kept its words for good; "Mark as
+  there" had a different name for screen readers than on the button; a
+  document's download failed when its name was cut in half an emoji;
+  the link's upload read 10 MB from anyone before checking the link;
+  and a long one-word title pushed a phone's page sideways.
+- Checked with both together: the typecheck; the shared tests (180);
+  the server tests (394 on PGlite, and the real-Postgres file, 12, with
+  two servers clearing at once); the web build; the full browser suite
+  (78), and the documents and certificates specs three more times.
+
+**Next**
+
+- Merge, with Colly's go-ahead, and check it on the live server.
+- The stock list next week. On the live server, a list of 1,500 rows is
+  expected to take about 8 to 10 minutes with the page left open.
+- The keys: the Google key, the backups bucket (now for documents'
+  files too, with `BACKUP_KEY`), and the Sentry key. Then the real crew
+  list, after Start fresh, and an approver opening 2026 for leave.
+
 ## 3 October 2026: leave years the office opens
 
 **Done**
@@ -13,10 +63,10 @@ waiting on someone.
   for leave from the Leave screen, this year or next only, and an open
   year stays open. Staff can only ask for leave in an open year, and are
   told plainly when the next one isn't open yet; allowances can be set
-  for this year or next. On the live server the update opens this year,
-  and any earlier year that already holds leave. Since no leave can now
-  be put in a year far ahead, a slip can't keep an erased person's name
-  for decades.
+  for this year or next. On a server already in use, the update opens
+  this year and any earlier year that already holds leave. Since no
+  leave can now be put in a year far ahead, a slip can't keep an erased
+  person's name for decades.
 - Colly confirmed that erasure keeps declined and cancelled leave for
   three years along with approved leave, and that a kept name lasts as
   long as the records it's kept for. Both were already so; ADR 0027
@@ -31,10 +81,16 @@ waiting on someone.
   on PGlite, twice, and the real-Postgres file, 11); the web build; the
   full browser suite (74), and the history spec five more times.
 
+- Merged into `main` at 10:45 UTC (Colly: "Finish off that PR") and
+  live by 10:54 once main's checks passed. The live database has the
+  leave module at version 2 with its `leave_years` table, and nothing
+  went wrong. No year is open there yet: the live database is still
+  empty, and the update opens years only on a server already in use, so
+  made-up data and a restore start clean. When the real staff are in,
+  an approver opens 2026 on the Leave screen with one tap.
+
 **Next**
 
-- Merge (Colly: "Finish off that PR"), then check the update on the
-  live server.
 - The small items, being built: the office recording running late for
   someone who rang in, old running-late notes cleared after their day,
   the call-changed message naming a change to the certificates a call

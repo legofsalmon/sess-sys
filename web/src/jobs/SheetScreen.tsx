@@ -255,6 +255,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
                 {c.role}
               </b>
               {c.days && <span className="muted"> {c.days}</span>}
+              {c.needs && <span className="muted"> needs {c.needs}</span>}
               {!!c.toFind && (print ? <span className="muted"> · {c.toFind} to find</span> : <StatusPill tone="pending">{c.toFind} to find</StatusPill>)}
             </header>
             {c.details && <p className="lines muted">{c.details}</p>}

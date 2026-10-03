@@ -96,7 +96,7 @@ describe('download everything', () => {
     expect(res.headers['content-disposition']).toBe(`attachment; filename="session-hire-${irishTime(new Date()).slice(0, 10)}.zip"`)
     expect(res.headers['cache-control']).toBe('no-store')
 
-    // Every table, running_late (ADR 0028) and erasures (ADR 0027) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
+    // Every table, running_late (ADR 0028), erasures (ADR 0027) and documents (ADR 0029) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
     const tables = [
       'assets',
       'backup_runs',
@@ -107,6 +107,8 @@ describe('download everything', () => {
       'changes',
       'clients',
       'crew_calls',
+      'document_files_to_delete',
+      'documents',
       'erasures',
       'faults',
       'identifiers',
@@ -153,6 +155,9 @@ describe('download everything', () => {
     expect(readme).toMatch(/running_late +0 rows +People saying on their private link that they're running late/)
     expect(readme).toMatch(/erasures +0 rows +People whose details were erased on request: only their id/)
     expect(readme).toContain('Left out on purpose')
+    // Documents' details are in, their files are not, and the README says where they are (ADR 0029).
+    expect(readme).toMatch(/documents +0 rows +People's documents, such as insurance and certificate cards/)
+    expect(readme).toContain("- Documents' files, such as insurance and certificate cards: they stay in\n  the storage beside the backups")
   })
 
   it("leaves out freelancers' link secrets, old and new, and sign-in sessions", async () => {

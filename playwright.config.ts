@@ -5,7 +5,9 @@ import { defineConfig } from '@playwright/test'
  * built web app. Build first: `npm run build:web`.
  * In sandboxes without Playwright's own browsers, set PW_CHROMIUM to a
  * Chromium binary. Two checkouts can run the suite at once on different
- * ports: set E2E_PORT, and each gets a data folder of its own.
+ * ports: set E2E_PORT, and each gets a data folder of its own. Documents'
+ * files go in a folder of their own (ADR 0029), so the server has them
+ * while it has no backups, as the Backups card's tests expect.
  */
 const port = process.env.E2E_PORT ?? '3099'
 
@@ -19,7 +21,7 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
   webServer: {
-    command: `rm -rf .e2e-data/${port} && mkdir -p .e2e-data && DATA_DIR=$PWD/.e2e-data/${port} PORT=${port} npm start -w server`,
+    command: `rm -rf .e2e-data/${port} .e2e-data/${port}-documents && mkdir -p .e2e-data && DATA_DIR=$PWD/.e2e-data/${port} DOCUMENTS_DIR=$PWD/.e2e-data/${port}-documents PORT=${port} npm start -w server`,
     url: `http://localhost:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,

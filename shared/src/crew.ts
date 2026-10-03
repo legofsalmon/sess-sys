@@ -595,7 +595,9 @@ export type TellEvent =
 
 /** What a message needs besides the person: the call as it stands, and the booking's own figures where they differ. */
 export interface TellContext {
-  call: Pick<CrewCall, 'id' | 'project' | 'phase' | 'role' | 'start' | 'end' | 'callTime' | 'venue' | 'dayRateCents'>
+  call: Pick<CrewCall, 'id' | 'project' | 'phase' | 'role' | 'start' | 'end' | 'callTime' | 'venue' | 'dayRateCents'> & Partial<Pick<CrewCall, 'needsCertificates'>>
+  /** For a changed call: the certificates it needed before, so the message says what it needs now, or no longer (ADR 0028). */
+  neededBefore?: readonly CertificateKind[]
   /** The person's own days, when they took only some. */
   days?: readonly string[]
   /** The booking, for the timesheet's address. */
@@ -668,16 +670,24 @@ export function tellMessage(event: TellEvent, p: Addressee, ctx: TellContext, li
         subject: `Cancelled: ${job}, ${when}`,
         what: 'cancellation',
       }
-    case 'call-changed':
+    case 'call-changed': {
+      // Said plainly, so nobody turns up without a card the site now asks for, or worries about one it no longer does.
+      const now = needsOf(c)
+      const was = ctx.neededBefore ? tidyNeeds(ctx.neededBefore) : now
+      const added = now.filter((k) => !was.includes(k))
+      const dropped = was.filter((k) => !now.includes(k))
       return {
         text: lines([
           `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}${rated ? `, ${rateLine(c)}` : ''}.`,
+          added.length && `This call now needs ${needsLabel(added)}.`,
+          dropped.length && `This call no longer needs ${needsLabel(dropped)}.`,
           `The details are on your page: ${link}`,
           'If that no longer suits, say so there or ring the office.',
         ]),
         subject: `Changed: ${job}, ${when}`,
         what: 'change',
       }
+    }
     case 'phase-moved':
       return {
         text: lines([
