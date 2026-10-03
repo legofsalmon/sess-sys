@@ -115,6 +115,7 @@ describe('download everything', () => {
       'label_runs',
       'leave_allowances',
       'leave_requests',
+      'leave_years',
       'lieu_entries',
       'models',
       'movements',

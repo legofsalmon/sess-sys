@@ -334,8 +334,10 @@ says product and item; the code says model and asset.
   annual leave applied for and approved in whole days, counted in the
   weekdays that aren't Irish public holidays, against a calendar-year
   allowance; days in lieu logged for a day worked and approved the same
-  way. Whoever has "Can approve time off" decides, never their own.
-  Approved leave is days off, so the planner shows it and offers warn.
+  way. Whoever has "Can approve time off" decides, never their own,
+  and opens each year for leave, this year or next: staff ask only in an
+  open year. Approved leave is days off, so the planner shows it and
+  offers warn.
 - **Crew assignment**: person on a phase in a role at an agreed rate, with a
   status (proposed, offered, accepted, declined, confirmed, cancelled, or
   pulled-out when a booked freelancer says they can't make it) and a
@@ -541,10 +543,14 @@ Crewbox.
   unsettled, and the app takes their details from everywhere they live:
   their record, every earlier copy in the change feed, the history, the
   export, each device's copy, their link, feed and sign-in account. Their
-  name and timesheets stay for six years if they were paid, for Revenue,
-  and bookings stay as records of work. Backups can't be edited, so old
-  copies age out on their own schedule (a year and a month at most); a
-  restore applies the list of erasures again, so nobody comes back.
+  name and timesheets stay for six years if they were paid, for Revenue;
+  a member of staff's leave records stay for three years, without their
+  notes, as the Organisation of Working Time Act asks, and their name
+  with them; and bookings stay as records of work. The server deletes
+  each kept record, and the name, by itself on the day its time is up.
+  Backups can't be edited, so old copies age out on their own schedule
+  (a year and a month at most); a restore applies the list of erasures
+  again, so nobody comes back.
 - Data stays in the EU. A processing record and retention rules are written
   before crew data goes in.
 

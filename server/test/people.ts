@@ -101,3 +101,10 @@ export async function onLink(app: FastifyInstance, path: string, fields: Record<
   const to = new URL(res.headers.location as string, 'http://x')
   expect(flashOf((await app.inject({ url: to.pathname + to.search })).body).ok).toBe(true)
 }
+
+/**
+ * Stored text to search for what someone typed, with every id, token and key the app makes blanked out. Each of those
+ * is one run of 16 or more letters, digits, - and _, so one can hold a short trace by chance: a random id once held
+ * "m50", as in a note about the M50. Nothing typed in these tests is such a run, so blanking them hides no trace.
+ */
+export const typedOnly = (text: string) => text.replace(/[\w-]{16,}/g, ' ')

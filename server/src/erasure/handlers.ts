@@ -1,8 +1,8 @@
-import { dayLabel, ERASED_NAME, ERASED_REFUSAL, irishToday, keptArgs, PERSON_COMMANDS, type CommandArgs, type CommandName, type Person } from '@sh/shared'
+import { dayLabel, ERASED_NAME, ERASED_REFUSAL, irishToday, keptArgs, nameKept, PERSON_COMMANDS, type CommandArgs, type CommandName, type NameKept, type Person } from '@sh/shared'
 import { getPerson } from '../crew/store.ts'
 import type { Queryable } from '../db.ts'
 import { Refused, type Ctx } from '../kernel.ts'
-import { erasePerson, readErasure, RECORDS } from './places.ts'
+import { erasePerson, keptRecords, readErasure, RECORDS } from './places.ts'
 
 /**
  * Erasing a person on request (ADR 0027): the command, what has to be
@@ -12,9 +12,10 @@ import { erasePerson, readErasure, RECORDS } from './places.ts'
 
 /**
  * Whom a command is about, by the server's own tables, if it's one that
- * can be. A record that has gone, such as leave taken with an erasure, is
- * still theirs by the command that made it, so a decision on it sent
- * afterwards is turned down and stored without its reason.
+ * can be. A record that has gone, such as leave whose three years were up
+ * when they were erased, is still theirs by the command that made it, so
+ * a decision on it sent afterwards is turned down and stored without its
+ * reason, as one on leave still kept is.
  */
 async function personNamed(tx: Queryable, name: string, args: unknown): Promise<string | undefined> {
   const rule = PERSON_COMMANDS[name as CommandName]
@@ -67,10 +68,11 @@ export async function argsToStore(tx: Queryable, name: string, args: unknown): P
  * undefined. Anything unsettled is settled first: an offer or a booking on
  * a job that hasn't ended, being the contact on the day for a phase that
  * hasn't, a timesheet waiting for approval (so the pay is on record under
- * their name), and their Google account writing the jobs to Google
- * Calendar. The device asks the same before it sends (eraseRefusal), and
- * both name the earliest of several by its first day, then its id, so
- * they say it in the same words.
+ * their name), leave or a day in lieu waiting for a decision (so the leave
+ * records kept say how it ended), and their Google account writing the
+ * jobs to Google Calendar. The device asks the same before it sends
+ * (eraseRefusal), and both name the earliest of several by its first day,
+ * then its id, so they say it in the same words.
  */
 async function notYet(tx: Queryable, person: Person, today: string): Promise<string | undefined> {
   const job = (r: { project: string; phase: string | null }) => (r.phase ? `${r.project} (${r.phase})` : r.project)
@@ -97,11 +99,25 @@ async function notYet(tx: Queryable, person: Person, today: string): Promise<str
     [person.id]
   )
   if (waiting[0]) return `${person.name} has a timesheet waiting on ${waiting[0].project}: approve it first, so their pay is on record.`
+  // Their leave is kept once they're erased, and nothing more can be decided for them, so one left waiting would sit in
+  // the approvers' queue for good. A request is named before a day in lieu, as the device names them.
+  const { rows: undecided } = await tx.query<{ what: string }>(
+    `SELECT 1 AS first, 'leave' AS what FROM leave_requests WHERE person_id = $1 AND status = 'waiting'
+     UNION ALL SELECT 2, 'a day in lieu' FROM lieu_entries WHERE person_id = $1 AND status = 'waiting' ORDER BY first LIMIT 1`,
+    [person.id]
+  )
+  if (undecided[0]) return `${person.name} has ${undecided[0].what} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
   if (person.email?.trim()) {
     const { rows: link } = await tx.query(`SELECT 1 FROM calendar_link WHERE state <> 'off' AND lower(trim(account_email)) = lower(trim($1))`, [person.email])
     if (link.length) return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`
   }
   return undefined
+}
+
+/** What a name is kept for, in a few words: "Revenue's records", "their leave records under the Working Time Act", or both. */
+function keptFor(k: NameKept): string {
+  const why = [k.pay && "Revenue's records", k.leave && 'their leave records under the Working Time Act'].filter(Boolean)
+  return why.length ? why.join(' and ') : "the business's records"
 }
 
 type Handler<N extends 'person.erase'> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
@@ -113,11 +129,15 @@ export const erasureHandlers: { 'person.erase': Handler<'person.erase'> } = {
     const today = irishToday()
     const was = await readErasure(ctx.tx, a.id)
     if (was) {
-      // Erased already: sent again, it takes a name kept for Revenue once the six years are up.
+      // Erased already: sent again, it takes a kept name once its day has come, and the leave records kept with it, as
+      // the server does by itself that day (due.ts).
       if (was.nameKeptUntil === null) return
-      if (was.nameKeptUntil > today)
-        throw new Refused({ code: 'conflict', message: `${person.name}'s name is kept for Revenue's records until ${dayLabel(was.nameKeptUntil)} ${was.nameKeptUntil.slice(0, 4)}, and can be erased from then.` })
-      await erasePerson(ctx, a.id, { today })
+      if (was.nameKeptUntil > today) {
+        // Why, as it was decided: the records themselves don't change once they're erased.
+        const why = keptFor(nameKept(await keptRecords(ctx.tx, a.id), irishToday(new Date(was.erasedAt))))
+        throw new Refused({ code: 'conflict', message: `${person.name}'s name is kept for ${why} until ${dayLabel(was.nameKeptUntil)} ${was.nameKeptUntil.slice(0, 4)}, and the app erases it that day.` })
+      }
+      await erasePerson(ctx, a.id, { today, nameKeptUntil: null })
       return
     }
     // Two deliberate steps: archived first, so nobody is erased by a slip.

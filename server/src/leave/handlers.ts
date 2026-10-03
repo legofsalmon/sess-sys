@@ -8,8 +8,11 @@ import {
   leaveDays,
   leaveLabel,
   leaveSpanLabel,
+  noAllowanceReason,
   noCancelReason,
+  noOpenReason,
   notEnoughLeft,
+  notOpenReason,
   requestsOverlap,
   yearOf,
   type CommandArgs,
@@ -17,7 +20,7 @@ import {
 } from '@sh/shared'
 import { getAway, getPerson, personByEmail } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
-import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, requestsFor } from './store.ts'
+import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, getYear, requestsFor } from './store.ts'
 
 /**
  * Staff leave and time in lieu (ADR 0024). The rules the server keeps,
@@ -25,6 +28,8 @@ import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, requestsFor
  *
  * - only staff have leave, and a request is the person's own: with
  *   sign-in on, the signed-in account's email has to be theirs;
+ * - leave is asked for only in a year an approver has opened, and only
+ *   this year or next can be opened, or have allowances set;
  * - a request can't overlap the person's own waiting or approved ones,
  *   nor ask for more days than are left this year, and a day in lieu is
  *   logged once, for a day that has happened;
@@ -38,7 +43,7 @@ import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, requestsFor
  * is deciding (`by`), as the rest of the app trusts a device today.
  */
 
-type LeaveCommand = 'leave.request' | 'leave.cancel' | 'leave.decide' | 'lieu.log' | 'lieu.cancel' | 'lieu.decide' | 'leave.allowance'
+type LeaveCommand = 'leave.request' | 'leave.cancel' | 'leave.decide' | 'lieu.log' | 'lieu.cancel' | 'lieu.decide' | 'leave.allowance' | 'leave.open'
 type Handler<N extends LeaveCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 /** The signed-in person, by the account's email matched to the Crew tab; undefined while sign-in is off. */
@@ -107,9 +112,12 @@ export const leaveHandlers: { [N in LeaveCommand]: Handler<N> } = {
     // Each request belongs to one leave year, so the balances stay simple.
     if (yearOf(a.start) !== yearOf(a.end))
       throw new Refused({ code: 'invalid', message: "A request can't cross the year end: ask for December and January separately." })
+    const year = yearOf(a.start)
+    const open = !!(await getYear(ctx.tx, year))
+    const shut = notOpenReason(year, () => open, irishToday())
+    if (shut) throw new Refused({ code: 'conflict', message: shut })
     const days = leaveDays(a.start, a.end)
     if (days === 0) throw new Refused({ code: 'invalid', message: "There are no working days in that span: it's all weekend or public holidays." })
-    const year = yearOf(a.start)
     const clash = (await requestsFor(ctx.tx, person.id, year)).find((r) => HOLDS_DAYS.includes(r.status) && requestsOverlap(r, a))
     if (clash)
       throw new Refused({
@@ -226,6 +234,9 @@ export const leaveHandlers: { [N in LeaveCommand]: Handler<N> } = {
     const person = await getPerson(ctx.tx, a.personId)
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (person.kind !== 'staff') throw new Refused({ code: 'conflict', message: `Only staff have an allowance; ${person.name} is a freelancer.` })
+    // Next year's can be set before it opens, so it's ready on the day.
+    const far = noAllowanceReason(a.year, irishToday())
+    if (far) throw new Refused({ code: 'invalid', message: far })
     const id = allowanceId(person.id, a.year)
     await ctx.tx.query(
       `INSERT INTO leave_allowances (id, person_id, year, days, carried_over, note) VALUES ($1, $2, $3, $4, $5, $6)
@@ -233,6 +244,16 @@ export const leaveHandlers: { [N in LeaveCommand]: Handler<N> } = {
       [id, person.id, a.year, a.days, a.carriedOver, a.note.trim()]
     )
     await emit(ctx, 'leaveAllowance', id, await getAllowance(ctx.tx, person.id, a.year))
+  },
+
+  async 'leave.open'(ctx, a) {
+    await approver(ctx, a.by)
+    // Open is open: a second approver, or a phone sending twice, changes nothing, even once the year has gone by.
+    if (await getYear(ctx.tx, a.year)) return
+    const far = noOpenReason(a.year, irishToday())
+    if (far) throw new Refused({ code: 'invalid', message: far })
+    await ctx.tx.query(`INSERT INTO leave_years (year, opened_at) VALUES ($1, now())`, [a.year])
+    await emit(ctx, 'leaveYear', String(a.year), await getYear(ctx.tx, a.year))
   },
 }
 

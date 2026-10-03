@@ -4,9 +4,12 @@ import { join } from 'node:path'
 import {
   addDays,
   dayLabel,
+  daysLabel,
+  eachDay,
   ERASED_NAME,
   feedCodeFor,
   irishToday,
+  leaveDays,
   MemoryStorage,
   newId,
   SyncClient,
@@ -18,19 +21,21 @@ import {
   type Transport,
 } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { restoreFrom } from '../src/backup/service.ts'
 import { dirStore, type BackupStore } from '../src/backup/store.ts'
 import { pgliteDb, type Db } from '../src/db.ts'
-import { describe as inWords, ERASED_AGAIN_ACTION } from '../src/history.ts'
+import { describe as inWords, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION } from '../src/history.ts'
+import { DueErasures, eraseWhatIsDue } from '../src/erasure/due.ts'
 import { LIST_KEY } from '../src/erasure/list.ts'
-import { flashOf, IPHONE, server as signedIn, staff, WINDOWS } from './people.ts'
+import { flashOf, IPHONE, server as signedIn, staff, typedOnly, WINDOWS } from './people.ts'
 
 /**
  * Erasing a person's details on request (ADR 0027): everywhere they live
- * on the server goes, what Revenue needs is kept, nothing about them can
- * be put on record again, and no restore from a backup brings them back.
+ * on the server goes, what Revenue and the Working Time Act need is kept
+ * for as long as they need it, nothing about them can be put on record
+ * again, and no restore from a backup brings them back.
  */
 
 let cleanup: (() => Promise<void> | void)[] = []
@@ -77,6 +82,23 @@ async function ok(app: FastifyInstance, ...mutations: Mutation[]) {
 const refusal = async (app: FastifyInstance, mutation: Mutation) => {
   const [r] = await send(app, mutation)
   return r?.status === 'rejected' ? r.reason.message : `applied`
+}
+
+/**
+ * Years opened for leave in a test's setup, straight into the table as the migration opens a year with leave in it:
+ * these tests keep leave from years long gone, and in 2031, which no approver can open today (ADR 0024).
+ */
+const openYears = (db: Db, ...years: number[]) => db.query(`INSERT INTO leave_years (year) SELECT unnest($1::int[]) ON CONFLICT DO NOTHING`, [years])
+
+/** Run as on a day in a year long gone, for an allowance set then: one can be set only for this year or next. */
+async function back<T>(to: number, fn: () => Promise<T>): Promise<T> {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(`${to}-06-15T12:00:00Z`))
+  try {
+    return await fn()
+  } finally {
+    vi.useRealTimers()
+  }
 }
 
 /** Everything about Ciara that must go, as it was typed. */
@@ -152,14 +174,15 @@ async function device(app: FastifyInstance, storage = new MemoryStorage()) {
   return { client, storage }
 }
 
-/** Every row of a table as text, to search for anything left. */
+/** Every row of a table as text, to search for anything left of what was typed. */
 async function everything(db: Db, table: string): Promise<string> {
   const { rows } = await db.query(`SELECT row_to_json(t)::text AS j FROM ${table} t`)
-  return rows.map((r) => r.j as string).join('\n')
+  return typedOnly(rows.map((r) => r.j as string).join('\n'))
 }
 
 function noTraces(text: string, where: string) {
-  for (const t of TRACES) expect(text.toLowerCase(), `${where} still holds "${t}"`).not.toContain(t.toLowerCase())
+  const left = typedOnly(text).toLowerCase()
+  for (const t of TRACES) expect(left, `${where} still holds "${t}"`).not.toContain(t.toLowerCase())
 }
 
 /**
@@ -208,8 +231,9 @@ describe('erasing someone with no paid work', () => {
     const { app, db } = await server()
     const { token, late } = await ciaraOnRecord(app)
     const feed = await feedCodeFor(token)
-    const before = await (await app.inject({ url: '/api/export' })).json()
-    expect(JSON.stringify(before)).toContain('Allergic to nuts')
+    // Every trace is found before, by the same search, so finding none after means each went from where it was.
+    const before = typedOnly(JSON.stringify(await (await app.inject({ url: '/api/export' })).json())).toLowerCase()
+    for (const t of TRACES) expect(before, `the export holds "${t}"`).toContain(t.toLowerCase())
 
     await ok(app, m('person.erase', { id: 'p7' }))
 
@@ -356,7 +380,414 @@ describe('erasing someone with paid work in the last six years', () => {
 
     const history: HistoryPage = (await app.inject({ url: '/api/history?limit=200' })).json()
     expect(history.entries.map((e) => e.what)).toContain(`Approved ${CIARA.name}'s timesheet for Rigger on Body & Soul: 2 days at €300, and €12 of extras: €612`)
-    expect(await refusal(app, m('person.erase', { id: 'p7' }))).toMatch(new RegExp(`^${CIARA.name}'s name is kept for Revenue's records until .* ${until.slice(0, 4)}, and can be erased from then\\.$`))
+    expect(await refusal(app, m('person.erase', { id: 'p7' }))).toMatch(new RegExp(`^${CIARA.name}'s name is kept for Revenue's records until .* ${until.slice(0, 4)}, and the app erases it that day\\.$`))
+  })
+})
+
+const year = Number(today.slice(0, 4))
+/** What anyone wrote in Aoife's leave, and her own details: none of it may be left once she's erased. */
+const AOIFE = {
+  note: 'Family wedding in Kerry',
+  reason: 'Covered by Cian',
+  oldNote: 'Lanzarote with the girls',
+  oldReason: 'Too many away for the stocktake',
+  lieuNote: 'Worked the Saturday get-out',
+  lieuReason: 'Thanks for staying late',
+  allowance: 'Agreed at interview',
+}
+const AOIFE_TRACES = ['Kerry', 'Covered by', 'Lanzarote', 'stocktake', 'get-out', 'staying late', 'interview', 'aoife@example.ie', '555 0303']
+/** Her week this year, and the one four years ago, whose three years after its year are up. */
+const NOW = { start: `${year}-02-09`, end: `${year}-02-13` }
+const OLD = { start: `${year - 4}-02-09`, end: `${year - 4}-02-13` }
+/** Three whole years after the end of this year: the day her name and this year's leave can go. */
+const LEAVE_UNTIL = `${year + 4}-01-01`
+
+const staffer = (id: string, name: string, approvesLeave: boolean) =>
+  m('person.upsert', { id, name, kind: 'staff', email: `${id}@example.ie`, phone: approvesLeave ? null : '+353 87 555 0303', skills: [], dayRateCents: null, notes: '', approvesLeave })
+
+/**
+ * Aoife, on the staff, and Colly, who approves time off and says who he is
+ * (sign-in is off). Aoife had a week's leave approved this year and one
+ * declined four years ago, a day in lieu today, and allowances for both
+ * years, each with a note or a reason, and no timesheets. Then she left.
+ */
+async function aoifeOnRecord(app: FastifyInstance, data: Db) {
+  await openYears(data, year, year - 4)
+  await ok(app, staffer('colly', 'Colly Hewson', true), staffer('aoife', 'Aoife Byrne', false))
+  await ok(app, m('leave.allowance', { personId: 'aoife', year, days: 22, carriedOver: 2, note: AOIFE.allowance, by: 'colly' }))
+  await back(year - 4, () => ok(app, m('leave.allowance', { personId: 'aoife', year: year - 4, days: 20, carriedOver: 0, note: AOIFE.allowance, by: 'colly' })))
+  await ok(
+    app,
+    m('leave.request', { id: 'now', personId: 'aoife', type: 'annual', ...NOW, note: AOIFE.note }),
+    m('leave.decide', { id: 'now', approved: true, reason: AOIFE.reason, by: 'colly' }),
+    m('leave.request', { id: 'old', personId: 'aoife', type: 'annual', ...OLD, note: AOIFE.oldNote }),
+    m('leave.decide', { id: 'old', approved: false, reason: AOIFE.oldReason, by: 'colly' }),
+    m('lieu.log', { id: 'sat', personId: 'aoife', day: today, days: 1, note: AOIFE.lieuNote }),
+    m('lieu.decide', { id: 'sat', approved: true, reason: AOIFE.lieuReason, by: 'colly' }),
+    m('person.archive', { id: 'aoife', archived: true })
+  )
+  // Approving the week put it in the planner as days off.
+  expect((await data.query(`SELECT id FROM unavailability WHERE person_id = 'aoife'`)).rows).toEqual([{ id: 'now' }])
+}
+
+/** What is left of Aoife in a copy of the data, to compare two copies. */
+async function leftOfAoife(q: Db) {
+  const rows = async (sql: string) => (await q.query(sql)).rows
+  return {
+    person: await rows(`SELECT name, email, phone, notes, archived FROM people WHERE id = 'aoife'`),
+    erasure: await rows(`SELECT erased_at, name_kept_until::text AS until FROM erasures`),
+    requests: await rows(`SELECT * FROM leave_requests ORDER BY id`),
+    entries: await rows(`SELECT * FROM lieu_entries ORDER BY id`),
+    allowances: await rows(`SELECT * FROM leave_allowances ORDER BY id`),
+    away: await rows(`SELECT * FROM unavailability WHERE person_id = 'aoife'`),
+    feed: await rows(`SELECT entity, entity_id, op, data FROM changes WHERE entity IN ('leaveRequest', 'lieuEntry', 'leaveAllowance', 'unavailability') ORDER BY seq`),
+  }
+}
+
+describe('erasing a member of staff with leave on record', () => {
+  it("keeps this year's leave for three years without what anyone wrote in it, takes the older, and keeps her name until the last can go", async () => {
+    // Proves: Colly's decision (2 October 2026): her leave records stay for the Working Time Act's three years after the end
+    // of their year, with whose, what, when, how many days and who decided, but not her note, the approver's reason or the
+    // allowance's note, in the rows, every earlier copy in the feed and the stored commands; leave four years old goes, as
+    // do the approved leave's days off; her name stays until 1 January three years on from next, and the office laptop
+    // works out that day before it sends, as the server does.
+    const { app, db: data } = await server()
+    await aoifeOnRecord(app, data)
+    const office = await device(app)
+    await office.client.sync()
+    const away = await new SyncClient({ storage: office.storage, transport: offline }).open()
+    await away.mutate('person.erase', { id: 'aoife' })
+    expect(away.view().erasures.aoife).toMatchObject({ nameKeptUntil: LEAVE_UNTIL, pending: true })
+    const laidOver = away.view().leave
+    const { client } = await device(app, office.storage)
+    await client.sync()
+    expect(client.view().pendingCount).toBe(0)
+
+    expect((await data.query(`SELECT name_kept_until::text AS until FROM erasures WHERE person_id = 'aoife'`)).rows).toEqual([{ until: LEAVE_UNTIL }])
+    expect((await data.query(`SELECT name, email, phone FROM people WHERE id = 'aoife'`)).rows).toEqual([{ name: 'Aoife Byrne', email: null, phone: null }])
+    expect(
+      (await data.query(`SELECT id, type, start_day::text AS start, end_day::text AS end, days, status, decided_by, decided_at IS NOT NULL AS decided, note, reason FROM leave_requests`)).rows
+    ).toEqual([{ id: 'now', type: 'annual', ...NOW, days: leaveDays(NOW.start, NOW.end), status: 'approved', decided_by: 'colly', decided: true, note: '', reason: '' }])
+    expect((await data.query(`SELECT id, day::text AS day, days, status, decided_by, note, reason FROM lieu_entries`)).rows).toEqual([
+      { id: 'sat', day: today, days: 1, status: 'approved', decided_by: 'colly', note: '', reason: '' },
+    ])
+    expect((await data.query(`SELECT id, year, days, carried_over, note FROM leave_allowances`)).rows).toEqual([{ id: `aoife-${year}`, year, days: 22, carried_over: 2, note: '' }])
+    expect((await data.query(`SELECT * FROM unavailability WHERE person_id = 'aoife'`)).rows).toEqual([])
+
+    // The device laid it over just as the server did it.
+    expect(laidOver.requests.map((r) => [r.id, r.note, r.reason])).toEqual([['now', '', '']])
+    expect(laidOver.entries.map((e) => [e.id, e.note, e.reason])).toEqual([['sat', '', '']])
+    expect(client.view().leave.requests.map((r) => [r.id, r.start, r.end, r.days, r.status, r.note, r.reason])).toEqual([
+      ['now', NOW.start, NOW.end, leaveDays(NOW.start, NOW.end), 'approved', '', ''],
+    ])
+
+    // In the feed, every copy of what stays has lost its words, and every copy of what went is a deletion.
+    const feed = (await data.query<{ entity: string; id: string; op: string }>(`SELECT entity, entity_id AS id, op FROM changes WHERE entity IN ('leaveRequest', 'lieuEntry', 'leaveAllowance', 'unavailability')`)).rows
+    const ops = (entity: string, id: string) => [...new Set(feed.filter((c) => c.entity === entity && c.id === id).map((c) => c.op))]
+    expect([ops('leaveRequest', 'now'), ops('lieuEntry', 'sat'), ops('leaveAllowance', `aoife-${year}`)]).toEqual([['put'], ['put'], ['put']])
+    expect([ops('leaveRequest', 'old'), ops('leaveAllowance', `aoife-${year - 4}`), ops('unavailability', 'now')]).toEqual([['delete'], ['delete'], ['delete']])
+    for (const table of ['people', 'leave_requests', 'lieu_entries', 'leave_allowances', 'changes', 'mutations']) {
+      const text = await everything(data, table)
+      for (const t of AOIFE_TRACES) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+    }
+    const laptop = typedOnly(JSON.stringify(await office.storage.load()))
+    for (const t of AOIFE_TRACES) expect(laptop, `the office laptop still holds "${t}"`).not.toContain(t)
+
+    // The history's stored commands keep only what erasing keeps of them: no dates, notes, reasons or figures.
+    const { rows: stored } = await data.query<{ name: string; args: unknown }>(`SELECT name, args FROM mutations WHERE name LIKE 'leave.%' OR name LIKE 'lieu.%'`)
+    expect(stored).toHaveLength(8)
+    expect(stored).toEqual(
+      expect.arrayContaining([
+        { name: 'leave.allowance', args: { personId: 'aoife', year, by: 'colly' } },
+        { name: 'leave.allowance', args: { personId: 'aoife', year: year - 4, by: 'colly' } },
+        { name: 'leave.request', args: { id: 'now', personId: 'aoife', type: 'annual' } },
+        { name: 'leave.decide', args: { id: 'now', approved: true, reason: '', by: 'colly' } },
+        { name: 'leave.request', args: { id: 'old', personId: 'aoife', type: 'annual' } },
+        { name: 'leave.decide', args: { id: 'old', approved: false, reason: '', by: 'colly' } },
+        { name: 'lieu.log', args: { id: 'sat', personId: 'aoife' } },
+        { name: 'lieu.decide', args: { id: 'sat', approved: true, reason: '', by: 'colly' } },
+      ])
+    )
+    // Its words read the dates from the record while it's kept, and have none once it has gone.
+    const history: HistoryPage = (await app.inject({ url: '/api/history?limit=200' })).json()
+    const words = history.entries.map((e) => e.what)
+    const n = leaveDays(NOW.start, NOW.end)
+    expect(words).toContain(`Aoife Byrne asked for annual leave, ${daysLabel(eachDay(NOW.start, NOW.end))} (${n} day${n === 1 ? '' : 's'})`)
+    expect(words).toContain('Aoife Byrne asked for annual leave, on dates since removed')
+    expect(words).toContain(`Aoife Byrne logged a day in lieu for ${dayLabel(today)}`)
+
+    // The name can't be taken before its day.
+    expect(await refusal(app, m('person.erase', { id: 'aoife' }))).toBe(
+      `Aoife Byrne's name is kept for their leave records under the Working Time Act until ${dayLabel(LEAVE_UNTIL)} ${year + 4}, and the app erases it that day.`
+    )
+  })
+
+  it('takes her name, and the leave kept with it, on the day the last of it can go, and not the day before', async () => {
+    // Proves: the erasure sent again (a device sending it again after a restore, say) is refused on the eve of the day and
+    // takes the name and every leave record left on the day, as Ireland's clock has it, with their earlier copies in the
+    // feed and the refusal that named her.
+    const { app, db: data } = await server()
+    await aoifeOnRecord(app, data)
+    await ok(app, m('person.erase', { id: 'aoife' }))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    cleanup.push(() => {
+      vi.useRealTimers()
+    })
+
+    vi.setSystemTime(new Date(`${year + 3}-12-31T23:30:00Z`))
+    expect(await refusal(app, m('person.erase', { id: 'aoife' }))).toBe(
+      `Aoife Byrne's name is kept for their leave records under the Working Time Act until ${dayLabel(LEAVE_UNTIL)} ${year + 4}, and the app erases it that day.`
+    )
+    expect((await data.query(`SELECT count(*)::int AS n FROM leave_requests`)).rows).toEqual([{ n: 1 }])
+
+    vi.setSystemTime(new Date(`${LEAVE_UNTIL}T00:30:00Z`))
+    await ok(app, m('person.erase', { id: 'aoife' }))
+    expect((await data.query(`SELECT name FROM people WHERE id = 'aoife'`)).rows).toEqual([{ name: ERASED_NAME }])
+    expect((await data.query(`SELECT name_kept_until FROM erasures`)).rows).toEqual([{ name_kept_until: null }])
+    for (const table of ['leave_requests', 'lieu_entries', 'leave_allowances', 'unavailability']) expect((await data.query(`SELECT id FROM ${table}`)).rows, table).toEqual([])
+    const ops = (await data.query<{ op: string }>(`SELECT DISTINCT op FROM changes WHERE entity IN ('leaveRequest', 'lieuEntry', 'leaveAllowance', 'unavailability')`)).rows
+    expect(ops).toEqual([{ op: 'delete' }])
+    for (const table of ['people', 'changes', 'mutations']) expect(await everything(data, table), table).not.toContain('Aoife')
+    const history: HistoryPage = (await app.inject({ url: '/api/history?limit=200' })).json()
+    expect(history.entries.map((e) => e.what)).toContain(`${ERASED_NAME} asked for annual leave, on dates since removed`)
+  })
+
+  it('ends the same after a restore of a backup taken before the erasure', async () => {
+    // Proves: the backup still holds her leave with every note and reason, and the leave whose three years are up; a
+    // restore applies her erasure again before anyone uses the copy, and leaves exactly what the erasure left.
+    const store = dirStore(folder())
+    const { app, db: data } = await server(undefined, store)
+    await aoifeOnRecord(app, data)
+    expect((await app.backups.run('manual')).status).toBe('ok')
+    await ok(app, m('person.erase', { id: 'aoife' }))
+    await app.erasures!.keep()
+
+    const fresh = await database()
+    expect(await restoreFrom(fresh, store, 'latest')).toMatchObject({ erasedAgain: 1 })
+    expect(await leftOfAoife(fresh)).toEqual(await leftOfAoife(data))
+    for (const table of ['people', 'leave_requests', 'lieu_entries', 'leave_allowances', 'changes', 'mutations']) {
+      const text = await everything(fresh, table)
+      for (const t of AOIFE_TRACES) expect(text, `${table} after the restore still holds "${t}"`).not.toContain(t)
+    }
+  })
+})
+
+describe('a restore from a backup taken while her leave waited for a decision', () => {
+  it('brings back nothing waiting that can no longer be decided', async () => {
+    // Proves: the backup holds her request and day in lieu still waiting, decided and erased since. Applied again after the
+    // restore, the erasure keeps no leave that waits: nothing more can be decided for her, so it would sit in the approvers'
+    // queue for good, and it records no leave. A device starting on the restored copy has nothing to approve.
+    const store = dirStore(folder())
+    const { app, db } = await server(undefined, store)
+    await openYears(db, year)
+    await ok(app, staffer('colly', 'Colly Hewson', true), staffer('aoife', 'Aoife Byrne', false))
+    await ok(
+      app,
+      m('leave.request', { id: 'now', personId: 'aoife', type: 'annual', ...NOW, note: AOIFE.note }),
+      m('lieu.log', { id: 'sat', personId: 'aoife', day: today, days: 1, note: AOIFE.lieuNote }),
+      m('person.archive', { id: 'aoife', archived: true })
+    )
+    expect((await app.backups.run('manual')).status).toBe('ok')
+    await ok(
+      app,
+      m('leave.decide', { id: 'now', approved: false, reason: AOIFE.reason, by: 'colly' }),
+      m('lieu.decide', { id: 'sat', approved: false, reason: AOIFE.lieuReason, by: 'colly' }),
+      m('person.erase', { id: 'aoife' })
+    )
+    await app.erasures!.keep()
+
+    const fresh = await database()
+    expect(await restoreFrom(fresh, store, 'latest')).toMatchObject({ erasedAgain: 1 })
+    for (const table of ['leave_requests', 'lieu_entries']) expect((await fresh.query(`SELECT id, status FROM ${table}`)).rows, table).toEqual([])
+    const again = await server(fresh, store)
+    const { client } = await device(again.app)
+    await client.sync()
+    expect(client.view().leave.queue).toEqual([])
+    for (const table of ['changes', 'mutations']) {
+      const text = await everything(fresh, table)
+      for (const t of AOIFE_TRACES) expect(text, `${table} after the restore still holds "${t}"`).not.toContain(t)
+    }
+  })
+})
+
+/** Two years ago's week: its three years are up on 1 January two years from now, before this year's. */
+const THEN = { start: `${year - 2}-03-02`, end: `${year - 2}-03-06` }
+const THEN_UNTIL = `${year + 2}-01-01`
+
+/**
+ * Aoife's leave from two years ago and this year, each with a note and a
+ * reason, and an allowance for two years ago with its note; then she
+ * leaves and asks to be erased. Niamh, still at work, has leave as old
+ * and older, which nothing here may touch.
+ */
+async function aoifeErasedWithTwoYears(app: FastifyInstance, data: Db) {
+  const niamh = m('person.upsert', { id: 'niamh', name: 'Niamh Walsh', kind: 'staff', email: null, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: false })
+  await openYears(data, year, year - 2, year - 4)
+  await ok(app, staffer('colly', 'Colly Hewson', true), staffer('aoife', 'Aoife Byrne', false), niamh)
+  await back(year - 2, () => ok(app, m('leave.allowance', { personId: 'aoife', year: year - 2, days: 20, carriedOver: 0, note: AOIFE.allowance, by: 'colly' })))
+  await ok(
+    app,
+    m('leave.request', { id: 'then', personId: 'aoife', type: 'annual', ...THEN, note: AOIFE.oldNote }),
+    m('leave.decide', { id: 'then', approved: true, reason: AOIFE.oldReason, by: 'colly' }),
+    m('leave.request', { id: 'now', personId: 'aoife', type: 'annual', ...NOW, note: AOIFE.note }),
+    m('leave.decide', { id: 'now', approved: true, reason: AOIFE.reason, by: 'colly' }),
+    m('leave.request', { id: 'niamh-then', personId: 'niamh', type: 'annual', ...THEN, note: 'Lisbon for the week' }),
+    m('leave.decide', { id: 'niamh-then', approved: true, reason: '', by: 'colly' }),
+    m('leave.request', { id: 'niamh-old', personId: 'niamh', type: 'annual', ...OLD, note: 'Gran Canaria again' }),
+    m('leave.decide', { id: 'niamh-old', approved: true, reason: '', by: 'colly' }),
+    m('person.archive', { id: 'aoife', archived: true }),
+    m('person.erase', { id: 'aoife' })
+  )
+}
+
+/** Each leave record still on the server, and how many history entries the daily run has made. */
+async function leaveLeft(q: Db) {
+  const ids = async (table: string) => (await q.query<{ id: string }>(`SELECT id FROM ${table} ORDER BY id`)).rows.map((r) => r.id)
+  const { rows } = await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM mutations WHERE name = $1`, [ERASED_WHEN_DUE_ACTION])
+  return { requests: await ids('leave_requests'), allowances: await ids('leave_allowances'), runs: rows[0]!.n }
+}
+
+describe('what an erasure kept goes on its day, with nobody to remember', () => {
+  it('takes each leave record the day its three years are up, and the name the day the last can go, and nothing of anyone not erased', async () => {
+    // Proves: the server's daily run (as started at start-up) takes two years ago's leave at the first moment of the day
+    // its three years are up in Ireland, and not a minute before: the rows, every earlier copy in the feed, and from a
+    // device that held them, in one history entry with no name. This year's leave and the name stay to their own day,
+    // when both go. Niamh, never erased, keeps all of hers, whatever its age.
+    const { app, db: data } = await server()
+    await aoifeErasedWithTwoYears(app, data)
+    const office = await device(app)
+    await office.client.sync()
+    let told = 0
+    const daily = new DueErasures(data, { changed: () => told++ })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    cleanup.push(() => {
+      vi.useRealTimers()
+    })
+    const before = { requests: ['niamh-old', 'niamh-then', 'now', 'then'], allowances: [`aoife-${year - 2}`], runs: 0 }
+    expect(await leaveLeft(data)).toEqual(before)
+
+    // A minute before midnight on New Year's Eve in Ireland: nothing is due.
+    vi.setSystemTime(new Date(`${year + 1}-12-31T23:59:00Z`))
+    expect(await daily.run()).toBe(0)
+    expect(await leaveLeft(data)).toEqual(before)
+
+    vi.setSystemTime(new Date(`${THEN_UNTIL}T00:01:00Z`))
+    expect(await daily.run()).toBe(1)
+    expect(await leaveLeft(data)).toEqual({ requests: ['niamh-old', 'niamh-then', 'now'], allowances: [], runs: 1 })
+    expect(told).toBe(1)
+    expect((await data.query(`SELECT p.name, e.name_kept_until::text AS until FROM people p JOIN erasures e ON e.person_id = p.id`)).rows).toEqual([
+      { name: 'Aoife Byrne', until: LEAVE_UNTIL },
+    ])
+    const ops = async (entity: string, id: string) =>
+      [...new Set((await data.query<{ op: string }>(`SELECT op FROM changes WHERE entity = $1 AND entity_id = $2`, [entity, id])).rows.map((r) => r.op))]
+    expect([await ops('leaveRequest', 'then'), await ops('leaveAllowance', `aoife-${year - 2}`), await ops('leaveRequest', 'now'), await ops('leaveRequest', 'niamh-then')]).toEqual([
+      ['delete'],
+      ['delete'],
+      ['put'],
+      ['put'],
+    ])
+    await office.client.sync()
+    expect(office.client.view().leave.requests.map((r) => r.id)).toEqual(['niamh-old', 'niamh-then', 'now'])
+    const history: HistoryPage = (await app.inject({ url: '/api/history?limit=5' })).json()
+    expect(history.entries[0]).toMatchObject({ what: "Deleted an erased person's leave records whose three years were up", outcome: 'done' })
+
+    // Again that day, from the timer or by hand: nothing more.
+    expect(await daily.run()).toBeUndefined()
+    expect(await eraseWhatIsDue(data)).toBe(0)
+    expect((await leaveLeft(data)).runs).toBe(1)
+
+    // The day the last of her leave can go, her name goes with it.
+    vi.setSystemTime(new Date(`${LEAVE_UNTIL}T00:01:00Z`))
+    expect(await daily.run()).toBe(1)
+    expect(await leaveLeft(data)).toEqual({ requests: ['niamh-old', 'niamh-then'], allowances: [], runs: 2 })
+    expect((await data.query(`SELECT p.name, e.name_kept_until FROM people p JOIN erasures e ON e.person_id = p.id`)).rows).toEqual([{ name: ERASED_NAME, name_kept_until: null }])
+    expect((await app.inject({ url: '/api/history?limit=1' })).json().entries[0].what).toBe("Erased the name kept with a person's records, as the law no longer asks for it")
+    for (const table of ['people', 'leave_requests', 'changes', 'mutations']) {
+      const text = await everything(data, table)
+      for (const t of ['Aoife', ...AOIFE_TRACES]) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+    }
+    expect((await data.query(`SELECT id, note FROM leave_requests ORDER BY id`)).rows).toEqual([
+      { id: 'niamh-old', note: 'Gran Canaria again' },
+      { id: 'niamh-then', note: 'Lisbon for the week' },
+    ])
+    expect(await eraseWhatIsDue(data)).toBe(0)
+  })
+
+  it('takes a name kept for Revenue alone on its day too, as the server starts, and keeps the list beside the backups', async () => {
+    // Proves: a freelancer's name kept with an approved timesheet goes the first day after Revenue's six years, not the day
+    // before, with nobody pressing anything, when the server starts as on any day; the list beside the backups says so,
+    // so a restore takes it too; the timesheet stays, with its figures, under "Erased person".
+    const store = dirStore(folder())
+    const { app, db } = await server(undefined, store)
+    await ciaraOnRecord(app)
+    await ok(app, m('timesheet.send', { id: 'o-past', days: [day(-10)], extras: [], note: '' }))
+    await ok(app, m('timesheet.approve', { id: 'o-past', days: [day(-10)], dayRateCents: 30000, extras: [], officeNote: '' }), m('person.erase', { id: 'p7' }))
+    expect(await eraseWhatIsDue(db, `${year + 6}-12-31`)).toBe(0)
+    expect((await db.query(`SELECT name FROM people WHERE id = 'p7'`)).rows).toEqual([{ name: CIARA.name }])
+    vi.useFakeTimers({ toFake: ['Date'] })
+    cleanup.push(() => {
+      vi.useRealTimers()
+    })
+    vi.setSystemTime(new Date(`${year + 7}-01-01T00:01:00Z`))
+    expect(await app.dueErasures.start()).toBe(1)
+    await app.erasures!.keep()
+    expect((await db.query(`SELECT p.name, e.name_kept_until FROM people p JOIN erasures e ON e.person_id = p.id`)).rows).toEqual([{ name: ERASED_NAME, name_kept_until: null }])
+    expect(JSON.parse((await store.get(LIST_KEY)).toString('utf8')).erasures).toEqual([{ id: 'p7', erasedAt: expect.any(String), nameKeptUntil: null }])
+    expect((await db.query(`SELECT status, day_rate_cents FROM timesheets WHERE id = 'o-past'`)).rows).toEqual([{ status: 'approved', day_rate_cents: 30000 }])
+    for (const table of ['people', 'changes', 'mutations']) noTraces(await everything(db, table), table)
+  })
+
+  it('looks once each day in Ireland, and two runs at once, here or on two copies of the server, take what is due once', async () => {
+    // Proves: the run goes to the database once per Irish day, so a new day starts at midnight in Ireland, even an hour
+    // before midnight by the server's clock in summer; and two runs at the same moment (each looks again under the lock
+    // every change takes) delete once, in one history entry. Postgres proves it for two servers (postgres.test.ts).
+    const { app, db: data } = await server()
+    await aoifeErasedWithTwoYears(app, data)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    cleanup.push(() => {
+      vi.useRealTimers()
+    })
+    vi.setSystemTime(new Date(`${THEN_UNTIL}T00:01:00Z`))
+    expect((await Promise.all([eraseWhatIsDue(data), eraseWhatIsDue(data)])).sort()).toEqual([0, 1])
+    expect(await leaveLeft(data)).toEqual({ requests: ['niamh-old', 'niamh-then', 'now'], allowances: [], runs: 1 })
+    const sent = await data.query(`SELECT c.entity, c.entity_id AS id, c.op FROM changes c JOIN mutations m ON m.id = c.mutation_id WHERE m.name = $1 AND c.entity LIKE 'leave%'`, [
+      ERASED_WHEN_DUE_ACTION,
+    ])
+    expect(sent.rows).toEqual([
+      { entity: 'leaveRequest', id: 'then', op: 'delete' },
+      { entity: 'leaveAllowance', id: `aoife-${year - 2}`, op: 'delete' },
+    ])
+
+    const daily = new DueErasures(data, { changed: () => {} })
+    vi.setSystemTime(new Date(`${year + 2}-06-30T22:30:00Z`))
+    expect(await daily.run()).toBe(0)
+    expect(await daily.run()).toBeUndefined()
+    // 12.30am on 1 July in Ireland, still 30 June by the server's clock.
+    vi.setSystemTime(new Date(`${year + 2}-06-30T23:30:00Z`))
+    expect(await daily.run()).toBe(0)
+    expect(await daily.run()).toBeUndefined()
+  })
+})
+
+describe('erasing a freelancer with only days off', () => {
+  it('takes their days off at once, and their name with them', async () => {
+    // Proves: no law asks for a freelancer's own days off, so they go at once, every copy in the feed with them, and with
+    // nothing else on record nothing keeps the name.
+    const { app, db: data } = await server()
+    await ok(
+      app,
+      m('person.upsert', { id: 'dara', name: 'Dara Quinn', kind: 'freelancer', email: null, phone: '+353 85 555 0404', skills: ['lighting'], dayRateCents: 28000, notes: '' }),
+      m('unavailability.add', { id: 'fleadh', personId: 'dara', start: day(10), end: day(12), note: 'The Fleadh in Wexford' }),
+      m('person.archive', { id: 'dara', archived: true })
+    )
+    await ok(app, m('person.erase', { id: 'dara' }))
+    expect((await data.query(`SELECT * FROM unavailability`)).rows).toEqual([])
+    expect((await data.query(`SELECT DISTINCT op FROM changes WHERE entity = 'unavailability'`)).rows).toEqual([{ op: 'delete' }])
+    expect((await data.query(`SELECT p.name, e.name_kept_until FROM people p JOIN erasures e ON e.person_id = p.id`)).rows).toEqual([{ name: ERASED_NAME, name_kept_until: null }])
+    for (const table of ['people', 'changes', 'mutations']) {
+      const text = await everything(data, table)
+      for (const t of ['Dara', 'Fleadh', '555 0404']) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+    }
   })
 })
 
@@ -383,6 +814,27 @@ describe('erasing is refused', () => {
     await ok(app, m('timesheet.send', { id: 'o-past', days: [day(-10)], extras: [], note: '' }), m('person.archive', { id: 'p7', archived: true }))
     expect(await refusal(app, m('person.erase', { id: 'p7' }))).toBe(`${CIARA.name} has a timesheet waiting on Body & Soul: approve it first, so their pay is on record.`)
   })
+
+  it('while leave or a day in lieu of theirs waits for a decision, so the leave records kept say how it ended', async () => {
+    // Proves: leave stays once they're erased and nothing more can be decided for them, so anything still waiting would sit
+    // in the approvers' queue for good: it stops the erasure, a request named before a day in lieu, in the device's words
+    // (shared/test/erasure.test.ts). Declined, as anything for someone archived can be, it no longer does.
+    const { app, db } = await server()
+    await openYears(db, year)
+    await ok(app, staffer('colly', 'Colly Hewson', true), staffer('aoife', 'Aoife Byrne', false))
+    await ok(
+      app,
+      m('lieu.log', { id: 'sat', personId: 'aoife', day: today, days: 1, note: '' }),
+      m('leave.request', { id: 'now', personId: 'aoife', type: 'annual', ...NOW, note: '' }),
+      m('person.archive', { id: 'aoife', archived: true })
+    )
+    const words = (what: string) => `Aoife Byrne has ${what} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
+    expect(await refusal(app, m('person.erase', { id: 'aoife' }))).toBe(words('leave'))
+    await ok(app, m('leave.decide', { id: 'now', approved: false, reason: '', by: 'colly' }))
+    expect(await refusal(app, m('person.erase', { id: 'aoife' }))).toBe(words('a day in lieu'))
+    await ok(app, m('lieu.decide', { id: 'sat', approved: false, reason: '', by: 'colly' }))
+    await ok(app, m('person.erase', { id: 'aoife' }))
+  })
 })
 
 describe('erasing is refused, naming the first thing unsettled', () => {
@@ -401,7 +853,9 @@ describe('erasing is refused, naming the first thing unsettled', () => {
 
 describe('erasing a member of staff who signs in', () => {
   it('ends their sessions and takes their name and email off their account, so the history calls them Erased person', async () => {
-    // Proves: an erased person's sign-in record goes with them: signed out at once, no name or email left, switched off; their leave goes too.
+    // Proves: an erased person's sign-in record goes with them: signed out at once, no name or email left, switched off. Their
+    // leave stays, without what they wrote, for the Working Time Act's three years (Colly's decision, 2 October 2026), and the
+    // name on their person stays with it, but never on the account.
     const { app, db } = await signedIn()
     const colly = await staff(app, db, 'Colly Hewson', WINDOWS, 'office-c0ffee')
     const cian = await staff(app, db, 'Cian Murphy', IPHONE, 'phone-c1an00')
@@ -418,6 +872,7 @@ describe('erasing a member of staff who signs in', () => {
     })
     expect(await colly.send('person.upsert', person('colly', 'Colly Hewson', colly.email, true, null))).toMatchObject({ status: 'applied' })
     expect(await colly.send('person.upsert', person('s2', 'Cian Murphy', cian.email, false, '+353 87 444 0909'))).toMatchObject({ status: 'applied' })
+    await openYears(db, 2031)
     expect(await cian.send('leave.request', { id: 'ski', personId: 's2', type: 'annual', start: '2031-03-03', end: '2031-03-07', note: 'Skiing in Andorra' })).toMatchObject({
       status: 'applied',
     })
@@ -436,15 +891,24 @@ describe('erasing a member of staff who signs in', () => {
       disabled: true,
       gone: true,
     })
-    for (const table of ['leave_requests', 'unavailability']) expect((await db.query(`SELECT * FROM ${table} WHERE person_id = 's2'`)).rows).toEqual([])
+    // The days off that approving it put in the planner go; the request is the record, kept until 1 January 2035 without its note.
+    expect((await db.query(`SELECT * FROM unavailability WHERE person_id = 's2'`)).rows).toEqual([])
+    expect((await db.query(`SELECT id, status, start_day::text AS start, end_day::text AS end, days, note, decided_by FROM leave_requests WHERE person_id = 's2'`)).rows).toEqual([
+      { id: 'ski', status: 'approved', start: '2031-03-03', end: '2031-03-07', days: 5, note: '', decided_by: 'colly' },
+    ])
+    expect((await db.query(`SELECT p.name, e.name_kept_until::text AS until FROM people p JOIN erasures e ON e.person_id = p.id WHERE p.id = 's2'`)).rows).toEqual([
+      { name: 'Cian Murphy', until: '2035-01-01' },
+    ])
+    expect(await everything(db, 'users')).not.toContain('Cian')
     for (const table of ['people', 'users', 'changes', 'mutations']) {
       const text = await everything(db, table)
-      for (const t of ['Cian', 'cian@', 'Andorra', '444 0909']) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+      for (const t of ['cian@', 'Andorra', '444 0909']) expect(text, `${table} still holds "${t}"`).not.toContain(t)
     }
     const history = await colly.history('?limit=200')
     const made = history.entries.find((e) => e.command === 'leave.request')!
     expect(made.who).toMatchObject({ kind: 'staff', name: ERASED_NAME })
-    expect(made.what).toBe(`${ERASED_NAME} asked for annual leave, on dates since removed`)
+    // The command keeps no dates, but the record it made still has them.
+    expect(made.what).toBe('Cian Murphy asked for annual leave, Mon 3 Mar to Fri 7 Mar (5 days)')
     expect(history.people?.map((p) => p.name)).toEqual(['Colly Hewson', ERASED_NAME])
   })
 })
@@ -490,16 +954,24 @@ describe('their staff account, found by their addresses', () => {
   })
 
   it('turns down a decision on their leave that arrives after the erasure, and keeps none of its reason', async () => {
-    // Proves: leave goes with an erasure, but a decision on it sent late from a device is still known to be about them by the request that made it.
+    // Proves: leave whose three years are up goes with an erasure, but a decision on it sent late from a device (another
+    // approver's phone, say, that decided it with no signal) is still known to be about them by the request that made it.
+    // The leave is from four years ago, as leave since then is now kept, and so is the name with it (Colly's decision,
+    // 2 October 2026); and it is decided first, as leave still waiting now stops an erasure.
     const { app, db } = await signedIn()
     const colly = await staff(app, db, 'Colly Hewson', WINDOWS, 'office-c0ffee')
     const cian = await staff(app, db, 'Cian Murphy', IPHONE, 'phone-c1an00')
     await colly.send('person.upsert', person('colly', 'Colly Hewson', colly.email))
     await colly.send('person.upsert', person('cian', 'Cian Murphy', cian.email))
-    expect(await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: '2031-03-03', end: '2031-03-04', note: '' })).toMatchObject({ status: 'applied' })
-    expect(await cian.send('lieu.log', { id: 'l1', personId: 'cian', day: day(-3), days: 1, note: '' })).toMatchObject({ status: 'applied' })
+    const old = Number(today.slice(0, 4)) - 4
+    await openYears(db, old)
+    expect(await cian.send('leave.request', { id: 'r1', personId: 'cian', type: 'annual', start: `${old}-03-02`, end: `${old}-03-06`, note: '' })).toMatchObject({ status: 'applied' })
+    expect(await cian.send('lieu.log', { id: 'l1', personId: 'cian', day: `${old}-06-06`, days: 1, note: '' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('leave.decide', { id: 'r1', approved: true, reason: '' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('lieu.decide', { id: 'l1', approved: true, reason: '' })).toMatchObject({ status: 'applied' })
     await colly.send('person.archive', { id: 'cian', archived: true })
-    await colly.send('person.erase', { id: 'cian' })
+    expect(await colly.send('person.erase', { id: 'cian' })).toMatchObject({ status: 'applied' })
+    for (const table of ['leave_requests', 'lieu_entries']) expect((await db.query(`SELECT id FROM ${table}`)).rows, table).toEqual([])
 
     const late = await colly.send('leave.decide', { id: 'r1', approved: false, reason: 'Cian, the Body & Soul build needs you that week' })
     expect(late).toMatchObject({ status: 'rejected', reason: { message: "This person's details were erased on request, so nothing more can be recorded for them." } })
@@ -595,11 +1067,28 @@ describe('a restore from a backup taken before an erasure', () => {
   })
 })
 
+describe('the search for what was typed', () => {
+  it('finds a trace in words, and never in an id that holds one by chance', () => {
+    // Proves: the checks here can't fail by chance, as one did when a random mutation id held "m50": an id holding a
+    // trace isn't taken for what was typed, and a note beside it still is.
+    const id = `${newId().slice(0, 12)}m50${newId().slice(-6)}`
+    expect(() => noTraces(JSON.stringify({ id }), 'an id')).not.toThrow()
+    expect(() => noTraces(JSON.stringify({ id, note: CIARA.late }), 'a note')).toThrow('a note still holds "M50"')
+  })
+})
+
 describe('the history', () => {
   it('has words for an erasure applied again after a restore, with no name', () => {
     // Proves: what the server records itself after a restore reads as words, like every command.
     const nothing = () => undefined
     expect(inWords(ERASED_AGAIN_ACTION, { id: 'p7' }, nothing)).toBe("Erased a person's details again, after the data was put back from a backup")
     expect(inWords('person.erase', { id: 'p7' }, nothing)).toBe("Erased a person's details on request")
+  })
+
+  it('has words for what an erasure kept going on its day, with no name', () => {
+    // Proves: the daily run's two kinds of entry say what went, and why, without naming anyone.
+    const nothing = () => undefined
+    expect(inWords(ERASED_WHEN_DUE_ACTION, { id: 'aoife' }, nothing)).toBe("Deleted an erased person's leave records whose three years were up")
+    expect(inWords(ERASED_WHEN_DUE_ACTION, { id: 'aoife', name: true }, nothing)).toBe("Erased the name kept with a person's records, as the law no longer asks for it")
   })
 })

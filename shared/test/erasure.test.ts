@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { COMMAND_NAMES, commandSchemas, type Mutation } from '../src/commands.ts'
 import type { CrewCall, Offer, Person } from '../src/crew.ts'
-import { ERASED_NAME, ERASED_REFUSAL, erasedPerson, nameKeptUntil, PERSON_COMMANDS, type Erasure } from '../src/erasure.ts'
+import { irishToday } from '../src/day.ts'
+import { ERASED_NAME, ERASED_REFUSAL, erasedPerson, leaveRecordKept, nameKept, nameKeptUntil, PERSON_COMMANDS, type Erasure } from '../src/erasure.ts'
 import type { Phase, Project } from '../src/jobs.ts'
 import type { RunningLate } from '../src/late.ts'
+import type { LeaveAllowance, LeaveRequest, LieuEntry } from '../src/leave.ts'
 import type { Change, PullResponse } from '../src/protocol.ts'
 import { emptySnapshot, MemoryStorage, SyncClient, type Snapshot, type Transport } from '../src/sync/client.ts'
 import { eraseRefusal, forgetErased } from '../src/sync/erasure-view.ts'
@@ -15,7 +17,8 @@ import type { Timesheet } from '../src/timesheets.ts'
  * them; the device refuses the same things the server does, in the same
  * words; and when the server says someone was erased, the device forgets
  * what it still held about them outside its records. Plus the rules both
- * share: the six years, and every command that names a person.
+ * share: the six years for pay, the three for staff leave, and every
+ * command that names a person.
  */
 
 const TODAY = '2026-10-02'
@@ -84,6 +87,56 @@ const sheet = (id: string, status: Timesheet['status'], approvedAt: string | nul
   sentVia: 'link',
   approvedAt,
 })
+
+/** Aoife, on the staff, who has left and asked for her details to go. */
+const aoife: Person = {
+  ...ciara,
+  id: 'aoife',
+  name: 'Aoife Byrne',
+  kind: 'staff',
+  email: 'aoife.byrne@example.ie',
+  phone: '+353 87 555 0303',
+  skills: [],
+  dayRateCents: null,
+  notes: 'Prefers the early van',
+  linkToken: 'zyxwvutsrqponmlkjihgfedc',
+  department: null,
+  level: 1,
+  knownAs: null,
+  certificates: {},
+  company: null,
+}
+const request = (id: string, start: string, end: string, over: Partial<LeaveRequest> = {}): LeaveRequest => ({
+  id,
+  personId: 'aoife',
+  type: 'annual',
+  start,
+  end,
+  days: 5,
+  note: 'Family wedding in Kerry',
+  status: 'approved',
+  requestedAt: `${start.slice(0, 4)}-01-05T09:00:00.000Z`,
+  decidedBy: 'colly',
+  decidedAt: `${start.slice(0, 4)}-01-06T09:00:00.000Z`,
+  reason: 'Covered by Cian',
+  ...over,
+})
+const entry = (id: string, day: string, over: Partial<LieuEntry> = {}): LieuEntry => ({
+  id,
+  personId: 'aoife',
+  day,
+  days: 1,
+  note: 'Worked the Saturday get-out',
+  status: 'approved',
+  loggedAt: `${day}T18:00:00.000Z`,
+  decidedBy: 'colly',
+  decidedAt: `${day}T19:00:00.000Z`,
+  reason: 'Thanks for staying late',
+  ...over,
+})
+const allowance = (year: number): LeaveAllowance => ({ id: `aoife-${year}`, personId: 'aoife', year, days: 22, carriedOver: 2, note: 'Agreed at interview' })
+/** What anyone wrote in Aoife's leave: none of it may be left once she's erased. */
+const LEAVE_WORDS = ['Kerry', 'Covered by', 'get-out', 'staying late', 'interview']
 
 const offline: Transport = { push: () => Promise.reject(new Error('offline')), pull: () => Promise.reject(new Error('offline')) }
 
@@ -155,6 +208,33 @@ describe('an erasure waiting to send', () => {
     expect(client.view().erasures.p7).toMatchObject({ nameKeptUntil: '2033-01-01', pending: true })
     expect(client.view().crew.people[0]).toMatchObject({ name: ciara.name, phone: null, notes: '', company: null, knownAs: null })
   })
+
+  it("keeps a member of staff's leave for three years, without notes or reasons, and her name with it", async () => {
+    // Proves: the device lays the erasure over her leave as the server does (server/test/erasure.test.ts erases the same):
+    // this year's request, day in lieu and allowance kept with their dates, days and decisions but nothing anyone wrote in
+    // them; 2022's gone, its three years up; the approved leave's days off gone; and her name kept until 1 January 2030.
+    const client = await device({
+      person: { aoife },
+      leaveRequest: { now: request('now', '2026-02-09', '2026-02-13'), old: request('old', '2022-02-07', '2022-02-11') },
+      lieuEntry: { sat: entry('sat', '2026-09-26') },
+      leaveAllowance: { 'aoife-2026': allowance(2026), 'aoife-2022': allowance(2022) },
+      unavailability: { now: { id: 'now', personId: 'aoife', start: '2026-02-09', end: '2026-02-13', note: 'Annual leave', source: 'leave' } },
+    })
+    expect(client.view().keptFor('aoife')).toEqual({ pay: null, leave: '2030-01-01', until: '2030-01-01' })
+    await client.mutate('person.erase', { id: 'aoife' })
+    const view = client.view()
+    expect(view.erasures.aoife).toMatchObject({ nameKeptUntil: '2030-01-01', pending: true })
+    expect(view.crew.people[0]).toMatchObject({ name: 'Aoife Byrne', email: null, phone: null, notes: '', pending: true })
+    expect(view.crew.unavailability).toEqual([])
+    expect(view.leave.requests.map((r) => [r.id, r.status, r.start, r.end, r.days, r.decidedBy, r.note, r.reason])).toEqual([
+      ['now', 'approved', '2026-02-09', '2026-02-13', 5, 'colly', '', ''],
+    ])
+    expect(view.leave.entries.map((e) => [e.id, e.status, e.day, e.days, e.decidedBy, e.note, e.reason])).toEqual([['sat', 'approved', '2026-09-26', 1, 'colly', '', '']])
+    expect(view.leave.allowance('aoife', 2026)).toMatchObject({ days: 22, carriedOver: 2, note: '' })
+    expect(view.leave.allowance('aoife', 2022)).toBeUndefined()
+    const shown = JSON.stringify(view.leave.requests) + JSON.stringify(view.leave.entries) + JSON.stringify(view.leave.allowance('aoife', 2026))
+    for (const t of LEAVE_WORDS) expect(shown, t).not.toContain(t)
+  })
 })
 
 describe('what has to be settled first', () => {
@@ -205,6 +285,24 @@ describe('what has to be settled first', () => {
       phase: { prep: at('prep', 'ep', 'Prep', '2026-09-01', '2026-09-01'), show: at('show', 'ep', 'Show', '2026-12-01', '2026-12-02'), build: at('build', 'bs', 'Build', '2026-10-12', '2026-10-13') },
     })
     expect(eraseRefusal(ciara, client.view(), TODAY)).toBe(`${ciara.name} is the contact on the day for Body & Soul (Build), which hasn't ended. Choose someone else first.`)
+  })
+
+  it('is said for leave still waiting for a decision, in the words the server uses', async () => {
+    // Proves: her leave stays once she's erased, and nothing more can be decided for her, so a request or a day in lieu
+    // still waiting is settled first, or it would sit in the approvers' queue for good. A request is named before a day in
+    // lieu, as on the server (server/test/erasure.test.ts).
+    const refusal = async (entities: Parameters<typeof device>[0]) => eraseRefusal(aoife, (await device({ person: { aoife }, ...entities })).view(), TODAY)
+    const undecided = { status: 'waiting', decidedBy: null, decidedAt: null, reason: '' } as const
+    const words = (what: string) => `Aoife Byrne has ${what} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
+    expect(await refusal({ lieuEntry: { e: entry('e', '2026-09-26', undecided) }, leaveRequest: { r: request('r', '2026-11-02', '2026-11-06', undecided) } })).toBe(words('leave'))
+    expect(await refusal({ lieuEntry: { e: entry('e', '2026-09-26', undecided) } })).toBe(words('a day in lieu'))
+    // Decided either way, or taken back, nothing is in the way.
+    expect(
+      await refusal({
+        leaveRequest: { r: request('r', '2026-11-02', '2026-11-06', { status: 'declined' }), c: request('c', '2026-12-07', '2026-12-08', { ...undecided, status: 'cancelled' }) },
+        lieuEntry: { e: entry('e', '2026-09-26') },
+      })
+    ).toBeUndefined()
   })
 })
 
@@ -308,15 +406,71 @@ describe('the certificate kinds that came later (ADR 0028)', () => {
 })
 
 describe('the rules the server and devices share', () => {
+  const paid = (...approvedAt: (string | null)[]) => ({ approvedAt, leave: [] })
+
   it('keep a name for six whole years after the year of the latest approval, and no longer', () => {
     // Proves: as Revenue counts, from the end of the year the latest approved timesheet falls in, by Ireland's day.
-    expect(nameKeptUntil([], TODAY)).toBeNull()
-    expect(nameKeptUntil([null, '2021-03-01T10:00:00Z', '2024-06-30T23:30:00Z'], TODAY)).toBe('2031-01-01')
+    expect(nameKeptUntil(paid(), TODAY)).toBeNull()
+    expect(nameKeptUntil(paid(null, '2021-03-01T10:00:00Z', '2024-06-30T23:30:00Z'), TODAY)).toBe('2031-01-01')
     // Paid on the last night of 2019: kept until 1 January 2026, so free to go by October.
-    expect(nameKeptUntil(['2019-12-31T23:30:00Z'], TODAY)).toBeNull()
-    expect(nameKeptUntil(['2020-01-01T00:30:00Z'], TODAY)).toBe('2027-01-01')
+    expect(nameKeptUntil(paid('2019-12-31T23:30:00Z'), TODAY)).toBeNull()
+    expect(nameKeptUntil(paid('2020-01-01T00:30:00Z'), TODAY)).toBe('2027-01-01')
     // The day it can go, it goes.
-    expect(nameKeptUntil(['2020-06-01T09:00:00Z'], '2027-01-01')).toBeNull()
+    expect(nameKeptUntil(paid('2020-06-01T09:00:00Z'), '2027-01-01')).toBeNull()
+  })
+
+  it('keep a leave record, and the name with it, for three whole years after the end of its year', () => {
+    // Proves: as the Working Time Act asks, counted like the timesheets' rule: a request by the year of its last day, a day
+    // in lieu by its day, an allowance by its year. Leave late in 2023 is still kept in October 2026, on the safe side of
+    // "three years from when it was made"; leave in 2022 is not.
+    const leave = (...records: ({ end: string } | { day: string } | { year: number })[]) => ({ approvedAt: [], leave: records })
+    expect(nameKept(leave({ end: '2026-02-13' }), TODAY)).toEqual({ pay: null, leave: '2030-01-01', until: '2030-01-01' })
+    expect(nameKeptUntil(leave({ day: '2025-12-27' }), TODAY)).toBe('2029-01-01')
+    expect(nameKeptUntil(leave({ year: 2024 }), TODAY)).toBe('2028-01-01')
+    expect(nameKeptUntil(leave({ end: '2023-12-31' }), TODAY)).toBe('2027-01-01')
+    expect(nameKeptUntil(leave({ end: '2022-12-31' }, { day: '2022-06-04' }, { year: 2022 }), TODAY)).toBeNull()
+    // The latest decides the name; each record keeps its own day.
+    expect(nameKeptUntil(leave({ year: 2022 }, { end: '2026-02-13' }, { day: '2025-12-27' }), TODAY)).toBe('2030-01-01')
+    expect([leaveRecordKept({ year: 2022 }, TODAY), leaveRecordKept({ day: '2025-12-27' }, TODAY)]).toEqual([false, true])
+  })
+
+  it('keep no leave still waiting for a decision, nor a name for it', () => {
+    // Proves: a request or a day in lieu still waiting records no leave, and nothing more can be decided once its person is
+    // erased, so it isn't kept and keeps no name (a restore can bring one back from before it was decided). Decided either
+    // way, the same record is kept for its three years.
+    expect(leaveRecordKept({ end: '2026-11-06', status: 'waiting' }, TODAY)).toBe(false)
+    expect(leaveRecordKept({ day: '2026-09-26', status: 'waiting' }, TODAY)).toBe(false)
+    expect([leaveRecordKept({ end: '2026-11-06', status: 'declined' }, TODAY), leaveRecordKept({ day: '2026-09-26', status: 'cancelled' }, TODAY)]).toEqual([true, true])
+    expect(nameKept({ approvedAt: [], leave: [{ end: '2026-11-06', status: 'waiting' }, { year: 2024 }] }, TODAY)).toEqual({ pay: null, leave: '2028-01-01', until: '2028-01-01' })
+    expect(nameKeptUntil({ approvedAt: [], leave: [{ day: '2026-09-26', status: 'waiting' }] }, TODAY)).toBeNull()
+  })
+
+  it('keep the name for both, until the later of the two', () => {
+    // Proves: pay and leave are counted apart and the name waits for the later, whichever it is.
+    expect(nameKept({ approvedAt: ['2021-03-01T10:00:00Z'], leave: [{ end: '2026-02-13' }] }, TODAY)).toEqual({ pay: '2028-01-01', leave: '2030-01-01', until: '2030-01-01' })
+    expect(nameKept({ approvedAt: ['2026-06-20T15:00:00Z'], leave: [{ year: 2024 }] }, TODAY)).toEqual({ pay: '2033-01-01', leave: '2028-01-01', until: '2033-01-01' })
+    // Paid too long ago to keep it, but on leave this year: kept for the leave alone.
+    expect(nameKept({ approvedAt: ['2019-06-01T09:00:00Z'], leave: [{ day: '2026-09-26' }] }, TODAY)).toEqual({ pay: null, leave: '2030-01-01', until: '2030-01-01' })
+  })
+
+  it('let a record and the name go on the day its years are up, and not the day before', () => {
+    // Proves: the boundary, for leave alone and for pay and leave ending the same day.
+    expect(leaveRecordKept({ end: '2026-12-31' }, '2029-12-31')).toBe(true)
+    expect(leaveRecordKept({ end: '2026-12-31' }, '2030-01-01')).toBe(false)
+    const both = { approvedAt: ['2023-11-30T12:00:00Z'], leave: [{ year: 2026 }] }
+    expect(nameKept(both, '2029-12-31')).toEqual({ pay: '2030-01-01', leave: '2030-01-01', until: '2030-01-01' })
+    expect(nameKept(both, '2030-01-01')).toEqual({ pay: null, leave: null, until: null })
+  })
+
+  it("count by Ireland's day across midnight", () => {
+    // Proves: an approval just before midnight on New Year's Eve in Ireland belongs to the old year, even when written
+    // with another offset, and the name goes at midnight in Ireland, not before.
+    const records = { approvedAt: ['2023-12-31T23:59:00Z'], leave: [{ end: '2026-03-06' }] }
+    expect(nameKeptUntil(records, irishToday(new Date('2029-12-31T23:59:00Z')))).toBe('2030-01-01')
+    expect(nameKeptUntil(records, irishToday(new Date('2030-01-01T00:00:00Z')))).toBeNull()
+    // 11.30pm on New Year's Eve in New York is already New Year's Day in Ireland.
+    expect(nameKept({ approvedAt: ['2023-12-31T23:30:00-05:00'], leave: [] }, TODAY).pay).toBe('2031-01-01')
+    expect(nameKept({ approvedAt: ['2023-12-31T23:30:00+01:00'], leave: [] }, TODAY).pay).toBe('2030-01-01')
   })
 
   it('name every command that names a person, so none keeps their details after they are erased', () => {

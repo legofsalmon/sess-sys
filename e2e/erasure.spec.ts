@@ -5,8 +5,10 @@ import { expect, test } from '@playwright/test'
  * adds someone, archives them, and erases them through the question in
  * place, which says what goes, what stays and that backups keep copies for
  * a while; the card then reads "Erased person", and the private link they
- * were sent no longer works. The person has this run's own name, since
- * the test server is shared.
+ * were sent no longer works. For a member of staff with leave records,
+ * the question and the card say their leave and their name are kept, for
+ * how long and why. Each person has this run's own name, since the test
+ * server is shared.
  */
 
 const phoneSize = { width: 390, height: 844 }
@@ -66,4 +68,71 @@ test('archived, then erased through the question in place: the card says so and 
   const run = office.locator('section.day').first().locator('.entries > li').first()
   await run.getByRole('button').click()
   await expect(run.locator('.entries .entry .what').first()).toHaveText("Erased a person's details on request")
+})
+
+test('for a member of staff with leave records, the question keeps their leave, saying for how long and why, and so does the card', async ({ browser }) => {
+  // Proves: Colly's decision (2 October 2026), at a phone's width: staff leave moves from what goes to what is kept, until
+  // three whole years after the end of this year, under the Working Time Act, while their days off still go; once erased,
+  // the card keeps the name and says why, and the day the app erases it, with nothing for anyone to press. Made through
+  // the sync API with this run's own names.
+  const year = Number(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }).slice(0, 4))
+  const staffName = `Nóra Leave ${id}`
+  const k = (key: string) => `${key}-${id}`
+  const context = await browser.newContext({ viewport: phoneSize })
+  const person = (key: string, name: string, approvesLeave: boolean) => ({
+    id: k(key),
+    name,
+    kind: 'staff',
+    email: null,
+    phone: approvesLeave ? null : '+353 87 555 0303',
+    skills: [],
+    dayRateCents: null,
+    notes: '',
+    approvesLeave,
+  })
+  const mutations: [string, Record<string, unknown>][] = [
+    ['person.upsert', person('eoin', `Eoin Approver ${id}`, true)],
+    ['person.upsert', person('nora', staffName, false)],
+    // Leave is asked for only in a year the office has opened; opening it again, as another test may have, changes nothing.
+    ['leave.open', { year, by: k('eoin') }],
+    ['leave.allowance', { personId: k('nora'), year, days: 22, carriedOver: 2, note: 'Agreed at interview', by: k('eoin') }],
+    ['leave.request', { id: k('week'), personId: k('nora'), type: 'annual', start: `${year}-02-09`, end: `${year}-02-13`, note: 'Family wedding in Kerry' }],
+    ['leave.decide', { id: k('week'), approved: true, reason: '', by: k('eoin') }],
+    ['person.archive', { id: k('nora'), archived: true }],
+  ]
+  const res = await context.request.post('/api/sync/push', {
+    data: { clientId: `erasure-${id}`, mutations: mutations.map(([name, args], i) => ({ id: `${k('m')}-${i}`, name, args, createdAt: new Date().toISOString() })) },
+  })
+  const { results } = await res.json()
+  expect(results.map((r: { status: string; reason?: { message: string } }) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
+
+  const office = await context.newPage()
+  await office.goto('/#crew')
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  const people = office.getByRole('region', { name: 'People' })
+  await people.getByText(/^Archived \(\d+\)$/).click()
+  const row = people.locator('details.archived .row', { hasText: staffName })
+  await row.getByRole('button', { name: 'Erase details…' }).click()
+  const question = row.getByRole('group', { name: `Erase ${staffName}'s details? This can't be undone.` })
+  const until = new RegExp(`until \\w{3} 1 Jan ${year + 4}`)
+  const goes = question.locator('p', { hasText: 'Goes:' })
+  await expect(goes).toContainText('day rate, days off and what they said about running late.')
+  await expect(goes).not.toContainText('staff leave')
+  await expect(goes).toContainText('If they sign in to the app, they are signed out and their account is switched off.')
+  const kept = question.locator('p', { hasText: 'Kept:' })
+  await expect(kept).toContainText('their name and their staff leave records, without notes or reasons,')
+  await expect(kept).toContainText(until)
+  await expect(kept).toContainText('the Working Time Act asks for records of leave to be kept for three years.')
+  await expect(kept).toContainText('Their bookings, offers and timesheets stay too, as records of work.')
+  // Nothing wider than the phone, however long the words.
+  expect(await office.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneSize.width)
+  await question.getByRole('button', { name: 'Erase their details' }).click()
+
+  const erased = people.locator('details.archived .row.erased', { hasText: staffName })
+  await expect(erased).toContainText('Details erased on request')
+  await expect(erased).toContainText('Their name is kept with their staff leave records: the Working Time Act asks for records of leave to be kept for three years.')
+  await expect(erased).toContainText(new RegExp(`The app erases it on \\w{3} 1 Jan ${year + 4}\\.`))
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await expect(erased.getByRole('button', { name: 'Erase the name now' })).toHaveCount(0)
+  await context.close()
 })

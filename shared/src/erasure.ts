@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { CommandName } from './commands.ts'
 import { DEFAULT_LEVEL, type Person } from './crew.ts'
 import { irishToday } from './day.ts'
+import { yearOf, type LeaveAllowance, type LeaveRequest, type LeaveStatus, type LieuEntry } from './leave.ts'
 
 /**
  * Erasing a person's details on request (ADR 0027): GDPR's right to
@@ -17,18 +18,29 @@ export const ERASED_NAME = 'Erased person'
 
 /**
  * Revenue expects a business to keep its records for six years from the
- * end of the year they belong to, and erasure gives way to a legal
- * obligation (Article 17(3)(b)): someone paid in that time keeps their
- * name, beside the timesheets that show the pay.
+ * end of the year they belong to (Taxes Consolidation Act 1997, section
+ * 886), and erasure gives way to a legal obligation (Article 17(3)(b)):
+ * someone paid in that time keeps their name, beside the timesheets that
+ * show the pay.
  */
 export const PAID_WORK_YEARS = 6
+
+/**
+ * The Organisation of Working Time Act 1997 (section 25), with the
+ * Organisation of Working Time (Records) (Prescribed Form and Exemptions)
+ * Regulations 2001, asks an employer to keep records of annual leave and
+ * public holidays for three years. So erasing a member of staff keeps
+ * their leave records that long, and their name with them, since a record
+ * has to say whose it is.
+ */
+export const LEAVE_RECORD_YEARS = 3
 
 /** The record that someone was erased: their id and dates, nothing else about them. */
 export interface Erasure {
   /** The person's id. */
   id: string
   erasedAt: string
-  /** Their name is kept until this day, for Revenue's six years, and can go from it; null once it has gone. */
+  /** Their name is kept until this day, for their pay or leave records, and can go from it; null once it has gone. */
   nameKeptUntil: string | null
 }
 
@@ -42,8 +54,8 @@ const id = z.string().min(1).max(64)
 export const erasureCommandSchemas = {
   /**
    * Erase an archived person's details. Only their id travels, so the
-   * history holds nothing about them. Sent again once a kept name's six
-   * years are up, it takes the name.
+   * history holds nothing about them. Sent again once a kept name's day
+   * has come, it takes the name, and the leave records kept with it.
    */
   'person.erase': z.object({ id }),
 } as const
@@ -52,32 +64,101 @@ export const erasureCommandSchemas = {
 export const ERASED_REFUSAL = "This person's details were erased on request, so nothing more can be recorded for them."
 
 /**
- * The day a person's name can go, from when each of their timesheets was
- * approved: six whole years after the end of the year of the latest, as
- * Revenue counts from the end of the tax year (an approval in June 2026
- * keeps it until 1 January 2033), while that is still to come. Null when
- * they have no paid work on record in that time.
+ * The first day after some whole years from the end of a year. Records
+ * are counted from the end of the year they belong to, as Revenue counts
+ * from the end of the tax year, which errs on the safe side of "from when
+ * it was made".
  */
-export function nameKeptUntil(approvedAt: readonly (string | null | undefined)[], today: string): string | null {
-  let latest: string | undefined
-  for (const at of approvedAt) {
+const yearsAfter = (year: number, years: number) => `${year + years + 1}-01-01`
+
+/**
+ * A staff leave record (ADR 0024), by what says which year it belongs to:
+ * a request by its last day, a day in lieu by the day worked, an allowance
+ * by its own year; and, for a request or a day in lieu, its status.
+ */
+export type LeaveRecord = (Pick<LeaveRequest, 'end'> | Pick<LieuEntry, 'day'> | Pick<LeaveAllowance, 'year'>) & { status?: LeaveStatus }
+
+export function leaveRecordYear(r: LeaveRecord): number {
+  if ('year' in r) return r.year
+  return yearOf('end' in r ? r.end : r.day)
+}
+
+/** The day a leave record can go: three whole years after the end of its year, so leave in 2026 is kept until 1 January 2030. */
+export function leaveRecordKeptUntil(r: LeaveRecord): string {
+  return yearsAfter(leaveRecordYear(r), LEAVE_RECORD_YEARS)
+}
+
+/**
+ * Whether a leave record stays when its person is erased: still in its
+ * three years, and decided. One still waiting records no leave, and
+ * nothing more can be decided for them, so it would sit in the approvers'
+ * queue for good. Erasing is refused while one waits, but a restore can
+ * bring one back from before it was decided.
+ */
+export function leaveRecordKept(r: LeaveRecord, today: string): boolean {
+  return r.status !== 'waiting' && leaveRecordKeptUntil(r) > today
+}
+
+/**
+ * What a person has on record that the law asks the business to keep:
+ * when each of their timesheets was approved, and their staff leave. The
+ * server reads it from its tables and a device from its copy, and both
+ * decide with `nameKept`, so they come to the same day.
+ */
+export interface KeptRecords {
+  approvedAt: readonly (string | null | undefined)[]
+  leave: readonly LeaveRecord[]
+}
+
+/** What keeps an erased person's name, each as the day it can go: null for nothing still to come. */
+export interface NameKept {
+  /** Their pay records, for Revenue: six whole years after the year of the latest approved timesheet. */
+  pay: string | null
+  /** Their leave records, under the Working Time Act: the day the last of them can go. */
+  leave: string | null
+  /** Their name: the later of the two, since every record kept has to say whose it is. */
+  until: string | null
+}
+
+export function nameKept(records: KeptRecords, today: string): NameKept {
+  let paid: number | undefined
+  for (const at of records.approvedAt) {
     if (!at) continue
-    const day = irishToday(new Date(at))
-    if (!latest || day > latest) latest = day
+    // By Ireland's day: an approval late on New Year's Eve belongs to the old year.
+    const year = yearOf(irishToday(new Date(at)))
+    if (paid === undefined || year > paid) paid = year
   }
-  if (!latest) return null
-  const until = `${Number(latest.slice(0, 4)) + PAID_WORK_YEARS + 1}-01-01`
-  return until > today ? until : null
+  let leave: string | undefined
+  for (const r of records.leave) {
+    if (!leaveRecordKept(r, today)) continue
+    const until = leaveRecordKeptUntil(r)
+    if (!leave || until > leave) leave = until
+  }
+  const still = (d: string | undefined) => (d && d > today ? d : null)
+  const pay = still(paid === undefined ? undefined : yearsAfter(paid, PAID_WORK_YEARS))
+  const kept = still(leave)
+  return { pay, leave: kept, until: pay && kept ? (pay > kept ? pay : kept) : (pay ?? kept) }
+}
+
+/**
+ * The day a person's name can go, while that is still to come: the later
+ * of the day their pay records can go (an approval in June 2026 keeps it
+ * until 1 January 2033) and the day their leave records can (leave in
+ * 2026, until 1 January 2030). Null when nothing on record needs it.
+ */
+export function nameKeptUntil(records: KeptRecords, today: string): string | null {
+  return nameKept(records, today).until
 }
 
 /**
  * A person as erasing leaves them. Every field is named, not copied, so a
  * field added to a person later fails to compile here until someone says
  * whether it goes. Kept: the id and whether they're staff, which says
- * nothing about them but how they were paid, and the name while Revenue
- * needs it. The level goes back to the default, which says nothing about
- * them either. The link secret goes: the server gives the row a new
- * random one that matches nothing, and devices are sent none.
+ * nothing about them but how they were paid, and the name while their pay
+ * or leave records need it. The level goes back to the default, which
+ * says nothing about them either. The link secret goes: the server gives
+ * the row a new random one that matches nothing, and devices are sent
+ * none.
  */
 export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'>, keepName: boolean): Person {
   return {
@@ -129,7 +210,7 @@ const only =
  * checks every command naming a person is listed.
  */
 export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
-  // The name is the one they have now: "Erased person", or the name Revenue's six years keep.
+  // The name is the one they have now: "Erased person", or the name kept with their pay or leave records.
   'person.upsert': { names: { field: 'id' }, refused: true, keep: (a, name) => ({ ...only('id', 'kind')(a), name }) },
   // Which details changed, never what to: the history's words need only that.
   'person.contact': {
@@ -145,6 +226,8 @@ export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
   // Their answer stays as a record of work; what they wrote with it goes.
   'offer.respond': { names: { field: 'id', via: 'offer' }, refused: true, keep: (a) => ({ ...a, note: '' }) },
   'timesheet.send': { names: { field: 'id', via: 'offer' }, refused: true, keep: (a) => ({ ...a, note: '' }) },
+  // Leave keeps no dates, notes or reasons here. A record kept under the Working Time Act holds its own dates, days and
+  // decision, which the history reads from it; once its three years are up it goes, and nothing here names a day.
   'leave.request': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId', 'type') },
   'leave.cancel': { names: { field: 'id', via: 'leaveRequest' }, refused: true, keep: as },
   'leave.decide': { names: { field: 'id', via: 'leaveRequest' }, refused: true, keep: (a) => ({ ...a, reason: '' }) },

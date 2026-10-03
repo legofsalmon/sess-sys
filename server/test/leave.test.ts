@@ -11,6 +11,7 @@ import {
   type CommandName,
   type LeaveAllowance,
   type LeaveRequest,
+  type LeaveYear,
   type LieuEntry,
   type MutationResult,
   type Person,
@@ -20,18 +21,27 @@ import {
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
-import { pgliteDb } from '../src/db.ts'
+import { pgliteDb, type Db } from '../src/db.ts'
+import { LEAVE, LEAVE_YEARS_OPEN } from '../src/leave/schema.ts'
+import { runMigrations } from '../src/migrations.ts'
+import { migrateAll, MODULES } from '../src/modules.ts'
 import { flashOf, IPHONE, server, staff, WINDOWS } from './people.ts'
 
 /**
  * Staff leave and time in lieu (ADR 0024): the rules the server keeps, one
  * by one, with staff signed in on their own devices; what approved leave
- * does to the planner, offers and the person's calendar feed; and the
- * device saying who it is while sign-in is off.
+ * does to the planner, offers and the person's calendar feed; the device
+ * saying who it is while sign-in is off; and the years the office opens.
  */
 
 const today = irishToday()
 const day = (n: number) => addDays(today, n)
+
+/**
+ * Years opened for leave in a test's setup, straight into the table as the migration opens a year with leave in it:
+ * the tests use 2031 for its fixed weekdays, which no approver can open today, as only this year and next open.
+ */
+const openYears = (db: Db, ...years: number[]) => db.query(`INSERT INTO leave_years (year) SELECT unnest($1::int[]) ON CONFLICT DO NOTHING`, [years])
 
 /** Colly approves time off; Aoife and Cian are staff; Dara is a freelancer. Each staff account's email is on their person. */
 async function company() {
@@ -52,6 +62,7 @@ async function company() {
   })
   for (const p of [person('colly', 'Colly Hewson', 'Colly@SessionHire.com', 'staff', true), person('aoife', 'Aoife Byrne', aoife.email), person('cian', 'Cian Murphy', cian.email), person('dara', 'Dara Quinn', null, 'freelancer')])
     expect(await colly.send('person.upsert', p)).toMatchObject({ status: 'applied' })
+  await openYears(db, 2031)
   return { app, db, colly, aoife, cian }
 }
 
@@ -107,8 +118,9 @@ describe('asking for leave', () => {
   })
 
   it('cannot ask for more than is left this year, nor be approved past it', async () => {
-    const { aoife, colly } = await company()
-    expect(await colly.send('leave.allowance', { personId: 'aoife', year: 2031, days: 6, carriedOver: 0, note: '' })).toMatchObject({ status: 'applied' })
+    const { aoife, colly, db } = await company()
+    // Her 2031 allowance, which an approver could set only in 2030 or 2031, put straight in: this is about what's left.
+    await db.query(`INSERT INTO leave_allowances (id, person_id, year, days, carried_over, note) VALUES ('aoife-2031', 'aoife', 2031, 6, 0, '')`)
     expect(await aoife.send('leave.request', week('r1', 'aoife'))).toMatchObject({ status: 'applied' })
     // Waiting requests don't hold days, so a second week can be asked for; approving the first leaves one day.
     expect(await aoife.send('leave.request', week('r2', 'aoife', { start: '2031-03-10', end: '2031-03-14' }))).toMatchObject({ status: 'applied' })
@@ -216,8 +228,9 @@ describe('deciding', () => {
 
 describe('days in lieu', () => {
   it('are logged for a day worked, approved, taken as leave, and then cannot be un-earned', async () => {
-    const { aoife, colly } = await company()
+    const { aoife, colly, db } = await company()
     const worked = day(-9)
+    await openYears(db, Number(worked.slice(0, 4)))
     expect(refused(await aoife.send('lieu.log', { id: 'e-soon', personId: 'aoife', day: day(1), days: 1, note: '' }))).toMatch(/hasn't come yet/)
     expect(await aoife.send('lieu.log', { id: 'e1', personId: 'aoife', day: worked, days: 1, note: 'Drove the kit back' })).toMatchObject({ status: 'applied' })
     expect(refused(await aoife.send('lieu.log', { id: 'e-twice', personId: 'aoife', day: worked, days: 1, note: '' }))).toMatch(/is already logged\.$/)
@@ -242,16 +255,19 @@ describe('days in lieu', () => {
 
 describe('allowances', () => {
   it('are set by an approver, for staff only, and read as 20 days until then', async () => {
+    // Next year's, as an allowance can now be set only for this year or next.
     const { app, aoife, colly } = await company()
+    const next = Number(today.slice(0, 4)) + 1
     const before = await synced(app, aoife.cookies)
-    expect(before.leave.balance('aoife', 2031)).toMatchObject({ allowance: 20, carriedOver: 0, allowanceSet: false })
-    expect(refused(await colly.send('leave.allowance', { personId: 'dara', year: 2031, days: 20, carriedOver: 0, note: '' }))).toBe('Only staff have an allowance; Dara Quinn is a freelancer.')
-    expect(await colly.send('leave.allowance', { personId: 'aoife', year: 2031, days: 22, carriedOver: 2, note: 'Two days left from 2030', by: 'colly' })).toMatchObject({ status: 'applied' })
-    expect(await colly.record<LeaveAllowance>('leaveAllowance', 'aoife-2031')).toEqual({ id: 'aoife-2031', personId: 'aoife', year: 2031, days: 22, carriedOver: 2, note: 'Two days left from 2030' })
+    expect(before.leave.balance('aoife', next)).toMatchObject({ allowance: 20, carriedOver: 0, allowanceSet: false })
+    expect(refused(await colly.send('leave.allowance', { personId: 'dara', year: next, days: 20, carriedOver: 0, note: '' }))).toBe('Only staff have an allowance; Dara Quinn is a freelancer.')
+    const note = `Two days left from ${next - 1}`
+    expect(await colly.send('leave.allowance', { personId: 'aoife', year: next, days: 22, carriedOver: 2, note, by: 'colly' })).toMatchObject({ status: 'applied' })
+    expect(await colly.record<LeaveAllowance>('leaveAllowance', `aoife-${next}`)).toEqual({ id: `aoife-${next}`, personId: 'aoife', year: next, days: 22, carriedOver: 2, note })
     const after = await synced(app, aoife.cookies)
-    expect(after.leave.balance('aoife', 2031)).toMatchObject({ allowance: 22, carriedOver: 2, allowanceSet: true, annual: { left: 24 } })
+    expect(after.leave.balance('aoife', next)).toMatchObject({ allowance: 22, carriedOver: 2, allowanceSet: true, annual: { left: 24 } })
     const history = await colly.history()
-    expect(history.entries[0]).toMatchObject({ who: { name: 'Colly Hewson' }, what: "Colly Hewson set Aoife Byrne's 2031 allowance to 22 days, 2 carried over" })
+    expect(history.entries[0]).toMatchObject({ who: { name: 'Colly Hewson' }, what: `Colly Hewson set Aoife Byrne's ${next} allowance to 22 days, 2 carried over` })
   })
 })
 
@@ -265,6 +281,7 @@ describe('while sign-in is off', () => {
     }
     const person = (id: string, name: string, approvesLeave = false): CommandInput<'person.upsert'> => ({ id, name, kind: 'staff', email: null, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave })
     for (const p of [person('colly', 'Colly Hewson', true), person('aoife', 'Aoife Byrne'), person('cian', 'Cian Murphy')]) expect(await send('person.upsert', p)).toMatchObject({ status: 'applied' })
+    await openYears(db, 2031)
     // Nobody is signed in, so a request for anyone goes through, as the rest of the app trusts a device today.
     expect(await send('leave.request', week('r1', 'aoife'))).toMatchObject({ status: 'applied' })
     expect(refused(await send('leave.decide', { id: 'r1', approved: true, reason: '' }))).toBe('Say who you are first: pick your name on the Leave screen.')
@@ -285,3 +302,88 @@ describe('while sign-in is off', () => {
   })
 })
 
+
+describe('the years open for leave', () => {
+  const year = Number(today.slice(0, 4))
+  /** A working day in early February of a year, for a one-day request. */
+  const february = (y: number) => workingDays(`${y}-02-02`, `${y}-02-08`)[0]!
+  const one = (id: string, y: number): CommandInput<'leave.request'> => ({ id, personId: 'aoife', type: 'annual', start: february(y), end: february(y), note: '' })
+
+  it('are opened by an approver only, this year or next, and opening again changes nothing', async () => {
+    // Proves: Colly's decision (3 October 2026): the office opens each year. Without the flag it's refused; a year before
+    // this one or after next is refused, so a slip can't open 2062, and a number that isn't a year is refused with the
+    // years written as years; next year opens, devices hear of it, the history says who opened it, and a second Open, as
+    // a phone sending twice does, writes nothing more.
+    const { app, cian, colly } = await company()
+    expect(refused(await cian.send('leave.open', { year: year + 1 }))).toMatch(/^Only someone who can approve time off can do this/)
+    expect(refused(await colly.send('leave.open', { year: year + 2 }))).toBe(`Only this year or next can be opened for leave: ${year} or ${year + 1}.`)
+    expect(refused(await colly.send('leave.open', { year: year - 1 }))).toBe(`Only this year or next can be opened for leave: ${year} or ${year + 1}.`)
+    expect(refused(await colly.send('leave.open', { year: year + 0.5 }))).toBe('The year is a whole number from 2000 to 2999.')
+    expect(await colly.send('leave.open', { year: year + 1 })).toMatchObject({ status: 'applied' })
+    expect(await colly.record<LeaveYear>('leaveYear', String(year + 1))).toMatchObject({ id: String(year + 1), year: year + 1 })
+    expect(await colly.send('leave.open', { year: year + 1 })).toMatchObject({ status: 'applied' })
+    const changes = (await app.inject({ url: '/api/sync/pull?after=0', cookies: colly.cookies })).json().changes as { entity: string }[]
+    expect(changes.filter((c) => c.entity === 'leaveYear')).toHaveLength(1)
+    const view = await synced(app, colly.cookies)
+    expect([view.leave.isOpen(year + 1), view.leave.toOpen]).toEqual([true, year])
+    const history = await colly.history()
+    expect(history.entries.map((e) => [e.who.name, e.what, e.outcome])).toContainEqual(['Colly Hewson', `Opened ${year + 1} for leave`, 'done'])
+  })
+
+  it('takes a request only in an open year, in the words the device uses, and takes it once the year is open', async () => {
+    // Proves: next year, not open yet, is refused as the Leave screen says it before sending; last year, never opened
+    // here, can't be now; once an approver opens next year, the same request goes in, waiting. A day in lieu is logged
+    // for a day already worked, so it needs no open year.
+    const { aoife, colly } = await company()
+    expect(refused(await aoife.send('leave.request', one('r-next', year + 1)))).toBe(`Leave for ${year + 1} isn't open yet. The office opens each year when it's ready.`)
+    expect(refused(await aoife.send('leave.request', one('r-last', year - 1)))).toBe(`Leave for ${year - 1} isn't open, and only this year and next can be opened.`)
+    expect(await aoife.send('lieu.log', { id: 'e-last', personId: 'aoife', day: `${year - 1}-12-13`, days: 1, note: '' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('leave.open', { year: year + 1 })).toMatchObject({ status: 'applied' })
+    expect(await aoife.send('leave.request', one('r-next', year + 1))).toMatchObject({ status: 'applied' })
+    expect(await aoife.record<LeaveRequest>('leaveRequest', 'r-next')).toMatchObject({ start: february(year + 1), status: 'waiting' })
+  })
+
+  it('take allowances for this year or next only, next year\'s before it opens', async () => {
+    // Proves: next year's allowances can be set while it is still shut, so they're ready the day it opens; this year's as
+    // before; and a year gone or after next is refused, as a typo would otherwise set 2062's.
+    const { colly } = await company()
+    const allowance = (y: number): CommandInput<'leave.allowance'> => ({ personId: 'aoife', year: y, days: 22, carriedOver: 0, note: '' })
+    expect(await colly.send('leave.allowance', allowance(year + 1))).toMatchObject({ status: 'applied' })
+    expect(await colly.send('leave.allowance', allowance(year))).toMatchObject({ status: 'applied' })
+    for (const y of [year - 1, year + 2]) expect(refused(await colly.send('leave.allowance', allowance(y)))).toBe(`Allowances are set for this year or next only: ${year} or ${year + 1}.`)
+  })
+
+  it('open, by the migration, this year and every year up to next with leave in it on a server in use, and none on an empty one', async () => {
+    // Proves: on the live server nothing stops working. A database as it was the day before, with a request two years
+    // ago, a day in lieu last year and an allowance typed for three years on, opens the first two years and this one,
+    // and tells devices through the feed as the server's own, outside anyone's history. Next year stays shut, and so
+    // does the year typed far ahead, as no approver could open it. A new, empty database opens nothing, so it stays
+    // empty for made-up data.
+    const db = await pgliteDb()
+    for (const mod of MODULES) await runMigrations(db, mod, mod === LEAVE ? LEAVE_YEARS_OPEN - 1 : undefined)
+    await db.query(`INSERT INTO people (id, name, kind, link_token) VALUES ('aoife', 'Aoife Byrne', 'staff', 'aoife-link-token-000000000000')`)
+    await db.query(`INSERT INTO changes (entity, entity_id, op, data) VALUES ('person', 'aoife', 'put', '{"id": "aoife", "name": "Aoife Byrne", "kind": "staff"}')`)
+    await db.query(`INSERT INTO leave_requests (id, person_id, type, start_day, end_day, days, status) VALUES ('r-old', 'aoife', 'annual', $1, $1, 1, 'approved')`, [february(year - 2)])
+    await db.query(`INSERT INTO lieu_entries (id, person_id, day, days, status) VALUES ('e-last', 'aoife', $1, 1, 'approved')`, [`${year - 1}-12-13`])
+    await db.query(`INSERT INTO leave_allowances (id, person_id, year, days) VALUES ($1, 'aoife', $2, 20)`, [`aoife-${year + 3}`, year + 3])
+    const app = await buildApp({ db })
+    const opened = [year - 2, year - 1, year]
+    expect((await db.query<{ year: number }>(`SELECT year FROM leave_years ORDER BY year`)).rows.map((r) => r.year)).toEqual(opened)
+    const feed = (await db.query<{ id: string; data: LeaveYear; mutation_id: string | null }>(`SELECT entity_id AS id, data, mutation_id FROM changes WHERE entity = 'leaveYear' ORDER BY seq`)).rows
+    expect(feed.map((c) => [c.id, c.data.id, c.data.year, c.mutation_id])).toEqual(opened.map((y) => [String(y), String(y), y, null]))
+    expect(feed.every((c) => !Number.isNaN(Date.parse(c.data.openedAt)))).toBe(true)
+    const send = async (args: CommandInput<'leave.request'>): Promise<MutationResult> =>
+      (await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [{ id: newId(), name: 'leave.request', args, createdAt: new Date().toISOString() }] } })).json()
+        .results[0]
+    expect(await send(one('r-last', year - 1))).toMatchObject({ status: 'applied' })
+    for (const y of [year + 1, year + 3]) expect(refused(await send(one(`r-${y}`, y)))).toBe(`Leave for ${y} isn't open yet. The office opens each year when it's ready.`)
+    await app.close()
+    await db.close()
+
+    const empty = await pgliteDb()
+    await migrateAll(empty)
+    expect((await empty.query(`SELECT year FROM leave_years`)).rows).toEqual([])
+    expect((await empty.query(`SELECT 1 FROM changes`)).rows).toEqual([])
+    await empty.close()
+  })
+})

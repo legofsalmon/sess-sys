@@ -31,7 +31,8 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * - the office's own details, on every freelancer page, and a freelancer
  *   who was booked and can't make it any more, waiting in "Answers to
  *   check" beside the decline;
- * - staff leave (ADR 0024): the staff's allowances for this year, Aoife
+ * - staff leave (ADR 0024): this year open for leave and next year not, so
+ *   opening it can be tried; the staff's allowances for this year, Aoife
  *   approving time off, Cian waiting on a week's leave and a day in lieu,
  *   and Orla's week last month approved, so her days off are in the planner;
  * - profiles (ADR 0025): departments and levels, a certificate in date and
@@ -152,12 +153,17 @@ export function madeUpData(today: string): Mutation[] {
   add('person.archive', { id: ronan, archived: true })
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
 
-  // Staff leave (ADR 0024). A week counted from today, moved a week on when it would cross the year end, since a request belongs to one year.
-  const week = (from: number): [string, string] => {
-    const [s, e] = [day(from), day(from + 4)]
-    return s.slice(0, 4) === e.slice(0, 4) ? [s, e] : from < 0 ? [day(from - 7), day(from - 3)] : [day(from + 7), day(from + 11)]
-  }
+  // Staff leave (ADR 0024). Only this year is open, so an approver can try opening next year (Colly, 3 October 2026). A week
+  // counted from today is moved by whole weeks until it's all in this year: early in January Orla's comes after today,
+  // and late in December Cian's before it.
   const year = Number(today.slice(0, 4))
+  const week = (from: number): [string, string] => {
+    let n = from
+    while (Number(day(n).slice(0, 4)) < year) n += 7
+    while (Number(day(n + 4).slice(0, 4)) > year) n -= 7
+    return [day(n), day(n + 4)]
+  }
+  add('leave.open', { year, by: aoife })
   for (const [personId, days, carriedOver] of [[aoife, 22, 2], [cian, 20, 0], [orla, 20, 3]] as const)
     add('leave.allowance', { personId, year, days, carriedOver, note: '', by: aoife })
   const [orlaStart, orlaEnd] = week(-20)

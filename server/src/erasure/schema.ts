@@ -6,7 +6,7 @@ import type { Module } from '../migrations.ts'
  * backed up and exported like every module's tables.
  *
  * Ids and dates only, nothing about the person: their id, when, and the
- * day their name can go if it was kept for Revenue's six years. No
+ * day their name can go if it was kept for their pay or leave records. No
  * reference to `people`: a restore of a backup from before someone was
  * added still keeps them on the list, so nothing sent again afterwards
  * can bring them back.

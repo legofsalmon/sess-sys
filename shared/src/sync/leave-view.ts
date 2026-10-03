@@ -1,5 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { HOLDING } from '../crew.ts'
+import { leaveRecordKept } from '../erasure.ts'
 import {
   allowanceId,
   canApproveLeave,
@@ -7,11 +8,14 @@ import {
   leaveDays,
   leaveLabel,
   leaveSpanLabel,
+  nearYears,
+  noOpenReason,
   requestsOverlap,
   type LeaveAllowance,
   type LeaveBalance,
   type LeaveEntities,
   type LeaveRequest,
+  type LeaveYear,
   type LieuEntry,
 } from '../leave.ts'
 import type { CrewView, PersonView } from './crew-view.ts'
@@ -32,6 +36,9 @@ export interface LieuEntryView extends LieuEntry {
   person: PersonView | undefined
 }
 export interface LeaveAllowanceView extends LeaveAllowance {
+  pending: boolean
+}
+export interface LeaveYearView extends LeaveYear {
   pending: boolean
 }
 
@@ -60,11 +67,24 @@ export interface LeaveView {
   staff: PersonView[]
   /** Staff who can approve time off. */
   approvers: PersonView[]
+  /** The years open for leave, by year. */
+  years: LeaveYearView[]
+  isOpen(year: number): boolean
+  /** This year, or else next, while it isn't open: what an approver is offered to open. */
+  toOpen: number | undefined
 }
 
 type Tables = { [E in keyof LeaveEntities]: Record<string, LeaveEntities[E]> }
 
-export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number, crew: CrewView, today: string): LeaveView {
+export function leaveView(
+  entities: Partial<Tables>,
+  outbox: readonly (Mutation & { appliedSeq?: number })[],
+  cursor: number,
+  crew: CrewView,
+  today: string,
+  /** People erased on request, an erasure still to send included (ADR 0027). */
+  erased: Readonly<Record<string, { pending: boolean; nameKeptUntil: string | null }>> = {}
+): LeaveView {
   const people = new Map(crew.people.map((p) => [p.id, p]))
   const requests = new Map<string, LeaveRequestView>()
   // Snapshots saved before leave existed have no tables for it.
@@ -73,6 +93,8 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
   for (const e of Object.values(entities.lieuEntry ?? {})) entries.set(e.id, { ...e, pending: false, person: people.get(e.personId) })
   const allowances = new Map<string, LeaveAllowanceView>()
   for (const a of Object.values(entities.leaveAllowance ?? {})) allowances.set(a.id, { ...a, pending: false })
+  const years = new Map<number, LeaveYearView>()
+  for (const y of Object.values(entities.leaveYear ?? {})) years.set(y.year, { ...y, pending: false })
 
   const decided = (status: 'approved' | 'declined', a: { reason: string; by?: string }, at: string) => ({
     status,
@@ -136,8 +158,29 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
         allowances.set(id, { id, personId: a.personId, year: a.year, days: a.days, carriedOver: a.carriedOver, note: a.note, pending: true })
         break
       }
+      case 'leave.open': {
+        const { year } = m.args as CommandArgs<'leave.open'>
+        // As the server will have it: opening again changes nothing, and only this year or next opens.
+        if (!years.has(year) && noOpenReason(year, today) === null) years.set(year, { id: String(year), year, openedAt: m.createdAt, pending: true })
+        break
+      }
     }
   }
+
+  // Someone erased (ADR 0027): their leave as the server leaves it, kept under the Working Time Act without what anyone
+  // wrote in it. An erasure still to send also drops what the server will delete: records whose three years are up, and
+  // all of them when the name goes, as a record has to say whose it is.
+  const erasing = <R extends LeaveRequest | LieuEntry | LeaveAllowance>(records: Map<string, R>, clear: Partial<R>) => {
+    for (const r of records.values()) {
+      const e = erased[r.personId]
+      if (!e) continue
+      if (e.pending && (e.nameKeptUntil === null || !leaveRecordKept(r, today))) records.delete(r.id)
+      else records.set(r.id, { ...r, ...clear })
+    }
+  }
+  erasing(requests, { note: '', reason: '' })
+  erasing(entries, { note: '', reason: '' })
+  erasing(allowances, { note: '' })
 
   const allRequests = [...requests.values()].sort((a, b) => a.start.localeCompare(b.start) || a.requestedAt.localeCompare(b.requestedAt) || a.id.localeCompare(b.id))
   const allEntries = [...entries.values()].sort((a, b) => a.day.localeCompare(b.day) || a.loggedAt.localeCompare(b.loggedAt) || a.id.localeCompare(b.id))
@@ -185,6 +228,9 @@ export function leaveView(entities: Partial<Tables>, outbox: readonly (Mutation 
     queue,
     staff,
     approvers: staff.filter(canApproveLeave),
+    years: [...years.values()].sort((a, b) => a.year - b.year),
+    isOpen: (year) => years.has(year),
+    toOpen: nearYears(today).find((y) => !years.has(y)),
   }
 }
 

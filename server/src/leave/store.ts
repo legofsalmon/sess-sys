@@ -1,4 +1,4 @@
-import { allowanceId, leaveBalance, type LeaveAllowance, type LeaveBalance, type LeaveRequest, type LieuEntry } from '@sh/shared'
+import { allowanceId, leaveBalance, type LeaveAllowance, type LeaveBalance, type LeaveRequest, type LeaveYear, type LieuEntry } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading leave rows back as the entities devices see (ADR 0024). */
@@ -39,8 +39,17 @@ export const toEntry = (r: Row): LieuEntry => ({
   reason: r.reason,
 })
 
+export async function getYear(q: Queryable, year: number): Promise<LeaveYear | undefined> {
+  const { rows } = await q.query<Row>(`SELECT year, opened_at FROM leave_years WHERE year = $1`, [year])
+  return rows[0] ? { id: String(rows[0].year), year: rows[0].year, openedAt: at(rows[0].opened_at)! } : undefined
+}
+
 export async function getAllowance(q: Queryable, personId: string, year: number) {
-  const { rows } = await q.query(`SELECT ${ALLOWANCE} FROM leave_allowances WHERE id = $1`, [allowanceId(personId, year)])
+  return getAllowanceById(q, allowanceId(personId, year))
+}
+
+export async function getAllowanceById(q: Queryable, id: string) {
+  const { rows } = await q.query(`SELECT ${ALLOWANCE} FROM leave_allowances WHERE id = $1`, [id])
   return rows[0] ? toAllowance(rows[0]) : undefined
 }
 

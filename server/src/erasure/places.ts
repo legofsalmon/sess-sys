@@ -4,12 +4,15 @@ import {
   ERASED_NAME,
   erasedPerson,
   keptArgs,
+  leaveRecordKept,
   nameKeptUntil,
   PERSON_COMMANDS,
   phoneDigits,
   type CommandName,
   type EntityName,
   type Erasure,
+  type KeptRecords,
+  type LeaveRecord,
   type Person,
   type PersonRecord,
 } from '@sh/shared'
@@ -18,6 +21,7 @@ import { getOffer, getPerson } from '../crew/store.ts'
 import { getTimesheet } from '../crew/timesheets.ts'
 import type { Queryable } from '../db.ts'
 import { emit, emitRemoved, type Ctx } from '../kernel.ts'
+import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
 
 /**
  * Everywhere a person's details live on the server, and what erasing them
@@ -53,11 +57,8 @@ export const GONE: readonly Gone[] = [
   // offers and calls: nothing that clears those later can trip on them. The office's queue and the contact's call sheet
   // lose the note with it.
   { table: 'running_late', entity: 'runningLate' },
-  // Days off, approved leave's included: those have the request's id.
+  // Days off, approved leave's included: those have the request's id. The request is the record of the leave (LEAVE, below).
   { table: 'unavailability', entity: 'unavailability' },
-  { table: 'leave_requests', entity: 'leaveRequest' },
-  { table: 'lieu_entries', entity: 'lieuEntry' },
-  { table: 'leave_allowances', entity: 'leaveAllowance' },
   // Their address on Google Calendar invites, which devices never see. While invites are on, a day still to come keeps
   // theirs until the calendar's next run takes them off its event, and that run removes the row: gone now, it would
   // leave them on the event as a guest added by hand. Past events in Google keep theirs (ADR 0027).
@@ -86,6 +87,28 @@ export const STRIPPED: readonly Stripped[] = [
   { table: 'offers', entity: 'offer', clear: { note: '' }, fields: { note: '' }, read: getOffer },
   // Timesheets keep their figures, and the office's note on them; the freelancer's own note goes.
   { table: 'timesheets', entity: 'timesheet', theirs: BY_BOOKING('id'), clear: { note: '' }, fields: { note: '' }, read: getTimesheet },
+]
+
+/** Records of theirs the law asks the business to keep for a time: stripped like STRIPPED while it lasts, then gone like GONE. */
+interface ForATime extends Stripped {
+  /** The columns the shared rule reads a leave record by (`LeaveRecord`): which year it belongs to, and its status. */
+  record: string
+}
+
+/**
+ * Their staff leave (ADR 0024). The Working Time Act asks for records of
+ * leave to be kept for three years (LEAVE_RECORD_YEARS), so each stays
+ * until three whole years after the end of its year, saying whose it is,
+ * what, when, how many days, and who decided it and when. The person's
+ * note, the approver's reason and the allowance's note go. Once its three
+ * years are up it goes (the server looks each day: due.ts), and every one
+ * left goes with the name: a record has to say whose it is. One still
+ * waiting for a decision goes at once (leaveRecordKept).
+ */
+export const LEAVE: readonly ForATime[] = [
+  { table: 'leave_requests', entity: 'leaveRequest', record: 'end_day::text AS "end", status', clear: { note: '', reason: '' }, fields: { note: '', reason: '' }, read: getRequest },
+  { table: 'lieu_entries', entity: 'lieuEntry', record: 'day::text AS day, status', clear: { note: '', reason: '' }, fields: { note: '', reason: '' }, read: getEntry },
+  { table: 'leave_allowances', entity: 'leaveAllowance', record: 'year', clear: { note: '' }, fields: { note: '' }, read: getAllowanceById },
 ]
 
 /**
@@ -128,20 +151,27 @@ export async function readErasure(q: Queryable, personId: string): Promise<Erasu
   return r && { id: r.person_id, erasedAt: new Date(r.erased_at).toISOString(), nameKeptUntil: r.name_kept_until ?? null }
 }
 
-/** The day their name can go, from their approved timesheets: null when they have no paid work in the last six years. */
-export async function keptByTimesheets(q: Queryable, personId: string, today: string): Promise<string | null> {
+/**
+ * What they have on record that keeps their name: their approved
+ * timesheets and their staff leave, read as a device reads its copy
+ * (keptRecordsOf in shared/src/sync/erasure-view.ts), so the two decide
+ * the same day with the same rule (nameKept in shared/src/erasure.ts).
+ */
+export async function keptRecords(q: Queryable, personId: string): Promise<KeptRecords> {
   const { rows } = await q.query<{ approved_at: Date | string }>(
     `SELECT t.approved_at FROM timesheets t JOIN offers o ON o.id = t.id WHERE o.person_id = $1 AND t.status = 'approved' AND t.approved_at IS NOT NULL`,
     [personId]
   )
-  return nameKeptUntil(rows.map((r) => new Date(r.approved_at).toISOString()), today)
+  const leave: LeaveRecord[] = []
+  for (const l of LEAVE) leave.push(...(await q.query<LeaveRecord>(`SELECT ${l.record} FROM ${l.table} WHERE ${BY_PERSON}`, [personId])).rows)
+  return { approvedAt: rows.map((r) => new Date(r.approved_at).toISOString()), leave }
 }
 
 export interface EraseHow {
   today: string
   /** When it was first done, for a restore doing it again. */
   at?: string
-  /** The decision about the name, for a restore doing it again; otherwise worked out from their timesheets. */
+  /** The decision about the name, for a restore doing it again; otherwise worked out from their pay and leave records. */
   nameKeptUntil?: string | null
 }
 
@@ -149,14 +179,16 @@ export interface EraseHow {
  * Erase a person's details everywhere they live, inside the caller's
  * command or server change. No checks: the command checks first, and a
  * restore applying an erasure again owes the person it whatever the copy
- * says. Doing it twice changes nothing more, except that a name kept for
- * six years goes once they're up. A name once gone never comes back.
+ * says. Doing it again changes nothing more, except that leave records
+ * whose three years are up go, and a kept name goes once its day has
+ * come, with the leave records still kept for it. A name once gone never
+ * comes back.
  */
 export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Promise<Erasure> {
   const { tx } = ctx
   const before = await getPerson(tx, personId)
   const was = await readErasure(tx, personId)
-  let kept = how.nameKeptUntil !== undefined ? how.nameKeptUntil : await keptByTimesheets(tx, personId, how.today)
+  let kept = how.nameKeptUntil !== undefined ? how.nameKeptUntil : nameKeptUntil(await keptRecords(tx, personId), how.today)
   if ((kept !== null && kept <= how.today) || (was && was.nameKeptUntil === null)) kept = null
   const erasure: Erasure = { id: personId, erasedAt: was?.erasedAt ?? how.at ?? new Date().toISOString(), nameKeptUntil: kept }
 
@@ -185,24 +217,18 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
       await tx.query(`DELETE FROM ${g.table} WHERE ${theirs}`, [personId])
       continue
     }
-    const copies = await idsOf(tx, `SELECT id FROM ${g.table} WHERE ${theirs}`, personId, g.entity)
-    const { rows } = await tx.query<{ id: string }>(`DELETE FROM ${g.table} WHERE ${theirs} RETURNING id`, [personId])
-    await tx.query(`UPDATE changes SET op = 'delete', data = NULL WHERE entity = $1 AND entity_id = ANY($2::text[])`, [g.entity, copies])
-    for (const { id } of rows) await emitRemoved(ctx, g.entity, id)
+    await remove(ctx, personId, { table: g.table, entity: g.entity, theirs }, await idsOf(tx, `SELECT id FROM ${g.table} WHERE ${theirs}`, personId, g.entity))
   }
 
-  for (const s of STRIPPED) {
-    const ids = await idsOf(tx, `SELECT id FROM ${s.table} WHERE ${s.theirs ?? BY_PERSON}`, personId)
-    if (!ids.length) continue
-    const cols = Object.keys(s.clear)
-    const { rows } = await tx.query<{ id: string }>(
-      `UPDATE ${s.table} SET ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')}
-        WHERE id = ANY($1::text[]) AND (${cols.map((c, i) => `${c} IS DISTINCT FROM $${i + 2}`).join(' OR ')}) RETURNING id`,
-      [ids, ...cols.map((c) => s.clear[c])]
-    )
-    await tx.query(`UPDATE changes SET data = data || $3::jsonb WHERE entity = $1 AND entity_id = ANY($2::text[]) AND op = 'put'`, [s.entity, ids, JSON.stringify(s.fields)])
-    for (const { id } of rows) await emit(ctx, s.entity, id, await s.read(tx, id))
+  // Their leave: each decided record still in its three years stays, without its words, while the name does; the rest go.
+  for (const l of LEAVE) {
+    const { rows } = await tx.query<LeaveRecord & { id: string }>(`SELECT id, ${l.record} FROM ${l.table} WHERE ${BY_PERSON}`, [personId])
+    const stay = new Set(kept === null ? [] : rows.filter((r) => leaveRecordKept(r, how.today)).map((r) => r.id))
+    await remove(ctx, personId, l, (await idsOf(tx, `SELECT id FROM ${l.table} WHERE ${BY_PERSON}`, personId, l.entity)).filter((id) => !stay.has(id)))
+    await strip(ctx, l, [...stay])
   }
+
+  for (const s of STRIPPED) await strip(ctx, s, await idsOf(tx, `SELECT id FROM ${s.table} WHERE ${s.theirs ?? BY_PERSON}`, personId))
 
   // Their own row, and every earlier copy of it, as erasing leaves it. A new link secret matches no old link or feed address.
   const after = erasedPerson(before, kept !== null)
@@ -231,6 +257,32 @@ async function idsOf(tx: Queryable, sql: string, personId: string, entity?: Enti
     for (const r of copies) ids.add(r.id)
   }
   return [...ids]
+}
+
+/**
+ * Records of theirs deleted, and every earlier copy of them in the change
+ * feed made a deletion, so a new device's first sync finds none. `ids`
+ * holds the feed's copies as well as the rows still here.
+ */
+async function remove(ctx: Ctx, personId: string, place: { table: string; entity: EntityName; theirs?: string }, ids: string[]) {
+  if (!ids.length) return
+  const { table, entity } = place
+  const { rows } = await ctx.tx.query<{ id: string }>(`DELETE FROM ${table} WHERE ${place.theirs ?? BY_PERSON} AND id = ANY($2::text[]) RETURNING id`, [personId, ids])
+  await ctx.tx.query(`UPDATE changes SET op = 'delete', data = NULL WHERE entity = $1 AND entity_id = ANY($2::text[])`, [entity, ids])
+  for (const { id } of rows) await emitRemoved(ctx, entity, id)
+}
+
+/** Records kept without what was written in them, in the rows and in every earlier copy in the change feed; devices are sent each one that changed. */
+async function strip(ctx: Ctx, s: Stripped, ids: string[]) {
+  if (!ids.length) return
+  const cols = Object.keys(s.clear)
+  const { rows } = await ctx.tx.query<{ id: string }>(
+    `UPDATE ${s.table} SET ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')}
+      WHERE id = ANY($1::text[]) AND (${cols.map((c, i) => `${c} IS DISTINCT FROM $${i + 2}`).join(' OR ')}) RETURNING id`,
+    [ids, ...cols.map((c) => s.clear[c])]
+  )
+  await ctx.tx.query(`UPDATE changes SET data = data || $3::jsonb WHERE entity = $1 AND entity_id = ANY($2::text[]) AND op = 'put'`, [s.entity, ids, JSON.stringify(s.fields)])
+  for (const { id } of rows) await emit(ctx, s.entity, id, await s.read(ctx.tx, id))
 }
 
 /**
@@ -264,10 +316,10 @@ async function accountsOf(tx: Queryable, emails: string[]): Promise<string[]> {
 /**
  * A staff account of theirs: every session ended, so their devices are
  * signed out at once; the name the history shows becomes "Erased person",
- * even while their name is kept with their timesheets, which is all
- * Revenue needs; the email, picture and Google id go, and it is switched
- * off, so signing in again with Google starts a new account rather than
- * this one.
+ * even while their name is kept with their timesheets or leave, which
+ * need it only on their person; the email, picture and Google id go, and
+ * it is switched off, so signing in again with Google starts a new
+ * account rather than this one.
  */
 async function eraseAccount(ctx: Ctx, userId: string) {
   const { tx } = ctx

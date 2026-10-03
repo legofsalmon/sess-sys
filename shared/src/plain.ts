@@ -16,10 +16,12 @@ export const text = (max: number, what: string) => z.string().max(max, `${what} 
 export const needed = (max: number, what: string, which: string) => text(max, what).min(1, `${which} is needed.`)
 
 /** A whole number from `min` to `max`, said the same way whichever way it's wrong. */
-export function whole(min: number, max: number, what: string) {
-  const said = `${what} is a whole number from ${min.toLocaleString('en-IE')} to ${max.toLocaleString('en-IE')}.`
+export function whole(min: number, max: number, what: string, said = `${what} is a whole number from ${min.toLocaleString('en-IE')} to ${max.toLocaleString('en-IE')}.`) {
   return z.number({ invalid_type_error: said, required_error: said }).int(said).min(min, said).max(max, said)
 }
+
+/** A year, said as years are written: "from 2000 to 2999", never "2,000". */
+export const wholeYear = (min: number, max: number, what: string) => whole(min, max, what, `${what} is a whole number from ${min} to ${max}.`)
 
 /** Money in euro cents, so sums never drift, up to `maxCents`: "A day rate can be up to €100,000." */
 export function euroCents(maxCents: number, what: string) {

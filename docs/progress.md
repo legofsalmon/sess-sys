@@ -3,6 +3,48 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 3 October 2026: leave years the office opens
+
+**Done**
+
+- **Leave years the office opens** (Colly, 3 October: "the office have
+  to manually open the years for leave. So staff can't apply for leave
+  very far in advance"; ADR 0024 amended). An approver opens each year
+  for leave from the Leave screen, this year or next only, and an open
+  year stays open. Staff can only ask for leave in an open year, and are
+  told plainly when the next one isn't open yet; allowances can be set
+  for this year or next. On the live server the update opens this year,
+  and any earlier year that already holds leave. Since no leave can now
+  be put in a year far ahead, a slip can't keep an erased person's name
+  for decades.
+- Colly confirmed that erasure keeps declined and cancelled leave for
+  three years along with approved leave, and that a kept name lasts as
+  long as the records it's kept for. Both were already so; ADR 0027
+  says it.
+- Found and fixed in review: the update would have opened a year far
+  ahead if an allowance had been typed for one; a year that wasn't a
+  whole number was turned down with "2,000" in its words; the "not
+  done" list wrote a year as "2,026"; and an erasure test could fail by
+  chance when a random id happened to hold one of the words it looked
+  for, about one run in twenty.
+- Checked: the typecheck; the shared tests (169); the server tests (371
+  on PGlite, twice, and the real-Postgres file, 11); the web build; the
+  full browser suite (74), and the history spec five more times.
+
+**Next**
+
+- Merge (Colly: "Finish off that PR"), then check the update on the
+  live server.
+- The small items, being built: the office recording running late for
+  someone who rang in, old running-late notes cleared after their day,
+  the call-changed message naming a change to the certificates a call
+  needs, and documents uploaded with expiry reminders.
+- The stock list next week. On the live server, a list of 1,500 rows is
+  expected to take about 8 to 10 minutes with the page left open.
+- The keys, as before: the Google key, the backups bucket (and a
+  `BACKUP_KEY`), and the Sentry key. Then the real crew list, after
+  Start fresh, and opening 2027 for leave when the office is ready.
+
 ## 2 October 2026: the stock list, item logs, erasure, certificates and running late
 
 **Done**
@@ -76,17 +118,40 @@ waiting on someone.
   web build; the Blueprint build; the full browser suite (72), with the
   new specs run three more times; and screenshots of each new screen at
   phone and laptop widths, light and dark.
+- Merged into `main` at 18:46 UTC once GitHub's checks passed, and live
+  by 18:55: Railway waited for main's checks, then deployed it on its
+  own. The live database has the core schema at version 5, with the old
+  sync test's four empty tables gone; stock at 8, with an item's old
+  number, its PAT due date and the new index; crew at 9, with what a
+  call needs and the running-late table; and erasure's own module at 1.
+  The new import route answers, the start-up log says where the list of
+  erasures is kept while backups are off, and nothing went wrong. The
+  Blueprint rebuilt itself from `main`.
+
+- **Records kept for their recommended time, then let go** (Colly, 2
+  October: "Keep all records for the recommended timeframes"; ADR 0027
+  amended). Erasing someone now keeps their staff leave records (leave
+  asked for, days in lieu and allowances) for three years, as the
+  Organisation of Working Time Act asks, with their notes and the
+  approver's reasons cleared. Pay records keep their six years for
+  Revenue, as before. The name stays only while a kept record needs it.
+  The server goes through what erasures kept once a day, after Irish
+  midnight, and lets each record and name go on its day, so nobody has
+  to remember; the "Erase the name now" button is gone. Erasing waits
+  while someone's leave waits for a decision, so nothing is left that
+  can never be decided. The decision has a table of how long each kind
+  of record is kept, and why.
+- Found and fixed in review: a staff member's older leave would have
+  stayed until their newest leave's day rather than its own, and a
+  restore could bring back a request still waiting for a decision that
+  could no longer be made.
+- Checked: the typecheck; the shared tests (168); the server tests (366
+  on PGlite, and the real-Postgres file, 11, with two servers running
+  the daily look at once); the web build; the full browser suite (73).
 
 **Next**
 
-- Colly to confirm erasure's defaults: archive first, and the name and
-  timesheets kept for six years where there's paid work. Staff leave
-  records go with the rest; Irish working-time rules may want them kept
-  for three years instead.
-- The stock list next week. On the live server, a list of 1,500 rows is
-  expected to take about 8 to 10 minutes with the page left open.
-- The keys, as before: the Google key, the backups bucket (and a
-  `BACKUP_KEY`), and the Sentry key.
+- See 3 October.
 
 ## 2 October 2026: audit round three
 

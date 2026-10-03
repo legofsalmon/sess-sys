@@ -1,11 +1,11 @@
 import { CALENDAR_LINK_ID, irishToday, type CalendarDay, type CalendarLink } from '../calendar.ts'
 import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, type Mutation, type Rejection } from '../commands.ts'
-import type { Erasure } from '../erasure.ts'
+import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
 import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { crewView, type CrewView } from './crew-view.ts'
-import { erasuresView, forgetErased, withErasures, type ErasuresView } from './erasure-view.ts'
+import { erasuresView, forgetErased, keptRecordsOf, withErasures, type ErasuresView } from './erasure-view.ts'
 import { faultsView, type FaultsView } from './faults-view.ts'
 import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
@@ -110,6 +110,12 @@ export interface View {
   late: LateView
   /** People erased on request, by person, and an erasure still to send laid over them (ADR 0027). */
   erasures: ErasuresView
+  /**
+   * What would keep a person's name were they erased on a day (today
+   * unless said): their pay records and their leave records, each with
+   * the day it can go, from what this device holds, as the server decides.
+   */
+  keptFor(personId: string, on?: string): NameKept
   /** Where jobs go on Google Calendar (ADR 0008): the connection, and each phase-day written, by `calendarDayId`. */
   calendar: { link: CalendarLink | undefined; days: Readonly<Record<string, CalendarDay>> }
   pendingCount: number
@@ -361,9 +367,10 @@ export class SyncClient {
       inspections,
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
       office: officeView(entities, outbox, this.state.cursor),
-      leave: leaveView(entities, outbox, this.state.cursor, crew, today),
+      leave: leaveView(entities, outbox, this.state.cursor, crew, today, erasures),
       late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
       erasures,
+      keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,

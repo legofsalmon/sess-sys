@@ -45,6 +45,8 @@ export const IMPORT_PEOPLE_ACTION = 'people.import'
 export const IMPORT_STOCK_ACTION = 'stock.import'
 /** What it records erasing someone again after a restore as (ADR 0027), likewise. */
 export const ERASED_AGAIN_ACTION = 'person.erase-again'
+/** And taking what an erasure kept, once the law no longer asks for it (ADR 0027). */
+export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -384,6 +386,10 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return "Erased a person's details on request"
     case ERASED_AGAIN_ACTION:
       return "Erased a person's details again, after the data was put back from a backup"
+    case ERASED_WHEN_DUE_ACTION:
+      return a.name
+        ? "Erased the name kept with a person's records, as the law no longer asks for it"
+        : "Deleted an erased person's leave records whose three years were up"
     case 'person.contact': {
       // Which details changed, never what they are now: the history is read by every member of staff.
       const parts: string[] = []
@@ -645,10 +651,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Reopened ${o.who}'s timesheet for ${o.what}, to change it`
     }
     case 'leave.request': {
-      const n = typeof a.start === 'string' && typeof a.end === 'string' ? leaveDays(a.start, a.end) : 0
-      // An erased person's leave has no dates left to count (ADR 0027).
-      const count = typeof a.start === 'string' ? ` (${n} day${n === 1 ? '' : 's'})` : ''
-      return `${person(a.personId)} asked for ${leaveWords(a.type, n)}, ${dates(a.start, a.end)}${count}`
+      // An erased person's request keeps no dates here (ADR 0027): kept under the Working Time Act, the record has its
+      // own, which never change once asked for; once its three years are up, neither has any.
+      const r = typeof a.start === 'string' ? undefined : look('leaveRequest', a.id)
+      const [start, end] = r ? [r.start, r.end] : [a.start, a.end]
+      const n = typeof start === 'string' && typeof end === 'string' ? leaveDays(start, end) : 0
+      const count = typeof start === 'string' ? ` (${n} day${n === 1 ? '' : 's'})` : ''
+      return `${person(a.personId)} asked for ${leaveWords(a.type, n)}, ${dates(start, end)}${count}`
     }
     case 'leave.cancel': {
       const r = leaveOf(a.id)
@@ -658,8 +667,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const r = leaveOf(a.id)
       return `${decided(a.by, a.approved)} ${r.who}'s ${r.what}${why(a.approved, a.reason)}`
     }
-    case 'lieu.log':
-      return `${person(a.personId)} logged ${leaveWords('lieu', typeof a.days === 'number' ? a.days : 1)} for ${typeof a.day === 'string' ? dayLabel(a.day) : 'a day'}`
+    case 'lieu.log': {
+      // As for a request: an erased person's entry has its day and days on the record while it's kept.
+      const e = typeof a.day === 'string' ? a : (look('lieuEntry', a.id) ?? a)
+      return `${person(a.personId)} logged ${leaveWords('lieu', typeof e.days === 'number' ? e.days : 1)} for ${typeof e.day === 'string' ? dayLabel(e.day) : 'a day'}`
+    }
     case 'lieu.cancel': {
       const e = lieuOf(a.id)
       return `${e.who} cancelled their ${e.what}`
@@ -669,10 +681,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `${decided(a.by, a.approved)} ${e.who}'s ${e.what}${why(a.approved, a.reason)}`
     }
     case 'leave.allowance': {
-      // An erased person's allowance went with their leave (ADR 0027).
+      // An erased person's keeps no figures (ADR 0027). Their allowance may still be on record, but it holds the last
+      // figures set, not necessarily these.
       const to = typeof a.days === 'number' ? ` to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over` : ''
       return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance${to}`
     }
+    case 'leave.open':
+      return `${a.by ? `${person(a.by)} opened` : 'Opened'} ${typeof a.year === 'number' ? a.year : 'a year'} for leave`
     case 'late.say': {
       const l = lateOf(a.id, a.offerId)
       const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })

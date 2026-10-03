@@ -104,9 +104,13 @@ export class ErasureList {
 /**
  * Erase again everyone on the list who this copy of the data has back,
  * with the same decision about their name, each as a change of its own in
- * the history. After a restore (`everyone`), someone this copy has never
- * heard of goes on its own list too, so nothing sent again afterwards can
- * add them. Answers how many were erased again.
+ * the history. Their leave records come back from the copy and are
+ * decided again by the same three years, counted to today: kept ones lose
+ * what was written in them again, and ones whose years are up, or kept
+ * for a name that has since gone, go. After a restore (`everyone`),
+ * someone this copy has never heard of goes on its own list too, so
+ * nothing sent again afterwards can add them. Answers how many were
+ * erased again.
  */
 export async function eraseAgain(db: Db, listed: readonly Listed[], { everyone }: { everyone: boolean }): Promise<number> {
   const today = irishToday()
