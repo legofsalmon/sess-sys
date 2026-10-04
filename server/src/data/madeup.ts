@@ -1,4 +1,4 @@
-import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, type CommandName, type Mutation } from '@sh/shared'
+import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, type CommandName, type DocumentKind, type Mutation } from '@sh/shared'
 
 /**
  * Made-up data (ADR 0019): enough of a small A/V company's weeks to try
@@ -44,8 +44,14 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *   certificates running out soon for the reminders; and a shoot today with
  *   someone running late, said from their link, on the contact's call sheet;
  * - a freelancer who has left and asked for their details to go, archived,
- *   so erasing someone on request (ADR 0027) can be tried.
+ *   so erasing someone on request (ADR 0027) can be tried;
+ * - documents (ADR 0029): insurance run out and running out soon, for the
+ *   reminders, and certificates' cards; where a store is set up, a made-up
+ *   PDF on each, and a renewed card sent from a link (MADE_UP_RENEWAL).
  */
+/** Where a store is set up, Róisín has sent her renewed Safe Pass card from her link, waiting for the office to check (ADR 0029). */
+export const MADE_UP_RENEWAL = { name: 'Róisín Farrell', kind: 'safe-pass', days: 377 } as const
+
 export function madeUpData(today: string): Mutation[] {
   const out: Mutation[] = []
   const add = <N extends CommandName>(name: N, args: CommandInput<N>) => {
@@ -152,6 +158,16 @@ export function madeUpData(today: string): Mutation[] {
   const ronan = person('Rónán Moran', 'freelancer', 'Audio', 2, ['Audio'], 260, { notes: 'Moved to Melbourne. Asked us to delete his details.' })
   add('person.archive', { id: ronan, archived: true })
   add('unavailability.add', { id: newId(), personId: laoise, start: day(12), end: day(16), note: 'Holidays' })
+
+  // Documents (ADR 0029): Dara's insurance runs out soon and Gráinne's has, so both join the reminders; the cards sit beside the
+  // certificates they stand for, which hold their dates. Files come after, where a store is set up (documents/actions.ts).
+  const document = (personId: string, kind: DocumentKind, title: string, expires: string | null) => add('document.save', { id: newId(), personId, kind, title, expires })
+  document(dara, 'insurance', 'Public liability insurance (Quinn Audio Ltd)', day(18))
+  document(grainne, 'insurance', 'Public liability insurance', day(-6))
+  document(fionn, 'insurance', 'Public liability insurance', day(240))
+  document(padraig, 'ipaf', 'IPAF card', day(20))
+  document(roisin, 'safe-pass', 'Safe Pass card', day(12))
+  document(cian, 'driving-licence', 'Driving licence', null)
 
   // Staff leave (ADR 0024). Only this year is open, so an approver can try opening next year (Colly, 3 October 2026). A week
   // counted from today is moved by whole weeks until it's all in this year: early in January Orla's comes after today,

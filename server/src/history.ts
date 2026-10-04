@@ -8,6 +8,7 @@ import {
   invitesLabel,
   irishToday,
   LATE_BY,
+  LATE_KEPT_DAYS,
   lateWords,
   leaveDays,
   levelLabel,
@@ -27,6 +28,7 @@ import {
   type ProjectStatus,
   type RetiredReason,
 } from '@sh/shared'
+import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -47,6 +49,8 @@ export const IMPORT_STOCK_ACTION = 'stock.import'
 export const ERASED_AGAIN_ACTION = 'person.erase-again'
 /** And taking what an erasure kept, once the law no longer asks for it (ADR 0027). */
 export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
+/** And clearing running late 30 days after its day (ADR 0028). */
+export const LATE_CLEARED_ACTION = 'late.clear-old'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -692,19 +696,68 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const l = lateOf(a.id, a.offerId)
       const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })
       const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
-      return `${l.who} said they'll be ${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+      const what = `${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
+      // From the app it's the office noting someone who rang; the entry's own who names whoever noted it.
+      return from === 'app' ? `Noted that ${l.who} rang to say they'll be ${what}` : `${l.who} said they'll be ${what}`
     }
+    // Both carry the booking once the record has gone 30 days after its day, so they still say whose it was.
     case 'late.arrived': {
-      const l = lateOf(a.id)
-      return `${l.who} said they're there now, at ${l.job}`
+      const l = lateOf(a.id, a.offerId)
+      return from === 'app' ? `Marked ${l.who} as there now, at ${l.job}` : `${l.who} said they're there now, at ${l.job}`
     }
     case 'late.seen': {
-      const l = lateOf(a.id)
+      const l = lateOf(a.id, a.offerId)
       return `Noted that ${l.who} is running late for ${l.job}`
     }
+    // No name, as for erasing: it's about everyone whose went that day.
+    case LATE_CLEARED_ACTION:
+      return `Cleared running late more than ${LATE_KEPT_DAYS} days after its day, notes and all`
+    // People's documents (ADR 0029). Once their person is erased, a command keeps no title or date, so the kind names it.
+    case 'document.save':
+    case 'document.check':
+    case 'document.remove':
+    case DOCUMENT_ACTIONS.file:
+    case DOCUMENT_ACTIONS.send:
+      return documentWords(command, a, look, person)
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:
       return command
+  }
+}
+
+/** "Thu 3 Nov 2027": a document's day wants its year. */
+const fullDay = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
+
+/**
+ * A document's change in words (ADR 0029): whose, and its title as it
+ * reads mid-sentence ("Dara Quinn's public liability insurance"), from the
+ * command or the record as it is now; a certificate's card says what it
+ * set the certificate to.
+ */
+function documentWords(command: string, a: Data, look: Look, person: (id: unknown) => string): string {
+  const d = look('document', a.id)
+  const kind = DOCUMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
+  const title = titleInSentence(text(a.title ?? d?.title, (kind && DOCUMENT_TITLES[kind]) || 'document'))
+  const whose = `${person(a.personId ?? d?.personId)}'s ${title}`
+  const cert = kind && certificateOf(kind)
+  const on = (v: unknown) => (typeof v === 'string' ? fullDay(v) : undefined)
+  const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
+  switch (command) {
+    case 'document.save':
+      if (cert && a.expires !== undefined) return `Saved ${whose}, with their ${certificateName(cert)} ${on(a.expires) ? `running out on ${on(a.expires)}` : 'held, with no expiry'}`
+      return `Saved ${whose}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}`
+    case 'document.check': {
+      const instead = d?.renews ? ', in place of the one before' : ''
+      if (cert && a.expires !== undefined) return `Checked ${whose}${instead}, and set their ${certificateName(cert)} to ${on(a.expires) ? `run out on ${on(a.expires)}` : 'no expiry'}`
+      return `Checked ${whose}${instead}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}`
+    }
+    case 'document.remove':
+      return d ? `Removed ${whose}` : 'Removed a document'
+    case DOCUMENT_ACTIONS.file:
+      if (a.added) return `Added ${whose}, with its file${file}`
+      return `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
+    default:
+      return `${person(a.personId ?? d?.personId)} sent ${a.renews ? 'a renewed' : 'a new'} ${title}${on(a.expires) ? `, running out ${on(a.expires)}` : ''}${file}`
   }
 }

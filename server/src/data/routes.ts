@@ -1,8 +1,10 @@
-import { START_FRESH_WORDS, type DataStatus } from '@sh/shared'
+import { irishToday, START_FRESH_WORDS, type DataStatus } from '@sh/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { Busy, type Backups } from '../backup/service.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
+import { putMadeUpFiles } from '../documents/actions.ts'
+import type { DocumentFiles } from '../documents/files.ts'
 import { dataStatus, DataRefused, fillWithMadeUpData, startFresh, type Who } from './fresh.ts'
 
 /**
@@ -10,7 +12,7 @@ import { dataStatus, DataRefused, fillWithMadeUpData, startFresh, type Who } fro
  * putting it in, and starting fresh. All of it needs sign-in like the rest
  * of the API, and `client` is the app's device code, for the history.
  */
-export function registerDataRoutes(app: FastifyInstance, { db, backups, onChange }: { db: Db; backups: Backups; onChange: () => void }) {
+export function registerDataRoutes(app: FastifyInstance, { db, backups, documents, onChange }: { db: Db; backups: Backups; documents: DocumentFiles; onChange: () => void }) {
   const who = (req: FastifyRequest<{ Querystring: { client?: string } }>): Who => ({
     userId: req.user?.id,
     name: req.user?.name,
@@ -31,6 +33,9 @@ export function registerDataRoutes(app: FastifyInstance, { db, backups, onChange
       if (err instanceof DataRefused) return reply.code(409).send({ error: err.message })
       throw err
     }
+    // Made-up files for the made-up documents, where there's a store to keep them in (ADR 0029). Made up, so a store
+    // that won't take them leaves the documents as details only, as on a server with no bucket.
+    await putMadeUpFiles(db, documents, irishToday(), { userId: req.user?.id, clientId: req.query.client }).catch((err) => req.log.warn({ err }, 'Could not put in the made-up documents\' files'))
     onChange()
     return status()
   })

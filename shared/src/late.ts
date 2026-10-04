@@ -8,7 +8,9 @@ import { text } from './plain.ts'
  * their private link roughly how late they'll be, or when they'll be
  * there, with a short note; they can change it, or say they're there. The
  * office sees it at once, and so does the contact on the day on their call
- * sheet. Every screen shows it only until its day is over.
+ * sheet. Every screen shows it only until its day is over. Someone who
+ * rings instead is noted by the office in the same record, and the record
+ * goes 30 days after its day.
  */
 
 const id = z.string().min(1).max(64)
@@ -22,6 +24,17 @@ export const LATE_NOTE_LENGTH = 200
 
 /** From this time the evening before a booked day, a late start can be said for it: the day's plans are known by then, and it's well before a 7am call. */
 export const LATE_OPENS = '18:00'
+
+/**
+ * How many days after its day a running late is kept (ADR 0028, amended).
+ * No law asks for it and it holds the person's own words, so it goes; a
+ * month covers looking back on the day while their timesheet for it comes
+ * in and is approved.
+ */
+export const LATE_KEPT_DAYS = 30
+
+/** The latest day whose running late has gone by `today` in Ireland: today is its day and 30 more, or later. */
+export const lateGoneUpTo = (today: string) => daysAfter(today, -LATE_KEPT_DAYS)
 
 export interface RunningLate {
   id: string
@@ -84,7 +97,8 @@ export function lateDayWord(d: string, today: string): string {
   return d === nextDay(today) ? 'tomorrow' : dayLabel(d)
 }
 
-const nextDay = (d: string) => new Date(Date.parse(`${d}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+const daysAfter = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+const nextDay = (d: string) => daysAfter(d, 1)
 
 /** The time in Ireland as 18:05. */
 export const irishClock = (now = new Date()) => now.toLocaleTimeString('en-GB', { timeZone: 'Europe/Dublin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -103,10 +117,19 @@ export function lateDays(held: readonly string[], now = new Date()): string[] {
   return out
 }
 
-/** Why a late start can't be said for this day, or null when it can. */
-export function noLateReason(held: readonly string[], d: string, now = new Date()): string | null {
+/**
+ * Why a late start can't be said for this day, or null when it can. On
+ * their link it's said to them; the office, noting it for someone who
+ * rang, is told the same rules about the person by name (`who`).
+ */
+export function noLateReason(held: readonly string[], d: string, now = new Date(), who?: string): string | null {
   if (lateDays(held, now).includes(d)) return null
-  if (!held.includes(d)) return `You're not booked on ${dayLabel(d)}.`
+  if (!held.includes(d)) return who ? `${who} isn't booked on ${dayLabel(d)}.` : `You're not booked on ${dayLabel(d)}.`
   if (d < irishToday(now)) return `${dayLabel(d)} is over.`
+  if (who) return "Running late can be noted from 6pm the evening before a day they're booked."
   return "You can say you're running late from 6pm the evening before a day you're booked."
 }
+
+/** Why there's nothing to be late for: the booking was let go, or its call cancelled. Named for the office, as above. */
+export const lateGoneReason = (who?: string) =>
+  who ? `${who} isn't booked on this one any more, so there's nothing to be late for.` : "You're not booked on this one any more, so there's nothing to be late for."

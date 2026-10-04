@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Mutation } from '../src/commands.ts'
 import type { CrewCall, Offer, Person } from '../src/crew.ts'
-import { lateDays, lateLine, lateShown, lateWords, noLateReason, type RunningLate } from '../src/late.ts'
+import { LATE_KEPT_DAYS, lateDays, lateGoneReason, lateGoneUpTo, lateLine, lateShown, lateWords, noLateReason, type RunningLate } from '../src/late.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import { lateView } from '../src/sync/late-view.ts'
 import { plan } from '../src/sync/plan.ts'
@@ -96,6 +96,25 @@ describe('when it can be said', () => {
     expect(noLateReason(held, '2026-10-03', irish('2026-10-01', '20:00'))).toBe("You can say you're running late from 6pm the evening before a day you're booked.")
     expect(noLateReason(held, '2026-10-02', irish('2026-10-03', '09:00'))).toBe('Fri 2 Oct is over.')
   })
+
+  it('is the same for the office noting it for someone who rang, said about them by name', () => {
+    // Proves: the office gets the link's rules in its own voice: the same window, a day they don't hold, too early, and a booking let go.
+    const held = ['2026-10-02', '2026-10-03']
+    expect(noLateReason(held, '2026-10-02', irish('2026-10-02', '07:45'), 'Gráinne Power')).toBeNull()
+    expect(noLateReason(held, '2026-10-05', irish('2026-10-04', '19:00'), 'Gráinne Power')).toBe("Gráinne Power isn't booked on Mon 5 Oct.")
+    expect(noLateReason(held, '2026-10-03', irish('2026-10-01', '20:00'), 'Gráinne Power')).toBe("Running late can be noted from 6pm the evening before a day they're booked.")
+    expect(noLateReason(held, '2026-10-02', irish('2026-10-03', '09:00'), 'Gráinne Power')).toBe('Fri 2 Oct is over.')
+    expect(lateGoneReason('Gráinne Power')).toBe("Gráinne Power isn't booked on this one any more, so there's nothing to be late for.")
+    expect(lateGoneReason()).toBe("You're not booked on this one any more, so there's nothing to be late for.")
+  })
+
+  it('is kept until 30 days after its day', () => {
+    // Proves: a record goes on its day and 30 more, and not the day before, counted in whole days across a month's end, the clocks going back on 25 October, and a short February.
+    expect(LATE_KEPT_DAYS).toBe(30)
+    expect(lateGoneUpTo('2026-10-31')).toBe('2026-10-01')
+    expect(lateGoneUpTo('2026-11-01')).toBe('2026-10-02')
+    expect(lateGoneUpTo('2027-03-17')).toBe('2027-02-15')
+  })
 })
 
 describe('what it says', () => {
@@ -133,6 +152,23 @@ describe("the office's view", () => {
     expect(after.forOffer('o1')).toEqual([])
     expect(lateShown(said, '2026-10-02')).toBe(true)
     expect(lateShown(said, '2026-10-03')).toBe(false)
+  })
+
+  it("lays the office's own note for someone who rang over its copy, as the link's would be, and its 'there now'", () => {
+    // Proves: a late.say waiting on the office's device, for a booking with nothing said yet, shows at once in the queue, on the call and the planner, marked as waiting; "Mark as there" laid over it takes it from the queue and says they're there.
+    const noted = pending('late.say', { id: 'l2', offerId: 'o1', day: '2026-10-02', by: '60', arriveAt: null, note: 'Rang: van broke down' })
+    const view = lateView({}, [noted], 0, crew, '2026-10-02')
+    expect(view.current.map((l) => [l.id, l.person?.name, l.call?.role, lateLine(l), l.pending, l.seenAt])).toEqual([
+      ['l2', 'Gráinne Power', 'Camera', 'about an hour late, “Rang: van broke down”', true, null],
+    ])
+    expect(view.toCheck.map((l) => l.id)).toEqual(['l2'])
+    expect(view.forOffer('o1').map((l) => l.id)).toEqual(['l2'])
+    const p = plan({ jobs: jobsView({}, [], 0, crew.calls), crew, late: view }, ['2026-10-02'])
+    expect(p.jobs[0]!.days['2026-10-02']!.late).toEqual(['Gráinne: about an hour late, “Rang: van broke down”'])
+
+    const there = lateView({}, [noted, { ...pending('late.arrived', { id: 'l2' }), createdAt: '2026-10-02T08:40:00.000Z' }], 0, crew, '2026-10-02')
+    expect(there.toCheck).toEqual([])
+    expect(there.current.map((l) => [lateLine(l), l.arrivedAt, l.pending])).toEqual([['there now', '2026-10-02T08:40:00.000Z', true]])
   })
 
   it('lays a change said again over the same record, new to the office again', () => {

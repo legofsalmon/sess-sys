@@ -11,6 +11,9 @@
   years, as approved leave is, and that a name kept for records lasts
   exactly as long as they do. Leave years are now opened by the office,
   so no new leave record is for a year after next (below).
+- **Amended:** 3 October 2026 by [ADR 0029](0029-documents.md): a
+  person's documents go at once when they're erased, their files deleted
+  from the storage straight after, and tried again each day until gone.
 - **Decides:** how someone's details are erased when they ask (GDPR's
   right to erasure, Article 17), what is kept and why, where a person's
   details live and what erasing does to each place, and how a restore
@@ -173,10 +176,13 @@ to: one constant each in `shared/src/erasure.ts` (`PAID_WORK_YEARS`,
 | Their name | Until the later of the above can go | A record has to say whose it is | The name, on their person (never on their staff account) | Everything else on their person, at once |
 | Bookings and offers | No end set, like the jobs they belong to | Records of the business's work | The job, the days, the rates and the answer | The person's note on each answer |
 | Contact details, notes, skills, certificates, company details, day rate, days off (approved leave's too), running late | Not kept | No law asks for them | Nothing | All of it, at once |
+| Running late, anyone's, erased or not ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)) | 30 days after its day; at once when they're erased | No law asks for it, and it holds their own words; a month covers their timesheet for the day | In the history: who, how late, the job and the day | The record, every copy in the change feed, and the note in the history |
+| Documents and their files ([ADR 0029](0029-documents.md)) | Not kept | No law asks for them | Nothing | The details at once; the files from the storage straight after, through the list of files to delete, tried again after each change and each day until they've gone |
 
-Each goes on the day its time is up, always a 1 January: at once when
-the person is erased, if that day has passed, and otherwise when the
-server looks that day.
+Each kept for years goes on the day its time is up, always a 1 January:
+at once when the person is erased, if that day has passed, and otherwise
+when the server looks that day. Running late goes on the server's same
+daily look.
 
 A leave record for a year typed far ahead would have kept the name for
 three years after that year. Since 3 October 2026 no new one can be
@@ -211,6 +217,7 @@ holds a person's details goes in one of them:
 | --- | --- |
 | `people`, their row | Every field above cleared; the name "Erased person" or kept; a new random link secret, so the old link and feed address match nothing, and devices are sent none; archived. |
 | `unavailability`, their days off | Deleted, approved leave's days with them: the request is the record of the leave. |
+| `documents`, their documents ([ADR 0029](0029-documents.md)) | Deleted, every earlier copy in the change feed made a deletion; each file put on `document_files_to_delete` in the same change, and deleted from the storage straight after. One the storage won't delete stays on that list with why, and is tried again after the next change and each day until it goes. The history's commands and actions about them keep only which document and what kind. |
 | `running_late`, what they said on their link about running late ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)) | Deleted, before anything else, as its rows point at their offers and calls. The office's queue, the call's line, the planner and the contact on the day's call sheet lose the note with it. |
 | `leave_requests`, `lieu_entries`, `leave_allowances` | Theirs kept for three years after the year each belongs to, without the note, the approver's reason or the allowance's note; deleted by the server on the day those years are up, or when the name goes, and at once if still waiting for a decision. Refused while any of it waits for a decision. Requests they decided for others keep them as the one who decided. |
 | `offers`, their offers and bookings | Kept; their own note on each answer cleared. |

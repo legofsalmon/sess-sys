@@ -20,6 +20,7 @@ import { linkEntity, readLink } from '../calendar/store.ts'
 import { getOffer, getPerson } from '../crew/store.ts'
 import { getTimesheet } from '../crew/timesheets.ts'
 import type { Queryable } from '../db.ts'
+import { queueFilesOf } from '../documents/store.ts'
 import { emit, emitRemoved, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
 
@@ -45,6 +46,8 @@ interface Gone {
   entity?: EntityName
   /** Which rows are theirs; `person_id = $1` when not said. A table devices see needs an `id`. */
   theirs?: string
+  /** What goes with the rows outside the database, done first in the same change: a document's file in the storage. */
+  first?: (tx: Queryable, personId: string) => Promise<void>
 }
 
 /**
@@ -59,6 +62,9 @@ export const GONE: readonly Gone[] = [
   { table: 'running_late', entity: 'runningLate' },
   // Days off, approved leave's included: those have the request's id. The request is the record of the leave (LEAVE, below).
   { table: 'unavailability', entity: 'unavailability' },
+  // Their documents (ADR 0029): no law asks for them, so they go at once. Their files go on the list of files to delete
+  // in the same change, and the server deletes them from the storage straight after, and again each day until they've gone.
+  { table: 'documents', entity: 'document', first: queueFilesOf },
   // Their address on Google Calendar invites, which devices never see. While invites are on, a day still to come keeps
   // theirs until the calendar's next run takes them off its event, and that run removes the row: gone now, it would
   // leave them on the event as a guest added by hand. Past events in Google keep theirs (ADR 0027).
@@ -120,6 +126,7 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
   offer: { table: 'offers', madeBy: 'offer.send' },
   leaveRequest: { table: 'leave_requests', madeBy: 'leave.request' },
   lieuEntry: { table: 'lieu_entries', madeBy: 'lieu.log' },
+  document: { table: 'documents', madeBy: 'document.save' },
 }
 
 /**
@@ -209,10 +216,12 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
     offer: await idsOf(tx, `SELECT id FROM offers WHERE ${BY_PERSON}`, personId),
     leaveRequest: await idsOf(tx, `SELECT id FROM leave_requests WHERE ${BY_PERSON}`, personId, 'leaveRequest'),
     lieuEntry: await idsOf(tx, `SELECT id FROM lieu_entries WHERE ${BY_PERSON}`, personId, 'lieuEntry'),
+    document: await idsOf(tx, `SELECT id FROM documents WHERE ${BY_PERSON}`, personId, 'document'),
   }
 
   for (const g of GONE) {
     const theirs = g.theirs ?? BY_PERSON
+    await g.first?.(tx, personId)
     if (!g.entity) {
       await tx.query(`DELETE FROM ${g.table} WHERE ${theirs}`, [personId])
       continue

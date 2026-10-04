@@ -1,4 +1,4 @@
-import { addDays, irishToday, type CrewCall, type CrewListPreview, type MutationResult, type Offer, type Person } from '@sh/shared'
+import { addDays, irishToday, tellMessage, type CrewCall, type CrewListPreview, type MutationResult, type Offer, type Person } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
 import { IPHONE, server, staff } from './people.ts'
 
@@ -104,6 +104,35 @@ describe('an offer for a call that needs certificates', () => {
     expect(words).toContain('Changed the call for Rigger on Harbour Lights Festival: certificates needed to Safe Pass, working at height and IPAF')
     expect(words).toContain('Changed the call for Rigger on Harbour Lights Festival: no certificates needed')
     expect(words.find((w) => w.startsWith('Asked for 3 × Rigger'))).toMatch(/, needing working at height and IPAF$/)
+  })
+})
+
+describe('a call whose certificates change', () => {
+  it("is told to the crew in the call-changed message, and their offer card and call sheet say what it needs now", async () => {
+    // Proves: once the office changes what a booked call needs, the message it's prompted to send, built from the call as a
+    // device holds it, says what's added and what's dropped, and Pádraig's own link, on its offer card and its call sheet,
+    // reads the needs as they are now, not as they were offered.
+    const { app, db, colly } = await rigging()
+    for (const r of [
+      await colly.send('offer.send', { id: 'o-padraig', callId: 'riggers', personId: 'padraig', override: false }),
+      await colly.send('offer.respond', { id: 'o-padraig', answer: 'accept', days: null, note: '' }),
+      await colly.send('offer.confirm', { id: 'o-padraig' }),
+    ])
+      expect(r).toMatchObject({ status: 'applied' })
+    const before = await colly.record<CrewCall>('crewCall', 'riggers')
+    expect(await colly.send('call.update', { id: 'riggers', needsCertificates: ['ipaf', 'safe-pass'] })).toMatchObject({ status: 'applied' })
+    const after = await colly.record<CrewCall>('crewCall', 'riggers')
+
+    const padraig = await colly.record<Person>('person', 'padraig')
+    const link = `/f/${(await db.query<{ t: string }>(`SELECT link_token AS t FROM people WHERE id = 'padraig'`)).rows[0]!.t}`
+    const message = tellMessage('call-changed', padraig, { call: after, neededBefore: before.needsCertificates }, `https://app.example${link}`).text.split('\n')
+    expect(message.slice(1, 3)).toEqual(['This call now needs Safe Pass.', 'This call no longer needs working at height.'])
+
+    const page = (await app.inject({ url: link })).body
+    expect(page).toContain('<dt>Needs</dt><dd>Safe Pass and IPAF</dd>')
+    const sheet = (await app.inject({ url: `${link}/sheet/riggers` })).body
+    expect(sheet).toContain('<p>Needs Safe Pass and IPAF.</p>')
+    expect(sheet).not.toContain('working at height')
   })
 })
 

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { CommandName } from './commands.ts'
 import { DEFAULT_LEVEL, type Person } from './crew.ts'
 import { irishToday } from './day.ts'
+import { DOCUMENT_ACTIONS, type DocumentAction } from './documents.ts'
 import { yearOf, type LeaveAllowance, type LeaveRequest, type LeaveStatus, type LieuEntry } from './leave.ts'
 
 /**
@@ -184,7 +185,7 @@ export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'>, keepName: 
 type Args = Record<string, unknown>
 
 /** The records a command can name a person through: one of theirs, whose own `personId` is them. */
-export type PersonRecord = 'offer' | 'leaveRequest' | 'lieuEntry'
+export type PersonRecord = 'offer' | 'leaveRequest' | 'lieuEntry' | 'document'
 
 /** A command that is about a person, and what erasing them does to it. */
 export interface PersonCommand {
@@ -209,7 +210,7 @@ const only =
  * what it carried after the person is erased. The test beside this file
  * checks every command naming a person is listed.
  */
-export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
+export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction, PersonCommand>> = {
   // The name is the one they have now: "Erased person", or the name kept with their pay or leave records.
   'person.upsert': { names: { field: 'id' }, refused: true, keep: (a, name) => ({ ...only('id', 'kind')(a), name }) },
   // Which details changed, never what to: the history's words need only that.
@@ -238,6 +239,12 @@ export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
   // Running late (ADR 0028): the booking and the day stay, for the history's words; what they wrote goes. Saying they're
   // there, and the office noting it, carry only the record's id, and the record is deleted, so those are refused as not found.
   'late.say': { names: { field: 'offerId', via: 'offer' }, refused: true, keep: (a) => ({ ...a, note: '' }) },
+  // Their documents (ADR 0029) go at once, so only what says which document and of what kind is kept: never its title,
+  // the day it runs out, or its file. A file put on one, or sent from their link, is a server action, kept the same way.
+  'document.save': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId', 'kind') },
+  'document.check': { names: { field: 'id', via: 'document' }, refused: true, keep: only('id') },
+  [DOCUMENT_ACTIONS.file]: { names: { field: 'personId' }, refused: true, keep: only('id', 'personId', 'kind', 'type', 'bytes', 'added', 'replaced') },
+  [DOCUMENT_ACTIONS.send]: { names: { field: 'personId' }, refused: true, keep: only('id', 'personId', 'kind', 'type', 'bytes', 'renews') },
 }
 
 /**
@@ -246,7 +253,7 @@ export const PERSON_COMMANDS: Partial<Record<CommandName, PersonCommand>> = {
  * the caller holds (the server's tables, or a device's copy).
  */
 export function personNamedBy(name: string, args: unknown, personOf: (record: PersonRecord, id: string) => string | undefined): string | undefined {
-  const rule = PERSON_COMMANDS[name as CommandName]
+  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction]
   if (!rule || !args || typeof args !== 'object') return undefined
   const value = (args as Args)[rule.names.field]
   if (typeof value !== 'string') return undefined
@@ -255,7 +262,7 @@ export function personNamedBy(name: string, args: unknown, personOf: (record: Pe
 
 /** A command's arguments with only what erasing keeps, or as they are when it isn't about a person. */
 export function keptArgs(name: string, args: unknown, personName: string): unknown {
-  const rule = PERSON_COMMANDS[name as CommandName]
+  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction]
   if (!rule || !args || typeof args !== 'object') return args
   return rule.keep(args as Args, personName)
 }

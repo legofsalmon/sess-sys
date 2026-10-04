@@ -301,7 +301,8 @@ describe('erasing someone with no paid work', () => {
     // Saying she's there, or noting it, sent late from a phone: they carry only the record's id, which went with her, so
     // they're turned down as not found, in words that don't name her, and keep nothing of hers.
     const [there, noted] = [m('late.arrived', { id: late }), m('late.seen', { id: late })]
-    expect(await refusal(app, there)).toBe("There's nothing to say you're there for.")
+    // Sent from the app, it's the office marking her there (ADR 0028, amended), so it's said to the office.
+    expect(await refusal(app, there)).toBe('That running late is no longer there.')
     expect(await refusal(app, noted)).toBe('That running late is no longer there.')
     const { rows: stored } = await db.query(`SELECT args FROM mutations WHERE id = ANY($1::text[]) ORDER BY name`, [[there.id, noted.id]])
     expect(stored.map((r) => r.args)).toEqual([{ id: late }, { id: late }])

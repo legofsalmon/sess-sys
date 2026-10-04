@@ -106,8 +106,9 @@ also work for other companies, so the system bends to them instead:
   running late, add a note to the call sheet, swap a shift with another
   approved freelancer if ops allow it. Running late is built
   ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md)):
-  said from their link on the day, seen at once by the office and the
-  contact on the day.
+  said from their link on the day, or noted by the office when they
+  ring, seen at once by the office and the contact on the day, and
+  cleared 30 days after.
 
 ## The shape of the system
 
@@ -328,7 +329,13 @@ says product and item; the code says model and asset.
   crew call says which it needs, an offer to anyone without one, or whose
   one runs out before the job ends, is refused by name, and the Crew tab
   lists those running out in the next 30 days with a message asking for
-  the new card.
+  the new card. Documents are built too
+  ([ADR 0029](adr/0029-documents.md)): insurance, each certificate's card
+  and anything else, with a day it runs out and a file kept in the
+  backups' bucket, encrypted with the backup key and read only through
+  the server; a freelancer sends a renewed one from their link, the
+  office checks it, and a card's certificate takes its date; documents'
+  expiries join the same list.
 - **Availability**: freelancers mark unavailable days; offers respect them.
 - **Leave and time in lieu**, for staff ([ADR 0024](adr/0024-staff-leave.md)):
   annual leave applied for and approved in whole days, counted in the

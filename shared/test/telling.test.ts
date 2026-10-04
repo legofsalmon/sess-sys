@@ -139,6 +139,29 @@ describe('the message after what the office did', () => {
     expect(tellMessage('phase-moved', aoife, { call: { ...show, start: '2026-10-17', end: '2026-10-18' } }, link).text).toContain('has moved: Sound No.1 is now Sat 17 Oct to Sun 18 Oct, call 12:00.')
   })
 
+  it('says plainly when a changed call comes to need a certificate, or no longer needs one', () => {
+    // Proves: the "call changed" message names each certificate added or dropped in its own line beside the call as it now is (ADR 0028), says nothing of ones unchanged, and nothing at all when the office didn't change them.
+    const riggers = { ...show, role: 'Rigger', needsCertificates: ['ipaf' as const, 'safe-pass' as const] }
+    const changed = tellMessage('call-changed', aoife, { call: riggers, neededBefore: ['working-at-height', 'safe-pass'] }, link)
+    expect(changed.text).toBe(
+      [
+        'Hi Aoife, a change to Harbour Lights Festival (Show): Rigger is now Sat 10 Oct to Sun 11 Oct, call 12:00, at Riverside Park, Limerick, €320 a day.',
+        'This call now needs IPAF.',
+        'This call no longer needs working at height.',
+        `The details are on your page: ${link}`,
+        'If that no longer suits, say so there or ring the office.',
+      ].join('\n')
+    )
+    // Two at once read as one line, in the list's order whatever order they were ticked in.
+    expect(tellMessage('call-changed', aoife, { call: { ...riggers, needsCertificates: ['ipaf', 'working-at-height'] }, neededBefore: [] }, link).text).toContain(
+      '\nThis call now needs working at height and IPAF.\n'
+    )
+    expect(tellMessage('call-changed', aoife, { call: { ...show, needsCertificates: [] }, neededBefore: ['ipaf'] }, link).text).toContain('\nThis call no longer needs IPAF.\n')
+    // The same needs, or a change the office made somewhere else that doesn't say what was needed before: nothing about certificates.
+    expect(tellMessage('call-changed', aoife, { call: riggers, neededBefore: ['safe-pass', 'ipaf'] }, link).text).not.toMatch(/needs/)
+    expect(tellMessage('call-changed', aoife, { call: riggers }, link).text).not.toMatch(/needs/)
+  })
+
   it('tells a freelancer what was approved on their timesheet, and what changed from what they sent', () => {
     const approved = tellMessage(
       'timesheet-approved',

@@ -194,6 +194,10 @@ const ABOUT: Record<string, string> = {
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, and the certificates each needs, such as IPAF.',
+  // People's documents (ADR 0029): the details here, the files in the storage.
+  document_files_to_delete: "Files the storage still holds for documents that have gone, or for uploads that didn't finish, waiting to be deleted: the storage's name for each, when, and why one couldn't be deleted yet. Nothing says whose it was.",
+  documents:
+    "People's documents, such as insurance and certificate cards: whose, what kind, the title, the day it runs out (a certificate's card goes by the certificate in people), whether it was sent from their private link and when the office checked it, and the file's type and size. The files stay in the storage: see Left out on purpose.",
   erasures: 'People whose details were erased on request: only their id, when, and the day a name kept with their pay or leave records goes. Nothing else about them.',
   faults: 'Faults and missing kit: the item, or the product and how many, damaged or missing, the job it came back from, what was wrong, the repair notes, and how it ended.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
@@ -212,7 +216,7 @@ const ABOUT: Record<string, string> = {
   phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
-  running_late: "People saying on their private link that they're running late on a day they're booked: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over.",
+  running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages.",
   stock: 'Counted stock: how many of a product are at a place or in a case.',
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
@@ -254,6 +258,9 @@ Left out on purpose
   file could otherwise act as them.
 - The server's own bookkeeping: schema versions, and which copy of the data
   this is.
+- Documents' files, such as insurance and certificate cards: they stay in
+  the storage beside the backups, and each opens from the person's card on
+  the Crew tab. documents lists their details.
 
 Good to know
 ------------

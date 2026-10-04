@@ -1,6 +1,7 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { irishToday } from '../calendar.ts'
 import { certificatesAfter, daysBetween, DEFAULT_LEVEL, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
 
@@ -70,7 +71,7 @@ const withDefaults = (p: Person): Person => ({
 })
 
 export function crewView(
-  entities: Partial<Tables> & { phase?: Record<string, Phase>; project?: Record<string, Project>; leaveRequest?: Record<string, LeaveRequest> },
+  entities: Partial<Tables> & { phase?: Record<string, Phase>; project?: Record<string, Project>; leaveRequest?: Record<string, LeaveRequest>; document?: Record<string, Document> },
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number,
   today = irishToday()
@@ -111,6 +112,13 @@ export function crewView(
     }
   }
 
+  /** A certificate's card is in: the certificate is held, running out on its day, the note kept. */
+  const cardSets = (personId: string, kind: Document['kind'], expires: string | null) => {
+    const cert = certificateOf(kind)
+    const p = people.get(personId)
+    if (cert && p) people.set(p.id, { ...p, certificates: { ...p.certificates, [cert]: { held: true, expires, note: p.certificates[cert]?.note ?? '' } }, pending: true })
+  }
+
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
@@ -140,6 +148,21 @@ export function crewView(
         const a = m.args as CommandArgs<'person.level'>
         const p = people.get(a.id)
         if (p) people.set(p.id, { ...p, level: a.level, pending: true })
+        break
+      }
+      // A certificate's card saved or checked sets the certificate on the person, which holds its date (ADR 0029).
+      case 'document.save': {
+        const a = m.args as CommandArgs<'document.save'>
+        const doc = entities.document?.[a.id]
+        // As the server: someone else's, or one sent from a link and not checked yet, isn't changed by a save.
+        if (!doc || (doc.personId === a.personId && doc.checkedAt)) cardSets(a.personId, a.kind, a.expires)
+        break
+      }
+      case 'document.check': {
+        const a = m.args as CommandArgs<'document.check'>
+        const doc = entities.document?.[a.id]
+        // Checked once is checked.
+        if (doc && !doc.checkedAt) cardSets(doc.personId, doc.kind, a.expires)
         break
       }
       case 'person.archive': {

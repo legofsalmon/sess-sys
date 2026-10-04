@@ -52,9 +52,10 @@ import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
+import { Documents, DocumentToCheck } from './Documents.tsx'
 import { ArchivedPerson } from './Erase.tsx'
 import { useFeedAddress } from './feed.ts'
-import { LateLines, LateRow } from './Late.tsx'
+import { LateLines, LateRow, NoteLate } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 
@@ -240,6 +241,8 @@ export function CrewScreen() {
   )
   // Running late, said on a link (ADR 0028): first in the queue, as it's about today.
   const late = view.late.toCheck
+  // Documents sent from a link, for the office to check (ADR 0029).
+  const docs = view.documents.toCheck
   // What the device turned down, said in the card it was asked from.
   const answers = useAct()
   const roster = useAct()
@@ -257,14 +260,15 @@ export function CrewScreen() {
     <div className="app crew">
       <Top view={view} title="Crew" />
 
-      {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0) && (
+      {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
         <section className="card">
           {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
-          <h2>Answers to check ({late.length + toSortOut.length + toCheck.length})</h2>
+          <h2>Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</h2>
           <Refusal error={answers.error} />
           <ShowAll
             items={[
               ...late.map((l) => <LateRow key={l.id} note={l} today={today} onNoted={() => void answers.run(() => client.mutate('late.seen', { id: l.id }))} />),
+              ...docs.map((d) => <DocumentToCheck key={d.id} doc={d} />),
               ...toSortOut.map(({ c, o, text }) => (
                 <div className="row" key={o.id}>
                   <div>
@@ -515,6 +519,8 @@ export function CallCard({
         </p>
       ))}
       <LateLines call={call} late={late} today={today} />
+      {/* Someone booked who rang to say they're late, noted where their line is (ADR 0028). */}
+      <NoteLate call={call} late={late} />
 
       {open && (
         <>
@@ -575,7 +581,13 @@ export function CallCard({
 
       {open && (
         <>
-          {editing && <EditCall call={call} onDone={() => setEditing(false)} onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => (datesMoved ? forCallDays(t) : t))))} />}
+          {editing && (
+            <EditCall
+              call={call}
+              onDone={() => setEditing(false)}
+              onSaved={(after, datesMoved) => onTell?.(promptFor('call-changed', peopleOn(after).map((t) => neededBefore(datesMoved ? forCallDays(t) : t, call))))}
+            />
+          )}
           <Refusal error={error} />
           {cancelling ? (
             <Confirm
@@ -617,7 +629,10 @@ export function CallCard({
 const forCallDays = (t: TellTo): TellTo => ({ ...t, context: { ...t.context, days: undefined } })
 
 /** What the crew would notice; how many are needed and the reply-by date aren't worth a message. */
-const NOTICED = ['role', 'start', 'end', 'callTime', 'dayRateCents', 'details', 'project', 'phase', 'venue'] as const
+const NOTICED = ['role', 'start', 'end', 'callTime', 'dayRateCents', 'details', 'project', 'phase', 'venue', 'needsCertificates'] as const
+
+/** The same person, told what the call needed before, so the message says what it needs now (ADR 0028). */
+const neededBefore = (t: TellTo, call: CallView): TellTo => ({ ...t, context: { ...t.context, neededBefore: needsOf(call) } })
 
 /** The call as the change leaves it, for the message to the people on it; undefined when nobody would notice. */
 function afterChange(call: CallView, changes: CommandInput<'call.update'>): CallView | undefined {
@@ -636,6 +651,7 @@ function afterChange(call: CallView, changes: CommandInput<'call.update'>): Call
     project: changes.project ?? call.project,
     phase: changes.phase ?? call.phase,
     venue: changes.venue ?? call.venue,
+    needsCertificates: changes.needsCertificates ?? call.needsCertificates,
   }
 }
 
@@ -1054,6 +1070,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
           {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
           {person.company && <p className="muted">{companyLine(person)}</p>}
           <CertificateLines person={person} />
+          <Documents person={person} />
           {person.notes && <p className="muted">{person.notes}</p>}
           <label className="level-pick">
             Level

@@ -1,14 +1,18 @@
-import { addDays, dayLabel, irishToday, MemoryStorage, SyncClient, type PullResponse, type PushRequest, type PushResponse, type RunningLate } from '@sh/shared'
+import { addDays, dayLabel, irishToday, lateLine, MemoryStorage, SyncClient, type PullResponse, type PushRequest, type PushResponse, type RunningLate } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import { describe, expect, it } from 'vitest'
-import { ANDROID, flashOf, IPHONE, onLink, server, staff } from './people.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clearOldLate } from '../src/crew/late.ts'
+import { DueErasures } from '../src/erasure/due.ts'
+import { LATE_CLEARED_ACTION } from '../src/history.ts'
+import { ANDROID, flashOf, IPHONE, onLink, server, staff, typedOnly } from './people.ts'
 
 /**
  * Running late (ADR 0028): said from a freelancer's private link on a day
  * they're booked, it reaches the office's queue and the history at once,
  * and the contact on the day's call sheet, but no one else's; said again
  * it changes the one record; "I'm here" closes it; and on a day they're
- * not booked it's refused in words.
+ * not booked it's refused in words. The office notes it the same way for
+ * someone who rang, and every record goes 30 days after its day.
  */
 
 /** A shoot today: Gráinne on camera, Dara on sound, and Aoife running it as the contact on the day. */
@@ -45,14 +49,15 @@ async function shoot() {
   expect(await colly.send('phase.update', { id: 'day', contactId: 'aoife' })).toMatchObject({ status: 'applied' })
   const token = async (id: string) => (await db.query<{ t: string }>('SELECT link_token AS t FROM people WHERE id = $1', [id])).rows[0]!.t
   // The office's own phone, with its copy of everything, as the Crew tab reads it.
+  const storage = new MemoryStorage()
   const office = await new SyncClient({
-    storage: new MemoryStorage(),
+    storage,
     transport: {
       push: async (req: PushRequest) => (await app.inject({ method: 'POST', url: '/api/sync/push', payload: req, cookies: colly.cookies })).json() as PushResponse,
       pull: async (after: number) => (await app.inject({ url: `/api/sync/pull?after=${after}`, cookies: colly.cookies })).json() as PullResponse,
     },
   }).open()
-  return { app, db, colly, today, token, office }
+  return { app, db, colly, today, token, office, storage }
 }
 
 /** Post a form from a link page and read back the message the page it lands on shows. */
@@ -150,9 +155,10 @@ describe('running late from a link', () => {
     })
     // An offer only, not a booking: nothing to be late for.
     expect(await colly.send('offer.send', { id: 'o-dara-2', callId: 'camera', personId: 'dara', override: true })).toMatchObject({ status: 'rejected' })
+    // From the office's app it's the same rule, said about her by name (ADR 0028, amended).
     expect(await colly.send('late.say', { id: 'x', offerId: 'o-grainne', day: later, by: '15', arriveAt: null, note: '' })).toMatchObject({
       status: 'rejected',
-      reason: { message: `You're not booked on ${dayLabel(later)}.` },
+      reason: { message: `Gráinne Power isn't booked on ${dayLabel(later)}.` },
     })
     expect((await db.query('SELECT 1 FROM running_late')).rows).toEqual([])
   })
@@ -169,5 +175,181 @@ describe('running late from a link', () => {
     expect((await db.query('SELECT person_id, offer_id, late_by, note FROM running_late')).rows).toEqual([
       { person_id: 'grainne', offer_id: 'o-grainne', late_by: '30', note: 'Traffic on the M50' },
     ])
+  })
+})
+
+describe('running late noted by the office, for someone who rang', () => {
+  it("lands in the same record: in the queue, on the call, on the contact's sheet and their own page, the history saying who noted it", async () => {
+    // Proves: Colly notes from the app that Dara rang to say he'll be about 30 minutes late; it's in the office's queue and on the call as one from a link would be, on Aoife's sheet as contact and on Dara's own page, and the history says Colly noted it; marking him there closes it, in words too.
+    const { app, colly, today, token, office } = await shoot()
+    expect(await colly.send('late.say', { id: 'l-dara', offerId: 'o-dara', day: today, by: '30', arriveAt: null, note: 'Rang from the M50' })).toMatchObject({ status: 'applied' })
+    await office.sync()
+    expect(office.view().late.toCheck.map((l) => [l.person?.name, l.call?.role, lateLine(l)])).toEqual([['Dara Quinn', 'Sound No.1', 'about 30 minutes late, “Rang from the M50”']])
+    expect(office.view().late.forOffer('o-dara').map((l) => l.id)).toEqual(['l-dara'])
+    const sheet = async () => (await app.inject({ url: `/f/${await token('aoife')}/sheet/chief` })).body
+    expect(await sheet()).toContain('<b>Dara Quinn</b>: about 30 minutes late, “Rang from the M50”')
+    expect((await app.inject({ url: `/f/${await token('dara')}` })).body).toContain("You've told us: about 30 minutes late, “Rang from the M50”.")
+    const [noted] = (await colly.history()).entries
+    expect(noted).toMatchObject({ command: 'late.say', who: { kind: 'staff', name: 'Colly Hewson' } })
+    expect(noted!.what).toBe(`Noted that Dara Quinn rang to say they'll be about 30 minutes late for Liffey Brands Shoot (Shoot), ${dayLabel(today)}: Rang from the M50`)
+
+    expect(await colly.send('late.arrived', { id: 'l-dara' })).toMatchObject({ status: 'applied' })
+    await office.sync()
+    expect(office.view().late.toCheck).toEqual([])
+    expect(await sheet()).toContain('<b>Dara Quinn</b>: there now')
+    expect((await colly.history()).entries[0]).toMatchObject({ what: 'Marked Dara Quinn as there now, at Liffey Brands Shoot (Shoot)', who: { name: 'Colly Hewson' } })
+  })
+
+  it("is refused on a day they're not booked, and once the booking is let go, in words about them", async () => {
+    // Proves: the link's refusals hold when the office notes it, said about the person by name, and nothing is written.
+    const { db, colly, today } = await shoot()
+    const later = addDays(today, 2)
+    expect(await colly.send('late.say', { id: 'l-dara', offerId: 'o-dara', day: later, by: '30', arriveAt: null, note: '' })).toMatchObject({
+      status: 'rejected',
+      reason: { message: `Dara Quinn isn't booked on ${dayLabel(later)}.` },
+    })
+    expect(await colly.send('offer.cancel', { id: 'o-dara' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('late.say', { id: 'l-dara', offerId: 'o-dara', day: today, by: '30', arriveAt: null, note: 'Rang' })).toMatchObject({
+      status: 'rejected',
+      reason: { message: "Dara Quinn isn't booked on this one any more, so there's nothing to be late for." },
+    })
+    expect((await db.query('SELECT 1 FROM running_late')).rows).toEqual([])
+  })
+})
+
+describe('running late, 30 days after its day', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('goes on the 30th day after in Ireland, not before: the record, its copies, the note in the history, and from the devices', async () => {
+    // Proves: the server's daily look clears a running late the first moment of the 30th day after its day in Ireland
+    // (12.30am in summer, still the day before by the server's clock), and not at 11.30pm the night before; the row and
+    // every copy in the change feed go, the device drops it, the notes go from the stored commands (one turned down too),
+    // and the history still says who, how late and for which job, without the note, in one entry naming nobody. A second
+    // run that day changes nothing. One said for the next day stays until its own 30th day.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // 9am in Ireland on the day of the shoot.
+    vi.setSystemTime(new Date('2027-06-01T08:00:00Z'))
+    const { app, db, colly, today, token, office, storage } = await shoot()
+    expect(today).toBe('2027-06-01')
+    const gráinne = await token('grainne')
+    await onLink(app, `/f/${gráinne}/late`, { offer: 'o-grainne', day: today, by: '30', note: 'Traffic on the M50' })
+    // Turned down, and kept in the history with what she typed.
+    expect(await post(app, `/f/${gráinne}/late`, { offer: 'o-grainne', day: today, at: '99:99', note: 'Puncture on the N7' })).toMatchObject({ ok: false })
+    const [said] = (await db.query<{ id: string }>('SELECT id FROM running_late')).rows
+    expect(await colly.send('late.seen', { id: said!.id })).toMatchObject({ status: 'applied' })
+    // Pick-ups the next day, with Dara on sound; he rings that evening to say he'll be late in the morning.
+    const tomorrow = addDays(today, 1)
+    for (const r of [
+      await colly.send('call.create', {
+        id: 'pickups',
+        project: 'Liffey Brands Shoot',
+        phase: 'Pick-ups',
+        venue: '',
+        role: 'Sound No.1',
+        start: tomorrow,
+        end: tomorrow,
+        callTime: '09:00',
+        needed: 1,
+        dayRateCents: 30000,
+        details: '',
+        replyBy: null,
+      }),
+      await colly.send('offer.send', { id: 'o-dara-2', callId: 'pickups', personId: 'dara', override: false }),
+      await colly.send('offer.respond', { id: 'o-dara-2', answer: 'accept', days: null, note: '' }),
+      await colly.send('offer.confirm', { id: 'o-dara-2' }),
+    ])
+      expect(r).toMatchObject({ status: 'applied' })
+    vi.setSystemTime(new Date('2027-06-01T18:30:00Z'))
+    expect(await colly.send('late.say', { id: 'l-dara', offerId: 'o-dara-2', day: tomorrow, by: '15', arriveAt: null, note: 'Dropping the kids first' })).toMatchObject({
+      status: 'applied',
+    })
+    await office.sync()
+    const held = async () => Object.keys((await storage.load())!.entities.runningLate ?? {}).sort()
+    expect(await held()).toEqual(['l-dara', said!.id].sort())
+
+    let told = 0
+    const daily = new DueErasures(db, { changed: () => told++ })
+    const left = async () => (await db.query<{ id: string }>('SELECT id FROM running_late ORDER BY id')).rows.map((r) => r.id)
+    const runs = async () => (await db.query<{ n: number }>('SELECT count(*)::int AS n FROM mutations WHERE name = $1', [LATE_CLEARED_ACTION])).rows[0]!.n
+
+    // 11.30pm on 30 June in Ireland, the 29th day after: still kept.
+    vi.setSystemTime(new Date('2027-06-30T22:30:00Z'))
+    await daily.run()
+    expect([await left(), await runs(), told]).toEqual([['l-dara', said!.id].sort(), 0, 0])
+
+    // 12.30am on 1 July in Ireland, the 30th day after, still 30 June by the server's clock.
+    vi.setSystemTime(new Date('2027-06-30T23:30:00Z'))
+    await daily.run()
+    expect([await left(), await runs(), told]).toEqual([['l-dara'], 1, 1])
+    expect((await db.query(`SELECT DISTINCT op FROM changes WHERE entity = 'runningLate' AND entity_id = $1`, [said!.id])).rows).toEqual([{ op: 'delete' }])
+    for (const table of ['changes', 'mutations']) {
+      const text = typedOnly((await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n'))
+      for (const t of ['Traffic on the M50', 'Puncture on the N7']) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+      expect(text, `${table} lost Dara's, still in its 30 days`).toContain('Dropping the kids first')
+    }
+    await office.sync()
+    expect(await held()).toEqual(['l-dara'])
+    expect(((await app.inject({ url: `/f/${gráinne}/data.json` })).json() as { runningLate: RunningLate[] }).runningLate).toEqual([])
+
+    const entries = (await colly.history('?limit=50')).entries
+    expect(entries[0]).toMatchObject({ command: LATE_CLEARED_ACTION, what: 'Cleared running late more than 30 days after its day, notes and all', who: { kind: 'unknown' } })
+    expect(entries.filter((e) => e.command.startsWith('late.') && e.command !== LATE_CLEARED_ACTION).map((e) => e.what)).toEqual([
+      `Noted that Dara Quinn rang to say they'll be about 15 minutes late for Liffey Brands Shoot (Pick-ups), ${dayLabel(tomorrow)}: Dropping the kids first`,
+      // Noting it carried only the record's id: it's given the booking as the record goes, so it still says whose.
+      'Noted that Gráinne Power is running late for Liffey Brands Shoot (Shoot)',
+      `Gráinne Power said they'll be there at about 99:99 for Liffey Brands Shoot (Shoot), ${dayLabel(today)}`,
+      `Gráinne Power said they'll be about 30 minutes late for Liffey Brands Shoot (Shoot), ${dayLabel(today)}`,
+    ])
+
+    // Again that day, by the timer or by hand: nothing more, and no second entry.
+    expect(await daily.run()).toBeUndefined()
+    expect(await clearOldLate(db)).toBe(0)
+    expect([await runs(), told]).toEqual([1, 1])
+
+    // The next night, Dara's own 30th day: his goes too.
+    vi.setSystemTime(new Date('2027-07-01T23:30:00Z'))
+    await daily.run()
+    expect([await left(), await runs(), told]).toEqual([[], 2, 2])
+    expect((await colly.history('?limit=5')).entries.map((e) => e.what)).toContain(
+      `Noted that Dara Quinn rang to say they'll be about 15 minutes late for Liffey Brands Shoot (Pick-ups), ${dayLabel(tomorrow)}`
+    )
+  })
+
+  it('takes the note from one turned down for a day years off, or for no real day, a month after it came in', async () => {
+    // Proves: none can be said further ahead than the next day, so one turned down for a day in 2999 on the link, or for
+    // a day that doesn't exist from a device, counts as for the day after it came in: its note goes on the 30th day
+    // after that one, and not a day before, rather than being kept for centuries.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2027-06-01T08:00:00Z'))
+    const { app, db, colly, today, token } = await shoot()
+    expect(await post(app, `/f/${await token('grainne')}/late`, { offer: 'o-grainne', day: '2999-12-31', by: '30', note: 'Puncture on the N7' })).toMatchObject({
+      ok: false,
+      message: `You're not booked on ${dayLabel('2999-12-31')}.`,
+    })
+    expect(await colly.send('late.say', { id: 'l-dara', offerId: 'o-dara', day: '2027-13-45', by: '15', arriveAt: null, note: 'Dropping the kids first' })).toMatchObject({
+      status: 'rejected',
+    })
+    const notes = async () => (await db.query<{ note: string }>(`SELECT args->>'note' AS note FROM mutations WHERE name = 'late.say' ORDER BY received_at`)).rows.map((r) => r.note)
+    expect(await clearOldLate(db, addDays(today, 30))).toBe(0)
+    expect(await notes()).toEqual(['Puncture on the N7', 'Dropping the kids first'])
+    expect(await clearOldLate(db, addDays(today, 31))).toBe(0)
+    expect(await notes()).toEqual(['', ''])
+  })
+
+  it('clears once when two runs look at the same moment', async () => {
+    // Proves: each run looks again under the lock every change takes, so two at once delete the record once, in one
+    // history entry, and tell devices once. Postgres proves it for two copies of the server (postgres.test.ts).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2027-06-01T08:00:00Z'))
+    const { app, db, today, token } = await shoot()
+    await onLink(app, `/f/${await token('grainne')}/late`, { offer: 'o-grainne', day: today, by: '60', note: 'Traffic on the M50' })
+    expect(await clearOldLate(db, addDays(today, 29))).toBe(0)
+    const due = addDays(today, 30)
+    expect((await Promise.all([clearOldLate(db, due), clearOldLate(db, due)])).sort()).toEqual([0, 1])
+    expect((await db.query('SELECT 1 FROM running_late')).rows).toEqual([])
+    const sent = await db.query(`SELECT c.entity, c.op FROM changes c JOIN mutations m ON m.id = c.mutation_id WHERE m.name = $1`, [LATE_CLEARED_ACTION])
+    expect(sent.rows).toEqual([{ entity: 'runningLate', op: 'delete' }])
   })
 })

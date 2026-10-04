@@ -133,9 +133,9 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .offer-form .find { grid-column: 1 / -1; }
 
 /* The certificates a call needs, and running late (ADR 0028). The ticks for what a call needs wrap as chips; a certificate's note sits beside its expiry, or under it on a phone. */
-.app .grid-form .needs > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.app .grid-form .needs label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
-.app .grid-form .needs input { width: 20px; height: 20px; accent-color: var(--accent); }
+.app .grid-form .needs > div, .app .grid-form .chips > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.app .grid-form .needs label, .app .grid-form .chips label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
+.app .grid-form .needs input, .app .grid-form .chips input { width: 20px; height: 20px; accent-color: var(--accent); }
 .crew .more-grid .cert { grid-template-columns: 1fr 1fr 1.2fr; }
 .crew .offer-form .warn-line { grid-column: 1 / -1; }
 .crew .call > .warn-line { margin-top: calc(-1 * var(--space-4)); }
@@ -146,9 +146,23 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .crew .reminders .reminder.soon p { color: var(--warn); }
 .crew .reminders .reminder.ran-out p { color: var(--bad); }
 .crew .late-row > div:first-child { flex: 1 1 14em; }
+/* The office noting it for someone who rang: a link under the line at rest, opening the same choices as the link page as chips. */
+.crew .call > button.late-open { justify-self: start; }
 .plan .timeline .blk small.late, .plan .timeline .item small.late { color: var(--warn); font-weight: 700; }
 .sheet-screen .sheet-call li .late-line { flex-basis: 100%; }
 @media (max-width: 480px) {
   .crew .more-grid .cert { grid-template-columns: 1fr 1fr; }
   .crew .more-grid .cert .cert-note { grid-column: 1 / -1; }
 }
+
+/* People's documents (ADR 0029): a line each on the person's card, in the warn tone when one runs out soon and the bad tone once it has, the form to add or change one, and one sent from a link in "Answers to check". */
+.crew .detail .documents { display: grid; gap: var(--space-6); }
+/* A card's detail sets its lines in ink; what's only a hint here keeps the hint's tone. */
+.crew .documents .hint, .crew .documents .row.doc p { color: var(--muted); }
+/* A title typed as one long word, such as a file's name, wraps rather than pushing the card wider than a phone. */
+.crew .documents .row.doc > div:first-child, .crew .doc-check > div:first-child { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
+.crew .documents .row.doc .warn { color: var(--warn); font-weight: 600; }
+.crew .documents .row.doc .bad { color: var(--bad); font-weight: 600; }
+.crew .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.crew .doc-form small { color: var(--muted); }
+.crew .doc-check .field { display: flex; gap: var(--space-6); align-items: center; font-size: var(--text-hint); color: var(--muted); }

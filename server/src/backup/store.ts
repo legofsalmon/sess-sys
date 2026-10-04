@@ -59,7 +59,8 @@ export function s3Store(settings: S3Settings): BackupStore {
     async put(key, data) {
       // The storage checks the file against this checksum, so a file damaged on the way is refused rather than kept.
       const sha256 = createHash('sha256').update(data).digest('hex')
-      const type = key.endsWith('.enc') ? 'application/octet-stream' : 'application/gzip'
+      // A backup is gzip inside unless encrypted; anything else (a document's file, ADR 0029) is bytes the server reads back itself.
+      const type = key.endsWith('.gz') ? 'application/gzip' : 'application/octet-stream'
       await send(url(key), { method: 'PUT', body: new Uint8Array(data), headers: { 'content-type': type, 'x-amz-content-sha256': sha256 } })
     },
     async get(key) {
