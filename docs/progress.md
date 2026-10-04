@@ -43,10 +43,16 @@ waiting on someone.
   the server tests (394 on PGlite, and the real-Postgres file, 12, with
   two servers clearing at once); the web build; the full browser suite
   (78), and the documents and certificates specs three more times.
+- Merged into `main` on 4 October at 07:24 UTC (Colly: "Merge 56") and
+  live by 07:34 once main's checks passed. The live database has the
+  documents module at version 1 with its `documents` and
+  `document_files_to_delete` tables, and nothing went wrong at start-up.
+  The server says documents' files are off until the backups' bucket is
+  set, as expected: their details and dates work meanwhile.
 
 **Next**
 
-- Merge, with Colly's go-ahead, and check it on the live server.
+- See 4 October.
 - The stock list next week. On the live server, a list of 1,500 rows is
   expected to take about 8 to 10 minutes with the page left open.
 - The keys: the Google key, the backups bucket (now for documents'
