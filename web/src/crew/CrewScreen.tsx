@@ -267,7 +267,7 @@ export function CrewScreen() {
           <Refusal error={answers.error} />
           <ShowAll
             items={[
-              ...late.map((l) => <LateRow key={l.id} note={l} today={today} onNoted={() => void answers.run(() => client.mutate('late.seen', { id: l.id }))} />),
+              ...late.map((l) => <LateRow key={l.id} note={l} today={today} onNoted={() => void answers.run(() => client.mutate('late.seen', { id: l.id, offerId: l.offerId, day: l.day }))} />),
               ...docs.map((d) => <DocumentToCheck key={d.id} doc={d} />),
               ...toSortOut.map(({ c, o, text }) => (
                 <div className="row" key={o.id}>

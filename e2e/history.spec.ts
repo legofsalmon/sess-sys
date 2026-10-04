@@ -47,12 +47,15 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   await addPlace(page, bay)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  // Added with no signal, and sent two hours later.
-  await page.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  // Added with no signal, and sent two hours later. The signal comes back by the same route letting the push through,
+  // not by taking the route away: the two hours fire the app's retry, and a push caught mid-route as it was taken away
+  // was left hanging, never sent nor failed, so the app waited out its 30 seconds with "No signal" showing.
+  let signal = false
+  await page.route('**/api/sync/push', (route) => (signal ? route.continue() : route.abort('internetdisconnected')))
   await addPlace(page, van)
   await expect(page.locator('.conn')).toHaveText(/1 waiting/)
   await page.clock.fastForward('02:00:00')
-  await page.unroute('**/api/sync/push')
+  signal = true
   await page.evaluate(() => dispatchEvent(new Event('online')))
   await expect(page.locator('.conn')).toHaveText('Up to date')
 

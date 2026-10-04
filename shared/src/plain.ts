@@ -9,11 +9,29 @@ import { EURO_HINT } from './money.ts'
  * wording, which only a bug could reach.
  */
 
-/** Typed text, up to `max` characters: "The notes can be up to 2,000 characters." */
-export const text = (max: number, what: string) => z.string().max(max, `${what} can be up to ${max.toLocaleString('en-IE')} characters.`)
+/**
+ * Typed text as it's kept. Text pasted from Word or a PDF can carry
+ * control characters nobody can see to take out, and the database takes
+ * no NUL at all, so they're cleaned away rather than refused. Tab, line
+ * feed and carriage return stay as typed. A vertical tab (Word's line
+ * break), a form feed (a page break) and the old next-line character
+ * become line feeds, which is what they meant; the rest go. So does half
+ * an emoji, left by text cut short at a length, which the database's JSON
+ * can't hold either. The device cleans what it sends with the command's
+ * own schema and the server cleans again, which changes nothing the
+ * second time, so the phone's copy and the server's say the same.
+ */
+export function cleanText(s: string): string {
+  return s.replace(/[\u000b\u000c\u0085]/g, '\n').replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]|\p{Cs}/gu, '')
+}
+
+const upTo = (max: number, what: string) => z.string().max(max, `${what} can be up to ${max.toLocaleString('en-IE')} characters.`)
+
+/** Typed text, up to `max` characters once cleaned: "The notes can be up to 2,000 characters." */
+export const text = (max: number, what: string) => z.string().transform(cleanText).pipe(upTo(max, what))
 
 /** Text that can't be left out: "A name is needed." */
-export const needed = (max: number, what: string, which: string) => text(max, what).min(1, `${which} is needed.`)
+export const needed = (max: number, what: string, which: string) => z.string().transform(cleanText).pipe(upTo(max, what).min(1, `${which} is needed.`))
 
 /** A whole number from `min` to `max`, said the same way whichever way it's wrong. */
 export function whole(min: number, max: number, what: string, said = `${what} is a whole number from ${min.toLocaleString('en-IE')} to ${max.toLocaleString('en-IE')}.`) {

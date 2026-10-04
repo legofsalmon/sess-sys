@@ -17,6 +17,37 @@
   any more, so it wasn't made."), with nothing kept, while the rest of
   its outbox goes through; the old records in its copy sit unused.
 - **Amended:** 2 October 2026 by [ADR 0027](0027-erasing-a-person-on-request.md): erasing a person on request rewrites the earlier copies of their records in the change feed, which otherwise only ever grows, so a new device's first sync can't pull their old details.
+- **Amended:** 4 October 2026: control characters. Postgres keeps no NUL
+  in text or JSON, and text pasted from Word or a PDF can carry invisible
+  control characters, so a NUL in a person's name failed the whole push.
+  Typed text is now cleaned, not refused: nobody can see a stray control
+  character to take it out. The shared helpers every command uses
+  (`shared/src/plain.ts`) keep tab, line feed and carriage return, turn a
+  vertical tab (Word's line break), a form feed and the old next-line
+  character into line feeds, and drop the rest, and half an emoji left by
+  cutting text short. The device keeps a command as its schema reads it,
+  so it sends cleaned text and lays it over its copy, the server cleans
+  again to the same text, and its change coming back matches. A command
+  from an older version of the app is recorded with its text cleaned the
+  same way. The CSV reader and text from Google Calendar are cleaned as
+  they're read. Where a character can't be cleaned, such as in an id, the
+  server turns that one change down in plain words ("Something in this
+  has a character the app can't keep, so it wasn't saved. Check it and
+  try again.") and the rest of the push goes on; any other request gets
+  a 400 in the same words. It's what was sent, so it's not reported as a
+  fault. Only those characters count: the same codes for anything else,
+  such as JSON the server built wrong, are the server's own fault and
+  are reported as any fault is. Real Postgres and PGlite refuse these
+  the same way, and both are tested.
+- **Amended:** 4 October 2026: a sync asked for while a round is failing
+  (as the app asks when the phone says it's back online) gets a round of
+  its own rather than the failure of the round sent before, which left
+  "No signal" showing until the next retry, up to 30 seconds on. The
+  app's retries (`shared/src/sync/retry.ts`) leave one retry for each
+  sync however many asked for it, still backing off to every 30
+  seconds: a retry each stacked up, so a few asks while a slow round
+  failed kept a phone on a poor signal trying every few seconds for
+  ten minutes.
 
 ## Context
 

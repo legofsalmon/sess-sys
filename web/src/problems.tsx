@@ -125,7 +125,9 @@ function describer(view: View): (m: Mutation) => string {
     return e ? `${e.person?.name ?? 'someone'}'s day in lieu for ${dayLabel(e.day)}` : "someone's day in lieu"
   }
 
-  const late = (id: unknown) => view.late.current.find((l) => l.id === id)?.person?.name ?? 'someone'
+  // By the record, or else by the booking sent with it, as the server finds it (ADR 0028): one this device noted under an id
+  // of its own is under another once the server has it.
+  const late = (a: Record<string, unknown>) => view.late.current.find((l) => l.id === a.id)?.person?.name ?? offer(a.offerId).who
   /** "Pádraig Kenny's IPAF card" (ADR 0029). */
   const docOf = (id: unknown) => {
     const d = view.documents.all.find((x) => x.id === id)
@@ -267,9 +269,9 @@ function describer(view: View): (m: Mutation) => string {
       case 'late.say':
         return `Say ${offer(a.offerId).who} is running late for ${offer(a.offerId).what}`
       case 'late.arrived':
-        return `Say ${late(a.id)} is there now`
+        return `Say ${late(a)} is there now`
       case 'late.seen':
-        return `Note that ${late(a.id)} is running late`
+        return `Note that ${late(a)} is running late`
       // People's documents (ADR 0029). A file goes straight to the server, so only details wait here.
       case 'document.save':
         return `Save ${person(a.personId)}'s ${titleInSentence(str(a.title, 'document'))}`

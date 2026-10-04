@@ -14,6 +14,29 @@ export class Refused extends Error {
   }
 }
 
+/**
+ * What a request is told when it carried a character the database can't
+ * hold. Typed text is cleaned before it gets that far (shared/src/plain.ts),
+ * so only a part nobody types reaches this, such as an id.
+ */
+export const CHARACTERS = "Something in this has a character the app can't keep, so it wasn't saved. Check it and try again."
+
+/**
+ * Postgres turning a value down for a character it can't hold: a NUL in
+ * text (22021, "0x00"), a \u0000 in JSON (22P05), or half an emoji in JSON
+ * (22P02, its detail naming a surrogate). PGlite says the same as a real
+ * server. It's what was sent, not a fault of the server's, so it's
+ * answered as a refusal and never reported as a crash. The same codes for
+ * anything else, such as JSON the server built wrong, are its own fault,
+ * so they're still reported.
+ */
+export function isCharacterError(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown; detail?: unknown } | null
+  if (!e || typeof e.code !== 'string') return false
+  const says = (v: unknown, words: RegExp) => typeof v === 'string' && words.test(v)
+  return (e.code === '22021' && says(e.message, /0x00$/)) || e.code === '22P05' || (e.code === '22P02' && says(e.detail, /surrogate/))
+}
+
 export interface Ctx {
   tx: Queryable
   /** The command the changes belong to, for the history; null for the server's own bookkeeping. */

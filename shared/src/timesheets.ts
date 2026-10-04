@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { dayLabel, daysLabel, euro, firstName, type CrewCall, type Offer, type Person } from './crew.ts'
 import { day } from './day.ts'
 import { EURO_HINT } from './money.ts'
-import { euroCents, text } from './plain.ts'
+import { cleanText, euroCents, text } from './plain.ts'
 
 /**
  * Timesheets (ADR 0022): what a freelancer worked on a booking, so they're
@@ -23,7 +23,7 @@ const rate = euroCents(100_000_00, 'A day rate')
 export const MAX_EXTRAS = 10
 
 export const timesheetExtra = z.object({
-  what: z.string().trim().min(1, 'Say what each extra is for.').max(100, 'What an extra is for can be up to 100 characters.'),
+  what: z.string().transform(cleanText).pipe(z.string().trim().min(1, 'Say what each extra is for.').max(100, 'What an extra is for can be up to 100 characters.')),
   cents: z.number({ invalid_type_error: EURO_HINT }).int(EURO_HINT).min(1, 'An extra needs an amount.').max(10_000_00, 'An extra can be up to €10,000.'),
 })
 export type TimesheetExtra = z.infer<typeof timesheetExtra>

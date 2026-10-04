@@ -46,16 +46,25 @@ import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, getYear, re
 type LeaveCommand = 'leave.request' | 'leave.cancel' | 'leave.decide' | 'lieu.log' | 'lieu.cancel' | 'lieu.decide' | 'leave.allowance' | 'leave.open'
 type Handler<N extends LeaveCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
-/** The signed-in person, by the account's email matched to the Crew tab; undefined while sign-in is off. */
-async function signedInPerson(ctx: Ctx): Promise<Person | undefined> {
+/**
+ * The signed-in person, by the account's email matched to the Crew tab; undefined while sign-in is off. Someone
+ * archived isn't matched, so where it says more than "put your email on" (deciding), `archived` is what they're told.
+ */
+async function signedInPerson(ctx: Ctx, archived?: string): Promise<Person | undefined> {
   if (!ctx.user) return undefined
   const me = await personByEmail(ctx.tx, ctx.user.email)
-  if (!me)
-    throw new Refused({
-      code: 'forbidden',
-      message: `Your account, ${ctx.user.email}, isn't matched to anyone on the Crew tab. Put that email on your own person there first.`,
-    })
-  return me
+  if (me) return me
+  if (archived && (await archivedByEmail(ctx, ctx.user.email))) throw new Refused({ code: 'forbidden', message: archived })
+  throw new Refused({
+    code: 'forbidden',
+    message: `Your account, ${ctx.user.email}, isn't matched to anyone on the Crew tab. Put that email on your own person there first.`,
+  })
+}
+
+/** Whether someone archived on the Crew tab has this email, as the account's email is matched to a person. */
+async function archivedByEmail(ctx: Ctx, email: string) {
+  const { rows } = await ctx.tx.query('SELECT 1 FROM people WHERE lower(trim(email)) = $1 AND archived LIMIT 1', [email.trim().toLowerCase()])
+  return rows.length > 0
 }
 
 /** The person a request or an entry is for, who has to be staff and, with sign-in on, the signed-in person. */
@@ -81,9 +90,13 @@ async function requester(ctx: Ctx, by: string | undefined, personId: string) {
   }
 }
 
-/** Who is deciding, or setting an allowance: the signed-in person, or `by` while sign-in is off, with the flag either way. */
+/**
+ * Who is deciding, or setting an allowance, or opening a year: the signed-in person, or `by` while sign-in is off,
+ * with the flag either way. Someone archived can't approve, ticked or not, and is told so plainly: being told to
+ * tick the box would send someone to tick one that's ticked already.
+ */
 async function approver(ctx: Ctx, by: string | undefined): Promise<Person> {
-  const me = await signedInPerson(ctx)
+  const me = await signedInPerson(ctx, "You've been archived on the Crew tab, so you can't approve time off.")
   if (me) {
     if (by && by !== me.id) throw new Refused({ code: 'forbidden', message: `You're signed in as ${me.name}, so you can't act as someone else.` })
     if (!canApproveLeave(me))
@@ -93,6 +106,7 @@ async function approver(ctx: Ctx, by: string | undefined): Promise<Person> {
   if (!by) throw new Refused({ code: 'forbidden', message: 'Say who you are first: pick your name on the Leave screen.' })
   const who = await getPerson(ctx.tx, by)
   if (!who) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+  if (who.archived) throw new Refused({ code: 'forbidden', message: `${who.name} has been archived, so they can't approve time off.` })
   if (!canApproveLeave(who)) throw new Refused({ code: 'forbidden', message: `${who.name} can't approve time off. Tick "Can approve time off" on their person on the Crew tab.` })
   return who
 }

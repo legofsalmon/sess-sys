@@ -7,6 +7,7 @@ import {
   daysLabel,
   eachDay,
   ERASED_NAME,
+  ERASED_REFUSAL,
   feedCodeFor,
   irishToday,
   leaveDays,
@@ -307,6 +308,15 @@ describe('erasing someone with no paid work', () => {
     const { rows: stored } = await db.query(`SELECT args FROM mutations WHERE id = ANY($1::text[]) ORDER BY name`, [[there.id, noted.id]])
     expect(stored.map((r) => r.args)).toEqual([{ id: late }, { id: late }])
     noTraces(await everything(db, 'mutations'), 'the history after a late Noted')
+    // From this version of the app they carry her booking and the day too, which name her: turned down as erased, keeping
+    // only those, as running late itself keeps them, so they hold nothing of hers either.
+    const booking = { id: 'noted-on-a-phone', offerId: 'o-today', day: day(0) }
+    const [there2, noted2] = [m('late.arrived', booking), m('late.seen', booking)]
+    expect(await refusal(app, there2)).toBe(ERASED_REFUSAL)
+    expect(await refusal(app, noted2)).toBe(ERASED_REFUSAL)
+    const { rows: stored2 } = await db.query(`SELECT args FROM mutations WHERE id = ANY($1::text[])`, [[there2.id, noted2.id]])
+    expect(stored2.map((r) => r.args)).toEqual([booking, booking])
+    noTraces(await everything(db, 'mutations'), 'the history after a late Noted from this app')
   })
 
   it('reaches a device that held her before, and what it was still holding about her', async () => {

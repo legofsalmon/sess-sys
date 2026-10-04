@@ -60,6 +60,15 @@ async function emitLate(ctx: Ctx, id: string) {
   await emit(ctx, 'runningLate', id, await getLate(ctx.tx, id))
 }
 
+/**
+ * The record a "they're there" or "noted" is about: by its id, or else by the booking and day the app sends with it.
+ * A phone that hadn't yet heard what was said on the link notes it under an id of its own, which `late.say` writes
+ * into the record already there, so the quick "Mark as there" straight after names an id no record has.
+ */
+async function lateNamed(ctx: Ctx, a: CommandArgs<'late.arrived' | 'late.seen'>) {
+  return (await getLate(ctx.tx, a.id)) ?? (a.offerId && a.day ? await lateFor(ctx.tx, a.offerId, a.day) : undefined)
+}
+
 type LateCommand = 'late.say' | 'late.arrived' | 'late.seen'
 type Handler<N extends LateCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
@@ -90,7 +99,7 @@ export const lateHandlers: { [N in LateCommand]: Handler<N> } = {
   },
 
   async 'late.arrived'(ctx, a) {
-    const late = await getLate(ctx.tx, a.id)
+    const late = await lateNamed(ctx, a)
     if (!late) throw new Refused({ code: 'not-found', message: ctx.via === 'link' ? "There's nothing to say you're there for." : 'That running late is no longer there.' })
     // There once is there: a second tap changes nothing.
     if (late.arrivedAt) return
@@ -99,7 +108,7 @@ export const lateHandlers: { [N in LateCommand]: Handler<N> } = {
   },
 
   async 'late.seen'(ctx, a) {
-    const late = await getLate(ctx.tx, a.id)
+    const late = await lateNamed(ctx, a)
     if (!late) throw new Refused({ code: 'not-found', message: 'That running late is no longer there.' })
     // Noted once is noted, as for answers: a second device's Noted changes nothing.
     if (late.seenAt) return
@@ -126,9 +135,10 @@ const SAID_FOR = `LEAST(CASE WHEN args->>'day' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' 
  * earlier copy of it in the change feed becomes a deletion, devices are
  * told, and the note goes from each stored "running late" for that day,
  * so the history reads without it, as after an erasure. "They're there"
- * and "Noted" carry only the record's id, so each is given the booking's
- * id as the record goes, and the history still says whose it was and for
- * which job. One server change, in the history with no name. It looks
+ * and "Noted" from the link, or from a version of the app from before
+ * they carried the booking and day, have only the record's id, so each is
+ * given the booking's id as the record goes, and the history still says
+ * whose it was and for which job. One server change, in the history with no name. It looks
  * again under the lock every change takes, so a second run, or another
  * copy of the server at the same moment, finds nothing and changes
  * nothing. Answers how many records went.

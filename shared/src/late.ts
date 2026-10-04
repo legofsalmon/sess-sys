@@ -68,10 +68,14 @@ export const lateCommandSchemas = {
   'late.say': z
     .object({ id, offerId: id, day, by: z.enum(LATE_BY).nullable(), arriveAt: time.nullable(), note: text(LATE_NOTE_LENGTH, 'The note') })
     .refine((l) => l.by !== null || l.arriveAt !== null, { message: "Say roughly how late you'll be, or the time you'll be there." }),
-  /** They're there. */
-  'late.arrived': z.object({ id }),
-  /** The office has seen it, so it leaves "Answers to check". */
-  'late.seen': z.object({ id }),
+  /**
+   * They're there. The app sends the record's booking and day too: a phone that hadn't yet heard what was said on
+   * the link noted it under an id of its own, which the server wrote into the record already there, so the record is
+   * found by those when its id isn't. Left out by the link, which knows the record, and by versions from before.
+   */
+  'late.arrived': z.object({ id, offerId: id.optional(), day: day.optional() }),
+  /** The office has seen it, so it leaves "Answers to check". Found as "They're there" is. */
+  'late.seen': z.object({ id, offerId: id.optional(), day: day.optional() }),
 } as const
 
 const BY_WORDS: Record<LateBy, string> = { '15': 'about 15 minutes late', '30': 'about 30 minutes late', '60': 'about an hour late', more: 'more than an hour late' }

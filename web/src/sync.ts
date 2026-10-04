@@ -1,4 +1,4 @@
-import { SyncClient } from '@sh/shared'
+import { keepSyncing, SyncClient } from '@sh/shared'
 import { markSignedOut } from './auth.ts'
 import { openStorage } from './storage.ts'
 import { claimTab, onTabMessage, onTabRole, tabRole } from './tabs.ts'
@@ -18,25 +18,18 @@ export const storage = await openStorage()
 export const client = await new SyncClient({ storage, transport }).open()
 
 /** Try now, and keep trying while offline, backing off to once every 30 s. */
-let failures = 0
-let timer: ReturnType<typeof setTimeout> | undefined
-export function syncSoon() {
-  clearTimeout(timer)
+const retry = keepSyncing(() => client.sync(), {
   // Another tab is doing the syncing and saving; this one shows what it loaded.
-  if (tabRole() !== 'writer') return
-  client.sync().then(
-    () => {
-      failures = 0
-    },
-    (err) => {
-      // Changes stay in the outbox; they go once the person signs in again.
-      if (err instanceof SignedOutError) return markSignedOut()
-      failures++
-      timer = setTimeout(syncSoon, Math.min(30_000, 1000 * 2 ** failures))
-    }
-  )
-}
-onTabRole(() => clearTimeout(timer))
+  may: () => tabRole() === 'writer',
+  stop: (err) => {
+    if (!(err instanceof SignedOutError)) return false
+    // Changes stay in the outbox; they go once the person signs in again.
+    markSignedOut()
+    return true
+  },
+})
+export const syncSoon = retry.soon
+onTabRole(retry.pause)
 // Signed out in another tab, which wiped the copy: this one keeps nothing more and goes to sign in too.
 onTabMessage('wipe', () => {
   storage.forget()

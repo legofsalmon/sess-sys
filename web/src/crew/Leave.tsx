@@ -172,12 +172,20 @@ export function LeaveScreen({ view }: { view: View }) {
 function WhoAreYou({ view, signedIn, email, onPick }: { view: View; signedIn: boolean; email: string | undefined; onPick: (id: string) => void }) {
   const [id, setId] = useState('')
   const staff = view.leave.staff
-  if (signedIn)
+  if (signedIn) {
+    // Someone archived isn't matched either, and is told so, not sent to put on an email that's there already.
+    const wanted = email?.trim().toLowerCase()
+    const archived = !!wanted && view.crew.people.some((p) => p.archived && p.email?.trim().toLowerCase() === wanted)
     return (
       <section className="card">
-        <p className="empty">Your account, {email}, isn't matched to anyone on the Crew tab. Put that email on your own person there, as staff, and come back.</p>
+        <p className="empty">
+          {archived
+            ? "You've been archived on the Crew tab, so you can't ask for or approve time off."
+            : `Your account, ${email}, isn't matched to anyone on the Crew tab. Put that email on your own person there, as staff, and come back.`}
+        </p>
       </section>
     )
+  }
   return (
     <section className="card">
       <h2>Who are you?</h2>

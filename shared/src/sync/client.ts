@@ -294,7 +294,11 @@ export class SyncClient {
   /**
    * Push the outbox, then pull until up to date. Calls that arrive while a
    * sync is running are folded into one more round rather than run in
-   * parallel, so the outbox is never sent twice at once.
+   * parallel, so the outbox is never sent twice at once. That round still
+   * runs when the one before it fails: a call made as the signal came back
+   * is answered by a round that tries with the signal, not by the failure
+   * of one sent before it, which would leave "No signal" showing until the
+   * next retry, up to 30 seconds on.
    */
   sync(): Promise<void> {
     if (this.running) {
@@ -305,7 +309,11 @@ export class SyncClient {
       try {
         do {
           this.again = false
-          await this.round()
+          try {
+            await this.round()
+          } catch (err) {
+            if (!this.again) throw err
+          }
         } while (this.again)
       } finally {
         this.running = undefined

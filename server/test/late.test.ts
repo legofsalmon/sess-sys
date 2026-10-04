@@ -163,6 +163,20 @@ describe('running late from a link', () => {
     expect((await db.query('SELECT 1 FROM running_late')).rows).toEqual([])
   })
 
+  it('takes a note with a NUL in it, or cut to its length in the middle of an emoji, as words', async () => {
+    // Proves: what the link page's form posts reaches the server as typed: a NUL, which the database can't hold, is cleaned
+    // out of the note as the app cleans typed text, and a note cut to 200 characters inside an emoji loses the half, which
+    // the database's JSON can't hold either; each lands with "Thanks" rather than failing on the server.
+    const { app, db, today, token } = await shoot()
+    const gráinne = await token('grainne')
+    const sent = { ok: true, message: "Thanks. The office, and whoever's running the day, can see it now." }
+    expect(await post(app, `/f/${gráinne}/late`, { offer: 'o-grainne', day: today, by: '30', note: 'Traffic\u0000 on the M50' })).toMatchObject(sent)
+    expect((await db.query('SELECT note FROM running_late')).rows).toEqual([{ note: 'Traffic on the M50' }])
+    const long = `${'Stuck behind a tractor. '.repeat(9).slice(0, 199)}\u{1F69C}`
+    expect(await post(app, `/f/${gráinne}/late`, { offer: 'o-grainne', day: today, by: '60', note: long })).toMatchObject(sent)
+    expect((await db.query('SELECT note FROM running_late')).rows).toEqual([{ note: long.slice(0, 199).trim() }])
+  })
+
   it("never writes over another booking's record that has the same id", async () => {
     // Proves: a change sent with the id of Gráinne's record, for Dara's booking, is refused and leaves hers as she said it.
     const { app, db, colly, today, token } = await shoot()
@@ -198,6 +212,48 @@ describe('running late noted by the office, for someone who rang', () => {
     expect(office.view().late.toCheck).toEqual([])
     expect(await sheet()).toContain('<b>Dara Quinn</b>: there now')
     expect((await colly.history()).entries[0]).toMatchObject({ what: 'Marked Dara Quinn as there now, at Liffey Brands Shoot (Shoot)', who: { name: 'Colly Hewson' } })
+  })
+
+  it("finds her record when a phone that hadn't heard hers notes it again, and Noted and Mark as there go straight after", async () => {
+    // Proves: Gráinne says on her link she's running late; the office's phone, behind, hasn't heard it, so noting it for the same
+    // booking and day makes an id of its own, which the server writes into her record. Noted, tapped straight after and sent with
+    // it, and Mark as there, tapped once the phone has heard hers but on the line it showed before, carry the booking and the day
+    // as the app sends them, so the phone shows hers closed at once and the server finds and closes it, rather than either
+    // calling it gone; the phone and the server end on the one record, and the history says whose. Thirty days on, the record
+    // goes and the commands keep nothing she wrote.
+    const { app, db, colly, today, token, office } = await shoot()
+    await office.sync()
+    await onLink(app, `/f/${await token('grainne')}/late`, { offer: 'o-grainne', day: today, by: '30', note: 'Traffic on the M50' })
+    const [hers] = (await db.query<{ id: string }>('SELECT id FROM running_late')).rows
+    await office.mutate('late.say', { id: 'from-the-phone', offerId: 'o-grainne', day: today, by: '15', arriveAt: null, note: 'Rang the office' })
+    const said = office.view().late.forOffer('o-grainne')
+    expect(said.map((l) => l.id)).toEqual(['from-the-phone'])
+    const { id, offerId, day } = said[0]!
+    await office.mutate('late.seen', { id, offerId, day })
+    await office.sync()
+    expect(office.view().late.forOffer('o-grainne')).toMatchObject([{ id: hers!.id, seenAt: expect.any(String), arrivedAt: null }])
+    await office.mutate('late.arrived', { id, offerId, day })
+    expect(office.view().late.forOffer('o-grainne')).toMatchObject([{ id: hers!.id, arrivedAt: expect.any(String), pending: true }])
+    await office.sync()
+    expect(office.view().problems).toEqual([])
+    expect((await db.query('SELECT id, late_by, note, seen_at IS NOT NULL AS seen, arrived_at IS NOT NULL AS there FROM running_late')).rows).toEqual([
+      { id: hers!.id, late_by: '15', note: 'Rang the office', seen: true, there: true },
+    ])
+    expect(office.view().late.forOffer('o-grainne')).toMatchObject([{ id: hers!.id, arrivedAt: expect.any(String), seenAt: expect.any(String) }])
+    expect((await colly.history()).entries.slice(0, 2).map((e) => e.what)).toEqual([
+      'Marked Gráinne Power as there now, at Liffey Brands Shoot (Shoot)',
+      'Noted that Gráinne Power is running late for Liffey Brands Shoot (Shoot)',
+    ])
+
+    expect(await clearOldLate(db, addDays(today, 30))).toBe(1)
+    expect((await db.query('SELECT 1 FROM running_late')).rows).toEqual([])
+    for (const table of ['changes', 'mutations']) {
+      const text = typedOnly((await db.query<{ j: string }>(`SELECT row_to_json(t)::text AS j FROM ${table} t`)).rows.map((r) => r.j).join('\n'))
+      for (const t of ['Traffic on the M50', 'Rang the office']) expect(text, `${table} still holds "${t}"`).not.toContain(t)
+    }
+    expect((await colly.history('?limit=50')).entries.filter((e) => e.command === 'late.arrived').map((e) => e.what)).toEqual([
+      'Marked Gráinne Power as there now, at Liffey Brands Shoot (Shoot)',
+    ])
   })
 
   it("is refused on a day they're not booked, and once the booking is let go, in words about them", async () => {

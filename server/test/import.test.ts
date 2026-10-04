@@ -531,6 +531,21 @@ describe('bringing jobs in from Google Calendar', () => {
     expect(theirs.changed).toEqual([])
   })
 
+  it('brings in an event whose title, place and notes carry control characters, as pasted from Word, cleaned', async () => {
+    // Proves: a NUL, which the database can't hold, and a vertical tab (Word's line break) typed into an event in Google don't
+    // fail bringing it in: they're cleaned as the app cleans typed text, so the preview shows the job as it comes in.
+    const s = await setup()
+    await s.connect()
+    s.google.add(OPS, { summary: 'Aviva\u0000 - Build', days: '2031-04-02', location: 'Aviva Stadium\u0000, Lansdowne Road, Dublin 4', description: 'Load in\u000bvia the north gate' })
+    const preview = ok<ImportPreview>(await s.look(OPS))
+    expect(preview.jobs.map((j) => [j.name, j.venue?.name])).toEqual([['Aviva', 'Aviva Stadium']])
+    ok(await s.bring(choose(preview)))
+    const f = await s.feed()
+    expect(f.projects.map((p) => p.name)).toEqual(['Aviva'])
+    expect(f.venues.map((v) => [v.name, v.address])).toEqual([['Aviva Stadium', 'Aviva Stadium, Lansdowne Road, Dublin 4']])
+    expect(JSON.stringify(f)).toContain('Load in\\nvia the north gate')
+  })
+
   it('says why it can’t, when it can’t', async () => {
     const off = await setup({ calendar: false })
     expect((await off.app.inject({ url: '/api/calendar/import/calendars', cookies: off.colly.cookies })).json().error).toBe(

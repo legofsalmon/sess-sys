@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Rejection } from '../src/commands.ts'
+import { commandSchemas, type Rejection } from '../src/commands.ts'
 import type { EntityName } from '../src/model.ts'
 import { PUSH_LIMIT, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
 import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
+import { keepSyncing } from '../src/sync/retry.ts'
 
 /**
  * The device side of sync on its own, against a pretend server: a big
@@ -12,7 +13,10 @@ import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport }
  * know is kept for the build that will; a round that finds nothing saves
  * nothing and wakes nobody, unless a screen opened mid-round or the day has
  * turned, and the view is the same object until something changes; a
- * device that can't save still works; a long feed is pulled a page at a
+ * device that can't save still works; text pasted with control characters
+ * is cleaned on the device as the server cleans it; a sync asked for while
+ * a round fails gets a round of its own, and leaves one retry however many
+ * asked, backing off to every 30 seconds; a long feed is pulled a page at a
  * time; after the server is restored from a backup the device starts its
  * copy afresh and sends again what it did lately, unless the server was
  * cleared on purpose, when it drops it; and a push the server calls stale
@@ -140,6 +144,25 @@ describe('a date that is not real', () => {
     await phone.sync()
     expect(server.pushes).toEqual([])
     expect((await storage.load())?.outbox ?? []).toEqual([])
+  })
+})
+
+describe('text pasted with control characters', () => {
+  it('is cleaned on the device before it is saved or sent, as the server cleans it, so both hold the same words', async () => {
+    // Proves: a NUL, a vertical tab (Word's line break), a C1 control, DEL and half an emoji, as text pasted from Word or a PDF
+    // or cut at a length can carry, are cleaned out of what the device keeps and sends; tab and line breaks stay where notes
+    // have them; a name of nothing but control characters is "needed"; and cleaning what's clean, as the server does, changes nothing.
+    const server = new PretendServer()
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    const sent = await phone.mutate('place.upsert', { id: 'a3', name: 'Bay\u0000 A3\u007f\ud83c', notes: 'Top shelf\u000bspares\u0085\tonly\r\nNo\u0001 cases \u{1F3AC}' })
+    const clean = { id: 'a3', name: 'Bay A3', notes: 'Top shelf\nspares\n\tonly\r\nNo cases \u{1F3AC}' }
+    expect(sent.args).toEqual(clean)
+    expect((await storage.load())!.outbox[0]!.args).toEqual(clean)
+    expect(commandSchemas['place.upsert'].parse(clean)).toEqual(clean)
+    await expect(phone.mutate('place.upsert', { id: 'a4', name: '\u0000\u0001', notes: '' })).rejects.toThrow("The place's name is needed.")
+    await phone.sync()
+    expect(server.pushes[0]!.mutations[0]!.args).toEqual(clean)
   })
 })
 
@@ -476,6 +499,73 @@ describe('after the server is restored from a backup', () => {
     expect(phone.pendingCount).toBe(0)
     expect(phone.view().problems).toEqual([])
     expect(await storage.load()).toMatchObject({ generation: 'g2', outbox: [], problems: [] })
+  })
+})
+
+describe('a sync asked for while a round is failing', () => {
+  it('gets a round of its own, so the signal coming back mid-round is not lost', async () => {
+    // Proves: a round whose push went out with no signal fails, but a sync asked for while it was on its way (as the app asks
+    // when the phone says it's back online) still runs, and its answer is the one given: the change goes and the device is up
+    // to date, rather than saying "No signal" until the next retry, up to 30 seconds on. With no second ask, a failed round fails.
+    const server = new PretendServer()
+    let lost: (() => void) | undefined
+    const transport: Transport = {
+      push: (req) => (lost ? server.push(req) : new Promise((_, fail) => (lost = () => fail(new Error('No signal'))))),
+      pull: (after) => server.pull(after),
+    }
+    const phone = await device(transport)
+    await phone.mutate('place.upsert', place('a3'))
+    const first = phone.sync()
+    await vi.waitFor(() => expect(lost).toBeDefined())
+    const back = phone.sync()
+    lost!()
+    await expect(Promise.all([first, back])).resolves.toBeDefined()
+    expect(server.pushes).toHaveLength(1)
+    expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 0 })
+
+    server.down = true
+    await phone.mutate('place.upsert', place('van1'))
+    await expect(phone.sync()).rejects.toThrow('No signal')
+    expect(phone.view().connection).toBe('offline')
+  })
+})
+
+describe('trying again with no signal', () => {
+  it('backs off to every 30 seconds, and leaves one retry however many asked while a slow round failed', async () => {
+    // Proves: with no signal, and each push taking five seconds to fail as on a poor signal, the device tries again 2, 4, 8,
+    // then 16 seconds after each failure in turn, then every 30; five "back online" asks while the first round is on its way
+    // get one more round between them and then that same backing off, not a retry each, which stacked up into a push every
+    // few seconds for ten minutes; a failure trying again can't fix, such as being signed out, stops it.
+    vi.useFakeTimers()
+    try {
+      const pushedAt: number[] = []
+      let signedOut = false
+      const transport: Transport = {
+        push: () => {
+          pushedAt.push(Date.now())
+          return new Promise((_, fail) => setTimeout(() => fail(new Error(signedOut ? 'Sign in first.' : 'No signal')), 5000))
+        },
+        pull: () => Promise.reject(new Error('No signal')),
+      }
+      const phone = await device(transport)
+      await phone.mutate('place.upsert', place('a3'))
+      const start = Date.now()
+      const retry = keepSyncing(() => phone.sync(), { may: () => true, stop: (err) => (err as Error).message === 'Sign in first.' })
+      retry.soon()
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(300)
+        retry.soon()
+      }
+      await vi.advanceTimersByTimeAsync(180_000 - 1500)
+      expect(pushedAt.map((t) => (t - start) / 1000)).toEqual([0, 5, 12, 21, 34, 55, 90, 125, 160])
+
+      signedOut = true
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(pushedAt).toHaveLength(10)
+      retry.pause()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

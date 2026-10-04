@@ -4,7 +4,9 @@
   crew profiles ([ADR 0025](0025-crew-profiles-and-bringing-in-the-list.md)).
   Amended 3 October 2026 (below): the office notes running late for
   someone who rings instead, a running late goes 30 days after its day,
-  and the message after a call's certificates change says so.
+  and the message after a call's certificates change says so. Amended
+  4 October 2026: "Mark as there" and Noted carry the booking and day
+  from the app, so a phone that hadn't heard theirs still finds it.
 - **Decides:** which certificates the app knows, how a crew call says
   which ones it needs and what that does to an offer, how the office is
   reminded before a certificate runs out, how a freelancer says from
@@ -171,6 +173,16 @@ the office's view on a device like any change:
 - `late.arrived`: they're there.
 - `late.seen`: the office noted it.
 
+Both name the record by its id. From the app they carry its booking and
+day as well (amended 4 October 2026), and the server finds the record by
+those when no record has the id: a phone that hadn't yet heard what was
+said on the link notes it under an id of its own, which `late.say`
+writes into the record already there, so "Mark as there" or Noted
+tapped straight after would otherwise be refused as gone. The link, and
+versions of the app from before, send the id alone, as before. One the
+server turns down is listed as not done with whose it was, found the
+same way.
+
 The history says "Gráinne Power said they'll be about 30 minutes late
 for Liffey Brands Shoot (Shoot), Fri 2 Oct: Traffic on the M50", "Gráinne
 Power said they're there now, at Liffey Brands Shoot (Shoot)", and
@@ -300,9 +312,13 @@ it came in, so one turned down for a day further off, or for no real
 day, counts as for that day after, rather than keeping its note for
 years. The history's words then read without the note, as they do after
 erasure, still saying who, how late, and for which job and day. Saying
-they're there, and the office noting it, carry only the record's id, so
-as the record goes each is given the booking's id, and the history still
-says whose it was and which job. The export and the person's own
+they're there, and the office noting it, carry only the record's id from
+the link (and from versions of the app before they carried the booking
+and day, above), so as the record goes each is given the booking's id,
+and the history still says whose it was and which job. Neither holds
+anything the person wrote, so nothing more of them goes. Erasing someone
+keeps the booking and day on them, as on `late.say`, and turns down one
+naming a booking of theirs that arrives later. The export and the person's own
 download hold only what's left. ADR 0027's table of how long records are
 kept has the row.
 

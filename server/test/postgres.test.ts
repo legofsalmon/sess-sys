@@ -1,6 +1,8 @@
-import { irishToday, itemLogWords, newId, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
+import { irishToday, itemLogWords, newId, type CrewListPreview, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
@@ -8,6 +10,7 @@ import { migrateAuth } from '../src/auth/schema.ts'
 import { createSession, endSession, sessionUser, upsertUser } from '../src/auth/sessions.ts'
 import { restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { checkRestores } from '../src/backup/service.ts'
+import { dirStore } from '../src/backup/store.ts'
 import { clearOldLate } from '../src/crew/late.ts'
 import { postgresDb, type Db } from '../src/db.ts'
 import { eraseWhatIsDue } from '../src/erasure/due.ts'
@@ -595,6 +598,52 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     } finally {
       await app.close()
       await db.close()
+    }
+  })
+
+  it('cleans a NUL and other control characters from typed text, and turns one it cannot clean down in words, as on PGlite', async () => {
+    // Proves: real Postgres refuses a NUL in text and in JSON as PGlite does, and the server meets it the same way: a person's
+    // name through the sync push, a document's title in the address, a crew list's cells and a note posted from a link page are
+    // kept cleaned rather than failing; a NUL in an id, a change's own id or a request's address is a plain refusal, never a 500.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const files = mkdtempSync(join(tmpdir(), 'sh-pg-documents-'))
+    const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] }, documentStore: dirStore(files) })
+    try {
+      const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
+      const CHARACTERS = "Something in this has a character the app can't keep, so it wasn't saved. Check it and try again."
+      const dara = { id: 'dara', name: 'Dara\u0000 Quinn\u007f', kind: 'freelancer' as const, email: null, phone: null, skills: [], dayRateCents: null, notes: 'Own van\u000bno trailer\ud83c' }
+      expect(await colly.send('person.upsert', dara)).toMatchObject({ status: 'applied' })
+      expect(await colly.record<Person>('person', 'dara')).toMatchObject({ name: 'Dara Quinn', notes: 'Own van\nno trailer' })
+
+      expect(await colly.send('place.upsert', { id: 'a\u00003', name: 'Bay A3', notes: '' })).toMatchObject({ status: 'rejected', reason: { message: CHARACTERS } })
+      const ownId = { id: 'm\u0000', name: 'place.upsert', args: { id: 'van1', name: 'Van 1', notes: '' }, createdAt: new Date().toISOString() }
+      const halfEmoji = { ...ownId, id: 'm\ud83c' }
+      const pushed = await app.inject({ method: 'POST', url: '/api/sync/push', cookies: colly.cookies, payload: { clientId: 'phonec0ffee', mutations: [ownId, halfEmoji] } })
+      expect(pushed.json().results).toEqual([ownId, halfEmoji].map((m) => ({ id: m.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } })))
+      const asked = await app.inject({ url: '/api/documents/d1%00/file', cookies: colly.cookies })
+      expect([asked.statusCode, asked.json()]).toEqual([400, { error: CHARACTERS }])
+
+      const title = new URLSearchParams({ personId: 'dara', kind: 'insurance', title: 'Van\u0000 insurance\u0090', expires: '' })
+      const upload = await app.inject({ method: 'POST', url: `/api/documents/d1/file?${title}`, cookies: colly.cookies, headers: { 'content-type': 'application/octet-stream' }, payload: Buffer.from('%PDF-1.4\n% Made up for a test.\n') })
+      expect(upload.statusCode).toBe(200)
+      expect((await db.query(`SELECT title FROM documents WHERE id = 'd1'`)).rows).toEqual([{ title: 'Van insurance' }])
+
+      const list = 'First Name,Last Name,Phone,Notes\r\nSiobhán\u0000,Ní Bhriain\u007f,0877000006,"Own camera\u000bdrone ticket"'
+      const preview = (await app.inject({ method: 'POST', url: '/api/people/import/preview', cookies: colly.cookies, payload: { text: list } })).json() as CrewListPreview
+      expect(preview.rows.map((r) => [r.name, r.notes])).toEqual([['Siobhán Ní Bhriain', 'Own camera\ndrone ticket']])
+      const brought = await app.inject({ method: 'POST', url: '/api/people/import', cookies: colly.cookies, payload: { rows: preview.rows.map((r) => ({ ...r, skip: false })) } })
+      expect([brought.statusCode, brought.json()]).toEqual([200, { added: 1, updated: 0, unchanged: 0, skipped: 0 }])
+      expect((await db.query(`SELECT name, notes FROM people WHERE phone = '+353877000006'`)).rows).toEqual([{ name: 'Siobhán Ní Bhriain', notes: 'Own camera\ndrone ticket' }])
+
+      const away = `${'Wedding\u0000 in Cork. '.repeat(30).slice(0, 499)}\u{1F492}`
+      const { linkToken } = await colly.record<Person>('person', 'dara')
+      await onLink(app, `/f/${linkToken}/away`, { start: '2031-03-03', end: '2031-03-04', note: away })
+      expect((await db.query(`SELECT note FROM unavailability WHERE person_id = 'dara'`)).rows).toEqual([{ note: away.slice(0, 499).replace(/\u0000/g, '') }])
+    } finally {
+      await app.close()
+      await db.close()
+      rmSync(files, { recursive: true, force: true })
     }
   })
 })

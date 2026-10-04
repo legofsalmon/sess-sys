@@ -348,6 +348,29 @@ describe('what the link page sends, as typed', () => {
     expect(await documentRows(db)).toHaveLength(1)
     expect(await files()).toHaveLength(1)
   })
+
+  it('takes a title cut to its 100 characters in the middle of an emoji, without the half', async () => {
+    // Proves: the title is cut at 100 of JavaScript's characters, which can fall inside an emoji; the half left, which the
+    // database's JSON can't hold, goes, so the document is sent rather than failing on the server.
+    const { app, db, colly, token } = await office()
+    const title = `${'Van insurance '.repeat(8).slice(0, 99)}\u{1F69A}`
+    expect(await fromLink(app, await token('dara'), { kind: 'other', title, expires: '' }, PDF)).toMatchObject({ ok: true, message: THANKS })
+    const [row] = await documentRows(db)
+    expect((await colly.record<Document>('document', row!.id)).title).toBe(title.slice(0, 99).trim())
+  })
+})
+
+describe('what the office sends, as typed', () => {
+  it('takes a title in the address with control characters in it, cleaned as the app cleans what it types', async () => {
+    // Proves: the title of a file put on a document from the person's card comes in the query string, where a NUL, DEL and a C1
+    // control, as text pasted from Word or a PDF can carry, are cleaned out as any typed text is, so the file goes on rather than
+    // failing on the server, and the title is kept as it reads.
+    const { colly, upload } = await office()
+    const added = await upload('d1', { personId: 'dara', kind: 'insurance', title: 'Van\u0000 insurance\u007f\u0090', expires: day(30) }, PDF)
+    expect(added.statusCode).toBe(200)
+    expect(await colly.record<Document>('document', 'd1')).toMatchObject({ title: 'Van insurance', file: { type: 'pdf' } })
+    expect((await colly.history()).entries[0]!.what).toBe(`Added Dara Quinn's Van insurance, with its file (PDF, 1 KB)`)
+  })
 })
 
 describe('with no bucket on the server', () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cleanText } from './plain.ts'
 
 /**
  * The office's own details (audit finding 10): the name, phone and email
@@ -32,7 +33,7 @@ export const SETTING_ENTITY_NAMES = ['setting'] as const
 export const officeCommandSchemas = {
   /** Set the office's details, all of them at once: there is only one office. */
   'office.update': z.object({
-    name: z.string().trim().max(200, "The office's name can be up to 200 characters."),
+    name: z.string().transform(cleanText).pipe(z.string().trim().max(200, "The office's name can be up to 200 characters.")),
     phone: phone.nullable(),
     email: z.string().trim().email('That email address doesn’t look right.').max(200, 'The email address can be up to 200 characters.').nullable(),
   }),
