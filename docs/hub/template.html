@@ -1133,8 +1133,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <div><b>High-value gear</b><span class="small">Labelled as it comes back from each job.</span></div>
             <div><b>Cases</b><span class="small">Metal tags; contents recorded.</span></div>
             <div><b>Cables</b><span class="small">As bundles first.</span></div>
-            <div><b>Stocktake</b><span class="small">A full baseline count.</span></div>
-            <div><b>Cycle counts</b><span class="small">Rolling spot counts, most valuable first.</span></div>
+            <div><b>Stocktake</b><span class="small">A full baseline count, place by place on a phone, once the stock list is in.</span></div>
+            <div><b>Cycle counts</b><span class="small">A few places each week, longest since counted first, so every place is counted each quarter.</span></div>
           </div>
         </div>
         <p class="small">Starter hardware is roughly £4,000 to £6,000: two rugged Android scanners, pocket and ring scanners, a label printer and a portable labeller. Prices are estimates; get supplier quotes.</p>
@@ -1200,7 +1200,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   // wait (built, waiting on a key); the note is the small word beside the name. The lines are code written
   // across the app, the server and what they share, counted on the date given.
   const JOURNEY = {
-    asOf: '3 October 2026', live: '30 September 2026', lines: 37000, tests: 22800, decisions: 29,
+    asOf: '4 October 2026', live: '30 September 2026', lines: 39500, tests: 24200, decisions: 30,
     stages: [
       { id: 'enquire', icon: 'enquire', name: 'Enquire and quote', place: 'The office', state: 'part', word: 'Partly built', next: 'quoting is planned',
         sum: 'Logged from the first call: client, venue and status.', toast: ['enquire', 'Enquiry logged'],
@@ -1216,8 +1216,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         parts: [['Offers and links', 'built'], ['Call sheets', 'built'], ['Messages', 'built'], ['Staff leave', 'built'], ['Profiles and certificates', 'built'], ['Running late', 'built'], ['Documents', 'wait', 'the bucket']] },
       { id: 'prep', icon: 'case', name: 'Prep the kit', place: 'The warehouse', state: 'built', word: 'Built', next: 'label trial to come',
         sum: 'Catalogue, labels and pick lists; works with no signal.', toast: ['scan', 'Kit picked and labelled, no signal'],
-        left: 'the label trial (a real-world pilot, not started), cycle counts, and RFID later.',
-        parts: [['Catalogue and items', 'built'], ['The stock list brought in', 'built'], ['Kit on jobs', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built']] },
+        left: 'the label trial (a real-world pilot, not started), and RFID later.',
+        parts: [['Catalogue and items', 'built'], ['The stock list brought in', 'built'], ['Kit on jobs', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built'], ['Stocktakes and counts', 'built']] },
       { id: 'deliver', icon: 'van', name: 'Deliver and run the show', place: 'Van and venue', state: 'built', word: 'Built', next: 'Crewbox planned',
         sum: 'Kit scanned out; the call sheet on a phone, offline.', toast: ['doc', "Call sheet on the crew chief's phone"],
         left: 'GPS in the vans and the Crewbox on site (phase 5, planned).',
@@ -1336,7 +1336,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', 'Foundations', 'now', 'Built and live; three keys and a phone field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'now', 'Built; office trial on the real calendar left'],
-    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, labels, scanning, pick lists, repairs, inspections, the stock list import and item logs built; cycle counts and RFID later'],
+    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, labels, scanning, pick lists, repairs, inspections, the stock list import, item logs, stocktakes and rolling counts built; RFID later'],
     ['3', 'Crew', 'now', 'Started early: offers, links, call sheets, timesheets, messages, staff leave, profiles, certificates, running late, documents and the crew list built, three audit rounds done; invoices parked'],
     ['4', 'Finance', 'todo', 'Parked for now'],
     ['5', 'Crewbox link', 'todo', 'Planned'],
