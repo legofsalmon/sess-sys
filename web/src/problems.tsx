@@ -277,6 +277,9 @@ function describer(view: View): (m: Mutation) => string {
         return `Check ${docOf(a.id)}`
       case 'document.remove':
         return `Remove ${docOf(a.id)}`
+      // A count (ADR 0030): turned down only when the place or case was never saved.
+      case 'count.record':
+        return `Record the count of ${a.placeId ? place(a.placeId) : item(a.caseId)}`
       // Kept from an older version of the app, such as the old sync test's bookings. The server's reason says it's gone, so this only says where it came from.
       default:
         return 'A change from an older version of the app'

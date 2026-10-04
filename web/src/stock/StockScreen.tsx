@@ -26,6 +26,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useView, useWide } from '../view.ts'
 import { amountLabel, atLabel, mistakeLabel, numberLabel, ScanResult, TrackingChoice, whereLabel } from './common.tsx'
+import { CountPage, CountsCard, CountScreen } from './Counts.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
 import { InspectionsDue, TestingScreen } from './Inspections.tsx'
@@ -44,7 +45,8 @@ import './stock.css'
  * (ADR 0020). A product, item or place opens on its own page
  * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>), labels on
  * theirs (#stock/labels, #stock/labels/<id>), and testing a batch on
- * #stock/testing.
+ * #stock/testing. Counting a place or a case is #stock/count, and a count's
+ * page #stock/count/<id> (ADR 0030).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 export function StockScreen() {
@@ -53,6 +55,9 @@ export function StockScreen() {
   const wide = useWide()
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
   if (hash === '#stock/testing') return <TestingScreen view={view} />
+  if (hash === '#stock/count') return <CountScreen view={view} />
+  const [, count] = /^#stock\/count\/(.+)$/.exec(hash) ?? []
+  if (count) return <CountPage key={count} view={view} id={decodeURIComponent(count)} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
   if (run) return <RunScreen key={run} view={view} id={decodeURIComponent(run)} />
   const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
@@ -99,6 +104,8 @@ function StockRest({ view }: { view: View }) {
       <RepairList view={view} />
 
       <InspectionsDue view={view} />
+
+      <CountsCard view={view} />
 
       <ShortKit view={view} />
 

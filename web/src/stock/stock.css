@@ -180,3 +180,51 @@
 .warehouse .log .what { display: block; overflow-wrap: anywhere; }
 .warehouse .log small { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--text-hint); }
 .warehouse .item-log > .link { justify-self: start; }
+
+/* Counts (ADR 0030): the tally big at the top, a big field per product, a big Finish, and each difference a row with its fix. */
+.warehouse .count-tally { margin: 0; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.warehouse.counting .said { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); font-size: var(--text-small); }
+.warehouse.counting .said.ok { background: var(--good-soft); color: var(--good); }
+.warehouse.counting .said.warn { background: var(--warn-soft); color: var(--warn); }
+.warehouse.counting .said.quiet { background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.warehouse.counting .group h3 { margin: 0; }
+.warehouse .said-list, .warehouse .count-lines { list-style: none; margin: 0; padding: 0; display: grid; }
+.warehouse .said-list li { padding: var(--space-6) 0; border-top: 1px solid var(--line); font-size: var(--text-small); color: var(--muted); }
+.warehouse .said-list li:first-child { border-top: 0; }
+.warehouse .said-list b { color: var(--ink); }
+.warehouse .count-field { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; gap: var(--space-10); align-items: center; padding: var(--space-8) 0; border-top: 1px solid var(--line); }
+.warehouse .count-field b, .warehouse .count-field small { display: block; }
+.warehouse .count-field small { color: var(--muted); font-size: var(--text-hint); }
+.warehouse .count-field input { min-height: 52px; font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.warehouse .count-field input::placeholder { font-size: var(--text-small); font-weight: 400; }
+.warehouse .add-product { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: end; padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.warehouse .finish button.big { min-height: 56px; font-size: var(--text-body); width: 100%; }
+.warehouse .finish .hint { text-align: center; }
+.warehouse .finish > button.link { justify-self: center; }
+.warehouse .count-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-10) 0; border-top: 1px solid var(--line); }
+.warehouse .count-line:first-child { border-top: 0; padding-top: 0; }
+.warehouse .count-line > div:first-child { flex: 1; min-width: 55%; }
+.warehouse .count-line a { color: var(--accent-ink); font-weight: 600; }
+.warehouse .count-line p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.warehouse .count-line .alert { flex-basis: 100%; }
+.warehouse .count-line .done { color: var(--good); font-weight: 600; font-size: var(--text-small); }
+/* A number no item has can be a long web address from a maker's QR code: it wraps rather than widening the page. */
+.warehouse .said-list li, .warehouse.counting .said, .warehouse .count-line > div:first-child { overflow-wrap: anywhere; }
+.warehouse .count-fixes > button.all { justify-self: start; }
+.warehouse .counts h3 { margin: var(--space-4) 0 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.warehouse .counts .last-counted { margin: 0; }
+.warehouse .counts .done-line { margin: 0; color: var(--good); font-weight: 600; }
+.warehouse .counts .under-way { display: grid; gap: var(--space-8); padding: var(--space-10) var(--space-12); border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-soft); color: var(--warn); }
+.warehouse .counts .under-way p { margin: 0; }
+.warehouse .counts .under-way .button { justify-self: start; }
+.warehouse .count-due { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); border-top: 1px solid var(--line); }
+.warehouse .count-due:first-child { border-top: 0; }
+/* A count's row, as a list row looks (.job-row), under a class of its own: a place's name on the Counts card isn't its row in Places. */
+.warehouse .count-link { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.warehouse .job-list li:first-child .count-link { border-top: 0; padding-top: 0; }
+.warehouse .count-link p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.warehouse .count-link .side { display: grid; justify-items: end; align-content: start; gap: var(--space-4); text-align: right; }
+.warehouse .count-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.warehouse .count-due .count-link { flex: 1; border-top: 0; min-width: 55%; }
+.warehouse .count-due .confirm { flex-basis: 100%; padding-bottom: var(--space-10); }
+.warehouse .counts > button { justify-self: start; }

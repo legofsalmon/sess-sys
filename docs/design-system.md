@@ -346,6 +346,25 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   is, with a tag ("With the office to check" amber, "Runs out soon" amber,
   "Ran out" in the bad tone), View the file, and "Send a new one" folded
   under it. Not in Figma yet.
+- Counts ([ADR 0030](adr/0030-stocktakes-and-rolling-counts.md)) borrow
+  the pick list's parts. Counting, the tally is in heavy 1.6rem type
+  ("31 of 42 found") over the scan field with **Scan**, and the answer to
+  the last scan is the rounded box: green when found, amber when it isn't
+  as recorded, saying why, grey when already counted. What's still to
+  find is number pills under each product's name, what wasn't as
+  recorded a list in words, and what was found folds away. Counted kit
+  is a field per product, 52 px tall in big type, with no recorded
+  number beside it: the count is blind. **Finish the count** is the one
+  red button, full width and 56 px tall, with "Discard this count" as a
+  link under it, asked in place. A count's page is a card per kind of
+  difference, a row each: the item or product as a link, what the count
+  said in muted text, and its fix as a button on the right ("Report
+  missing", "Move here", "Set to 115"), which becomes what's been done
+  once it is; "Report all 3 missing" sits under the rows where there's
+  more than one. The Stock tab's Counts card has a count under way in a
+  warn-toned box with **Carry on counting**, the quarter in a hint line,
+  this week's places with **Count** on the right of each, and what's
+  been counted this week. Not in Figma yet.
 
 ## Accessibility
 

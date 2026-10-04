@@ -7,8 +7,9 @@ import { runMigrations, type Module } from '../migrations.ts'
  * the kit on jobs (ADR 0014), which refers to jobs and their phases; and
  * the numbers set aside for printing labels (ADR 0015); kit scanned out
  * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
- * inspections (ADR 0020); what was added by mistake (audit finding 19); and
- * what the stock list brings in that items didn't hold before (ADR 0026).
+ * inspections (ADR 0020); what was added by mistake (audit finding 19);
+ * what the stock list brings in that items didn't hold before (ADR 0026);
+ * and counts of places and cases (ADR 0030).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -192,6 +193,28 @@ const MIGRATIONS: string[] = [
   ALTER TABLE assets ADD COLUMN IF NOT EXISTS pat_due date;
   CREATE UNIQUE INDEX IF NOT EXISTS assets_old_number ON assets (lower(old_number)) WHERE old_number <> '';
   CREATE INDEX IF NOT EXISTS identifiers_asset ON identifiers (asset_id);
+  `,
+  // Counts (ADR 0030): a place or a case counted, kept as what the phone
+  // said of each item and product, like a scan. The place has no foreign
+  // key, so a place removed since keeps its counts; who counted points at
+  // a person, kept when they're erased (ADR 0027), reading as their name now reads.
+  `
+  CREATE TABLE IF NOT EXISTS counts (
+    id           text PRIMARY KEY,
+    place_id     text,
+    case_id      text REFERENCES assets(id),
+    started_at   timestamptz NOT NULL,
+    finished_at  timestamptz NOT NULL,
+    counted_by   text REFERENCES people(id),
+    items        jsonb NOT NULL DEFAULT '[]',
+    unknown      jsonb NOT NULL DEFAULT '[]',
+    products     jsonb NOT NULL DEFAULT '[]',
+    summary      jsonb NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    CHECK ((place_id IS NULL) <> (case_id IS NULL))
+  );
+  CREATE INDEX IF NOT EXISTS counts_place ON counts (place_id);
+  CREATE INDEX IF NOT EXISTS counts_case ON counts (case_id);
   `,
 ]
 

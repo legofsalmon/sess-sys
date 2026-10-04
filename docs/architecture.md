@@ -289,6 +289,14 @@ says product and item; the code says model and asset.
   product says how many months apart its items need each, and each
   device works out when it's next due. Failed or overdue kit is warned
   about when scanned out, the same way.
+- **Count**: a place or a case checked against the record, kept as what
+  it found of each item and product, with who and when. Built
+  ([ADR 0030](adr/0030-stocktakes-and-rolling-counts.md)): counted on a
+  phone with no signal and kept whatever has changed since, as a scan
+  is; each difference is put right with the command that already exists
+  (a move, a missing report, a count set), and each week's places come
+  from when each was last counted, so every one is counted within a
+  quarter.
 - **Availability** is computed from equipment lines, movements and
   maintenance, per product per hour, including prep and return buffers.
   Built for now from kit lines and what's owned, per product per whole

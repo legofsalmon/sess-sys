@@ -1,4 +1,5 @@
 import { CALENDAR_ENTITY_NAMES, type CalendarEntities } from './calendar.ts'
+import { COUNT_ENTITY_NAMES, type CountEntities } from './counts.ts'
 import { CREW_ENTITY_NAMES, type CrewEntities } from './crew.ts'
 import { DOCUMENT_ENTITY_NAMES, type DocumentEntities } from './documents.ts'
 import { ERASURE_ENTITY_NAMES, type ErasureEntities } from './erasure.ts'
@@ -30,7 +31,8 @@ export interface Entities
     LeaveEntities,
     LateEntities,
     ErasureEntities,
-    DocumentEntities {}
+    DocumentEntities,
+    CountEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -48,4 +50,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...LATE_ENTITY_NAMES,
   ...ERASURE_ENTITY_NAMES,
   ...DOCUMENT_ENTITY_NAMES,
+  ...COUNT_ENTITY_NAMES,
 ]

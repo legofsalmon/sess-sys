@@ -4,6 +4,7 @@ import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
 import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
+import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
 import { erasuresView, forgetErased, keptRecordsOf, withErasures, type ErasuresView } from './erasure-view.ts'
@@ -113,6 +114,8 @@ export interface View {
   erasures: ErasuresView
   /** People's documents, and those sent from a link waiting to be checked (ADR 0029). */
   documents: DocumentsView
+  /** Counts of places and cases, when each was last counted, and this week's list (ADR 0030). */
+  counts: CountsView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -374,6 +377,7 @@ export class SyncClient {
       late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
       erasures,
       documents: documentsView(entities, outbox, this.state.cursor, crew, erasures),
+      counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

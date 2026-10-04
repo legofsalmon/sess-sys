@@ -6,13 +6,15 @@ import { Page } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, ScanResult, WhereChoices } from './common.tsx'
+import { CountsOf } from './Counts.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
  * One place: what's kept there, cases and what's in them, and what's
  * counted there. Walking round with a phone, items are put here by their
  * number, scanned with the camera or typed, and counts taken as they're
- * found.
+ * found. Counting the whole place against the record, and when it was last
+ * counted, is its Counts card (ADR 0030).
  */
 export function PlaceScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
@@ -33,6 +35,7 @@ export function PlaceScreen({ view, id, bare }: { view: View; id: string; bare?:
   return (
     <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
       <Summary p={p} w={w} />
+      <CountsOf view={view} where={{ placeId: p.id, caseId: null }} />
       <Here p={p} w={w} />
       <WhereChoices w={w} />
     </Page>

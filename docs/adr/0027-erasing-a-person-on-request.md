@@ -14,6 +14,10 @@
 - **Amended:** 3 October 2026 by [ADR 0029](0029-documents.md): a
   person's documents go at once when they're erased, their files deleted
   from the storage straight after, and tried again each day until gone.
+- **Amended:** 4 October 2026 by
+  [ADR 0030](0030-stocktakes-and-rolling-counts.md): who counted a place
+  or a case is a pointer to them, kept with the count, as the contact on
+  the day is.
 - **Decides:** how someone's details are erased when they ask (GDPR's
   right to erasure, Article 17), what is kept and why, where a person's
   details live and what erasing does to each place, and how a restore
@@ -178,6 +182,7 @@ to: one constant each in `shared/src/erasure.ts` (`PAID_WORK_YEARS`,
 | Contact details, notes, skills, certificates, company details, day rate, days off (approved leave's too), running late | Not kept | No law asks for them | Nothing | All of it, at once |
 | Running late, anyone's, erased or not ([ADR 0028](0028-certificates-a-call-needs-and-running-late.md)) | 30 days after its day; at once when they're erased | No law asks for it, and it holds their own words; a month covers their timesheet for the day | In the history: who, how late, the job and the day | The record, every copy in the change feed, and the note in the history |
 | Documents and their files ([ADR 0029](0029-documents.md)) | Not kept | No law asks for them | Nothing | The details at once; the files from the storage straight after, through the list of files to delete, tried again after each change and each day until they've gone |
+| Counts of places and cases, who counted ([ADR 0030](0030-stocktakes-and-rolling-counts.md)) | No end set, like the warehouse records they are | A count is the business's record of what was on the shelf, not the person's, and no law asks for the counter's name | The count, and who counted as a pointer to them, reading "Erased person" (or their name while it's kept for their records) | Nothing; a count arriving after the erasure that names them is kept with nobody named |
 
 Each kept for years goes on the day its time is up, always a 1 January:
 at once when the person is erased, if that day has passed, and otherwise
@@ -223,6 +228,7 @@ holds a person's details goes in one of them:
 | `offers`, their offers and bookings | Kept; their own note on each answer cleared. |
 | `timesheets`, for their bookings | Kept with the figures; their own note cleared. |
 | `phases.contact_id` | Kept; reads "Erased person". Refused while the phase hasn't ended. |
+| `counts.counted_by`, who counted a place or a case ([ADR 0030](0030-stocktakes-and-rolling-counts.md)) | Kept; reads "Erased person", or the name while it's kept. Listed with the other pointers from records that aren't theirs in `POINTERS`; a test checks every column with a foreign key to `people` is in one of erasure's lists. A count sent afterwards that names them is kept with nobody named. |
 | `calendar_guests`, their address on Google Calendar invites | Past days' rows deleted. While invites are on, a day still to come keeps theirs until the calendar's next run (seconds later, or once it is reconnected) takes them off that day's event, as for any withdrawn offer, and that run removes the row: deleted first, the app would take them for a guest added by hand in Google and leave them on. The app only writes days from today on, so past events in Google keep their guest list as Google has it; Colly removes them there by hand if asked. |
 | `calendar_link` | Refused while their account is the connected one. Its earlier copies in the change feed, and the history's "Connected Google Calendar as…", lose their address, and "connected by" names "Erased person". |
 | `users` and `sessions`, if they sign in | Their accounts are the ones that sign in with an address on their record, now or before, so one made before they changed it is found too. Every session ended at once. The account's name becomes "Erased person", even while their name is kept with their timesheets or leave, which only need it on their person; its email, picture and Google id go; it is switched off, so signing in again starts a new account, not this one. The history then calls them "Erased person" too. An address another person in the app still has (a second record for the same person, or a shared one) is left to them, account and all: erase that record too, and the last erasure takes it. |

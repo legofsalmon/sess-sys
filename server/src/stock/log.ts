@@ -2,6 +2,7 @@ import {
   caseNamed,
   editWords,
   type CommandArgs,
+  type CountItem,
   type FaultKind,
   type ItemEvent,
   type ItemLogEntry,
@@ -16,9 +17,10 @@ import { caseChain, getAsset } from './store.ts'
  * An item's log, the server's part (ADR 0026): what the history holds about
  * one item, as the typed events the phone makes too, with who did each and
  * on what. That's every change that touched the item, and the scans (its
- * own, and those of the cases it's in now), fault reports, fault changes and
- * tests aimed at it, which touched other records. The phone joins these to
- * what it holds by what each entry is about (shared/src/item-log.ts).
+ * own, and those of the cases it's in now), fault reports, fault changes,
+ * tests and counts (ADR 0030) aimed at it, which touched other records. The
+ * phone joins these to what it holds by what each entry is about
+ * (shared/src/item-log.ts).
  */
 
 const PAGE = 100
@@ -52,13 +54,13 @@ export async function readItemLog(q: Queryable, assetId: string, before?: string
   // Its cases, as the phone has them: a case's scan took what's in it now along.
   const holders = [assetId, ...(asset.caseId ? await caseChain(q, asset.caseId) : [])]
   const { rows: faults } = await q.query<{ id: string; kind: FaultKind }>('SELECT id, kind FROM faults WHERE asset_id = $1', [assetId])
-  const params: unknown[] = [assetId, holders, faults.map((f) => f.id)]
+  const params: unknown[] = [assetId, holders, faults.map((f) => f.id), JSON.stringify([{ assetId }])]
   let page = ''
   if (before) {
     const cursor = readCursor(before)
     if (cursor) {
       params.push(cursor.at, cursor.id)
-      page = ` AND (m.received_at, m.id) < ($4::timestamptz, $5::text)`
+      page = ` AND (m.received_at, m.id) < ($5::timestamptz, $6::text)`
     }
   }
   const { rows } = await q.query<Row>(
@@ -67,13 +69,14 @@ export async function readItemLog(q: Queryable, assetId: string, before?: string
         AND (m.id IN (SELECT mutation_id FROM changes WHERE entity = 'asset' AND entity_id = $1 AND mutation_id IS NOT NULL)
              OR (m.name IN ('fault.report', 'inspection.record') AND m.args->>'assetId' = $1)
              OR (m.name = 'move.record' AND m.args->>'assetId' = ANY($2::text[]))
-             OR (m.name IN ('fault.update', 'fault.close') AND m.args->>'id' = ANY($3::text[])))${page}
+             OR (m.name IN ('fault.update', 'fault.close') AND m.args->>'id' = ANY($3::text[]))
+             OR (m.name = 'count.record' AND m.args->'items' @> $4::jsonb))${page}
       ORDER BY m.received_at DESC, m.id DESC
       LIMIT ${PAGE + 1}`,
     params
   )
   const shown = rows.slice(0, PAGE)
-  const names = await namesFor(q, shown)
+  const names = await namesFor(q, shown, assetId)
   const kinds = new Map(faults.map((f) => [f.id, f.kind]))
   const entries: ItemLogEntry[] = []
   for (const r of shown) {
@@ -97,9 +100,19 @@ interface Names {
   product: (id: unknown) => string
 }
 
-/** The names of what the changes name, as they are today. */
-async function namesFor(q: Queryable, rows: Row[]): Promise<Names> {
-  const ids = (key: string) => [...new Set(rows.map((r) => r.args[key]).filter((v): v is string => typeof v === 'string'))]
+/** What a count said of the item, from its record. */
+const countedItem = (r: Row, assetId: string) =>
+  r.name === 'count.record' && Array.isArray(r.args.items) ? (r.args.items as CountItem[]).find((i) => i.assetId === assetId) : undefined
+
+/** The names of what the changes name, as they are today: a count's place or case, and where it found the item kept. */
+async function namesFor(q: Queryable, rows: Row[], assetId: string): Promise<Names> {
+  const ids = (key: 'projectId' | 'placeId' | 'caseId' | 'assetId' | 'modelId') => [
+    ...new Set(
+      rows
+        .flatMap((r) => [r.args[key], key === 'placeId' || key === 'caseId' ? countedItem(r, assetId)?.[key] : undefined])
+        .filter((v): v is string => typeof v === 'string')
+    ),
+  ]
   const [jobs, places, items, products] = await Promise.all([
     q.query<{ id: string; name: string }>('SELECT id, name FROM projects WHERE id = ANY($1::text[])', [ids('projectId')]),
     q.query<{ id: string; name: string }>('SELECT id, name FROM places WHERE id = ANY($1::text[])', [ids('placeId')]),
@@ -165,6 +178,12 @@ function eventOf(r: Row, assetId: string, n: Names, kinds: Map<string, FaultKind
     case 'inspection.record': {
       const i = a as CommandArgs<'inspection.record'>
       return { key: `inspection:${i.id}`, at: when(i.at), event: { kind: 'test', test: i.kind, passed: i.passed, by: i.by.trim(), note: i.note.trim() } }
+    }
+    case 'count.record': {
+      // Kit away and not scanned gets no line, as on the phone: the count said nothing new about it.
+      const item = countedItem(r, assetId)
+      if (!item || !(item.scanned || item.said === 'not-found')) return undefined
+      return { key: `count:${a.id}`, at: when(a.finishedAt), event: { kind: 'counted', where: where(a), found: item.scanned, ...(item.said === 'elsewhere' ? { kept: where(item) } : {}) } }
     }
     default:
       return undefined

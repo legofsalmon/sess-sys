@@ -32,12 +32,14 @@ export type ItemEvent =
   | { kind: 'test'; test: InspectionKind; passed: boolean; by: string; note: string }
   | { kind: 'retired'; reason: RetiredReason; note: string }
   | { kind: 'reinstated' }
+  /** What a count said of it (ADR 0030): found, or expected and not found, and where it was kept when found somewhere else. */
+  | { kind: 'counted'; where: LogWhere; found: boolean; kept?: LogWhere }
 
 export interface ItemLogEntry {
   /**
    * What it's about, the same on the phone and the server: "movement:<id>",
-   * "fault:<id>", "closed:<fault id>" or "inspection:<id>" for a record the
-   * phone holds too, and "mutation:<id>" for a change itself.
+   * "fault:<id>", "closed:<fault id>", "inspection:<id>" or "count:<id>"
+   * for a record the phone holds too, and "mutation:<id>" for a change itself.
    */
   key: string
   /** When it happened: by the phone's clock for a scan, a fault or a test; when it was made, otherwise. */
@@ -103,6 +105,11 @@ export function itemLogWords(e: ItemEvent): string {
       return `Retired: ${RETIRED_LABELS[e.reason].toLowerCase()}${e.note.trim() ? ` (${e.note.trim()})` : ''}`
     case 'reinstated':
       return 'Brought back into stock'
+    case 'counted': {
+      const where = !e.where ? '' : 'place' in e.where ? ` at ${e.where.place}` : ` of ${e.where.case}`
+      const kept = e.kept === undefined ? '' : !e.kept ? ', not placed yet' : 'place' in e.kept ? `, kept at ${e.kept.place}` : `, kept in ${e.kept.case}`
+      return `${e.found ? 'Found' : 'Not found'} in the count${where}${kept}`
+    }
   }
 }
 
@@ -134,7 +141,11 @@ export function editWords(a: Partial<CommandArgs<'asset.update'>>, productName: 
  * phone's own changes to it still waiting to sync. Not who did each, nor
  * when it was added, moved or relabelled: those are on the server.
  */
-export function deviceItemLog(view: Pick<View, 'warehouse' | 'moves' | 'faults' | 'inspections' | 'jobs'>, assetId: string, waiting: readonly Mutation[] = []): ItemLogEntry[] {
+export function deviceItemLog(
+  view: Pick<View, 'warehouse' | 'moves' | 'faults' | 'inspections' | 'jobs'> & Partial<Pick<View, 'counts'>>,
+  assetId: string,
+  waiting: readonly Mutation[] = []
+): ItemLogEntry[] {
   const w = view.warehouse
   const a = w.assets.get(assetId)
   if (!a) return []
@@ -165,6 +176,14 @@ export function deviceItemLog(view: Pick<View, 'warehouse' | 'moves' | 'faults' 
   }
   for (const i of view.inspections.ofAsset(assetId))
     out.push({ key: `inspection:${i.id}`, at: i.at, event: { kind: 'test', test: i.kind, passed: i.passed, by: i.by, note: i.note }, pending: i.pending, from: 'device' })
+  for (const { count: c, item } of view.counts?.ofItem(assetId) ?? [])
+    out.push({
+      key: `count:${c.id}`,
+      at: c.finishedAt,
+      event: { kind: 'counted', where: whereOn(w, c), found: item.scanned, ...(item.said === 'elsewhere' ? { kept: whereOn(w, item) } : {}) },
+      pending: c.pending,
+      from: 'device',
+    })
 
   // This phone's own changes to the item, said as they'll be once they sync.
   const faultIds = new Set(view.faults.ofAsset(assetId).map((f) => f.id))
