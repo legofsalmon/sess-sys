@@ -135,13 +135,15 @@ test('downloads everything in one file, and the download shows in the history', 
   await page.getByRole('button', { name: 'Download everything' }).click()
   const download = await downloading
   expect(download.suggestedFilename()).toMatch(/^session-hire-\d{4}-\d{2}-\d{2}\.zip$/)
-  await expect(page.getByText(/^Downloaded session-hire-\d{4}-\d{2}-\d{2}\.zip \(\d+ KB\)\.$/)).toBeVisible()
+  // The size is in KB, or MB from 1 MB; a test server shared by every spec can grow past it.
+  await expect(page.getByText(/^Downloaded session-hire-\d{4}-\d{2}-\d{2}\.zip \((\d+ KB|\d+\.\d MB)\)\.$/)).toBeVisible()
 
   const files = unzipSync(readFileSync((await download.path())!))
   expect(Object.keys(files)).toEqual(expect.arrayContaining(['README.txt', 'history.csv', 'everything.json', 'tables/models.csv', 'tables/people.csv']))
   expect(Object.keys(files)).not.toContain('tables/products.csv')
   expect(strFromU8(files['README.txt']!)).toContain('Session Hire: everything, exported')
 
+  // From 1,000 rows the count has a comma, as the history writes every number.
   await page.getByRole('link', { name: 'History' }).click()
-  await expect(page.locator('.entry', { hasText: `Chrome on Linux, device ${code}` }).filter({ hasText: /^Downloaded everything \(\d+ rows\)/ })).not.toHaveCount(0)
+  await expect(page.locator('.entry', { hasText: `Chrome on Linux, device ${code}` }).filter({ hasText: /^Downloaded everything \([\d,]+ rows\)/ })).not.toHaveCount(0)
 })
