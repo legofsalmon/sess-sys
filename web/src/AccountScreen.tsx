@@ -12,6 +12,7 @@ import { ImportStockCard } from './ImportStockCard.tsx'
 import { MadeUp, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { useNotDone } from './problems.tsx'
+import { forgetCountDraft } from './stock/Counts.tsx'
 import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { client, storage } from './sync.ts'
 import { useView } from './view.ts'
@@ -44,6 +45,7 @@ export function AccountScreen() {
       return setProblem("Couldn't reach the server to sign out. Try again when you have signal.")
     }
     // A shared or handed-back phone shouldn't keep the company's data.
+    forgetCountDraft()
     await storage.wipe()
     location.replace('/')
   }

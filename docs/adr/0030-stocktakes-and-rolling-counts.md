@@ -86,7 +86,9 @@ with what is actually there.
   to carry on with the one under way or discard it. Two tabs of the app
   on one phone share that count, each hearing the other's scans, so
   neither writes over them. Discarding asks first, in place, never with
-  the browser's own dialog.
+  the browser's own dialog. Signing out forgets it along with the rest
+  of the phone's copy, so whoever signs in next can't finish it as
+  theirs.
 - **No signal needed.** Everything is worked out from the phone's copy.
   **Finish** works out the comparison, sends one command (below), and
   opens the count's page with the differences.
@@ -148,7 +150,9 @@ rule makes any day safe.
 ### The count is a record
 
 **`count.record`**, one command, sent at **Finish**: the place or the
-case; when it started and finished, by the phone's clock; who counted
+case; when it started and finished, by the phone's clock, though never
+later than it reached the server, so a phone whose clock runs ahead
+can't leave its place counted "this week" for good; who counted
 (a person on the Crew tab, or nobody said); what the count said of each
 item (found; not found; out with a job, reported missing or in repair;
 found though kept elsewhere, in a case here, retired or out with a job),

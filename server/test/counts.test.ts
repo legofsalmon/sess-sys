@@ -146,6 +146,23 @@ describe('a count', () => {
     expect(await refused(app, m('count.record', { ...record({ placeId: 'a3' }), caseId: 'r1' }))).toBe('Say what was counted: a place or a case.')
   })
 
+  it('is never kept as later than it reached the server, so a phone whose clock runs ahead can’t leave a place counted for good', async () => {
+    // Proves: a count from a phone set to 2031 is kept as finished when it arrived, started no later, so its place comes
+    // back round on the week's list; one sent a day late, after no signal, keeps the times the phone gave.
+    const { app } = await server()
+    await warehouse(app)
+    const before = Date.now()
+    const ahead = record({ placeId: 'a3' }, { startedAt: '2031-05-01T09:00:00.000Z', finishedAt: '2031-05-01T09:30:00.000Z' })
+    const late = record({ placeId: 'b1' })
+    await ok(app, m('count.record', ahead), m('count.record', late))
+    const kept = await counts(app)
+    const finished = Date.parse(kept.get(ahead.id)!.finishedAt)
+    expect(finished).toBeGreaterThanOrEqual(before - 1000)
+    expect(finished).toBeLessThanOrEqual(Date.now() + 1000)
+    expect(Date.parse(kept.get(ahead.id)!.startedAt)).toBeLessThanOrEqual(finished)
+    expect(kept.get(late.id)).toMatchObject({ startedAt: late.startedAt, finishedAt: late.finishedAt })
+  })
+
   it('says who counted: the signed-in person, or whoever the phone says while sign-in is off, and nobody it can’t name', async () => {
     // Proves: with sign-in off the phone's pick is kept; someone not on the Crew tab is left out, not refused; with
     // sign-in on, the signed-in person matched by email, whatever the phone says; an account matched to nobody, nobody.

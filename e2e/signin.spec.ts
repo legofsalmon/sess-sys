@@ -83,10 +83,18 @@ test('shows who is signed in, and signing out clears the device', async ({ page 
   await expect(page.getByText('Aoife Byrne')).toBeVisible()
   await expect(page.getByText('aoife@sessionhire.com')).toBeVisible()
   await expect.poll(() => deviceCopy(page)).not.toBeNull()
+  // A count left half done (ADR 0030) goes too, so whoever signs in next can't finish it as theirs.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'sh.count',
+      JSON.stringify({ id: 'c1', placeId: 'p1', caseId: null, startedAt: '2026-10-04T09:00:00.000Z', by: null, scanned: [], unknown: [], counted: {}, added: [] })
+    )
+  )
 
   await page.getByRole('button', { name: 'Sign out' }).click()
   // Signing out reloads the app at its start, signed out.
   await page.waitForURL(/\/$/)
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   expect(await deviceCopy(page)).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('sh.count'))).toBeNull()
 })

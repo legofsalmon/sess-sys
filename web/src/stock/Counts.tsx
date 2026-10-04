@@ -84,6 +84,9 @@ function saveDraft(next: CountDraft | undefined) {
   for (const fn of listeners) fn()
 }
 
+/** Signing out forgets a count in progress too, so whoever signs in next can't finish it as their own. */
+export const forgetCountDraft = () => saveDraft(undefined)
+
 // A second tab of the app on this phone counts the same count: each hears the other's scans, so neither writes over them.
 try {
   addEventListener('storage', (e) => {

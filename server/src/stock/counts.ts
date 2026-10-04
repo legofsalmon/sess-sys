@@ -86,9 +86,11 @@ export const countHandlers: { [N in CountCommand]: Handler<N> } = {
         throw new Refused({ code: 'conflict', message: `${c.number || 'That item'}${m ? ` (${m.name})` : ''} doesn't hold other kit, so the count wasn't kept.` })
       }
     }
+    // A phone whose clock runs ahead would leave its place counted "this week" for good, so no count is kept as later than
+    // it reached the server. One sent late, after a day without signal, keeps its own time.
     await ctx.tx.query(
       `INSERT INTO counts (id, place_id, case_id, started_at, finished_at, counted_by, items, unknown, products, summary)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, LEAST($4::timestamptz, $5::timestamptz, now()), LEAST($5::timestamptz, now()), $6, $7, $8, $9, $10)`,
       [
         a.id,
         a.placeId,
