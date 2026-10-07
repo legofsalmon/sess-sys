@@ -35,9 +35,11 @@ waiting on someone.
   two new); the web build; the full browser suite (78), with the kit
   spec now changing a job's days from the Kit card.
 
+- Merged into `main` at 10:27 UTC once GitHub's checks passed, and live
+  by 10:36: Railway deployed it on its own.
+
 **Next**
 
-- Merge and check it on the live server.
 - Stocktakes and rolling counts are built in
   [PR #57](https://github.com/legofsalmon/sess-sys/pull/57), waiting to
   merge; it took Decision 0030 first, so this is 0031. After that, the
