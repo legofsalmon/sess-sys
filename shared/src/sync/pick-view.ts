@@ -109,7 +109,7 @@ export interface MovesView {
   stillOut: PickList[]
   /**
    * How many of a product are out with jobs whose kit should be back by now
-   * (ADR 0030): not free for any job until they're back. Items that can't
+   * (ADR 0031): not free for any job until they're back. Items that can't
    * go out anyway are left to the faults.
    */
   lateOut(modelId: string): number

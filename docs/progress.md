@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - **Getting kit ready and checking it back in**
-  ([Decision 0030](adr/0030-getting-kit-ready-and-back.md)), the next
+  ([Decision 0031](adr/0031-getting-kit-ready-and-back.md)), the next
   item in the plan ("working hours and buffer time on availability").
   Each job now holds its kit a day before, to get it ready, and a day
   after, to check it back in, so a job the day before or after can't
@@ -38,8 +38,11 @@ waiting on someone.
 **Next**
 
 - Merge and check it on the live server.
-- The rest of Phase 2 is the labelling rollout, which is work in the
-  warehouse rather than in the app; cycle counts and RFID are later.
+- Stocktakes and rolling counts are built in
+  [PR #57](https://github.com/legofsalmon/sess-sys/pull/57), waiting to
+  merge; it took Decision 0030 first, so this is 0031. After that, the
+  rest of Phase 2 is the labelling rollout, which is work in the
+  warehouse rather than in the app, and RFID later.
 
 ## 3 October 2026: the small items
 

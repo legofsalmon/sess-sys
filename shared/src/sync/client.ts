@@ -357,7 +357,7 @@ export class SyncClient {
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
     const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)
     const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse, (id) => !!inspections.blocks(id))
-    // Kit still out after its job comes off what's free (ADR 0030), and the pick lists need the kit: so the moves first, reading the kit only when a pick list is.
+    // Kit still out after its job comes off what's free (ADR 0031), and the pick lists need the kit: so the moves first, reading the kit only when a pick list is.
     let kit: KitView | undefined
     const moves = movesView(entities, outbox, this.state.cursor, jobs, warehouse, () => kit!, today, faults)
     kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults, moves.lateOut)

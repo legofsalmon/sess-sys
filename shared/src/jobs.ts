@@ -61,7 +61,7 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
 export const STOPPED: readonly ProjectStatus[] = ['cancelled', 'lost']
 
 /**
- * Getting a job's kit ready and checking it back in (ADR 0030): the whole
+ * Getting a job's kit ready and checking it back in (ADR 0031): the whole
  * days before its kit is needed that it's held for the job too, and after.
  */
 export const DEFAULT_PREP_DAYS = 1
@@ -81,7 +81,7 @@ export const project = z.object({
   venueId: id.nullable(),
   status: z.enum(PROJECT_STATUSES),
   notes: text(4000, 'The notes'),
-  /** Days its kit is held before it's needed, to get it ready; missing means the usual one (ADR 0030). */
+  /** Days its kit is held before it's needed, to get it ready; missing means the usual one (ADR 0031). */
   prepDays: kitDays.optional(),
   /** Days its kit is held after, to come back and be checked in; missing means the usual one. */
   returnDays: kitDays.optional(),

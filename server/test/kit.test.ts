@@ -90,7 +90,7 @@ const product = (name: string, extra: Partial<Model> = {}): CommandInput<'model.
 /**
  * A job and its phases, as [name, first day, last day]. Its kit is held on
  * its own days only, unless it says otherwise: the days around them to get
- * kit ready and back (ADR 0030) have tests of their own.
+ * kit ready and back (ADR 0031) have tests of their own.
  */
 async function job(
   app: FastifyInstance,

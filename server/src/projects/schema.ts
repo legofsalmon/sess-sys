@@ -53,7 +53,7 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE phases ADD COLUMN IF NOT EXISTS contact_id text;
   `,
-  // The days a job's kit is held before it's needed and after (ADR 0030): one of each, as usual.
+  // The days a job's kit is held before it's needed and after (ADR 0031): one of each, as usual.
   `
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS prep_days integer NOT NULL DEFAULT 1 CHECK (prep_days BETWEEN 0 AND 14);
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS return_days integer NOT NULL DEFAULT 1 CHECK (return_days BETWEEN 0 AND 14);

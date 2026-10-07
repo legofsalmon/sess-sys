@@ -63,7 +63,7 @@ function notFree(l: KitLineView): string {
   )
 }
 
-/** ", getting it ready" on a day before the line's own, ", checking it back in" on one after (ADR 0030). */
+/** ", getting it ready" on a day before the line's own, ", checking it back in" on one after (ADR 0031). */
 function whichDay(l: KitLineView, day: string): string {
   if (!l.span) return ''
   return day < l.span.start ? ', getting it ready' : day > l.span.end ? ', checking it back in' : ''
@@ -72,7 +72,7 @@ function whichDay(l: KitLineView, day: string): string {
 /**
  * Whether a line has enough, in words: "Short 2 on Wed 8 Oct: 10 owned, 4
  * on Fuel". Kit damaged or missing (ADR 0018), failed or overdue a test
- * (ADR 0020), or still out after another job (ADR 0030), isn't counted as
+ * (ADR 0020), or still out after another job (ADR 0031), isn't counted as
  * owned. A line's kit is held on its days to get it ready and check it
  * back too, so it can be short on those. Short on a confirmed job is bad; on
  * an enquiry or a quote it's a warning, as is enough that the pencilled jobs would use up. Undefined
@@ -195,7 +195,7 @@ function PickLink({ job, view, lines }: { job: JobView; view: View; lines: reado
 const daysWord = (n: number) => (n === 0 ? 'no days' : n === 1 ? 'a day' : `${n} days`)
 
 /**
- * When the job's kit is held (ADR 0030): its days, with the days before to
+ * When the job's kit is held (ADR 0031): its days, with the days before to
  * get it ready and after to check it back in, which the job can change.
  */
 function KitDays({ job }: { job: JobView }) {

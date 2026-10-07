@@ -181,7 +181,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   line's form with the number filled in and the cursor in From. The jobs
   list says "Kit short" in the same red or amber. Not in Figma yet.
 - The days a job holds its kit
-  ([ADR 0030](adr/0030-getting-kit-ready-and-back.md)) are one line of
+  ([ADR 0031](adr/0031-getting-kit-ready-and-back.md)) are one line of
   small text at the top of the Kit card, the days in bold ("Kit held
   **Tue 3 Sep to Thu 5 Sep**: a day before to get it ready, a day after
   to check it back in"), with Change as a link. Change opens the grid

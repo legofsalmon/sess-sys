@@ -5,7 +5,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
  * counted in the warehouse, put on a festival for the whole job (the days
  * between its build and show included) and for its show; a launch in the
  * gap is short and says who has the rest, getting ready too until it's
- * held for its own day only (ADR 0030), and subhiring the shortfall sorts
+ * held for its own day only (ADR 0031), and subhiring the shortfall sorts
  * it. A quote on the festival's show day would be short if it went ahead,
  * and the festival says so. The Stock tab lists what's short and the
  * product page lists its jobs. Kit added with no signal counts at once and
@@ -74,7 +74,7 @@ async function addKit(page: Page, product: string, qty: number, days = 'Whole jo
 
 const state = (line: Locator) => line.locator('.kit-state')
 
-/** How many days the job holds its kit before and after (ADR 0030), from the Kit card. */
+/** How many days the job holds its kit before and after (ADR 0031), from the Kit card. */
 async function kitDays(page: Page, before: number, after: number, screenshot?: string) {
   const days = page.locator('.kit-days')
   await days.getByRole('button', { name: 'Change' }).click()

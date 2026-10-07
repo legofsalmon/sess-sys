@@ -14,7 +14,7 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *
  * What it shows:
  * - two confirmed jobs on the same days, with 6 d&b Y10P short between them:
- *   4 for the days they share, and 2 still out after the gala (ADR 0030);
+ *   4 for the days they share, and 2 still out after the gala (ADR 0031);
  * - a quote that would leave the Robe Spiiders short if it goes ahead, and
  *   the confirmed job whose spare it would use;
  * - an LED wall hired in, as nothing like it is owned;

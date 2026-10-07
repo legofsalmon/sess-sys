@@ -1,4 +1,4 @@
-# ADR 0030: Getting kit ready and back, and kit still out
+# ADR 0031: Getting kit ready and back, and kit still out
 
 - **Status:** Accepted, 7 October 2026. The next part of Phase 2, after
   inspections ([ADR 0020](0020-inspections.md)).

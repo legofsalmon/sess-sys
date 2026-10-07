@@ -17,7 +17,7 @@ import type { ModelView, WarehouseView } from './stock-view.ts'
  * checked, since what's past can't be short any more.
  *
  * A line's kit is held on its own days and, around them, the job's days to
- * get it ready and check it back in (ADR 0030): one of each unless the job
+ * get it ready and check it back in (ADR 0031): one of each unless the job
  * says otherwise. Kit still out with a job after those, or with a job not
  * going ahead, isn't free on any day until it's back.
  */
@@ -62,7 +62,7 @@ export interface KitLineView extends KitLine {
   hold: KitHold
   /** Its days: its phase's, or the whole job's; undefined while there are none. */
   span: { start: string; end: string } | undefined
-  /** The days its kit is held: its own, with the job's days to get it ready and check it back (ADR 0030). */
+  /** The days its kit is held: its own, with the job's days to get it ready and check it back (ADR 0031). */
   held: { start: string; end: string } | undefined
   /** How many come out of Session Hire's own stock: all but those subhired. */
   own: number
@@ -126,7 +126,7 @@ export function kitView(
   warehouse: WarehouseView,
   today: string,
   faults?: FaultsView,
-  /** How many of a product are out with jobs whose kit should be back by now (ADR 0030). */
+  /** How many of a product are out with jobs whose kit should be back by now (ADR 0031). */
   lateOut?: (modelId: string) => number
 ): KitView {
   const lines = new Map<string, KitLine & { pending: boolean }>()
