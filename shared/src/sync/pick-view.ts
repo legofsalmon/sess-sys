@@ -1,10 +1,9 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { STOPPED } from '../jobs.ts'
 import type { MoveEntities, Movement } from '../moves.ts'
 import { DEPARTMENTS } from '../stock.ts'
 import type { FaultsView } from './faults-view.ts'
 import type { JobsView, JobView } from './jobs-view.ts'
-import { holdOf, type KitLineView, type KitView } from './kit-view.ts'
+import { holdOf, kitDue, type KitLineView, type KitView } from './kit-view.ts'
 import { addDays } from './plan.ts'
 import type { AssetView, ModelView, WarehouseView } from './stock-view.ts'
 
@@ -108,8 +107,14 @@ export interface MovesView {
   pickList(jobId: string): PickList | undefined
   /** Confirmed jobs on now or starting in the next 14 days, with kit to go out; soonest first. */
   soon: PickList[]
-  /** Jobs over, or not going ahead, with kit still out; the longest over first. */
+  /** Jobs whose kit should be back by now (over, past their days to check it back, or not going ahead) with kit still out; the longest over first. */
   stillOut: PickList[]
+  /**
+   * How many of a product are out with jobs whose kit should be back by now
+   * (ADR 0031): not free for any job until they're back. Items that can't
+   * go out anyway are left to the faults.
+   */
+  lateOut(modelId: string): number
 }
 
 type Tables = { [E in keyof MoveEntities]: Record<string, MoveEntities[E]> }
@@ -130,10 +135,12 @@ export function movesView(
   cursor: number,
   jobs: JobsView,
   warehouse: WarehouseView,
-  kit: KitView,
+  /** The kit on jobs, or how to get it: kit availability needs `lateOut` from here first, so it's read only once a pick list is. */
+  kitOrLater: KitView | (() => KitView),
   today: string,
   faults?: FaultsView
 ): MovesView {
+  const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
   const moves = new Map<string, MovementView>()
   for (const m of Object.values(entities.movement ?? {})) moves.set(m.id, { ...m, pending: false })
   for (const m of outbox) {
@@ -275,7 +282,7 @@ export function movesView(
       }
       return r
     }
-    for (const l of kit.byJob.get(jobId) ?? []) {
+    for (const l of kitOf().byJob.get(jobId) ?? []) {
       const r = row(l.modelId)
       r.lines.push(l)
       r.need += l.own
@@ -326,18 +333,38 @@ export function movesView(
   }
 
   const until = addDays(today, PICK_AHEAD_DAYS - 1)
-  const soon = jobs.jobs
-    .filter((j) => holdOf(j.status) === 'held' && j.span && j.span.end >= today && j.span.start <= until && kit.byJob.has(j.id))
-    .map((j) => pickList(j.id)!)
-    .filter((p) => p.need > 0)
-    .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
+  const soon = () =>
+    jobs.jobs
+      .filter((j) => holdOf(j.status) === 'held' && j.span && j.span.end >= today && j.span.start <= until && kitOf().byJob.has(j.id))
+      .map((j) => pickList(j.id)!)
+      .filter((p) => p.need > 0)
+      .sort((a, b) => a.job.span!.start.localeCompare(b.job.span!.start) || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   const withKitOut = new Set([...outByJob.keys(), ...[...counted].filter(([, byModel]) => [...byModel.values()].some((c) => c.out > c.back + c.missing)).map(([id]) => id)])
-  const over = (j: JobView) => STOPPED.includes(j.status) || !j.span || j.span.end < today
-  const stillOut = [...withKitOut]
-    .map((id) => pickList(id))
-    .filter((p): p is PickList => !!p && over(p.job) && p.stillOut > 0)
-    .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
+  // Kit out with a job that isn't on the device yet is late too: nothing says when it's due back.
+  const due = (id: string) => {
+    const j = jobById.get(id)
+    return !j || kitDue(j, today)
+  }
+  const stillOut = () =>
+    [...withKitOut]
+      .filter(due)
+      .map((id) => pickList(id))
+      .filter((p): p is PickList => !!p && p.stillOut > 0)
+      .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
+
+  const late = new Map<string, number>()
+  for (const [id, items] of outByJob) {
+    if (!due(id)) continue
+    for (const a of items) if (a.status === 'active' && !faults?.cantGoOut(a.id)) late.set(a.modelId, (late.get(a.modelId) ?? 0) + 1)
+  }
+  for (const [id, byModel] of counted) {
+    if (!due(id)) continue
+    for (const [modelId, c] of byModel) {
+      const n = c.out - c.back - c.missing
+      if (n > 0) late.set(modelId, (late.get(modelId) ?? 0) + n)
+    }
+  }
 
   const moved = new Set([...moves.values()].map((m) => m.modelId))
 
@@ -353,5 +380,21 @@ export function movesView(
       return n + (c ? Math.max(0, c.out - c.back - c.missing) : 0)
     }, 0)
 
-  return { outOf: (id) => outState.get(id), outWith, countedOut, everMoved: (id) => moved.has(id), ofItem, pickList, soon, stillOut }
+  let soonList: PickList[] | undefined
+  let stillOutList: PickList[] | undefined
+  return {
+    outOf: (id) => outState.get(id),
+    outWith,
+    countedOut,
+    everMoved: (id) => moved.has(id),
+    ofItem,
+    pickList,
+    get soon() {
+      return (soonList ??= soon())
+    },
+    get stillOut() {
+      return (stillOutList ??= stillOut())
+    },
+    lateOut: (modelId) => late.get(modelId) ?? 0,
+  }
 }

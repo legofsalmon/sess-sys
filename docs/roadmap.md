@@ -109,7 +109,10 @@ faults, missing kit and repairs
 - Equipment lines on projects, with live availability and shortage
   warnings, including subhire lines (built: kit lines for the whole job
   or a phase; confirmed jobs hold kit and enquiries and quotes are
-  pencilled in; short is warned about, never refused).
+  pencilled in; short is warned about, never refused; each job holds its
+  kit a day before and after by default, to get it ready and check it
+  back in, and kit still out after its job isn't free; whole days, since
+  phases have no hours yet).
 - Scanning with the phone's camera in the app, offline (built: labels and
   makers' barcodes in the Stock search, one after another).
 - Pick lists per project, **scan out and scan in on a phone, offline**,

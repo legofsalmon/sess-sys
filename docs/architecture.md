@@ -301,11 +301,13 @@ says product and item; the code says model and asset.
   maintenance, per product per hour, including prep and return buffers.
   Built for now from kit lines and what's owned, per product per whole
   day, on each device ([ADR 0014](adr/0014-kit-on-jobs.md)): confirmed
-  jobs hold kit, enquiries and quotes are pencilled in. Movements are
-  recorded now (ADR 0017), but kit out past its job isn't yet taken off
-  what's free. Kit missing, or damaged and not fit to use, is
-  (ADR 0018), and so is kit that failed or is overdue a test
-  (ADR 0020); hours and buffers come next.
+  jobs hold kit, enquiries and quotes are pencilled in. Each job holds
+  its kit a whole day before and after by default, to get it ready and
+  check it back in, and kit still out after its job isn't free
+  ([ADR 0031](adr/0031-getting-kit-ready-and-back.md)). Kit missing, or
+  damaged and not fit to use, isn't either (ADR 0018), nor kit that
+  failed or is overdue a test (ADR 0020). Hours wait on phases having
+  times.
 
 **People**
 

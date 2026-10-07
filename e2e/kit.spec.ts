@@ -4,7 +4,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
  * Kit on jobs end to end (ADR 0014), at phone size: speakers and cables
  * counted in the warehouse, put on a festival for the whole job (the days
  * between its build and show included) and for its show; a launch in the
- * gap is short and says who has the rest, and subhiring the shortfall sorts
+ * gap is short and says who has the rest, getting ready too until it's
+ * held for its own day only (ADR 0031), and subhiring the shortfall sorts
  * it. A quote on the festival's show day would be short if it went ahead,
  * and the festival says so. The Stock tab lists what's short and the
  * product page lists its jobs. Kit added with no signal counts at once and
@@ -73,6 +74,21 @@ async function addKit(page: Page, product: string, qty: number, days = 'Whole jo
 
 const state = (line: Locator) => line.locator('.kit-state')
 
+/** How many days the job holds its kit before and after (ADR 0031), from the Kit card. */
+async function kitDays(page: Page, before: number, after: number, screenshot?: string) {
+  const days = page.locator('.kit-days')
+  await days.getByRole('button', { name: 'Change' }).click()
+  const form = days.getByRole('form', { name: 'Days to get kit ready and back' })
+  await form.getByLabel('Days before, to get it ready').fill(String(before))
+  await form.getByLabel('Days after, to check it back in').fill(String(after))
+  if (screenshot) {
+    await toCard(page.getByRole('region', { name: 'Kit' }))
+    await page.screenshot(shot(screenshot))
+  }
+  await form.getByRole('button', { name: 'Save' }).click()
+  await expect(form).toHaveCount(0)
+}
+
 /** A card near the top of the screen, under the header, for a screenshot. */
 const toCard = (card: Locator) => card.evaluate((el) => scrollTo(0, el.getBoundingClientRect().top + scrollY - 64))
 
@@ -110,6 +126,13 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   await newJob(page, launch, 'Confirmed', [['Show', '2030-09-04', '2030-09-04']])
   await addKit(page, speaker, 4)
   const monitors = kit.getByRole('article', { name: `4 × ${speaker}` })
+  // Held a day either side as usual, it's short getting ready too, while the festival is still building.
+  const held = page.locator('.kit-days p')
+  await expect(held).toContainText('Kit held Tue 3 Sep to Thu 5 Sep: a day before to get it ready, a day after to check it back in.')
+  await expect(state(monitors)).toHaveText(`Short 2 on Tue 3 Sep, getting it ready: 10 owned, 8 on ${festival}. Short on 2 other days too.`)
+  // The launch's kit is ready in the van the same morning, and back that night.
+  await kitDays(page, 0, 0, 'kit-days')
+  await expect(held).toContainText('Kit held Wed 4 Sep: no days before to get it ready, no days after to check it back in.')
   await expect(state(monitors)).toHaveText(`Short 2 on Wed 4 Sep: 10 owned, 8 on ${festival}.`)
   await expect(state(monitors)).toHaveClass(/bad/)
   await expect(page.locator('.facts')).toContainText('1 product, 1 short')
@@ -137,6 +160,7 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   // A quote on the festival's show day would be short if it went ahead, and the festival says so.
   await newJob(page, quote, 'Quoted', [['Show', '2030-09-06', '2030-09-06']])
   await addKit(page, speaker, 4)
+  await kitDays(page, 0, 0)
   const pencilled = kit.getByRole('article', { name: `4 × ${speaker}` })
   await expect(state(pencilled)).toHaveText(`Would be short 2 on Fri 6 Sep if it goes ahead: 10 owned, 8 on ${festival}.`)
   await expect(state(pencilled)).toHaveClass(/warn/)
@@ -198,7 +222,7 @@ test('kit added with no signal counts at once, then goes through', async ({ brow
   await addKit(page, light, 3)
   const line = page.getByRole('region', { name: 'Kit' }).getByRole('article', { name: `3 × ${light}` })
   await expect(line.locator('.pill')).toHaveText('Waiting to sync')
-  await expect(state(line)).toHaveText('Short 1 on Thu 10 Oct: 2 owned.')
+  await expect(state(line)).toHaveText('Short 1 on Wed 9 Oct, getting it ready: 2 owned. Short on 2 other days too.')
   await expect(page.locator('.kit-group h3')).toHaveText(['Lighting'])
   await expect(page.locator('.conn')).toContainText('No signal')
 
@@ -213,5 +237,5 @@ test('kit added with no signal counts at once, then goes through', async ({ brow
   await laptop.getByLabel('Find').fill(light)
   await laptop.getByLabel('Find').press('Enter')
   const row = laptop.getByRole('region', { name: 'On jobs' }).locator('.job-row', { hasText: job })
-  await expect(row.locator('.kit-note')).toHaveText('Short 1 on Thu 10 Oct: 2 owned.')
+  await expect(row.locator('.kit-note')).toHaveText('Short 1 on Wed 9 Oct, getting it ready: 2 owned. Short on 2 other days too.')
 })

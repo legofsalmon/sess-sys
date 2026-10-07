@@ -1,10 +1,11 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { eachDay } from '../crew.ts'
-import { STOPPED, type ProjectStatus } from '../jobs.ts'
+import { kitDaysOf, STOPPED, type ProjectStatus } from '../jobs.ts'
 import type { KitEntities, KitLine } from '../kit.ts'
 import { DEPARTMENTS } from '../stock.ts'
 import type { FaultsView } from './faults-view.ts'
 import type { JobsView, JobView, PhaseView } from './jobs-view.ts'
+import { addDays } from './plan.ts'
 import type { ModelView, WarehouseView } from './stock-view.ts'
 
 /**
@@ -14,7 +15,24 @@ import type { ModelView, WarehouseView } from './stock-view.ts'
  * pencilled in, checked as if they went ahead but never counted as taken;
  * cancelled and lost jobs hold nothing. Only days from today on are
  * checked, since what's past can't be short any more.
+ *
+ * A line's kit is held on its own days and, around them, the job's days to
+ * get it ready and check it back in (ADR 0031): one of each unless the job
+ * says otherwise. Kit still out with a job after those, or with a job not
+ * going ahead, isn't free on any day until it's back.
  */
+
+/** The days a job's kit is held around some of its days: those, with its days to get it ready before and check it back after. */
+export function heldAround(job: { prepDays?: number; returnDays?: number }, span: { start: string; end: string }) {
+  const { prep, back } = kitDaysOf(job)
+  return { start: addDays(span.start, -prep), end: addDays(span.end, back) }
+}
+
+/** Whether a job's kit should all be back by `today`: it isn't going ahead, has no days, or its last day to check kit back is past. */
+export function kitDue(job: JobView, today: string): boolean {
+  if (STOPPED.includes(job.status) || !job.span) return true
+  return heldAround(job, job.span).end < today
+}
 
 /** What a job's status means for its kit. */
 export type KitHold = 'held' | 'pencilled' | 'none'
@@ -44,12 +62,16 @@ export interface KitLineView extends KitLine {
   hold: KitHold
   /** Its days: its phase's, or the whole job's; undefined while there are none. */
   span: { start: string; end: string } | undefined
+  /** The days its kit is held: its own, with the job's days to get it ready and check it back (ADR 0031). */
+  held: { start: string; end: string } | undefined
   /** How many come out of Session Hire's own stock: all but those subhired. */
   own: number
   /** How many Session Hire has that can go out: items in stock and what's counted, less those missing or not fit to use (ADR 0018). */
   owned: number
   /** How many of it are missing or not fit to use. */
   unusable: number
+  /** How many are still out with jobs that should have brought them back by now, so aren't free on any day until they're back. */
+  late: number
   /** The most it's short on any day from today on; 0 when there are enough. */
   short: number
   /** The first day it's that short. */
@@ -103,7 +125,9 @@ export function kitView(
   jobs: JobsView,
   warehouse: WarehouseView,
   today: string,
-  faults?: FaultsView
+  faults?: FaultsView,
+  /** How many of a product are out with jobs whose kit should be back by now (ADR 0031). */
+  lateOut?: (modelId: string) => number
 ): KitView {
   const lines = new Map<string, KitLine & { pending: boolean }>()
   for (const l of Object.values(entities.kitLine ?? {})) lines.set(l.id, { ...l, pending: false })
@@ -134,16 +158,20 @@ export function kitView(
     const phase = l.phaseId ? job?.phases.find((p) => p.id === l.phaseId) : undefined
     const model = modelById.get(l.modelId)
     const unusable = faults?.unusable(l.modelId) ?? 0
+    const late = lateOut?.(l.modelId) ?? 0
+    const span = l.phaseId ? phase && { start: phase.start, end: phase.end } : job?.span
     return {
       ...l,
       job,
       phase,
       model,
       hold: job ? holdOf(job.status) : 'none',
-      span: l.phaseId ? phase && { start: phase.start, end: phase.end } : job?.span,
+      span,
+      held: span && job && heldAround(job, span),
       own: Math.max(0, l.qty - l.subhireQty),
-      owned: Math.max(0, (model?.total ?? 0) - unusable),
+      owned: Math.max(0, (model?.total ?? 0) - unusable - late),
       unusable,
+      late,
       short: 0,
       shortDay: undefined,
       shortDays: 0,
@@ -154,8 +182,8 @@ export function kitView(
     }
   })
 
-  /** A line's days from today on. */
-  const daysOf = (v: KitLineView) => (v.span && v.span.end >= today ? eachDay(v.span.start < today ? today : v.span.start, v.span.end) : [])
+  /** The days a line's kit is held from today on. */
+  const daysOf = (v: KitLineView) => (v.held && v.held.end >= today ? eachDay(v.held.start < today ? today : v.held.start, v.held.end) : [])
   const counts = (v: KitLineView) => v.hold !== 'none' && v.own > 0
 
   // What each product has out, day by day.
@@ -229,7 +257,7 @@ export function kitView(
         a.id.localeCompare(b.id)
     )
 
-  const coming = (v: KitLineView) => v.hold !== 'none' && (!v.span || v.span.end >= today)
+  const coming = (v: KitLineView) => v.hold !== 'none' && (!v.held || v.held.end >= today)
   const soonest = (a: KitLineView, b: KitLineView) =>
     (a.span ? 0 : 1) - (b.span ? 0 : 1) ||
     (a.span?.start ?? '').localeCompare(b.span?.start ?? '') ||

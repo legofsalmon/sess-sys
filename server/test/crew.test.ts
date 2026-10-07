@@ -1,6 +1,6 @@
 import { addDays, dayLabel, daysLabel, feedCodeFor, feedPath, irishToday, MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type CrewCall, type HistoryPage, type MutationResult, type Offer, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { readApp } from '../src/calendar/import.ts'
 import { pgliteDb } from '../src/db.ts'
@@ -13,8 +13,15 @@ import { flashOf, IPHONE, server as signedIn, staff } from './people.ts'
  * being over-filled.
  */
 
+// The calls here are on fixed days in October 2026; the clock stays before them, so they're never in the past.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-09-28T09:00:00Z'))
+})
+
 let cleanup: (() => Promise<void>)[] = []
 afterEach(async () => {
+  vi.useRealTimers()
   for (const fn of cleanup.reverse()) await fn()
   cleanup = []
 })

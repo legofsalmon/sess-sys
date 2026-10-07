@@ -180,6 +180,15 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   short line has one button, "Subhire the 2 short", which opens the
   line's form with the number filled in and the cursor in From. The jobs
   list says "Kit short" in the same red or amber. Not in Figma yet.
+- The days a job holds its kit
+  ([ADR 0031](adr/0031-getting-kit-ready-and-back.md)) are one line of
+  small text at the top of the Kit card, the days in bold ("Kit held
+  **Tue 3 Sep to Thu 5 Sep**: a day before to get it ready, a day after
+  to check it back in"), with Change as a link. Change opens the grid
+  form under it, before and after side by side, a hint with the usual
+  days, Save and Cancel. A shortage on one of those days adds ",
+  getting it ready" or ", checking it back in" after the day, in the
+  line's own tone. Not in Figma yet.
 - A label ([ADR 0015](adr/0015-printing-labels.md)) is black on white in
   any theme, sized in millimetres: the QR code on the left (on top for a
   25 mm square) with two modules of white round it, the number in heavy
