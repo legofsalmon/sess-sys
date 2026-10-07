@@ -357,7 +357,10 @@ export class SyncClient {
     const warehouse = warehouseView(entities, outbox, this.state.cursor)
     const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)
     const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse, (id) => !!inspections.blocks(id))
-    const kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults)
+    // Kit still out after its job comes off what's free (ADR 0030), and the pick lists need the kit: so the moves first, reading the kit only when a pick list is.
+    let kit: KitView | undefined
+    const moves = movesView(entities, outbox, this.state.cursor, jobs, warehouse, () => kit!, today, faults)
+    kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults, moves.lateOut)
     return {
       problems: [...this.state.problems],
       crew,
@@ -365,7 +368,7 @@ export class SyncClient {
       warehouse,
       kit,
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
-      moves: movesView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today, faults),
+      moves,
       faults,
       inspections,
       timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),

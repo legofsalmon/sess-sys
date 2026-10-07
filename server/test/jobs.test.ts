@@ -126,6 +126,8 @@ describe('a job, its phases, client and venue', () => {
       venueId: ids.venue,
       status: 'confirmed',
       notes: '',
+      prepDays: 1,
+      returnDays: 1,
     })
     expect(await latest<Phase>(app, 'phase', ids.build)).toMatchObject({ projectId: ids.job, name: 'Build', start: '2026-10-07', end: '2026-10-08', venueId: null })
   })

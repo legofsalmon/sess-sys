@@ -191,3 +191,8 @@
   .call-sheet .sheet-call header { font-weight: 700; }
   .call-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
+
+/* When a job's kit is held (ADR 0030): its days, with getting it ready and checking it back. */
+.jobs .kit-days p { margin: 0; color: var(--muted); font-size: .9rem; }
+.jobs .kit-days p b { color: var(--ink); }
+.jobs .kit-days form { margin-top: var(--space-8); }

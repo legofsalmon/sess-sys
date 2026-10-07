@@ -1,6 +1,11 @@
 import {
   dayLabel,
+  DEFAULT_PREP_DAYS,
+  DEFAULT_RETURN_DAYS,
   DEPARTMENT_LABELS,
+  heldAround,
+  kitDaysOf,
+  MAX_KIT_DAYS,
   DEPARTMENTS,
   MAX_QTY,
   newId,
@@ -48,36 +53,57 @@ const whoHas = (others: KitOther[]) => inWords(others.map((o) => (o.same ? `${o.
 
 export type Tone = 'bad' | 'warn' | 'ok' | 'quiet'
 
+/** Why some aren't counted as owned: "1 damaged, missing or due a test and 2 still out after their jobs". */
+function notFree(l: KitLineView): string {
+  return inWords(
+    [
+      l.unusable ? `${l.unusable} damaged, missing or due a test` : '',
+      l.late ? `${l.late} still out after ${l.late === 1 ? 'its job' : 'their jobs'}` : '',
+    ].filter(Boolean)
+  )
+}
+
+/** ", getting it ready" on a day before the line's own, ", checking it back in" on one after (ADR 0030). */
+function whichDay(l: KitLineView, day: string): string {
+  if (!l.span) return ''
+  return day < l.span.start ? ', getting it ready' : day > l.span.end ? ', checking it back in' : ''
+}
+
 /**
  * Whether a line has enough, in words: "Short 2 on Wed 8 Oct: 10 owned, 4
- * on Fuel". Kit damaged or missing (ADR 0018), or failed or overdue a test
- * (ADR 0020), isn't counted as owned. Short on a confirmed job is bad; on
+ * on Fuel". Kit damaged or missing (ADR 0018), failed or overdue a test
+ * (ADR 0020), or still out after another job (ADR 0030), isn't counted as
+ * owned. A line's kit is held on its days to get it ready and check it
+ * back too, so it can be short on those. Short on a confirmed job is bad; on
  * an enquiry or a quote it's a warning, as is enough that the pencilled jobs would use up. Undefined
  * when there's nothing to say: a stopped job, or days gone by.
  */
 export function kitState(l: KitLineView, today: string): { tone: Tone; text: string } | undefined {
   const subhired = l.subhireQty > 0 ? `${l.subhireQty === l.qty ? 'All' : l.subhireQty} subhired${l.supplier ? ` from ${l.supplier}` : ''}.` : ''
   const say = (tone: Tone, text: string) => ({ tone, text: [subhired, text].filter(Boolean).join(' ') })
-  if (l.hold === 'none' || (l.span && l.span.end < today)) return subhired ? say('quiet', '') : undefined
+  if (l.hold === 'none' || (l.held && l.held.end < today)) return subhired ? say('quiet', '') : undefined
   if (!l.span) return say('quiet', l.phaseId ? "Its phase has been removed, so it isn't checked." : "No dates yet, so it isn't checked yet.")
   if (l.own === 0) return say('ok', '')
   const pencilled = l.hold === 'pencilled'
   if (l.short > 0) {
     const tone = pencilled ? 'warn' : 'bad'
-    if (l.owned === 0 && l.unusable > 0)
-      return say(tone, `None fit to go out: ${l.unusable} damaged, missing or due a test, so ${pencilled ? 'it would be' : "it's"} short ${l.short} until they're fixed, found or tested.`)
+    if (l.owned === 0 && l.unusable + l.late > 0)
+      return say(
+        tone,
+        `None fit to go out: ${notFree(l)}, so ${pencilled ? 'it would be' : "it's"} short ${l.short} until they're ${l.late ? (l.unusable ? 'back, fixed, found or tested' : 'back') : 'fixed, found or tested'}.`
+      )
     if (l.owned === 0) return say(tone, `None counted in stock yet, so ${pencilled ? 'it would be' : "it's"} short ${l.short} until they are.`)
     const held = l.others.filter((o) => o.hold === 'held')
     const more = l.shortDays > 1 ? ` Short on ${plural(l.shortDays - 1, 'other day')} too.` : ''
     return say(
       tone,
-      `${pencilled ? 'Would be short' : 'Short'} ${l.short} on ${dayLabel(l.shortDay!)}${pencilled ? ' if it goes ahead' : ''}: ${l.owned} owned${l.unusable ? ` and fit to go out (${l.unusable} damaged, missing or due a test)` : ''}${held.length ? `, ${whoHas(held)}` : ''}.${more}`
+      `${pencilled ? 'Would be short' : 'Short'} ${l.short} on ${dayLabel(l.shortDay!)}${whichDay(l, l.shortDay!)}${pencilled ? ' if it goes ahead' : ''}: ${l.owned} owned${l.unusable || l.late ? ` and fit to go out (${notFree(l)})` : ''}${held.length ? `, ${whoHas(held)}` : ''}.${more}`
     )
   }
   if (l.ifPencilled > 0) {
     const names = l.others.filter((o) => o.hold === 'pencilled' && !o.same).map((o) => o.name)
     const unless = names.length ? `unless ${inWords(names)} ${names.length === 1 ? 'goes' : 'go'} ahead` : 'unless the enquiries and quotes then go ahead'
-    return say('warn', `Enough, ${unless}: then short ${l.ifPencilled} on ${dayLabel(l.pencilledDay!)}.`)
+    return say('warn', `Enough, ${unless}: then short ${l.ifPencilled} on ${dayLabel(l.pencilledDay!)}${whichDay(l, l.pencilledDay!)}.`)
   }
   return say('ok', l.spare ? `Enough, with ${l.spare} to spare.` : 'Enough, with none to spare.')
 }
@@ -112,6 +138,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
     <section className="card kit" aria-label="Kit">
       <h2>Kit</h2>
       <PickLink job={job} view={view} lines={lines} />
+      {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
       {lines.length === 0 && <Empty>Add what the job needs from the stock list, for the whole job or one phase.</Empty>}
       <ShowAll items={byDepartment} limit={3} what="lines" keep={toAct}>
@@ -161,6 +188,82 @@ function PickLink({ job, view, lines }: { job: JobView; view: View; lines: reado
         Pick list
       </a>
       <span>{said}</span>
+    </div>
+  )
+}
+
+const daysWord = (n: number) => (n === 0 ? 'no days' : n === 1 ? 'a day' : `${n} days`)
+
+/**
+ * When the job's kit is held (ADR 0030): its days, with the days before to
+ * get it ready and after to check it back in, which the job can change.
+ */
+function KitDays({ job }: { job: JobView }) {
+  const { prep, back } = kitDaysOf(job)
+  const [editing, setEditing] = useState(false)
+  const [f, setF] = useState({ prep: String(prep), back: String(back) })
+  const { run, error, refuse } = useAct()
+  const held = job.span && heldAround(job, job.span)
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    const p = Number(f.prep)
+    const b = Number(f.back)
+    const ok = (n: number) => Number.isInteger(n) && n >= 0 && n <= MAX_KIT_DAYS
+    if (!f.prep.trim() || !f.back.trim() || !ok(p) || !ok(b)) return refuse(`Whole days, from 0 to ${MAX_KIT_DAYS}, before and after.`)
+    const changes: CommandInput<'project.update'> = { id: job.id }
+    if (p !== prep) changes.prepDays = p
+    if (b !== back) changes.returnDays = b
+    if (changes.prepDays === undefined && changes.returnDays === undefined) return setEditing(false)
+    void run(() => client.mutate('project.update', changes)).then((done) => done && setEditing(false))
+  }
+  return (
+    <div className="kit-days">
+      <p>
+        {held ? (
+          <>
+            Kit held <b>{spanLabel(held)}</b>:{' '}
+          </>
+        ) : (
+          'Kit held '
+        )}
+        {daysWord(prep)} before to get it ready, {daysWord(back)} after to check it back in.{' '}
+        {!editing && (
+          <button type="button" className="link" onClick={() => setEditing(true)}>
+            Change
+          </button>
+        )}
+      </p>
+      {editing && (
+        <form className="grid-form" onSubmit={save} aria-label="Days to get kit ready and back">
+          <label>
+            Days before, to get it ready
+            <input inputMode="numeric" value={f.prep} onChange={(e) => setF({ ...f, prep: e.target.value })} />
+          </label>
+          <label>
+            Days after, to check it back in
+            <input inputMode="numeric" value={f.back} onChange={(e) => setF({ ...f, back: e.target.value })} />
+          </label>
+          <p className="hint wide">
+            Usually {daysWord(DEFAULT_PREP_DAYS)} before and {daysWord(DEFAULT_RETURN_DAYS)} after. None before when the job has its own Prep phase.
+          </p>
+          <Refusal error={error} className="wide" />
+          <div className="actions wide">
+            <button type="submit" className="primary">
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setF({ prep: String(prep), back: String(back) })
+                refuse('')
+                setEditing(false)
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   )
 }
