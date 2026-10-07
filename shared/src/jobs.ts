@@ -60,6 +60,19 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
 /** A job that isn't going ahead. Its crew calls are cancelled with it. */
 export const STOPPED: readonly ProjectStatus[] = ['cancelled', 'lost']
 
+/**
+ * Getting a job's kit ready and checking it back in (ADR 0031): the whole
+ * days before its kit is needed that it's held for the job too, and after.
+ */
+export const DEFAULT_PREP_DAYS = 1
+export const DEFAULT_RETURN_DAYS = 1
+export const MAX_KIT_DAYS = 14
+const kitDays = z
+  .number()
+  .int('Whole days, please.')
+  .min(0, "Days can't be fewer than none.")
+  .max(MAX_KIT_DAYS, `Up to ${MAX_KIT_DAYS} days, please.`)
+
 export const project = z.object({
   id,
   name: needed(200, "The job's name", "The job's name"),
@@ -68,6 +81,16 @@ export const project = z.object({
   venueId: id.nullable(),
   status: z.enum(PROJECT_STATUSES),
   notes: text(4000, 'The notes'),
+  /** Days its kit is held before it's needed, to get it ready; missing means the usual one (ADR 0031). */
+  prepDays: kitDays.optional(),
+  /** Days its kit is held after, to come back and be checked in; missing means the usual one. */
+  returnDays: kitDays.optional(),
+})
+
+/** A job's days for getting kit ready and checking it back, the usual ones when it doesn't say. */
+export const kitDaysOf = (p: { prepDays?: number; returnDays?: number }) => ({
+  prep: p.prepDays ?? DEFAULT_PREP_DAYS,
+  back: p.returnDays ?? DEFAULT_RETURN_DAYS,
 })
 export type Project = z.infer<typeof project> & {
   /**
@@ -137,6 +160,8 @@ export const jobCommandSchemas = {
       venueId: project.shape.venueId.optional(),
       status: project.shape.status.optional(),
       notes: project.shape.notes.optional(),
+      prepDays: kitDays.optional(),
+      returnDays: kitDays.optional(),
     })
     .refine(...somethingToChange),
   'phase.add': phase.refine(...phaseFits).refine(...phaseNotTooLong),

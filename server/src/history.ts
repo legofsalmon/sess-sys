@@ -17,6 +17,7 @@ import {
   normaliseNumber,
   numberText,
   OFFLINE_AFTER_SECONDS,
+  plural,
   RETIRED_LABELS,
   STATUS_LABELS,
   tidyNeeds,
@@ -467,6 +468,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.clientId !== undefined) parts.push(a.clientId ? `client to ${client(a.clientId)}` : 'no client')
       if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : 'no venue')
       if (a.notes !== undefined) parts.push('the notes')
+      if (a.prepDays !== undefined) parts.push(`kit held ${a.prepDays ? plural(Number(a.prepDays), 'day') : 'no days'} before, to get it ready`)
+      if (a.returnDays !== undefined) parts.push(`kit held ${a.returnDays ? plural(Number(a.returnDays), 'day') : 'no days'} after, to check it back in`)
       return `Changed the job ${job(a.id)}: ${inWords(parts)}`
     }
     case 'phase.add':

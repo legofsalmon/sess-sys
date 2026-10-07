@@ -13,7 +13,8 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * always in the coming weeks.
  *
  * What it shows:
- * - two confirmed jobs on the same days, with 4 d&b Y10P short between them;
+ * - two confirmed jobs on the same days, with 6 d&b Y10P short between them:
+ *   4 for the days they share, and 2 still out after the gala (ADR 0031);
  * - a quote that would leave the Robe Spiiders short if it goes ahead, and
  *   the confirmed job whose spare it would use;
  * - an LED wall hired in, as nothing like it is owned;
@@ -319,7 +320,7 @@ export function madeUpData(today: string): Mutation[] {
   kit(harbour, spiider, 8)
   kit(harbour, xlr, 60)
   kit(harbour, powercon, 20)
-  // With Harbour Lights on the same days: 4 short.
+  // With Harbour Lights on the same days: 4 short, and 2 more while the gala still has them.
   kit(summit, y10p, 8)
   kit(summit, sm58, 8)
   kit(summit, led, 24, { qty: 24, supplier: 'Lumen Video Hire' })

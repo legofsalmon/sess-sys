@@ -87,10 +87,20 @@ const product = (name: string, extra: Partial<Model> = {}): CommandInput<'model.
   ...extra,
 })
 
-/** A job and its phases, as [name, first day, last day]. */
-async function job(app: FastifyInstance, name: string, status: ProjectStatus, phases: [string, string, string][]) {
+/**
+ * A job and its phases, as [name, first day, last day]. Its kit is held on
+ * its own days only, unless it says otherwise: the days around them to get
+ * kit ready and back (ADR 0031) have tests of their own.
+ */
+async function job(
+  app: FastifyInstance,
+  name: string,
+  status: ProjectStatus,
+  phases: [string, string, string][],
+  kitDays: Pick<CommandInput<'project.create'>, 'prepDays' | 'returnDays'> = { prepDays: 0, returnDays: 0 }
+) {
   const id = newId()
-  await ok(app, 'project.create', { id, name, clientId: null, venueId: null, status, notes: '' })
+  await ok(app, 'project.create', { id, name, clientId: null, venueId: null, status, notes: '', ...kitDays })
   const ids: Record<string, string> = {}
   for (const [phase, start, end] of phases) {
     ids[phase] = newId()
@@ -348,5 +358,67 @@ describe('what a device shows', () => {
       ['XLR 10 m', true],
       ['Clay Paky Sharpy', true],
     ])
+  })
+
+  it('holds kit a day before a job to get it ready and a day after to check it back, unless the job says otherwise', async () => {
+    const { app, db, xlr } = await warehouse()
+    const usual = {}
+    const nissan = await job(app, 'Nissan', 'confirmed', [['Show', '2026-10-06', '2026-10-07']], usual)
+    const fuel = await job(app, 'Fuel', 'confirmed', [['Show', '2026-10-09', '2026-10-09']], usual)
+    const cables = line(nissan.id, xlr.id, 8)
+    const more = line(fuel.id, xlr.id, 4)
+    await ok(app, 'kit.add', cables)
+    await ok(app, 'kit.add', more)
+
+    // Nissan's day to check its kit back is Fuel's day to get it ready: short then, and only then.
+    const office = await device(app)
+    let kit = office.client.view().kit
+    const find = (id: string) => kit.lines.find((l) => l.id === id)
+    expect(find(cables.id)).toMatchObject({ span: { start: '2026-10-06', end: '2026-10-07' }, held: { start: '2026-10-05', end: '2026-10-08' } })
+    expect(state(find(cables.id))).toMatchObject({ short: 2, shortDay: '2026-10-08', shortDays: 1, others: [['Fuel', 4, 'held']] })
+    expect(state(find(more.id))).toMatchObject({ short: 2, shortDay: '2026-10-08', shortDays: 1, others: [['Nissan', 8, 'held']] })
+
+    // Fuel's kit is got ready on its own day: nothing short.
+    await office.client.mutate('project.update', { id: fuel.id, prepDays: 0 })
+    await office.client.sync()
+    kit = office.client.view().kit
+    expect(find(more.id)).toMatchObject({ held: { start: '2026-10-09', end: '2026-10-10' }, short: 0 })
+    expect(find(cables.id)).toMatchObject({ short: 0, spare: 2 })
+    expect((await readHistory(db)).entries.map((e) => e.what)).toContain('Changed the job Fuel: kit held no days before, to get it ready')
+
+    // Too many days, or part of one, is turned down.
+    expect(await refused(app, 'project.update', { id: fuel.id, returnDays: 15 })).toBe('Up to 14 days, please.')
+    expect(await refused(app, 'project.update', { id: fuel.id, returnDays: 0.5 })).toBe('Whole days, please.')
+  })
+
+  it("doesn't count kit still out after its job as free, from the day it should have been back until it is", async () => {
+    const { app, xlr } = await warehouse()
+    const gala = await job(app, 'Gala', 'confirmed', [['Show', '2026-09-28', '2026-09-28']], {})
+    const nissan = await job(app, 'Nissan', 'confirmed', [['Show', '2026-10-06', '2026-10-07']])
+    const cables = line(nissan.id, xlr.id, 8)
+    await ok(app, 'kit.add', line(gala.id, xlr.id, 3))
+    await ok(app, 'kit.add', cables)
+    // Three went to the gala and one came back.
+    await ok(app, 'move.record', { id: newId(), projectId: gala.id, direction: 'out', assetId: null, modelId: xlr.id, qty: 3, at: '2026-09-27T09:00:00Z' })
+    await ok(app, 'move.record', { id: newId(), projectId: gala.id, direction: 'in', assetId: null, modelId: xlr.id, qty: 1, at: '2026-09-29T09:00:00Z' })
+
+    // On the gala's day to check its kit back, they're still on their way.
+    let view = (await device(app, '2026-09-29')).client.view()
+    expect(view.moves.lateOut(xlr.id)).toBe(0)
+    expect(view.kit.lines.find((l) => l.id === cables.id)).toMatchObject({ owned: 10, late: 0, spare: 2 })
+    expect(view.moves.stillOut).toEqual([])
+
+    // The day after, the two still out aren't free for Nissan.
+    const office = await device(app, '2026-10-01')
+    view = office.client.view()
+    expect(view.moves.lateOut(xlr.id)).toBe(2)
+    expect(view.kit.lines.find((l) => l.id === cables.id)).toMatchObject({ owned: 8, late: 2, short: 0, spare: 0 })
+    expect(view.moves.stillOut.map((p) => p.job.name)).toEqual(['Gala'])
+
+    // Back, they're free again.
+    await office.client.mutate('move.record', { id: newId(), projectId: gala.id, direction: 'in', assetId: null, modelId: xlr.id, qty: 2, at: '2026-10-01T09:00:00Z' })
+    view = office.client.view()
+    expect(view.kit.lines.find((l) => l.id === cables.id)).toMatchObject({ owned: 10, late: 0, spare: 2 })
+    expect(view.moves.stillOut).toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import { MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
+import { kitDaysOf, MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
 import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
 import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
@@ -20,7 +20,15 @@ type JobCommand = 'client.upsert' | 'venue.upsert' | 'project.create' | 'project
 type Handler<N extends JobCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 /** The columns each field of a job or phase is kept in. */
-const PROJECT_COLUMNS = { name: 'name', clientId: 'client_id', venueId: 'venue_id', status: 'status', notes: 'notes' } as const
+const PROJECT_COLUMNS = {
+  name: 'name',
+  clientId: 'client_id',
+  venueId: 'venue_id',
+  status: 'status',
+  notes: 'notes',
+  prepDays: 'prep_days',
+  returnDays: 'return_days',
+} as const
 const PHASE_COLUMNS = { name: 'name', start: 'start_day', end: 'end_day', venueId: 'venue_id', notes: 'notes', contactId: 'contact_id' } as const
 
 /** Set only the fields given; the rest stay as they are. */
@@ -103,14 +111,10 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     if (await getProject(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This job already exists.' })
     await checkClient(ctx, a.clientId)
     await checkVenue(ctx, a.venueId)
-    await ctx.tx.query('INSERT INTO projects (id, name, client_id, venue_id, status, notes) VALUES ($1, $2, $3, $4, $5, $6)', [
-      a.id,
-      a.name,
-      a.clientId,
-      a.venueId,
-      a.status,
-      a.notes,
-    ])
+    await ctx.tx.query(
+      'INSERT INTO projects (id, name, client_id, venue_id, status, notes, prep_days, return_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [a.id, a.name, a.clientId, a.venueId, a.status, a.notes, kitDaysOf(a).prep, kitDaysOf(a).back]
+    )
     await emit(ctx, 'project', a.id, await getProject(ctx.tx, a.id))
   },
 

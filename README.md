@@ -24,7 +24,9 @@ the app; a pick list for each job, with kit scanned out and back in
 on a phone, with no signal too; and damaged and missing kit reported as
 it comes back, with a repair list; and PAT tests and thorough
 examinations recorded, a batch at a time by scanning, with failed and
-overdue kit kept off jobs. Phase 3, crew, has call sheets for each
+overdue kit kept off jobs; and each job holding its kit a day either
+side to get it ready and check it back in, with kit still out after its
+job kept off the next. Phase 3, crew, has call sheets for each
 phase: in the app, on paper, and on each freelancer's private link,
 with who to ring on the day; and timesheets, the days worked at the day
 rate and the extras, sent from a freelancer's link and approved by the

@@ -3,6 +3,47 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 7 October 2026: getting kit ready and back
+
+**Done**
+
+- **Getting kit ready and checking it back in**
+  ([Decision 0031](adr/0031-getting-kit-ready-and-back.md)), the next
+  item in the plan ("working hours and buffer time on availability").
+  Each job now holds its kit a day before, to get it ready, and a day
+  after, to check it back in, so a job the day before or after can't
+  have the same speakers. The Kit card says the days held, with a
+  Change link for any job to say from 0 to 14 of each: none before when
+  it has its own Prep phase, or none either side when kit goes straight
+  from one job to the next. A shortage on one of those days says so:
+  "Short 2 on Tue 3 Sep, getting it ready".
+- **Kit still out after its job isn't free.** Once a job's days are
+  over, kit scanned out with it and not back is taken off what's owned
+  until it's scanned in, and its line says "2 still out after their
+  jobs". Kit already reported missing or not fit to go out isn't counted
+  twice.
+- **Hours, not yet.** Phases are whole days, and the calendar events
+  carry no times, so the days held are whole days too. Hours can come
+  with times on phases if the office wants them.
+- Jobs already in the app hold a day either side from now on, so a few
+  more shortages may show between jobs a day apart. In the made-up data,
+  two speakers still out after the gala now show short on the next two
+  jobs, as they should.
+- Six crew tests had started failing on their own once their October
+  dates passed; they now run on a fixed day.
+- Checked: the typecheck; the shared tests (180); the server tests (408,
+  two new); the web build; the full browser suite (78), with the kit
+  spec now changing a job's days from the Kit card.
+
+**Next**
+
+- Merge and check it on the live server.
+- Stocktakes and rolling counts are built in
+  [PR #57](https://github.com/legofsalmon/sess-sys/pull/57), waiting to
+  merge; it took Decision 0030 first, so this is 0031. After that, the
+  rest of Phase 2 is the labelling rollout, which is work in the
+  warehouse rather than in the app, and RFID later.
+
 ## 3 October 2026: the small items
 
 **Done**
