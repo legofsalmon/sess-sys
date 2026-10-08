@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 8 October 2026: stocktakes and rolling counts merged and live
+
+**Done**
+
+- Colly chose "Merge it" for stocktakes and rolling counts
+  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57),
+  [Decision 0030](adr/0030-stocktakes-and-rolling-counts.md); see
+  4 October). It was brought up to date with getting kit ready and back
+  (7 October) first, and the full suite passed with both: the
+  typecheck, the shared tests (194), the server tests (427) and the
+  browser suite (84).
+- Merged into `main` at 19:35 UTC once GitHub's checks passed, and live
+  by 19:47: Railway deployed it on its own.
+
+**Next**
+
+- Phase 2's app work is done. What's left is the labelling rollout,
+  which is work in the warehouse rather than in the app, and RFID later.
+- The stock list, then the baseline stocktake: count every place once,
+  from the Counts card on the Stock tab.
+- The keys: the Google key, the backups bucket with `BACKUP_KEY`, and
+  the Sentry key.
+
 ## 7 October 2026: getting kit ready and back
 
 **Done**
@@ -115,7 +138,6 @@ waiting on someone.
 
 **Next**
 
-- Merge, with Colly's go-ahead, and check it on the live server.
 - The stock list next week. Then the baseline stocktake: count every
   place once, from the Counts card on the Stock tab.
 - The keys:
