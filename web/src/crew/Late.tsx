@@ -156,9 +156,10 @@ function LateFields({ call, offer, day, said }: { call: CallView; offer: OfferVi
     const args = { id: said?.id ?? newId(), offerId: offer.id, day, by: by || null, arriveAt: at || null, note: note.trim() }
     void run(() => client.mutate('late.say', args)).then((ok) => ok && setDone(`Noted: ${first}, ${lateLine({ ...args, arrivedAt: null })}.`))
   }
-  const there = (id: string) => {
+  // With the booking and the day, so a record this device noted under its own id before it heard theirs is still found.
+  const there = (l: LateNote) => {
     setDone('')
-    void run(() => client.mutate('late.arrived', { id })).then((ok) => ok && setDone(`Noted: ${first} is there now.`))
+    void run(() => client.mutate('late.arrived', { id: l.id, offerId: l.offerId, day: l.day })).then((ok) => ok && setDone(`Noted: ${first} is there now.`))
   }
 
   return (
@@ -190,7 +191,7 @@ function LateFields({ call, offer, day, said }: { call: CallView; offer: OfferVi
           Save
         </button>
         {said && !said.arrivedAt && (
-          <button type="button" onClick={() => there(said.id)} aria-label={`Mark as there: ${name}`}>
+          <button type="button" onClick={() => there(said)} aria-label={`Mark as there: ${name}`}>
             Mark as there
           </button>
         )}

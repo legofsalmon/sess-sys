@@ -47,12 +47,15 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   await addPlace(page, bay)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  // Added with no signal, and sent two hours later.
-  await page.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  // Added with no signal, and sent two hours later. The signal comes back by the same route letting the push through,
+  // not by taking the route away: the two hours fire the app's retry, and a push caught mid-route as it was taken away
+  // was left hanging, never sent nor failed, so the app waited out its 30 seconds with "No signal" showing.
+  let signal = false
+  await page.route('**/api/sync/push', (route) => (signal ? route.continue() : route.abort('internetdisconnected')))
   await addPlace(page, van)
   await expect(page.locator('.conn')).toHaveText(/1 waiting/)
   await page.clock.fastForward('02:00:00')
-  await page.unroute('**/api/sync/push')
+  signal = true
   await page.evaluate(() => dispatchEvent(new Event('online')))
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
@@ -132,13 +135,15 @@ test('downloads everything in one file, and the download shows in the history', 
   await page.getByRole('button', { name: 'Download everything' }).click()
   const download = await downloading
   expect(download.suggestedFilename()).toMatch(/^session-hire-\d{4}-\d{2}-\d{2}\.zip$/)
-  await expect(page.getByText(/^Downloaded session-hire-\d{4}-\d{2}-\d{2}\.zip \(\d+ KB\)\.$/)).toBeVisible()
+  // The size is in KB, or MB from 1 MB; a test server shared by every spec can grow past it.
+  await expect(page.getByText(/^Downloaded session-hire-\d{4}-\d{2}-\d{2}\.zip \((\d+ KB|\d+\.\d MB)\)\.$/)).toBeVisible()
 
   const files = unzipSync(readFileSync((await download.path())!))
   expect(Object.keys(files)).toEqual(expect.arrayContaining(['README.txt', 'history.csv', 'everything.json', 'tables/models.csv', 'tables/people.csv']))
   expect(Object.keys(files)).not.toContain('tables/products.csv')
   expect(strFromU8(files['README.txt']!)).toContain('Session Hire: everything, exported')
 
+  // From 1,000 rows the count has a comma, as the history writes every number.
   await page.getByRole('link', { name: 'History' }).click()
-  await expect(page.locator('.entry', { hasText: `Chrome on Linux, device ${code}` }).filter({ hasText: /^Downloaded everything \(\d+ rows\)/ })).not.toHaveCount(0)
+  await expect(page.locator('.entry', { hasText: `Chrome on Linux, device ${code}` }).filter({ hasText: /^Downloaded everything \([\d,]+ rows\)/ })).not.toHaveCount(0)
 })

@@ -162,6 +162,11 @@ describe('every kind of entry', () => {
       [{ kind: 'retired', reason: 'stolen', note: 'From the van' }, 'Retired: stolen (From the van)'],
       [{ kind: 'retired', reason: 'mistake', note: '' }, 'Marked as added by mistake'],
       [{ kind: 'reinstated' }, 'Brought back into stock'],
+      // What a count said of it (ADR 0030).
+      [{ kind: 'counted', where: { place: 'Bay A3' }, found: true }, 'Found in the count at Bay A3'],
+      [{ kind: 'counted', where: { case: 'SH-000001 (Amp rack)' }, found: false }, 'Not found in the count of SH-000001 (Amp rack)'],
+      [{ kind: 'counted', where: { place: 'Bay A3' }, found: true, kept: { case: 'SH-000001 (Amp rack)' } }, 'Found in the count at Bay A3, kept in SH-000001 (Amp rack)'],
+      [{ kind: 'counted', where: { place: 'Bay A3' }, found: true, kept: null }, 'Found in the count at Bay A3, not placed yet'],
     ]
     for (const [event, text] of said) expect(itemLogWords(event)).toBe(text)
   })

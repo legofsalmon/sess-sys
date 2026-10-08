@@ -2,6 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  compareCount,
+  countSummaryWords,
   eraseRefusal,
   irishToday,
   MemoryStorage,
@@ -210,6 +212,19 @@ describe('made-up data', () => {
     expect(view.labels.runs[0]).toMatchObject({ name: 'Made-up roll', firstNumber: 'SH-000027', lastNumber: 'SH-000046' })
     expect(view.labels.next).toBe('SH-000047')
 
+    // Counts (ADR 0030): three places counted, Bay A1 with a speaker not found and a count short, as the phone's own
+    // comparison says of what was scanned and counted; Van 1 never, so it's this week's.
+    expect(view.counts.all.map((c) => [c.what, c.person?.name, countSummaryWords(c.summary)])).toEqual([
+      ['Bay A1', 'Cian Murphy', '9 of 10 found, 1 not found, 1 count short'],
+      ['Bay A2', 'Orla Hayes', 'All 2 found, as recorded'],
+      ['Bay B1', 'Cian Murphy', 'All 8 found, as recorded'],
+    ])
+    const a1 = view.counts.all[0]!
+    const scanned = a1.items.filter((i) => i.scanned).map((i) => i.assetId)
+    expect(compareCount(view, { placeId: a1.placeId, caseId: null, scanned, unknown: [], counted: { [y10p.id]: 3 }, added: [] }).summary).toEqual(a1.summary)
+    expect(view.counts.week.due.map((d) => d.place.name)).toEqual(['Van 1'])
+    expect([view.counts.week.counted, view.counts.week.places]).toEqual([3, 4])
+
     // Pick lists: the jobs going out soon, and the gala over with two speakers not back.
     expect(view.moves.soon.map((p) => p.job.name)).toEqual(['Harbour Lights Festival', 'Brightwater Tech Summit', 'Liffey Brands Launch'])
     expect(view.moves.stillOut.map((p) => [p.job.name, p.stillOut, p.back])).toEqual([['Autumn Gala', 2, 6]])
@@ -293,7 +308,8 @@ describe('starting fresh', () => {
     const { rows: ronan } = await db.query<{ id: string }>(`SELECT id FROM people WHERE name = 'Rónán Moran'`)
     expect(await aoife.send('person.erase', { id: ronan[0]!.id })).toMatchObject({ status: 'applied' })
     const before = await rowsLeft(db)
-    expect(before).toMatchObject({ projects: 8, running_late: 1, erasures: 1 })
+    // Counts too (ADR 0030).
+    expect(before).toMatchObject({ projects: 8, running_late: 1, erasures: 1, counts: 3 })
     const total = Object.values(before).reduce((a, b) => a + b, 0)
 
     const res = await startFresh(app, START_FRESH_WORDS, aoife)

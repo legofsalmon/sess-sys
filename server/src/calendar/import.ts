@@ -1,5 +1,6 @@
 import {
   addDays,
+  cleanText,
   isDay,
   newId,
   type GuestResponse,
@@ -43,7 +44,7 @@ const PERSON_NOTE = 'Added from the guests on Google Calendar.'
 const day = z.string().refine(isDay, 'Choose the first day to bring jobs in from.')
 const lookBody = z.object({ calendarId: z.string().min(1, 'Choose a calendar.').max(1024), from: day })
 const bringBody = lookBody.extend({
-  jobs: z.array(z.object({ key: z.string().min(1).max(400), name: z.string().max(200), include: z.boolean() })).max(5000),
+  jobs: z.array(z.object({ key: z.string().min(1).max(400), name: z.string().max(200).transform(cleanText), include: z.boolean() })).max(5000),
   people: z.array(z.object({ email: z.string().max(320), include: z.boolean() })).max(5000),
 })
 
@@ -62,7 +63,10 @@ function window(from: string, today: string) {
   return { from, to, times: { timeMin: `${from}T00:00:00Z`, timeMax: `${to}T00:00:00Z` } }
 }
 
-/** An event as the plan reads it. The app's own events carry its mark (ADR 0008); a repeating one's days share one id, so each keeps its own. */
+/**
+ * An event as the plan reads it. The app's own events carry its mark (ADR 0008); a repeating one's days share one id, so each keeps its own.
+ * What people typed in Google is cleaned as typed text is in the app (shared/src/plain.ts): it's often pasted from Word.
+ */
 export function sourceEvent(ev: GoogleEvent): SourceEvent {
   const start = ev.start?.date
   const endAfter = ev.end?.date
@@ -71,15 +75,15 @@ export function sourceEvent(ev: GoogleEvent): SourceEvent {
     id: ev.id,
     uid: ev.recurringEventId ? ev.id : (ev.iCalUID ?? ev.id),
     cancelled: ev.status === 'cancelled',
-    title: ev.summary ?? '',
+    title: cleanText(ev.summary ?? ''),
     days: start && last ? { start, end: last < start ? start : last } : null,
-    location: ev.location ?? '',
-    description: ev.description ?? '',
+    location: cleanText(ev.location ?? ''),
+    description: cleanText(ev.description ?? ''),
     guests: (ev.attendees ?? [])
       .filter((a) => a.email)
       .map((a) => ({
         email: a.email,
-        name: a.displayName ?? null,
+        name: a.displayName ? cleanText(a.displayName) : null,
         answer: a.responseStatus ?? 'needsAction',
         notCrew: a.organizer === true || a.self === true || a.resource === true,
       })),

@@ -42,4 +42,14 @@ describe('reading a CSV file', () => {
       ['1', '2'],
     ])
   })
+
+  it('cleans each field as typed text is cleaned, keeping tabs and line breaks', () => {
+    // Proves: a NUL, DEL and other control characters a cell copied from Word or a PDF can carry go, a vertical tab (Word's line
+    // break) becomes a line feed inside its field rather than starting a row, and a tab and a quoted line break stay, so the
+    // preview shows what will be kept and a second import of the same file compares like with like.
+    expect(parseCsv('name,notes\nDara\u0000 Quinn\u007f,"Line one\u000bLine\ttwo\nLine\u0001 three"\n')).toEqual([
+      ['name', 'notes'],
+      ['Dara Quinn', 'Line one\nLine\ttwo\nLine three'],
+    ])
+  })
 })

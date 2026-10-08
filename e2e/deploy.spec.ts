@@ -33,7 +33,10 @@ test('a new version waits for Reload, which brings it in with an unsynced change
   // A change made with no signal: the server can't be reached, so it waits in the outbox.
   const id = Math.random().toString(36).slice(2, 8)
   const bay = `Deploy test ${id}`
-  await context.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  // The signal comes back by this route letting the push through, not by taking it away: a retry caught as it was taken
+  // away was left hanging, never sent nor failed (as in history.spec.ts).
+  let signal = false
+  await context.route('**/api/sync/push', (route) => (signal ? route.continue() : route.abort('internetdisconnected')))
   await tab.getByRole('button', { name: 'Add place' }).click()
   await tab.getByLabel('New place').fill(bay)
   await tab.getByRole('button', { name: 'Add place' }).click()
@@ -55,7 +58,7 @@ test('a new version waits for Reload, which brings it in with an unsynced change
   await expect(tab.locator('.conn')).toHaveText(/1 waiting/)
 
   // Signal back, and Reload: the new build, with the change made before it now synced.
-  await context.unroute('**/api/sync/push')
+  signal = true
   await tab.getByRole('button', { name: 'Reload' }).click()
   await tab.waitForFunction(() => document.querySelector('meta[name="build"]')?.getAttribute('content') === 'two', null, { timeout: 20_000 })
   await expect(tab.locator('.conn')).toHaveText('Up to date', { timeout: 20_000 })

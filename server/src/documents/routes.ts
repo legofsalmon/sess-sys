@@ -1,4 +1,5 @@
 import {
+  cleanText,
   DOCUMENT_KINDS,
   DOCUMENT_TITLES,
   documentDetails,
@@ -170,8 +171,9 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
         // A renewal is the kind of the one it renews, whatever the form says.
         const kind = DOCUMENT_KINDS.find((k) => k === form.fields.kind) ?? (renews ? 'other' : undefined)
         if (!kind) return back('try-again')
-        // Control characters become spaces: the database takes no NUL, and none belongs in a title.
-        const title = (form.fields.title ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 100) || DOCUMENT_TITLES[kind] || 'Document'
+        // Control characters become spaces: the database takes no NUL, and none belongs in a title. Cleaned again once
+        // cut to length, which can leave half an emoji at the end (shared/src/plain.ts).
+        const title = cleanText((form.fields.title ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 100)).trim() || DOCUMENT_TITLES[kind] || 'Document'
         const expires = (form.fields.expires ?? '').trim()
         if (expires && !isDay(expires)) return again('check-the-dates')
         try {

@@ -94,6 +94,8 @@ export interface MovesView {
    * added by mistake, so the phone says first what the server would.
    */
   outWith(modelId: string): { what: string; job: string }[]
+  /** How many of a product are counted out with jobs and not back or reported missing, job by job added up: what a count takes as away (ADR 0030). */
+  countedOut(modelId: string): number
   /** Whether a product has ever been scanned or counted out or back, which keeps it in the stock list for the record, as on the server. */
   everMoved(modelId: string): boolean
   /**
@@ -372,11 +374,18 @@ export function movesView(
     return [...moves.values()].filter((m) => m.assetId && ids.has(m.assetId)).sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id))
   }
 
+  const countedOut = (modelId: string) =>
+    [...counted.values()].reduce((n, byModel) => {
+      const c = byModel.get(modelId)
+      return n + (c ? Math.max(0, c.out - c.back - c.missing) : 0)
+    }, 0)
+
   let soonList: PickList[] | undefined
   let stillOutList: PickList[] | undefined
   return {
     outOf: (id) => outState.get(id),
     outWith,
+    countedOut,
     everMoved: (id) => moved.has(id),
     ofItem,
     pickList,

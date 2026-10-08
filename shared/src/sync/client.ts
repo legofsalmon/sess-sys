@@ -4,6 +4,7 @@ import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
 import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
+import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
 import { erasuresView, forgetErased, keptRecordsOf, withErasures, type ErasuresView } from './erasure-view.ts'
@@ -113,6 +114,8 @@ export interface View {
   erasures: ErasuresView
   /** People's documents, and those sent from a link waiting to be checked (ADR 0029). */
   documents: DocumentsView
+  /** Counts of places and cases, when each was last counted, and this week's list (ADR 0030). */
+  counts: CountsView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -291,7 +294,11 @@ export class SyncClient {
   /**
    * Push the outbox, then pull until up to date. Calls that arrive while a
    * sync is running are folded into one more round rather than run in
-   * parallel, so the outbox is never sent twice at once.
+   * parallel, so the outbox is never sent twice at once. That round still
+   * runs when the one before it fails: a call made as the signal came back
+   * is answered by a round that tries with the signal, not by the failure
+   * of one sent before it, which would leave "No signal" showing until the
+   * next retry, up to 30 seconds on.
    */
   sync(): Promise<void> {
     if (this.running) {
@@ -302,7 +309,11 @@ export class SyncClient {
       try {
         do {
           this.again = false
-          await this.round()
+          try {
+            await this.round()
+          } catch (err) {
+            if (!this.again) throw err
+          }
         } while (this.again)
       } finally {
         this.running = undefined
@@ -377,6 +388,7 @@ export class SyncClient {
       late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
       erasures,
       documents: documentsView(entities, outbox, this.state.cursor, crew, erasures),
+      counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

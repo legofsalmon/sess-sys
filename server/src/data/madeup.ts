@@ -48,7 +48,9 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *   so erasing someone on request (ADR 0027) can be tried;
  * - documents (ADR 0029): insurance run out and running out soon, for the
  *   reminders, and certificates' cards; where a store is set up, a made-up
- *   PDF on each, and a renewed card sent from a link (MADE_UP_RENEWAL).
+ *   PDF on each, and a renewed card sent from a link (MADE_UP_RENEWAL);
+ * - counts (ADR 0030): three places counted, one with a speaker not found
+ *   and a count short, and one never counted, first on the week's list.
  */
 /** Where a store is set up, Róisín has sent her renewed Safe Pass card from her link, waiting for the office to check (ADR 0029). */
 export const MADE_UP_RENEWAL = { name: 'Róisín Farrell', kind: 'safe-pass', days: 377 } as const
@@ -347,5 +349,41 @@ export function madeUpData(today: string): Mutation[] {
     note: 'Rattles at high level. Fine for speech meanwhile.',
     at: `${day(-8)}T11:05:00.000Z`,
   })
+
+  // Counts (ADR 0030): Bay B1 and Bay A2 as recorded, and Bay A1 five days ago with a speaker not found and the speakers not
+  // labelled yet one short, left for the office to look into; the gala's two still out said as out. Van 1 has never been
+  // counted, so it's first on the week's list.
+  const itemsOf = (modelId: string) => out.filter((m) => m.name === 'asset.add' && (m.args as CommandInput<'asset.add'>).modelId === modelId).map((m) => (m.args as CommandInput<'asset.add'>).id)
+  const found = (ids: string[]) => ids.map((assetId) => ({ assetId, said: 'found' as const, scanned: true }))
+  const none = { notFound: 0, elsewhere: 0, unexpected: 0, uncounted: 0, short: 0, over: 0 }
+  const counted = (placeId: string, on: number, by: string, items: CommandInput<'count.record'>['items'], products: [string, number, number][], summary: CommandInput<'count.record'>['summary']) =>
+    add('count.record', {
+      id: newId(),
+      placeId,
+      caseId: null,
+      startedAt: `${day(on)}T10:05:00.000Z`,
+      finishedAt: `${day(on)}T10:40:00.000Z`,
+      by,
+      items,
+      unknown: [],
+      products: products.map(([modelId, recorded, qty]) => ({ modelId, recorded, counted: qty, away: 0 })),
+      summary,
+    })
+  const spiiders = itemsOf(spiider)
+  counted(bayB1, -40, cian, found(spiiders), [[spiider, 8, 8], [powercon, 40, 40], [deck, 30, 30]], { expected: 8, found: 8, ...none })
+  counted(bayA2, -20, orla, found(itemsOf(rack)), [[sm58, 24, 24], [xlr, 80, 80]], { expected: 2, found: 2, ...none })
+  counted(
+    bayA1,
+    -5,
+    cian,
+    [
+      ...found(speakers.slice(0, 6)),
+      ...speakers.slice(6, 8).map((assetId) => ({ assetId, said: 'out' as const, scanned: false, projectId: gala })),
+      ...found(speakers.slice(8, 11)),
+      { assetId: speakers[11]!, said: 'not-found', scanned: false },
+    ],
+    [[y10p, 4, 3]],
+    { expected: 10, found: 9, ...none, notFound: 1, short: 1 }
+  )
   return out
 }

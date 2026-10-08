@@ -9,7 +9,8 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
  * and a running late sent from a freelancer's link, with no app and no
  * script, shows on the Crew tab at once and on the badge, as one the
  * office notes from the call's line for someone who rang does on the
- * contact's call sheet. Uses the made-up
+ * contact's call sheet, and a Mark as there turned down says whose it
+ * was. Uses the made-up
  * data (ADR 0019), so it starts fresh before and after: the other tests
  * share this server.
  */
@@ -182,6 +183,50 @@ test('the office notes a running late from the call line for someone who rang, a
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await phone.reload()
   await expect(phone.locator('section.late li', { hasText: 'Dara Quinn' })).toContainText('Dara Quinn: there now')
+})
+
+test('a Mark as there turned down, from a phone that noted it before it heard theirs, still says whose it was', async ({ browser, request }) => {
+  // Proves: with no signal, the office notes Aoife running late as she says it on her link, so its phone makes an id of its own,
+  // which the server writes into hers; Mark as there, tapped then and turned down when the signal is back, is listed as not
+  // done with her name, found by the booking it was sent with, not as "someone", which is all its own id would find.
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await office.goto('/#crew')
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  // No signal, and then a server that turns down Mark as there alone, passing the rest on.
+  let signal = false
+  await office.route(/\/api\/sync\/(push|pull)/, async (route) => {
+    if (!signal) return route.abort('internetdisconnected')
+    if (!route.request().url().includes('/push')) return route.continue()
+    const sent = route.request().postDataJSON() as { mutations: { id: string; name: string }[] }
+    const there = sent.mutations.filter((m) => m.name === 'late.arrived')
+    const res = await route.fetch({ postData: { ...sent, mutations: sent.mutations.filter((m) => m.name !== 'late.arrived') } })
+    const { results } = (await res.json()) as { results: unknown[] }
+    const no = there.map((m) => ({ id: m.id, status: 'rejected', reason: { code: 'not-found', message: 'Pretend the server said no.' } }))
+    return route.fulfill({ response: res, json: { results: [...results, ...no] } })
+  })
+
+  const phone = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()
+  await phone.goto(await linkOf(request, 'Aoife Brennan'))
+  const today = phone.locator('section.today')
+  await today.getByText('Running late?').click()
+  await today.getByLabel('About 15 minutes').check()
+  await today.getByRole('button', { name: 'Send' }).click()
+  await expect(phone.getByRole('status')).toHaveText("Thanks. The office, and whoever's running the day, can see it now.")
+
+  const call = office.locator('.call-group', { hasText: 'Liffey Brands Shoot' }).getByRole('article', { name: '1 × Crew chief' })
+  await call.getByRole('button', { name: 'Running late…' }).click()
+  const form = call.getByRole('form', { name: 'Aoife Brennan running late' })
+  await form.getByLabel('About 30 minutes').check()
+  await form.getByRole('button', { name: 'Save' }).click()
+  await form.getByRole('button', { name: 'Mark as there: Aoife Brennan', exact: true }).click()
+  await expect(office.getByRole('status')).toHaveText(/2 waiting/)
+
+  signal = true
+  await office.evaluate(() => dispatchEvent(new Event('online')))
+  const count = office.getByRole('button', { name: /not done$/ })
+  await expect(count).toHaveText('1 not done')
+  await count.click()
+  await expect(office.getByRole('region', { name: 'Not done' }).locator('.row')).toContainText('Say Aoife Brennan is there now')
 })
 
 /** Some fields of a record, as they are. */

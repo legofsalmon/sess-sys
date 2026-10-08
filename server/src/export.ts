@@ -193,6 +193,9 @@ const ABOUT: Record<string, string> = {
   calendar_link: 'The Google calendar confirmed jobs are written to, the account that writes them, and who connected it.',
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
+  // Counts of places and cases (ADR 0030). The fixes a count led to are in the tables they changed: assets, stock and faults.
+  counts:
+    'Counts of places and cases: where, when they started and finished on the phone, who counted, what the count said of each item (found, not found, away, or found though kept elsewhere), the numbers no item had, each product counted against what was recorded and how many were out, and a summary in numbers.',
   crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, and the certificates each needs, such as IPAF.',
   // People's documents (ADR 0029): the details here, the files in the storage.
   document_files_to_delete: "Files the storage still holds for documents that have gone, or for uploads that didn't finish, waiting to be deleted: the storage's name for each, when, and why one couldn't be deleted yet. Nothing says whose it was.",

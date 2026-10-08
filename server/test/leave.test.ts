@@ -161,6 +161,21 @@ describe('deciding', () => {
     expect(await colly.record<LeaveRequest>('leaveRequest', 'r-cian')).toMatchObject({ status: 'declined' })
   })
 
+  it('tells an approver who has since been archived so, plainly, for each thing only an approver does', async () => {
+    // Proves: Colly, ticked to approve time off and then archived, signed in on his phone, is told he's been archived, not sent to
+    // tick a box, on deciding leave, deciding a day in lieu, setting an allowance and opening a year: everything that needs an approver.
+    const { aoife, colly } = await company()
+    const year = Number(today.slice(0, 4))
+    expect(await aoife.send('leave.request', week('r1', 'aoife'))).toMatchObject({ status: 'applied' })
+    expect(await aoife.send('lieu.log', { id: 'e1', personId: 'aoife', day: day(-2), days: 1, note: '' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('person.archive', { id: 'colly', archived: true })).toMatchObject({ status: 'applied' })
+    const archived = "You've been archived on the Crew tab, so you can't approve time off."
+    expect(refused(await colly.send('leave.decide', { id: 'r1', approved: true, reason: '' }))).toBe(archived)
+    expect(refused(await colly.send('lieu.decide', { id: 'e1', approved: true, reason: '' }))).toBe(archived)
+    expect(refused(await colly.send('leave.allowance', { personId: 'aoife', year, days: 22, carriedOver: 0, note: '' }))).toBe(archived)
+    expect(refused(await colly.send('leave.open', { year: year + 1 }))).toBe(archived)
+  })
+
   it('approves into days off, which the planner, offers and the calendar feed see, until the request is cancelled', async () => {
     const { app, aoife, cian, colly } = await company()
     expect(await aoife.send('leave.request', week('r1', 'aoife'))).toMatchObject({ status: 'applied' })
@@ -297,6 +312,34 @@ describe('while sign-in is off', () => {
     const latest = (id: string) => pulled.filter((c) => c.entity === 'person' && c.id === id).at(-1)!.data
     expect(latest('dara').approvesLeave).toBe(false)
     expect(latest('colly').approvesLeave).toBe(true)
+    await app.close()
+    await db.close()
+  })
+
+  it('tells the device plainly when the approver it says is deciding has since been archived, for each thing only an approver does', async () => {
+    // Proves: Colly, picked on the Leave screen and ticked to approve time off, then archived from another device, is said to have
+    // been archived, not to need the box ticked, on deciding leave, deciding a day in lieu, setting an allowance and opening a year.
+    const db = await pgliteDb()
+    const app = await buildApp({ db })
+    const send = async <N extends CommandName>(name: N, args: CommandInput<N>): Promise<MutationResult> => {
+      const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [{ id: newId(), name, args, createdAt: new Date().toISOString() }] } })
+      return res.json().results[0]
+    }
+    const year = Number(today.slice(0, 4))
+    for (const p of [
+      { id: 'colly', name: 'Colly Hewson', approvesLeave: true },
+      { id: 'aoife', name: 'Aoife Byrne', approvesLeave: false },
+    ])
+      expect(await send('person.upsert', { ...p, kind: 'staff', email: null, phone: null, skills: [], dayRateCents: null, notes: '' })).toMatchObject({ status: 'applied' })
+    await openYears(db, 2031)
+    expect(await send('leave.request', week('r1', 'aoife'))).toMatchObject({ status: 'applied' })
+    expect(await send('lieu.log', { id: 'e1', personId: 'aoife', day: day(-2), days: 1, note: '' })).toMatchObject({ status: 'applied' })
+    expect(await send('person.archive', { id: 'colly', archived: true })).toMatchObject({ status: 'applied' })
+    const archived = "Colly Hewson has been archived, so they can't approve time off."
+    expect(refused(await send('leave.decide', { id: 'r1', approved: true, reason: '', by: 'colly' }))).toBe(archived)
+    expect(refused(await send('lieu.decide', { id: 'e1', approved: true, reason: '', by: 'colly' }))).toBe(archived)
+    expect(refused(await send('leave.allowance', { personId: 'aoife', year, days: 22, carriedOver: 0, note: '', by: 'colly' }))).toBe(archived)
+    expect(refused(await send('leave.open', { year: year + 1, by: 'colly' }))).toBe(archived)
     await app.close()
     await db.close()
   })

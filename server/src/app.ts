@@ -28,6 +28,7 @@ import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
+import { CHARACTERS, isCharacterError } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
@@ -98,8 +99,11 @@ declare module 'fastify' {
   }
 }
 
-/** The status an error asks for, by either name libraries give it; without one, it's a fault. */
-const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCode ?? err.status ?? 500
+/**
+ * The status an error asks for, by either name libraries give it; without one, it's a fault, unless it's Postgres
+ * turning down a character it can't hold (a NUL in a query string, say), which is the request's, so a refusal.
+ */
+const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCode ?? err.status ?? (isCharacterError(err) ? 400 : 500)
 
 /**
  * The sync API. Three routes do the work (push, pull, live); `history` and
@@ -187,6 +191,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // A request turned away (400, 401, 404) keeps Fastify's answer saying why.
   app.setErrorHandler((err: FastifyError, req, reply) => {
     const status = statusOf(err)
+    if (isCharacterError(err)) {
+      reply.code(status).send({ error: CHARACTERS })
+      return
+    }
     if (status < 500) {
       reply.send(err)
       return
@@ -250,12 +258,21 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     let stale = false
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) {
-      const result = await db.transaction(async (tx) => {
-        await tx.query('SELECT pg_advisory_xact_lock(7331)')
-        // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
-        if (generation && (await clearedSince(tx, generation))) return undefined
-        return applyMutationIn(tx, clientId, m as never, from, req.log)
-      })
+      const result = await db
+        .transaction(async (tx) => {
+          await tx.query('SELECT pg_advisory_xact_lock(7331)')
+          // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
+          if (generation && (await clearedSince(tx, generation))) return undefined
+          return applyMutationIn(tx, clientId, m as never, from, req.log)
+        })
+        .catch((err: unknown): MutationResult => {
+          // A character the database can't hold where it can't be cleaned, such as in the change's own id or the
+          // device's: nothing of it can be recorded, so it's answered here, as a refusal, and the rest of the push
+          // carries on rather than failing with it and stranding the phone. A resend gets the same answer.
+          if (!isCharacterError(err)) throw err
+          req.log.info({ command: m.name }, 'Turned down a change with a character the database cannot hold')
+          return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } }
+        })
       if (!result) {
         stale = true
         break

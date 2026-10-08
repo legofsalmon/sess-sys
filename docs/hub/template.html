@@ -629,10 +629,10 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       <div class="grid2 now">
         <div class="panel latest" id="latest"><p class="small">Loading the latest entry…</p></div>
         <div class="panel shots">
-          <h3>Latest: on the day, and the certificates a job needs</h3>
+          <h3>Latest: stocktakes and rolling counts</h3>
           <div class="phones">
-            <figure><img src="img/late-link.png" alt="A freelancer's private link on the day of a shoot: they've told the office they'll be about 30 minutes late, with a button to say they're there now" width="390" height="844" loading="lazy"><figcaption><b>Running late.</b> Said from their link; the office and the contact on the day see it at once.</figcaption></figure>
-            <figure><img src="img/certificates-refused.png" alt="A rigger call that needs working at height and IPAF: the offer to someone with no IPAF is turned down, saying why" width="390" height="844" loading="lazy"><figcaption><b>Needs IPAF.</b> An offer to someone without it is turned down, saying why.</figcaption></figure>
+            <figure><img src="img/count-scanning.png" alt="Counting Bay A2 on a phone: 1 of 2 found, the scan field, and a speaker scanned here that the record keeps at Bay A1, with the amp rack still to find" width="390" height="844" loading="lazy"><figcaption><b>Counting a place.</b> Labels scanned, with no signal needed; what isn't as recorded is said at once.</figcaption></figure>
+            <figure><img src="img/count-page.png" alt="A finished count of Bay A1: 9 of 10 found, one speaker not found with Report missing beside it, and counted kit one short with Set to 3" width="390" height="844" loading="lazy"><figcaption><b>What it found.</b> Each difference with its fix one tap away.</figcaption></figure>
           </div>
         </div>
       </div>
@@ -1096,8 +1096,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         </div>
       </div>
       <div class="panel">
-        <h3>Built so far: the catalogue, kit on jobs, labels, scanning, pick lists, repairs, inspections and days to get kit ready (Decisions 0013 to 0020, and 0031)</h3>
-        <p class="small">The Stock tab holds every product, numbered or counted, each numbered item with its Session Hire number, the places kit is kept and the cases it lives in. Numbered kit can be counted until it's labelled, so the app knows everything owned from the first day and shows how far the labelling has got. Labels can go on over weeks: an item takes the number on its label, typed or scanned, or the next free one. A number is never used twice, even after a new label. Jobs now list the kit they need, and each line says whether there's enough on its days, so shortages show before the day; until the counting is done, some will be counts not finished yet. Labels print here or from a spreadsheet a label maker works from, on numbers set aside so none is given out twice, and scanning a new label puts it on an item: the product and place are picked once, then each label on the shelf is a scan and Enter. Phones scan labels with their camera in the app, with no signal too. Each job has a pick list saying where its kit is, and kit is scanned out to the job and back in, with every scan kept even when it doesn't match the plan. Kit that comes back damaged or doesn't come back is reported as it's scanned, goes on the repair list, and isn't counted as free for jobs until it's fixed or found. PAT tests and thorough examinations are recorded on each item, or a shelf at a time by scanning, and kit that failed or is overdue is kept off jobs the same way. Each job holds its kit a day before and after, to get it ready and check it back in, and kit still out after its job isn't free for the next.</p>
+        <h3>Built so far: the catalogue, kit on jobs, labels, scanning, pick lists, repairs, inspections, days to get kit ready, and stocktakes (Decisions 0013 to 0020, 0030 and 0031)</h3>
+        <p class="small">The Stock tab holds every product, numbered or counted, each numbered item with its Session Hire number, the places kit is kept and the cases it lives in. Numbered kit can be counted until it's labelled, so the app knows everything owned from the first day and shows how far the labelling has got. Labels can go on over weeks: an item takes the number on its label, typed or scanned, or the next free one. A number is never used twice, even after a new label. Jobs now list the kit they need, and each line says whether there's enough on its days, so shortages show before the day; until the counting is done, some will be counts not finished yet. Labels print here or from a spreadsheet a label maker works from, on numbers set aside so none is given out twice, and scanning a new label puts it on an item: the product and place are picked once, then each label on the shelf is a scan and Enter. Phones scan labels with their camera in the app, with no signal too. Each job has a pick list saying where its kit is, and kit is scanned out to the job and back in, with every scan kept even when it doesn't match the plan. Kit that comes back damaged or doesn't come back is reported as it's scanned, goes on the repair list, and isn't counted as free for jobs until it's fixed or found. PAT tests and thorough examinations are recorded on each item, or a shelf at a time by scanning, and kit that failed or is overdue is kept off jobs the same way. Each job holds its kit a day before and after, to get it ready and check it back in, and kit still out after its job isn't free for the next. Places and cases are counted on a phone, a few each week, so every place is counted each quarter.</p>
       </div>
       <div class="scroll panel" style="padding:0">
         <table>
@@ -1141,8 +1141,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
             <div><b>High-value gear</b><span class="small">Labelled as it comes back from each job.</span></div>
             <div><b>Cases</b><span class="small">Metal tags; contents recorded.</span></div>
             <div><b>Cables</b><span class="small">As bundles first.</span></div>
-            <div><b>Stocktake</b><span class="small">A full baseline count.</span></div>
-            <div><b>Cycle counts</b><span class="small">Rolling spot counts, most valuable first.</span></div>
+            <div><b>Stocktake</b><span class="small">A full baseline count, place by place on a phone, once the stock list is in.</span></div>
+            <div><b>Cycle counts</b><span class="small">A few places each week, longest since counted first, so every place is counted each quarter.</span></div>
           </div>
         </div>
         <p class="small">Starter hardware is roughly £4,000 to £6,000: two rugged Android scanners, pocket and ring scanners, a label printer and a portable labeller. Prices are estimates; get supplier quotes.</p>
@@ -1208,7 +1208,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   // wait (built, waiting on a key); the note is the small word beside the name. The lines are code written
   // across the app, the server and what they share, counted on the date given.
   const JOURNEY = {
-    asOf: '3 October 2026', live: '30 September 2026', lines: 37000, tests: 22800, decisions: 29,
+    asOf: '4 October 2026', live: '30 September 2026', lines: 39500, tests: 24200, decisions: 31,
     stages: [
       { id: 'enquire', icon: 'enquire', name: 'Enquire and quote', place: 'The office', state: 'part', word: 'Partly built', next: 'quoting is planned',
         sum: 'Logged from the first call: client, venue and status.', toast: ['enquire', 'Enquiry logged'],
@@ -1224,8 +1224,8 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
         parts: [['Offers and links', 'built'], ['Call sheets', 'built'], ['Messages', 'built'], ['Staff leave', 'built'], ['Profiles and certificates', 'built'], ['Running late', 'built'], ['Documents', 'wait', 'the bucket']] },
       { id: 'prep', icon: 'case', name: 'Prep the kit', place: 'The warehouse', state: 'built', word: 'Built', next: 'label trial to come',
         sum: 'Catalogue, labels and pick lists; works with no signal.', toast: ['scan', 'Kit picked and labelled, no signal'],
-        left: 'the label trial (a real-world pilot, not started), cycle counts, and RFID later.',
-        parts: [['Catalogue and items', 'built'], ['The stock list brought in', 'built'], ['Kit on jobs', 'built'], ['Kit ready and back', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built']] },
+        left: 'the label trial (a real-world pilot, not started), and RFID later.',
+        parts: [['Catalogue and items', 'built'], ['The stock list brought in', 'built'], ['Kit on jobs', 'built'], ['Kit ready and back', 'built'], ['Labels and scanning', 'built'], ['Pick lists', 'built'], ['Stocktakes and counts', 'built']] },
       { id: 'deliver', icon: 'van', name: 'Deliver and run the show', place: 'Van and venue', state: 'built', word: 'Built', next: 'Crewbox planned',
         sum: 'Kit scanned out; the call sheet on a phone, offline.', toast: ['doc', "Call sheet on the crew chief's phone"],
         left: 'GPS in the vans and the Crewbox on site (phase 5, planned).',
@@ -1344,7 +1344,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
     ['0', 'Foundations', 'now', 'Built and live; three keys and a phone field test left'],
     ['+', 'Label trial', 'todo', 'Not started'],
     ['1', 'Projects and calendar', 'now', 'Built; office trial on the real calendar left'],
-    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, days to get kit ready and back, labels, scanning, pick lists, repairs, inspections, the stock list import and item logs built; cycle counts and RFID later'],
+    ['2', 'Warehouse', 'now', 'Catalogue, kit on jobs, days to get kit ready and back, labels, scanning, pick lists, repairs, inspections, the stock list import, item logs, stocktakes and rolling counts built; RFID later'],
     ['3', 'Crew', 'now', 'Started early: offers, links, call sheets, timesheets, messages, staff leave, profiles, certificates, running late, documents and the crew list built, three audit rounds done; invoices parked'],
     ['4', 'Finance', 'todo', 'Parked for now'],
     ['5', 'Crewbox link', 'todo', 'Planned'],

@@ -39,6 +39,10 @@ export function lateView(
   const offers = new Map<string, { offer: OfferView; call: CallView }>()
   for (const call of crew.calls) for (const offer of call.offers) offers.set(offer.id, { offer, call })
 
+  /** The record a "they're there" or "noted" is about: by its id, or by the booking and day, as the server finds it. */
+  const named = (a: CommandArgs<'late.arrived' | 'late.seen'>) =>
+    all.get(a.id) ?? (a.offerId ? [...all.values()].find((l) => l.offerId === a.offerId && l.day === a.day) : undefined)
+
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
@@ -67,12 +71,12 @@ export function lateView(
         break
       }
       case 'late.arrived': {
-        const l = all.get((m.args as CommandArgs<'late.arrived'>).id)
+        const l = named(m.args as CommandArgs<'late.arrived'>)
         if (l && !l.arrivedAt) all.set(l.id, { ...l, arrivedAt: m.createdAt, pending: true })
         break
       }
       case 'late.seen': {
-        const l = all.get((m.args as CommandArgs<'late.seen'>).id)
+        const l = named(m.args as CommandArgs<'late.seen'>)
         if (l && !l.seenAt) all.set(l.id, { ...l, seenAt: m.createdAt, pending: true })
         break
       }

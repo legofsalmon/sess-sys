@@ -237,8 +237,11 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction, Perso
   'lieu.decide': { names: { field: 'id', via: 'lieuEntry' }, refused: true, keep: (a) => ({ ...a, reason: '' }) },
   'leave.allowance': { names: { field: 'personId' }, refused: true, keep: only('personId', 'year', 'by') },
   // Running late (ADR 0028): the booking and the day stay, for the history's words; what they wrote goes. Saying they're
-  // there, and the office noting it, carry only the record's id, and the record is deleted, so those are refused as not found.
+  // there, and the office noting it, carry the record's id, and from the app its booking and day, which stay as here and
+  // name them; from the link, or an older app, the id alone names no one, and the record is deleted, so it isn't found.
   'late.say': { names: { field: 'offerId', via: 'offer' }, refused: true, keep: (a) => ({ ...a, note: '' }) },
+  'late.arrived': { names: { field: 'offerId', via: 'offer' }, refused: true, keep: as },
+  'late.seen': { names: { field: 'offerId', via: 'offer' }, refused: true, keep: as },
   // Their documents (ADR 0029) go at once, so only what says which document and of what kind is kept: never its title,
   // the day it runs out, or its file. A file put on one, or sent from their link, is a server action, kept the same way.
   'document.save': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId', 'kind') },

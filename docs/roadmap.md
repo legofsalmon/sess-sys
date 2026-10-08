@@ -144,6 +144,15 @@ faults, missing kit and repairs
   changes, newest first, with who; what the phone holds shows with no
   signal. Trackers' locations later, from trackers that offer a way to
   read them).
+- Stocktakes and rolling counts (built, 4 October 2026,
+  [ADR 0030](adr/0030-stocktakes-and-rolling-counts.md): a place or a
+  case counted on a phone with no signal, labels scanned and counted kit
+  typed without the record beside it; the differences in words with each
+  fix one tap away; kit out with a job, already missing or in repair
+  never said to be newly missing, and counted kit out on jobs never
+  lowering what's owned; when each place and case was last counted; and
+  each week's places, so every one is counted within a quarter. The
+  first round, once the stock list is in, is the baseline stocktake).
 
 **Done when:** a job's kit is picked and returned by scanning, and
 availability for next week is trusted without walking the shelves.

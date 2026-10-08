@@ -139,7 +139,14 @@ leave very far in advance."
   request or lieu entry; nothing is approved for someone archived since
   they asked, so no days off are written for someone who has left
   (declining still clears the queue); allowances are set, and years
-  opened, by approvers only;
+  opened, by approvers only; an approver who has since been archived
+  can't, whatever their box says, and is told so ("Colly Hewson has
+  been archived, so they can't approve time off.", or signed in "You've
+  been archived on the Crew tab, so you can't approve time off.")
+  rather than to tick the box, and the Leave screen tells someone
+  archived who signs in so too ("You've been archived on the Crew tab,
+  so you can't ask for or approve time off.") rather than to put on an
+  email that's there already;
 - cancelling is the requester's, while the request is waiting or
   approved and hasn't started.
 

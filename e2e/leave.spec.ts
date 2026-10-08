@@ -8,7 +8,8 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
  * the moment he says who he is, approves it, and has a blanked allowance
  * turned down in place, and one the server turns down listed as not done
  * with its year as a year; the planner shows the days off; and an offer to
- * that person for those days warns. The staff and the crew call are made
+ * that person for those days warns. Signed in, someone archived since is
+ * told so. The staff and the crew call are made
  * through the sync API with this run's own names, since the test server is
  * shared, and this year is opened there too.
  */
@@ -248,4 +249,23 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await call.getByLabel('Offer to').selectOption({ label: `Nora Walsh ${id} · Level 1 ⚠` })
   await expect(call.locator('.warn')).toContainText(`Marked unavailable ${FROM} to ${MIDDLE} (Annual leave)`)
   await expect(call.getByRole('button', { name: 'Offer', exact: true })).toBeDisabled()
+})
+
+test('someone archived who signs in is told so on the Leave screen, not to put on their email', async ({ browser }) => {
+  // Proves: Áine, archived on the Crew tab since, signs in with the email on her person; the Leave screen says she's been
+  // archived, as the server says when she tries, rather than that her account isn't matched to anyone, which would send her
+  // to put on an email that's there already.
+  const email = `aine-${id}@sessionhire.com`
+  const context = await browser.newContext({ viewport: phoneSize })
+  const aine = { id: k('aine'), name: `Áine Doyle ${id}`, kind: 'staff', email, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: true }
+  await push(context.request, [
+    ['person.upsert', aine],
+    ['person.archive', { id: aine.id, archived: true }],
+  ])
+  const page = await context.newPage()
+  await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'google', user: { id: 'u-aine', email, name: aine.name } } }))
+  await page.goto('/#crew/leave')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await expect(page.locator('.leave-screen .card .empty')).toHaveText("You've been archived on the Crew tab, so you can't ask for or approve time off.")
+  await context.close()
 })

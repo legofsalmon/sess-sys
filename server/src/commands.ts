@@ -1,4 +1,5 @@
 import {
+  cleanText,
   commandSchemas,
   type CommandArgs,
   type CommandName,
@@ -11,7 +12,7 @@ import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { documentHandlers } from './documents/handlers.ts'
 import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers.ts'
-import { Refused, type Ctx } from './kernel.ts'
+import { CHARACTERS, isCharacterError, Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
 import { officeHandlers } from './office/handlers.ts'
@@ -22,6 +23,7 @@ import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
 import { inspectionHandlers } from './stock/inspections.ts'
 import { moveHandlers } from './stock/moves.ts'
+import { countHandlers } from './stock/counts.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -48,6 +50,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...lateHandlers,
   ...erasureHandlers,
   ...documentHandlers,
+  ...countHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */
@@ -94,7 +97,8 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
   // About someone erased on request, only what erasing keeps is stored, even of a change turned down (ADR 0027).
-  const stored = await argsToStore(tx, m.name, m.args)
+  // Its text is cleaned as the schema will clean it, so a NUL from an older version of the app can't fail the push.
+  const stored = cleanArgs(await argsToStore(tx, m.name, m.args))
   await tx.query(
     `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
      VALUES ($1, $2, $3, $4, $5, coalesce($6::timestamptz, clock_timestamp()), $7, $8, clock_timestamp(), 'applied', '{}')`,
@@ -118,6 +122,12 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
       await tx.query('ROLLBACK TO SAVEPOINT cmd')
       if (err instanceof Refused) {
         result = { id: m.id, status: 'rejected', reason: err.reason }
+      } else if (isCharacterError(err)) {
+        // A character the database can't hold, in a part nobody types (typed text is cleaned): what was sent, not
+        // the server's fault, so it's turned down like any refusal and not reported. Before the calendar's own
+        // case, as trying it again next round would only find the same character.
+        log?.info({ command: m.name }, 'Turned down a change with a character the database cannot hold')
+        result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } }
       } else {
         // The calendar sync runs an answer inside its own round and tries
         // again next time: it wants the fault, not a change dropped for good.
@@ -139,12 +149,27 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   return result
 }
 
+/**
+ * A command's arguments as the history keeps them: every piece of text,
+ * keys too, cleaned as the schemas clean typed text. They're stored before
+ * they're checked, so a change from an older version of the app with a NUL
+ * in it is still recorded, and applied as cleaned, rather than failing the
+ * whole push.
+ */
+function cleanArgs(v: unknown): unknown {
+  if (typeof v === 'string') return cleanText(v)
+  if (Array.isArray(v)) return v.map(cleanArgs)
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [cleanText(k), cleanArgs(x)]))
+  return v
+}
+
 const DROPPED = "The server couldn't apply this change, so it was dropped. Check it and send it again."
 const UNKNOWN = "The app doesn't do this any more, so it wasn't made."
 
-/** Where a dropped change is noted, besides the error report: the request's log. */
+/** Where a dropped change is noted, besides the error report, and a refused one: the request's log. */
 export interface Log {
   warn(detail: object, message: string): void
+  info(detail: object, message: string): void
 }
 
 /**

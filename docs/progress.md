@@ -40,11 +40,90 @@ waiting on someone.
 
 **Next**
 
-- Stocktakes and rolling counts are built in
-  [PR #57](https://github.com/legofsalmon/sess-sys/pull/57), waiting to
-  merge; it took Decision 0030 first, so this is 0031. After that, the
-  rest of Phase 2 is the labelling rollout, which is work in the
-  warehouse rather than in the app, and RFID later.
+- Stocktakes and rolling counts
+  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57)) took
+  Decision 0030 first, so this is 0031. With both in, the rest of
+  Phase 2 is the labelling rollout, which is work in the warehouse
+  rather than in the app, and RFID later.
+
+## 4 October 2026: stocktakes, rolling counts and four loose ends
+
+**Done**
+
+- Colly, 4 October: "Merge 56 and go with 1 and 2". #56 is merged and
+  live (see 3 October). Then the two parts below, each built, then read
+  by a reviewer trying to break it and corrected.
+- **Stocktakes and rolling counts**
+  ([Decision 0030](adr/0030-stocktakes-and-rolling-counts.md)).
+  - A place or a case is counted on a phone, with no signal needed.
+    Labels are scanned. Counted kit is typed without the record beside
+    it, so the number on the screen doesn't become the count.
+  - **Finish** says what's different, in words, with each fix one tap
+    away:
+    - not found: report it missing;
+    - in the wrong place: move it here;
+    - not expected: bring it back, mark it found, or put the label on
+      its item;
+    - counted kit short or over: set the count.
+  - Kit out with a job, already missing or in repair is never called
+    newly missing. Counted kit out on jobs never lowers what's owned.
+  - Each place and case shows when it was last counted and by whom, and
+    each item's log says what a count found.
+  - The Stock tab's Counts card lists this week's places: those never
+    counted first, then those counted longest ago, so every place is
+    counted within a quarter. It shows how far the round has got. The
+    first round, once the stock list is in, is the baseline stocktake.
+- **Four loose ends**:
+  - **Hidden characters.** Text pasted from Word or a PDF can carry
+    invisible control characters. They gave a server error on staff
+    forms, and also on the freelancer's link, the crew list import and
+    documents. Text is now cleaned of them everywhere, keeping tabs and
+    line breaks. A character the database still can't hold is turned
+    down in plain words, never a crash, and is never reported as one.
+  - **"Mark as there"** works now on a phone that hadn't yet heard the
+    freelancer say they were late.
+  - **Archived approvers.** Someone archived is told so when they try
+    to approve leave, on the server and on the Leave screen.
+  - **A history browser test that failed now and then.** It was a race
+    in the test itself, and two other tests had the same pattern; all
+    three are fixed. In the app, a sync asked for while one was failing
+    now runs, with one retry at a time, never more.
+- Found and fixed in review:
+  - a count could move an item out of its case;
+  - a case found only by what's in it was called missing;
+  - an older count's page could undo newer changes;
+  - a long maker's QR code could leave a count that could never be
+    finished;
+  - two tabs on one phone overwrote each other's scans;
+  - a phone with its clock set ahead could leave a place counted for
+    good;
+  - a half-done count stayed on the phone after signing out;
+  - the history named the wrong counter;
+  - the character safety net would have hidden a real server bug;
+  - sync retries piled up on a poor signal.
+- The download test in the history spec failed once the shared test
+  server had more than 1,000 rows. The test expected "(123 rows)", but
+  the app writes "(1,234 rows)". The test now reads the number as the
+  app writes it, and the size in MB too.
+- Checked with both parts together:
+  - the typecheck;
+  - the shared tests (194);
+  - the server tests (412 on PGlite, and the real-Postgres file, 13);
+  - the web build;
+  - the full browser suite (84);
+  - the history, counts and sign-in specs ten times over (120).
+
+**Next**
+
+- Merge, with Colly's go-ahead, and check it on the live server.
+- The stock list next week. Then the baseline stocktake: count every
+  place once, from the Counts card on the Stock tab.
+- The keys:
+  - the Google key;
+  - the backups bucket, with `BACKUP_KEY`, for documents' files too;
+  - the Sentry key.
+- Then the real crew list, after Start fresh, and an approver opening
+  2026 for leave.
 
 ## 3 October 2026: the small items
 
@@ -86,10 +165,16 @@ waiting on someone.
   the server tests (394 on PGlite, and the real-Postgres file, 12, with
   two servers clearing at once); the web build; the full browser suite
   (78), and the documents and certificates specs three more times.
+- Merged into `main` on 4 October at 07:24 UTC (Colly: "Merge 56") and
+  live by 07:34 once main's checks passed. The live database has the
+  documents module at version 1 with its `documents` and
+  `document_files_to_delete` tables, and nothing went wrong at start-up.
+  The server says documents' files are off until the backups' bucket is
+  set, as expected: their details and dates work meanwhile.
 
 **Next**
 
-- Merge, with Colly's go-ahead, and check it on the live server.
+- See 4 October.
 - The stock list next week. On the live server, a list of 1,500 rows is
   expected to take about 8 to 10 minutes with the page left open.
 - The keys: the Google key, the backups bucket (now for documents'

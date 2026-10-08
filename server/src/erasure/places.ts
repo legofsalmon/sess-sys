@@ -95,6 +95,26 @@ export const STRIPPED: readonly Stripped[] = [
   { table: 'timesheets', entity: 'timesheet', theirs: BY_BOOKING('id'), clear: { note: '' }, fields: { note: '' }, read: getTimesheet },
 ]
 
+/**
+ * Pointers to them from records that aren't theirs, kept as they are: the
+ * record is the business's, and the pointer reads as their name now reads,
+ * "Erased person", or their name while it's kept for their records.
+ * Nothing is done to these; they're listed so each is a decision, and a
+ * test fails for a column with a foreign key to people that's in no list
+ * here (one without a foreign key, such as phases.contact_id, needs adding
+ * by hand).
+ */
+export const POINTERS: readonly { table: string; column: string }[] = [
+  // Who crew ring on the day of a phase (ADR 0021); erasing is refused while the phase hasn't ended.
+  { table: 'phases', column: 'contact_id' },
+  // Who decided someone else's leave (ADR 0024).
+  { table: 'leave_requests', column: 'decided_by' },
+  { table: 'lieu_entries', column: 'decided_by' },
+  // Who counted a place or a case (ADR 0030): a warehouse record, needed for what was found where, not for who found it,
+  // and no law asks for the name, so the count stays and reads "Erased person" once their name goes.
+  { table: 'counts', column: 'counted_by' },
+]
+
 /** Records of theirs the law asks the business to keep for a time: stripped like STRIPPED while it lasts, then gone like GONE. */
 interface ForATime extends Stripped {
   /** The columns the shared rule reads a leave record by (`LeaveRecord`): which year it belongs to, and its status. */

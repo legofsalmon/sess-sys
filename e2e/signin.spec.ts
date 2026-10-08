@@ -33,12 +33,15 @@ test('a device that is signed out sees only the way in, and keeps what it has wa
   // sign in. The test server is shared with the other browser tests, so the
   // place has a name of its own.
   const bay = `Bay ${Math.random().toString(36).slice(2, 8)}`
-  await page.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  // The signal comes back by this route passing the push on, not by taking it away: a retry caught as it was taken away
+  // was left hanging, never sent nor failed, and the next sync waited on it (as in history.spec.ts).
+  let signal = false
+  await page.route('**/api/sync/push', (route) => (signal ? route.fallback() : route.abort('internetdisconnected')))
   await page.getByRole('button', { name: 'Add place' }).click()
   await page.getByLabel('New place').fill(bay)
   await page.getByRole('button', { name: 'Add place' }).click()
   await expect(page.locator('.conn')).toHaveText(/1 waiting/)
-  await page.unroute('**/api/sync/push')
+  signal = true
   await notSignedIn(page)
   await page.evaluate(() => dispatchEvent(new Event('online')))
 
@@ -83,10 +86,18 @@ test('shows who is signed in, and signing out clears the device', async ({ page 
   await expect(page.getByText('Aoife Byrne')).toBeVisible()
   await expect(page.getByText('aoife@sessionhire.com')).toBeVisible()
   await expect.poll(() => deviceCopy(page)).not.toBeNull()
+  // A count left half done (ADR 0030) goes too, so whoever signs in next can't finish it as theirs.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'sh.count',
+      JSON.stringify({ id: 'c1', placeId: 'p1', caseId: null, startedAt: '2026-10-04T09:00:00.000Z', by: null, scanned: [], unknown: [], counted: {}, added: [] })
+    )
+  )
 
   await page.getByRole('button', { name: 'Sign out' }).click()
   // Signing out reloads the app at its start, signed out.
   await page.waitForURL(/\/$/)
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   expect(await deviceCopy(page)).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('sh.count'))).toBeNull()
 })

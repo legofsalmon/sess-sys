@@ -30,6 +30,7 @@ import {
   type RetiredReason,
 } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
+import { countSummaryWords, isCountSummary } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -641,6 +642,14 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
       const day = typeof a.at === 'string' ? ` on ${dayLabel(irishToday(new Date(a.at)))}` : ''
       return `Recorded ${item(a.assetId)} ${a.passed ? 'passing' : 'failing'} its ${what}${day}${by}${note}`
+    }
+    // A count (ADR 0030): who counted, where, and what it found; the fixes are lines of their own. Who is as the count was
+    // kept, not as the phone said: someone it couldn't name, or erased since, is kept as nobody.
+    case 'count.record': {
+      const said = isCountSummary(a.summary) ? `: ${countSummaryWords(a.summary)}` : ''
+      const kept = look('count', a.id)
+      const by = kept ? kept.by : a.by
+      return `${by ? `${person(by)} counted` : 'Counted'} ${a.caseId ? `what's in ${item(a.caseId)}` : placeName(a.placeId)}${said}`
     }
     case 'timesheet.send': {
       const o = offer(a.id)

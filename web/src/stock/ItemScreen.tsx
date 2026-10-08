@@ -20,6 +20,7 @@ import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText, InspectionsCard } from './Inspections.tsx'
 import { ItemLog } from './ItemLog.tsx'
+import { CountsOf } from './Counts.tsx'
 import { PrintLabels } from './Labels.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import {
@@ -85,6 +86,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
       </FaultsCard>
       <InspectionsCard view={view} a={a} />
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
+      {a.model?.isCase && a.status === 'active' && <CountsOf view={view} where={{ placeId: null, caseId: a.id }} />}
       <ItemLog view={view} a={a} />
       <WhereChoices w={w} />
     </Page>

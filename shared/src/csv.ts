@@ -1,3 +1,5 @@
+import { cleanText } from './plain.ts'
+
 /**
  * A small CSV reader, as RFC 4180 has it: fields split by commas, a field
  * in double quotes can hold commas, line breaks and doubled quotes, lines
@@ -19,9 +21,14 @@ export function parseCsv(text: string, separator: ',' | ';' = ','): string[][] {
   let quoted = false
   // Excel writes UTF-8 with a mark at the start, which isn't part of the first header.
   let i = text.charCodeAt(0) === 0xfeff ? 1 : 0
-  const endRow = () => {
-    row.push(field)
+  // Each field cleaned as typed text is (plain.ts), so what the preview shows, and what a second import compares, is
+  // what was kept: a cell copied from Word keeps no control characters, and a NUL can't fail the import.
+  const endField = () => {
+    row.push(cleanText(field))
     field = ''
+  }
+  const endRow = () => {
+    endField()
     rows.push(row)
     row = []
   }
@@ -41,10 +48,8 @@ export function parseCsv(text: string, separator: ',' | ';' = ','): string[][] {
       continue
     }
     if (ch === '"') quoted = true
-    else if (ch === separator) {
-      row.push(field)
-      field = ''
-    } else if (ch === '\n') endRow()
+    else if (ch === separator) endField()
+    else if (ch === '\n') endRow()
     else if (ch === '\r') {
       if (text[i + 1] === '\n') i++
       endRow()

@@ -1,4 +1,4 @@
-import { newId, type CommandInput, type CommandName, type Mutation } from '@sh/shared'
+import { MemoryStorage, newId, SyncClient, type CommandInput, type CommandName, type Mutation, type Transport } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
@@ -10,9 +10,14 @@ import { reportError } from '../src/monitoring.ts'
  * One bad change must never strand a phone (audit of 30 September 2026, P0
  * 2). A fault the server didn't expect drops that one change with a reason,
  * is reported, and the device carries on; what a device or browser is
- * told about a failed request never carries the fault's own words; and a
- * fault while telling devices about a change never stops the server.
+ * told about a failed request never carries the fault's own words; a
+ * fault while telling devices about a change never stops the server; and a
+ * character the database can't hold is cleaned from typed text, or else
+ * turned down in words, never taken for a fault.
  */
+
+/** What a change, or a request, with a character the database can't hold where it can't be cleaned is told. */
+const CHARACTERS = "Something in this has a character the app can't keep, so it wasn't saved. Check it and try again."
 
 // Reporting is stood in for, so a test can see what was reported, and with what.
 vi.mock('../src/monitoring.ts', async (importOriginal) => ({
@@ -38,10 +43,11 @@ async function server(db: Db) {
 
 /**
  * The real database, with one statement made to fail the next time it runs.
- * Postgres raises the error itself (dividing by zero), so the transaction is
- * left in the aborted state a real fault inside a handler leaves it in.
+ * Postgres raises the error itself (dividing by zero, unless another fault
+ * is given), so the transaction is left in the aborted state a real fault
+ * inside a handler leaves it in.
  */
-function withFault(db: Db, statement: (sql: string) => boolean): Db & { failNext: boolean } {
+function withFault(db: Db, statement: (sql: string) => boolean, fault = 'SELECT 1/0'): Db & { failNext: boolean } {
   const faulty: Db & { failNext: boolean } = {
     ...db,
     failNext: false,
@@ -50,7 +56,7 @@ function withFault(db: Db, statement: (sql: string) => boolean): Db & { failNext
         const query: Queryable['query'] = <T>(sql: string, params?: unknown[]) => {
           if (faulty.failNext && statement(sql)) {
             faulty.failNext = false
-            return tx.query<T>('SELECT 1/0')
+            return tx.query<T>(fault)
           }
           return tx.query<T>(sql, params)
         }
@@ -208,5 +214,86 @@ describe('telling devices about a change', () => {
     } finally {
       ws.terminate()
     }
+  })
+})
+
+describe('a character the database cannot hold', () => {
+  it("is cleaned from a person's name sent through the sync push, so the phone and the server hold the same words", async () => {
+    // Proves: a NUL, which neither Postgres's text nor its JSON can hold, with other control characters and half an emoji,
+    // in a person's name and notes from an older app that sent them as typed, is applied cleaned, not a 500, and the history
+    // keeps it; this app cleans the same text on the phone before it's sent, so the phone's copy and the server's agree.
+    const db = await pgliteDb()
+    const app = await server(db)
+    const person = (id: string, name: string, notes: string) => ({ id, name, kind: 'freelancer' as const, email: null, phone: null, skills: [], dayRateCents: null, notes })
+    const older = mutation('person.upsert', person('p1', 'Seán\u0000 Ó Briain\u007f\ud83c', 'Rang\u000bfrom the M50\tlate\u0001'))
+    const res = await push(app, [older])
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results).toMatchObject([{ id: older.id, status: 'applied' }])
+    expect((await db.query('SELECT name, notes FROM people')).rows).toEqual([{ name: 'Seán Ó Briain', notes: 'Rang\nfrom the M50\tlate' }])
+    expect((await app.inject('/api/history')).json().entries).toMatchObject([{ what: "Saved Seán Ó Briain's details", outcome: 'done' }])
+
+    const transport: Transport = {
+      push: async (req) => (await app.inject({ method: 'POST', url: '/api/sync/push', payload: req })).json(),
+      pull: async (after) => (await app.inject({ url: `/api/sync/pull?after=${after}` })).json(),
+    }
+    const phone = await new SyncClient({ storage: new MemoryStorage(), transport }).open()
+    await phone.mutate('person.upsert', person('p2', 'Dara\u0000 Quinn', 'Own van\u000bno trailer'))
+    const shown = phone.view().crew.people.find((p) => p.id === 'p2')
+    expect([shown?.name, shown?.notes]).toEqual(['Dara Quinn', 'Own van\nno trailer'])
+    await phone.sync()
+    const kept = (await db.query<{ name: string; notes: string }>("SELECT name, notes FROM people WHERE id = 'p2'")).rows[0]
+    expect(kept).toEqual({ name: 'Dara Quinn', notes: 'Own van\nno trailer' })
+    expect(phone.view().crew.people.find((p) => p.id === 'p2')).toMatchObject(kept!)
+    expect(reportError).not.toHaveBeenCalled()
+  })
+
+  it("anywhere it can't be cleaned, such as an id, is a refusal in plain words for that change alone, never a 500, and isn't reported", async () => {
+    // Proves: the server's safety net: a NUL in an id inside a change is turned down with a reason and recorded like any refusal;
+    // one in the change's own id, or half an emoji there, which Postgres's JSON calls bad, can't even be recorded, and is turned
+    // down all the same; the rest of the push goes through; a NUL in a request's address answers 400 with the same plain words;
+    // and none of it is reported as a fault of the server's.
+    const db = await pgliteDb()
+    const app = await server(db)
+    const inArgs = mutation('place.upsert', { ...A3, id: 'a\u00003' })
+    const ownId = { ...mutation('place.upsert', VAN1), id: 'm\u0000' }
+    const halfEmoji = { ...mutation('place.upsert', VAN1), id: 'm\ud83c' }
+    const fine = mutation('place.upsert', VAN2)
+    const res = await push(app, [inArgs, ownId, halfEmoji, fine])
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results).toEqual([
+      { id: inArgs.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } },
+      { id: ownId.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } },
+      { id: halfEmoji.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } },
+      { id: fine.id, status: 'applied', seq: expect.any(Number) },
+    ])
+    expect((await db.query('SELECT id FROM places')).rows).toEqual([{ id: 'van2' }])
+    expect((await app.inject('/api/history')).json().entries).toMatchObject([
+      { command: 'place.upsert', outcome: 'done' },
+      { command: 'place.upsert', outcome: 'turned-down', reason: CHARACTERS },
+    ])
+
+    const asked = await app.inject({ url: '/api/documents/d1%00/file' })
+    expect(asked.statusCode).toBe(400)
+    expect(asked.json()).toEqual({ error: CHARACTERS })
+    expect(reportError).not.toHaveBeenCalled()
+  })
+
+  it('is told apart from JSON the server built wrong, which is still a fault, dropped or answered as one and reported', async () => {
+    // Proves: Postgres calls JSON the server built wrong bad JSON under the same code as half an emoji; that's the server's
+    // own fault, never something sent, so a change it hits is dropped and reported, and a request it hits answers 500 and is
+    // reported, rather than either being told about a character nobody typed.
+    const BUILT_WRONG = `SELECT '[object Object]'::jsonb`
+    const db = withFault(await pgliteDb(), (sql) => sql.startsWith('INSERT INTO places'), BUILT_WRONG)
+    const app = await server(db)
+    db.failNext = true
+    const bad = mutation('place.upsert', A3)
+    expect((await push(app, [bad])).json().results).toMatchObject([{ id: bad.id, status: 'rejected', reason: { message: expect.stringContaining('dropped') } }])
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ code: '22P02' }), { area: 'commands', command: 'place.upsert' })
+
+    vi.mocked(reportError).mockClear()
+    const app2 = await server({ ...db, query: (sql, params) => (sql.includes('max(seq)') ? db.query(BUILT_WRONG) : db.query(sql, params)) })
+    const res = await app2.inject({ method: 'GET', url: '/api/health' })
+    expect([res.statusCode, res.json()]).toEqual([500, { error: 'Something went wrong on the server.' }])
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ code: '22P02' }), { route: '/api/health', method: 'GET' })
   })
 })

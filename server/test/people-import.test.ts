@@ -90,6 +90,22 @@ describe('the preview', () => {
 })
 
 describe('bringing the list in', () => {
+  it('takes cells with control characters in them, as copied from Word or a PDF, cleaned, and the same file again changes nothing', async () => {
+    // Proves: a NUL, which the database can't hold, DEL and a vertical tab (Word's line break) in a name and the notes don't fail
+    // the import: the preview shows the person as they'll be kept, they go in so, with the notes' line break kept, and the same
+    // file again finds them unchanged rather than different.
+    const { app, db, colly } = await company()
+    const file = [HEADER, 'Siobhán\u0000,Ní Bhriain\u007f,Video,0877000006,,,,,,,,,,,,"Own camera\u000bdrone ticket",Video: Camera'].join('\r\n')
+    const p = await preview(app, colly.cookies, file)
+    expect(p.rows.map((r) => [r.name, r.notes, r.problems])).toEqual([['Siobhán Ní Bhriain', 'Own camera\ndrone ticket', []]])
+    const res = await bringIn(app, colly.cookies, choices(p))
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ added: 1, updated: 0, unchanged: 0, skipped: 0 } satisfies CrewListResult)
+    expect((await db.query(`SELECT name, notes FROM people WHERE phone = '+353877000006'`)).rows).toEqual([{ name: 'Siobhán Ní Bhriain', notes: 'Own camera\ndrone ticket' }])
+    const second = await bringIn(app, colly.cookies, choices(await preview(app, colly.cookies, file)))
+    expect(second.json()).toEqual({ added: 0, updated: 0, unchanged: 1, skipped: 0 })
+  })
+
   it('adds and updates as the rules say, and the same file again changes nothing and sends nothing', async () => {
     const { app, db, colly } = await company()
     const p = await preview(app, colly.cookies)
