@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 9 October 2026: a demo copy, locked with a passcode
+
+**Done**
+
+- For showing the app as a proposal before the Google key is in, a
+  `DEMO_PASSCODE` setting now locks a copy of the app behind one shared
+  passcode ([PR #61](https://github.com/legofsalmon/sess-sys/pull/61);
+  [sign-in setup](sign-in-setup.md)). Freelancers' private links still
+  open without it, and once the Google key is set Google sign-in takes
+  over.
+- A separate demo copy runs on Railway as the `demo` service, in the EU,
+  with its own small database on a Railway volume, so nothing touches the
+  live app's data. It deploys from `main` like the live app and sleeps
+  when nobody is using it. It is filled with made-up data. Its address
+  and passcode are in the project thread, not here.
+
+**Next**
+
+- Start fresh, then made-up data again, on the demo copy before each
+  showing if it has been played with.
+
 ## 8 October 2026: stocktakes and rolling counts merged and live
 
 **Done**
