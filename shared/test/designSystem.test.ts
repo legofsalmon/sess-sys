@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ownColours } from '../src/own-colours.ts'
 
 /**
- * The shared design system, as Session Hire takes it: its colours only.
+ * The shared design system, as Session Hire takes it: its colours only, but
+ * for the red accent and the bad tone, which stay Session Hire's own.
  *
  * shared/src/ds/ holds only what the design system's scripts/sync.mjs
  * vendored. Whether a copy is behind the design system needs a checkout of
@@ -55,18 +57,18 @@ describe('the vendored design system', () => {
     expect(unknown).toEqual([])
   })
 
-  it('keeps the brand red to the brand', () => {
-    // Red means stop. The brand red is --brand, on the SH mark, and the phone's status bar (theme-color); nothing that means something.
-    const red = /#ee3744|#c8202e|#ff737d/i
-    const found: string[] = []
-    for (const file of appSources()) {
-      readFileSync(file, 'utf8')
-        .split('\n')
-        .forEach((line, i) => {
-          if (red.test(line) && !/--brand:|theme-color/.test(line)) found.push(`${relative(ROOT, file)}:${i + 1}`)
-        })
-    }
-    expect(found).toEqual([])
+  it("declares Session Hire's own colours in app.css as own-colours.ts has them", () => {
+    // The red accent and the bad tone aren't shared roles; the freelancer's pages take them from own-colours.ts, the app from app.css.
+    const css = readFileSync(join(ROOT, 'web', 'src', 'app.css'), 'utf8')
+    const darkAt = css.indexOf('@media (prefers-color-scheme: dark)')
+    const declared = (block: string) =>
+      Object.fromEntries([...block.matchAll(/(--[a-z-]+):\s*(#[0-9a-f]{3,8})\b/gi)].map((m) => [m[1]!.slice(2), m[2]!.toLowerCase()]))
+    const light = declared(css.slice(0, darkAt))
+    const dark = declared(css.slice(darkAt, css.indexOf('}', darkAt)))
+    for (const [name, value] of Object.entries(ownColours.light)) expect(light[name], `light --${name}`).toBe(value)
+    for (const [name, value] of Object.entries(ownColours.dark)) expect(dark[name], `dark --${name}`).toBe(value)
+    // And nothing else in the colour block is a literal: every other colour is a shared role.
+    expect(Object.keys(light).sort()).toEqual(Object.keys(ownColours.light).sort())
   })
 
   it('takes the page in the phone theme', () => {

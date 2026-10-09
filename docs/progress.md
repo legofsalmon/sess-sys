@@ -8,16 +8,14 @@ waiting on someone.
 **Done**
 
 - The app's colours, and the freelancer's pages', now come from the
-  shared design system that all of Colly's apps take their colours from
-  ([design system](design-system.md)). Only the colours changed: layout,
-  type, spacing, corners and components are as they were. Cyan now marks
-  the one thing to do next, the current tab, the open record, links and
-  focus; errors are red; amber and green mean what they did. The brand red
-  stays on the SH mark, the icon and the phone's status bar.
+  shared design system that Colly's other apps take theirs from
+  ([design system](design-system.md)): the page, cards, text, lines, and the
+  green and amber. Session Hire keeps its own red for the one thing to do
+  next, the current tab, links and focus, and its burnt-orange bad tone.
+  Layout, type, spacing, corners and components are as they were.
 - Checked in both themes: the unit tests (including a new check that the
-  vendored token files are unedited and that the brand red stays on the
-  brand), the end-to-end suite with its contrast checks, and every text
-  colour against the page and a card.
+  vendored token files are unedited), the end-to-end suite with its
+  contrast checks, and every text colour against the page and a card.
 
 **Next**
 
