@@ -6,7 +6,23 @@ The Session Hire design system lives in Figma:
 stands, so it matches what is on phones today rather than a new look.
 
 **Code wins.** When Figma and `web/src/app.css` disagree, the CSS is right
-and Figma gets updated. Every colour token carries its CSS name (for example
+and Figma gets updated.
+
+**Colours come from the shared design system** (since October 2026), which
+every one of Colly's apps now takes its colours from; everything else here
+(layout, type, spacing, corners, components) is still Session Hire's own.
+The built token files are vendored in `shared/src/ds/` by `npm run ds:sync`,
+stamped, and never edited here; `npm run ds:check` says whether they're
+behind (both need a checkout of the design-system repository beside this
+one). `web/src/app.css` points each of the names below at a shared role, and
+the freelancer's pages (`server/src/crew/page.ts`) write the same roles out
+as values. The shared grammar: neutral at rest, **cyan is you** (the one
+thing to do next, the current tab, the open record, links, focus), amber is
+someone has to act, **red is stop**, green is settled. The brand red is
+`--brand`, on the SH mark, the app icon and the phone's status bar only;
+`shared/test/designSystem.test.ts` fails if it turns up anywhere else. The
+Figma file still has the old red accent and red bad tone until it's
+next updated. Every colour token carries its CSS name (for example
 `color/accent` is `var(--accent)`), so Dev Mode shows the variable to use.
 
 ## What is in the file
@@ -33,7 +49,8 @@ and Figma gets updated. Every colour token carries its CSS name (for example
   card), `on-line` (text on a line-coloured surface, such as the grey
   pill), `accent`, `accent-ink`, `accent-fill`, `on-accent`, and `good`,
   `warn`, `bad` with a `-soft` background each. Dark follows the phone's
-  setting, as the app does. `field-line` and `on-line` aren't in Figma
+  setting, as the app does (`data-theme="auto"` on the page). `bad-fill`
+  and `on-bad` are the one red fill (Delete everything) and its text. `field-line` and `on-line` aren't in Figma
   yet; until they are, the code is the reference.
 - **Spacing**: 2, 4, 6, 8, 10, 12, 14, 16, 20, 40 px.
 - **Radius**: control 8, tab 10, card 12, full (pills).
@@ -69,7 +86,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   rest, with no way back as the list is beside it, starting at its top
   however far down the last one the window was; with nothing open, the
   right-hand column holds the rest of the tab. The two together are 1400px
-  wide at most. The open one is marked in the list by a red bar down its
+  wide at most. The open one is marked in the list by a cyan bar down its
   left, and the list keeps its search, filter and scroll as things are
   opened from it. Below 960px nothing changes: a record is a page of its
   own with "‹ All jobs" or "‹ All stock". The other screens stay one
@@ -86,8 +103,9 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   screen's own line: what to do about it, or where its things come from
   ("Nothing here yet. Add your crew below."). A record that isn't on the
   device says so in its own words. Not in Figma yet.
-- Red marks the one thing to do next and the current tab. Errors use the
-  burnt-orange **bad** tone, never the brand red, so red never means "broken".
+- Cyan marks the one thing to do next and the current tab. Errors use the
+  red **bad** tone; the brand red is only the SH mark, so it never means
+  anything inside the app.
 - Areas live in a tab bar at the bottom, where a thumb reaches, on a laptop
   as well: the office's phone and laptop work the same way, and the top bar
   keeps to the screen's name and what's waiting.
@@ -196,7 +214,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   small. The print screen shows the first three at their real size on a
   grey panel, above one button that says how many it prints. A range of
   numbers wraps only between the numbers, never inside one. A label
-  scanned in the search that isn't on anything yet opens a red-bordered
+  scanned in the search that isn't on anything yet opens a cyan-bordered
   form right under the search, with the cursor in its first field. Not in
   Figma yet.
 - The camera ([ADR 0016](adr/0016-camera-scanning.md)) opens under the
@@ -216,7 +234,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   (Booked in green, To confirm in amber, Offered in grey) and Send.
   Places still to find are an amber pill beside the call. On the
   freelancer's page their own call is the first card, with a green edge,
-  and who to ring the next, with a red one. On paper it's black on
+  and who to ring the next, with a cyan one. On paper it's black on
   white, one A4 page where it fits, only those who've said yes, and it
   says it's the office's copy. Not in Figma yet.
 - A refusal is shown where the action was
@@ -298,24 +316,24 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   not on the job's list goes under "Not on the kit", with an amber note.
   Not in Figma yet.
 - Faults ([ADR 0018](adr/0018-faults-missing-kit-and-repairs.md)) are
-  cards in a list with a 4 px stripe down the left: burnt orange when the
+  cards in a list with a 4 px stripe down the left: red when the
   kit can't go out, amber when it's damaged but fit to use, the line
   colour once closed. Each has its state in bold ("Damaged, can't go
   out"), the job and when in muted small text, what's wrong, the repair
   notes, and the ways it can end as buttons (Fixed, Not faulty, Write
   off; Found, Write off), with Repair notes last. Closed ones sit under
   "N before". On a pick list coming back, items reported missing are
-  number pills with a dashed burnt-orange border after "Missing:", and
+  number pills with a dashed red border after "Missing:", and
   the report form opens under the scan answer. An item's fault is a fact
-  in burnt orange at the top of its page. Not in Figma yet.
+  in red at the top of its page. Not in Figma yet.
 - Inspections ([ADR 0020](adr/0020-inspections.md)) use the same stripe:
   green when it's in date, amber when it's due in the next 30 days or
-  not recorded yet, burnt orange when it failed or is overdue, with the
+  not recorded yet, red when it failed or is overdue, with the
   state in bold ("PAT overdue since 2 Oct 2026") and what it means in
   muted text under it. What's recorded sits under "N recorded", each
   with the day, who did it and the note. Testing a batch is the pick
   list's scan field and answer box, with the kind as two filter buttons
-  and the items tested as number pills, burnt orange for a fail. Not in
+  and the items tested as number pills, red for a fail. Not in
   Figma yet.
 - What a call needs ([ADR 0028](adr/0028-certificates-a-call-needs-and-running-late.md))
   is a row of ticks that wrap as chips under "Certificates needed", and
@@ -325,7 +343,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   people under the select's own headings (those who hold it, "Not known:
   check first", "Missing a certificate"), each line marked ("· no
   IPAF"), and Offer says why not in the alert line. Certificates running
-  out are a card of rows, the line in amber for soon and burnt orange
+  out are a card of rows, the line in amber for soon and red
   for run out, with "Ask for the new card" opening the Send panel.
   Running late is a row in "Answers to check" with Ring and Noted, and a
   bold amber line under the call ("Gráinne: about 30 minutes late,
@@ -364,7 +382,7 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   recorded a list in words, and what was found folds away. Counted kit
   is a field per product, 52 px tall in big type, with no recorded
   number beside it: the count is blind. **Finish the count** is the one
-  red button, full width and 56 px tall, with "Discard this count" as a
+  cyan button, full width and 56 px tall, with "Discard this count" as a
   link under it, asked in place. A count's page is a card per kind of
   difference, a row each: the item or product as a link, what the count
   said in muted text, and its fix as a button on the right ("Report
@@ -384,7 +402,9 @@ app and in Figma:
 - White text sits on `accent-fill` (#c8202e), 5.7:1, instead of the brand
   red (4.0:1). That covers primary buttons in the app and the Accept button
   and "Offered" tag on the freelancer page. The brand red stays for the mark
-  and focus rings.
+  and focus rings. (Since October 2026 these are the shared cyan with its
+  own text colour, and the focus ring is cyan too; see the end of this
+  section.)
 - Warn text is #8a5800 in light mode, 5.3:1 on its pill.
 - Buttons and fields are at least 44px tall, which matters with gloves on in
   a dark venue.
@@ -401,3 +421,11 @@ audit (finding 22):
   #6b7684 in dark, 3.6:1), not `line`, which at 1.4:1 let fields dissolve
   in daylight. WCAG asks 3:1 of a control's edge. The same token is on the
   freelancer's pages.
+
+On 9 October 2026 the colours moved onto the shared design system, which
+checks every text colour against every surface in both themes. Measured on
+the page and on a card, the tightest are: settled, attention and error text
+on their own pills in light mode, 4.6 to 4.7:1 on the page; hint text
+(`muted`), 5.1:1 on a dark card; the current tab and primary buttons, 6.0:1
+in light and 9.4:1 in dark; Delete everything, 6.5:1 and 5.8:1; the grey
+pill, 6.1:1 or more; a field's border, 3:1 or more on a card in both.

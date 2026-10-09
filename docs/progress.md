@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 9 October 2026: colours from the shared design system
+
+**Done**
+
+- The app's colours, and the freelancer's pages', now come from the
+  shared design system that all of Colly's apps take their colours from
+  ([design system](design-system.md)). Only the colours changed: layout,
+  type, spacing, corners and components are as they were. Cyan now marks
+  the one thing to do next, the current tab, the open record, links and
+  focus; errors are red; amber and green mean what they did. The brand red
+  stays on the SH mark, the icon and the phone's status bar.
+- Checked in both themes: the unit tests (including a new check that the
+  vendored token files are unedited and that the brand red stays on the
+  brand), the end-to-end suite with its contrast checks, and every text
+  colour against the page and a card.
+
+**Next**
+
+- Bring the Figma file's colours over to match.
+
 ## 9 October 2026: a demo copy, locked with a passcode
 
 **Done**
