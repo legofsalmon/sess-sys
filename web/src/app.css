@@ -1,24 +1,47 @@
+@import '../../shared/src/ds/tokens.css';
+
+/*
+ * Colours come from the shared design system (shared/src/ds/tokens.css,
+ * vendored by `npm run ds:sync`; never edit the copy). These are Session
+ * Hire's own names pointed at its roles, so the rest of the stylesheets read
+ * as they always have. index.html sets data-theme="auto", so the theme still
+ * follows the phone's setting.
+ *
+ * The grammar: neutral at rest; cyan is you (the one thing to do next, the
+ * current tab, the open job, links, focus); amber is someone has to act; red
+ * is stop (failed, refused, a clash); green is settled. The brand red was the
+ * accent until 2026-10; it now stays on the SH mark, the icon and the phone's
+ * status bar, and means nothing inside the app.
+ */
 :root {
-  --bg: #eef1f4;
-  --panel: #ffffff;
-  --ink: #16202b;
-  --muted: #5a6776;
-  --line: #d3dae2;
-  /* Round a field: a line is 1.4:1 on a card, so fields dissolved in daylight; this is 3.4:1 (audit finding 22). */
-  --field-line: #7f8c9a;
-  /* Text on a line-coloured surface, such as the grey pill: muted was 4.1:1 there, this is 5.1:1. */
-  --on-line: #4d5968;
-  --accent: #ee3744;
-  --accent-ink: #c8202e;
-  /* Behind white text: the brand red is 4.0:1 with white, this is 5.7:1 (AA). */
-  --accent-fill: #c8202e;
-  --on-accent: #ffffff;
-  --good: #1d7a4c;
-  --good-soft: #dff2e8;
-  --warn: #8a5800;
-  --warn-soft: #fbefd6;
-  --bad: #a8480f;
-  --bad-soft: #f9e4d6;
+  --bg: var(--ds-surface-ground);
+  --panel: var(--ds-surface-panel);
+  --ink: var(--ds-ink-primary);
+  /* Hints, labels and the tabs not open: matched by lightness, the tertiary ink, which clears AA on every surface here. */
+  --muted: var(--ds-ink-tertiary);
+  --line: var(--ds-line-subtle);
+  /* Round a field: 3:1 against a card in both themes (audit finding 22). */
+  --field-line: var(--ds-line-control);
+  /* Text on a line-coloured surface, such as the grey pill. */
+  --on-line: var(--ds-ink-secondary);
+  /* You: focus, ticks, the open row's bar. --accent-fill is behind --on-accent text (primary buttons, the current tab). */
+  --accent: var(--ds-accent);
+  --accent-ink: var(--ds-accent-ink);
+  --accent-fill: var(--ds-accent);
+  --on-accent: var(--ds-accent-on);
+  /* Settled, someone has to act, and stop: --good, --warn and --bad are text, on the page or on their -soft fill. */
+  --good: var(--ds-ok-ink);
+  --good-soft: var(--ds-ok-soft);
+  --warn: var(--ds-warn-ink);
+  --warn-soft: var(--ds-warn-soft);
+  --bad: var(--ds-bad-ink);
+  --bad-soft: var(--ds-bad-soft);
+  /* A red fill, with --on-bad text on it (Delete everything). */
+  --bad-fill: var(--ds-bad);
+  --on-bad: var(--ds-bad-on);
+  /* The brand, not a token: on the SH mark and nowhere that means something. */
+  --brand: #ee3744; /* not a token: the brand */
+  --on-brand: #ffffff;
   /* Spacing and radius, named as in Figma. */
   --space-2: 2px;
   --space-4: 4px;
@@ -48,17 +71,7 @@
   --text-status: .82rem;
   --text-pill: .75rem;
   --text-footer: .75rem;
-  color-scheme: light;
   font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f151c; --panel: #17202a; --ink: #e6ecf2; --muted: #9aa8b7; --line: #2b3745;
-    --field-line: #6b7684; --on-line: #9aa8b7;
-    --accent-ink: #ff737d; --good: #5fd09a; --good-soft: #15352a; --warn: #f0b85a; --warn-soft: #3a2c12;
-    --bad: #f0a064; --bad-soft: #3a2414;
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); }
@@ -72,13 +85,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
 .brand small, label small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .brand .made-up { color: var(--warn); font-weight: 600; }
-.mark { width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
+.mark { width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--brand); color: var(--on-brand); display: grid; place-items: center; font-weight: 800; }
 .conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
 .conn.online { background: var(--good-soft); color: var(--good); }
 .conn.syncing { background: var(--warn-soft); color: var(--warn); }
 .conn.offline { background: var(--ink); color: var(--bg); }
 .top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-6); }
-/* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
+/* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone. Pressing it opens the list under the top bar. */
 .top .not-done { min-height: 0; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
 .top .not-done[aria-expanded='true'] { border-color: var(--bad); }
 /* The list is part of the bar, under its row and never over it, so the badge and the screen's name stay in view wherever the page is scrolled to. */
@@ -108,8 +121,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
-/* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
-button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
+/* Deleting everything (ADR 0019): the stop colour, the one red fill in the app. */
+button.danger { background: var(--bad-fill); border-color: var(--bad-fill); color: var(--on-bad); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
 .hint, .empty { margin: 0; color: var(--muted); font-size: var(--text-hint); }

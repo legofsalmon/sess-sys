@@ -98,7 +98,7 @@
 .warehouse .viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .warehouse .viewfinder .frame { position: absolute; inset: 14%; border: 3px solid #fff8; border-radius: 10px; box-shadow: 0 0 0 999px #0005; pointer-events: none; }
 .warehouse .viewfinder .frame[data-read] { animation: scan-read .6s ease-out; }
-@keyframes scan-read { from { border-color: var(--good); background: #1d7a4c40; } to { border-color: #fff8; background: transparent; } }
+@keyframes scan-read { from { border-color: var(--good); background: var(--good-soft); } to { border-color: #fff8; background: transparent; } }
 .warehouse .viewfinder .starting { position: absolute; inset: auto 0 12px; margin: 0; text-align: center; color: #fff; font-size: .9rem; }
 .warehouse .scan-status { margin: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 1.4em; }
 .warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: var(--space-6); justify-content: center; }

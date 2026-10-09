@@ -1,5 +1,6 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
+import { dsColor } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -437,14 +438,40 @@ export function renderGone(): string {
 <p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p></main></body></html>`
 }
 
+/**
+ * The page's colour names pointed at the shared design system's roles, as
+ * web/src/app.css does for the app, written out as values: the page has no
+ * stylesheet of its own to import. The brand red stays on the SH mark only.
+ */
+const roles = (t: (typeof dsColor)[keyof typeof dsColor]) =>
+  Object.entries({
+    bg: t.surface.ground,
+    panel: t.surface.panel,
+    ink: t.ink.primary,
+    muted: t.ink.tertiary,
+    line: t.line.subtle,
+    'field-line': t.line.control,
+    accent: t.accent.default,
+    'accent-fill': t.accent.default,
+    'on-accent': t.accent.on,
+    good: t.ok.ink,
+    'good-soft': t.ok.soft,
+    warn: t.warn.ink,
+    'warn-soft': t.warn.soft,
+    bad: t.bad.ink,
+    'bad-soft': t.bad.soft,
+  })
+    .map(([name, value]) => `--${name}:${value}`)
+    .join(';')
+
 export const CSS = `
-:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--field-line:#7f8c9a;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;--bad:#a8480f;--bad-soft:#f9e4d6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--field-line:#6b7684;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;--bad:#f0a064;--bad-soft:#3a2414;color-scheme:dark}}
+:root{${roles(dsColor.light)};--brand:#ee3744;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{${roles(dsColor.dark)};color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
 .top{display:flex;gap:12px;align-items:center}.top b{display:block;text-transform:uppercase;letter-spacing:.03em}.top small{color:var(--muted)}
-.mark{width:40px;height:40px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+.mark{width:40px;height:40px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
 h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
 section{display:grid;gap:10px}
 .offer{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
@@ -455,7 +482,7 @@ section{display:grid;gap:10px}
 .offer header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
 h3{margin:0;font-size:1.1rem}h3 span{font-weight:500;color:var(--muted)}
 .tag{font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--line);white-space:nowrap}
-.tag.offered{background:var(--accent-fill);color:#fff}.tag.confirmed{background:var(--good-soft);color:var(--good)}.tag.accepted,.tag.countered{background:var(--warn-soft);color:var(--warn)}
+.tag.offered{background:var(--accent-fill);color:var(--on-accent)}.tag.confirmed{background:var(--good-soft);color:var(--good)}.tag.accepted,.tag.countered{background:var(--warn-soft);color:var(--warn)}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0}.facts dt{color:var(--muted)}.facts dd{margin:0}
 .details{margin:0;padding:10px;background:var(--bg);border-radius:8px;font-size:.92rem}
 form{display:grid;gap:10px;margin:0}
@@ -465,7 +492,7 @@ fieldset.days label.gone{opacity:.55}fieldset.days input{width:20px;height:20px;
 .buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 button{font:600 1rem system-ui,sans-serif;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;min-height:48px}
 .on-enter{position:absolute;width:1px;height:1px;min-height:0;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
-button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent)}
 details{border-top:1px solid var(--line);padding-top:8px}summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
 details[open]{display:grid;gap:8px}
 label{display:grid;gap:4px;font-size:.9rem}input,textarea,select{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--field-line);background:var(--bg);color:var(--ink);min-width:0;width:100%}

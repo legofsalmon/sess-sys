@@ -2,6 +2,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { color } from '../shared/src/ds/tokens.js'
 
 export default defineConfig({
   // Which code this is, for error reports (ADR 0005). Railway says when it builds.
@@ -18,8 +19,9 @@ export default defineConfig({
       manifest: {
         name: 'Session Hire',
         short_name: 'Session Hire',
+        // The brand red tints the phone's status bar; the splash behind the icon is the light theme's page.
         theme_color: '#ee3744',
-        background_color: '#eef1f4',
+        background_color: color.light.surface.ground,
         display: 'standalone',
         // PNGs beside the SVG (audit finding 26), made by scripts/make-icons.mjs: a phone installs with a real icon. They fill
         // their square with the mark well inside the middle, so Android may also crop them to its own shape ("maskable")
