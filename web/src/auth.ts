@@ -9,10 +9,10 @@ import { useEffect, useState } from 'react'
  */
 export type Auth =
   | { status: 'unknown' }
-  /** The server hasn't got sign-in switched on. */
-  | { status: 'open' }
+  /** The server hasn't got sign-in switched on, or (passcode) is a demo copy locked with a shared passcode. */
+  | { status: 'open'; passcode?: true }
   | { status: 'signed-in'; user: StaffUser }
-  | { status: 'signed-out' }
+  | { status: 'signed-out'; passcode?: true }
 
 const KEY = 'sh.auth'
 const base = import.meta.env.VITE_API_BASE ?? ''
@@ -53,10 +53,13 @@ export function useAuth(): Auth {
 export async function checkAuth() {
   try {
     const res = await fetch(`${base}/api/me`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) })
-    if (res.status === 401) return set({ status: 'signed-out' })
+    if (res.status === 401) {
+      const body = (await res.json().catch(() => ({}))) as { auth?: string }
+      return set(body.auth === 'passcode' ? { status: 'signed-out', passcode: true } : { status: 'signed-out' })
+    }
     if (!res.ok) return
     const me = (await res.json()) as MeResponse
-    set(me.auth === 'off' ? { status: 'open' } : { status: 'signed-in', user: me.user })
+    set(me.auth === 'off' ? { status: 'open' } : me.auth === 'passcode' ? { status: 'open', passcode: true } : { status: 'signed-in', user: me.user })
   } catch {
     // No signal or server down: carry on as before.
   }
@@ -64,7 +67,28 @@ export async function checkAuth() {
 
 /** The server turned a sync away because this device isn't signed in (any more). */
 export function markSignedOut() {
-  if (current.status !== 'signed-out') set({ status: 'signed-out' })
+  if (current.status === 'signed-out') return
+  set(current.status === 'open' && current.passcode ? { status: 'signed-out', passcode: true } : { status: 'signed-out' })
+  // A demo copy's passcode may have changed; the server says which way in it wants.
+  void checkAuth()
+}
+
+/** A demo copy's shared passcode. Needs signal. Says what went wrong, or nothing when it worked. */
+export async function enterPasscode(passcode: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(`${base}/api/auth/passcode`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ passcode }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (res.status === 403) return "That passcode isn't right."
+    if (!res.ok) return `The server answered ${res.status}. Please try again.`
+  } catch {
+    return "Couldn't reach the server. Check the signal and try again."
+  }
+  await checkAuth()
+  return undefined
 }
 
 export const signInUrl = (area: string) => `${base}/api/auth/google/start?next=${encodeURIComponent(area)}`

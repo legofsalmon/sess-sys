@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { MeResponse, StaffUser } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Db } from '../db.ts'
@@ -21,6 +21,12 @@ const SESSION_COOKIE = 'sh_session'
 /** Holds the sign-in attempt (state, PKCE verifier, where to land) between leaving for Google and coming back. */
 const ATTEMPT_COOKIE = 'sh_signin'
 const ATTEMPT_PATH = '/api/auth'
+/** Holds proof that this browser was given the demo passcode (never the passcode itself). */
+const PASSCODE_COOKIE = 'sh_passcode'
+
+/** What the passcode cookie holds: changes whenever the passcode does, so changing it locks every device out. */
+const passcodeProof = (passcode: string) => createHmac('sha256', passcode).update('session-hire demo').digest('base64url')
+const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 
 /**
  * Where to land after signing in: one of the app's own areas, or a place in
@@ -31,12 +37,17 @@ const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\
 /**
  * Staff sign-in. When it is on, every /api route needs a signed-in person
  * unless the route is marked public (health, the sign-in steps, /api/me).
+ * A demo copy without Google can instead be locked with one shared
+ * passcode (DEMO_PASSCODE): the same routes need it, and nobody is named.
  * The app shell, its files and freelancers' private links (/f/...) are not
  * API routes, so they load for anyone: the shell holds no data, and a link's
  * secret is its own credential.
  */
-export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | undefined) {
+export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | undefined, passcode?: string) {
   app.decorateRequest('user', null)
+  // Google sign-in wins: a passcode is only for a demo copy before it is set up.
+  const proof = !auth && passcode ? passcodeProof(passcode) : undefined
+  const hasPasscode = (req: FastifyRequest) => !!proof && same(readCookie(req, PASSCODE_COOKIE) ?? '', proof)
 
   async function signedIn(req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
     const token = readCookie(req, SESSION_COOKIE)
@@ -47,13 +58,19 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
   }
 
   app.addHook('onRequest', async (req, reply) => {
-    if (!auth || !req.routeOptions.url?.startsWith('/api/') || req.routeOptions.config.public) return
+    if (!req.routeOptions.url?.startsWith('/api/') || req.routeOptions.config.public) return
+    if (proof) {
+      if (!hasPasscode(req)) return reply.code(401).send({ error: 'Enter the passcode first.' })
+      return
+    }
+    if (!auth) return
     req.user = await signedIn(req, reply)
     if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
   })
 
   app.get('/api/me', { config: { public: true } }, async (req, reply): Promise<MeResponse | void> => {
     reply.header('cache-control', 'no-store')
+    if (proof) return hasPasscode(req) ? { auth: 'passcode' } : reply.code(401).send({ auth: 'passcode', error: 'Enter the passcode first.' })
     if (!auth) return { auth: 'off' }
     const user = await signedIn(req, reply)
     if (!user) return reply.code(401).send({ auth: 'google', error: 'Sign in first.' })
@@ -107,10 +124,23 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     }
   )
 
+  app.post<{ Body: { passcode?: unknown } }>('/api/auth/passcode', { config: { public: true } }, async (req, reply) => {
+    reply.header('cache-control', 'no-store')
+    if (!proof) return reply.code(404).send({ error: 'This copy of the app has no passcode.' })
+    const given = typeof req.body?.passcode === 'string' ? req.body.passcode.trim() : ''
+    if (!same(passcodeProof(given), proof)) {
+      // A pause on every wrong guess, so guessing takes far too long.
+      await new Promise((r) => setTimeout(r, 1_000))
+      return reply.code(403).send({ error: "That passcode isn't right." })
+    }
+    setCookie(req, reply, PASSCODE_COOKIE, proof, { maxAge: SESSION_DAYS * 86_400 })
+    return { ok: true }
+  })
+
   app.post('/api/auth/signout', { config: { public: true } }, async (req, reply) => {
     const token = readCookie(req, SESSION_COOKIE)
     if (token) await endSession(db, token)
-    clearCookie(req, reply, SESSION_COOKIE)
+    clearCookie(req, reply, proof ? PASSCODE_COOKIE : SESSION_COOKIE)
     return { ok: true }
   })
 }

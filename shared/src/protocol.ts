@@ -114,7 +114,7 @@ export interface StaffUser {
  * device is signed in as. Answers 401 when sign-in is on and the device
  * isn't signed in.
  */
-export type MeResponse = { auth: 'off' } | { auth: 'google'; user: StaffUser }
+export type MeResponse = { auth: 'off' } | { auth: 'passcode' } | { auth: 'google'; user: StaffUser }
 
 /** One nightly (or "Back up now") backup, as the Account screen shows it. */
 export interface BackupRun {

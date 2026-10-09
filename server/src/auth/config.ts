@@ -48,6 +48,18 @@ export function googleClientFromEnv(env: NodeJS.ProcessEnv = process.env): { cli
 }
 
 /**
+ * A shared passcode in front of the app (DEMO_PASSCODE), for a demo copy
+ * with made-up data before Google sign-in is set up. Only used when Google
+ * sign-in is off: once the Google keys are in, they decide who gets in.
+ */
+export function passcodeFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const passcode = env.DEMO_PASSCODE?.trim()
+  if (!passcode) return undefined
+  if (passcode.length < 8) throw new Error('DEMO_PASSCODE is too short: use at least 8 characters.')
+  return passcode
+}
+
+/**
  * Staff means a verified address that is either listed by itself or on a
  * Workspace account of a listed domain. The domain comes from Google's `hd`
  * claim, not the email's ending: a personal Google account can be made

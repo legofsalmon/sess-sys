@@ -191,6 +191,8 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .signin .card { gap: var(--space-14); padding: var(--space-20) var(--space-16); }
 .signin p { margin: 0; }
 .signin .button { padding: var(--space-12) var(--space-16); font-size: var(--text-body); }
+.signin .passcode { display: grid; gap: var(--space-14); }
+.signin .passcode button { padding: var(--space-12) var(--space-16); font-size: var(--text-body); }
 .account .card p { margin: 0; }
 .account .who b, .account .who span { display: block; }
 .account .who span { color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
