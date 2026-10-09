@@ -182,6 +182,12 @@ Worth knowing before turning it on for **Session Hire Gigs**:
 - Once anyone has signed in, the server won't start without the two Google
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
+- A demo copy with made-up data can be locked before Google is set up:
+  set `DEMO_PASSCODE` (at least 8 characters) on that copy's server, and
+  it asks for the passcode instead of a Google account. Freelancers'
+  private links still open without it. Changing the passcode locks every
+  device out until they enter the new one. Once the Google variables are
+  set, the passcode is ignored and Google decides who gets in.
 - Bringing jobs in (step 6) only reads the calendar: nothing is written
   to Google and nobody is emailed.
 - The calendar gets crew by name only: rates and phone numbers stay in

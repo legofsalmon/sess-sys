@@ -3,7 +3,7 @@ import { newId } from '@sh/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
-import { assertSignInKept, authFromEnv, type AuthConfig } from '../src/auth/config.ts'
+import { assertSignInKept, authFromEnv, passcodeFromEnv, type AuthConfig } from '../src/auth/config.ts'
 import { googleProvider, identityFromIdToken, type Identity, type IdentityProvider } from '../src/auth/google.ts'
 import { pgliteDb } from '../src/db.ts'
 
@@ -308,6 +308,67 @@ describe('Google', () => {
       redirect_uri: 'https://app.example/api/auth/google/callback',
       grant_type: 'authorization_code',
     })
+  })
+})
+
+describe('demo passcode', () => {
+  async function demo(opts: { signIn?: boolean } = {}) {
+    const db = await pgliteDb()
+    const google = fakeGoogle()
+    const auth: AuthConfig | undefined = opts.signIn ? { provider: google.provider, domains: ['sessionhire.com'], emails: [] } : undefined
+    const app = await buildApp({ db, auth, passcode: 'loud-speakers-42' })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    return { app, google }
+  }
+  const enter = (app: FastifyInstance, passcode: string) => app.inject({ method: 'POST', url: '/api/auth/passcode', payload: { passcode } })
+
+  it('keeps the API behind the passcode, but not health', async () => {
+    const { app } = await demo()
+    expect((await pull(app)).statusCode).toBe(401)
+    expect((await push(app, undefined, 'place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })).statusCode).toBe(401)
+    expect((await app.inject('/api/export')).statusCode).toBe(401)
+    expect((await app.inject('/api/me')).json()).toEqual({ auth: 'passcode', error: 'Enter the passcode first.' })
+    expect((await app.inject('/api/health')).json()).toMatchObject({ ok: true, auth: 'passcode' })
+    await app.ready()
+    await expect(app.injectWS('/api/sync/live')).rejects.toThrow('401')
+  })
+
+  it('lets a browser in with the right passcode, and remembers it', async () => {
+    const { app } = await demo()
+    const ok = await enter(app, ' loud-speakers-42 ')
+    expect(ok.statusCode).toBe(200)
+    const set = cookie(ok, 'sh_passcode')!
+    expect(set).toMatchObject({ httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 60 * 86_400 })
+    expect(set.value).not.toContain('loud-speakers')
+    const cookies = { sh_passcode: set.value }
+    expect((await app.inject({ url: '/api/me', cookies })).json()).toEqual({ auth: 'passcode' })
+    expect((await app.inject({ url: '/api/sync/pull?after=0', cookies })).statusCode).toBe(200)
+
+    const out = await app.inject({ method: 'POST', url: '/api/auth/signout', cookies })
+    expect(cookie(out, 'sh_passcode')).toMatchObject({ value: '', maxAge: 0 })
+  })
+
+  it('turns a wrong passcode away', async () => {
+    const { app } = await demo()
+    const wrong = await enter(app, 'quiet-speakers-42')
+    expect(wrong.statusCode).toBe(403)
+    expect(cookie(wrong, 'sh_passcode')).toBeUndefined()
+    expect((await app.inject({ url: '/api/me', cookies: { sh_passcode: 'made-up' } })).statusCode).toBe(401)
+  })
+
+  it('steps aside once Google sign-in is on', async () => {
+    const { app } = await demo({ signIn: true })
+    expect((await enter(app, 'loud-speakers-42')).statusCode).toBe(404)
+    expect((await app.inject('/api/health')).json()).toMatchObject({ auth: 'google' })
+  })
+
+  it('is read from DEMO_PASSCODE, and refuses a short one', () => {
+    expect(passcodeFromEnv({})).toBeUndefined()
+    expect(passcodeFromEnv({ DEMO_PASSCODE: ' loud-speakers-42 ' })).toBe('loud-speakers-42')
+    expect(() => passcodeFromEnv({ DEMO_PASSCODE: '1234' })).toThrow('too short')
   })
 })
 
