@@ -14,7 +14,7 @@ import { MOVE_ENTITY_NAMES, type MoveEntities } from './moves.ts'
 import { SETTING_ENTITY_NAMES, type SettingEntities } from './office.ts'
 import { STOCK_ENTITY_NAMES, type StockEntities } from './stock.ts'
 import { TIMESHEET_ENTITY_NAMES, type TimesheetEntities } from './timesheets.ts'
-import { VENUE_DOCUMENT_ENTITY_NAMES, type VenueDocumentEntities } from './venue-documents.ts'
+import { ATTACHMENT_ENTITY_NAMES, type AttachmentEntities } from './attachments.ts'
 
 /** Every record a device keeps, by the name the change feed gives it, gathered from each module. */
 export interface Entities
@@ -34,7 +34,7 @@ export interface Entities
     ErasureEntities,
     DocumentEntities,
     CountEntities,
-    VenueDocumentEntities {}
+    AttachmentEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -53,5 +53,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...ERASURE_ENTITY_NAMES,
   ...DOCUMENT_ENTITY_NAMES,
   ...COUNT_ENTITY_NAMES,
-  ...VENUE_DOCUMENT_ENTITY_NAMES,
+  ...ATTACHMENT_ENTITY_NAMES,
 ]

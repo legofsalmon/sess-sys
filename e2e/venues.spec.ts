@@ -2,11 +2,12 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 /**
- * Venues' pages (ADR 0032), end to end on a phone: a venue in the Jobs
- * tab's list opens a page of its own, with its address and notes, its
- * documents and the jobs there; the office adds a link and a file, opens
- * the file, and removes one; a link that isn't a web address is refused
- * in place. The test server keeps files in a folder (DOCUMENTS_DIR), as a
+ * Venues' and clients' pages (ADR 0032), end to end on a phone: a venue
+ * in the Jobs tab's list opens a page of its own, with its address and
+ * notes, its documents and the jobs there; the office adds a link and a
+ * file, opens the file, and removes one; a link that isn't a web address
+ * is refused in place. A client opens the same way, with its contacts,
+ * its documents and its jobs. The test server keeps files in a folder (DOCUMENTS_DIR), as a
  * bucket would. Uses the made-up data (ADR 0019), so it starts fresh
  * before and after: the other tests share this server.
  * To refresh the blueprint screenshot, run this file on its own with SHOTS=1.
@@ -82,4 +83,42 @@ test("a venue opens on its own page, with its documents and its jobs, and keeps 
   // Up goes back to the jobs, where the venue's row counts its documents.
   await office.getByRole('link', { name: '‹ All jobs' }).click()
   await expect(office.getByRole('link', { name: /^Northbank Conference Centre/ })).toContainText('4 documents')
+})
+
+test('a client opens on its own page, with its contacts, its documents and its jobs', async ({ browser }) => {
+  // Proves: the client list links to the page, also from a job; the page shows the contact, the made-up contract and purchase order, the client's own kinds of document, and their jobs; a contact is changed from the page.
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await office.goto('/#jobs')
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await office.getByRole('link', { name: /^Brightwater Conferences/ }).click()
+  await expect(office).toHaveURL(/#clients\//)
+  await expect(office.getByRole('heading', { level: 1 })).toHaveText('Brightwater Conferences')
+  await expect(office.getByText('Declan Moore')).toBeVisible()
+
+  const docs = office.getByRole('region', { name: 'Documents' })
+  await expect(docs.locator('.row.doc', { hasText: 'Contract for 2026' })).toContainText('Contract · link to example.com')
+  await expect(docs.locator('.row.doc', { hasText: 'Purchase order BW-4471' })).toBeVisible()
+  await docs.getByRole('button', { name: 'Add document' }).click()
+  const form = docs.getByRole('form', { name: 'Add a document for Brightwater Conferences' })
+  await expect(form.getByLabel('What is it').locator('option')).toHaveText(['Contract', 'Purchase order', 'Brief', 'Brand guidelines', 'Insurance they ask for', 'Something else'])
+  await form.getByLabel('What is it').selectOption('brief')
+  await form.getByLabel('Link').fill('https://example.com/made-up/brightwater-summit-brief')
+  await form.getByRole('button', { name: 'Add document' }).click()
+  await expect(docs.locator('.row.doc', { hasText: 'Brief' })).toContainText('Brief · link to example.com')
+
+  const jobs = office.getByRole('region', { name: 'Their jobs' })
+  await expect(jobs.getByRole('link', { name: /Brightwater Tech Summit/ })).toBeVisible()
+  await jobs.getByRole('link', { name: /Brightwater Tech Summit/ }).click()
+  await expect(office.getByRole('heading', { level: 1 })).toHaveText('Brightwater Tech Summit')
+  // From the job, its client's name goes back to the client's page.
+  await office.getByRole('link', { name: 'Brightwater Conferences', exact: true }).click()
+  await expect(office.getByRole('heading', { level: 1 })).toHaveText('Brightwater Conferences')
+
+  await office.getByRole('button', { name: 'Change details' }).click()
+  await office.getByRole('form', { name: 'Change Brightwater Conferences' }).getByLabel('Role').fill('Head of events')
+  await office.getByRole('button', { name: 'Save client' }).click()
+  await expect(office.getByText('Head of events')).toBeVisible()
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await office.evaluate(() => scrollTo(0, 0))
+  await office.screenshot(shot('client-page'))
 })

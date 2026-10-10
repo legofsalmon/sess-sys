@@ -9,7 +9,7 @@ import {
   FILE_TYPES,
   fileTypeOf,
   FILES_WAIT,
-  FILES_WAIT_VENUE,
+  FILES_WAIT_LINK,
   isDay,
   MAX_FILE_BYTES,
   NO_FILE,
@@ -17,7 +17,7 @@ import {
   type DocumentStorage,
   type FileType,
   type Person,
-  venueDocumentDetails,
+  attachmentDetails,
 } from '@sh/shared'
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { renderGone } from '../crew/page.ts'
@@ -30,8 +30,7 @@ import { FileGone, FileLocked, NotKept, type DocumentFiles } from './files.ts'
 import { NotAForm, readForm } from './form.ts'
 import { renderNoFile } from './page.ts'
 import { fileKeyOf, getDocument } from './store.ts'
-import { getVenueDocument, venueFile, venueFileKeyOf } from './venues.ts'
-import { getVenue } from '../projects/store.ts'
+import { attachmentFile, attachmentFileKeyOf, getAttachment, ownerName } from './attachments.ts'
 
 /**
  * Documents' files (ADR 0029), read and written only through the server:
@@ -50,7 +49,7 @@ const ROUTE_LIMIT = MAX_FILE_BYTES + 256 * 1024
 type Said = 'doc-sent' | 'doc-no-file' | 'doc-too-big' | 'doc-web-page' | 'doc-not-a-file' | 'doc-not-on' | 'doc-not-yours' | 'doc-not-kept' | 'check-the-dates' | 'try-again'
 
 type OfficeReq = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string; personId?: string; kind?: string; title?: string; expires?: string } }>
-type VenueReq = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string; venueId?: string; kind?: string; title?: string; link?: string } }>
+type AttachmentReq = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string; owner?: string; ownerId?: string; kind?: string; title?: string; link?: string } }>
 type LinkReq = FastifyRequest<{ Params: { token: string; id?: string } }>
 
 /**
@@ -124,19 +123,19 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
       }
     })
 
-    /** The office puts a file on a venue's document (ADR 0032), with its details, as for a person's. */
-    scope.post('/api/venue-documents/:id/file', { bodyLimit: ROUTE_LIMIT }, async (req: VenueReq, reply) => {
-      if (!files.on) return reply.code(409).send({ error: FILES_WAIT_VENUE })
+    /** The office puts a file on a venue's or client's document (ADR 0032), with its details, as for a person's. */
+    scope.post('/api/attachments/:id/file', { bodyLimit: ROUTE_LIMIT }, async (req: AttachmentReq, reply) => {
+      if (!files.on) return reply.code(409).send({ error: FILES_WAIT_LINK })
       const body = req.body
       if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })
       if (body.length > MAX_FILE_BYTES) return reply.code(413).send({ error: FILE_TOO_BIG })
       const found = fileTypeOf(body.subarray(0, FILE_HEAD_BYTES))
       if ('refused' in found) return reply.code(415).send({ error: found.refused })
       const q = req.query
-      const details = venueDocumentDetails.safeParse({ id: req.params.id, venueId: q.venueId, kind: q.kind, title: q.title, link: q.link || null })
+      const details = attachmentDetails.safeParse({ id: req.params.id, owner: q.owner, ownerId: q.ownerId, kind: q.kind, title: q.title, link: q.link || null })
       if (!details.success) return reply.code(400).send({ error: details.error.issues[0]?.message ?? 'Check the details and try again.' })
       try {
-        await venueFile(db, files, details.data, body, found.type, { clientId: q.client, userId: req.user?.id, device: describeDevice(req.headers['user-agent']) })
+        await attachmentFile(db, files, details.data, body, found.type, { clientId: q.client, userId: req.user?.id, device: describeDevice(req.headers['user-agent']) })
       } catch (err) {
         if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
         if (err instanceof NotKept) return reply.code(502).send({ error: err.message })
@@ -146,14 +145,14 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
       return { ok: true }
     })
 
-    scope.get('/api/venue-documents/:id/file', async (req: VenueReq, reply) => {
-      const doc = await getVenueDocument(db, req.params.id)
+    scope.get('/api/attachments/:id/file', async (req: AttachmentReq, reply) => {
+      const doc = await getAttachment(db, req.params.id)
       if (!doc) return reply.code(404).send({ error: 'That document is no longer there.' })
-      const key = await venueFileKeyOf(db, doc.id)
+      const key = await attachmentFileKeyOf(db, doc.id)
       if (!key || !doc.file) return reply.code(404).send({ error: "There's no file for this document." })
       if (!files.on) return reply.code(409).send({ error: "The file is in the storage bucket, which isn't set up on this server." })
       try {
-        return sendFile(reply, await files.read(key), doc.file.type, documentFileName((await getVenue(db, doc.venueId))?.name ?? '', doc.title, doc.file.type))
+        return sendFile(reply, await files.read(key), doc.file.type, documentFileName((await ownerName(db, doc.owner, doc.ownerId)) ?? '', doc.title, doc.file.type))
       } catch (err) {
         if (err instanceof FileGone) return reply.code(404).send({ error: err.message })
         if (err instanceof FileLocked) return reply.code(409).send({ error: err.message })

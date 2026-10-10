@@ -31,7 +31,7 @@ import {
 } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
-import { VENUE_DOCUMENT_FILE_ACTION, VENUE_DOCUMENT_KINDS, VENUE_DOCUMENT_TITLES, venueTitleInSentence } from '@sh/shared'
+import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -732,16 +732,17 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case DOCUMENT_ACTIONS.file:
     case DOCUMENT_ACTIONS.send:
       return documentWords(command, a, look, person)
-    // Venues' documents (ADR 0032): "Saved the Heritage's floor plan, as a link".
-    case 'venueDocument.save':
-    case 'venueDocument.remove':
-    case VENUE_DOCUMENT_FILE_ACTION: {
-      const d = look('venueDocument', a.id)
-      const kind = VENUE_DOCUMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
-      const whose = `${venue(a.venueId ?? d?.venueId)}'s ${venueTitleInSentence(text(a.title ?? d?.title, (kind && VENUE_DOCUMENT_TITLES[kind]) || 'document'))}`
+    // Documents kept on venues and clients (ADR 0032): "Saved The Heritage's floor plan, as a link".
+    case 'attachment.save':
+    case 'attachment.remove':
+    case ATTACHMENT_FILE_ACTION: {
+      const d = look('attachment', a.id)
+      const kind = ATTACHMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
+      const owner = (a.owner ?? d?.owner) === 'client' ? client : venue
+      const whose = `${owner(a.ownerId ?? d?.ownerId)}'s ${attachmentTitleInSentence(text(a.title ?? d?.title, (kind && ATTACHMENT_TITLES[kind]) || 'document'))}`
       const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
-      if (command === 'venueDocument.remove') return d ? `Removed ${whose}` : 'Removed a venue document'
-      if (command === 'venueDocument.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
+      if (command === 'attachment.remove') return d ? `Removed ${whose}` : 'Removed a document'
+      if (command === 'attachment.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
       return a.added ? `Added ${whose}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
     }
     case EXPORT_COMMAND:

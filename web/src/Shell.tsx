@@ -54,7 +54,7 @@ export function Shell() {
   }, [])
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
   // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab.
-  const area = within('#plan') || within('#import') || within('#venues') ? AREAS[0] : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  const area = within('#plan') || within('#import') || within('#venues') || within('#clients') ? AREAS[0] : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
 
   const main = useRef<HTMLElement>(null)
   // The address the last move was to: the page's own load keeps focus where the browser put it, and a sign-in on the same address isn't a move.
