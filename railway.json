@@ -13,7 +13,7 @@
     ]
   },
   "deploy": {
-    "startCommand": "npm start -w server",
+    "startCommand": "node --import tsx server/src/index.ts",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
