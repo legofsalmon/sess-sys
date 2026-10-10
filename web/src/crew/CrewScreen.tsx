@@ -12,6 +12,7 @@ import {
   eachDay,
   euro,
   euroText,
+  firstName,
   HOLDING,
   levelLabel,
   levelLine,
@@ -201,6 +202,24 @@ function groupCalls(calls: readonly CallView[], inJobs: readonly JobView[]) {
   return [...jobs.values()]
 }
 
+/**
+ * Answers on Google Calendar the app couldn't act on, such as a No to a
+ * booked day: for the office to sort out. Counted in "Answers to check" and
+ * on the Crew badge alike, so neither says less is waiting than the other.
+ */
+export function calendarAnswersToSortOut(view: View, today: string) {
+  return view.crew.calls
+    .filter((c) => c.end >= today && c.status === 'open')
+    .flatMap((c) =>
+      c.offers
+        .filter((o) => o.status === 'offered' || o.status === 'confirmed')
+        .flatMap((o) => {
+          const cal = offerOnCalendar(o, view.calendar.days, today)
+          return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
+        })
+    )
+}
+
 export function CrewScreen() {
   const view = useView()
   const hash = useHash()
@@ -230,15 +249,7 @@ export function CrewScreen() {
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
   const toCheck = answersToCheck(crew, today).map((a) => ({ ...a, warning: onCalendar(a.offer)?.warning }))
-  // Answers in Google the app couldn't act on, such as a No to a booked day: for the office to sort out.
-  const toSortOut = upcoming.flatMap((c) =>
-    c.offers
-      .filter((o) => o.status === 'offered' || o.status === 'confirmed')
-      .flatMap((o) => {
-        const cal = onCalendar(o)
-        return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
-      })
-  )
+  const toSortOut = calendarAnswersToSortOut(view, today)
   // Running late, said on a link (ADR 0028): first in the queue, as it's about today.
   const late = view.late.toCheck
   // Documents sent from a link, for the office to check (ADR 0029).
@@ -246,6 +257,10 @@ export function CrewScreen() {
   // What the device turned down, said in the card it was asked from.
   const answers = useAct()
   const roster = useAct()
+  // The yes or counter being turned down, asked first in its row: it can't be taken back, and their link says so at once (rule 1).
+  const [turningDown, setTurningDown] = useState<string | undefined>()
+  // Who was just archived, said where the list was, with the way back (rule 10).
+  const [archivedNow, setArchivedNow] = useState<{ id: string; name: string } | undefined>()
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
   // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
@@ -306,12 +321,27 @@ export function CrewScreen() {
                       {warning && <><br />{warning}</>}
                     </p>
                   </div>
-                  {kind === 'accepted' || kind === 'countered' ? (
+                  {(kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
+                    <Confirm
+                      question={
+                        kind === 'countered'
+                          ? `Say no to ${o.person?.name ?? 'them'} at ${euro(o.counterRateCents)}? The offer is withdrawn, and their link says so at once.`
+                          : `Release ${o.person?.name ?? 'them'} from ${c.project}? Their place goes back to the call, and their link says so at once.`
+                      }
+                      yes={kind === 'countered' ? 'Withdraw the offer' : `Release ${o.person ? firstName(o.person) : 'them'}`}
+                      no={kind === 'countered' ? 'Keep it open' : 'Keep them'}
+                      onYes={() => {
+                        setTurningDown(undefined)
+                        settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')
+                      }}
+                      onNo={() => setTurningDown(undefined)}
+                    />
+                  ) : kind === 'accepted' || kind === 'countered' ? (
                     <div className="actions">
                       <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
                         {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
                       </button>
-                      <button type="button" onClick={() => settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')}>
+                      <button type="button" onClick={() => setTurningDown(o.id)}>
                         {kind === 'countered' ? 'Say no' : 'Release'}
                       </button>
                     </div>
@@ -391,6 +421,25 @@ export function CrewScreen() {
       <section className="card" aria-label="People">
         <h2>People</h2>
         <Refusal error={roster.error} />
+        {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
+        <div aria-live="polite">
+          {archivedNow && people.get(archivedNow.id)?.archived && (
+            <p className="added">
+              Archived {archivedNow.name}.{' '}
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  const { id } = archivedNow
+                  setArchivedNow(undefined)
+                  void roster.run(() => client.mutate('person.archive', { id, archived: false }))
+                }}
+              >
+                Bring {archivedNow.name} back
+              </button>
+            </p>
+          )}
+        </div>
         {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
         {active.length > 0 && (
           <input className="search" type="search" placeholder="Name, department or skill" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a person" />
@@ -408,7 +457,7 @@ export function CrewScreen() {
         )}
         {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
         <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
-          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
+          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} onArchived={() => setArchivedNow({ id: p.id, name: p.name })} />)}
         </ShowAll>
         {archived.length > 0 && (
           <details className="archived">
@@ -470,6 +519,8 @@ export function CallCard({
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  // The offer or booking being withdrawn, asked first on its line: it can't be taken back, and their link says so at once (rule 1).
+  const [withdrawing, setWithdrawing] = useState<string | undefined>()
   const { run, error } = useAct()
   const today = useToday()
   const filled = call.openDays.length === 0
@@ -550,12 +601,28 @@ export function CallCard({
                           Send
                         </button>
                       )}
-                      {(o.status === 'offered' || o.status === 'confirmed') && (
-                        <button type="button" className="link" onClick={() => withdraw(o)}>
+                      {(o.status === 'offered' || o.status === 'confirmed') && withdrawing !== o.id && (
+                        <button type="button" className="link" onClick={() => setWithdrawing(o.id)}>
                           Withdraw
                         </button>
                       )}
                     </span>
+                    {withdrawing === o.id && (
+                      <Confirm
+                        question={
+                          o.status === 'confirmed'
+                            ? `Release ${o.person?.name ?? 'them'} from this call? The days they're booked for go back to it, and their link says so at once.`
+                            : `Withdraw the offer to ${o.person?.name ?? 'them'}? Their link says it's withdrawn at once.`
+                        }
+                        yes={o.status === 'confirmed' ? `Release ${o.person ? firstName(o.person) : 'them'}` : 'Withdraw the offer'}
+                        no={o.status === 'confirmed' ? 'Keep them' : 'Keep it open'}
+                        onYes={() => {
+                          setWithdrawing(undefined)
+                          withdraw(o)
+                        }}
+                        onNo={() => setWithdrawing(undefined)}
+                      />
+                    )}
                     {cal && <small className="on-cal">{cal.line}</small>}
                     {cal?.warning && <small className="warn-line">{cal.warning}</small>}
                     {/* Not known is allowed, and said on the offer (ADR 0028). */}
@@ -768,12 +835,13 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
         <p className="hint wide">The call is filled: needing more opens it again. Anyone told it had filled gets a new offer, not the old one back.</p>
       )}
       <Refusal error={error} className="wide" />
+      {/* Not "Cancel", beside "Cancel crew call": this one only closes the form (rule 10). */}
       <div className="actions wide">
         <button type="submit" className="primary">
-          Save
+          Save changes
         </button>
         <button type="button" onClick={onDone}>
-          Cancel
+          Keep as it was
         </button>
       </div>
     </form>
@@ -1003,8 +1071,11 @@ export function TellPanel({ tell, onClose }: { tell: Tell; onClose: () => void }
   )
 }
 
-function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
+function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: CrewView; onArchived: () => void }) {
   const [open, setOpen] = useState(false)
+  // Which address was just copied, said on its button (rule 10).
+  const [copied, setCopied] = useState<'link' | 'feed' | undefined>()
+  const copy = (what: 'link' | 'feed', text: string) => void navigator.clipboard?.writeText(text).then(() => setCopied(what))
   const [editing, setEditing] = useState(false)
   const [relinking, setRelinking] = useState(false)
   const { run, error, refuse } = useAct()
@@ -1036,7 +1107,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
             : `${person.name} has an open offer for ${job}; withdraw it first.`
       )
     }
-    void run(() => client.mutate('person.archive', { id: person.id, archived: true }))
+    void run(() => client.mutate('person.archive', { id: person.id, archived: true })).then((ok) => ok && onArchived())
   }
   return (
     <div className="row person">
@@ -1136,14 +1207,14 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
                 <a className="button" href={link} target="_blank" rel="noreferrer">
                   Open their page
                 </a>
-                <button type="button" onClick={() => navigator.clipboard?.writeText(link)}>
-                  Copy link
+                <button type="button" onClick={() => copy('link', link)}>
+                  {copied === 'link' ? 'Copied' : 'Copy link'}
                 </button>
               </>
             )}
             {feed && (
-              <button type="button" onClick={() => navigator.clipboard?.writeText(feed)}>
-                Copy calendar address
+              <button type="button" onClick={() => copy('feed', feed)}>
+                {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
               </button>
             )}
             {!relinking && (

@@ -116,6 +116,8 @@ describe('the office’s details', () => {
       // At the top, before anything else on the page.
       expect(html.indexOf(block), name).toBeLessThan(html.indexOf('<section'))
     }
+    // A link that no longer works says who to ask for a new one (rule 15).
+    expect((await app.inject({ url: '/f/not-a-real-token-at-all' })).body).toContain(block)
     // The way out of a booking says ringing is quickest, with the number.
     expect((await pages()).offers).toContain('Ringing +353 1 234 5678 is quickest.')
 

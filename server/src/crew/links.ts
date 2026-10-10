@@ -1,4 +1,4 @@
-import { eachDay, EURO_HINT, feedCodeFor, feedPath, HOLDING, isDay, LATE_BY, lateDays, MAX_EXTRAS, newId, noTimesheetReason, OPEN, parseEuro, type CommandArgs, type CommandName, type LateBy, type MutationResult, type TimesheetExtra } from '@sh/shared'
+import { eachDay, EURO_HINT, feedCodeFor, feedPath, HOLDING, isDay, LATE_BY, lateDays, MAX_EXTRAS, newId, noTimesheetReason, OPEN, parseEuro, type CommandArgs, type CommandName, type LateBy, type CrewCall, type MutationResult, type Offer, type Person, type TimesheetExtra } from '@sh/shared'
 import { FILE_TOO_BIG, NO_FILE, WEB_FILE, WRONG_FILE } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { applyMutation } from '../commands.ts'
@@ -11,7 +11,7 @@ import { officeFor } from '../office/store.ts'
 import { getPhase } from '../projects/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { getLate, lateFor, lateOf } from './late.ts'
-import { renderGone, renderPage, type Flash, type OnTheDay } from './page.ts'
+import { renderGone, renderPage, type Flash, type Kept, type OnTheDay } from './page.ts'
 import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
 import { awayFor, endedOn, getAway, getCall, getOffer, getPerson, heldByCall, heldElsewhereIn, offersFor, personByToken } from './store.ts'
 import { renderTimesheet } from './timesheet-page.ts'
@@ -37,8 +37,8 @@ type Form = URLSearchParams
  */
 type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; r?: string; o?: string; s?: string } }>
 
-/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), their documents (ADR 0029), or else the offer's card. */
-const SECTIONS = ['details', 'late', 'documents'] as const
+/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), their documents (ADR 0029), their days off, or else the offer's card. */
+const SECTIONS = ['details', 'late', 'documents', 'away'] as const
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -146,10 +146,26 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
 
   const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store').header('x-robots-tag', 'noindex')
 
-  app.get('/f/:token', async (req: Req, reply) => {
+  /** A link that doesn't work any more, with the office's number and email to ask for a new one. */
+  const gone = async (reply: FastifyReply) => reply.code(404).type('text/html').send(renderGone(await officeFor(db)))
+
+  /** A refusal in words: one of the pages' own, or the reason the rules gave. */
+  const reasonOf = (what: Said | Refusal) => (typeof what === 'string' ? SAID[what].text : what.reason.message)
+
+  /**
+   * A refused post (rule 11): the page drawn again at once, with the reason
+   * where the form is and everything typed still in it, rather than a
+   * redirect, which could carry only the reason. The form's address ends in
+   * its place on the page, so the browser lands there.
+   */
+  const refused = async (req: Req, reply: FastifyReply, person: Person, what: Said | Refusal, kept: Kept, where: Pick<Flash, 'offer' | 'section'>) =>
     noStore(reply)
-    const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+      .code(422)
+      .type('text/html')
+      .send(await home(req, person, { ok: false, text: reasonOf(what), ...where }, kept))
+
+  /** Their page, with a message, and with what a refused post typed drawn back into its form. */
+  async function home(req: Req, person: Person, flash: Flash | undefined, kept?: Kept): Promise<string> {
     const rows = await offersFor(db, person.id)
     const held = await heldByCall(db, rows.map((r) => r.call))
     const now = today()
@@ -163,7 +179,6 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       return { offer, call, openDays: Object.keys(byDay).filter((d) => byDay[d]! < call.needed), busy }
     })
     const feed = `${publicOrigin(req)}${feedPath(await feedCodeFor(person.linkToken))}`
-    const flash = await flashFor(person.id, req.query)
     // A day they hold, from 6pm the evening before (ADR 0028): what they've said about being late, and who to ring if it won't send.
     const onTheDay: OnTheDay[] = []
     for (const { offer, call } of rows) {
@@ -175,68 +190,80 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       const lead = phase?.contactId && phase.contactId !== person.id ? await getPerson(db, phase.contactId) : undefined
       onTheDay.push({ offer, call, days, said, contact: lead && !lead.archived ? { name: lead.name, phone: lead.phone } : null })
     }
-    return reply
-      .type('text/html')
-      .send(
-        renderPage({
-          person,
-          jobs,
-          away: await awayFor(db, person.id),
-          base: base(req, person.linkToken),
-          feed,
-          flash,
-          today: now,
-          ended: await endedOn(db, rows.map((r) => r.offer)),
-          timesheets: await timesheetsFor(db, person.id),
-          office: await officeFor(db),
-          onTheDay,
-          // Their documents (ADR 0029), with forms to send a new one where the server can keep files.
-          documents: documentsSection({ person, list: await documentsOf(db, person.id), files: app.documents.on, base: base(req, person.linkToken), today: now, flash }),
-        })
-      )
+    return renderPage({
+      person,
+      jobs,
+      away: await awayFor(db, person.id),
+      base: base(req, person.linkToken),
+      feed,
+      flash,
+      kept,
+      today: now,
+      ended: await endedOn(db, rows.map((r) => r.offer)),
+      timesheets: await timesheetsFor(db, person.id),
+      office: await officeFor(db),
+      onTheDay,
+      // Their documents (ADR 0029), with forms to send a new one where the server can keep files.
+      documents: documentsSection({ person, list: await documentsOf(db, person.id), files: app.documents.on, base: base(req, person.linkToken), today: now, flash }),
+    })
+  }
+
+  app.get('/f/:token', async (req: Req, reply) => {
+    noStore(reply)
+    const person = await personByToken(db, req.params.token)
+    if (!person) return gone(reply)
+    return reply.type('text/html').send(await home(req, person, await flashFor(person.id, req.query)))
   })
 
   // A booking's call sheet (ADR 0021): only the person's own, while it's going ahead.
   app.get('/f/:token/sheet/:id', async (req: Req, reply) => {
     noStore(reply)
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const sheet = await sheetFor(db, person.id, req.params.id ?? '')
     if (!sheet) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken)))
     return reply.type('text/html').send(renderSheet(sheet, base(req, person.linkToken), await officeFor(db)))
   })
 
+  /** A booking's timesheet page, with a message, and with what a refused post typed drawn back into the form. */
+  async function timesheetPage(req: Req, person: Person, offer: Offer, call: CrewCall, flash: Flash | undefined, kept?: URLSearchParams) {
+    return renderTimesheet({
+      offer,
+      call,
+      timesheet: await getTimesheet(db, offer.id),
+      why: noTimesheetReason(offer, call, person, today()),
+      staff: person.kind === 'staff',
+      base: base(req, person.linkToken),
+      flash,
+      kept,
+      office: await officeFor(db),
+    })
+  }
+
   // A booking's timesheet (ADR 0022): the person's own, from its first day.
   app.get('/f/:token/timesheet/:id', async (req: Req, reply) => {
     noStore(reply)
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const offer = await getOffer(db, req.params.id ?? '')
     const call = offer && offer.personId === person.id ? await getCall(db, offer.callId) : undefined
     if (!offer || !call) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken), 'timesheet'))
-    return reply.type('text/html').send(
-      renderTimesheet({
-        offer,
-        call,
-        timesheet: await getTimesheet(db, offer.id),
-        why: noTimesheetReason(offer, call, person, today()),
-        staff: person.kind === 'staff',
-        base: base(req, person.linkToken),
-        flash: await flashFor(person.id, req.query),
-        office: await officeFor(db),
-      })
-    )
+    return reply.type('text/html').send(await timesheetPage(req, person, offer, call, await flashFor(person.id, req.query)))
   })
 
   app.post('/f/:token/timesheet/:id', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const offer = await getOffer(db, req.params.id ?? '')
     if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, 'not-your-booking')
     const again = (what: Said | Refusal) => reply.redirect(`/f/${person.linkToken}/timesheet/${encodeURIComponent(offer.id)}?${new URLSearchParams(told(what))}`, 303)
     const form = (req.body ?? new URLSearchParams()) as Form
+    // A refusal keeps the days, extras and note as they were typed (rule 11).
+    const call = await getCall(db, offer.callId)
+    const turnedDown = async (what: Said | Refusal) =>
+      call ? noStore(reply).code(422).type('text/html').send(await timesheetPage(req, person, offer, call, { ok: false, text: reasonOf(what) }, form)) : again(what)
     const days = form.getAll('days')
-    if (days.length === 0) return again('tick-a-day-worked')
+    if (days.length === 0) return turnedDown('tick-a-day-worked')
     const whats = form.getAll('what')
     const euros = form.getAll('euro')
     const extras: TimesheetExtra[] = []
@@ -244,35 +271,37 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       const what = (whats[i] ?? '').trim().slice(0, 100)
       const typed = (euros[i] ?? '').trim()
       if (!what && !typed) continue
-      if (!what) return again('say-what-for')
+      if (!what) return turnedDown('say-what-for')
       // As typed on a phone: "€12.50", "12,50" or "1,250" all read as a person means them (audit finding 15).
       const amount = parseEuro(typed)
-      if (amount.reason !== undefined || !amount.cents) return again('extra-amount')
+      if (amount.reason !== undefined || !amount.cents) return turnedDown('extra-amount')
       extras.push({ what, cents: amount.cents })
     }
-    if (extras.length > MAX_EXTRAS) return again('too-many-extras')
+    if (extras.length > MAX_EXTRAS) return turnedDown('too-many-extras')
     const note = (form.get('note') ?? '').slice(0, 1000)
     const result = await run(req, person.id, 'timesheet.send', { id: offer.id, days, extras, note })
-    if (result.status === 'rejected') return again(result)
+    if (result.status === 'rejected') return turnedDown(result)
     return again('timesheet-sent')
   })
 
   app.post('/f/:token/offers/:id', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const offer = await getOffer(db, req.params.id!)
     if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, 'not-your-offer')
     const form = (req.body ?? new URLSearchParams()) as Form
+    // A refusal keeps the days ticked, the rate and the note as they were typed, in the offer's card (rule 11).
+    const turnedDown = (what: Said | Refusal) => refused(req, reply, person, what, { form: `offer:${offer.id}`, values: form }, { offer: offer.id })
     let answer = form.get('answer')
     // Enter in the rate field presses the form's hidden first button. With a rate that's a counter; without one there's only a tap to ask for. Never an accept.
     if (answer === 'implicit') {
       // Staff have no rate to send (audit finding 21), so there are only two buttons to name.
-      if (!(form.get('rate') ?? '').trim()) return back(reply, person.linkToken, person.kind === 'staff' ? 'tap-yes-or-no' : 'tap-a-button', offer.id)
+      if (!(form.get('rate') ?? '').trim()) return turnedDown(person.kind === 'staff' ? 'tap-yes-or-no' : 'tap-a-button')
       answer = 'counter'
     }
     const note = (form.get('note') ?? '').slice(0, 1000)
     const picked = form.getAll('days')
-    if (form.get('picker') && picked.length === 0 && answer !== 'decline') return back(reply, person.linkToken, 'tick-a-day', offer.id)
+    if (form.get('picker') && picked.length === 0 && answer !== 'decline') return turnedDown('tick-a-day')
     const days = picked.length ? picked : null
 
     let result: MutationResult
@@ -282,15 +311,15 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     else if (answer === 'pullOut') result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'pullOut', note })
     else if (answer === 'counter') {
       // Staff are paid through payroll, so their page has no rate to send (audit finding 21), and a post that sends one anyway is asked for a tap.
-      if (person.kind === 'staff') return back(reply, person.linkToken, 'tap-yes-or-no', offer.id)
+      if (person.kind === 'staff') return turnedDown('tap-yes-or-no')
       // "€300", "1,250" or "1 250,50" read as the person means them (audit finding 15); anything else says what to put in.
       const rate = parseEuro(form.get('rate') ?? '')
-      if (rate.reason !== undefined) return back(reply, person.linkToken, 'not-a-price', offer.id)
-      if (!rate.cents) return back(reply, person.linkToken, 'no-rate', offer.id)
+      if (rate.reason !== undefined) return turnedDown('not-a-price')
+      if (!rate.cents) return turnedDown('no-rate')
       result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: rate.cents, days, note })
     } else return back(reply, person.linkToken, 'try-again')
 
-    if (result.status === 'rejected') return back(reply, person.linkToken, result, offer.id)
+    if (result.status === 'rejected') return turnedDown(result)
     const said: Said = answer === 'accept' ? 'accepted' : answer === 'decline' ? 'declined' : answer === 'pullOut' ? 'pulled-out' : 'rate-sent'
     // A pull-out leaves the card for "Declined and withdrawn", so its message goes at the top.
     return back(reply, person.linkToken, said, answer === 'pullOut' ? undefined : offer.id)
@@ -303,7 +332,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
    */
   app.post('/f/:token/late', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const form = (req.body ?? new URLSearchParams()) as Form
     const offer = await getOffer(db, form.get('offer') ?? '')
     if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, 'not-your-booking')
@@ -311,18 +340,20 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const typed = form.get('by') ?? ''
     const by = (LATE_BY as readonly string[]).includes(typed) ? (typed as LateBy) : null
     const arriveAt = (form.get('at') ?? '').trim() || null
-    if (!by && !arriveAt) return inCard('late-how')
+    // A refusal keeps how late, the time and the note as they were typed, in the running-late card (rule 11).
+    const turnedDown = (what: Said | Refusal) => refused(req, reply, person, what, { form: `late:${offer.id}`, values: form }, { section: 'late', offer: offer.id })
+    if (!by && !arriveAt) return turnedDown('late-how')
     const day = form.get('day') ?? ''
     // The same record each time, so the office sees one line for the day, however often it changes.
     const was = isDay(day) ? await lateFor(db, offer.id, day) : undefined
     const note = (form.get('note') ?? '').trim().slice(0, 200)
     const result = await run(req, person.id, 'late.say', { id: was?.id ?? newId(), offerId: offer.id, day, by, arriveAt, note })
-    return inCard(result.status === 'rejected' ? result : 'late-sent')
+    return result.status === 'rejected' ? turnedDown(result) : inCard('late-sent')
   })
 
   app.post('/f/:token/late/here', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const form = (req.body ?? new URLSearchParams()) as Form
     const late = await getLate(db, form.get('id') ?? '')
     if (!late || late.personId !== person.id) return back(reply, person.linkToken, 'not-your-booking')
@@ -333,7 +364,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
   // Their own email and phone (audit finding 7). Only what differs is sent, so the history can say which changed.
   app.post('/f/:token/details', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const inSection = (what: Said | Refusal) => reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ ...told(what), s: 'details' })}#details`, 303)
     const form = (req.body ?? new URLSearchParams()) as Form
     // A field the form didn't send is left alone; one sent empty is cleared.
@@ -345,13 +376,14 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (phone !== undefined && phone !== person.phone) changes.phone = phone
     if (changes.email === undefined && changes.phone === undefined) return inSection('details-same')
     const result = await run(req, person.id, 'person.contact', changes)
-    if (result.status === 'rejected') return inSection(result)
+    // A refusal keeps the number and email as they were typed (rule 11).
+    if (result.status === 'rejected') return refused(req, reply, person, result, { form: 'details', values: form }, { section: 'details' })
     return inSection('details-saved')
   })
 
   app.post('/f/:token/away', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const form = (req.body ?? new URLSearchParams()) as Form
     const start = form.get('start') ?? ''
     const end = form.get('end') || start
@@ -362,14 +394,14 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       end,
       note: (form.get('note') ?? '').slice(0, 500),
     }).catch(() => undefined)
-    if (!result) return back(reply, person.linkToken, 'check-the-dates')
-    if (result.status === 'rejected') return back(reply, person.linkToken, result)
+    // A refusal keeps the dates and the note as they were typed, beside the form (rule 11).
+    if (!result || result.status === 'rejected') return refused(req, reply, person, result ?? 'check-the-dates', { form: 'away', values: form }, { section: 'away' })
     return back(reply, person.linkToken, 'days-off-added')
   })
 
   app.post('/f/:token/away/:id/remove', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
-    if (!person) return reply.code(404).type('text/html').send(renderGone())
+    if (!person) return gone(reply)
     const away = await getAway(db, req.params.id!)
     if (!away || away.personId !== person.id) return back(reply, person.linkToken, 'days-off-gone')
     const result = await run(req, person.id, 'unavailability.remove', { id: away.id })

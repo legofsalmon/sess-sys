@@ -99,7 +99,8 @@ async function sendFile(details: DocumentDetails, file: File) {
       signal: AbortSignal.timeout(120_000),
     })
   } catch {
-    throw new Error("Couldn't reach the server. A file needs signal to send: try again when you have it.")
+    // Said as what's kept and what to do, not as a fault (rule 8): the form keeps everything, file and all.
+    throw new Error('Not sent: a file needs signal. What you filled in is kept here, so send it again when you have signal.')
   }
   if (!res.ok) throw await refusal(res)
 }

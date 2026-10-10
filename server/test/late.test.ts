@@ -63,9 +63,12 @@ async function shoot() {
 /** Post a form from a link page and read back the message the page it lands on shows. */
 async function post(app: FastifyInstance, path: string, fields: Record<string, string>) {
   const res = await app.inject({ method: 'POST', url: path, headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': ANDROID }, payload: new URLSearchParams(fields).toString() })
+  // A refusal is drawn at once, with what was typed still in the form (rule 11); it lands at the address posted to.
+  if (res.statusCode === 422) return { ...flashOf(res.body), to: new URL(path, 'http://x'), page: res.body }
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
-  return { ...flashOf((await app.inject({ url: to.pathname + to.search })).body), to }
+  const page = (await app.inject({ url: to.pathname + to.search })).body
+  return { ...flashOf(page), to, page }
 }
 
 describe('running late from a link', () => {

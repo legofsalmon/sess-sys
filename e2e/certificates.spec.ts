@@ -155,11 +155,11 @@ test('the office notes a running late from the call line for someone who rang, a
   await call.getByRole('button', { name: 'Running late…' }).click()
   const form = call.getByRole('form', { name: 'Dara Quinn running late' })
   // Nothing chosen: said in place, in the office's words, and nothing is sent.
-  await form.getByRole('button', { name: 'Save' }).click()
+  await form.getByRole('button', { name: 'Note Dara as late' }).click()
   await expect(form.getByRole('alert')).toHaveText("Say roughly how late they'll be, or the time they'll be there.")
   await form.getByLabel('About 30 minutes').check()
   await form.getByLabel('Note, if you like').fill('Rang: stuck behind a tractor')
-  await form.getByRole('button', { name: 'Save' }).click()
+  await form.getByRole('button', { name: 'Note Dara as late' }).click()
   await expect(form.locator('.added')).toHaveText('Noted: Dara, about 30 minutes late, “Rang: stuck behind a tractor”.')
   await expect(call.locator('.late-line')).toHaveText('Dara: about 30 minutes late, “Rang: stuck behind a tractor”')
   const answers = office.locator('section').filter({ has: office.getByRole('heading', { name: /^Answers to check/ }) })
@@ -217,7 +217,7 @@ test('a Mark as there turned down, from a phone that noted it before it heard th
   await call.getByRole('button', { name: 'Running late…' }).click()
   const form = call.getByRole('form', { name: 'Aoife Brennan running late' })
   await form.getByLabel('About 30 minutes').check()
-  await form.getByRole('button', { name: 'Save' }).click()
+  await form.getByRole('button', { name: 'Note Aoife as late' }).click()
   await form.getByRole('button', { name: 'Mark as there: Aoife Brennan', exact: true }).click()
   await expect(office.getByRole('status')).toHaveText(/2 waiting/)
 

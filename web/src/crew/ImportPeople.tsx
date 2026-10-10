@@ -103,6 +103,8 @@ export function ImportPeopleScreen({ view }: { view: View }) {
         ‹ Account
       </a>
       <header className="title">
+        {/* Where it's up to (rule 13): choosing the file, then checking every row before anything is saved. */}
+        {step.at !== 'done' && <p className="kicker">{step.at === 'preview' ? 'Step 2 of 2: check every row' : 'Step 1 of 2: choose the file'}</p>}
         <h1 ref={heading} tabIndex={-1}>
           {step.at === 'done' ? 'Brought in' : 'Bring in a list'}
         </h1>
@@ -161,6 +163,10 @@ function Preview(p: {
   const { run, error } = useAct()
   const [bringing, setBringing] = useState(false)
   const [asking, setAsking] = useState(false)
+  // Rows fixed or skipped here are the office's work: choosing another file drops them, so that's asked first (rule 11).
+  const [leaving, setLeaving] = useState(false)
+  const read = new Map(p.preview.rows.map((r) => [r.row, typedOf(r)]))
+  const worked = rows.filter((r) => r.skip || JSON.stringify(r.typed) !== JSON.stringify(read.get(r.row))).length
   const counts = importCounts(rows)
   const live = counts.rows - counts.skipped
 
@@ -204,9 +210,19 @@ function Preview(p: {
         ) : (
           <p className="hint">Emails at {p.preview.officeDomain} come in as staff; the rest as freelancers. Levels come from Preferred and Onboarded; the office's own level is kept for anyone already here.</p>
         )}
-        <button type="button" className="link" onClick={p.onBack} disabled={bringing}>
-          Choose another file
-        </button>
+        {leaving ? (
+          <Confirm
+            question={`Drop ${plural(worked, 'row', 'rows')} fixed or skipped here and choose another file?`}
+            yes="Choose another file"
+            no="Keep working on this one"
+            onYes={p.onBack}
+            onNo={() => setLeaving(false)}
+          />
+        ) : (
+          <button type="button" className="link" onClick={() => (worked > 0 ? setLeaving(true) : p.onBack())} disabled={bringing}>
+            Choose another file
+          </button>
+        )}
       </section>
 
       <section className="card" aria-label="Rows">

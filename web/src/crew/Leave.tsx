@@ -380,6 +380,8 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
   const today = useToday()
   const blank = { type: 'annual' as LeaveType, start: today, end: today, note: '' }
   const [f, setF] = useState(blank)
+  // What was just asked for, said under the button, as the request itself is listed further down, off a phone's screen (rule 10).
+  const [done, setDone] = useState('')
   const { run, error, refuse } = useAct()
   const end = f.end < f.start ? f.start : f.end
   const count = leaveDays(f.start, end)
@@ -387,6 +389,7 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
   const crossesYear = year !== Number(end.slice(0, 4))
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    setDone('')
     // The same checks as the server's, said here first so nothing waits on a sync to be refused.
     if (crossesYear) return refuse("A request can't cross the year end: ask for December and January separately.")
     const shut = notOpenReason(year, view.leave.isOpen, today)
@@ -397,7 +400,9 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
     const left = daysLeft(view.leave.balance(me.id, year), f.type)
     if (count > left) return refuse(notEnoughLeft(f.type, left))
     void run(() => client.mutate('leave.request', { id: newId(), personId: me.id, type: f.type, start: f.start, end, note: f.note.trim() })).then((ok) => {
-      if (ok) setF(blank)
+      if (!ok) return
+      setF(blank)
+      setDone(`Asked for ${days(count)} of ${f.type === 'annual' ? 'annual leave' : 'time in lieu'}, ${leaveSpanLabel({ start: f.start, end })}: waiting on approval, under My requests.`)
     })
   }
   return (
@@ -425,8 +430,12 @@ function Apply({ view, me }: { view: View; me: PersonView }) {
       <p className="hint wide">Days already gone can go in too, for the record; once approved they count as taken.</p>
       <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
-        Apply
+        {crossesYear || count === 0 ? 'Apply' : `Apply for ${days(count)}`}
       </button>
+      {/* Read out as it changes, as it's there from the form's opening. */}
+      <div className="wide" aria-live="polite">
+        {done && <p className="added">{done}</p>}
+      </div>
     </form>
   )
 }
@@ -435,11 +444,16 @@ function LogLieu({ me }: { me: PersonView }) {
   const today = useToday()
   const blank = { day: today, days: 1, note: '' }
   const [f, setF] = useState(blank)
+  // What was just logged, said under the button (rule 10).
+  const [done, setDone] = useState('')
   const { run, error } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    setDone('')
     void run(() => client.mutate('lieu.log', { id: newId(), personId: me.id, day: f.day, days: f.days, note: f.note.trim() })).then((ok) => {
-      if (ok) setF(blank)
+      if (!ok) return
+      setF(blank)
+      setDone(`Logged ${f.days === 1 ? 'a day' : `${f.days} days`} in lieu for ${dayLabel(f.day)}: waiting on approval, under My requests.`)
     })
   }
   return (
@@ -457,6 +471,9 @@ function LogLieu({ me }: { me: PersonView }) {
       <button type="submit" className="wide">
         Log day in lieu
       </button>
+      <div className="wide" aria-live="polite">
+        {done && <p className="added">{done}</p>}
+      </div>
     </form>
   )
 }
@@ -465,6 +482,13 @@ function RequestRow({ r, me }: { r: LeaveRequestView; me: PersonView }) {
   const { run, error } = useAct()
   const today = useToday()
   const canCancel = !r.pending && noCancelReason(r, today) === null
+  // Approved leave, once cancelled, has to be asked for and approved again, so it's asked first (rule 1); a request still waiting goes at once.
+  const [asking, setAsking] = useState(false)
+  const what = `${leaveLabel(r.type, r.days).toLowerCase()}, ${leaveSpanLabel(r)}`
+  const cancel = () => {
+    setAsking(false)
+    void run(() => client.mutate('leave.cancel', { id: r.id, by: me.id }))
+  }
   return (
     <div className="row leave-row">
       <div>
@@ -480,12 +504,15 @@ function RequestRow({ r, me }: { r: LeaveRequestView; me: PersonView }) {
       </div>
       <div className="actions">
         <LeavePill status={r.status} pending={r.pending} />
-        {canCancel && (
-          <button type="button" className="link" onClick={() => void run(() => client.mutate('leave.cancel', { id: r.id, by: me.id }))} aria-label={`Cancel ${leaveLabel(r.type, r.days).toLowerCase()}, ${leaveSpanLabel(r)}`}>
+        {canCancel && !asking && (
+          <button type="button" className="link" onClick={() => (r.status === 'approved' ? setAsking(true) : cancel())} aria-label={`Cancel ${what}`}>
             Cancel
           </button>
         )}
       </div>
+      {canCancel && asking && (
+        <Confirm question={`Cancel your ${what}? It would need asking for and approving again.`} yes="Cancel the leave" no="Keep it" onYes={cancel} onNo={() => setAsking(false)} />
+      )}
     </div>
   )
 }
@@ -493,6 +520,12 @@ function RequestRow({ r, me }: { r: LeaveRequestView; me: PersonView }) {
 function EntryRow({ e, me }: { e: LieuEntryView; me: PersonView }) {
   const { run, error } = useAct()
   const canCancel = !e.pending && (e.status === 'waiting' || e.status === 'approved')
+  // An approved day in lieu, once cancelled, has to be logged and approved again, so it's asked first (rule 1).
+  const [asking, setAsking] = useState(false)
+  const cancel = () => {
+    setAsking(false)
+    void run(() => client.mutate('lieu.cancel', { id: e.id, by: me.id }))
+  }
   return (
     <div className="row leave-row">
       <div>
@@ -507,12 +540,21 @@ function EntryRow({ e, me }: { e: LieuEntryView; me: PersonView }) {
       </div>
       <div className="actions">
         <LeavePill status={e.status} pending={e.pending} />
-        {canCancel && (
-          <button type="button" className="link" onClick={() => void run(() => client.mutate('lieu.cancel', { id: e.id, by: me.id }))} aria-label={`Cancel the day in lieu for ${dayLabel(e.day)}`}>
+        {canCancel && !asking && (
+          <button type="button" className="link" onClick={() => (e.status === 'approved' ? setAsking(true) : cancel())} aria-label={`Cancel the day in lieu for ${dayLabel(e.day)}`}>
             Cancel
           </button>
         )}
       </div>
+      {canCancel && asking && (
+        <Confirm
+          question={`Cancel the ${e.days === 1 ? 'day' : `${e.days} days`} in lieu for ${dayLabel(e.day)}? It would need logging and approving again.`}
+          yes="Cancel the day in lieu"
+          no="Keep it"
+          onYes={cancel}
+          onNo={() => setAsking(false)}
+        />
+      )}
     </div>
   )
 }
@@ -655,7 +697,7 @@ function AllowanceRow({ person, year, view, me, fixed }: { person: PersonView; y
         </label>
         {!fixed && (
           <button type="submit" disabled={!touched}>
-            Save
+            Save allowance
           </button>
         )}
       </div>

@@ -102,6 +102,8 @@ async function post(app: FastifyInstance, url: string, fields: [string, string][
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     payload: new URLSearchParams(fields).toString(),
   })
+  // A refusal is drawn at once, with what was typed still in the form (rule 11).
+  if (res.statusCode === 422) return { ...flashOf(res.body), back: { status: 422, html: res.body } }
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
   const back = await page(app, `${to.pathname}${to.search}`)
@@ -178,9 +180,14 @@ describe('a timesheet from a private link', () => {
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['picker', '1']])).message).toBe('Tick at least one day you worked.')
     expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', ''], ['euro', '12']])).message).toBe('Say what each extra is for.')
     // The message is one of the page's own, so it can't name the extra typed (audit finding 21).
-    expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', 'Tolls'], ['euro', 'lots']])).message).toBe(
-      'Put in the amount for each extra, in euro.'
-    )
+    const lots = await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', 'Tolls'], ['euro', 'lots'], ['note', 'Left at 2am']])
+    expect(lots.message).toBe('Put in the amount for each extra, in euro.')
+    // Drawn again at once with everything typed still in the form, to fix the one thing (rule 11).
+    expect(lots.back.html).toContain('value="Tolls"')
+    expect(lots.back.html).toContain('value="lots"')
+    expect(lots.back.html).toContain('>Left at 2am</textarea>')
+    expect(lots.back.html).toContain(`value="${day(-1)}" checked`)
+    expect(lots.back.html).not.toContain(`value="${day(-2)}" checked`)
     expect(await timesheet('dara-sound')).toBeUndefined()
   })
 })
