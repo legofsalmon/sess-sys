@@ -29,7 +29,7 @@ waiting on someone.
 **Next**
 
 - Set the storage bucket (the BACKUP_S3_ settings) to turn on files, for
-  people's documents and venues' alike.
+  people's documents and those on venues and clients alike.
 - Perhaps: crew opening a venue's documents from their call sheet.
 
 ## 10 October 2026: the planner's days open their job
