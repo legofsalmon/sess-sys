@@ -91,6 +91,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const [camera, setCamera] = useState(false)
   const [typed, setTyped] = useState('')
   const [said, setSaid] = useState<Said>()
+  // Scans that weren't recorded stay, said together, until someone dismisses them: the next scan doesn't wipe them.
+  const [failed, setFailed] = useState<string[]>([])
   const field = useRef<HTMLInputElement>(null)
   const pick = view.moves.pickList(job.id)!
   const say = (tone: Tone, text: string, back?: AssetView) => setSaid({ tone, text, at: Date.now(), back })
@@ -144,7 +146,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     return say(notes.length ? 'warn' : 'ok', [text, ...notes].join(' '), a)
   }
 
-  const read = (code: string) => void onCode(code).catch((err: Error) => say('warn', err.message))
+  const read = (code: string) => void onCode(code).catch((err: Error) => setFailed((f) => [...f, `${code.trim()}: ${err.message}`]))
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const code = typed.trim()
@@ -224,6 +226,19 @@ function Pick({ view, job }: { view: View; job: JobView }) {
             {said.text}
           </p>
         )}
+        {failed.length > 0 && (
+          <div className="alert scan-failed" role="alert">
+            <p>{failed.length === 1 ? "1 scan wasn't recorded. Scan it again:" : `${failed.length} scans weren't recorded. Scan them again:`}</p>
+            <ul>
+              {failed.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setFailed([])}>
+              Dismiss
+            </button>
+          </div>
+        )}
         {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
       </section>
 
@@ -244,7 +259,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
                 .get(d)!
                 .filter((r) => shown.includes(r))
                 .map((r) => (
-                  <Row key={r.modelId} row={r} job={job} mode={mode} />
+                  <Row key={r.modelId} row={r} job={job} mode={mode} say={say} />
                 ))}
             </div>
           ))}
@@ -267,7 +282,10 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
   return <ReportFault kind="damaged" asset={a} model={a.model} projectId={job.id} onDone={() => setOpen(false)} />
 }
 
-function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }) {
+/** What a tap on the list did, said in the scan line at the top, where the eye already goes. */
+type Say = (tone: Tone, text: string) => void
+
+function Row({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Direction; say: Say }) {
   const name = rowName(row)
   const extra = row.lines.length === 0
   const missing = row.missing ? `, ${row.missing} missing` : ''
@@ -319,14 +337,23 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
           {row.items.map((a) => (
             <li key={a.id}>
               <a href={`#stock/item/${a.id}`}>{a.number || 'no number yet'}</a>
-              <button type="button" className="link" onClick={() => void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId }))}>
+              <button type="button" className="link" onClick={() =>
+                  void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId })).then(
+                    (ok) => ok && say('ok', mode === 'out' ? `${a.number || name} isn't going: it's back in stock.` : `${a.number || name} back.`)
+                  )
+                }
+              >
                 {mode === 'out' ? 'Not going' : 'Back'}
               </button>
               {mode === 'in' && (
                 <button
                   type="button"
                   className="link"
-                  onClick={() => void run(() => reportFault({ kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' }))}
+                  onClick={() =>
+                    void run(() => reportFault({ kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' })).then(
+                      (ok) => ok && say('warn', `${a.number || name} marked missing. Scan it when it turns up and it's marked found.`)
+                    )
+                  }
                 >
                   Missing
                 </button>
@@ -345,7 +372,7 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
           ))}
         </ul>
       )}
-      {countable && <Count row={row} job={job} mode={mode} />}
+      {countable && <Count row={row} job={job} mode={mode} say={say} />}
       {mode === 'in' && countable && row.countedBack > 0 && !damage && (
         <button type="button" className="link" onClick={() => setDamage(true)}>
           Report damage to counted {name}
@@ -357,7 +384,7 @@ function Row({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }
 }
 
 /** Counted kit, and numbered products not labelled yet: how many go out, or come back. */
-function Count({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction }) {
+function Count({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Direction; say: Say }) {
   const name = rowName(row)
   const [qty, setQty] = useState('')
   const { run, error, refuse } = useAct()
@@ -368,7 +395,12 @@ function Count({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction
       what === 'missing'
         ? reportFault({ kind: 'missing', assetId: null, modelId: row.modelId, qty: n, projectId: job.id, usable: false, note: '' })
         : record(job.id, what, { modelId: row.modelId, qty: n })
-    ).then((ok) => ok && setQty(''))
+    ).then((ok) => {
+      if (!ok) return
+      setQty('')
+      const many = `${n.toLocaleString('en-IE')} × ${name}`
+      say(what === 'missing' ? 'warn' : 'ok', what === 'missing' ? `${many} marked missing.` : what === 'out' ? `${many} counted out.` : `${many} counted back.`)
+    })
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -390,7 +422,7 @@ function Count({ row, job, mode }: { row: PickRow; job: JobView; mode: Direction
         {mode === 'in' && row.countedMissing > 0 && `, ${row.countedMissing.toLocaleString('en-IE')} missing`}
       </p>
       <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="How many" placeholder="How many" />
-      <button type="submit">{mode === 'out' ? 'Out' : 'Back'}</button>
+      <button type="submit">{label}</button>
       {mode === 'in' && row.counted > 0 && (
         <button type="button" onClick={() => go('missing')}>
           Missing

@@ -257,6 +257,7 @@ function NewJob({ view }: { view: View }) {
           ))}
         </select>
       </label>
+      {f.status === 'confirmed' && <p className="hint wide">A confirmed job goes on the jobs calendar and holds its kit.</p>}
       <fieldset className="wide phase-rows">
         <legend>Phases</legend>
         {phases.map((p, i) => (
@@ -298,7 +299,10 @@ const blankContact = (): Contact => ({ name: '', role: '', email: null, phone: n
 
 function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
   const [open, setOpen] = useState(false)
-  const [f, setF] = useState({ name: c.name, notes: c.notes, contacts: c.contacts })
+  const saved = { name: c.name, notes: c.notes, contacts: c.contacts }
+  const [f, setF] = useState(saved)
+  const [from, setFrom] = useState(saved)
+  const edited = JSON.stringify(f) !== JSON.stringify(from)
   const { run, error } = useAct()
   const setContact = (i: number, changes: Partial<Contact>) => setF({ ...f, contacts: f.contacts.map((x, j) => (j === i ? { ...x, ...changes } : x)) })
   const save = (e: FormEvent) => {
@@ -307,7 +311,11 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
     const contacts = f.contacts
       .filter((x) => x.name.trim())
       .map((x) => ({ name: x.name.trim(), role: x.role.trim(), email: x.email?.trim() || null, phone: x.phone?.trim() || null }))
-    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
+    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then((ok) => {
+      if (!ok) return
+      setFrom(f)
+      setOpen(false)
+    })
   }
   return (
     <div className="row person">
@@ -316,7 +324,11 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
         className="who"
         aria-expanded={open}
         onClick={() => {
-          setF({ name: c.name, notes: c.notes, contacts: c.contacts })
+          // Opening fills the form from what's saved, unless something was typed and closed unsaved: that's kept for the next open.
+          if (!open && !edited) {
+            setF(saved)
+            setFrom(saved)
+          }
           setOpen(!open)
         }}
       >
@@ -368,12 +380,19 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
 
 function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
   const [open, setOpen] = useState(false)
-  const [f, setF] = useState({ name: v.name, address: v.address, notes: v.notes })
+  const saved = { name: v.name, address: v.address, notes: v.notes }
+  const [f, setF] = useState(saved)
+  const [from, setFrom] = useState(saved)
+  const edited = JSON.stringify(f) !== JSON.stringify(from)
   const { run, error } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
-    void run(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
+    void run(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then((ok) => {
+      if (!ok) return
+      setFrom(f)
+      setOpen(false)
+    })
   }
   return (
     <div className="row person">
@@ -382,7 +401,10 @@ function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
         className="who"
         aria-expanded={open}
         onClick={() => {
-          setF({ name: v.name, address: v.address, notes: v.notes })
+          if (!open && !edited) {
+            setF(saved)
+            setFrom(saved)
+          }
           setOpen(!open)
         }}
       >

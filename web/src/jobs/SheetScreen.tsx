@@ -58,7 +58,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
   const job = view.jobs.jobs.find((j) => j.id === jobId)
   const phase = job?.phases.find((p) => p.id === phaseId)
   const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'yes' | 'failed'>()
   const [printing, setPrinting] = useState(false)
   useEffect(() => {
     if (!printing) return
@@ -86,7 +86,18 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
     )
 
   const sheet = callSheet(sheetInput(view, job, phase), 'office')
-  const copy = () => void navigator.clipboard?.writeText(callSheetText(sheet)).then(() => setCopied(true))
+  // Said either way: a phone that won't copy says so and points at Print, rather than doing nothing. "Copied" goes after a few seconds, so a second copy answers too.
+  const copy = () => {
+    const done = (how: 'yes' | 'failed') => {
+      setCopied(how)
+      if (how === 'yes') setTimeout(() => setCopied(undefined), 4000)
+    }
+    if (!navigator.clipboard) return done('failed')
+    void navigator.clipboard.writeText(callSheetText(sheet)).then(
+      () => done('yes'),
+      () => done('failed')
+    )
+  }
   const send = (call: CallView, personId: string) => {
     const person = view.crew.people.find((p) => p.id === personId)
     if (person) setShare({ person, call })
@@ -112,9 +123,14 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
             Print
           </button>
           <button type="button" onClick={copy}>
-            {copied ? 'Copied' : 'Copy for a WhatsApp group'}
+            {copied === 'yes' ? 'Copied' : 'Copy for a WhatsApp group'}
           </button>
         </div>
+        {copied === 'failed' && (
+          <p className="alert" role="alert">
+            This phone wouldn't copy it. Use Print, or send each person theirs from Crew below.
+          </p>
+        )}
         <p className="hint">
           Everyone who has said yes has their own on their private link: send it from Crew below. Theirs shows who else is on by name, and only the
           contact's number.

@@ -246,7 +246,7 @@ function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDo
       ) : (
         <div className="actions wide">
           <button type="submit" className="primary">
-            Save
+            Save job
           </button>
           <button type="button" onClick={onDone}>
             Cancel
@@ -498,7 +498,7 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
         ) : (
           <>
             <button type="submit" className="primary">
-              Save
+              Save phase
             </button>
             <button type="button" onClick={onDone}>
               Cancel
@@ -524,17 +524,21 @@ function AddPhase({ job }: { job: JobView }) {
   const today = useToday()
   const start = last?.end ?? today
   const [f, setF] = useState({ name: '', start, end: start })
+  const [added, setAdded] = useState('')
   const { run, error } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!f.name.trim()) return
+    const end = f.end < f.start ? f.start : f.end
     // Ready for the next phase, starting where this one ends; a refusal brings what was typed back, unless the next thing has been typed since.
     const cleared = { name: '', start: f.end, end: f.end }
     setF(cleared)
     void run(() =>
-      client.mutate('phase.add', { id: newId(), projectId: job.id, name: f.name.trim(), start: f.start, end: f.end < f.start ? f.start : f.end, venueId: null, notes: '' })
+      client.mutate('phase.add', { id: newId(), projectId: job.id, name: f.name.trim(), start: f.start, end, venueId: null, notes: '' })
     ).then((ok) => {
-      if (!ok) setF((now) => (now === cleared ? f : now))
+      // Said where it was added: on a phone the new phase lands above, out of sight.
+      if (ok) setAdded(`Added ${f.name.trim()}, ${spanLabel({ start: f.start, end })}.`)
+      else setF((now) => (now === cleared ? f : now))
     })
   }
   return (
@@ -549,6 +553,11 @@ function AddPhase({ job }: { job: JobView }) {
         To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} />
       </label>
       <Refusal error={error} className="wide" />
+      {added && !error && (
+        <p className="added wide" role="status">
+          {added}
+        </p>
+      )}
       <button type="submit" className="wide">
         Add phase
       </button>
@@ -578,6 +587,7 @@ function AskForCrew({ job }: { job: JobView }) {
   const venue = phase?.venue ?? job.venue
   const today = useToday()
   const replyBy = f.replyBy ?? (start ? (suggestedReplyBy(start, end < start ? start : end, today) ?? '') : '')
+  const [asked, setAsked] = useState('')
   const { run, error, refuse } = useAct()
 
   if (!job.span) return <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
@@ -609,7 +619,8 @@ function AskForCrew({ job }: { job: JobView }) {
         needsCertificates: f.needs,
       })
     ).then((ok) => {
-      if (ok) return
+      // Said where it was asked: the new call lands above, out of sight on a phone, and a second press would make a second call.
+      if (ok) return setAsked(`Asked for ${Math.max(1, f.needed)} × ${f.role.trim()} on ${phase?.name ?? (f.across.trim() || job.name)}, ${spanLabel({ start, end: end < start ? start : end })}. Send offers from its card above.`)
       setF((now) => (now === cleared ? f : now))
       setDates((now) => now ?? dates)
     })
@@ -666,6 +677,11 @@ function AskForCrew({ job }: { job: JobView }) {
       </label>
       <NeedsField value={f.needs} onChange={(needs) => setF({ ...f, needs })} />
       <Refusal error={error} className="wide" />
+      {asked && !error && (
+        <p className="added wide" role="status">
+          {asked}
+        </p>
+      )}
       <button type="submit" className="primary wide">
         Ask for crew
       </button>
