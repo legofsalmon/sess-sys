@@ -34,6 +34,9 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
 
   const form = newJobForm(office)
   await form.getByLabel('Job').fill(job)
+  await expect(form.getByLabel('Status')).toHaveValue('enquiry')
+  await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
+  await expect(form.getByText('A confirmed job goes on the jobs calendar and holds its kit.')).toBeVisible()
   await form.getByLabel('Client').fill(named('Nissan Ireland', id))
   await form.getByLabel('Venue').fill(named('The Heritage', id))
   await form.getByLabel('Phase 1', { exact: true }).fill('Build')
@@ -127,7 +130,8 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await context.setOffline(false)
   await phone.evaluate(() => dispatchEvent(new Event('online')))
   await expect(phone.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
-  await expect(phone.locator('.title .pill')).toHaveText('Confirmed')
+  // Nobody chose a status, so it came in as an enquiry: nothing on the jobs calendar, no kit held.
+  await expect(phone.locator('.title .pill')).toHaveText('Enquiry')
 
   // And another device has it.
   const laptop = await (await browser.newContext()).newPage()

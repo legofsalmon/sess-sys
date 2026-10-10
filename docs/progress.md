@@ -33,15 +33,14 @@ waiting on someone.
     - A closed fold keeps what was typed.
     - Signing out sends waiting changes first.
     - Buttons say what they do.
+  - **A new job starts as an enquiry** (Colly's call), so nothing goes on
+    the jobs calendar or holds kit until someone confirms it.
 - What the system didn't cover went back to it as learnings
   ([design-system PR #6](https://github.com/legofsalmon/design-system/pull/6)).
 - Checked: typecheck, the unit tests and the end-to-end suite.
 
 **Next**
 
-- A new job still starts as Confirmed, which puts it on the jobs calendar
-  and holds its kit. Colly to decide whether it should start as an
-  enquiry.
 - An Undo notice, so reversible actions can stop asking first.
 
 ## 10 October 2026: a page for each venue and client, with their documents
