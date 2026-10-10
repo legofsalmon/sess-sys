@@ -26,8 +26,12 @@ afterEach(async () => {
   cleanup = []
 })
 
+/** The last test server's database, to read what it recorded. */
+let lastDb: Awaited<ReturnType<typeof pgliteDb>>
+
 async function server() {
   const db = await pgliteDb()
+  lastDb = db
   const app = await buildApp({ db })
   cleanup.push(async () => {
     await app.close()
@@ -94,11 +98,13 @@ async function answer(app: FastifyInstance, token: string, offerId: string, fiel
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     payload: body.toString(),
   })
+  // A refusal is drawn at once, with what was typed still in the form (rule 11); it lands at the address posted to.
+  if (res.statusCode === 422) return { ...flashOf(res.body), to: new URL(`/f/${token}/offers/${offerId}`, 'http://x'), page: res.body }
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
   // The message is read from the page the address leads to: the address carries only a code (audit finding 21).
   const page = await app.inject({ url: to.pathname + to.search })
-  return { ...flashOf(page.body), to }
+  return { ...flashOf(page.body), to, page: page.body }
 }
 
 /** One offer's card, as the page draws it. */
@@ -225,10 +231,10 @@ describe('freelancer link', () => {
     expect(cardOf(page, picnic.id)).toContain('<p class="flash ok" role="status">Thanks, you&#39;re down for it.')
     expect(page.match(/class="flash/g)).toHaveLength(1)
 
-    // A refusal is an alert, in the card of the offer it's about.
-    const refused = await answer(app, aoife.linkToken, gig.id, { answer: 'accept' })
-    expect(refused.to.searchParams.get('o')).toBe(gig.id)
-    page = (await app.inject({ method: 'GET', url: refused.to.pathname + refused.to.search })).body
+    // A refusal is an alert, in the card of the offer it's about, drawn at once with the note still in it (rule 11).
+    const refused = await answer(app, aoife.linkToken, gig.id, { answer: 'accept', note: 'Can bring my own desk' })
+    page = refused.page
+    expect(cardOf(page, gig.id)).toContain('>Can bring my own desk</textarea>')
     expect(cardOf(page, gig.id)).toContain('<p class="flash bad" role="alert">Already booked on Electric Picnic (Build)')
     expect(page.match(/class="flash/g)).toHaveLength(1)
 
@@ -237,6 +243,18 @@ describe('freelancer link', () => {
     page = (await app.inject({ method: 'GET', url: off.to.pathname + off.to.search })).body
     expect(page).not.toContain(`id="o-${gig.id}"`)
     expect(page.indexOf('<p class="flash ok" role="status">Thanks for letting us know.')).toBeLessThan(page.indexOf('<section>'))
+  })
+
+  it('folds Decline away, as it cannot be taken back from the page', async () => {
+    // Proves: Decline is never a tap beside Accept (rule 1): it's behind "Can't do this one?", and names the job.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const o = await offer(app, await call(app), aoife.id)
+    const card = cardOf((await app.inject({ url: `/f/${aoife.linkToken}` })).body, o.id)
+    const fold = card.indexOf('<details class="decline"><summary>Can\'t do this one?</summary>')
+    expect(fold).toBeGreaterThan(-1)
+    expect(card.indexOf('value="decline">Decline Electric Picnic</button>')).toBeGreaterThan(fold)
+    expect(card.match(/value="decline"/g)).toHaveLength(1)
   })
 
   it('lets a freelancer mark days off, which ops then need to override', async () => {
@@ -249,6 +267,18 @@ describe('freelancer link', () => {
       payload: 'start=2026-10-03&end=2026-10-05&note=On+tour',
     })
     expect(res.statusCode).toBe(303)
+
+    // Dates it can't read are turned down beside the form, with what was typed still in it (rule 11).
+    const bad = await app.inject({
+      method: 'POST',
+      url: `/f/${aoife.linkToken}/away`,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'start=someday&note=At+a+wedding',
+    })
+    expect(bad.statusCode).toBe(422)
+    expect(flashOf(bad.body)).toMatchObject({ ok: false, message: "That isn't a real date." })
+    expect(bad.body.indexOf('<p class="flash bad"')).toBeGreaterThan(bad.body.indexOf('<section id="away">'))
+    expect(bad.body).toContain('value="At a wedding"')
 
     const c = await call(app)
     const refused = await offer(app, c, aoife.id)
@@ -374,14 +404,13 @@ describe('the freelancer page (audit finding 21)', () => {
     const niall = await person(app, 'Niall Kerr')
     const o = await offer(app, await call(app), aoife.id)
     const asked = await answer(app, aoife.linkToken, o.id, { answer: 'implicit', picker: '1', days: ['2026-10-02'], rate: '' })
-    expect(asked.to.searchParams.get('m')).toBe('tap-a-button')
     expect(asked).toMatchObject({ ok: false, message: 'Tap Accept, Decline or Send rate.' })
 
-    // A refusal by the rules names the day, so it travels as the change's id and the page reads what the server recorded.
+    // A refusal by the rules names the day, in the words the server recorded; a later visit reads it by the change's id.
     const refused = await answer(app, aoife.linkToken, o.id, { answer: 'accept', picker: '1', days: ['2027-01-01'] })
-    expect(refused.to.searchParams.has('m')).toBe(false)
     expect(refused).toMatchObject({ ok: false, message: `${dayLabel('2027-01-01')} is not part of this job.` })
-    const change = refused.to.searchParams.get('r')!
+    const change = (await lastDb.query<{ id: string }>(`SELECT id FROM mutations WHERE client_id = $1 AND status = 'rejected'`, [`link:${aoife.id}`])).rows[0]!.id
+    expect(flashOf((await app.inject({ url: `/f/${aoife.linkToken}?r=${change}` })).body).message).toBe(`${dayLabel('2027-01-01')} is not part of this job.`)
 
     const shows = async (token: string, query: string) => (await app.inject({ url: `/f/${token}?${query}` })).body
     const forged = await shows(aoife.linkToken, `m=${encodeURIComponent('<b>Pay me</b> now')}&o=${o.id}`)
@@ -829,10 +858,12 @@ async function post(app: FastifyInstance, path: string, fields: Record<string, s
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     payload: new URLSearchParams(fields).toString(),
   })
+  // A refusal is drawn at once, with what was typed still in the form (rule 11); it lands at the address posted to.
+  if (res.statusCode === 422) return { ...flashOf(res.body), to: new URL(path, 'http://x'), page: res.body }
   expect(res.statusCode).toBe(303)
   const to = new URL(res.headers.location as string, 'http://x')
   const page = await app.inject({ url: to.pathname + to.search })
-  return { ...flashOf(page.body), to }
+  return { ...flashOf(page.body), to, page: page.body }
 }
 
 describe('correcting people (audit finding 7)', () => {
@@ -974,7 +1005,9 @@ describe('correcting people (audit finding 7)', () => {
     // The same checks as the office's form, with the reason in the section.
     const badPhone = await post(app, details, { phone: 'ring me', email: 'aoife.byrne@example.com' })
     expect(badPhone).toMatchObject({ ok: false, message: 'Phone numbers need digits only, ideally starting with +353.' })
-    expect(badPhone.to.searchParams.get('s')).toBe('details')
+    // Drawn at once in the section, open, with what was typed still in it (rule 11).
+    expect(badPhone.page).toContain('<details id="details" open>')
+    expect(badPhone.page).toContain('value="ring me"')
     expect(await post(app, details, { phone: '', email: 'not an address' })).toMatchObject({ ok: false, message: "That email address doesn't look right." })
     expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
 

@@ -27,6 +27,8 @@ export interface TimesheetPage {
   staff: boolean
   base: string
   flash?: { ok: boolean; text: string }
+  /** What a refused post typed (rule 11), drawn back into the form so nothing is lost. */
+  kept?: URLSearchParams
   /** The office's phone and email, once set. */
   office?: OfficeDetails | null
 }
@@ -83,10 +85,16 @@ function approved(t: Timesheet): string {
 
 function form(d: TimesheetPage, action: string): string {
   const t = d.timesheet
-  const ticked = new Set(t?.days ?? d.offer.days)
-  const extras = t?.extras ?? []
+  const typed = d.kept
+  const ticked = new Set(typed ? typed.getAll('days') : (t?.days ?? d.offer.days))
+  // A refused send keeps each extra as it was typed, the one to fix among them; otherwise what was sent.
+  const whats = typed?.getAll('what') ?? []
+  const euros = typed?.getAll('euro') ?? []
+  const extras = typed
+    ? Array.from({ length: Math.max(whats.length, euros.length) }, (_, i) => ({ what: whats[i] ?? '', euro: euros[i] ?? '' })).filter((e) => e.what.trim() || e.euro.trim())
+    : (t?.extras ?? []).map((e) => ({ what: e.what, euro: euroInput(e.cents) }))
   const blanks = Math.max(0, Math.min(MAX_EXTRAS, Math.max(3, extras.length + 1)) - extras.length)
-  const rows = [...extras.map((e) => ({ what: e.what, euro: euroInput(e.cents) })), ...Array.from({ length: blanks }, () => ({ what: '', euro: '' }))]
+  const rows = [...extras, ...Array.from({ length: blanks }, () => ({ what: '', euro: '' }))]
   return `${
     t
       ? `<p class="flash ok">Sent to the office on ${h(on(t.sentAt))}: ${h(euro(timesheetTotal(t).total))} in all. They'll check it; you can change it until they approve it.</p>`
@@ -107,7 +115,7 @@ function form(d: TimesheetPage, action: string): string {
         )
         .join('')}
     </fieldset>
-    <label>Note for the office (optional) <textarea name="note" rows="2" maxlength="1000">${h(t?.note ?? '')}</textarea></label>
+    <label>Note for the office (optional) <textarea name="note" rows="2" maxlength="1000">${h(typed ? typed.get('note') : (t?.note ?? ''))}</textarea></label>
     <button class="yes">${t ? 'Update what you sent' : 'Send to the office'}</button>
   </form>`
 }

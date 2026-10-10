@@ -45,7 +45,9 @@ test('a clash is shown before the server says it, a refusal shows in the offerâ€
   expect(box!.x + box!.width).toBeLessThanOrEqual(phoneSize.width)
   expect(box!.y + box!.height).toBeLessThanOrEqual(phoneSize.height)
   await expect(card.locator('.tag')).toHaveText('Waiting on you')
-  await expect(card.getByRole('checkbox').first()).not.toBeChecked()
+  // What was ticked is kept, so nothing has to be done again; the clashing day is unticked by hand.
+  await expect(card.getByRole('checkbox').first()).toBeChecked()
+  await card.getByRole('checkbox').first().uncheck()
 
   // Asks for a different rate for the day that's free, with Enter in the rate field: the rate goes to the office, nothing is accepted.
   // Typed with a euro sign and a comma, as the audit found it (finding 15): the browser lets it through and the page reads it as â‚¬1,250.

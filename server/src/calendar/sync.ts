@@ -77,13 +77,13 @@ const problems = {
     `Google no longer accepts the app's access to ${account ?? 'the account'}'s calendars, so the calendar isn't being updated. Connect again to carry on.`,
   locked: "The app's Google key has changed since the calendar was connected, so its saved access can't be used. Connect again to carry on.",
   apiOff:
-    "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check now.",
+    "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check the calendar.",
   noAccess: (calendar: string, account: string | null) =>
     `${account ?? 'The connected account'} can't change ${calendar} any more: it may have been deleted, or its sharing changed. Choose another calendar, or give that account permission to change it again.`,
   busy: (at: Date) =>
     `Google Calendar isn't answering, so some days are still on their way. Trying again at ${at.toLocaleTimeString('en-IE', { timeZone: 'Europe/Dublin', hour: '2-digit', minute: '2-digit' })}.`,
   badClient:
-    "Google doesn't accept the app's own Google key (its client id and secret), so nothing can be written. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Railway, then press Check now.",
+    "Google doesn't accept the app's own Google key (its client id and secret), so nothing can be written. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Railway, then press Check the calendar.",
   refused: (reason: string) => `Google turned this day down${reason ? ` (${reason})` : ''}. It is tried again when the job changes, and each night.`,
   leftBehind: (n: number, calendar: string) =>
     `${n === 1 ? '1 day was' : `${n} days were`} left on ${calendar}, because Google no longer accepts the app's access. Delete ${n === 1 ? 'it' : 'them'} in Google Calendar if ${n === 1 ? "it isn't" : "they aren't"} wanted.`,

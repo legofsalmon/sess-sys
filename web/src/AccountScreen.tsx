@@ -9,12 +9,12 @@ import { ExportCard } from './ExportCard.tsx'
 import { FeedCard } from './FeedCard.tsx'
 import { ImportPeopleCard } from './ImportPeopleCard.tsx'
 import { ImportStockCard } from './ImportStockCard.tsx'
-import { MadeUp, useHash } from './jobs/common.tsx'
+import { Top, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
-import { useNotDone } from './problems.tsx'
 import { forgetCountDraft } from './stock/Counts.tsx'
 import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { client, storage } from './sync.ts'
+import { tabRole } from './tabs.ts'
 import { useView } from './view.ts'
 
 /** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, bringing in the crew list, and the device's own sync state. */
@@ -25,10 +25,10 @@ export function AccountScreen() {
   const hash = useHash()
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
-  // Signing out with changes still waiting asks first, in the card.
+  // Signing out with changes still waiting sends them first, and asks only if some are still here.
   const [asking, setAsking] = useState(false)
+  const [sending, setSending] = useState(false)
   const waiting = view.pendingCount
-  const notDone = useNotDone(view)
   // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
   if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
   // And the stock list (ADR 0026).
@@ -50,22 +50,25 @@ export function AccountScreen() {
     location.replace('/')
   }
 
+  // With signal, what's waiting is sent first, so signing out only asks when something would really be lost.
+  const press = async () => {
+    if (waiting > 0 && navigator.onLine && tabRole() === 'writer') {
+      setSending(true)
+      try {
+        await client.sync()
+      } catch {
+        // Not sent: the question below says what would go.
+      }
+      setSending(false)
+    }
+    if (client.pendingCount > 0) setAsking(true)
+    else void out()
+  }
+  const still = client.pendingCount
+
   return (
     <div className="app account">
-      <header className="top">
-        <div className="brand">
-          <span className="mark">SH</span>
-          <span>
-            <b>Session Hire</b>
-            <small>
-              Account
-              <MadeUp view={view} />
-            </small>
-          </span>
-        </div>
-        <div className="state">{notDone.count}</div>
-        {notDone.list}
-      </header>
+      <Top view={view} title="Account" />
 
       {auth.status === 'signed-in' && (
         <section className="card">
@@ -76,15 +79,15 @@ export function AccountScreen() {
           </p>
           {asking ? (
             <Confirm
-              question={`${waiting === 1 ? "1 change hasn't" : `${waiting} changes haven't`} synced yet. Signing out deletes ${waiting === 1 ? 'it' : 'them'} from this device.`}
-              yes="Sign out anyway"
+              question={`${still === 1 ? "1 change hasn't" : `${still} changes haven't`} synced yet. Signing out deletes ${still === 1 ? 'it' : 'them'} from this device.`}
+              yes={`Sign out and delete ${still === 1 ? 'it' : 'them'}`}
               no="Stay signed in"
               onYes={() => void out()}
               onNo={() => setAsking(false)}
             />
           ) : (
-            <button type="button" onClick={() => (waiting > 0 ? setAsking(true) : void out())} disabled={busy}>
-              Sign out
+            <button type="button" onClick={() => void press()} disabled={busy || sending}>
+              {sending ? 'Sending changes first…' : 'Sign out'}
             </button>
           )}
           {problem && (

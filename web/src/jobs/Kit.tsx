@@ -249,7 +249,7 @@ function KitDays({ job }: { job: JobView }) {
           <Refusal error={error} className="wide" />
           <div className="actions wide">
             <button type="submit" className="primary">
-              Save
+              Save kit days
             </button>
             <button
               type="button"
@@ -386,7 +386,7 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
       ) : (
         <div className="actions wide">
           <button type="submit" className="primary">
-            Save
+            Save line
           </button>
           <button type="button" onClick={onDone}>
             Cancel

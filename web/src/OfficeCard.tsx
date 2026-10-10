@@ -4,6 +4,10 @@ import { Refusal, useAct } from './act.tsx'
 import { Pending } from './StatusPill.tsx'
 import { client } from './sync.ts'
 
+type Fields = { name: string; phone: string; email: string }
+const fieldsOf = (details: OfficeView['details']): Fields => ({ name: details?.name ?? 'Session Hire office', phone: details?.phone ?? '', email: details?.email ?? '' })
+const same = (a: Fields, b: Fields) => a.name === b.name && a.phone === b.phone && a.email === b.email
+
 /**
  * The office's own details (audit finding 10): shown on every freelancer
  * page as a way back to the office, so someone booked can ring or email
@@ -11,14 +15,16 @@ import { client } from './sync.ts'
  * and syncs later.
  */
 export function OfficeCard({ office }: { office: OfficeView }) {
-  const { details } = office
-  // Starts again from what's saved whenever that changes, such as when another device's change syncs.
-  return <Form key={`${details?.name ?? ''}|${details?.phone ?? ''}|${details?.email ?? ''}`} office={office} />
-}
-
-function Form({ office }: { office: OfficeView }) {
   const { details, pending } = office
-  const [f, setF] = useState({ name: details?.name ?? 'Session Hire office', phone: details?.phone ?? '', email: details?.email ?? '' })
+  const saved = fieldsOf(details)
+  const [f, setF] = useState(saved)
+  // What the form last started from. When what's saved changes, such as when another device's change syncs, the form follows it,
+  // unless someone is part way through typing here: their typing is kept, and Save puts it over the other change.
+  const [from, setFrom] = useState(saved)
+  if (!same(from, saved)) {
+    setFrom(saved)
+    if (same(f, from)) setF(saved)
+  }
   const { run, error } = useAct()
   const shown = officeLine(details)
   const save = (e: FormEvent) => {
@@ -50,7 +56,7 @@ function Form({ office }: { office: OfficeView }) {
         </label>
         <div className="actions wide">
           <button type="submit" className="primary">
-            Save
+            Save office details
           </button>
           <Pending pending={pending} />
         </div>

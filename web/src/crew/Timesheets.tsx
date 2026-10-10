@@ -16,7 +16,7 @@ import {
   type TimesheetRow,
   type View,
 } from '@sh/shared'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Top } from '../jobs/common.tsx'
@@ -133,6 +133,9 @@ export function TimesheetScreen({ view, offerId }: { view: View; offerId: string
   const r = view.timesheets.row(offerId)
   // Kept here, above the timesheet, which starts again once it's approved.
   const [tell, setTell] = useState<Share | undefined>()
+  // Bumped to start the check again from what was sent, when the office asks for it.
+  const [fresh, setFresh] = useState(0)
+  const restart = () => setFresh((n) => n + 1)
   return (
     <div className="app crew jobs timesheet-screen">
       <Top view={view} title="Crew" />
@@ -144,15 +147,21 @@ export function TimesheetScreen({ view, offerId }: { view: View; offerId: string
           <p className="empty">This booking isn't on this device. It may have been removed, or still be on its way: check again once it says “Up to date”.</p>
         </section>
       ) : (
-        // Starts again from what's saved whenever that changes, such as when it syncs or is approved.
-        <Timesheet key={`${r.timesheet?.status}:${r.timesheet?.sentAt}:${r.timesheet?.approvedAt}`} view={view} r={r} onTell={setTell} />
+        // Starts again when it's approved or reopened, or when asked; a new version sent while it's open is said in the form rather than dropped on top of what's typed (rule 11).
+        <Timesheet
+          key={`${r.timesheet?.status === 'approved' ? `approved:${r.timesheet.approvedAt}` : 'open'}:${fresh}`}
+          view={view}
+          r={r}
+          onTell={setTell}
+          onRestart={restart}
+        />
       )}
       {tell && <SharePanelFor share={tell} onClose={() => setTell(undefined)} />}
     </div>
   )
 }
 
-function Timesheet({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTell }) {
+function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow; onTell: OnTell; onRestart: () => void }) {
   const t = r.timesheet
   const first = r.person?.name.split(' ')[0] ?? 'them'
   const [asking, setAsking] = useState(false)
@@ -188,7 +197,7 @@ function Timesheet({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: O
         )}
       </section>
       {asking && r.person && <Ask r={r} person={r.person} onClose={() => setAsking(false)} />}
-      {t?.status === 'approved' ? <Approved r={r} onTell={onTell} /> : !why && <Check view={view} r={r} onTell={onTell} />}
+      {t?.status === 'approved' ? <Approved r={r} onTell={onTell} /> : !why && <Check view={view} r={r} onTell={onTell} onRestart={onRestart} />}
     </>
   )
 }
@@ -248,8 +257,16 @@ interface ExtraRow {
 }
 
 /** The days worked, the rate and the extras, as the office agrees them, and approving. */
-function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTell }) {
+function Check({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow; onTell: OnTell; onRestart: () => void }) {
   const t = r.timesheet
+  // What the form started from. A new version sent from their link starts it again while nothing's been changed here;
+  // once something has, it's said, with the way to start from theirs, and nothing typed is lost (rule 11).
+  const [from] = useState(t?.sentAt)
+  const [touched, setTouched] = useState(false)
+  const newer = !!t && t.sentVia === 'link' && t.sentAt !== from
+  useEffect(() => {
+    if (newer && !touched) onRestart()
+  }, [newer, touched, onRestart])
   const [days, setDays] = useState(() => new Set(t?.days ?? r.offer.days))
   const [rate, setRate] = useState(() => {
     const c = t?.dayRateCents ?? r.offer.dayRateCents
@@ -292,12 +309,16 @@ function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTel
   const { run, error } = useAct()
 
   const toggle = (d: string) => {
+    setTouched(true)
     const next = new Set(days)
     if (next.has(d)) next.delete(d)
     else next.add(d)
     setDays(next)
   }
-  const setExtra = (i: number, e: Partial<ExtraRow>) => setExtras(extras.map((x, j) => (j === i ? { ...x, ...e } : x)))
+  const setExtra = (i: number, e: Partial<ExtraRow>) => {
+    setTouched(true)
+    setExtras(extras.map((x, j) => (j === i ? { ...x, ...e } : x)))
+  }
   const approve = () => {
     if (problem || rateCents === null) return
     const person = r.person
@@ -314,6 +335,14 @@ function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTel
   return (
     <section className="card ts-check" aria-label={t ? 'Check and approve' : 'Fill in'}>
       <h2>{t ? 'Check and approve' : 'Fill in for them'}</h2>
+      {newer && touched && (
+        <p className="warn-line">
+          {r.person?.name.split(' ')[0] ?? 'They'} sent a new version on {on(t.sentAt)}: what's below is what you've changed so far.{' '}
+          <button type="button" className="link" onClick={onRestart}>
+            Start from what they sent
+          </button>
+        </p>
+      )}
       <fieldset className="ts-days">
         <legend>Days worked</legend>
         {shown.map((d) => (
@@ -330,7 +359,7 @@ function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTel
       )}
       <label className="field">
         Day rate €
-        <input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Agreed rate" />
+        <input inputMode="decimal" value={rate} onChange={(e) => (setTouched(true), setRate(e.target.value))} placeholder="Agreed rate" />
       </label>
       <fieldset className="ts-extras">
         <legend>Extras</legend>
@@ -339,20 +368,20 @@ function Check({ view, r, onTell }: { view: View; r: TimesheetRow; onTell: OnTel
           <div key={i} className="ts-extra">
             <input aria-label="What" value={e.what} onChange={(x) => setExtra(i, { what: x.target.value })} placeholder="e.g. Parking" maxLength={100} />
             <input aria-label="€" inputMode="decimal" value={e.euro} onChange={(x) => setExtra(i, { euro: x.target.value })} placeholder="€" />
-            <button type="button" className="link" onClick={() => setExtras(extras.filter((_, j) => j !== i))} aria-label={`Remove ${e.what || 'this extra'}`}>
+            <button type="button" className="link" onClick={() => (setTouched(true), setExtras(extras.filter((_, j) => j !== i)))} aria-label={`Remove ${e.what || 'this extra'}`}>
               Remove
             </button>
           </div>
         ))}
         {extras.length < MAX_EXTRAS && (
-          <button type="button" className="link start" onClick={() => setExtras([...extras, { what: '', euro: '' }])}>
+          <button type="button" className="link start" onClick={() => (setTouched(true), setExtras([...extras, { what: '', euro: '' }]))}>
             Add an extra
           </button>
         )}
       </fieldset>
       <label className="field">
         Note for {r.person?.name.split(' ')[0] ?? 'them'} (optional)
-        <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why anything changed" maxLength={1000} />
+        <textarea rows={2} value={note} onChange={(e) => (setTouched(true), setNote(e.target.value))} placeholder="Why anything changed" maxLength={1000} />
       </label>
       {changes.length > 0 && (
         <div className="warn-line">

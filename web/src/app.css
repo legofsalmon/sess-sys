@@ -76,6 +76,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .top { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
 /* A new version arrived while the app was open: one line fixed at the top until they reload. The page and its sticky header move down under it, so it hides nothing. */
 .update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--space-12); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--space-16) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+/* Its words wrap when there's more to say, such as changes a reload would lose; the button stays whole. */
+.update > span { white-space: normal; }
 .update ~ main .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
 .update ~ main .app .top { top: calc(56px + env(safe-area-inset-top)); }
 .brand { display: flex; gap: var(--space-10); align-items: center; }
@@ -85,7 +87,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .mark { width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
 .conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
 .conn.online { background: var(--good-soft); color: var(--good); }
-.conn.syncing { background: var(--warn-soft); color: var(--warn); }
+/* Changes on their way: nobody has to act, so quiet grey and dashed, never amber. */
+.conn.syncing { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
 .conn.offline { background: var(--ink); color: var(--bg); }
 .top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-6); }
 /* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
@@ -110,12 +113,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .row:first-of-type { border-top: 0; padding-top: 0; }
 .row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .actions { display: flex; gap: var(--space-6); flex-wrap: wrap; align-items: center; }
-/* The one status pill (StatusPill.tsx): amber when someone has to act, green when settled, grey when off, the bad tone for a clash. */
+/* The one status pill (StatusPill.tsx): amber when someone has to act, green when settled, grey when off, the bad tone for a clash, and dashed grey while waiting to sync. */
 .pill { font-size: var(--text-pill); font-weight: 700; padding: var(--space-2) var(--space-8); border-radius: var(--radius-full); white-space: nowrap; }
 .pill.pending { background: var(--warn-soft); color: var(--warn); }
 .pill.confirmed { background: var(--good-soft); color: var(--good); }
 .pill.cancelled { background: var(--line); color: var(--on-line); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.waiting { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
 button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 /* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
@@ -188,6 +192,8 @@ h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--acc
 
 /* Keeping a screen short on a phone (audit finding 16, Fold.tsx): a form behind its button, and a list's first few with "Show all". */
 .fold { display: grid; gap: var(--space-10); }
+/* A form put away keeps what was typed (Fold.tsx), hidden rather than gone. */
+.fold[hidden] { display: none; }
 .fold > button.link, .app button.show-all { justify-self: start; }
 
 /* Sign-in and account. */

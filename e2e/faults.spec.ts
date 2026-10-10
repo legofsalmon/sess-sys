@@ -125,7 +125,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   const cableRow = page.getByRole('article', { name: cable })
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('20')
-  await countOut.getByRole('button', { name: 'Out' }).click()
+  await countOut.getByRole('button', { name: 'Count out' }).click()
   await expect(page.locator('.pick-total')).toHaveText('23 of 23 out')
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
@@ -153,7 +153,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   // 17 cables back, 3 missing, and 2 of those back are cut.
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('17')
-  await countBack.getByRole('button', { name: 'Back' }).click()
+  await countBack.getByRole('button', { name: 'Count back' }).click()
   await expect(cableRow.locator('.count')).toHaveText('3 still out')
   await countBack.getByLabel('How many').fill('3')
   await countBack.getByRole('button', { name: 'Missing' }).click()
@@ -205,7 +205,8 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await expect(page.locator('.facts')).toContainText("FaultDamaged, can't go out: Blown driver, rattles at high level")
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await page.screenshot(shot('faults-item'))
-  await faults.getByRole('button', { name: 'Fixed' }).click()
+  await faults.getByRole('button', { name: 'Mark fixed' }).click()
+  await faults.getByRole('button', { name: 'Mark it fixed' }).click()
   await expect(page.locator('.facts')).not.toContainText('Fault')
   await expect(faults.locator('summary')).toHaveText('One before')
 

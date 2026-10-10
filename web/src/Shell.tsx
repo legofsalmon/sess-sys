@@ -7,7 +7,7 @@ import { HistoryScreen } from './HistoryScreen.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
-import { StorageBanner } from './StorageBanner.tsx'
+import { StorageBanner, useUnkept } from './StorageBanner.tsx'
 import { UpdateBar } from './update.tsx'
 
 /**
@@ -46,6 +46,7 @@ const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=
 
 export function Shell() {
   const auth = useAuth()
+  const unkept = useUnkept()
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
     const on = () => setHash(location.hash)
@@ -83,7 +84,7 @@ export function Shell() {
   if (auth.status === 'signed-out')
     return (
       <>
-        <UpdateBar />
+        <UpdateBar unkept={unkept} />
         <main ref={main}>
           <SignIn />
         </main>
@@ -91,7 +92,7 @@ export function Shell() {
     )
   return (
     <>
-      <UpdateBar />
+      <UpdateBar unkept={unkept} />
       <StorageBanner />
       <main ref={main}>
         <area.Screen />

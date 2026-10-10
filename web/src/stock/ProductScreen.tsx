@@ -37,6 +37,7 @@ import {
   CountRow,
   findWhere,
   numberLabel,
+  SavedLine,
   TrackingChoice,
   useNewPlace,
   whereLabel,
@@ -526,24 +527,27 @@ function AddItem({ m, w }: { m: ModelView; w: WarehouseView }) {
 
 function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
   const numbered = m.tracking === 'serialised'
+  // What a count or a move just did, said here, as a row counted to none or moved away goes.
+  const [said, setSaid] = useState('')
   return (
     <section className="card" aria-label={numbered ? 'Not labelled yet' : 'Counted'}>
       <h2>{numbered ? 'Not labelled yet' : 'Counted'}</h2>
       {numbered && <p className="hint">How many are here but not labelled yet. Adding an item where some are counted takes one off.</p>}
       {m.counted.length === 0 && <Empty />}
       {m.counted.map((s) => (
-        <CountRow key={s.id} s={s} w={w}>
+        <CountRow key={s.id} s={s} w={w} onSaid={setSaid}>
           {whereLabel(s, w)}
         </CountRow>
       ))}
-      <NewCount m={m} w={w} />
+      <SavedLine text={said} />
+      <NewCount m={m} w={w} onSaid={setSaid} />
       <p className="hint">In all: {amountLabel(m)}.</p>
     </section>
   )
 }
 
 /** A count somewhere not counted before. */
-function NewCount({ m, w }: { m: ModelView; w: WarehouseView }) {
+function NewCount({ m, w, onSaid }: { m: ModelView; w: WarehouseView; onSaid: (text: string) => void }) {
   const [where, setWhere] = useState('')
   const [qty, setQty] = useState('')
   // A count that would replace one already made waits here until the office says so.
@@ -552,14 +556,19 @@ function NewCount({ m, w }: { m: ModelView; w: WarehouseView }) {
   const place = useNewPlace(w)
   const save = (n: number) => {
     setAsking(undefined)
+    onSaid('')
+    // Said as typed: a place made just now isn't in this render's list yet.
+    const known = findWhere(where, w)
+    const at = known ? atLabel(known, w) : `at ${where.trim()}`
     void run(async () => {
-      const at = await whereNamed(where, w)
-      if (!at) throw new Error('Where are they?')
-      await client.mutate('stock.set', { modelId: m.id, ...at, qty: n })
+      const dest = await whereNamed(where, w)
+      if (!dest) throw new Error('Where are they?')
+      await client.mutate('stock.set', { modelId: m.id, ...dest, qty: n })
     }).then((ok) => {
       if (!ok) return
       setWhere('')
       setQty('')
+      onSaid(`Counted ${n.toLocaleString('en-IE')} × ${m.name} ${at}.`)
     })
   }
   const submit = (e: FormEvent) => {

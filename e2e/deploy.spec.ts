@@ -5,7 +5,7 @@ import { join } from 'node:path'
 /**
  * A deploy while the app is open (audit findings 4 and 27), in a real
  * browser: the built app is swapped under a running session, the service
- * worker finds the new version and the bar at the top says so, and Reload
+ * worker finds the new version and the bar at the top says so, and Load the new version
  * brings in the new build without losing a change made with no signal. The
  * build is put back afterwards, as the other specs share it.
  */
@@ -20,8 +20,8 @@ const putBack = () => {
 }
 test.afterEach(putBack)
 
-test('a new version waits for Reload, which brings it in with an unsynced change intact', async ({ browser }) => {
-  // Proves: a deploy never takes the open page over by itself, and Reload brings the new build with nothing lost.
+test('a new version waits for Load the new version, which brings it in with an unsynced change intact', async ({ browser }) => {
+  // Proves: a deploy never takes the open page over by itself, and Load the new version brings the new build with nothing lost.
   const context = await browser.newContext()
   const tab = await context.newPage()
   await tab.goto('/#stock')
@@ -57,9 +57,9 @@ test('a new version waits for Reload, which brings it in with an unsynced change
   expect(await tab.evaluate(() => document.querySelector('meta[name="build"]')?.getAttribute('content') ?? null)).toBeNull()
   await expect(tab.locator('.conn')).toHaveText(/1 waiting/)
 
-  // Signal back, and Reload: the new build, with the change made before it now synced.
+  // Signal back, and Load the new version: the new build, with the change made before it now synced.
   signal = true
-  await tab.getByRole('button', { name: 'Reload' }).click()
+  await tab.getByRole('button', { name: 'Load the new version' }).click()
   await tab.waitForFunction(() => document.querySelector('meta[name="build"]')?.getAttribute('content') === 'two', null, { timeout: 20_000 })
   await expect(tab.locator('.conn')).toHaveText('Up to date', { timeout: 20_000 })
   const all = tab.getByRole('button', { name: /^Show all \d+ places$/ })

@@ -37,6 +37,9 @@ type Step =
   | { at: 'bringing'; preview: ImportPreview }
   | { at: 'done'; preview: ImportPreview; result: ImportResult }
 
+/** What was unticked, renamed and chosen on a calendar's list, kept while someone goes back to look at another and returns. */
+type Picks = { names: Record<string, string>; skip: ReadonlySet<string>; people: ReadonlySet<string> }
+
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-IE')} ${n === 1 ? one : many}`
 
 /** "Sat 12 Dec", with the year when it isn't this one. */
@@ -52,6 +55,7 @@ export function ImportScreen({ view }: { view: View }) {
   const [calendarId, setCalendarId] = useState('')
   const [from, setFrom] = useState(() => importFromDefault(today))
   const [step, setStep] = useState<Step>({ at: 'choose' })
+  const picks = useRef(new Map<string, Picks>())
   const heading = useRef<HTMLHeadingElement>(null)
   const offline = view.connection === 'offline'
 
@@ -93,6 +97,11 @@ export function ImportScreen({ view }: { view: View }) {
           {step.at === 'done' ? 'Brought in' : 'Bring in from Google Calendar'}
         </h1>
       </header>
+      {connected && step.at !== 'done' && (
+        <p className="hint step">
+          {step.at === 'choose' || step.at === 'looking' ? 'Step 1 of 2: choose a calendar and a day' : 'Step 2 of 2: check what comes in'}
+        </p>
+      )}
 
       {!connected ? (
         <section className="card">
@@ -126,6 +135,8 @@ export function ImportScreen({ view }: { view: View }) {
           bringing={step.at === 'bringing'}
           offline={offline}
           problem={step.at === 'look' ? step.problem : undefined}
+          kept={picks.current.get(`${step.preview.calendar.id}|${step.preview.from}`)}
+          onKeep={(kept) => picks.current.set(`${step.preview.calendar.id}|${step.preview.from}`, kept)}
           onBack={() => setStep({ at: 'choose' })}
           onBring={bring}
         />
@@ -213,14 +224,21 @@ function Look(p: {
   bringing: boolean
   offline: boolean
   problem: string | undefined
+  kept: Picks | undefined
+  onKeep: (picks: Picks) => void
   onBack: () => void
   onBring: (preview: ImportPreview, choices: ImportChoices) => void
 }) {
   const { preview } = p
   const year = useToday().slice(0, 4)
-  const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(preview.jobs.map((j) => [j.key, j.name])))
-  const [skip, setSkip] = useState<ReadonlySet<string>>(new Set())
-  const [people, setPeople] = useState<ReadonlySet<string>>(() => new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
+  // Back on a calendar and day already looked at, what was unticked, renamed and chosen is as it was left.
+  const [names, setNames] = useState<Record<string, string>>(() => ({ ...Object.fromEntries(preview.jobs.map((j) => [j.key, j.name])), ...p.kept?.names }))
+  const [skip, setSkip] = useState<ReadonlySet<string>>(() => p.kept?.skip ?? new Set())
+  const [people, setPeople] = useState<ReadonlySet<string>>(() => p.kept?.people ?? new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
+  const { onKeep } = p
+  useEffect(() => {
+    onKeep({ names, skip, people })
+  }, [names, skip, people, onKeep])
   // The question before anything is saved, in the bar the button is in.
   const [asking, setAsking] = useState(false)
   const toggle = <T,>(set: ReadonlySet<T>, item: T) => {

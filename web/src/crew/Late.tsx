@@ -188,7 +188,7 @@ function LateFields({ call, offer, day, said }: { call: CallView; offer: OfferVi
       </div>
       <div className="actions wide">
         <button type="submit" className="primary">
-          Save
+          {said ? 'Change how late' : `Note ${first} as late`}
         </button>
         {said && !said.arrivedAt && (
           <button type="button" onClick={() => there(said)} aria-label={`Mark as there: ${name}`}>

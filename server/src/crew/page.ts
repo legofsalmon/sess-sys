@@ -21,9 +21,22 @@ export interface Flash {
   ok: boolean
   text: string
   offer?: string
-  /** Their details, the running-late card for the offer (ADR 0028), or their documents (ADR 0029). */
-  section?: 'details' | 'late' | 'documents'
+  /** Their details, the running-late card for the offer (ADR 0028), their documents (ADR 0029), or their days off. */
+  section?: 'details' | 'late' | 'documents' | 'away'
 }
+
+/**
+ * What a refused post typed (rule 11), drawn back into the form it came
+ * from so nothing is lost: an offer's card ("offer:<id>"), a running-late
+ * card ("late:<offer>"), their details, or the days-off form.
+ */
+export interface Kept {
+  form: string
+  values: URLSearchParams
+}
+
+/** What was typed into one form, when that's the form a refused post came from. */
+const keptIn = (d: Pick<PageData, 'kept'>, form: string) => (d.kept?.form === form ? d.kept.values : undefined)
 
 /** A booking on a day they can say they're running late for (ADR 0028): today, and tomorrow from 6pm. */
 export interface OnTheDay {
@@ -65,6 +78,8 @@ export interface PageData {
   /** The read-only calendar feed address (ADR 0012), safe to add to a shared calendar. */
   feed: string
   flash?: Flash
+  /** What a refused post typed, to draw back into its form. */
+  kept?: Kept
   today: string
   /** When each withdrawn or filled offer ended, by offer, for "Declined and withdrawn". */
   ended: ReadonlyMap<string, string>
@@ -105,6 +120,18 @@ function pullOut(d: PageData, action: string) {
     </details>`
 }
 
+/**
+ * Turning an offer down (rule 1): it can't be taken back from here, so it's
+ * folded away as "Can't make it" is, never a tap beside Accept. Any note
+ * typed above goes with it.
+ */
+function decline(call: CrewCall) {
+  return `<details class="decline"><summary>Can't do this one?</summary>
+        <p class="small">Once declined, it's off your page: only the office can offer it to you again.</p>
+        <button class="no" name="answer" value="decline">Decline ${h(call.project)}</button>
+      </details>`
+}
+
 /** Staff are paid through payroll, so their page carries no rate (audit finding 21). */
 const isStaff = (p: Pick<Person, 'kind'>) => p.kind === 'staff'
 
@@ -125,7 +152,10 @@ function facts(call: CrewCall, offer: Offer, staff: boolean) {
 function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const { offer, call, openDays, busy } = job
   const days = eachDay(call.start, call.end)
-  const action = `${d.base}/offers/${encodeURIComponent(offer.id)}`
+  // Ending in the card's place, so a refusal drawn at this address lands on the card.
+  const action = `${d.base}/offers/${encodeURIComponent(offer.id)}#o-${h(offer.id)}`
+  // What a refused answer typed, back in place of what's saved (rule 11).
+  const typed = keptIn(d, `offer:${offer.id}`)
   const title = `${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}`
   // Someone who said yes can still change their days; on a one-day job there is nothing to change.
   const canAnswer = offer.status === 'offered' || offer.status === 'countered' || (offer.status === 'accepted' && days.length > 1)
@@ -137,7 +167,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
       ? `<input type="hidden" name="picker" value="1"><fieldset class="days"><legend>Your days</legend>${days
           .map((day) => {
             const open = openDays.includes(day) || (offer.status === 'accepted' && offer.days.includes(day))
-            const checked = (offer.status === 'offered' ? open : offer.days.includes(day)) && !busy[day]
+            const checked = typed ? typed.getAll('days').includes(day) : (offer.status === 'offered' ? open : offer.days.includes(day)) && !busy[day]
             const note = !open ? 'filled' : busy[day] ? `booked on ${h(busy[day])}` : ''
             return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day))}${note ? ` <small>${note}</small>` : ''}</label>`
           })
@@ -162,15 +192,15 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
         ? `<form method="post" action="${action}">
       ${onEnter}
       ${dayPicker}
-      <div class="buttons${holding ? ' one' : ''}">
+      <div class="buttons one">
         <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
-        ${holding ? '' : '<button class="no" name="answer" value="decline">Decline</button>'}
       </div>
-      <details${offer.status === 'countered' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
-        ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : ''}"></label>`}
-        <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(offer.note)}</textarea></label>
+      <details${offer.status === 'countered' || typed?.get('rate')?.trim() || (typed?.get('note') ?? '') !== '' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
+        ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${h(typed ? (typed.get('rate') ?? '') : offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : '')}"></label>`}
+        <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(typed ? (typed.get('note') ?? '') : offer.note)}</textarea></label>
         ${staff ? '<p class="small">It goes with your answer.</p>' : '<button name="answer" value="counter">Send rate</button>'}
       </details>
+      ${holding ? '' : decline(call)}
     </form>`
         : ''
     }
@@ -223,21 +253,24 @@ function todayCard(d: PageData, t: OnTheDay): string {
 
 /** Roughly how late, or the time they'll be there, and a note; filled in with what they said last, to change it. */
 function lateForm(d: PageData, t: OnTheDay, last: RunningLate | undefined, ring: { name: string; phone: string } | null): string {
+  // What a refused post typed, back in place of what was said last (rule 11).
+  const typed = keptIn(d, `late:${t.offer.id}`)
   const day =
     t.days.length > 1
       ? `<fieldset class="choice"><legend>Which day</legend>${t.days
-          .map((x, i) => `<label><input type="radio" name="day" value="${h(x)}"${i === 0 ? ' checked' : ''}> ${h(capital(lateDayWord(x, d.today)))}, ${h(dayLabel(x))}</label>`)
+          .map((x, i) => `<label><input type="radio" name="day" value="${h(x)}"${(typed?.get('day') ? typed.get('day') === x : i === 0) ? ' checked' : ''}> ${h(capital(lateDayWord(x, d.today)))}, ${h(dayLabel(x))}</label>`)
           .join('')}</fieldset>`
       : `<input type="hidden" name="day" value="${h(t.days[0])}">`
+  const by = typed ? typed.get('by') : last?.by
   // Red marks the one thing to do next: with a late start already said, that's "I'm here now", so Send for a change is plain.
-  return `<form method="post" action="${d.base}/late">
+  return `<form method="post" action="${d.base}/late#late-${h(t.offer.id)}">
         <input type="hidden" name="offer" value="${h(t.offer.id)}">
         ${day}
         <fieldset class="choice"><legend>Roughly how late</legend>${LATE_BY.map(
-          (b) => `<label><input type="radio" name="by" value="${h(b)}"${last?.by === b ? ' checked' : ''}> ${h(LATE_BY_LABELS[b])}</label>`
+          (b) => `<label><input type="radio" name="by" value="${h(b)}"${by === b ? ' checked' : ''}> ${h(LATE_BY_LABELS[b])}</label>`
         ).join('')}</fieldset>
-        <label>Or the time you'll be there <input type="time" name="at" value="${h(last?.arriveAt ?? '')}"></label>
-        <label>Note, if you like <input name="note" maxlength="${LATE_NOTE_LENGTH}" value="${h(last?.note ?? '')}" placeholder="e.g. traffic on the M50"></label>
+        <label>Or the time you'll be there <input type="time" name="at" value="${h(typed ? typed.get('at') : (last?.arriveAt ?? ''))}"></label>
+        <label>Note, if you like <input name="note" maxlength="${LATE_NOTE_LENGTH}" value="${h(typed ? typed.get('note') : (last?.note ?? ''))}" placeholder="e.g. traffic on the M50"></label>
         <p class="small">Sending this needs signal.${ring ? ` If it won't go, ring ${h(ring.name)} on <a href="${h(telHref(ring.phone))}">${h(ring.phone)}</a>.` : ''}</p>
         <button${last ? '' : ' class="yes"'}>Send</button>
       </form>`
@@ -274,16 +307,18 @@ const rank = (t: Timesheet | undefined) => (!t ? 0 : t.status === 'sent' ? 1 : 2
  */
 function details(d: PageData): string {
   const mine = d.flash?.section === 'details'
+  // What a refused save typed, back in place of what's saved (rule 11).
+  const typed = keptIn(d, 'details')
   return `<section class="me">
     <details id="details"${mine ? ' open' : ''}>
       <summary><h2>Your details</h2></summary>
       ${mine && d.flash ? flash(d.flash) : ''}
-      <form method="post" action="${d.base}/details">
+      <form method="post" action="${d.base}/details#details">
         <p class="small">You're down as <b>${h(d.person.name)}</b>. Ask the office to change your name; your number and email you can fix here.</p>
-        <label>Mobile <input type="tel" name="phone" value="${h(d.person.phone ?? '')}" maxlength="40" placeholder="+353 87 123 4567" autocomplete="tel"></label>
-        <label>Email <input type="email" name="email" value="${h(d.person.email ?? '')}" maxlength="200" autocomplete="email"></label>
+        <label>Mobile <input type="tel" name="phone" value="${h(typed ? typed.get('phone') : (d.person.phone ?? ''))}" maxlength="40" placeholder="+353 87 123 4567" autocomplete="tel"></label>
+        <label>Email <input type="email" name="email" value="${h(typed ? typed.get('email') : (d.person.email ?? ''))}" maxlength="200" autocomplete="email"></label>
         <p class="small">Write your mobile with the country code, +353 for Ireland, so WhatsApp messages and texts reach you.</p>
-        <button>Save</button>
+        <button>Save my number and email</button>
       </form>
     </details>
   </section>`
@@ -352,11 +387,13 @@ export function renderPage(d: PageData): string {
   const past = d.jobs.filter((j) => !booked.includes(j) && HOLDING.includes(j.offer.status)).slice(-8).reverse()
   const turned = d.jobs.filter((j) => !waiting.includes(j) && !booked.includes(j) && !HOLDING.includes(j.offer.status)).slice(-8).reverse()
   const first = firstName(d.person)
+  // What a refused "Add days off" typed, back in the form (rule 11).
+  const away = keptIn(d, 'away')
   // A message about an offer sits in that offer's card, one about their details in that section, one about running late in today's card; any other at the top.
   const inCard =
     d.flash?.section === 'late'
       ? (d.onTheDay ?? []).some((t) => t.offer.id === d.flash?.offer)
-      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details' || d.flash?.section === 'documents'
+      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details' || d.flash?.section === 'documents' || d.flash?.section === 'away'
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -390,8 +427,9 @@ export function renderPage(d: PageData): string {
     ${feedBlock(d.feed)}
   </section>
 
-  <section>
+  <section id="away">
     <h2>Days you can't work</h2>
+    ${d.flash?.section === 'away' ? flash(d.flash) : ''}
     ${
       d.away.length
         ? `<ul class="away">${d.away
@@ -406,10 +444,10 @@ export function renderPage(d: PageData): string {
             .join('')}</ul>`
         : ''
     }
-    <form method="post" action="${d.base}/away" class="add-away">
-      <label>From <input type="date" name="start" required min="${d.today}"></label>
-      <label>To <input type="date" name="end" min="${d.today}"></label>
-      <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour"></label>
+    <form method="post" action="${d.base}/away#away" class="add-away">
+      <label>From <input type="date" name="start" required min="${d.today}" value="${h(away?.get('start'))}"></label>
+      <label>To <input type="date" name="end" min="${d.today}" value="${h(away?.get('end'))}"></label>
+      <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour" value="${h(away?.get('note'))}"></label>
       <button>Add days off</button>
     </form>
   </section>
@@ -431,11 +469,12 @@ export function renderPage(d: PageData): string {
 </html>`
 }
 
-export function renderGone(): string {
+/** A link that no longer works, with the office's number and email, once set, so they know who to ask (rule 15). */
+export function renderGone(office?: OfficeDetails | null): string {
   return `<!doctype html><html lang="en-IE"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex"><title>Session Hire</title><style>${CSS}</style></head>
 <body><main><header class="top"><span class="mark">SH</span><div><b>Session Hire</b></div></header>
-<p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p></main></body></html>`
+<p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p>${officeBlock(office)}</main></body></html>`
 }
 
 /**
@@ -476,7 +515,7 @@ section{display:grid;gap:10px}
 .offer{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
 .offer.offered{border-left-color:var(--accent)}.offer.confirmed{border-left-color:var(--good)}.offer.accepted,.offer.countered{border-left-color:var(--warn)}
 .office{margin:0;font-size:.92rem;color:var(--muted)}.office a{font-weight:600;white-space:nowrap}
-.pull-out summary{color:var(--bad)}.pull-out[open]{display:grid;gap:8px}.tag.pulled-out{background:var(--bad-soft);color:var(--bad)}
+.pull-out summary,.decline summary{color:var(--bad)}.decline[open]{display:grid;gap:8px}.pull-out[open]{display:grid;gap:8px}.tag.pulled-out{background:var(--bad-soft);color:var(--bad)}
 .buttons.one{grid-template-columns:1fr}
 .offer header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
 h3{margin:0;font-size:1.1rem}h3 span{font-weight:500;color:var(--muted)}

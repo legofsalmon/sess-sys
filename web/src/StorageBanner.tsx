@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './storage.css'
-import { storage } from './sync.ts'
+import { client, storage } from './sync.ts'
 import { onTabRole, tabRole, takeOverTab, type TabRole } from './tabs.ts'
 import type { StorageState } from './storage.ts'
 
@@ -21,6 +21,14 @@ function useStorageState(): StorageState {
   const [state, setState] = useState(() => storage.state())
   useEffect(() => storage.subscribe(setState), [])
   return state
+}
+
+/** How many changes waiting to sync a reload would lose: none, unless this browser keeps nothing between reloads. */
+export function useUnkept(): number {
+  const { mode } = useStorageState()
+  const [waiting, setWaiting] = useState(() => client.pendingCount)
+  useEffect(() => client.subscribe((view) => setWaiting(view.pendingCount)), [])
+  return mode === 'memory' ? waiting : 0
 }
 
 export function StorageBanner() {

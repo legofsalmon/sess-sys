@@ -185,6 +185,42 @@ export function ScanResult({ children, onClose, label = 'Last scan' }: { childre
   )
 }
 
+/**
+ * Scans that weren't done, kept in a list under the camera until each is
+ * dismissed (audit finding 18, design rule 2): with the camera on, the next
+ * label is read at once, and a single line would be gone before anyone
+ * looked at it.
+ */
+export function useScanMisses() {
+  const [misses, setMisses] = useState<{ id: number; text: string }[]>([])
+  const add = (text: string) => setMisses((was) => [{ id: Date.now() + Math.random(), text }, ...was])
+  const dismiss = (id: number) => setMisses((was) => was.filter((m) => m.id !== id))
+  return { misses, add, dismiss }
+}
+
+/** The list itself, newest first; its live region is there before anything is in it, so each one is read out. */
+export function ScanMisses({ misses, onDismiss }: { misses: readonly { id: number; text: string }[]; onDismiss: (id: number) => void }) {
+  return (
+    <div className="scan-misses wide" aria-live="polite">
+      {misses.length > 0 && (
+        <>
+          <h4>Not done ({misses.length})</h4>
+          <ul className="said-list">
+            {misses.map((m) => (
+              <li key={m.id}>
+                <span>{m.text}</span>
+                <button type="button" className="link" onClick={() => onDismiss(m.id)} aria-label={`Dismiss: ${m.text}`}>
+                  Dismiss
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** "SH-000123 (d&b Y10P) was added by mistake.", for a label that's on nothing real. */
 export const mistakeLabel = (a: AssetView) => `${numberLabel(a)} (${a.model?.name ?? 'an item'}) was added by mistake.`
 
@@ -228,12 +264,25 @@ export function ProductChoices({ w }: { w: WarehouseView }) {
   )
 }
 
+/** What a count or a move just did, in a green line under the counts: said by the card, as a row counted to none or moved away goes. */
+export function SavedLine({ text }: { text: string }) {
+  if (!text) return null
+  return (
+    <p className="added" role="status">
+      {text}
+    </p>
+  )
+}
+
+/** "12 × XLR 10 m", or "none of XLR 10 m". */
+const howMany = (n: number, name: string) => (n === 0 ? `none of ${name}` : `${n.toLocaleString('en-IE')} × ${name}`)
+
 /**
  * How many are counted somewhere, with Count again and Move some.
  * `children` says what the count is of: where, on a product's page; the
- * product, on a place's or a case's.
+ * product, on a place's or a case's. `onSaid` gets what was done, in words.
  */
-export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; children: ReactNode }) {
+export function CountRow({ s, w, children, onSaid }: { s: StockView; w: WarehouseView; children: ReactNode; onSaid: (text: string) => void }) {
   const [mode, setMode] = useState<'count' | 'move' | undefined>()
   const [qty, setQty] = useState('')
   const [to, setTo] = useState('')
@@ -242,6 +291,7 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
   const name = s.model?.name ?? 'them'
   const open = (next: 'count' | 'move') => {
     refuse('')
+    onSaid('')
     setQty(next === 'count' ? String(s.qty) : '')
     setMode(mode === next ? undefined : next)
   }
@@ -250,7 +300,12 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
     const n = Number(qty)
     if (!Number.isInteger(n) || n < 0 || n > MAX_QTY) return refuse('A whole number, please.')
     if (mode === 'count') {
-      void run(() => client.mutate('stock.set', { modelId: s.modelId, placeId: s.placeId, caseId: s.caseId, qty: n })).then((ok) => ok && setMode(undefined))
+      const at = atLabel(s, w)
+      void run(() => client.mutate('stock.set', { modelId: s.modelId, placeId: s.placeId, caseId: s.caseId, qty: n })).then((ok) => {
+        if (!ok) return
+        setMode(undefined)
+        onSaid(`Counted ${howMany(n, s.model?.name ?? 'kit')} ${at}.`)
+      })
       return
     }
     if (n < 1) return refuse('How many to move?')
@@ -273,6 +328,7 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
         if (!ok) return
         setMode(undefined)
         setTo('')
+        onSaid(`Moved ${howMany(n, s.model?.name ?? 'kit')} to ${to.trim()}.`)
       })
     if (!ask(to, go)) go()
   }
@@ -314,7 +370,7 @@ export function CountRow({ s, w, children }: { s: StockView; w: WarehouseView; c
 }
 
 /** Count a product at a place or in a case, picking it by name. For a numbered product, it's the ones not labelled yet. */
-export function CountHere({ w, at, title }: { w: WarehouseView; at: Where; title: string }) {
+export function CountHere({ w, at, title, onSaid }: { w: WarehouseView; at: Where; title: string; onSaid: (text: string) => void }) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   // A count that would replace one already made waits here until the office says so.
@@ -322,10 +378,12 @@ export function CountHere({ w, at, title }: { w: WarehouseView; at: Where; title
   const { run, error, refuse } = useAct()
   const save = (m: ModelView, n: number) => {
     setAsking(undefined)
+    onSaid('')
     void run(() => client.mutate('stock.set', { modelId: m.id, ...at, qty: n })).then((ok) => {
       if (!ok) return
       setName('')
       setQty('')
+      onSaid(`Counted ${howMany(n, m.name)} ${atLabel(at, w)}.`)
     })
   }
   const submit = (e: FormEvent) => {

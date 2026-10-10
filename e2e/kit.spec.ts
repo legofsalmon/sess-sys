@@ -152,7 +152,7 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   await expect(change.getByLabel('Subhired')).toHaveValue('2')
   await expect(change.getByLabel('From')).toBeFocused()
   await change.getByLabel('From').fill('PRG')
-  await change.getByRole('button', { name: 'Save' }).click()
+  await change.getByRole('button', { name: 'Save line' }).click()
   await expect(state(monitors)).toHaveText('2 subhired from PRG. Enough, with none to spare.')
   await expect(page.locator('.facts')).toContainText('1 product')
   await expect(page.locator('.facts')).not.toContainText('short')

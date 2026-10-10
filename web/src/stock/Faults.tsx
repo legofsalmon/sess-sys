@@ -167,15 +167,28 @@ export function FaultsCard({ faults, children, title = 'Faults' }: { faults: Fau
   )
 }
 
+/** Each way of closing a fault, as a button: a verb, where OUTCOME_LABELS says how it ended. */
+const CLOSE_LABELS: Record<FaultOutcome, string> = { fixed: 'Mark fixed', 'not-faulty': 'Mark not faulty', found: 'Mark found', 'written-off': 'Write off' }
+
 function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   const [editing, setEditing] = useState(false)
-  const [writingOff, setWritingOff] = useState(false)
+  // Closing a fault can't be undone (there's no reopening one), so each way of closing it asks first, in place.
+  const [closing, setClosing] = useState<FaultOutcome>()
   const { run, error } = useAct()
   const closeAs = (outcome: FaultOutcome) => {
-    setWritingOff(false)
+    setClosing(undefined)
     void run(() => client.mutate('fault.close', { id: f.id, outcome, at: new Date().toISOString() }))
   }
+  const what = faultWhat(f)
+  const they = f.assetId ? 'It' : 'They'
   const effect = f.assetId ? `It's retired as ${f.kind === 'missing' ? 'lost' : 'scrapped'}` : "They're taken off the count"
+  /** The question before each way of closing it: what happens to the kit, in words. */
+  const asks: Record<FaultOutcome, { question: string; yes: string }> = {
+    fixed: { question: `Mark ${what} fixed? ${they} can go out on jobs again.`, yes: 'Mark it fixed' },
+    'not-faulty': { question: `Mark ${what} not faulty? ${they} can go out on jobs again.`, yes: 'Mark it not faulty' },
+    found: { question: `Mark ${what} found? ${they} can go out on jobs again.`, yes: 'Mark it found' },
+    'written-off': { question: `Write off ${what}? ${effect}, and it's kept in the history.`, yes: 'Write it off' },
+  }
   const href = f.assetId ? `#stock/item/${f.assetId}` : `#stock/product/${f.modelId}`
   return (
     <li className={`fault ${f.open ? (f.stops ? 'stops' : 'usable') : 'closed'}`} aria-label={faultWhat(f)}>
@@ -212,19 +225,14 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
       )}
       {editing ? (
         <EditFault f={f} onDone={() => setEditing(false)} />
-      ) : writingOff ? (
-        <Confirm
-          question={`Write off ${faultWhat(f)}? ${effect}, and it's kept in the history.`}
-          yes="Write it off"
-          onYes={() => closeAs('written-off')}
-          onNo={() => setWritingOff(false)}
-        />
+      ) : closing ? (
+        <Confirm question={asks[closing].question} yes={asks[closing].yes} onYes={() => closeAs(closing)} onNo={() => setClosing(undefined)} />
       ) : (
         f.open && (
           <div className="actions">
             {OUTCOMES_FOR[f.kind].map((o) => (
-              <button key={o} type="button" onClick={() => (o === 'written-off' ? setWritingOff(true) : closeAs(o))}>
-                {o === 'written-off' ? 'Write off' : OUTCOME_LABELS[o]}
+              <button key={o} type="button" onClick={() => setClosing(o)}>
+                {CLOSE_LABELS[o]}
               </button>
             ))}
             <button type="button" onClick={() => setEditing(true)}>

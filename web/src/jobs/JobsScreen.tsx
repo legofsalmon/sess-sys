@@ -211,7 +211,7 @@ function NewJob({ view }: { view: View }) {
   const { clients, venues } = view.jobs
   const today = useToday()
   const first = (): PhaseDraft => ({ key: newId(), name: 'Show', start: today, end: today })
-  const [f, setF] = useState({ name: '', client: '', venue: '', status: 'confirmed' as ProjectStatus })
+  const [f, setF] = useState({ name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus })
   const [phases, setPhases] = useState<PhaseDraft[]>(() => [first()])
   const { run, error } = useAct()
   const setPhase = (key: string, changes: Partial<PhaseDraft>) =>
@@ -229,7 +229,7 @@ function NewJob({ view }: { view: View }) {
     if (!f.name.trim()) return
     const id = newId()
     // A refusal brings what was typed back, unless the next thing has been typed since.
-    const cleared = { name: '', client: '', venue: '', status: 'confirmed' as ProjectStatus }
+    const cleared = { name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus }
     const clearedPhases = [first()]
     setF(cleared)
     setPhases(clearedPhases)
@@ -269,6 +269,7 @@ function NewJob({ view }: { view: View }) {
           ))}
         </select>
       </label>
+      {f.status === 'confirmed' && <p className="hint wide">A confirmed job goes on the jobs calendar and holds its kit.</p>}
       <fieldset className="wide phase-rows">
         <legend>Phases</legend>
         {phases.map((p, i) => (

@@ -204,3 +204,6 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .jobs .kit-days p { margin: 0; color: var(--muted); font-size: .9rem; }
 .jobs .kit-days p b { color: var(--ink); }
 .jobs .kit-days form { margin-top: var(--space-8); }
+.pick .scan-failed { display: grid; gap: var(--space-6); justify-items: start; }
+.pick .scan-failed p, .pick .scan-failed ul { margin: 0; }
+.pick .scan-failed ul { padding-left: var(--space-16); }

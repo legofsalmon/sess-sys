@@ -195,7 +195,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   // The cables, counted out.
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('12')
-  await countOut.getByRole('button', { name: 'Out' }).click()
+  await countOut.getByRole('button', { name: 'Count out' }).click()
   await expect(cableRow.locator('.count')).toHaveText('12 of 12 out')
   await expect(page.locator('.pick-total')).toHaveText('13 of 14 out')
   await expect(page.locator('.conn')).toHaveText('Up to date')
@@ -235,7 +235,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await expect(said).toHaveText(`${speakers[2]} ${speaker} isn't out, so there's nothing to bring back.`)
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('10')
-  await countBack.getByRole('button', { name: 'Back' }).click()
+  await countBack.getByRole('button', { name: 'Count back' }).click()
   await expect(cableRow.locator('.count')).toHaveText('2 still out')
   await expect(page.locator('.pick-total')).toHaveText('12 back, 3 still out')
   await expect(page.locator('.conn')).toContainText('No signal')

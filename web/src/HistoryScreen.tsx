@@ -2,8 +2,7 @@ import { deviceWords, historyDays, historyTime, runLabel, waitLabel, type Histor
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { markSignedOut, useAuth } from './auth.ts'
 import { Empty } from './Empty.tsx'
-import { MadeUp } from './jobs/common.tsx'
-import { useNotDone } from './problems.tsx'
+import { Top } from './jobs/common.tsx'
 import { useToday, useView } from './view.ts'
 
 /**
@@ -35,7 +34,6 @@ export function HistoryScreen() {
   const view = useView()
   const today = useToday()
   const auth = useAuth()
-  const notDone = useNotDone(view)
   const [who, setWho] = useState('')
   const [people, setPeople] = useState<Person[]>([])
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
@@ -91,20 +89,7 @@ export function HistoryScreen() {
 
   return (
     <div className="app history">
-      <header className="top">
-        <div className="brand">
-          <span className="mark">SH</span>
-          <span>
-            <b>Session Hire</b>
-            <small>
-              History
-              <MadeUp view={view} />
-            </small>
-          </span>
-        </div>
-        <div className="state">{notDone.count}</div>
-        {notDone.list}
-      </header>
+      <Top view={view} title="History" />
 
       <section className="card">
         <label className="field">
@@ -140,6 +125,13 @@ export function HistoryScreen() {
           </p>
         )}
 
+        {/* The history is the server's, so this device's own changes on their way aren't in it yet: said here, so nobody thinks they're lost. */}
+        {view.pendingCount > 0 && (
+          <p className="hint">
+            {view.pendingCount === 1 ? '1 change on this device is' : `${view.pendingCount} changes on this device are`} waiting to sync, and
+            {view.pendingCount === 1 ? ' shows' : ' show'} here once the server has {view.pendingCount === 1 ? 'it' : 'them'}.
+          </p>
+        )}
         {loaded.state === 'loading' && <p className="hint">Getting the history…</p>}
         {loaded.state === 'offline' && (
           <>
@@ -176,11 +168,8 @@ export function HistoryScreen() {
               {older === 'loading' ? 'Getting more…' : 'Show older'}
             </button>
           )}
-          {older === 'failed' && (
-            <p className="alert" role="alert">
-              Couldn't reach the server. Try again when you have signal.
-            </p>
-          )}
+          {/* No signal isn't a fault: said quietly, with Show older still there to try again. */}
+          {older === 'failed' && <p className="hint">No signal. Older history comes when you're back online.</p>}
           {!loaded.next && <p className="hint">That's the start of the history.</p>}
         </div>
       )}

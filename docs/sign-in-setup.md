@@ -92,7 +92,7 @@ a sessionhire.com Workspace account and isn't in `STAFF_EMAILS`.
    calendar.
 4. Try it: rename a job or move a phase, and the calendar follows within
    seconds. Change or delete one of the app's events in Google Calendar,
-   then tap **Check now** on the Account tab: it is put back (each night
+   then tap **Check the calendar** on the Account tab: it is put back (each night
    this happens by itself).
 
 **Change calendar** on the Account tab moves the app's days from today on
@@ -100,7 +100,7 @@ to another calendar; **Disconnect** takes them off and hands the app's
 access back to Google. Days before today stay where they are in both cases.
 
 If the Account tab says the Google Calendar API is switched off, do step
-1.5, then tap **Check now**.
+1.5, then tap **Check the calendar**.
 
 ## 5. Crew invites: try them on the test calendar first
 

@@ -34,6 +34,9 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
 
   const form = newJobForm(office)
   await form.getByLabel('Job').fill(job)
+  await expect(form.getByLabel('Status')).toHaveValue('enquiry')
+  await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
+  await expect(form.getByText('A confirmed job goes on the jobs calendar and holds its kit.')).toBeVisible()
   await form.getByLabel('Client').fill(named('Nissan Ireland', id))
   await form.getByLabel('Venue').fill(named('The Heritage', id))
   await form.getByLabel('Phase 1', { exact: true }).fill('Build')
@@ -47,7 +50,7 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
 
   // The job opens on its own page, with each day as it will read on the calendar.
   await expect(office.getByRole('heading', { name: job })).toBeVisible()
-  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(office.locator('.title .pill')).toHaveText('Confirmed')
   await expect(office.locator('.facts')).toContainText(named('Nissan Ireland', id))
   await expect(office.locator('.facts')).toContainText('Mon 7 Oct to Wed 9 Oct')
@@ -69,7 +72,7 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   // The call is one line under its phase (audit finding 16); a tap opens its days and rate.
   await build.getByRole('button', { name: '2 × Audio tech' }).click()
   await expect(build.locator('.job p').first()).toHaveText('Mon 7 Oct to Tue 8 Oct · €250')
-  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(office.locator('.facts')).toContainText('0 of 2 booked')
   await office.evaluate(() => scrollTo(0, 0))
   await office.screenshot(shot('jobs-job'))
@@ -77,9 +80,9 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   // Renamed, and the crew screen says so too.
   await office.getByRole('button', { name: 'Change details' }).click()
   await office.getByLabel('Job', { exact: true }).fill(renamed)
-  await office.getByRole('button', { name: 'Save', exact: true }).click()
+  await office.getByRole('button', { name: 'Save job' }).click()
   await expect(office.getByRole('heading', { name: renamed })).toBeVisible()
-  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await expect(office.locator('.conn')).toHaveText('Up to date')
   await office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
   // Grouped by job (audit finding 16): the job's name and Open job on the group, the call as one line under it.
   const group = office.locator('.call-group', { hasText: renamed })
@@ -121,13 +124,14 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await expect(phase.locator('.pill')).toHaveText('Waiting to sync')
   await phase.getByRole('button', { name: 'Change', exact: true }).click()
   await phase.getByLabel('To', { exact: true }).fill('2030-11-03')
-  await phase.getByRole('button', { name: 'Save' }).click()
+  await phase.getByRole('button', { name: 'Save phase' }).click()
   await expect(phase.locator('header')).toContainText('Sat 2 Nov to Sun 3 Nov')
 
   await context.setOffline(false)
   await phone.evaluate(() => dispatchEvent(new Event('online')))
   await expect(phone.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
-  await expect(phone.locator('.title .pill')).toHaveText('Confirmed')
+  // Nobody chose a status, so it came in as an enquiry: nothing on the jobs calendar, no kit held.
+  await expect(phone.locator('.title .pill')).toHaveText('Enquiry')
 
   // And another device has it.
   const laptop = await (await browser.newContext()).newPage()

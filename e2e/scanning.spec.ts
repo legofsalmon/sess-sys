@@ -308,15 +308,17 @@ test('an item is put at a place or in a case by camera, and the camera stays on 
   await put.getByRole('button', { name: 'Close' }).click()
   await expect(camera).toHaveCount(0)
   await expect(result).toHaveCount(0)
-  // A refusal shows where the scan was, and the camera stays on; Stop camera clears it with the session.
+  // A refusal shows where the scan was, and the camera stays on; it stays in a list, through Stop camera, until it's dismissed.
   await hold(page, null)
   await put.getByRole('button', { name: 'Scan' }).click()
   await hold(page, a!)
-  await expect(put.locator('.alert')).toHaveText(`${a} is here already.`)
+  await expect(put.locator('.scan-misses li')).toContainText(`${a} is here already.`)
   await expect(camera).toBeVisible()
   await camera.getByRole('button', { name: 'Stop camera' }).click()
   await expect(camera).toHaveCount(0)
-  await expect(put.locator('.alert')).toHaveCount(0)
+  await expect(put.locator('.scan-misses li')).toContainText(`${a} is here already.`)
+  await put.locator('.scan-misses').getByRole('button', { name: 'Dismiss' }).click()
+  await expect(put.locator('.scan-misses li')).toHaveCount(0)
   await hold(page, null)
 
   // Into a case the same way.

@@ -11,11 +11,21 @@ import { registerSW } from 'virtual:pwa-register'
  */
 
 const RELOADED = 'sh.reloadedAt'
+/** Set as the page starts again on its own, read once as it comes back, so the bar can say why. */
+const RESTARTED = 'sh.restarted'
 const listeners = new Set<(ready: boolean) => void>()
 let ready = false
 let reload: (() => Promise<void>) | undefined
+let restarted = false
 
 export function watchForUpdates() {
+  // The page started again on its own a moment ago: say so, once.
+  try {
+    restarted = sessionStorage.getItem(RESTARTED) !== null
+    sessionStorage.removeItem(RESTARTED)
+  } catch {
+    // Storage blocked: nothing to say it by.
+  }
   const update = registerSW({
     onNeedRefresh() {
       ready = true
@@ -44,6 +54,7 @@ export function watchForUpdates() {
     event.preventDefault()
     try {
       sessionStorage.setItem(RELOADED, String(Date.now()))
+      sessionStorage.setItem(RESTARTED, '1')
     } catch {
       // Storage blocked: nothing to remember the reload by, but reload anyway.
     }
@@ -61,9 +72,32 @@ function useUpdateReady() {
   return state
 }
 
-/** One line at the top until they reload; the page below moves down so it hides nothing. */
-export function UpdateBar() {
-  if (!useUpdateReady()) return null
+/**
+ * One line at the top until they reload; the page below moves down so it
+ * hides nothing. `unkept` is how many changes waiting to sync a reload
+ * would lose, because this browser keeps nothing between reloads: said
+ * before they press. And when the page started again on its own, the same
+ * line says so until it's dismissed.
+ */
+export function UpdateBar({ unkept = 0 }: { unkept?: number }) {
+  const ready = useUpdateReady()
+  const [said, setSaid] = useState(restarted)
+  if (!ready && said)
+    return (
+      <div className="update">
+        <span>Started again on the new version: the old one's files had gone.</span>
+        <button
+          type="button"
+          onClick={() => {
+            restarted = false
+            setSaid(false)
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    )
+  if (!ready) return null
   const onReload = () => {
     void reload?.()
     // The new version takes the page over and reloads it. Should it not (an older browser, say), start again anyway.
@@ -71,9 +105,13 @@ export function UpdateBar() {
   }
   return (
     <div className="update">
-      <span>A new version is ready.</span>
+      <span>
+        A new version is ready.
+        {unkept > 0 &&
+          ` ${unkept === 1 ? "1 change hasn't" : `${unkept} changes haven't`} synced yet, and this browser keeps nothing over a reload, so loading it now loses ${unkept === 1 ? 'it' : 'them'}. It can wait until ${unkept === 1 ? "it's" : "they've"} gone.`}
+      </span>
       <button type="button" className="primary" onClick={onReload}>
-        Reload
+        Load the new version
       </button>
     </div>
   )
