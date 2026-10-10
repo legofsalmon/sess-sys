@@ -233,7 +233,7 @@ function AttachmentForm({ owner, doc, onDone }: { owner: Owner; doc?: Attachment
       )}
       <Refusal error={error} className="wide" />
       <button type="submit" className={doc ? 'primary' : 'wide'} disabled={busy}>
-        {busy && file ? 'Sending…' : doc ? 'Save' : 'Add document'}
+        {busy && file ? 'Sending…' : doc ? 'Save document' : 'Add document'}
       </button>
       {doc && (
         <button type="button" onClick={onDone}>
