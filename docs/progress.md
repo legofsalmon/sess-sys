@@ -3,6 +3,24 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 9 October 2026: colours from the shared design system
+
+**Done**
+
+- The app's colours, and the freelancer's pages', now come from the
+  shared design system that Colly's other apps take theirs from
+  ([design system](design-system.md)): the page, cards, text, lines, and the
+  green and amber. Session Hire keeps its own red for the one thing to do
+  next, the current tab, links and focus, and its burnt-orange bad tone.
+  Layout, type, spacing, corners and components are as they were.
+- Checked in both themes: the unit tests (including a new check that the
+  vendored token files are unedited), the end-to-end suite with its
+  contrast checks, and every text colour against the page and a card.
+
+**Next**
+
+- Bring the Figma file's colours over to match.
+
 ## 9 October 2026: a demo copy, locked with a passcode
 
 **Done**

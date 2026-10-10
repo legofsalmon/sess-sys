@@ -1,22 +1,39 @@
+@import '../../shared/src/ds/tokens.css';
+
+/*
+ * Colours come from the shared design system (shared/src/ds/tokens.css,
+ * vendored by `npm run ds:sync`; never edit the copy), pointed at by Session
+ * Hire's own names so the rest of the stylesheets read as they always have.
+ * index.html sets data-theme="auto", so the theme still follows the phone.
+ *
+ * Two are Session Hire's own, not shared roles (Colly's call, 9 October 2026):
+ * the red accent, which marks the one thing to do next, the current tab,
+ * links and focus, and the burnt-orange bad tone, so red never means
+ * "broken". Their values are in shared/src/own-colours.ts too, for the
+ * freelancer's pages; a test holds the two together.
+ */
 :root {
-  --bg: #eef1f4;
-  --panel: #ffffff;
-  --ink: #16202b;
-  --muted: #5a6776;
-  --line: #d3dae2;
-  /* Round a field: a line is 1.4:1 on a card, so fields dissolved in daylight; this is 3.4:1 (audit finding 22). */
-  --field-line: #7f8c9a;
-  /* Text on a line-coloured surface, such as the grey pill: muted was 4.1:1 there, this is 5.1:1. */
-  --on-line: #4d5968;
+  --bg: var(--ds-surface-ground);
+  --panel: var(--ds-surface-panel);
+  --ink: var(--ds-ink-primary);
+  /* Hints, labels and the tabs not open: matched by lightness, the tertiary ink, which clears AA on every surface here. */
+  --muted: var(--ds-ink-tertiary);
+  --line: var(--ds-line-subtle);
+  /* Round a field: 3:1 against a card in both themes (audit finding 22). */
+  --field-line: var(--ds-line-control);
+  /* Text on a line-coloured surface, such as the grey pill. */
+  --on-line: var(--ds-ink-secondary);
+  /* Settled and someone has to act: text, on the page or on their -soft fill. */
+  --good: var(--ds-ok-ink);
+  --good-soft: var(--ds-ok-soft);
+  --warn: var(--ds-warn-ink);
+  --warn-soft: var(--ds-warn-soft);
+  /* Session Hire's own: the red accent and the bad tone. */
   --accent: #ee3744;
   --accent-ink: #c8202e;
   /* Behind white text: the brand red is 4.0:1 with white, this is 5.7:1 (AA). */
   --accent-fill: #c8202e;
   --on-accent: #ffffff;
-  --good: #1d7a4c;
-  --good-soft: #dff2e8;
-  --warn: #8a5800;
-  --warn-soft: #fbefd6;
   --bad: #a8480f;
   --bad-soft: #f9e4d6;
   /* Spacing and radius, named as in Figma. */
@@ -48,17 +65,10 @@
   --text-status: .82rem;
   --text-pill: .75rem;
   --text-footer: .75rem;
-  color-scheme: light;
   font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f151c; --panel: #17202a; --ink: #e6ecf2; --muted: #9aa8b7; --line: #2b3745;
-    --field-line: #6b7684; --on-line: #9aa8b7;
-    --accent-ink: #ff737d; --good: #5fd09a; --good-soft: #15352a; --warn: #f0b85a; --warn-soft: #3a2c12;
-    --bad: #f0a064; --bad-soft: #3a2414;
-    color-scheme: dark;
-  }
+  :root { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); }

@@ -17,7 +17,9 @@
     "dev": "concurrently -n server,web -c yellow,cyan \"npm:dev -w server\" \"npm:dev -w web\"",
     "typecheck": "npm run typecheck -w shared -w server -w web",
     "test": "npm test -w shared -w server",
-    "build:web": "npm run build -w web"
+    "build:web": "npm run build -w web",
+    "ds:sync": "node ../design-system/scripts/sync.mjs --to shared/src/ds --files tokens.css,tokens.js,tokens.d.ts",
+    "ds:check": "node ../design-system/scripts/sync.mjs --check shared/src/ds"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
