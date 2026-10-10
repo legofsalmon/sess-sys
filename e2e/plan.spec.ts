@@ -204,6 +204,18 @@ test('a month on a laptop, whose dates open their week', async ({ browser }) => 
   await expect(row(laptop, named('Dublin Tech expo')).nth(24).locator('.blk')).toHaveClass(/dashed/)
   await laptop.screenshot(shot('plan-month'))
 
+  // A job's day opens the job, and so does anywhere in its name cell, not just the words.
+  await paddys.nth(16).getByRole('link').click()
+  await expect(laptop).toHaveURL(/#jobs\/[^/]+$/)
+  await expect(laptop.getByRole('heading', { name: named("St Patrick's Festival") })).toBeVisible()
+  await laptop.goBack()
+  const summitName = laptop.getByRole('rowheader', { name: named('Web Summit') })
+  const box = (await summitName.boundingBox())!
+  await laptop.mouse.click(box.x + box.width - 4, box.y + box.height - 4)
+  await expect(laptop.getByRole('heading', { name: named('Web Summit') })).toBeVisible()
+  await laptop.goBack()
+  await expect(laptop.getByRole('heading', { name: 'March 2031' })).toBeVisible()
+
   // By person, a month reads as codes, with the words for a screen reader and on hover.
   await laptop.getByRole('button', { name: 'People' }).click()
   const aoife = row(laptop, named('Aoife Byrne'))

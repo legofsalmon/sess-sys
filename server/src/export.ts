@@ -186,6 +186,9 @@ function historyCsv(history: HistoryEntry[]): string {
 const ABOUT: Record<string, string> = {
   assets:
     'Numbered items of stock: their product, serial, where they are kept, whether they are retired (sold, scrapped, lost, stolen, or added by mistake), the old number they had before Session Hire\'s labels, and when the stock list said their next PAT is due.',
+  // Documents on venues and clients (ADR 0032): the details here, the files in the storage.
+  attachments:
+    "Documents kept on venues and clients, such as a venue's floor plan or a client's contract: which venue or client, what kind, the title, the link to where it's shared, and the file's type and size. The files stay in the storage: see Left out on purpose.",
   backup_runs: 'The nightly backups: when each ran and how it went.',
   calendar_days: 'Each day of a job the app has put on Google Calendar, with the event it wrote there.',
   calendar_guests: 'Crew the app has invited to those days in Google Calendar because of their offers, with the address used and their answer.',
@@ -263,7 +266,9 @@ Left out on purpose
   this is.
 - Documents' files, such as insurance and certificate cards: they stay in
   the storage beside the backups, and each opens from the person's card on
-  the Crew tab. documents lists their details.
+  the Crew tab. documents lists their details. The same goes for files
+  on venues and clients, which open from their pages; attachments lists
+  their details.
 
 Good to know
 ------------

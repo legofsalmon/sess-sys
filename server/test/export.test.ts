@@ -99,6 +99,7 @@ describe('download everything', () => {
     // Every table, running_late (ADR 0028), erasures (ADR 0027), documents (ADR 0029) and counts (ADR 0030) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
     const tables = [
       'assets',
+      'attachments',
       'backup_runs',
       'calendar_days',
       'calendar_guests',

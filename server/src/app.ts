@@ -51,6 +51,8 @@ export interface AppOptions {
   requestTimeoutMs?: number
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
+  /** A shared passcode for a demo copy (DEMO_PASSCODE); only used while Google sign-in is off. */
+  passcode?: string
   /** Where nightly backups go (ADR 0004). Without it there are none. */
   backupStore?: BackupStore
   /** Encrypts each backup file (docs/backups.md). Without it they are plain text inside. */
@@ -111,7 +113,7 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS } = options
+  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
@@ -216,14 +218,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (publicOrigin(req).startsWith('https:')) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains')
   })
 
-  registerAuth(app, db, auth)
+  registerAuth(app, db, auth, passcode)
 
   app.get('/api/health', { config: { public: true } }, async () => {
     const backup = backups.status()
     return {
       ok: true,
       db: db.kind,
-      auth: auth ? 'google' : 'off',
+      auth: auth ? 'google' : passcode ? 'passcode' : 'off',
       errors: errorReporting ? 'sentry' : 'off',
       // "fresh" false means the nightly backup has stopped working.
       backups: backup.configured ? { last: backup.lastOk?.finishedAt ?? null, fresh: backup.fresh } : 'off',

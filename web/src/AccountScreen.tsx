@@ -101,7 +101,17 @@ export function AccountScreen() {
 
       {auth.status === 'signed-in' && <FeedCard view={view} email={auth.user.email} />}
 
-      {auth.status === 'open' && (
+      {auth.status === 'open' && auth.passcode && (
+        <section className="card">
+          <h2>Demo copy</h2>
+          <p>
+            This copy is locked with a shared passcode instead of Google sign-in, so anyone who has the passcode can use it. Keep to made-up jobs
+            and people here.
+          </p>
+        </section>
+      )}
+
+      {auth.status === 'open' && !auth.passcode && (
         <section className="card attention">
           <h2>Sign-in is off</h2>
           <p>

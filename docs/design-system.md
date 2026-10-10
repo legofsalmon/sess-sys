@@ -6,7 +6,22 @@ The Session Hire design system lives in Figma:
 stands, so it matches what is on phones today rather than a new look.
 
 **Code wins.** When Figma and `web/src/app.css` disagree, the CSS is right
-and Figma gets updated. Every colour token carries its CSS name (for example
+and Figma gets updated.
+
+**Most colours come from the shared design system** (since 9 October 2026),
+which Colly's other apps take their colours from too; everything else here
+(layout, type, spacing, corners, components) is still Session Hire's own.
+The built token files are vendored in `shared/src/ds/` by `npm run ds:sync`,
+stamped, and never edited here; `npm run ds:check` says whether they're
+behind (both need a checkout of the design-system repository beside this
+one). `web/src/app.css` points each name below at a shared role: the page,
+cards, text, lines, and the green and amber. Two stay Session Hire's own, by
+Colly's choice: the red `accent` family, which marks the one thing to do
+next, and the burnt-orange **bad** tone, so red never means "broken". Their
+values live in `app.css` and `shared/src/own-colours.ts` (the freelancer's
+pages read that), and `shared/test/designSystem.test.ts` holds the two
+together. The Figma file still has the old greys, greens and ambers until
+it's next updated. Every colour token carries its CSS name (for example
 `color/accent` is `var(--accent)`), so Dev Mode shows the variable to use.
 
 ## What is in the file

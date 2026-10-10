@@ -44,7 +44,7 @@ import { useToday, useView } from '../view.ts'
 const base = import.meta.env.VITE_API_BASE ?? ''
 
 /** What the file field takes: the types by name too, for phones that pick by them. */
-const ACCEPT = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', ...Object.values(FILE_TYPES).map((t) => `.${t.ext}`), '.jpeg'].join(',')
+export const ACCEPT = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', ...Object.values(FILE_TYPES).map((t) => `.${t.ext}`), '.jpeg'].join(',')
 
 /** "Fri 23 Oct 2026": a document's day wants its year. */
 const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
@@ -70,7 +70,7 @@ export function useDocumentStorage(): DocumentStorage | undefined {
 }
 
 /** A failed answer from the server, in its words, or in general ones. */
-async function refusal(res: Response): Promise<Error> {
+export async function refusal(res: Response): Promise<Error> {
   if (res.status === 401) {
     markSignedOut()
     return new Error('Signed out.')

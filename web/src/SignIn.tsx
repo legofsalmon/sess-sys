@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { signInProblem, signInUrl } from './auth.ts'
+import { enterPasscode, signInProblem, signInUrl, useAuth } from './auth.ts'
 import { client } from './sync.ts'
 
 const PROBLEMS = {
@@ -14,6 +14,8 @@ const PROBLEMS = {
  * signed out stay in its outbox and go once someone signs in.
  */
 export function SignIn() {
+  const auth = useAuth()
+  const passcode = auth.status === 'signed-out' && auth.passcode
   const [pending, setPending] = useState(() => client.view().pendingCount)
   useEffect(() => client.subscribe((view) => setPending(view.pendingCount)), [])
   const [online, setOnline] = useState(navigator.onLine)
@@ -40,15 +42,21 @@ export function SignIn() {
       </header>
       <section className="card">
         <h1>Sign in</h1>
-        {signInProblem && (
-          <p className="alert" role="alert">
-            {PROBLEMS[signInProblem]}
-          </p>
+        {passcode ? (
+          <PasscodeForm />
+        ) : (
+          <>
+            {signInProblem && (
+              <p className="alert" role="alert">
+                {PROBLEMS[signInProblem]}
+              </p>
+            )}
+            <p>Use your Session Hire Google account.</p>
+            <a className="button primary" href={signInUrl(location.hash || '#jobs')}>
+              Sign in with Google
+            </a>
+          </>
         )}
-        <p>Use your Session Hire Google account.</p>
-        <a className="button primary" href={signInUrl(location.hash || '#jobs')}>
-          Sign in with Google
-        </a>
         {!online && <p className="hint">No signal right now. Sign in when you're back online.</p>}
         {pending > 0 && (
           <p className="hint">
@@ -57,5 +65,40 @@ export function SignIn() {
         )}
       </section>
     </div>
+  )
+}
+
+/** A demo copy's way in: one passcode shared with whoever is shown the demo. */
+function PasscodeForm() {
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string>()
+  return (
+    <form
+      className="passcode"
+      onSubmit={(e) => {
+        e.preventDefault()
+        setBusy(true)
+        setProblem(undefined)
+        void enterPasscode(value).then((p) => {
+          setBusy(false)
+          setProblem(p)
+        })
+      }}
+    >
+      <p>This is a demo with made-up data. Enter the passcode you were given.</p>
+      {problem && (
+        <p className="alert" role="alert">
+          {problem}
+        </p>
+      )}
+      <label className="field">
+        Passcode
+        <input type="password" autoComplete="current-password" value={value} onChange={(e) => setValue(e.target.value)} required />
+      </label>
+      <button type="submit" className="primary" disabled={busy || !value.trim()}>
+        Open the demo
+      </button>
+    </form>
   )
 }

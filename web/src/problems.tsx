@@ -1,5 +1,5 @@
 import { dayLabel, levelLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
-import { titleInSentence } from '@sh/shared'
+import { attachmentTitleInSentence, titleInSentence } from '@sh/shared'
 import { useEffect, useState, type ReactNode } from 'react'
 import { reasonOf } from './act.tsx'
 import { when } from './format.ts'
@@ -279,6 +279,11 @@ function describer(view: View): (m: Mutation) => string {
         return `Check ${docOf(a.id)}`
       case 'document.remove':
         return `Remove ${docOf(a.id)}`
+      // Documents on venues and clients (ADR 0032): a file goes straight to the server, so only links and details wait here.
+      case 'attachment.save':
+        return `Save ${[...view.jobs.venues, ...view.jobs.clients].find((o) => o.id === a.ownerId)?.name ?? 'a venue or client'}'s ${attachmentTitleInSentence(str(a.title, 'document'))}`
+      case 'attachment.remove':
+        return 'Remove a document'
       // A count (ADR 0030): turned down only when the place or case was never saved.
       case 'count.record':
         return `Record the count of ${a.placeId ? place(a.placeId) : item(a.caseId)}`

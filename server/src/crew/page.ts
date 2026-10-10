@@ -1,5 +1,6 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
+import { dsColor, ownColours } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -476,9 +477,34 @@ export function renderGone(office?: OfficeDetails | null): string {
 <p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p>${officeBlock(office)}</main></body></html>`
 }
 
+/**
+ * The page's colour names pointed at the shared design system's roles, as
+ * web/src/app.css does for the app, written out as values: the page has no
+ * stylesheet of its own to import. The red accent and the bad tone are
+ * Session Hire's own (shared/src/own-colours.ts).
+ */
+const roles = (theme: keyof typeof ownColours) => {
+  const t = dsColor[theme]
+  return Object.entries({
+    bg: t.surface.ground,
+    panel: t.surface.panel,
+    ink: t.ink.primary,
+    muted: t.ink.tertiary,
+    line: t.line.subtle,
+    'field-line': t.line.control,
+    good: t.ok.ink,
+    'good-soft': t.ok.soft,
+    warn: t.warn.ink,
+    'warn-soft': t.warn.soft,
+    ...ownColours[theme],
+  })
+    .map(([name, value]) => `--${name}:${value}`)
+    .join(';')
+}
+
 export const CSS = `
-:root{--bg:#f4f5f7;--panel:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9dee5;--field-line:#7f8c9a;--accent:#ee3744;--accent-fill:#c8202e;--good:#1d7a4c;--good-soft:#dff2e8;--warn:#8a5800;--warn-soft:#fbefd6;--bad:#a8480f;--bad-soft:#f9e4d6;color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0f151c;--panel:#17202a;--ink:#e6ecf2;--muted:#9aa8b7;--line:#2b3745;--field-line:#6b7684;--good:#5fd09a;--good-soft:#15352a;--warn:#f0b85a;--warn-soft:#3a2c12;--bad:#f0a064;--bad-soft:#3a2414;color-scheme:dark}}
+:root{${roles('light')};color-scheme:light;font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{${roles('dark')};color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}

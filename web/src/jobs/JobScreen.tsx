@@ -123,14 +123,14 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
       <dl className="facts">
         <div>
           <dt>Client</dt>
-          <dd>{job.client?.name ?? 'None yet'}</dd>
+          <dd>{job.client ? <a href={`#clients/${encodeURIComponent(job.client.id)}`}>{job.client.name}</a> : 'None yet'}</dd>
         </div>
         <div>
           <dt>Venue</dt>
           <dd>
             {job.venue ? (
               <>
-                {venueLabel(job.venue)}{' '}
+                <a href={`#venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>{' '}
                 <a href={mapLink(job.venue)} target="_blank" rel="noreferrer">
                   Map
                 </a>

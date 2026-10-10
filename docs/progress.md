@@ -3,6 +3,85 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 10 October 2026: a page for each venue and client, with their documents
+
+**Done**
+
+- Colly asked for each venue, and then each client, to have its own page
+  with somewhere to keep documents
+  ([Decision 0032](adr/0032-venue-and-client-pages-and-their-documents.md)).
+  A venue in the Jobs tab's list now opens its page: the address with the
+  map, the notes, its documents and the jobs there. A client opens its
+  page the same way: its contacts to ring or email, the notes, its
+  documents and its jobs. A job's venue and client link to their pages.
+- Each document is a file, a link to where it's shared (Dropbox, Google
+  Drive, a website), or both, with a kind: tech spec, floor plan,
+  rigging, power, access and load-in, health and safety for a venue;
+  contract, purchase order, brief, brand guidelines, insurance they ask
+  for for a client.
+- Links work now, with no signal too. Files are kept and opened exactly as
+  people's documents are, so they wait on the same storage bucket.
+- Checked: the typecheck, the shared and server tests (with four new ones
+  for these documents), and two new browser tests on a phone: one adds a
+  link and a file on a venue, opens the file and removes a document; the
+  other adds a link on a client and changes a contact.
+
+**Next**
+
+- Set the storage bucket (the BACKUP_S3_ settings) to turn on files, for
+  people's documents and those on venues and clients alike.
+- Perhaps: crew opening a venue's documents from their call sheet.
+
+## 10 October 2026: the planner's days open their job
+
+**Done**
+
+- In the Jobs tab's Week and Month views, a job's days now open that job,
+  and so does anywhere in its name cell on the left, not just the words
+  ([planner decision](adr/0010-planner.md)). Crew asked for on the Crew
+  tab, with no job behind them, still go to the Crew tab from their name.
+- Checked with the planner's end-to-end tests, which now open a job from
+  a day and from the edge of its name cell.
+
+## 9 October 2026: colours from the shared design system
+
+**Done**
+
+- The app's colours, and the freelancer's pages', now come from the
+  shared design system that Colly's other apps take theirs from
+  ([design system](design-system.md)): the page, cards, text, lines, and the
+  green and amber. Session Hire keeps its own red for the one thing to do
+  next, the current tab, links and focus, and its burnt-orange bad tone.
+  Layout, type, spacing, corners and components are as they were.
+- Checked in both themes: the unit tests (including a new check that the
+  vendored token files are unedited), the end-to-end suite with its
+  contrast checks, and every text colour against the page and a card.
+
+**Next**
+
+- Bring the Figma file's colours over to match.
+
+## 9 October 2026: a demo copy, locked with a passcode
+
+**Done**
+
+- For showing the app as a proposal before the Google key is in, a
+  `DEMO_PASSCODE` setting now locks a copy of the app behind one shared
+  passcode ([PR #61](https://github.com/legofsalmon/sess-sys/pull/61);
+  [sign-in setup](sign-in-setup.md)). Freelancers' private links still
+  open without it, and once the Google key is set Google sign-in takes
+  over.
+- A separate demo copy runs on Railway as the `demo` service, in the EU,
+  with its own small database on a Railway volume, so nothing touches the
+  live app's data. It deploys from `main` like the live app and sleeps
+  when nobody is using it. It is filled with made-up data. Its address
+  and passcode are in the project thread, not here.
+
+**Next**
+
+- Start fresh, then made-up data again, on the demo copy before each
+  showing if it has been played with.
+
 ## 8 October 2026: stocktakes and rolling counts merged and live
 
 **Done**

@@ -208,6 +208,13 @@ over by rule are later.
   office checks it, a card's certificate taking its date; their expiries
   join the list of what's running out; the files wait on the backups'
   bucket being set up, while the details work now).
+- A page for each venue and each client, with their documents (built,
+  10 October 2026,
+  [ADR 0032](adr/0032-venue-and-client-pages-and-their-documents.md): a
+  venue's address, notes and jobs, and its tech spec, floor plan and the
+  like; a client's contacts, notes and jobs, and its contract, purchase
+  orders and brief; each document a file or a link to where it's shared;
+  links work now, files with the bucket).
 - Availability: read free/busy from the freelancer's own calendar if they
   share it, or they mark days off by link.
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
