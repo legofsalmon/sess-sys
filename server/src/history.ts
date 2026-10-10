@@ -31,6 +31,7 @@ import {
 } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
+import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -731,6 +732,19 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case DOCUMENT_ACTIONS.file:
     case DOCUMENT_ACTIONS.send:
       return documentWords(command, a, look, person)
+    // Documents kept on venues and clients (ADR 0032): "Saved The Heritage's floor plan, as a link".
+    case 'attachment.save':
+    case 'attachment.remove':
+    case ATTACHMENT_FILE_ACTION: {
+      const d = look('attachment', a.id)
+      const kind = ATTACHMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
+      const owner = (a.owner ?? d?.owner) === 'client' ? client : venue
+      const whose = `${owner(a.ownerId ?? d?.ownerId)}'s ${attachmentTitleInSentence(text(a.title ?? d?.title, (kind && ATTACHMENT_TITLES[kind]) || 'document'))}`
+      const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
+      if (command === 'attachment.remove') return d ? `Removed ${whose}` : 'Removed a document'
+      if (command === 'attachment.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
+      return a.added ? `Added ${whose}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

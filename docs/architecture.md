@@ -206,6 +206,11 @@ a job ([ADR 0007](adr/0007-jobs.md)).
 
 - **Client**, **Contact**, **Venue** (address, access notes, load-in details,
   power, parking, what3words). Contacts are held inside the client for now.
+  Each venue and each client has a page of its own with its documents (a
+  venue's tech spec, floor plan, power, rigging, access, health and
+  safety; a client's contract, purchase orders, brief), each a file, a
+  link to where it's shared, or both, and its jobs
+  ([ADR 0032](adr/0032-venue-and-client-pages-and-their-documents.md)).
 - **Project**: a job for a client (for example, Nissan at the Heritage).
   Has a status people set: enquiry, quoted, confirmed, cancelled, lost.
   What the system can see for itself comes from the records that show it:

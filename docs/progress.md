@@ -3,6 +3,35 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 10 October 2026: a page for each venue and client, with their documents
+
+**Done**
+
+- Colly asked for each venue, and then each client, to have its own page
+  with somewhere to keep documents
+  ([Decision 0032](adr/0032-venue-and-client-pages-and-their-documents.md)).
+  A venue in the Jobs tab's list now opens its page: the address with the
+  map, the notes, its documents and the jobs there. A client opens its
+  page the same way: its contacts to ring or email, the notes, its
+  documents and its jobs. A job's venue and client link to their pages.
+- Each document is a file, a link to where it's shared (Dropbox, Google
+  Drive, a website), or both, with a kind: tech spec, floor plan,
+  rigging, power, access and load-in, health and safety for a venue;
+  contract, purchase order, brief, brand guidelines, insurance they ask
+  for for a client.
+- Links work now, with no signal too. Files are kept and opened exactly as
+  people's documents are, so they wait on the same storage bucket.
+- Checked: the typecheck, the shared and server tests (with four new ones
+  for these documents), and two new browser tests on a phone: one adds a
+  link and a file on a venue, opens the file and removes a document; the
+  other adds a link on a client and changes a contact.
+
+**Next**
+
+- Set the storage bucket (the BACKUP_S3_ settings) to turn on files, for
+  people's documents and those on venues and clients alike.
+- Perhaps: crew opening a venue's documents from their call sheet.
+
 ## 10 October 2026: the planner's days open their job
 
 **Done**

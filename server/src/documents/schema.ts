@@ -1,7 +1,7 @@
 import type { Module } from '../migrations.ts'
 
 /**
- * People's documents (ADR 0029). Versioned on their own
+ * People's documents (ADR 0029), and those kept on venues and clients (ADR 0032). Versioned on their own
  * (documents_schema_version), so they never fight the crew migrations,
  * and backed up and exported like every module's tables. Devices never
  * see where a file is kept, nor the list of files to delete.
@@ -37,6 +37,26 @@ const MIGRATIONS: string[] = [
     tries       integer NOT NULL DEFAULT 0,
     last_error  text
   );
+  `,
+  // Documents kept on venues and clients (ADR 0032): a file kept as people's are, on the same list of files to delete, or
+  // a link, or both. Exactly one of venue and client.
+  `
+  CREATE TABLE IF NOT EXISTS attachments (
+    id          text PRIMARY KEY,
+    venue_id    text REFERENCES venues(id),
+    client_id   text REFERENCES clients(id),
+    kind        text NOT NULL,
+    title       text NOT NULL,
+    link        text,
+    file_key    text UNIQUE,
+    file_type   text CHECK (file_type IN ('pdf', 'jpeg', 'png', 'webp', 'heic')),
+    file_bytes  integer,
+    file_at     timestamptz,
+    added_at    timestamptz NOT NULL,
+    CHECK ((venue_id IS NULL) <> (client_id IS NULL))
+  );
+  CREATE INDEX IF NOT EXISTS attachments_venue ON attachments (venue_id);
+  CREATE INDEX IF NOT EXISTS attachments_client ON attachments (client_id);
   `,
 ]
 

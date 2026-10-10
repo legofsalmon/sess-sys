@@ -1,6 +1,5 @@
 import {
   crewFill,
-  mapLink,
   newId,
   PHASE_NAMES,
   PROJECT_STATUSES,
@@ -8,7 +7,6 @@ import {
   STOPPED,
   spanLabel,
   type ClientView,
-  type Contact,
   type JobView,
   type KitLineView,
   type ProjectStatus,
@@ -28,13 +26,17 @@ import { kitShort } from './Kit.tsx'
 import { PickScreen } from './PickScreen.tsx'
 import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
+import { ClientScreen } from './ClientScreen.tsx'
+import { jobsAt, VenueScreen } from './VenueScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
  * A job opens on its own page (#jobs/<id>) with its phases, kit and crew,
  * its pick list on another (#jobs/<id>/pick, ADR 0017), each phase's call
  * sheet on another (#jobs/<id>/sheet/<phase>, ADR 0021), the
- * planner (#plan, ADR 0010) shows them by week or month, and jobs already
+ * planner (#plan, ADR 0010) shows them by week or month, each venue has a
+ * page of its own with its documents (#venues/<id>, ADR 0032), as does each
+ * client (#clients/<id>), and jobs already
  * on Google Calendar can be brought in (#import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -57,6 +59,8 @@ export function JobsScreen() {
   const wide = useWide()
   if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
   if (hash === '#import') return <ImportScreen view={view} />
+  if (hash.startsWith('#venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#venues/'.length))} />
+  if (hash.startsWith('#clients/')) return <ClientScreen view={view} id={decodeURIComponent(hash.slice('#clients/'.length))} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
   if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []
@@ -105,17 +109,25 @@ function JobsRest({ view }: { view: View }) {
       <section className="card">
         <h2>Clients</h2>
         {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
-        {clients.map((c) => (
-          <ClientRow key={c.id} c={c} jobs={jobs.filter((j) => j.clientId === c.id).length} />
-        ))}
+        <ul className="job-list">
+          {clients.map((c) => (
+            <li key={c.id}>
+              <ClientRow c={c} jobs={jobs.filter((j) => j.clientId === c.id).length} docs={view.attachments.of('client', c.id).length} />
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="card">
         <h2>Venues</h2>
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
-        {venues.map((v) => (
-          <VenueRow key={v.id} v={v} jobs={jobs.filter((j) => j.venueId === v.id || j.phases.some((p) => p.venueId === v.id)).length} />
-        ))}
+        <ul className="job-list">
+          {venues.map((v) => (
+            <li key={v.id}>
+              <VenueRow v={v} jobs={jobsAt(jobs, v.id).length} docs={view.attachments.of('venue', v.id).length} />
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   )
@@ -294,129 +306,40 @@ function NewJob({ view }: { view: View }) {
   )
 }
 
-const blankContact = (): Contact => ({ name: '', role: '', email: null, phone: null })
-
-function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
-  const [open, setOpen] = useState(false)
-  const [f, setF] = useState({ name: c.name, notes: c.notes, contacts: c.contacts })
-  const { run, error } = useAct()
-  const setContact = (i: number, changes: Partial<Contact>) => setF({ ...f, contacts: f.contacts.map((x, j) => (j === i ? { ...x, ...changes } : x)) })
-  const save = (e: FormEvent) => {
-    e.preventDefault()
-    if (!f.name.trim()) return
-    const contacts = f.contacts
-      .filter((x) => x.name.trim())
-      .map((x) => ({ name: x.name.trim(), role: x.role.trim(), email: x.email?.trim() || null, phone: x.phone?.trim() || null }))
-    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
-  }
+/** A client in the list: opens their own page, with their documents and their jobs (ADR 0032). */
+function ClientRow({ c, jobs, docs }: { c: ClientView; jobs: number; docs: number }) {
   return (
-    <div className="row person">
-      <button
-        type="button"
-        className="who"
-        aria-expanded={open}
-        onClick={() => {
-          setF({ name: c.name, notes: c.notes, contacts: c.contacts })
-          setOpen(!open)
-        }}
-      >
+    <a className="job-row" href={`#clients/${encodeURIComponent(c.id)}`}>
+      <div>
         <b>{c.name}</b>
-        <small>
+        <p>
           {jobs} job{jobs === 1 ? '' : 's'}
+          {docs > 0 && ` · ${docs} document${docs === 1 ? '' : 's'}`}
           {c.contacts.length > 0 && ` · ${c.contacts.map((x) => x.name).join(', ')}`}
-        </small>
-      </button>
-      <Pending pending={c.pending} />
-      {open && (
-        <form className="detail grid-form" onSubmit={save}>
-          <label className="wide">
-            Name <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
-          </label>
-          {f.contacts.map((x, i) => (
-            <fieldset className="wide contact" key={i}>
-              <legend>Contact {i + 1}</legend>
-              {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
-              <label>
-                Name <input value={x.name} onChange={(e) => setContact(i, { name: e.target.value })} />
-              </label>
-              <label>
-                Role <input value={x.role} onChange={(e) => setContact(i, { role: e.target.value })} placeholder="e.g. Producer" />
-              </label>
-              <label>
-                Mobile <input type="tel" value={x.phone ?? ''} onChange={(e) => setContact(i, { phone: e.target.value })} />
-              </label>
-              <label>
-                Email <input type="email" value={x.email ?? ''} onChange={(e) => setContact(i, { email: e.target.value })} />
-              </label>
-            </fieldset>
-          ))}
-          <button type="button" className="wide" onClick={() => setF({ ...f, contacts: [...f.contacts, blankContact()] })}>
-            Add a contact
-          </button>
-          <label className="wide">
-            Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
-          </label>
-          <Refusal error={error} className="wide" />
-          <button type="submit" className="primary wide">
-            Save client
-          </button>
-        </form>
-      )}
-    </div>
+        </p>
+      </div>
+      <div className="side">
+        <Pending pending={c.pending} />
+      </div>
+    </a>
   )
 }
 
-function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
-  const [open, setOpen] = useState(false)
-  const [f, setF] = useState({ name: v.name, address: v.address, notes: v.notes })
-  const { run, error } = useAct()
-  const save = (e: FormEvent) => {
-    e.preventDefault()
-    if (!f.name.trim()) return
-    void run(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
-  }
+/** A venue in the list: opens its own page, with its documents and its jobs (ADR 0032). */
+function VenueRow({ v, jobs, docs }: { v: VenueView; jobs: number; docs: number }) {
   return (
-    <div className="row person">
-      <button
-        type="button"
-        className="who"
-        aria-expanded={open}
-        onClick={() => {
-          setF({ name: v.name, address: v.address, notes: v.notes })
-          setOpen(!open)
-        }}
-      >
+    <a className="job-row" href={`#venues/${encodeURIComponent(v.id)}`}>
+      <div>
         <b>{v.name}</b>
-        <small>
+        <p>
           {jobs} job{jobs === 1 ? '' : 's'}
+          {docs > 0 && ` · ${docs} document${docs === 1 ? '' : 's'}`}
           {v.address && ` · ${v.address.split('\n')[0]}`}
-        </small>
-      </button>
-      <Pending pending={v.pending} />
-      {open && (
-        <form className="detail grid-form" onSubmit={save}>
-          <label className="wide">
-            Name <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
-          </label>
-          <label className="wide">
-            Address <textarea rows={2} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} placeholder="With the Eircode, the map link goes straight there" />
-          </label>
-          <label className="wide">
-            Notes <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Access, load-in, power, parking" />
-          </label>
-          <Refusal error={error} className="wide" />
-          <div className="actions wide">
-            <button type="submit" className="primary">
-              Save venue
-            </button>
-            {(v.address || v.name) && (
-              <a className="button" href={mapLink(v)} target="_blank" rel="noreferrer">
-                Map
-              </a>
-            )}
-          </div>
-        </form>
-      )}
-    </div>
+        </p>
+      </div>
+      <div className="side">
+        <Pending pending={v.pending} />
+      </div>
+    </a>
   )
 }

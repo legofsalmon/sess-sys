@@ -11,6 +11,7 @@ import { lateHandlers } from './crew/late.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { documentHandlers } from './documents/handlers.ts'
+import { attachmentHandlers } from './documents/attachments.ts'
 import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers.ts'
 import { CHARACTERS, isCharacterError, Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
@@ -51,6 +52,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...erasureHandlers,
   ...documentHandlers,
   ...countHandlers,
+  ...attachmentHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */

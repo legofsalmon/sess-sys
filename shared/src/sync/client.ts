@@ -7,6 +7,7 @@ import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type P
 import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
+import { attachmentsView, type AttachmentsView } from './attachments-view.ts'
 import { erasuresView, forgetErased, keptRecordsOf, withErasures, type ErasuresView } from './erasure-view.ts'
 import { faultsView, type FaultsView } from './faults-view.ts'
 import { inspectionsView, type InspectionsView } from './inspections-view.ts'
@@ -114,6 +115,8 @@ export interface View {
   erasures: ErasuresView
   /** People's documents, and those sent from a link waiting to be checked (ADR 0029). */
   documents: DocumentsView
+  /** Documents kept on venues and clients, as files or links, each on its own page (ADR 0032). */
+  attachments: AttachmentsView
   /** Counts of places and cases, when each was last counted, and this week's list (ADR 0030). */
   counts: CountsView
   /**
@@ -388,6 +391,7 @@ export class SyncClient {
       late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
       erasures,
       documents: documentsView(entities, outbox, this.state.cursor, crew, erasures),
+      attachments: attachmentsView(entities, outbox, this.state.cursor),
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
