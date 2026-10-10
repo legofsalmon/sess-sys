@@ -3,6 +3,17 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 10 October 2026: the planner's days open their job
+
+**Done**
+
+- In the Jobs tab's Week and Month views, a job's days now open that job,
+  and so does anywhere in its name cell on the left, not just the words
+  ([planner decision](adr/0010-planner.md)). Crew asked for on the Crew
+  tab, with no job behind them, still go to the Crew tab from their name.
+- Checked with the planner's end-to-end tests, which now open a job from
+  a day and from the edge of its name cell.
+
 ## 9 October 2026: colours from the shared design system
 
 **Done**
