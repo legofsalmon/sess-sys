@@ -263,15 +263,18 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
   const words = [label, crew, moved, ...(cell.late ?? [])].filter(Boolean).join(', ')
   const tone = cell.needed === 0 ? '' : cell.booked < cell.needed ? 'short' : 'full'
   const className = ['blk', lane.tentative ? 'dashed' : 'solid', tone, cell.stray && 'stray', lane.pending && 'pending'].filter(Boolean).join(' ')
+  // The day opens its job, as the name does; a call from the Crew tab has no job to open.
+  const Block = lane.jobId ? 'a' : 'div'
+  const href = lane.jobId ? `#jobs/${lane.jobId}` : undefined
   if (scale === 'month')
     return (
-      <div className={className} title={`${lane.name}: ${words}`}>
+      <Block className={className} href={href} title={`${lane.name}: ${words}`}>
         <span aria-hidden="true">{cell.phases[0] ? phaseCode(cell.phases[0].name) : cell.stray ? '?' : '•'}</span>
         <span className="sr-only">{words}</span>
-      </div>
+      </Block>
     )
   return (
-    <div className={className}>
+    <Block className={className} href={href}>
       {label ? <b>{label}</b> : null}
       {crew && (label ? <small>{crew}</small> : <b>{crew}</b>)}
       {moved && <small>{moved}</small>}
@@ -281,7 +284,7 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
           {l}
         </small>
       ))}
-    </div>
+    </Block>
   )
 }
 

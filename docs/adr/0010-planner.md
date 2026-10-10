@@ -64,7 +64,9 @@ flagged".
   built from the data each office device already holds, so it works with
   no signal, and a change made anywhere shows as soon as it syncs.
 - **Looking, not changing, for now.** Changes are made on the job's page
-  or the Crew tab, a tap away. Dragging a phase to other days, with an
+  or the Crew tab, a tap away: a job's name, anywhere in its cell, and
+  each of its days open the job (added 10 October 2026, when Colly asked
+  for the days to be clickable too). Dragging a phase to other days, with an
   option to move its crew too, waits until the office has used the planner
   and knows what it wants from it.
 
