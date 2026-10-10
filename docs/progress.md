@@ -3,6 +3,47 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 10 October 2026: screens checked against the shared behaviour rules
+
+**Done**
+
+- Every screen was read against the design system's behaviour rules
+  (`behavioural.md` and principles 1 to 15), and what fell short was
+  fixed. Most of it is about never losing typed work, asking before
+  things that can't be taken back, and saying what a press did where it
+  was pressed.
+  - **Jobs.** A scan that wasn't recorded stays until it's dismissed.
+    Taps on the pick list say what they recorded. Asking for crew and
+    adding a phase say so where the form is. The calendar import keeps
+    its picks when you go back, and says which step it's on.
+  - **Stock.**
+    - Fixed, Not faulty and Found ask first, since the kit can go out
+      again.
+    - A test and a retirement start with nothing chosen.
+    - A new number asks before the old one is gone for good.
+    - Counts and moves say what they did.
+  - **Crew.**
+    - A refused form on a freelancer's page keeps what they typed.
+    - Decline is folded away from Accept.
+    - Release, Say no, Withdraw and cancelling approved leave ask first.
+    - A timesheet check isn't wiped when a new version arrives.
+  - **Everywhere.**
+    - Account and History show what's waiting to sync.
+    - Waiting to sync is drawn quietly rather than in amber.
+    - A closed fold keeps what was typed.
+    - Signing out sends waiting changes first.
+    - Buttons say what they do.
+- What the system didn't cover went back to it as learnings
+  ([design-system PR #6](https://github.com/legofsalmon/design-system/pull/6)).
+- Checked: typecheck, the unit tests and the end-to-end suite.
+
+**Next**
+
+- A new job still starts as Confirmed, which puts it on the jobs calendar
+  and holds its kit. Colly to decide whether it should start as an
+  enquiry.
+- An Undo notice, so reversible actions can stop asking first.
+
 ## 10 October 2026: a page for each venue and client, with their documents
 
 **Done**
