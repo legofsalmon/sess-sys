@@ -236,7 +236,9 @@ function Look(p: {
   const [skip, setSkip] = useState<ReadonlySet<string>>(() => p.kept?.skip ?? new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => p.kept?.people ?? new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
   const { onKeep } = p
-  useEffect(() => onKeep({ names, skip, people }), [names, skip, people, onKeep])
+  useEffect(() => {
+    onKeep({ names, skip, people })
+  }, [names, skip, people, onKeep])
   // The question before anything is saved, in the bar the button is in.
   const [asking, setAsking] = useState(false)
   const toggle = <T,>(set: ReadonlySet<T>, item: T) => {

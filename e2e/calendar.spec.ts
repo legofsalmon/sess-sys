@@ -320,7 +320,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
     await call.getByRole('button', { name: 'Offer', exact: true }).click()
     await expect(build.locator('.offers')).toContainText(name)
   }
-  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
   const jobPage = page.url()
   // Off: nobody has heard from Google, and the job page says nothing about it.
   await expect(build.locator('.on-cal')).toHaveCount(0)
