@@ -21,12 +21,12 @@ export interface Who {
 }
 
 /** The history's record of the action, filled in once the change knows whether the document was new and had a file. */
-async function recordArgs(ctx: Ctx, args: Record<string, unknown>) {
+export async function recordArgs(ctx: Ctx, args: Record<string, unknown>) {
   await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify(args)])
 }
 
 /** Write the file, then make the change; a change turned down takes the file back out of the storage. */
-async function withFile<T>(files: DocumentFiles, data: Buffer, change: (key: string) => Promise<T>): Promise<T> {
+export async function withFile<T>(files: DocumentFiles, data: Buffer, change: (key: string) => Promise<T>): Promise<T> {
   const key = await files.keep(data)
   try {
     return await change(key)

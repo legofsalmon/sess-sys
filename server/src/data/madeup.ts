@@ -49,6 +49,8 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * - documents (ADR 0029): insurance run out and running out soon, for the
  *   reminders, and certificates' cards; where a store is set up, a made-up
  *   PDF on each, and a renewed card sent from a link (MADE_UP_RENEWAL);
+ * - venues' documents (ADR 0032): links on Northbank and Riverside Park, to
+ *   example.com, so their pages have something to open;
  * - counts (ADR 0030): three places counted, one with a speaker not found
  *   and a count short, and one never counted, first on the week's list.
  */
@@ -171,6 +173,14 @@ export function madeUpData(today: string): Mutation[] {
   document(padraig, 'ipaf', 'IPAF card', day(20))
   document(roisin, 'safe-pass', 'Safe Pass card', day(12))
   document(cian, 'driving-licence', 'Driving licence', null)
+
+  // Venues' documents (ADR 0032): links to where a venue shares them, on example.com so nothing made up reaches a real site.
+  const venueDoc = (venueId: string, kind: CommandInput<'venueDocument.save'>['kind'], title: string, path: string) =>
+    add('venueDocument.save', { id: newId(), venueId, kind, title, link: `https://example.com/made-up/${path}` })
+  venueDoc(northbank.id, 'tech-spec', 'Tech spec', 'northbank-tech-spec.pdf')
+  venueDoc(northbank.id, 'floor-plan', 'Auditorium floor plan', 'northbank-auditorium.pdf')
+  venueDoc(northbank.id, 'access', 'Loading bay booking', 'northbank-loading-bay')
+  venueDoc(riverside.id, 'power', 'Power spec', 'riverside-power.pdf')
 
   // Staff leave (ADR 0024). Only this year is open, so an approver can try opening next year (Colly, 3 October 2026). A week
   // counted from today is moved by whole weeks until it's all in this year: early in January Orla's comes after today,

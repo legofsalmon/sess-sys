@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 10 October 2026: a page for each venue, with its documents
+
+**Done**
+
+- Colly asked for each venue to have its own page with somewhere to keep
+  documents ([Decision 0032](adr/0032-venue-pages-and-their-documents.md)).
+  A venue in the Jobs tab's list now opens its page: the address with the
+  map, the notes, its documents and the jobs there. Each document is a
+  file, a link to where the venue shares it (Dropbox, Google Drive, its
+  website), or both, with a kind (tech spec, floor plan, rigging, power,
+  access and load-in, health and safety, something else).
+- Links work now, with no signal too. Files are kept and opened exactly as
+  people's documents are, so they wait on the same storage bucket.
+- Checked: the typecheck, the shared and server tests (with four new ones
+  for venues' documents), and a new browser test on a phone that adds a
+  link and a file, opens the file and removes a document.
+
+**Next**
+
+- Set the storage bucket (the BACKUP_S3_ settings) to turn on files, for
+  people's documents and venues' alike.
+- Perhaps: crew opening a venue's documents from their call sheet.
+
 ## 9 October 2026: colours from the shared design system
 
 **Done**

@@ -1,6 +1,5 @@
 import {
   crewFill,
-  mapLink,
   newId,
   PHASE_NAMES,
   PROJECT_STATUSES,
@@ -28,13 +27,15 @@ import { kitShort } from './Kit.tsx'
 import { PickScreen } from './PickScreen.tsx'
 import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
+import { jobsAt, VenueScreen } from './VenueScreen.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
  * A job opens on its own page (#jobs/<id>) with its phases, kit and crew,
  * its pick list on another (#jobs/<id>/pick, ADR 0017), each phase's call
  * sheet on another (#jobs/<id>/sheet/<phase>, ADR 0021), the
- * planner (#plan, ADR 0010) shows them by week or month, and jobs already
+ * planner (#plan, ADR 0010) shows them by week or month, each venue has a
+ * page of its own with its documents (#venues/<id>, ADR 0032), and jobs already
  * on Google Calendar can be brought in (#import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -57,6 +58,7 @@ export function JobsScreen() {
   const wide = useWide()
   if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
   if (hash === '#import') return <ImportScreen view={view} />
+  if (hash.startsWith('#venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#venues/'.length))} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
   if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []
@@ -113,9 +115,13 @@ function JobsRest({ view }: { view: View }) {
       <section className="card">
         <h2>Venues</h2>
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
-        {venues.map((v) => (
-          <VenueRow key={v.id} v={v} jobs={jobs.filter((j) => j.venueId === v.id || j.phases.some((p) => p.venueId === v.id)).length} />
-        ))}
+        <ul className="job-list">
+          {venues.map((v) => (
+            <li key={v.id}>
+              <VenueRow v={v} jobs={jobsAt(jobs, v.id).length} docs={view.venueDocuments.of(v.id).length} />
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   )
@@ -366,57 +372,21 @@ function ClientRow({ c, jobs }: { c: ClientView; jobs: number }) {
   )
 }
 
-function VenueRow({ v, jobs }: { v: VenueView; jobs: number }) {
-  const [open, setOpen] = useState(false)
-  const [f, setF] = useState({ name: v.name, address: v.address, notes: v.notes })
-  const { run, error } = useAct()
-  const save = (e: FormEvent) => {
-    e.preventDefault()
-    if (!f.name.trim()) return
-    void run(() => client.mutate('venue.upsert', { id: v.id, name: f.name.trim(), address: f.address.trim(), notes: f.notes.trim() })).then((ok) => ok && setOpen(false))
-  }
+/** A venue in the list: opens its own page, with its documents and its jobs (ADR 0032). */
+function VenueRow({ v, jobs, docs }: { v: VenueView; jobs: number; docs: number }) {
   return (
-    <div className="row person">
-      <button
-        type="button"
-        className="who"
-        aria-expanded={open}
-        onClick={() => {
-          setF({ name: v.name, address: v.address, notes: v.notes })
-          setOpen(!open)
-        }}
-      >
+    <a className="job-row" href={`#venues/${encodeURIComponent(v.id)}`}>
+      <div>
         <b>{v.name}</b>
-        <small>
+        <p>
           {jobs} job{jobs === 1 ? '' : 's'}
+          {docs > 0 && ` · ${docs} document${docs === 1 ? '' : 's'}`}
           {v.address && ` · ${v.address.split('\n')[0]}`}
-        </small>
-      </button>
-      <Pending pending={v.pending} />
-      {open && (
-        <form className="detail grid-form" onSubmit={save}>
-          <label className="wide">
-            Name <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
-          </label>
-          <label className="wide">
-            Address <textarea rows={2} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} placeholder="With the Eircode, the map link goes straight there" />
-          </label>
-          <label className="wide">
-            Notes <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Access, load-in, power, parking" />
-          </label>
-          <Refusal error={error} className="wide" />
-          <div className="actions wide">
-            <button type="submit" className="primary">
-              Save venue
-            </button>
-            {(v.address || v.name) && (
-              <a className="button" href={mapLink(v)} target="_blank" rel="noreferrer">
-                Map
-              </a>
-            )}
-          </div>
-        </form>
-      )}
-    </div>
+        </p>
+      </div>
+      <div className="side">
+        <Pending pending={v.pending} />
+      </div>
+    </a>
   )
 }

@@ -14,6 +14,7 @@ import { moveCommandSchemas } from './moves.ts'
 import { officeCommandSchemas } from './office.ts'
 import { stockCommandSchemas } from './stock.ts'
 import { timesheetCommandSchemas } from './timesheets.ts'
+import { venueDocumentCommandSchemas } from './venue-documents.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -40,6 +41,7 @@ export const commandSchemas = {
   ...erasureCommandSchemas,
   ...documentCommandSchemas,
   ...countCommandSchemas,
+  ...venueDocumentCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas
