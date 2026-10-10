@@ -6,9 +6,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  * first few with the rest a tap away.
  */
 
-/** The form behind a button: "Add person" opens it in place, with the cursor in its first field, and Close puts it away. */
+/**
+ * The form behind a button: "Add person" opens it in place, with the cursor
+ * in its first field, and Close puts it away. Put away, not thrown away:
+ * once opened the form stays, hidden, so whatever was typed is still there
+ * when it opens again.
+ */
 export function Fold({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false)
+  // Opened at least once: from then on the form is kept, open or not.
+  const [kept, setKept] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const opener = useRef<HTMLButtonElement>(null)
   const closed = useRef(false)
@@ -17,26 +24,37 @@ export function Fold({ label, children, className }: { label: string; children: 
     // Close goes as the form does, so on a keyboard the focus goes back to the button rather than being lost.
     else if (closed.current) opener.current?.focus()
   }, [open])
-  if (!open)
-    return (
-      <button type="button" className={className} onClick={() => setOpen(true)} ref={opener}>
-        {label}
-      </button>
-    )
   return (
-    <div className="fold" ref={box}>
-      {children}
-      <button
-        type="button"
-        className="link"
-        onClick={() => {
-          closed.current = true
-          setOpen(false)
-        }}
-      >
-        Close
-      </button>
-    </div>
+    <>
+      {!open && (
+        <button
+          type="button"
+          className={className}
+          onClick={() => {
+            setKept(true)
+            setOpen(true)
+          }}
+          ref={opener}
+        >
+          {label}
+        </button>
+      )}
+      {kept && (
+        <div className="fold" ref={box} hidden={!open}>
+          {children}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              closed.current = true
+              setOpen(false)
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

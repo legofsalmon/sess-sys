@@ -457,8 +457,12 @@ function Places({ view }: { view: View }) {
     if (taken) return refuse(`There's already a place called ${taken.name}.`)
     const id = newId()
     setAdded(undefined)
-    void run(() => client.mutate('place.upsert', { id, name: n, notes: '' })).then((ok) => ok && setAdded({ id, name: n }))
+    // A refusal brings what was typed back, unless the next name has been typed since.
     setName('')
+    void run(() => client.mutate('place.upsert', { id, name: n, notes: '' })).then((ok) => {
+      if (ok) setAdded({ id, name: n })
+      else setName((now) => (now === '' ? name : now))
+    })
   }
   return (
     <section className="card">

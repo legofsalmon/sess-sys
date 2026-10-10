@@ -194,7 +194,7 @@ test('set aside, printed, sent to a label maker, and put on items by scanning', 
   await expect(claim.getByRole('checkbox', { name: `One of the 3 counted at ${bay}, not labelled until now` })).toBeChecked()
   await top(page)
   await page.screenshot(shot('labels-claim'))
-  await claim.getByRole('button', { name: `Put ${sh(first + 4)} on it` }).click()
+  await claim.getByRole('button', { name: `Put ${sh(first + 4)} on ` }).click()
   const added = page.locator('p.added')
   await expect(added).toHaveText(`Added ${sh(first + 4)} (${speaker}) at ${bay}. Scan the next label.`)
   await expect(find).toBeFocused()

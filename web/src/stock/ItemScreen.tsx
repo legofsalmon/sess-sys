@@ -11,7 +11,7 @@ import {
   type WarehouseView,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { Refusal, useAct } from '../act.tsx'
+import { act, Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { when } from '../format.ts'
@@ -31,8 +31,11 @@ import {
   itemToPut,
   loopIn,
   numberLabel,
+  SavedLine,
+  ScanMisses,
   ScanResult,
   useNewPlace,
+  useScanMisses,
   whereLabel,
   WhereChoices,
   whereNamed,
@@ -338,7 +341,13 @@ function Details({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
 /** For a label that's lost or worn out. The old number stays with the item and is never used again. */
 function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () => void }) {
   const [typed, setTyped] = useState('')
+  // Nothing typed gives it the next free number, which no label in hand has yet, and its own is never used again: that's asked first.
+  const [asking, setAsking] = useState(false)
   const { run, error, refuse } = useAct()
+  const relabel = (number: string | null) => {
+    setAsking(false)
+    void run(() => client.mutate('asset.relabel', { id: a.id, number })).then((ok) => ok && onDone())
+  }
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const t = typed.trim()
@@ -355,7 +364,8 @@ function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
             : `${number} was used before (${other.model?.name ?? 'another item'}, now ${numberLabel(other)}), and a number is never used twice. Use another label.`
       )
     }
-    void run(() => client.mutate('asset.relabel', { id: a.id, number })).then((ok) => ok && onDone())
+    if (!number && a.number) return setAsking(true)
+    relabel(number)
   }
   return (
     <form className="grid-form" onSubmit={submit}>
@@ -369,23 +379,35 @@ function Relabel({ a, w, onDone }: { a: AssetView; w: WarehouseView; onDone: () 
           autoComplete="off"
           autoCapitalize="characters"
           autoFocus
+          disabled={asking}
         />
       </label>
       <Refusal error={error} className="wide" />
-      <div className="actions wide">
-        <button type="submit" className="primary">
-          Save new label
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
+      {asking ? (
+        <Confirm
+          className="wide"
+          question={`Give ${a.number} the next free number? ${a.number} is never used again, and the new number needs a label printed for it.`}
+          yes="Give it the next free number"
+          onYes={() => relabel(null)}
+          onNo={() => setAsking(false)}
+        />
+      ) : (
+        <div className="actions wide">
+          <button type="submit" className="primary">
+            {typed.trim() ? 'Save new label' : 'Give it the next free number'}
+          </button>
+          <button type="button" onClick={onDone}>
+            Cancel
+          </button>
+        </div>
+      )}
     </form>
   )
 }
 
 function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
-  const [reason, setReason] = useState<RetiredReason>('scrapped')
+  // No reason to start with: one left as it was would go in the history as why, whatever happened to it.
+  const [reason, setReason] = useState<RetiredReason>()
   const [note, setNote] = useState('')
   const { run, error, refuse } = useAct()
   const holding = [
@@ -395,6 +417,7 @@ function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (holding.length) return refuse(`${numberLabel(a)} still holds ${holding.join(' and ')}. Empty it first.`)
+    if (!reason) return refuse('Why is it being retired?')
     void run(() => client.mutate('asset.retire', { id: a.id, reason, note: note.trim() })).then((ok) => ok && onDone())
   }
   return (
@@ -430,17 +453,24 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
   const [camera, setCamera] = useState(false)
   const [putIn, setPutIn] = useState('')
-  const { run, error, refuse } = useAct()
-  const put = (t: string) => {
+  // What a count or a move of what's counted in it just did.
+  const [said, setSaid] = useState('')
+  const { error, refuse } = useAct()
+  // With the camera on, what wasn't done is kept in a list until dismissed, as the next label is read at once; typed, it's the line under the field.
+  const { misses, add, dismiss } = useScanMisses()
+  const put = (t: string, scanned = false) => {
     setPutIn('')
+    refuse('')
     if (!t) return
+    const fail = (reason: string) => (scanned ? add(reason) : refuse(reason))
     const { item, problem } = itemToPut(t, w)
-    if (!item) return refuse(problem)
-    if (item.caseId === c.id) return refuse(`${item.number} is in here already.`)
+    if (!item) return fail(problem)
+    if (item.caseId === c.id) return fail(`${item.number} is in here already.`)
     const loop = loopIn(item.id, c.id, w)
-    if (loop) return refuse(loop)
-    void run(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id })).then(
-      (ok) => ok && setPutIn(`${item.number} (${item.model?.name ?? 'an item'}) is in ${numberLabel(c)} now.`)
+    if (loop) return fail(loop)
+    void act(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id })).then(
+      () => setPutIn(`${item.number} (${item.model?.name ?? 'an item'}) is in ${numberLabel(c)} now.`),
+      (err: Error) => fail(`${item.number}: ${err.message}`)
     )
   }
   const submit = (e: FormEvent) => {
@@ -474,11 +504,12 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
         </ul>
       )}
       {c.counted.map((s) => (
-        <CountRow key={s.id} s={s} w={w}>
+        <CountRow key={s.id} s={s} w={w} onSaid={setSaid}>
           × {s.model ? <a href={`#stock/product/${s.model.id}`}>{s.model.name}</a> : 'a product since removed'}
           {s.model?.tracking === 'serialised' && <small>, not labelled yet</small>}
         </CountRow>
       ))}
+      <SavedLine text={said} />
       <form className="grid-form" onSubmit={submit}>
         <h3 className="wide">Put an item in</h3>
         <div className="wide scan-row">
@@ -507,10 +538,11 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
         </div>
         {camera && (
           <div className="wide">
-            <CameraScanner onRead={(code) => put(code.trim())} onStop={close} small />
+            <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
           </div>
         )}
         <Refusal error={error} className="wide" />
+        <ScanMisses misses={misses} onDismiss={dismiss} />
         {putIn && !error && (
           <ScanResult label="Put in" onClose={camera ? close : undefined}>
             {putIn}
@@ -521,7 +553,7 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
           Put it in {numberLabel(c)}
         </button>
       </form>
-      <CountHere w={w} at={{ placeId: null, caseId: c.id }} title="Count what's in it" />
+      <CountHere w={w} at={{ placeId: null, caseId: c.id }} title="Count what's in it" onSaid={setSaid} />
     </section>
   )
 }

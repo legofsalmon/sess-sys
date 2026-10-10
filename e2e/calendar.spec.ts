@@ -176,9 +176,9 @@ test('connecting Google Calendar, choosing its calendar, checking and disconnect
   await expect(card).toContainText('Confirmed jobs go on Test calendar, written by ops@sessionhire.com.')
   await expect(card).toContainText('4 days on it from today. Connected by Colly Hewson today at')
 
-  // Check now looks at the calendar itself and says what it did.
+  // Check the calendar looks at the calendar itself and says what it did.
   await page.route(/\/api\/calendar\/check/, (route) => route.fulfill({ json: { written: 2, removed: 1, failed: 0 } }))
-  await card.getByRole('button', { name: 'Check now' }).click()
+  await card.getByRole('button', { name: 'Check the calendar' }).click()
   await expect(card.getByRole('status')).toHaveText('Checked: wrote 2 days and took 1 off.')
   await page.evaluate(() => scrollTo(0, 0))
   await page.screenshot(shot('account-calendar'))
@@ -186,7 +186,7 @@ test('connecting Google Calendar, choosing its calendar, checking and disconnect
   // Something wrong shows on the card, in words.
   server.link = connected({
     problem:
-      "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check now.",
+      "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check the calendar.",
   })
   await page.reload()
   await expect(card.getByRole('alert')).toContainText('The Google Calendar API is switched off')
@@ -270,7 +270,7 @@ test('each phase of a job says how it stands on the calendar', async ({ browser 
   // Renamed: on its way until the server has rewritten the days.
   await page.getByRole('button', { name: 'Change details' }).click()
   await page.getByLabel('Job', { exact: true }).fill(renamed)
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('button', { name: 'Save job' }).click()
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible()
   await expect(build.locator('.cal')).toHaveText(`Going on Test calendar as “${renamed} - Build 1/2” and “${renamed} - Build 2/2”…`)
 })

@@ -16,7 +16,7 @@ import { Top } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
-import { mistakeLabel, numberLabel } from './common.tsx'
+import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
@@ -144,7 +144,8 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
 
 function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]; onDone: () => void }) {
   const [kind, setKind] = useState<InspectionKind>(kinds[0]!)
-  const [passed, setPassed] = useState(true)
+  // No result to start with: one left as it was would record a pass for kit that failed, and it would go out.
+  const [passed, setPassed] = useState<boolean>()
   const today = useToday()
   const [day, setDay] = useState(today)
   const [by, setBy] = useState(savedTester)
@@ -152,6 +153,7 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
   const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    if (passed === undefined) return refuse('Did it pass or fail?')
     if (!day || day > today) return refuse('When was it done? Today or a day before.')
     saveTester(by.trim())
     void run(() => record({ assetId: a.id, kind, passed, day, today, by: by.trim(), note: note.trim() })).then((ok) => ok && onDone())
@@ -172,11 +174,11 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
       <fieldset className="wide reasons">
         <legend>Result</legend>
         <label className="tick">
-          <input type="radio" name="result" checked={passed} onChange={() => setPassed(true)} />
+          <input type="radio" name="result" checked={passed === true} onChange={() => setPassed(true)} />
           <span>Passed</span>
         </label>
         <label className="tick">
-          <input type="radio" name="result" checked={!passed} onChange={() => setPassed(false)} />
+          <input type="radio" name="result" checked={passed === false} onChange={() => setPassed(false)} />
           <span>Failed</span>
         </label>
       </fieldset>
@@ -187,12 +189,14 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
         By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who tested it" maxLength={200} />
       </label>
       <label className="wide">
-        Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={passed ? 'e.g. Earth 0.08 Ω' : 'e.g. Earth fault on the IEC inlet'} maxLength={2000} />
+        Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={passed === false ? 'e.g. Earth fault on the IEC inlet' : 'e.g. Earth 0.08 Ω'} maxLength={2000} />
       </label>
       <Refusal error={error} className="wide" />
       <div className="actions wide">
         <button type="submit" className="primary">
+          {/* The result is said on the button, so what's recorded is read back as it's pressed. */}
           Record {INSPECTION_SHORT[kind] === 'PAT' ? 'PAT' : 'examination'}
+          {passed !== undefined && `: ${passed ? 'passed' : 'failed'}`}
         </button>
         <button type="button" onClick={onDone}>
           Cancel
@@ -304,6 +308,12 @@ export function TestingScreen({ view }: { view: View }) {
   // The one held as of the latest read, for a read or a timer that lands before the next render.
   const heldRef = useRef<Held>(undefined)
   const say = (tone: Said['tone'], text: string, last?: Said['last']) => setSaid({ tone, text, at: Date.now(), last })
+  // What wasn't recorded is said, and kept in a list until dismissed: the next read replaces the line at once (design rule 2).
+  const { misses, add, dismiss } = useScanMisses()
+  const missed = (text: string) => {
+    add(text)
+    say('warn', text)
+  }
 
   const hold = (h: Held) => {
     heldRef.current = h
@@ -325,7 +335,7 @@ export function TestingScreen({ view }: { view: View }) {
     try {
       await act(() => record({ assetId: h.a.id, kind: h.kind, passed: true, day: h.day, today: h.today, by: h.by, note: '' }))
     } catch (err) {
-      return say('warn', (err as Error).message)
+      return missed(`${name}: not recorded. ${(err as Error).message}`)
     }
     setDone((d) => [{ a: h.a, passed: true, at: Date.now() }, ...d])
     const due = client.view().inspections.dueOf(h.a.id).find((d) => d.kind === h.kind)
@@ -366,10 +376,10 @@ export function TestingScreen({ view }: { view: View }) {
     const n = normaliseNumber(code)
     // An old tag from before Session Hire's labels works too (ADR 0026).
     const a = itemByCode(w, code)
-    if (!a) return say('warn', n ? `${n} isn't on anything yet.` : `Nothing has the code ${code.trim()}.`)
+    if (!a) return missed(n ? `${n} isn't on anything yet.` : `Nothing has the code ${code.trim()}.`)
     const name = itemName(a)
-    if (a.retiredReason === 'mistake') return say('warn', `${mistakeLabel(a)} Nothing was recorded.`)
-    if (a.status !== 'active') return say('warn', `${name} is retired, so it wasn't recorded. Bring it back first if it's still here.`)
+    if (a.retiredReason === 'mistake') return missed(`${mistakeLabel(a)} Nothing was recorded.`)
+    if (a.status !== 'active') return missed(`${name} is retired, so it wasn't recorded. Bring it back first if it's still here.`)
     saveTester(by.trim())
     // The same label again while it's held: still held, not passed twice.
     if (heldRef.current?.a.id === a.id) return
@@ -378,7 +388,7 @@ export function TestingScreen({ view }: { view: View }) {
     hold({ a, kind, by: by.trim(), day, today, until: Date.now() + HOLD_MS })
     if (before) await commit(before)
   }
-  const read = (code: string) => void onCode(code).catch((err: Error) => say('warn', err.message))
+  const read = (code: string) => void onCode(code).catch((err: Error) => missed(err.message))
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const code = typed.trim()
@@ -397,7 +407,7 @@ export function TestingScreen({ view }: { view: View }) {
         setDone((d) => [{ a: last.a, passed: false, at: Date.now() }, ...d])
         say('warn', `${itemName(last.a)}: failed. It can't go out until it passes. Report what's wrong on its page.`)
       },
-      (err: Error) => say('warn', err.message)
+      (err: Error) => missed(`${itemName(last.a)}: the fail wasn't recorded. ${err.message}`)
     )
   // Failed while held: the fail is recorded in place of the pass.
   const failedHeld = () => {
@@ -478,6 +488,7 @@ export function TestingScreen({ view }: { view: View }) {
             {said.text}
           </p>
         )}
+        <ScanMisses misses={misses} onDismiss={dismiss} />
         {said?.last && !held && (
           <div className="actions">
             <button type="button" onClick={() => failed(said.last!)}>

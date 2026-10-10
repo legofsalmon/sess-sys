@@ -610,7 +610,8 @@ export function ClaimLabel({
       <Refusal error={error} className="wide" />
       {question ?? (
         <button type="submit" className="primary wide">
-          Put {number} on it
+          {/* The product named, as it's carried over from the last label: a shelf of something else shows here before it's pressed. */}
+          Put {number} on {m ? `a ${m.name}` : 'it'}
         </button>
       )}
       <ProductChoices w={w} />

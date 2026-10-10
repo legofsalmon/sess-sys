@@ -77,7 +77,7 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   // Renamed, and the crew screen says so too.
   await office.getByRole('button', { name: 'Change details' }).click()
   await office.getByLabel('Job', { exact: true }).fill(renamed)
-  await office.getByRole('button', { name: 'Save', exact: true }).click()
+  await office.getByRole('button', { name: 'Save job' }).click()
   await expect(office.getByRole('heading', { name: renamed })).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
@@ -121,7 +121,7 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await expect(phase.locator('.pill')).toHaveText('Waiting to sync')
   await phase.getByRole('button', { name: 'Change', exact: true }).click()
   await phase.getByLabel('To', { exact: true }).fill('2030-11-03')
-  await phase.getByRole('button', { name: 'Save' }).click()
+  await phase.getByRole('button', { name: 'Save phase' }).click()
   await expect(phase.locator('header')).toContainText('Sat 2 Nov to Sun 3 Nov')
 
   await context.setOffline(false)

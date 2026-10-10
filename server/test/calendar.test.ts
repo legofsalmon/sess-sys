@@ -585,7 +585,7 @@ describe('when access goes wrong', () => {
     expect((await feed(s)).link).toMatchObject({ state: 'reconnect', problem: expect.stringContaining("The app's Google key has changed") })
   })
 
-  it('explains a Calendar API that is switched off, and waits for Check now', async () => {
+  it('explains a Calendar API that is switched off, and waits for Check the calendar', async () => {
     const s = await setup()
     const job = await nissan(s)
     await connect(s)

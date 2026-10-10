@@ -26,6 +26,8 @@ export function ItemLog({ view, a }: { view: View; a: AssetView }) {
   const offline = view.connection === 'offline' || navigator.onLine === false
   const [server, setServer] = useState<Server>({ state: 'asking' })
   const [older, setOlder] = useState<{ entries: ItemLogEntry[]; next?: string }>()
+  // Older entries that couldn't be fetched: said under the log, which keeps what it has.
+  const [olderFailed, setOlderFailed] = useState(false)
   // Asked for again as changes arrive, a moment after the last, so a sync of many changes asks once.
   useEffect(() => {
     if (offline) return
@@ -51,11 +53,14 @@ export function ItemLog({ view, a }: { view: View; a: AssetView }) {
   const device = useMemo(() => deviceItemLog(view, a.id, client.waiting), [view, a.id])
   const entries = joinItemLog(device, server.state === 'got' ? [...server.entries, ...(older?.entries ?? [])] : undefined)
   const next = server.state === 'got' ? (older ? older.next : server.next) : undefined
-  const showOlder = () =>
+  // A failure here leaves the log as it was, with Show older still there to try again.
+  const showOlder = () => {
+    setOlderFailed(false)
     void ask<ItemLogPage>(`/api/stock/items/${encodeURIComponent(a.id)}/log?before=${encodeURIComponent(next!)}`).then(
       (page) => setOlder({ entries: [...(older?.entries ?? []), ...page.entries], next: page.next }),
-      () => setServer({ state: 'failed' })
+      () => setOlderFailed(true)
     )
+  }
 
   return (
     <section className="card item-log" aria-label="Log">
@@ -89,6 +94,7 @@ export function ItemLog({ view, a }: { view: View; a: AssetView }) {
           )}
         </ShowAll>
       )}
+      {olderFailed && next && <p className="hint">Couldn't reach the server for older entries. What's here stays; try again with signal.</p>}
       {next && !offline && (
         <button type="button" className="link" onClick={showOlder}>
           Show older

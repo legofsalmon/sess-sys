@@ -1,11 +1,11 @@
 import { plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { Confirm, Refusal, useAct } from '../act.tsx'
+import { act, Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, ScanResult, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, SavedLine, ScanMisses, ScanResult, useScanMisses, WhereChoices } from './common.tsx'
 import { CountsOf } from './Counts.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 
@@ -129,6 +129,8 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
   }
   const byName = [...groups.values()].sort((a, b) => (a[0]!.model?.name ?? '').localeCompare(b[0]!.model?.name ?? ''))
   const empty = p.items.length === 0 && p.counted.length === 0
+  // What a count or a move of what's counted here just did.
+  const [said, setSaid] = useState('')
   return (
     <section className="card" aria-label="Here">
       <h2>Here</h2>
@@ -168,13 +170,14 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
         )
       })}
       {p.counted.map((s) => (
-        <CountRow key={s.id} s={s} w={w}>
+        <CountRow key={s.id} s={s} w={w} onSaid={setSaid}>
           × {s.model ? <a href={`#stock/product/${s.model.id}`}>{s.model.name}</a> : 'a product since removed'}
           {s.model?.tracking === 'serialised' && <small>, not labelled yet</small>}
         </CountRow>
       ))}
+      <SavedLine text={said} />
       <PutHere p={p} w={w} />
-      <CountHere w={w} at={{ placeId: p.id, caseId: null }} title="Count something here" />
+      <CountHere w={w} at={{ placeId: p.id, caseId: null }} title="Count something here" onSaid={setSaid} />
     </section>
   )
 }
@@ -183,16 +186,21 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
 function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const [number, setNumber] = useState('')
   const [camera, setCamera] = useState(false)
-  const { run, error, refuse } = useAct()
+  const { error, refuse } = useAct()
   const [moved, setMoved] = useState('')
-  const put = (t: string) => {
+  // With the camera on, what wasn't done is kept in a list until dismissed, as the next label is read at once; typed, it's the line under the field.
+  const { misses, add, dismiss } = useScanMisses()
+  const put = (t: string, scanned = false) => {
     setMoved('')
+    refuse('')
     if (!t) return
+    const fail = (reason: string) => (scanned ? add(reason) : refuse(reason))
     const { item, problem } = itemToPut(t, w)
-    if (!item) return refuse(problem)
-    if (item.placeId === p.id) return refuse(`${item.number} is here already.`)
-    void run(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
-      (ok) => ok && setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`)
+    if (!item) return fail(problem)
+    if (item.placeId === p.id) return fail(`${item.number} is here already.`)
+    void act(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
+      () => setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`),
+      (err: Error) => fail(`${item.number}: ${err.message}`)
     )
   }
   const submit = (e: FormEvent) => {
@@ -234,10 +242,11 @@ function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
       </div>
       {camera && (
         <div className="wide">
-          <CameraScanner onRead={(code) => put(code.trim())} onStop={close} small />
+          <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
         </div>
       )}
       <Refusal error={error} className="wide" />
+      <ScanMisses misses={misses} onDismiss={dismiss} />
       {moved && !error && (
         <ScanResult label="Put here" onClose={camera ? close : undefined}>
           {moved}
