@@ -75,24 +75,28 @@
 html { overscroll-behavior-y: none; background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--ink); }
 .app { max-width: 640px; margin: 0 auto; padding: max(var(--space-12), env(safe-area-inset-top)) var(--space-16) var(--space-40); display: grid; gap: var(--space-14); }
-.top { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
+/* The name takes what the sync state leaves: the state keeps its one line, and a long screen name ends in … rather than wrapping, so nothing under the bar moves when the state changes. */
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
 /* A new version arrived while the app was open: one line fixed at the top until they reload. The page and its sticky header move down under it, so it hides nothing. */
 .update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--space-12); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--space-16) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
 /* Its words wrap when there's more to say, such as changes a reload would lose; the button stays whole. */
 .update > span { white-space: normal; }
 .update ~ main .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
 .update ~ main .app .top { top: calc(56px + env(safe-area-inset-top)); }
-.brand { display: flex; gap: var(--space-10); align-items: center; }
+.brand { display: flex; gap: var(--space-10); align-items: center; min-width: 0; }
+.brand > span:last-child { min-width: 0; }
+.brand b, .brand small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
 .brand small, label small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .brand .made-up { color: var(--warn); font-weight: 600; }
-.mark { width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
+.mark { flex: none; width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
 .conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
-.conn.online { background: var(--good-soft); color: var(--good); }
+/* Up to date is healthy, so it's quiet (the design system's "healthy is quiet"): muted words with no bubble round them. Only what's waiting or a lost signal gets a pill. */
+.conn.online { padding-inline: 0; background: transparent; color: var(--muted); font-weight: 500; }
 /* Changes on their way: nobody has to act, so quiet grey and dashed, never amber. */
 .conn.syncing { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
 .conn.offline { background: var(--ink); color: var(--bg); }
-.top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-6); }
+.top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-6); }
 /* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
 .top .not-done { min-height: 0; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
 .top .not-done[aria-expanded='true'] { border-color: var(--bad); }
