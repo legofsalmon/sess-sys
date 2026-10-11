@@ -224,7 +224,7 @@ test('every field on every screen has a name, and the not-done list is a live re
   await page.getByRole('button', { name: /^Dara Quinn/ }).click()
   await expect(page.getByLabel('Off from')).toBeVisible()
   expect(await unnamedFields(page), '#crew').toEqual([])
-  for (const hash of ['#jobs', '#stock', '#account', '#history', '#crew/leave']) {
+  for (const hash of ['#jobs', '#stock', '#menu', '#account', '#me', '#history', '#crew/leave']) {
     await page.goto(`/${hash}`)
     await expect(page.locator('.app')).toBeVisible()
     expect(await unnamedFields(page), hash).toEqual([])

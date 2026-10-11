@@ -52,10 +52,10 @@ test('the office copies a freelancer their calendar address, the same one their 
   expect(body).not.toContain(link.split('/f/')[1]!)
 })
 
-test('staff who also work jobs find their own bookings feed on the Account tab', async ({ browser }) => {
+test('staff who also work jobs find their own bookings feed under You', async ({ browser }) => {
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'google', user: { id: 'u7', email: 'ciara@sessionhire.com', name: 'Ciara Walsh' } } }))
-  await page.goto('/#account')
+  await page.goto('/#me')
   await expect(page.getByRole('heading', { name: 'Signed in' })).toBeVisible()
   const card = page.getByRole('region', { name: 'Your bookings in your own calendar' })
   // Not in Crew yet: nothing to show.
@@ -70,7 +70,7 @@ test('staff who also work jobs find their own bookings feed on the Account tab',
   await form.getByRole('button', { name: 'Add person' }).click()
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
-  await page.goto('/#account')
+  await page.goto('/#me')
   await expect(card).toBeVisible()
   const address = await card.getByLabel('Calendar address').inputValue()
   expect(address).toMatch(FEED)

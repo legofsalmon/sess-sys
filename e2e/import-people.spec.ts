@@ -72,7 +72,7 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await card.getByRole('link', { name: 'Bring in a list' }).click()
   await expect(office).toHaveURL(/#account\/import-people$/)
   await expect(office.getByRole('heading', { name: 'Bring in a list' })).toBeVisible()
-  await expect(office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Admin' })).toHaveAttribute('aria-current', 'page')
+  await expect(office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Menu' })).toHaveAttribute('aria-current', 'page')
 
   // The file, read on the phone and sent to the server for the preview.
   await office.getByLabel('Crew list file').setInputFiles(file)

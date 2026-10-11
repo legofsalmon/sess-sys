@@ -91,10 +91,10 @@ export function HistoryScreen() {
 
   return (
     <div className="app history">
-      <Top view={view} title="Admin" />
-      {/* Kept under Admin (ADR 0033): a record for the directors and the office, used now and then. */}
-      <a className="back" href="#account">
-        ‹ Admin
+      <Top view={view} title="Menu" />
+      {/* In the Menu (ADR 0035): a record for the directors and the office, used now and then. */}
+      <a className="back" href="#menu">
+        ‹ Menu
       </a>
       <h1>History</h1>
 

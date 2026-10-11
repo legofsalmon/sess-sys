@@ -10,10 +10,12 @@ import { PreviewBar, PreviewSplash, usePreview } from './home/Preview.tsx'
 // Holds every change to the person's role (ADR 0034).
 import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
+import { MenuScreen } from './MenuScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
 import { StorageBanner, useUnkept } from './StorageBanner.tsx'
 import { UpdateBar } from './update.tsx'
+import { YouScreen } from './YouScreen.tsx'
 
 /**
  * Switches between the app's areas. The address keeps the area, and within
@@ -24,17 +26,24 @@ import { UpdateBar } from './update.tsx'
  * where it is and the browser's history reads as pages.
  *
  * Five places, each a picture and a word (ADR 0033): Home first, the
- * three areas the work is done in, and Admin, which holds the settings and
- * the history, both used rarely. Five is what a phone's bar holds before
- * anything has to hide behind a menu. Account kept its address when it
- * became Admin, so links and bookmarks still land.
+ * three areas the work is done in, and the Menu (ADR 0035), which names
+ * every place in the app and holds what's used now and then: Admin (the
+ * company's settings, still at #account so links and bookmarks land),
+ * History and You (a person's own settings). Those keep the Menu's tab.
  */
 const AREAS = [
   { hash: '#home', label: 'Home', Screen: HomeScreen },
   { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
   { hash: '#stock', label: 'Stock', Screen: StockScreen },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
-  { hash: '#account', label: 'Admin', Screen: AccountScreen },
+  { hash: '#menu', label: 'Menu', Screen: MenuScreen },
+] as const
+
+/** Places reached from the Menu, which keep its tab. */
+const UNDER_MENU = [
+  { hash: '#account', Screen: AccountScreen },
+  { hash: '#history', Screen: HistoryScreen },
+  { hash: '#me', Screen: YouScreen },
 ] as const
 
 /**
@@ -53,7 +62,8 @@ function headingIn(root: HTMLElement | null): { el: HTMLElement; name: string } 
 }
 
 /** Fields a person types into, as against buttons, ticks and links. */
-const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=checkbox], [type=radio], [type=file], [type=range]), textarea, select, [contenteditable]'
+const TYPED_INTO =
+  'input:not([type=button], [type=submit], [type=reset], [type=checkbox], [type=radio], [type=file], [type=range]), textarea, select, [contenteditable]'
 
 /**
  * True while the phone's keyboard is up or the page is pinched in: the
@@ -87,11 +97,17 @@ export function Shell() {
     return () => removeEventListener('hashchange', on)
   }, [])
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
-  // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab; the history is kept under Admin.
+  // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab; Admin, History and You keep the Menu's.
   const jobs = AREAS[1]
-  const admin = AREAS[4]
-  const area = within('#plan') || within('#import') || within('#venues') || within('#clients') ? jobs : within('#history') ? admin : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
-  const Screen = within('#history') ? HistoryScreen : area.Screen
+  const menu = AREAS[4]
+  const under = UNDER_MENU.find((u) => within(u.hash))
+  const area =
+    within('#plan') || within('#import') || within('#venues') || within('#clients')
+      ? jobs
+      : under
+        ? menu
+        : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  const Screen = under?.Screen ?? area.Screen
 
   const main = useRef<HTMLElement>(null)
   // The address the last move was to: the page's own load keeps focus where the browser put it, and a sign-in on the same address isn't a move.
