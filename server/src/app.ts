@@ -317,7 +317,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
-  registerCrewLinks(app, db, changed, feeds)
+  registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode })
   registerDocumentRoutes(app, { db, files: documents, onChange: changed })
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, documents, onChange: changed })

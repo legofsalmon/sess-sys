@@ -272,6 +272,14 @@ design system asks (0 to 4; a 3 is fixed or named).
 | No money anywhere | D | 2 | Phase 4 |
 | Everyone signed in can do everything | D | 2 | Open: roles and permissions are not built. Home is a view, not a lock: anyone can switch who it's shown for. Worth a decision before the office trial ends |
 
+## Seeing it as each of them
+
+The demo copy (shdemo.letissier.ie) opens on **See it as…**, one card per
+persona above. Picking one opens the app where that person starts, with a
+bar on every screen saying whose eyes these are and **Choose someone
+else**. The freelancer card opens a made-up freelancer's own page, with
+the same bar.
+
 ## Next
 
 - A department on each crew call, so a head of department's Home narrows

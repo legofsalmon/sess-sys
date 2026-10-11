@@ -73,6 +73,17 @@ The personas, the flows they follow and the problems rated are in
    "1 offer to answer · 1 timesheet to send · Next: Harbour Lights
    Festival, Wed 14 Oct, call 08:00", each part a link down the page.
 
+7. **The demo copy opens on "See it as…"** (Colly, the same day): the six
+   personas, each saying who they are and what they look at first. Picking
+   one opens the app where that person starts (Home for the company, a
+   department or the warehouse, Crew for the office, Home for me as a
+   member of staff with bookings) or, for a freelancer, a made-up
+   freelancer's own page. A bar on every screen says whose eyes these are,
+   with **Choose someone else** back to the choice; the freelancer's page
+   has the same bar. Only on the passcode-locked demo (PR #61), never on
+   the live app. The choice is kept on the device (`sh.preview`). It
+   doesn't hide any tab, since there are no roles; the choice says so.
+
 ## Considered
 
 - **A tab for each part of an area** (Stock: Catalogue, Pick lists,

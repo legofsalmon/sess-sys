@@ -91,6 +91,8 @@ export interface PageData {
   onTheDay?: OnTheDay[]
   /** "Your documents" (ADR 0029), drawn by server/src/documents/page.ts. */
   documents?: string
+  /** On the demo copy (ADR 0033): a bar saying this is a freelancer's page, with the way back to choosing another view. */
+  demo?: boolean
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -424,6 +426,7 @@ export function renderPage(d: PageData): string {
 <style>${CSS}</style>
 </head>
 <body>
+${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</b>: ${h(d.person.name)}'s own page</span><a href="/#preview">Choose someone else</a></p>` : ''}
 <main>
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
   ${officeBlock(d.office)}
@@ -558,6 +561,8 @@ fieldset.days input{width:20px}
 .flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
 .clash{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}
+.demo-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;padding:8px 16px;background:var(--ink);color:var(--bg);font-size:.9rem}
+.demo-bar a{color:inherit;font-weight:700;white-space:nowrap}
 .glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem}
 .glance a{color:inherit}
 .feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}

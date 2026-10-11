@@ -26,6 +26,10 @@ waiting on someone.
   their counts, a tap away, marking the one in view.
 - **A freelancer's page** opens with what's waiting on them and what's
   next.
+- **The demo copy opens on "See it as…"**: pick a director, the office,
+  a head of department, the warehouse, staff crew or a freelancer, and the
+  app opens where that person starts, with a bar on every screen to choose
+  someone else.
 - Checked: typecheck, the unit tests and the end-to-end suite, with a new
   test for Home, History under Admin and the strip.
 

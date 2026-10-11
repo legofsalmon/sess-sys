@@ -18,7 +18,7 @@ import { addDays, departmentsIn, jobsOn, narrower, TILES_FOR, tiles, weekAhead, 
  */
 
 const KEY = 'sh.home'
-interface Saved {
+export interface Saved {
   for: HomeFor
   department?: string
 }
@@ -33,7 +33,7 @@ function load(): Saved | undefined {
   return undefined
 }
 
-function save(s: Saved) {
+export function saveHomeFor(s: Saved) {
   try {
     localStorage.setItem(KEY, JSON.stringify(s))
   } catch {
@@ -58,7 +58,7 @@ export function HomeScreen() {
   const shownFor: HomeFor = saved?.for ?? (me?.department ? 'department' : 'company')
   const department = saved?.department ?? me?.department ?? departments[0]
   const choose = (next: Saved) => {
-    save(next)
+    saveHomeFor(next)
     setSaved(next)
   }
 
@@ -279,7 +279,7 @@ function ForDepartment({
 function ForWarehouse({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
   const tomorrow = addDays(today, 1)
   const out = view.moves.soon.filter((p) => p.job.span && p.job.span.start <= addDays(today, 7))
-  const word = (start: string) => (start <= today ? 'Today' : start === tomorrow ? 'Tomorrow' : dayLabel(start))
+  const word = (start: string) => (start <= today ? 'Today · ' : start === tomorrow ? 'Tomorrow · ' : '')
   return (
     <>
       <section className="card">
@@ -294,7 +294,8 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
                   <div>
                     <b>{p.job.name}</b>
                     <p>
-                      {word(p.job.span!.start)} · {spanLabel(p.job.span!)}
+                      {word(p.job.span!.start)}
+                      {spanLabel(p.job.span!)}
                     </p>
                   </div>
                   <div className="side">

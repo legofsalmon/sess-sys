@@ -6,6 +6,7 @@ import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
 import { HomeScreen } from './home/HomeScreen.tsx'
 import { AreaIcon } from './home/icons.tsx'
+import { PreviewBar, PreviewSplash, usePreview } from './home/Preview.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
@@ -55,6 +56,7 @@ const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=
 export function Shell() {
   const auth = useAuth()
   const unkept = useUnkept()
+  const persona = usePreview()
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
     const on = () => setHash(location.hash)
@@ -101,10 +103,22 @@ export function Shell() {
         </main>
       </>
     )
+  // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and comes back to it from the bar.
+  const demo = auth.status === 'open' && auth.passcode === true
+  if (demo && (!persona || persona.key === 'freelancer' || hash === '#preview'))
+    return (
+      <>
+        <UpdateBar unkept={unkept} />
+        <main ref={main}>
+          <PreviewSplash />
+        </main>
+      </>
+    )
   return (
     <>
       <UpdateBar unkept={unkept} />
       <StorageBanner />
+      {demo && persona && <PreviewBar persona={persona} />}
       <main ref={main}>
         <Screen />
       </main>

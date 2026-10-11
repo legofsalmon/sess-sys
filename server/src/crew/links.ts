@@ -96,7 +96,8 @@ type Refusal = Extract<MutationResult, { status: 'rejected' }>
 /** The address's part for a message: its code, or the id of the change that was refused. */
 const told = (what: Said | Refusal): Record<string, string> => (typeof what === 'string' ? { m: what } : { r: what.id })
 
-export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void, feeds: Feeds) {
+/** `demo`: the passcode-locked demo copy (ADR 0033), whose freelancer pages say so and lead back to choosing whose eyes to see the app through. */
+export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void, feeds: Feeds, { demo = false }: { demo?: boolean } = {}) {
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) =>
     done(null, new URLSearchParams(String(body)))
   )
@@ -203,6 +204,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       timesheets: await timesheetsFor(db, person.id),
       office: await officeFor(db),
       onTheDay,
+      demo,
       // Their documents (ADR 0029), with forms to send a new one where the server can keep files.
       documents: documentsSection({ person, list: await documentsOf(db, person.id), files: app.documents.on, base: base(req, person.linkToken), today: now, flash }),
     })
