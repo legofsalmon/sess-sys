@@ -1216,7 +1216,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
   // wait (built, waiting on a key); the note is the small word beside the name. The lines are code written
   // across the app, the server and what they share, counted on the date given.
   const JOURNEY = {
-    asOf: '4 October 2026', live: '30 September 2026', lines: 39500, tests: 24200, decisions: 31,
+    asOf: '11 October 2026', live: '30 September 2026', lines: 42000, tests: 27000, decisions: 33,
     stages: [
       { id: 'enquire', icon: 'enquire', name: 'Enquire and quote', place: 'The office', state: 'part', word: 'Partly built', next: 'quoting is planned',
         sum: 'Logged from the first call: client, venue and status.', toast: ['enquire', 'Enquiry logged'],
@@ -1249,7 +1249,7 @@ svg .pkt-tape { fill: var(--tape); stroke: var(--tape-ink); stroke-width: .5; }
       { id: 'under', icon: 'under', under: true, name: 'Underneath it all', place: 'The cloud, in the EU', state: 'built', word: 'Built', next: 'three keys and a field test left',
         sum: 'Every phone keeps its own copy and works with no signal, then syncs. One copy of the data, every change kept with who and when.',
         left: 'each built and waiting on the owner: staff sign-in (the Google key), nightly backups (the bucket, and a key to encrypt them), error alerts (the Sentry key); and the phone field test.',
-        parts: [['Sync and offline', 'built'], ['History and export', 'built'], ['Erasure on request', 'built'], ['Sign-in, backups, alerts', 'wait', 'three keys'], ['Phone field test', 'plan', 'not started']] }
+        parts: [['Sync and offline', 'built'], ['Home for every role', 'built'], ['History and export', 'built'], ['Erasure on request', 'built'], ['Sign-in, backups, alerts', 'wait', 'three keys'], ['Phone field test', 'plan', 'not started']] }
     ]
   };
   (function drawJourney() {

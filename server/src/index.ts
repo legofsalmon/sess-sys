@@ -96,7 +96,7 @@ async function main() {
   else app.log.warn('Error reporting is off: set SENTRY_DSN to switch it on (docs/monitoring.md).')
   if (app.calendar) {
     await app.calendar.start()
-    app.log.info('Google Calendar: available; connect a calendar on the Account tab')
+    app.log.info('Google Calendar: available; connect a calendar on the Admin tab')
   } else app.log.info('Google Calendar: needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, like sign-in.')
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {

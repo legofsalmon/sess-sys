@@ -81,7 +81,7 @@ export function JobsScreen() {
 function JobList({ view }: { view: View }) {
   return (
     <div className="app crew jobs">
-      <Top view={view} />
+      <Top view={view} root />
       <JobViews />
 
       <JobsCard view={view} />
@@ -172,7 +172,7 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
   )
 }
 
-function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitLineView[] | undefined; current: boolean }) {
+export function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitLineView[] | undefined; current: boolean }) {
   const crew = crewFill(job.calls)
   const short = kitShort(kit)
   return (

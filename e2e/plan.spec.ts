@@ -234,5 +234,5 @@ test('a month on a laptop, whose dates open their week', async ({ browser }) => 
   await laptop.getByRole('navigation', { name: 'Show jobs as' }).getByRole('link', { name: 'Month' }).click()
   await expect(laptop).toHaveURL(/#plan\/month\/2031-03-01\/people$/)
   await laptop.getByRole('navigation', { name: 'Show jobs as' }).getByRole('link', { name: 'List' }).click()
-  await expect(laptop.getByRole('heading', { name: 'Jobs', exact: true })).toBeVisible()
+  await expect(laptop.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible()
 })

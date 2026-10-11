@@ -98,9 +98,9 @@ export function ImportPeopleScreen({ view }: { view: View }) {
 
   return (
     <div className="app crew jobs import import-people">
-      <Top view={view} title="Account" />
+      <Top view={view} title="Admin" />
       <a className="back" href="#account">
-        ‹ Account
+        ‹ Admin
       </a>
       <header className="title">
         {/* Where it's up to (rule 13): choosing the file, then checking every row before anything is saved. */}
@@ -206,7 +206,7 @@ function Preview(p: {
           <b>{plural(counts.rows, 'row', 'rows')}</b> read: {said.join(', ')}.
         </p>
         {p.preview.officeDomain === null ? (
-          <p className="warn-line">No office email is set on the Account tab, so everyone comes in as a freelancer. Set it first to have company emails come in as staff.</p>
+          <p className="warn-line">No office email is set on the Admin tab, so everyone comes in as a freelancer. Set it first to have company emails come in as staff.</p>
         ) : (
           <p className="hint">Emails at {p.preview.officeDomain} come in as staff; the rest as freelancers. Levels come from Preferred and Onboarded; the office's own level is kept for anyone already here.</p>
         )}

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './app.css'
 import './crew/crew.css'
 import './jobs/jobs.css'
+import './home/home.css'
 import { startErrorReporting } from './errors.ts'
 import { watchForUpdates } from './update.tsx'
 

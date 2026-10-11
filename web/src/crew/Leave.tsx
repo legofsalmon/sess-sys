@@ -58,7 +58,7 @@ const readMe = () => {
 const listeners = new Set<(id: string) => void>()
 let chosen = readMe()
 
-function choose(id: string) {
+export function chooseMe(id: string) {
   chosen = id
   try {
     if (id) localStorage.setItem(ME_KEY, id)
@@ -81,7 +81,7 @@ export function useMe(view: View): { me: PersonView | undefined; signedIn: boole
   const signedIn = auth.status === 'signed-in'
   const email = signedIn ? auth.user.email : undefined
   const me = signedIn ? personByEmail(view.crew.people, auth.user.email) : view.leave.staff.find((p) => p.id === id)
-  return { me, signedIn, email, pick: choose, clear: () => choose('') }
+  return { me, signedIn, email, pick: chooseMe, clear: () => chooseMe('') }
 }
 
 const yearOf = (day: string) => Number(day.slice(0, 4))

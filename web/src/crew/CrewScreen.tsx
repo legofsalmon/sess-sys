@@ -273,7 +273,7 @@ export function CrewScreen() {
 
   return (
     <div className="app crew">
-      <Top view={view} title="Crew" />
+      <Top view={view} title="Crew" root />
 
       {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
         <section className="card">

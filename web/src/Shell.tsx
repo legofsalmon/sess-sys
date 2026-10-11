@@ -4,6 +4,9 @@ import { useAuth } from './auth.ts'
 import { CrewBadge } from './crew/CrewBadge.tsx'
 import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
+import { HomeScreen } from './home/HomeScreen.tsx'
+import { AreaIcon } from './home/icons.tsx'
+import { PreviewBar, PreviewSplash, usePreview } from './home/Preview.tsx'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
@@ -17,13 +20,19 @@ import { UpdateBar } from './update.tsx'
  * link lands in the same place. Each move lands on the screen's heading
  * and names the tab after it (audit finding 22), so a screen reader says
  * where it is and the browser's history reads as pages.
+ *
+ * Five places, each a picture and a word (ADR 0033): Home first, the
+ * three areas the work is done in, and Admin, which holds the settings and
+ * the history, both used rarely. Five is what a phone's bar holds before
+ * anything has to hide behind a menu. Account kept its address when it
+ * became Admin, so links and bookmarks still land.
  */
 const AREAS = [
+  { hash: '#home', label: 'Home', Screen: HomeScreen },
   { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
   { hash: '#stock', label: 'Stock', Screen: StockScreen },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
-  { hash: '#history', label: 'History', Screen: HistoryScreen },
-  { hash: '#account', label: 'Account', Screen: AccountScreen },
+  { hash: '#account', label: 'Admin', Screen: AccountScreen },
 ] as const
 
 /**
@@ -47,6 +56,7 @@ const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=
 export function Shell() {
   const auth = useAuth()
   const unkept = useUnkept()
+  const persona = usePreview()
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
     const on = () => setHash(location.hash)
@@ -54,8 +64,11 @@ export function Shell() {
     return () => removeEventListener('hashchange', on)
   }, [])
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
-  // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab.
-  const area = within('#plan') || within('#import') || within('#venues') || within('#clients') ? AREAS[0] : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab; the history is kept under Admin.
+  const jobs = AREAS[1]
+  const admin = AREAS[4]
+  const area = within('#plan') || within('#import') || within('#venues') || within('#clients') ? jobs : within('#history') ? admin : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  const Screen = within('#history') ? HistoryScreen : area.Screen
 
   const main = useRef<HTMLElement>(null)
   // The address the last move was to: the page's own load keeps focus where the browser put it, and a sign-in on the same address isn't a move.
@@ -90,17 +103,30 @@ export function Shell() {
         </main>
       </>
     )
+  // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and comes back to it from the bar.
+  const demo = auth.status === 'open' && auth.passcode === true
+  if (demo && (!persona || persona.key === 'freelancer' || hash === '#preview'))
+    return (
+      <>
+        <UpdateBar unkept={unkept} />
+        <main ref={main}>
+          <PreviewSplash />
+        </main>
+      </>
+    )
   return (
     <>
       <UpdateBar unkept={unkept} />
       <StorageBanner />
+      {demo && persona && <PreviewBar persona={persona} />}
       <main ref={main}>
-        <area.Screen />
+        <Screen />
       </main>
       <nav className="tabs" aria-label="Areas">
         {AREAS.map((a) => (
           <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>
-            {a.label}
+            <AreaIcon area={a.hash} />
+            <span className="tab-word">{a.label}</span>
             {a.hash === '#crew' && <CrewBadge />}
           </a>
         ))}

@@ -70,7 +70,25 @@ export function AccountScreen() {
 
   return (
     <div className="app account">
-      <Top view={view} title="Account" />
+      <Top view={view} title="Admin" root />
+
+      {/* The history moved here from a tab of its own (ADR 0033), as the first thing, being what's looked for most. */}
+      <section className="card">
+        <h2>History</h2>
+        <ul className="job-list">
+          <li>
+            <a className="job-row" href="#history">
+              <div>
+                <b>Open the history</b>
+                <p>Every change, who made it and when, with what came in from the links.</p>
+              </div>
+              <div className="side" aria-hidden="true">
+                ›
+              </div>
+            </a>
+          </li>
+        </ul>
+      </section>
 
       {auth.status === 'signed-in' && (
         <section className="card">

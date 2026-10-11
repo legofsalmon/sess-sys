@@ -91,6 +91,8 @@ export interface PageData {
   onTheDay?: OnTheDay[]
   /** "Your documents" (ADR 0029), drawn by server/src/documents/page.ts. */
   documents?: string
+  /** On the demo copy (ADR 0033): a bar saying this is a freelancer's page, with the way back to choosing another view. */
+  demo?: boolean
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -287,7 +289,7 @@ function timesheets(d: PageData): string {
     .filter((j) => (j.t ? j.t.status !== 'approved' || (j.t.approvedAt ?? '') >= since : noTimesheetReason(j.offer, j.call, d.person, d.today) === null))
     .sort((a, b) => rank(a.t) - rank(b.t) || a.call.start.localeCompare(b.call.start))
   if (!rows.length) return ''
-  return `<section><h2>Timesheets</h2><ul class="ts-list">${rows
+  return `<section id="timesheets"><h2>Timesheets</h2><ul class="ts-list">${rows
     .map(({ offer, call, t }) => {
       const state = !t ? 'to-send' : t.status
       const text = !t
@@ -299,6 +301,23 @@ function timesheets(d: PageData): string {
     })
     .join('')}</ul></section>`
 }
+/**
+ * What's waiting on them and what's next, in one line at the top, each part
+ * a link down the page (ADR 0033): a long page says what matters before
+ * anyone scrolls. Nothing when there's nothing to say.
+ */
+function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']): string {
+  const toSend = d.jobs.filter((j) => !d.timesheets.get(j.offer.id) && noTimesheetReason(j.offer, j.call, d.person, d.today) === null).length
+  const firstDay = (j: PageData['jobs'][number]) => j.offer.days.find((x) => x >= d.today) ?? j.call.start
+  const next = [...booked].sort((a, b) => firstDay(a).localeCompare(firstDay(b)))[0]
+  const parts = [
+    waiting.length ? `<a href="#offers">${waiting.length === 1 ? '1 offer' : `${waiting.length} offers`} to answer</a>` : '',
+    toSend ? `<a href="#timesheets">${toSend === 1 ? '1 timesheet' : `${toSend} timesheets`} to send</a>` : '',
+    next ? `<a href="#bookings">Next: ${h(next.call.project)}, ${h(dayLabel(firstDay(next)))}${next.call.callTime ? `, call ${h(next.call.callTime)}` : ''}</a>` : '',
+  ].filter(Boolean)
+  return parts.length ? `<nav class="glance" aria-label="At a glance">${parts.join('<span aria-hidden="true"> · </span>')}</nav>` : ''
+}
+
 const rank = (t: Timesheet | undefined) => (!t ? 0 : t.status === 'sent' ? 1 : 2)
 
 /**
@@ -407,21 +426,24 @@ export function renderPage(d: PageData): string {
 <style>${CSS}</style>
 </head>
 <body>
+${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</b>: ${h(d.person.name)}'s own page</span><a href="/#preview">Choose someone else</a></p>` : ''}
 <main>
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
   ${officeBlock(d.office)}
   ${d.flash && !inCard ? flash(d.flash) : ''}
 
+  ${glance(d, waiting, booked)}
+
   ${onTheDay(d)}
 
-  <section>
+  <section id="offers">
     <h2>Offers waiting on you</h2>
     ${waiting.length ? waiting.map((j) => offerCard(d, j)).join('') : '<p class="empty">Nothing waiting right now.</p>'}
   </section>
 
   ${timesheets(d)}
 
-  <section>
+  <section id="bookings">
     <h2>Your bookings</h2>
     ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
     ${feedBlock(d.feed)}
@@ -539,6 +561,10 @@ fieldset.days input{width:20px}
 .flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
 .clash{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}
+.demo-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;padding:8px 16px;background:var(--ink);color:var(--bg);font-size:.9rem}
+.demo-bar a{color:inherit;font-weight:700;white-space:nowrap}
+.glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem}
+.glance a{color:inherit}
 .feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}
 .feed-buttons{display:flex;gap:8px}.feed-buttons>*{flex:1}.feed-buttons .copy[hidden]{display:none}
 a.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;text-decoration:none}

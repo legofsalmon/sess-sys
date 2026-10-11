@@ -21,7 +21,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   await card.getByRole('button', { name: 'Put in made-up data' }).click()
   await expect(card.getByRole('status')).toHaveText('Made-up data is in. Have a look round Jobs, Crew and Stock.')
   await expect(card.getByRole('heading', { name: 'Made-up data' })).toBeVisible()
-  await expect(office.locator('.brand small')).toHaveText('Account · made-up data')
+  await expect(office.locator('.brand small')).toHaveText('Admin · made-up data')
 
   // Every screen says it's made up.
   await office.goto('/#jobs')
@@ -55,7 +55,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   await remove.click()
   await expect(card.getByRole('status')).toHaveText('Started fresh. The app is empty, here and on every phone as it syncs.')
   await expect(card.getByRole('heading', { name: 'Try it with made-up data' })).toBeVisible()
-  await expect(office.locator('.brand small')).toHaveText('Account')
+  await expect(office.locator('.brand small')).toHaveText('Admin')
 
   // The other phone empties by itself, as soon as the server tells it.
   await expect(other.getByText('Harbour Lights Festival')).toHaveCount(0)

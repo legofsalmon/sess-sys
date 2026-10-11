@@ -321,7 +321,7 @@ describe('demo passcode', () => {
       await app.close()
       await db.close()
     })
-    return { app, google }
+    return { app, google, db }
   }
   const enter = (app: FastifyInstance, passcode: string) => app.inject({ method: 'POST', url: '/api/auth/passcode', payload: { passcode } })
 
@@ -357,6 +357,17 @@ describe('demo passcode', () => {
     expect(wrong.statusCode).toBe(403)
     expect(cookie(wrong, 'sh_passcode')).toBeUndefined()
     expect((await app.inject({ url: '/api/me', cookies: { sh_passcode: 'made-up' } })).statusCode).toBe(401)
+  })
+
+  it("says on a freelancer's page that it's the demo, with the way back to choosing whose eyes (ADR 0033)", async () => {
+    const { app, db } = await demo()
+    const set = cookie(await enter(app, 'loud-speakers-42'), 'sh_passcode')!
+    expect((await app.inject({ method: 'POST', url: '/api/data/made-up', cookies: { sh_passcode: set.value } })).statusCode).toBe(200)
+    const { rows } = await db.query<{ link_token: string }>("SELECT link_token FROM people WHERE kind = 'freelancer' AND NOT archived LIMIT 1")
+    const page = await app.inject(`/f/${rows[0]!.link_token}`)
+    expect(page.statusCode).toBe(200)
+    expect(page.body).toContain('class="demo-bar"')
+    expect(page.body).toContain('href="/#preview"')
   })
 
   it('steps aside once Google sign-in is on', async () => {

@@ -122,7 +122,7 @@ export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'arc
   if (leave) return `${person.name} has ${leave} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
   const account = view.calendar.link?.state !== 'off' ? view.calendar.link?.account : undefined
   if (account && person.email && account.trim().toLowerCase() === person.email.trim().toLowerCase())
-    return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`
+    return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Admin tab first.`
   return undefined
 }
 
