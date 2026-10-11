@@ -7,6 +7,8 @@ import { HistoryScreen } from './HistoryScreen.tsx'
 import { HomeScreen } from './home/HomeScreen.tsx'
 import { AreaIcon } from './home/icons.tsx'
 import { PreviewBar, PreviewSplash, usePreview } from './home/Preview.tsx'
+// Holds every change to the person's role (ADR 0034).
+import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'

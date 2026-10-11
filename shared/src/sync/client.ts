@@ -253,6 +253,13 @@ export class SyncClient {
     return this.state.outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > this.state.cursor)
   }
 
+  /**
+   * Says why a change can't be made by whoever is using this device, or
+   * nothing when it can. Set by the app from the person's role (ADR 0034);
+   * the server checks the same, so this only saves a change it would turn down.
+   */
+  guard?: (name: CommandName) => string | undefined
+
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
     return this.state.outbox.filter((m) => m.appliedSeq === undefined).length
@@ -264,6 +271,9 @@ export class SyncClient {
    * shown straight away as pending.
    */
   async mutate<N extends CommandName>(name: N, args: CommandInput<N>): Promise<Mutation<N>> {
+    // A change this person's role can't make is said so here, before it's kept, as the server would (ADR 0034).
+    const refused = this.guard?.(name)
+    if (refused) throw new Error(refused)
     const parsed = commandSchemas[name].safeParse(args)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }

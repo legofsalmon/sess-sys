@@ -25,9 +25,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   crew: 'Staff crew',
 }
 
-/** A role in a sentence: "a director", "office and production staff", "staff crew". */
-export const roleWords = (role: Role) => (role === 'office' ? 'office and production' : role === 'crew' ? 'staff crew' : `a ${ROLE_LABELS[role].toLowerCase()}`)
-
 /** What each role is for, in a line, where a role is chosen. */
 export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',

@@ -44,12 +44,14 @@ import {
   type View,
 } from '@sh/shared'
 import { blocks, CERTIFICATE_SOON_DAYS, certificateGaps, certificateName, certificateRefusal, certificateUnknowns, daysBetween, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
+import { ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
 import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
@@ -222,6 +224,8 @@ export function calendarAnswersToSortOut(view: View, today: string) {
 
 export function CrewScreen() {
   const view = useView()
+  // A role without crew sees who's on and what's waiting, without the ways to ask or add (ADR 0034).
+  const mayCrew = useAccess().can('crew')
   const hash = useHash()
   const today = useToday()
   const crew = view.crew
@@ -410,13 +414,15 @@ export function CrewScreen() {
 
       {share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />}
 
-      <section className="card">
-        <h2>Crew for something not in Jobs</h2>
-        <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
-        <Fold label="Ask for crew">
-          <NewCall />
-        </Fold>
-      </section>
+      {mayCrew && (
+        <section className="card">
+          <h2>Crew for something not in Jobs</h2>
+          <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
+          <Fold label="Ask for crew">
+            <NewCall />
+          </Fold>
+        </section>
+      )}
 
       <section className="card" aria-label="People">
         <h2>People</h2>
@@ -468,11 +474,13 @@ export function CrewScreen() {
             ))}
           </details>
         )}
-        <Fold label="Add person">
-          <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
-          {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
-          <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
-        </Fold>
+        {mayCrew && (
+          <Fold label="Add person">
+            <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
+            {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
+            <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
+          </Fold>
+        )}
       </section>
 
       <p className="hint">
@@ -516,6 +524,7 @@ export function CallCard({
   /** Under a phase on the job's page, for the phase's own days, which its header says already. */
   phaseDays?: boolean
 }) {
+  const mayOffer = useAccess().can('crew')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -640,7 +649,7 @@ export function CallCard({
         </>
       )}
 
-      {live && !filled && (
+      {live && !filled && mayOffer && (
         <Fold label="Offer…" className="offer">
           <OfferForm call={call} crew={crew} onShare={onShare} />
         </Fold>
@@ -1079,6 +1088,10 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
   const [editing, setEditing] = useState(false)
   const [relinking, setRelinking] = useState(false)
   const { run, error, refuse } = useAct()
+  const access = useAccess()
+  // Someone whose role doesn't cover crew sees a person as they are, with nothing to change (ADR 0034).
+  const mayEdit = access.can('crew')
+  const role = roleOfPerson(person)
   const today = useToday()
   const [away, setAway] = useState({ start: today, end: today, note: '' })
   const booked = crew.calls.flatMap((c) =>
@@ -1115,7 +1128,8 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
         <b>{person.name}</b>
         <small>
           {[
-            person.kind === 'staff' ? 'Staff' : null,
+            // A role set says more than "Staff"; none set is staff crew, which is what "Staff" says (ADR 0034).
+            person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : null,
             person.department,
             levelLine(person.level),
             person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
@@ -1143,16 +1157,19 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
           <CertificateLines person={person} />
           <Documents person={person} />
           {person.notes && <p className="muted">{person.notes}</p>}
-          <label className="level-pick">
-            Level
-            <select value={person.level} onChange={(e) => void run(() => client.mutate('person.level', { id: person.id, level: Number(e.target.value) }))} aria-label={`Level for ${person.name}`}>
-              {LEVELS.map((n) => (
-                <option key={n} value={n}>
-                  {levelLine(n)}
-                </option>
-              ))}
-            </select>
-          </label>
+          {mayEdit && (
+            <label className="level-pick">
+              Level
+              <select value={person.level} onChange={(e) => void run(() => client.mutate('person.level', { id: person.id, level: Number(e.target.value) }))} aria-label={`Level for ${person.name}`}>
+                {LEVELS.map((n) => (
+                  <option key={n} value={n}>
+                    {levelLine(n)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {role && <RolePick person={person} role={role} mayChange={access.can('company')} onChange={(next) => void run(() => client.mutate('person.role', { id: person.id, role: next }))} />}
           <Worked person={person} />
           {booked.map(({ c, o }) => (
             <p key={o.id}>
@@ -1165,13 +1182,15 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
               {u.note && ` (${u.note})`}
               {u.source === 'self' && ' · said on their link'}
               {/* Approved leave is cancelled on the Leave screen, so the two never disagree (ADR 0024). */}
-              {u.source === 'leave' ? (
-                <>
-                  {' · '}
-                  <a className="link" href="#crew/leave">
-                    approved leave
-                  </a>
-                </>
+              {u.source === 'leave' || !mayEdit ? (
+                u.source === 'leave' && (
+                  <>
+                    {' · '}
+                    <a className="link" href="#crew/leave">
+                      approved leave
+                    </a>
+                  </>
+                )
               ) : (
                 <>
                   {' '}
@@ -1182,70 +1201,101 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
               )}
             </p>
           ))}
-          <form
-            className="away-form"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
-            }}
-          >
-            {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
-            <label className="field">
-              Off from <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} />
-            </label>
-            <label className="field">
-              Off until <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} />
-            </label>
-            <label className="field wide">
-              Note <input placeholder="e.g. on tour" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
-            </label>
-            <button type="submit">Mark days off</button>
-          </form>
-          <div className="actions">
-            {link && (
-              <>
-                <a className="button" href={link} target="_blank" rel="noreferrer">
-                  Open their page
-                </a>
-                <button type="button" onClick={() => copy('link', link)}>
-                  {copied === 'link' ? 'Copied' : 'Copy link'}
+          {mayEdit && (
+            <>
+              <form
+                className="away-form"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
+                }}
+              >
+                {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
+                <label className="field">
+                  Off from <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} />
+                </label>
+                <label className="field">
+                  Off until <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} />
+                </label>
+                <label className="field wide">
+                  Note <input placeholder="e.g. on tour" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
+                </label>
+                <button type="submit">Mark days off</button>
+              </form>
+              <div className="actions">
+                {link && (
+                  <>
+                    <a className="button" href={link} target="_blank" rel="noreferrer">
+                      Open their page
+                    </a>
+                    <button type="button" onClick={() => copy('link', link)}>
+                      {copied === 'link' ? 'Copied' : 'Copy link'}
+                    </button>
+                  </>
+                )}
+                {feed && (
+                  <button type="button" onClick={() => copy('feed', feed)}>
+                    {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
+                  </button>
+                )}
+                {!relinking && (
+                  <button type="button" className="link" onClick={() => setRelinking(true)}>
+                    New link
+                  </button>
+                )}
+              </div>
+              {relinking && (
+                <Confirm
+                  question={`Make a new link for ${person.name}? The old one stops working, so anything sent with it no longer opens.`}
+                  yes="Make a new link"
+                  no="Keep the old one"
+                  onYes={() => {
+                    setRelinking(false)
+                    void run(() => client.mutate('person.newLink', { id: person.id }))
+                  }}
+                  onNo={() => setRelinking(false)}
+                />
+              )}
+              <div className="actions">
+                <button type="button" onClick={() => setEditing(true)}>
+                  Edit
                 </button>
-              </>
-            )}
-            {feed && (
-              <button type="button" onClick={() => copy('feed', feed)}>
-                {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
-              </button>
-            )}
-            {!relinking && (
-              <button type="button" className="link" onClick={() => setRelinking(true)}>
-                New link
-              </button>
-            )}
-          </div>
-          {relinking && (
-            <Confirm
-              question={`Make a new link for ${person.name}? The old one stops working, so anything sent with it no longer opens.`}
-              yes="Make a new link"
-              no="Keep the old one"
-              onYes={() => {
-                setRelinking(false)
-                void run(() => client.mutate('person.newLink', { id: person.id }))
-              }}
-              onNo={() => setRelinking(false)}
-            />
+                <button type="button" className="link" onClick={archive}>
+                  Archive
+                </button>
+              </div>
+            </>
           )}
-          <div className="actions">
-            <button type="button" onClick={() => setEditing(true)}>
-              Edit
-            </button>
-            <button type="button" className="link" onClick={archive}>
-              Archive
-            </button>
-          </div>
           <Refusal error={error} />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * A member of staff's role (ADR 0034): what they can change once signed in.
+ * A director picks it here, with what the role covers said under it; anyone
+ * else sees it as a line. The server keeps at least one director.
+ */
+function RolePick({ person, role, mayChange, onChange }: { person: PersonView; role: Role; mayChange: boolean; onChange: (role: Role) => void }) {
+  const hint = useId()
+  if (!mayChange) return <p className="muted">Role: {ROLE_LABELS[role]}</p>
+  return (
+    <div className="role-pick">
+      <label className="level-pick">
+        Role
+        <select value={role} onChange={(e) => onChange(e.target.value as Role)} aria-label={`Role for ${person.name}`} aria-describedby={hint}>
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="hint" id={hint}>
+        {ROLE_LINES[role]}
+      </p>
     </div>
   )
 }
@@ -1431,6 +1481,8 @@ function certificatesOf(fields: CertFields): Certificates {
 }
 
 function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
+  // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
+  const mayApprove = useAccess().can('company')
   const blank = {
     name: '',
     phone: '',
@@ -1528,7 +1580,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: Pers
           <option value="staff">Staff</option>
         </select>
       </label>
-      {f.kind === 'staff' && (
+      {f.kind === 'staff' && mayApprove && (
         <label className="wide tick">
           <input type="checkbox" checked={f.approvesLeave} onChange={(e) => setF({ ...f, approvesLeave: e.target.checked })} />
           <span>
