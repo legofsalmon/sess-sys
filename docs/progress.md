@@ -3,6 +3,38 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 11 October 2026: Home, and finding your way around
+
+**Done**
+
+- Colly asked for a look at the app through the eyes of each kind of
+  person who uses it, and said that on a phone every screen looked the
+  same and nothing gave an overview. [Who uses it, and how](personas.md)
+  sets out six personas (director, office, head of department,
+  warehouse, staff crew, freelancer), a job's path through them, and
+  what fell short for each, rated
+  ([Decision 0033](adr/0033-home-and-finding-your-way-around.md)).
+- **Home**, first in the bar: today, the counts that need someone, and
+  the week ahead, shown for the company, a department, the warehouse or
+  me. It starts on the person's own department when their profile has
+  one, and the phone remembers the choice. A count that's nothing isn't
+  shown.
+- **Five places, each with a picture and a word:** Home, Jobs, Stock,
+  Crew and Admin. History moved under Admin, which is Account renamed.
+- **Each area's screen has its name as a large title**, and every long
+  screen has **On this screen**: its parts by name under the bar, with
+  their counts, a tap away, marking the one in view.
+- **A freelancer's page** opens with what's waiting on them and what's
+  next.
+- Checked: typecheck, the unit tests and the end-to-end suite, with a new
+  test for Home, History under Admin and the strip.
+
+**Next**
+
+- A department on each crew call, so a department's Home narrows crew
+  still needed too.
+- Decide whether the app needs roles and permissions (personas.md).
+
 ## 10 October 2026: screens checked against the shared behaviour rules
 
 **Done**
