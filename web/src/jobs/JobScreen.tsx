@@ -33,6 +33,7 @@ import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../cre
 import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
 import { Pending } from '../StatusPill.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
@@ -112,6 +113,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
 
 function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (share: Share | undefined) => void }) {
   const [editing, setEditing] = useState(false)
+  const mayChange = useAccess().can('jobs')
   const crew = crewFill(job.calls)
   const kit = kitSummary(job, view.kit.byJob.get(job.id) ?? [])
   return (
@@ -168,9 +170,11 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
       {editing ? (
         <EditJob job={job} view={view} onDone={() => setEditing(false)} onTell={onTell} />
       ) : (
-        <button type="button" onClick={() => setEditing(true)}>
-          Change details
-        </button>
+        mayChange && (
+          <button type="button" onClick={() => setEditing(true)}>
+            Change details
+          </button>
+        )
       )}
     </section>
   )

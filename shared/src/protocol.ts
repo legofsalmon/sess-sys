@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Role } from './roles.ts'
 import { mutationSchema, type Rejection } from './commands.ts'
 import type { EntityName } from './model.ts'
 
@@ -114,7 +115,12 @@ export interface StaffUser {
  * device is signed in as. Answers 401 when sign-in is on and the device
  * isn't signed in.
  */
-export type MeResponse = { auth: 'off' } | { auth: 'passcode' } | { auth: 'google'; user: StaffUser }
+export type MeResponse =
+  | { auth: 'off' }
+  /** A demo copy: `role` is the persona chosen on its "See it as…" (ADR 0034), if one has been. */
+  | { auth: 'passcode'; role?: Role }
+  /** `role` is what they can change; `rolesOn` false while nobody is a director, when everyone can (ADR 0034). */
+  | { auth: 'google'; user: StaffUser; role: Role; rolesOn: boolean }
 
 /** One nightly (or "Back up now") backup, as the Account screen shows it. */
 export interface BackupRun {

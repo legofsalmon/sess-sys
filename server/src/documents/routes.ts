@@ -87,7 +87,7 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
     })
 
     /** The office puts a file on a document, with its details: added when new, replaced when it had one. */
-    scope.post('/api/documents/:id/file', { bodyLimit: ROUTE_LIMIT }, async (req: OfficeReq, reply) => {
+    scope.post('/api/documents/:id/file', { bodyLimit: ROUTE_LIMIT, config: { needs: 'crew' } }, async (req: OfficeReq, reply) => {
       if (!files.on) return reply.code(409).send({ error: FILES_WAIT })
       const body = req.body
       if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })
@@ -124,7 +124,7 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
     })
 
     /** The office puts a file on a venue's or client's document (ADR 0032), with its details, as for a person's. */
-    scope.post('/api/attachments/:id/file', { bodyLimit: ROUTE_LIMIT }, async (req: AttachmentReq, reply) => {
+    scope.post('/api/attachments/:id/file', { bodyLimit: ROUTE_LIMIT, config: { needs: 'jobs' } }, async (req: AttachmentReq, reply) => {
       if (!files.on) return reply.code(409).send({ error: FILES_WAIT_LINK })
       const body = req.body
       if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })

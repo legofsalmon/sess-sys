@@ -553,9 +553,15 @@ Crewbox.
 
 ## Security and GDPR
 
-- Roles: owner, ops, warehouse, crew chief, freelancer, accountant (read
-  finance only). Enforced on the server and in the sync scopes. Not built
-  yet: they wait on staff sign-in being switched on.
+- **Roles are built (11 October 2026,
+  [ADR 0034](adr/0034-roles-and-what-each-can-change.md)):** director,
+  office and production, head of department, warehouse and staff crew,
+  from the personas; freelancers keep their link. A role decides what a
+  member of staff can change, checked by the server on every command and
+  request, and the app offers only what it covers. They start off and come
+  on when a director is named from Admin. Not built yet: narrowing what
+  each role can *read* (the sync scopes), and an accountant's role, which
+  waits on finance.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
   details, documents) kept in separate tables with tighter access. Not
   built yet either, for the same reason.

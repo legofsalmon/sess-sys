@@ -253,6 +253,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const from = {
       userId: req.user?.id,
       ...(req.user ? { user: { id: req.user.id, email: req.user.email } } : {}),
+      // What they may change (ADR 0034); nothing is checked while roles are off.
+      ...(req.role ? { role: req.role } : {}),
       sentAt,
       device: describeDevice(req.headers['user-agent']),
     }
@@ -341,7 +343,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // goes in the history: who, when and on what device. The app records it with this
   // post as it asks for the file, so a fetch of the address alone (a browser warming
   // up a link, say) writes nothing. `client` is the app's device code.
-  app.post<{ Querystring: { client?: string }; Body: { format?: unknown } }>('/api/export/record', async (req, reply) => {
+  app.post<{ Querystring: { client?: string }; Body: { format?: unknown } }>('/api/export/record', { config: { needs: 'settings' } }, async (req, reply) => {
     const format = req.body?.format === 'json' ? 'json' : 'zip'
     const client = req.query.client ?? ''
     // The file is fetched after this, with this record in it, so the count includes it.
@@ -356,7 +358,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return reply.header('cache-control', 'no-store').send({ rows })
   })
 
-  app.get('/api/export.zip', async (req, reply) => {
+  app.get('/api/export.zip', { config: { needs: 'settings' } }, async (req, reply) => {
     const everything = await readEverything(db)
     const zip = everythingZip(everything, req.user ?? undefined)
     return reply
@@ -367,7 +369,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   // The same, as JSON, for scripts. A script that wants its download in the history posts to /api/export/record first.
-  app.get('/api/export', async (_req, reply) => {
+  app.get('/api/export', { config: { needs: 'settings' } }, async (_req, reply) => {
     const everything = await readEverything(db)
     return reply.header('cache-control', 'no-store').send(everythingJson(everything))
   })

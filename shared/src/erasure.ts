@@ -179,6 +179,7 @@ export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'>, keepName: 
     knownAs: null,
     certificates: {},
     company: null,
+    role: null,
   }
 }
 
@@ -221,6 +222,7 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction, Perso
   },
   'person.level': { names: { field: 'id' }, refused: true, keep: only('id') },
   'person.newLink': { names: { field: 'id' }, refused: true, keep: as },
+  'person.role': { names: { field: 'id' }, refused: true, keep: as },
   'person.archive': { names: { field: 'id' }, refused: true, keep: as },
   'unavailability.add': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId') },
   'offer.send': { names: { field: 'personId' }, refused: true, keep: as },

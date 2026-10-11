@@ -39,6 +39,9 @@ function set(next: Auth) {
   for (const fn of listeners) fn(next)
 }
 
+/** The same, outside a screen: the change guard reads it (ADR 0034). */
+export const currentAuth = (): Auth => current
+
 export function useAuth(): Auth {
   const [auth, setAuth] = useState(current)
   useEffect(() => {

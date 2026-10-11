@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { day } from './day.ts'
 import { euroCents, needed, text, whole } from './plain.ts'
+import { ROLES } from './roles.ts'
 
 /**
  * Crew booking: people, the roles a job needs (calls), the offers that fill
@@ -149,6 +150,11 @@ export const person = z.object({
   knownAs: knownAs.default(null),
   certificates: certificates.default({}),
   company: company.nullable().default(null),
+  /**
+   * What they can change once signed in (ADR 0034). Staff only; none set
+   * is staff crew. Set by a director with person.role, never by an edit.
+   */
+  role: z.enum(ROLES).nullable().default(null),
 })
 export type Person = z.infer<typeof person>
 
@@ -318,6 +324,8 @@ export const crewCommandSchemas = {
   'person.level': z.object({ id, level }),
   /** Replace a person's private link, so the old one stops working. */
   'person.newLink': z.object({ id }),
+  /** A member of staff's role (ADR 0034). Only a director, once roles are on; there is always one director after that. */
+  'person.role': z.object({ id, role: z.enum(ROLES) }),
   /**
    * Archive someone who has left, or bring them back. Refused while they
    * hold an open offer or a booking from today on, so nothing is left hanging.

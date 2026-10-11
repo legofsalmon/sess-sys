@@ -123,7 +123,8 @@ describe('staff sign-in', () => {
     expect(set.maxAge).toBe(60 * 86_400)
 
     const me = await app.inject({ url: '/api/me', cookies: { sh_session: session! } })
-    expect(me.json()).toEqual({ auth: 'google', user: { id: expect.any(String), email: 'aoife@sessionhire.com', name: 'Aoife Byrne' } })
+    // Nobody is a director yet, so roles are off and she can do everything (ADR 0034).
+    expect(me.json()).toEqual({ auth: 'google', user: { id: expect.any(String), email: 'aoife@sessionhire.com', name: 'Aoife Byrne' }, role: 'director', rolesOn: false })
     expect((await pull(app, session)).statusCode).toBe(200)
   })
 

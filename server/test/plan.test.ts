@@ -235,6 +235,7 @@ describe('the week by person', () => {
       linkToken: '',
       archived: false,
       approvesLeave: false,
+      role: null,
       department: null,
       level: 1,
       knownAs: null,

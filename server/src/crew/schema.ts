@@ -138,6 +138,11 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS running_late_person ON running_late (person_id);
   CREATE INDEX IF NOT EXISTS running_late_day ON running_late (day);
   `,
+  // Roles (ADR 0034): what a member of staff can change once signed in.
+  // None is staff crew; only staff have one.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS role text CHECK (role IN ('director', 'office', 'head', 'warehouse', 'crew'));
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

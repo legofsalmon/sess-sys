@@ -1,5 +1,6 @@
+import { ROLE_LABELS, ROLE_LINES } from '@sh/shared'
 import { useState } from 'react'
-import { Confirm } from './act.tsx'
+import { Confirm, Refusal, useAct } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
@@ -13,6 +14,7 @@ import { Top, useHash } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { forgetCountDraft } from './stock/Counts.tsx'
 import { ImportStockScreen } from './stock/ImportStock.tsx'
+import { useAccess } from './role.ts'
 import { client, storage } from './sync.ts'
 import { tabRole } from './tabs.ts'
 import { useView } from './view.ts'
@@ -31,6 +33,7 @@ export function AccountScreen() {
   const [sending, setSending] = useState(false)
   const late = useLate(sending)
   const waiting = view.pendingCount
+  const access = useAccess()
   // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
   if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
   // And the stock list (ADR 0026).
@@ -148,15 +151,26 @@ export function AccountScreen() {
         </section>
       )}
 
+      {(auth.status === 'signed-in' || (auth.status === 'open' && auth.passcode)) && <RoleCard />}
+
+      {/* Settings are for the office and directors, and the data's own switches for directors (ADR 0034); a role without them doesn't see them. */}
       {(auth.status === 'signed-in' || auth.status === 'open') && (
         <>
-          <OfficeCard office={view.office} />
-          <CalendarCard view={view} available={auth.status === 'signed-in'} />
-          <BackupsCard />
-          <ExportCard />
-          <DataCard view={view} />
-          <ImportPeopleCard />
-          <ImportStockCard />
+          {access.can('settings') && (
+            <>
+              <OfficeCard office={view.office} />
+              <CalendarCard view={view} available={auth.status === 'signed-in'} />
+              <BackupsCard />
+              <ExportCard />
+            </>
+          )}
+          {access.can('company') && <DataCard view={view} />}
+          {access.can('settings') && (
+            <>
+              <ImportPeopleCard />
+              <ImportStockCard />
+            </>
+          )}
         </>
       )}
 
@@ -167,5 +181,54 @@ export function AccountScreen() {
         </p>
       </section>
     </div>
+  )
+}
+
+/**
+ * What this person can change (ADR 0034), and who changes that. While
+ * nobody is a director, roles are off and it says so, with the way to
+ * switch them on: making yourself the first director.
+ */
+function RoleCard() {
+  const access = useAccess()
+  const { run, error } = useAct()
+  const [asking, setAsking] = useState(false)
+  if (access.rolesOff)
+    return (
+      <section className="card">
+        <h2>Roles</h2>
+        <p>Roles are off, so everyone signed in can change everything. They come on when someone is made a director, who then gives each member of staff theirs on the Crew tab.</p>
+        {!access.personId ? (
+          <p className="hint">To be the first director, put the email you sign in with on your own person on the Crew tab.</p>
+        ) : asking ? (
+          <Confirm
+            question="Make yourself the director and switch roles on? Everyone else becomes staff crew until you give them a role on the Crew tab."
+            yes="Make me the director"
+            no="Not now"
+            onYes={() => {
+              setAsking(false)
+              void run(() => client.mutate('person.role', { id: access.personId!, role: 'director' }))
+            }}
+            onNo={() => setAsking(false)}
+          />
+        ) : (
+          <button type="button" onClick={() => setAsking(true)}>
+            Switch roles on
+          </button>
+        )}
+        <Refusal error={error} />
+      </section>
+    )
+  if (!access.role) return null
+  return (
+    <section className="card">
+      <h2>Your role</h2>
+      <p>
+        <b>{ROLE_LABELS[access.role]}</b>. {ROLE_LINES[access.role]}
+      </p>
+      <p className="hint">
+        {access.role === 'director' ? "You give everyone else their role on their person on the Crew tab." : 'A director can change your role on your person on the Crew tab.'}
+      </p>
+    </section>
   )
 }

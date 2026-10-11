@@ -25,7 +25,7 @@ const person = (id: string, name: string): Person => ({
   notes: '',
   linkToken: '',
   archived: false,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: null,
   level: 1,
   knownAs: null,

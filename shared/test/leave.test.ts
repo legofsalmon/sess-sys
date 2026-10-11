@@ -39,7 +39,7 @@ const person = (id: string, name: string, extra: Partial<Person> = {}): Person =
   notes: '',
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: null,
   level: 1,
   knownAs: null,

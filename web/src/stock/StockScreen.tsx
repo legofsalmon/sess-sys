@@ -23,6 +23,7 @@ import { Fold, ShowAll } from '../Fold.tsx'
 import { Beside, JobStatusPill, Top, useHash } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { Pending } from '../StatusPill.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useView, useWide } from '../view.ts'
 import { amountLabel, atLabel, mistakeLabel, numberLabel, ScanResult, TrackingChoice, whereLabel } from './common.tsx'
@@ -119,6 +120,7 @@ function StockRest({ view }: { view: View }) {
 /** The catalogue: the search, the camera, the department filters, the products and adding one; `current` marks the one open beside it. */
 function StockCard({ view, current }: { view: View; current?: string }) {
   const w = view.warehouse
+  const mayAdd = useAccess().can('stock')
   const [department, setDepartment] = useState<Department | 'all'>('all')
   const [search, setSearch] = useState('')
   const q = search.trim().toLowerCase()
@@ -288,9 +290,11 @@ function StockCard({ view, current }: { view: View; current?: string }) {
         )}
       </ShowAll>
       {/* A new product starts in the department the list is narrowed to. */}
-      <Fold label="Add product">
-        <NewProduct view={view} department={department === 'all' ? 'audio' : department} />
-      </Fold>
+      {mayAdd && (
+        <Fold label="Add product">
+          <NewProduct view={view} department={department === 'all' ? 'audio' : department} />
+        </Fold>
+      )}
     </section>
   )
 }
