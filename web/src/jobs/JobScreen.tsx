@@ -130,7 +130,10 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
           <dd>
             {job.venue ? (
               <>
-                <a href={`#venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>{' '}
+                <a href={`#venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>
+                <span className="muted" aria-hidden="true">
+                  {' · '}
+                </span>
                 <a href={mapLink(job.venue)} target="_blank" rel="noreferrer">
                   Map
                 </a>

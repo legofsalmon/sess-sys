@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { markSignedOut } from './auth.ts'
 import { size } from './format.ts'
 import { client } from './sync.ts'
+import { useLate } from './useLate.ts'
 
 /**
  * "Download everything" (ADR 0006): every table as a spreadsheet and as
@@ -14,6 +15,7 @@ const base = import.meta.env.VITE_API_BASE ?? ''
 
 export function ExportCard() {
   const [busy, setBusy] = useState(false)
+  const late = useLate(busy)
   const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>()
 
   const download = async () => {
@@ -55,8 +57,8 @@ export function ExportCard() {
         Everything in the app in one file: a spreadsheet for each kind of record, all of it as JSON for moving to another system, and the
         history in words. Easiest on a laptop.
       </p>
-      <button type="button" onClick={download} disabled={busy}>
-        {busy ? 'Getting everything…' : 'Download everything'}
+      <button type="button" onClick={download} disabled={busy} aria-busy={busy}>
+        {late ? 'Getting everything…' : 'Download everything'}
       </button>
       {note && (
         <p className={note.ok ? 'hint' : 'alert'} role={note.ok ? 'status' : 'alert'}>

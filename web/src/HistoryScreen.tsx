@@ -4,6 +4,7 @@ import { markSignedOut, useAuth } from './auth.ts'
 import { Empty } from './Empty.tsx'
 import { Top } from './jobs/common.tsx'
 import { useToday, useView } from './view.ts'
+import { useLate } from './useLate.ts'
 
 /**
  * The history (ADR 0006): who did what, when, on which device, whether it
@@ -38,6 +39,7 @@ export function HistoryScreen() {
   const [people, setPeople] = useState<Person[]>([])
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
   const [older, setOlder] = useState<'idle' | 'loading' | 'failed'>('idle')
+  const lateOlder = useLate(older === 'loading')
   // Runs opened, by their newest change, which stays the same as older pages join them.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   // Answers to an earlier choice of person arrive late sometimes; only the latest request's answer counts.
@@ -164,8 +166,8 @@ export function HistoryScreen() {
       {loaded.state === 'ready' && (loaded.next || older === 'failed' || loaded.entries.length > 0) && (
         <div className="older">
           {loaded.next && (
-            <button type="button" onClick={showOlder} disabled={older === 'loading'}>
-              {older === 'loading' ? 'Getting more…' : 'Show older'}
+            <button type="button" onClick={showOlder} disabled={older === 'loading'} aria-busy={older === 'loading'}>
+              {lateOlder ? 'Getting more…' : 'Show older'}
             </button>
           )}
           {/* No signal isn't a fault: said quietly, with Show older still there to try again. */}

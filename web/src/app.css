@@ -113,10 +113,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .row:first-of-type { border-top: 0; padding-top: 0; }
 .row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .actions { display: flex; gap: var(--space-6); flex-wrap: wrap; align-items: center; }
-/* The one status pill (StatusPill.tsx): amber when someone has to act, green when settled, grey when off, the bad tone for a clash, and dashed grey while waiting to sync. */
-.pill { font-size: var(--text-pill); font-weight: 700; padding: var(--space-2) var(--space-8); border-radius: var(--radius-full); white-space: nowrap; }
+/* The one status pill (StatusPill.tsx): amber when someone has to act, outlined and quiet when settled, grey when off, the bad tone for a clash, and dashed grey while waiting to sync.
+   Settled is quiet, not green (the design system's "healthy is quiet"): a confirmed job, a filled call or approved leave is working as expected, so the colour is left for what still needs someone. Each keeps its word and a solid edge, so it still reads apart from off and from waiting. */
+.pill { font-size: var(--text-pill); font-weight: 700; padding: var(--space-2) var(--space-8); border: 1px solid transparent; border-radius: var(--radius-full); white-space: nowrap; }
 .pill.pending { background: var(--warn-soft); color: var(--warn); }
-.pill.confirmed { background: var(--good-soft); color: var(--good); }
+.pill.confirmed { background: transparent; color: var(--on-line); border-color: var(--line); }
 .pill.cancelled { background: var(--line); color: var(--on-line); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.waiting { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
@@ -124,13 +125,15 @@ button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; p
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 /* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input, select { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
+/* Focus on everything a keyboard reaches, links, text boxes and folds included: the same 2px ring outside the edge (design system rule 4). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 16px in every field, whatever the label round it is set in: iOS zooms the page into a field set any smaller. */
+input, select { font: inherit; font-size: var(--text-body); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
 .hint, .empty { margin: 0; color: var(--muted); font-size: var(--text-hint); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Getting about (audit finding 22): each move within the app lands on the screen's heading (Shell.tsx), which shows the same ring as a button. */
-h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* (The ring itself is the one rule for everything focusable, above.) */
 /* The live region round the "not done" count is a box of its own: older Safari leaves a display: contents box out of what a screen reader is told. Empty, it's taken out of the row, so on a 320px phone it doesn't take a line of its own and push the sync pill down. */
 .not-done-live { display: flex; }
 .not-done-live:empty { position: absolute; }
@@ -170,12 +173,13 @@ h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--acc
 .app .added a { color: inherit; font-weight: 700; }
 .app fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .app legend { padding: 0; font-size: var(--text-hint); color: var(--muted); margin-bottom: var(--space-4); }
-.app textarea { font: inherit; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
+.app textarea { font: inherit; font-size: var(--text-body); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
 .app .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
 .app .grid-form label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
 .app .grid-form .wide { grid-column: 1 / -1; }
-.app button.link { border: 0; background: none; padding: var(--space-4) var(--space-6); color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) var(--space-6); color: var(--muted); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
+/* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. */
+.app button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) 0; color: var(--muted); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
 .app .end { justify-content: flex-end; }
 /* A row that opens on a tap: the name as the button, its detail under it. */
 .app .person { align-items: center; }
@@ -199,7 +203,6 @@ h1:focus-visible, .top .brand small:focus-visible { outline: 2px solid var(--acc
 /* Sign-in and account. */
 a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
-a.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* 44px touch targets: easier with gloves on or in a dark venue. */
 input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
@@ -213,7 +216,7 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .account .who b, .account .who span { display: block; }
 .account .who span { color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
 .account .card button { justify-self: start; }
-.account button.link { border: 0; background: none; padding: var(--space-4) var(--space-6); color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.account button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
 .account .invites { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .account .feed input { font-size: var(--text-hint); color: var(--muted); }
 .account .invites h3 { margin: 0; font-size: var(--text-subheading); }
@@ -244,3 +247,25 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 /* 64px is the top bar's height and 80px the tab bar's with a margin, so the whole list scrolls between the two. */
 .app.beside .column.list { position: sticky; top: 64px; max-height: calc(100vh - 64px - 80px); overflow: auto; }
 .app.beside .job-row[aria-current='page'] { box-shadow: inset 3px 0 0 var(--accent); padding-left: var(--space-10); }
+
+/*
+ * States, as the design system draws them (its states.md), on Session Hire's own parts: every press shows at once that it landed, and
+ * where a pointer hovers, what can be pressed says so before it is. Hover only on a device with a pointer, so a tap on a phone doesn't
+ * leave a button looking held. The washes and timings are the shared ones; what is selected or current doesn't hover, and nothing
+ * disabled answers. Only colour changes, so reduced motion leaves it as it is.
+ */
+button, a.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.link {
+  transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard), filter var(--ds-duration-fast) var(--ds-ease-standard);
+}
+@media (hover: hover) {
+  button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
+  button.primary:not(:disabled):hover, a.button.primary:hover, button.danger:not(:disabled):hover { filter: brightness(.92); }
+  .app button.link:not(:disabled):hover, .app a.link:hover, .app .back:hover, .account button.link:not(:disabled):hover { color: var(--ink); }
+  .tabs a:not([aria-current='page']):hover { background: var(--ds-wash-hover); color: var(--ink); }
+  .app .job-row:not([aria-current='page']):hover b, .app .who:not(:disabled):hover b, .history .run-line:hover .what { text-decoration: underline; text-underline-offset: 3px; }
+}
+button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):active, a.button:not(.primary):active { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); transition-duration: var(--ds-duration-instant); }
+button.primary:not(:disabled):active, a.button.primary:active, button.danger:not(:disabled):active { filter: brightness(.84); transition-duration: var(--ds-duration-instant); }
+.tabs a:not([aria-current='page']):active { background: var(--ds-wash-pressed); }
+/* Work under way (aria-busy, useLate.ts): no second press, without the faded look of a button that can't be used. */
+button[aria-busy='true'] { cursor: progress; opacity: 1; }

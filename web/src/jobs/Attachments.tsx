@@ -30,6 +30,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { JobStatusPill } from './common.tsx'
+import { useLate } from '../useLate.ts'
 
 /**
  * What a venue's page and a client's page share (ADR 0032): the documents
@@ -184,6 +185,7 @@ function AttachmentForm({ owner, doc, onDone }: { owner: Owner; doc?: Attachment
   const [f, setF] = useState(doc ? { kind: doc.kind, title: doc.title, link: doc.link ?? '' } : blank)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const late = useLate(busy)
   const [added, setAdded] = useState('')
   const picker = useRef<HTMLInputElement>(null)
   const { run, error, refuse } = useAct()
@@ -232,8 +234,8 @@ function AttachmentForm({ owner, doc, onDone }: { owner: Owner; doc?: Attachment
         </label>
       )}
       <Refusal error={error} className="wide" />
-      <button type="submit" className={doc ? 'primary' : 'wide'} disabled={busy}>
-        {busy && file ? 'Sending…' : doc ? 'Save document' : 'Add document'}
+      <button type="submit" className={doc ? 'primary' : 'wide'} disabled={busy} aria-busy={busy}>
+        {late && file ? 'Sending…' : doc ? 'Save document' : 'Add document'}
       </button>
       {doc && (
         <button type="button" onClick={onDone}>

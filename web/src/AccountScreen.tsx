@@ -16,6 +16,7 @@ import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { client, storage } from './sync.ts'
 import { tabRole } from './tabs.ts'
 import { useView } from './view.ts'
+import { useLate } from './useLate.ts'
 
 /** Who this device is signed in as, signing out, their own bookings' calendar feed, Google Calendar, the company's backups and data, made-up data and starting fresh, bringing in the crew list, and the device's own sync state. */
 
@@ -28,6 +29,7 @@ export function AccountScreen() {
   // Signing out with changes still waiting sends them first, and asks only if some are still here.
   const [asking, setAsking] = useState(false)
   const [sending, setSending] = useState(false)
+  const late = useLate(sending)
   const waiting = view.pendingCount
   // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
   if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
@@ -86,8 +88,8 @@ export function AccountScreen() {
               onNo={() => setAsking(false)}
             />
           ) : (
-            <button type="button" onClick={() => void press()} disabled={busy || sending}>
-              {sending ? 'Sending changes first…' : 'Sign out'}
+            <button type="button" onClick={() => void press()} disabled={busy || sending} aria-busy={sending}>
+              {late ? 'Sending changes first…' : 'Sign out'}
             </button>
           )}
           {problem && (

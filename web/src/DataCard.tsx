@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { when } from './format.ts'
 import { ask, post } from './server.ts'
 import { syncSoon } from './sync.ts'
+import { useLate } from './useLate.ts'
 
 /**
  * Made-up data and starting fresh (ADR 0019): trying every part of the app
@@ -18,6 +19,7 @@ const by = (mark: { by: string | null }) => (mark.by ? ` by ${mark.by}` : '')
 export function DataCard({ view }: { view: View }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
   const [busy, setBusy] = useState<'made-up' | 'fresh' | undefined>()
+  const late = useLate(!!busy)
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
   const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>()
@@ -83,8 +85,8 @@ export function DataCard({ view }: { view: View }) {
             Disconnect Google Calendar first, above: the made-up jobs would go on it.
           </p>
         )}
-        <button type="button" className="primary" onClick={() => send('made-up')} disabled={!!busy || status.calendarConnected}>
-          {busy === 'made-up' ? 'Putting it in…' : 'Put in made-up data'}
+        <button type="button" className="primary" onClick={() => send('made-up')} disabled={!!busy || status.calendarConnected} aria-busy={busy === 'made-up'}>
+          {late && busy === 'made-up' ? 'Putting it in…' : 'Put in made-up data'}
         </button>
         {said}
         <p className="hint">
@@ -139,8 +141,8 @@ export function DataCard({ view }: { view: View }) {
                 Type “{START_FRESH_WORDS}” to confirm
                 <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} />
               </label>
-              <button type="button" className="danger" onClick={() => send('fresh')} disabled={!ready || !!busy}>
-                {busy === 'fresh' ? 'Deleting everything…' : 'Delete everything'}
+              <button type="button" className="danger" onClick={() => send('fresh')} disabled={!ready || !!busy} aria-busy={busy === 'fresh'}>
+                {late && busy === 'fresh' ? 'Deleting everything…' : 'Delete everything'}
               </button>
             </>
           )}

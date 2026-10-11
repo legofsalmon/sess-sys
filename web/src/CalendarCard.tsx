@@ -5,6 +5,7 @@ import { when } from './format.ts'
 import { ask, post, serverUrl } from './server.ts'
 import { client, syncSoon } from './sync.ts'
 import { useToday } from './view.ts'
+import { useLate } from './useLate.ts'
 
 /**
  * Google Calendar (ADR 0008), as the Account tab shows it: connecting the
@@ -61,6 +62,7 @@ export function CalendarCard({ view, available }: { view: View; available: boole
   const link = view.calendar.link
   const [note, setNote] = useState<Note | undefined>(outcome)
   const [busy, setBusy] = useState(false)
+  const late = useLate(busy)
   const [picking, setPicking] = useState(false)
   const [asking, setAsking] = useState<Asking | undefined>()
   const asked = asking && (
@@ -273,7 +275,7 @@ export function CalendarCard({ view, available }: { view: View; available: boole
       {question ?? (
         <div className="actions">
           <button type="button" onClick={() => void run(async () => ({ ok: true, text: checked(await post<CalendarCheck>('/api/calendar/check'), onIt) }))} disabled={busy}>
-            {busy ? 'Checking…' : 'Check the calendar'}
+            {late ? 'Checking…' : 'Check the calendar'}
           </button>
           <button type="button" onClick={() => setPicking(true)} disabled={busy}>
             Change calendar
