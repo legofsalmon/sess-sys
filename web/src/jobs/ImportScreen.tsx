@@ -107,11 +107,11 @@ export function ImportScreen({ view }: { view: View }) {
         <section className="card">
           {link?.state === 'reconnect' ? (
             <p>
-              Google Calendar needs connecting again on the <a href="#account">Account tab</a> first.
+              Google Calendar needs connecting again on the <a href="#account">Admin tab</a> first.
             </p>
           ) : (
             <p>
-              Jobs are read from the Google calendars of the account connected on the <a href="#account">Account tab</a>. Connect one there first.
+              Jobs are read from the Google calendars of the account connected on the <a href="#account">Admin tab</a>. Connect one there first.
             </p>
           )}
         </section>

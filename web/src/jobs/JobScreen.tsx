@@ -285,9 +285,9 @@ function CalendarLine({ job, phase, on, today }: { job: JobView; phase: PhaseVie
     case 'past':
       return <p className="cal">Over, so the calendar keeps it as it was.</p>
     case 'unconnected':
-      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase, today)} once one is connected on the Account tab.</p>
+      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase, today)} once one is connected on the Admin tab.</p>
     case 'paused':
-      return <p className="warn-line">Not being updated on the calendar: it needs connecting again on the Account tab.</p>
+      return <p className="warn-line">Not being updated on the calendar: it needs connecting again on the Admin tab.</p>
     case 'going':
       return (
         <p className="cal">

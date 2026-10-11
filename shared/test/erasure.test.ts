@@ -260,7 +260,7 @@ describe('what has to be settled first', () => {
     ).toBe(`${ciara.name} has a timesheet waiting on Body & Soul: approve it first, so their pay is on record.`)
     const link = { id: 'main', state: 'on', account: 'Ciara.NM@example.ie', calendarId: 'c', calendarName: 'Jobs', problem: null, connectedBy: null, connectedAt: null }
     expect(await refusal({ person: { p7: ciara }, calendarLink: { main: link } })).toBe(
-      `${ciara.name}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`
+      `${ciara.name}'s Google account writes the jobs to Google Calendar: connect another account on the Admin tab first.`
     )
     // A job over, a phase over, a timesheet approved, the calendar on another account: nothing in the way.
     expect(

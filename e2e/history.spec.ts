@@ -59,6 +59,8 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   await page.evaluate(() => dispatchEvent(new Event('online')))
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
+  // The history is kept under Admin (ADR 0033).
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Admin' }).click()
   await page.getByRole('link', { name: 'History' }).click()
   await expect(page.getByText('Names show once sign-in is on. Until then, changes are grouped by the device they came from.')).toBeVisible()
   // Two hours apart, so not one run: each its own line.

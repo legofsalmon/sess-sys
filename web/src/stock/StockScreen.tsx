@@ -86,7 +86,7 @@ export function StockScreen() {
 function Catalogue({ view }: { view: View }) {
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
+      <Top view={view} title="Stock" root />
 
       <StockCard view={view} />
 

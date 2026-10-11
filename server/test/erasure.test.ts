@@ -1025,7 +1025,7 @@ describe('what other people have', () => {
       'Mary Kelly-Byrne has been archived. Bring them back on the Crew tab to change their level.',
       `${ERASED_NAME} has been archived. Bring them back on the Crew tab to change their level.`,
       "Seán Ó'Brien Smith has been archived. Bring them back on the Crew tab to change their level.",
-      `${ERASED_NAME}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`,
+      `${ERASED_NAME}'s Google account writes the jobs to Google Calendar: connect another account on the Admin tab first.`,
     ])
   })
 })

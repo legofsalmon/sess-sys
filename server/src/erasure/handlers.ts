@@ -109,7 +109,7 @@ async function notYet(tx: Queryable, person: Person, today: string): Promise<str
   if (undecided[0]) return `${person.name} has ${undecided[0].what} waiting for a decision: decide it on the Leave screen first, so their leave records say how it ended.`
   if (person.email?.trim()) {
     const { rows: link } = await tx.query(`SELECT 1 FROM calendar_link WHERE state <> 'off' AND lower(trim(account_email)) = lower(trim($1))`, [person.email])
-    if (link.length) return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Account tab first.`
+    if (link.length) return `${person.name}'s Google account writes the jobs to Google Calendar: connect another account on the Admin tab first.`
   }
   return undefined
 }

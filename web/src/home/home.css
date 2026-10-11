@@ -1,0 +1,17 @@
+/* Home (ADR 0033): how things stand, for whoever is looking. */
+.home .home-day { margin: calc(-1 * var(--space-10)) 0 0; color: var(--muted); font-size: var(--text-small); }
+/* Who it's shown for: a toggle drawn like the Jobs tab's List, Week and Month. */
+.home .home-for { display: flex; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); }
+.home .home-for button { flex: 1 1 0; min-width: 0; padding: var(--space-4) var(--space-2); font-size: var(--text-small); border: 0; background: transparent; color: var(--muted); font-weight: 700; }
+.home .home-for button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
+.home .home-department select { width: 100%; }
+/* Counts as tiles: the number first and large, what it's of under it. Two across on a phone, more on a laptop. */
+.home .tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-8); }
+.home .tile { display: grid; align-content: start; gap: var(--space-2); min-height: 88px; padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: inherit; text-decoration: none; }
+.home .tile b { font-size: 1.75rem; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.home .tile span { color: var(--muted); font-size: var(--text-small); line-height: 1.3; }
+.home .tile.bad b { color: var(--bad); }
+.home .tile:hover { background: var(--ds-wash-hover); }
+.home .tile:active { background: var(--ds-wash-pressed); }
+.home .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home .all-clear { margin: 0; color: var(--muted); }

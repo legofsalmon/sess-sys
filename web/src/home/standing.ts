@@ -1,0 +1,128 @@
+import { answersToCheck, canApproveLeave, runningOut, type Department, type JobView, type PersonView, type View } from '@sh/shared'
+import { calendarAnswersToSortOut } from '../crew/CrewScreen.tsx'
+
+/**
+ * How things stand, for Home (ADR 0033): every count Home can show, each
+ * with where it's sorted out, worked out from this device's own copy so it
+ * is right with no signal too. Home picks which to show by who it's shown
+ * for; this says what each one is.
+ */
+
+/** Who Home is shown for: the personas in docs/personas.md. */
+export type HomeFor = 'company' | 'department' | 'warehouse' | 'me'
+
+export interface Tile {
+  key: string
+  count: number
+  /** What the count is of, after the number: "answers to check". */
+  label: string
+  href: string
+  /** Something stopping work, drawn as bad; otherwise neutral. */
+  bad?: boolean
+}
+
+/**
+ * A crew department's kit, by the stock list's departments, so a head of
+ * department sees their own kit as well as their own people. Departments
+ * with no kit of their own (production, transport, stage managers) have
+ * none.
+ */
+const KIT_OF: Record<string, Department> = {
+  audio: 'audio',
+  backline: 'audio',
+  lx: 'lighting',
+  lighting: 'lighting',
+  laser: 'lighting',
+  video: 'video',
+  'led tech': 'video',
+  led: 'video',
+  rigger: 'rigging',
+  rigging: 'rigging',
+  staging: 'staging',
+  power: 'power',
+}
+export const kitOf = (department: string): Department | undefined => KIT_OF[department.trim().toLowerCase()]
+
+export function addDays(day: string, n: number): string {
+  return new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+}
+
+/** The departments people are in, each once, by name: the ones a head of department can pick. */
+export function departmentsIn(people: readonly PersonView[]): string[] {
+  const out: string[] = []
+  for (const p of people) if (!p.archived && p.department && !out.some((d) => d.toLowerCase() === p.department!.toLowerCase())) out.push(p.department)
+  return out.sort((a, b) => a.localeCompare(b))
+}
+
+/** Narrows to one department: people by their profile, kit by the matching stock department. Everything, with no department. */
+export function narrower(department: string | undefined) {
+  const wanted = department?.trim().toLowerCase()
+  const kit = department ? kitOf(department) : undefined
+  return {
+    person: (p: Pick<PersonView, 'department'> | undefined) => !wanted || p?.department?.trim().toLowerCase() === wanted,
+    kit: (d: Department | undefined) => !wanted || (!!kit && d === kit),
+  }
+}
+
+/** The jobs on a day, by a phase on it: going ahead or not yet decided, never the cancelled or lost. */
+export function jobsOn(view: View, day: string): JobView[] {
+  return view.jobs.jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.phases.some((p) => p.start <= day && p.end >= day))
+}
+
+/** Jobs from tomorrow to a week on, by when they start: the week ahead. */
+export function weekAhead(view: View, today: string): JobView[] {
+  const end = addDays(today, 7)
+  return view.jobs.jobs
+    .filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.span && j.span.end > today && j.span.start <= end && !j.phases.some((p) => p.start <= today && p.end >= today))
+    .sort((a, b) => a.span!.start.localeCompare(b.span!.start) || a.name.localeCompare(b.name))
+}
+
+/** Every count Home knows, narrowed to a department when one is given, keyed for picking. */
+export function tiles(view: View, today: string, me: PersonView | undefined, department?: string): Record<string, Tile> {
+  const by = narrower(department)
+  const answers =
+    answersToCheck(view.crew, today).filter((a) => by.person(a.offer.person)).length +
+    (department ? 0 : calendarAnswersToSortOut(view, today).length) +
+    view.documents.toCheck.filter((d) => by.person(d.person)).length
+  const late = view.late.toCheck.filter((n) => by.person(n.person)).length
+  const fortnight = addDays(today, 14)
+  const crewNeeded = view.crew.calls.filter((c) => c.status === 'open' && c.end >= today && c.start <= fortnight && c.openDays.some((d) => d >= today)).length
+  const timesheets = view.timesheets.toApprove.filter((r) => by.person(r.person)).length
+  const leave = view.leave.queue.filter((q) => by.person(q.person)).length
+  const certificates = runningOut(view.crew.people, view.documents.all, today).filter((r) => by.person(r.person)).length
+  const short = view.kit.short.filter((l) => by.kit(l.model?.department))
+  const tomorrow = addDays(today, 1)
+  const toPick = view.moves.soon.filter((p) => p.job.span && p.job.span.start <= tomorrow && p.out < p.need).length
+  const stillOut = view.moves.stillOut.length
+  const faults = view.faults.open.filter((f) => by.kit(f.model?.department))
+  const tests = view.inspections.attention.filter((d) => by.kit(d.asset.model?.department))
+  const cantGo = tests.filter((d) => d.state !== 'soon').length
+  const counts = view.counts.week.due.length
+  const approver = canApproveLeave(me)
+
+  const all: Tile[] = [
+    { key: 'late', count: late, label: late === 1 ? 'person running late, not yet noted' : 'people running late, not yet noted', href: '#crew' },
+    { key: 'answers', count: answers, label: answers === 1 ? 'answer to check' : 'answers to check', href: '#crew' },
+    { key: 'crew-needed', count: crewNeeded, label: crewNeeded === 1 ? 'call still needs crew' : 'calls still need crew', href: '#crew' },
+    { key: 'timesheets', count: timesheets, label: timesheets === 1 ? 'timesheet to approve' : 'timesheets to approve', href: '#crew' },
+    { key: 'leave', count: leave, label: approver ? (leave === 1 ? 'leave request waiting on you' : 'leave requests waiting on you') : leave === 1 ? 'leave request waiting' : 'leave requests waiting', href: '#crew/leave' },
+    { key: 'certificates', count: certificates, label: certificates === 1 ? 'certificate or document running out' : 'certificates and documents running out', href: '#crew' },
+    { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock' },
+    { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true },
+    { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short' : 'kit lines short', href: '#stock', bad: short.some((l) => l.hold === 'held') },
+    { key: 'faults', count: faults.length, label: faults.length === 1 ? 'fault open' : 'faults open', href: '#stock', bad: faults.some((f) => f.stops) },
+    { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock', bad: true },
+    { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock' },
+    { key: 'counts', count: counts, label: counts === 1 ? 'place to count this week' : 'places to count this week', href: '#stock' },
+  ]
+  return Object.fromEntries(all.map((t) => [t.key, t]))
+}
+
+/** Which counts each view of Home shows, in order: the first is what that person reaches for first. */
+export const TILES_FOR: Record<HomeFor, readonly string[]> = {
+  company: ['late', 'answers', 'crew-needed', 'kit-short', 'still-out', 'to-pick', 'faults', 'cant-go', 'timesheets', 'leave', 'certificates', 'counts'],
+  // Only what can be narrowed to a department: crew calls carry no department yet, and kit still out is the job's, not a department's.
+  department: ['late', 'answers', 'leave', 'timesheets', 'certificates', 'kit-short', 'faults', 'cant-go', 'tests-soon'],
+  warehouse: ['to-pick', 'still-out', 'kit-short', 'faults', 'cant-go', 'counts', 'tests-soon'],
+  me: ['leave'],
+}

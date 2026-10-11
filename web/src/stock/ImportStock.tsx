@@ -124,9 +124,9 @@ export function ImportStockScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse jobs import import-stock">
-      <Top view={view} title="Account" />
+      <Top view={view} title="Admin" />
       <a className="back" href="#account">
-        ‹ Account
+        ‹ Admin
       </a>
       <header className="title">
         <h1 ref={heading} tabIndex={-1}>

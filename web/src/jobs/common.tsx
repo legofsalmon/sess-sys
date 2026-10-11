@@ -1,6 +1,7 @@
 import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueView, type View } from '@sh/shared'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNotDone } from '../problems.tsx'
+import { OnThisScreen } from '../OnThisScreen.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 
@@ -22,7 +23,13 @@ export function useHash(): string {
  * the one list of them under the bar. The list is inside the header, so
  * the two stick to the top as one block and the list never covers the bar.
  */
-export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
+/**
+ * The bar at the top of every screen: the app, the area and the sync state,
+ * and the parts of the screen under it (ADR 0033). On an area's own screen
+ * (`root`) the area's name follows as the screen's title, so Jobs, Stock and
+ * Crew read as different places; a record's page has its own title instead.
+ */
+export function Top({ view, title = 'Jobs', root = false }: { view: View; title?: string; root?: boolean }) {
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
   return (
@@ -45,7 +52,9 @@ export function Top({ view, title = 'Jobs' }: { view: View; title?: string }) {
           </span>
         </div>
         {notDone.list}
+        <OnThisScreen />
       </header>
+      {root && <h1 className="area-title">{title}</h1>}
     </>
   )
 }
@@ -99,7 +108,7 @@ export function Beside({
   }, [open])
   return (
     <div className={`app ${className} beside`}>
-      <Top view={view} title={title} />
+      <Top view={view} title={title} root={!open} />
       {head}
       <div className="columns">
         <div className="column list">{list}</div>
