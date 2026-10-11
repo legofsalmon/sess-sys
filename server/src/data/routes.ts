@@ -26,7 +26,7 @@ export function registerDataRoutes(app: FastifyInstance, { db, backups, document
     return status()
   })
 
-  app.post<{ Querystring: { client?: string } }>('/api/data/made-up', async (req, reply): Promise<DataStatus | void> => {
+  app.post<{ Querystring: { client?: string } }>('/api/data/made-up', { config: { needs: 'company' } }, async (req, reply): Promise<DataStatus | void> => {
     try {
       await fillWithMadeUpData(db, who(req))
     } catch (err) {
@@ -40,7 +40,7 @@ export function registerDataRoutes(app: FastifyInstance, { db, backups, document
     return status()
   })
 
-  app.post<{ Querystring: { client?: string }; Body: { confirm?: unknown } }>('/api/data/start-fresh', async (req, reply): Promise<DataStatus | void> => {
+  app.post<{ Querystring: { client?: string }; Body: { confirm?: unknown } }>('/api/data/start-fresh', { config: { needs: 'company' } }, async (req, reply): Promise<DataStatus | void> => {
     const typed = typeof req.body?.confirm === 'string' ? req.body.confirm.trim().toLowerCase() : ''
     if (typed !== START_FRESH_WORDS) return reply.code(400).send({ error: `Type “${START_FRESH_WORDS}” to start fresh.` })
     // A backup first, where there's somewhere to keep it, so starting fresh can be undone.

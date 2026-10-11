@@ -168,6 +168,7 @@ const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company'>]:
   level: 'level',
   knownAs: 'known_as',
   certificates: 'certificates',
+  role: 'role',
 }
 
 type Row = Record<string, any>

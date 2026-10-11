@@ -54,7 +54,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     device: describeDevice(req.headers['user-agent']),
   })
 
-  app.get<{ Querystring: { client?: string } }>('/api/calendar/connect', async (req, reply) => {
+  app.get<{ Querystring: { client?: string } }>('/api/calendar/connect', { config: { needs: 'settings' } }, async (req, reply) => {
     reply.header('cache-control', 'no-store')
     if (!google) return back(reply, 'off')
     const state = randomBytes(16).toString('base64url')
@@ -64,7 +64,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     return reply.redirect(google.authorizeUrl({ state, codeChallenge, redirectUri: callbackUrl(req), loginHint: req.user?.email }), 302)
   })
 
-  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>('/api/calendar/callback', async (req, reply) => {
+  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>('/api/calendar/callback', { config: { needs: 'settings' } }, async (req, reply) => {
     reply.header('cache-control', 'no-store')
     if (!google || !sync || !secret) return back(reply, 'off')
     const [state, verifier, client] = (readCookie(req, ATTEMPT_COOKIE) ?? '').split('.')
@@ -135,7 +135,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     }
   })
 
-  app.post<{ Querystring: { client?: string }; Body: { calendarId?: unknown } }>('/api/calendar/use', async (req, reply): Promise<CalendarLink | void> => {
+  app.post<{ Querystring: { client?: string }; Body: { calendarId?: unknown } }>('/api/calendar/use', { config: { needs: 'settings' } }, async (req, reply): Promise<CalendarLink | void> => {
     if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
     const calendarId = typeof req.body?.calendarId === 'string' ? req.body.calendarId : ''
     const link = await readLink(db)
@@ -163,7 +163,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
   })
 
   /** Crew invites on or off (ADR 0009). Each invite is an email to a freelancer, so it starts off and someone has to turn it on. */
-  app.post<{ Querystring: { client?: string }; Body: { on?: unknown } }>('/api/calendar/invites', async (req, reply): Promise<CalendarLink | void> => {
+  app.post<{ Querystring: { client?: string }; Body: { on?: unknown } }>('/api/calendar/invites', { config: { needs: 'settings' } }, async (req, reply): Promise<CalendarLink | void> => {
     if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
     if (typeof req.body?.on !== 'boolean') return reply.code(400).send({ error: 'Say whether crew invites should be on or off.' })
     const on = req.body.on
@@ -179,14 +179,14 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     return linkEntity(after)
   })
 
-  app.post('/api/calendar/check', async (_req, reply): Promise<CalendarCheck | void> => {
+  app.post('/api/calendar/check', { config: { needs: 'settings' } }, async (_req, reply): Promise<CalendarCheck | void> => {
     if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
     const link = await readLink(db)
     if (link?.state !== 'on') return reply.code(409).send({ error: 'No calendar is being written to yet.' })
     return sync.run(true)
   })
 
-  app.post<{ Querystring: { client?: string } }>('/api/calendar/disconnect', async (req, reply): Promise<CalendarLink | void> => {
+  app.post<{ Querystring: { client?: string } }>('/api/calendar/disconnect', { config: { needs: 'settings' } }, async (req, reply): Promise<CalendarLink | void> => {
     const link = await readLink(db)
     if (!sync || !link || link.state === 'off') return reply.code(409).send({ error: 'Google Calendar is not connected.' })
     if (link.state === 'stopping') return linkEntity(link)

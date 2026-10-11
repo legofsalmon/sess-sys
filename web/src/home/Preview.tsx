@@ -10,8 +10,9 @@ import { saveHomeFor, type Saved } from './HomeScreen.tsx'
  * on every screen after it saying whose they are, with the way back to
  * choose again. Only on the passcode-locked demo, which holds made-up data
  * (ADR 0019): the live app has no such screen. Choosing one sets where the
- * app starts, how Home is shown and, where it matters, who "me" is; it
- * doesn't hide anything, as the app has no roles yet.
+ * app starts, how Home is shown and, where it matters, who "me" is, and
+ * since roles (ADR 0034) it is the role that person has: the server holds
+ * this browser to it, and the app offers only what it covers.
  */
 
 export interface Persona {
@@ -42,8 +43,20 @@ function read(): string {
   }
 }
 
+/** Tell the server which role to hold this browser to; with no signal the device still holds it (web/src/role.ts). */
+function tellServer(key: string) {
+  const role = key && key !== 'freelancer' ? (key === 'staff' ? 'crew' : key) : null
+  void fetch(`${import.meta.env.VITE_API_BASE ?? ''}/api/auth/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ role }),
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => undefined)
+}
+
 function set(key: string) {
   current = key
+  tellServer(key)
   try {
     if (key) localStorage.setItem(KEY, key)
     else localStorage.removeItem(KEY)
@@ -52,6 +65,9 @@ function set(key: string) {
   }
   for (const fn of listeners) fn(key)
 }
+
+/** The persona chosen, outside a screen: the change guard reads it (ADR 0034). */
+export const previewKey = () => current
 
 /** Whose eyes the demo is seen through, if chosen. */
 export function usePreview(): Persona | undefined {
@@ -155,13 +171,17 @@ export function PreviewSplash() {
           </li>
         ))}
       </ul>
-      <p className="hint">Everyone signed in can open every tab today; the app has no roles yet. This shows where each person starts and what they look at first.</p>
+      <p className="hint">
+        Everyone can look at everything, but changes only what their role covers: the warehouse can't change a job, and staff crew only their own leave.
+      </p>
     </div>
   )
 }
 
 /** On every screen once a persona is chosen: whose eyes, and the way back to choose again. */
 export function PreviewBar({ persona }: { persona: Persona }) {
+  // Said again as the app opens, so a browser that chose before roles came in, or offline, is held to it too.
+  useEffect(() => tellServer(persona.key), [persona.key])
   return (
     <div className="preview-bar" role="note">
       <span>

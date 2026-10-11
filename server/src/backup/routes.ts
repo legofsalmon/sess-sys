@@ -13,7 +13,7 @@ export function registerBackupRoutes(app: FastifyInstance, backups: Backups) {
     return backups.status()
   })
 
-  app.post('/api/backups/run', async (_req, reply): Promise<BackupRun | void> => {
+  app.post('/api/backups/run', { config: { needs: 'settings' } }, async (_req, reply): Promise<BackupRun | void> => {
     if (!backups.store) return reply.code(409).send({ error: 'Backups are off: no storage is set up on the server yet.' })
     try {
       return await backups.run('manual')

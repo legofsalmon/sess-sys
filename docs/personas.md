@@ -270,7 +270,8 @@ design system asks (0 to 4; a 3 is fixed or named).
 | A freelancer's page doesn't say what's waiting | F | 2 | Fixed: the line at the top |
 | Staff can't see their own bookings in the app | S | 2 | Fixed: Home for me |
 | No money anywhere | D | 2 | Phase 4 |
-| Everyone signed in can do everything | D | 2 | Open: roles and permissions are not built. Home is a view, not a lock: anyone can switch who it's shown for. Worth a decision before the office trial ends |
+| Everyone signed in can do everything | D | 2 | Fixed: five roles decide what each person can change ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Home stays a view anyone can switch |
+| Everyone signed in can read everything, rates and links included | D, S | 2 | Open: reading isn't narrowed by role yet (Decision 0034) |
 
 ## Seeing it as each of them
 
@@ -284,9 +285,10 @@ the same bar.
 
 - A department on each crew call, so a head of department's Home narrows
   *crew needed* too.
-- Roles: decide whether the app should limit what each person can change
-  (a warehouse phone that can't cancel a job), or keep trusting everyone
-  signed in and rely on History. The personas here are the starting list.
+- Roles: built ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)).
+  Each persona with an account is a role that decides what they can
+  change; on the demo, *See it as…* holds the browser to that role. Next is
+  narrowing what each role can read.
 - Try Home with the office and the warehouse during the office trial, and
   write what they did that this page didn't predict into the design
   system's learnings.

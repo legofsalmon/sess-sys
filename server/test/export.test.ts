@@ -199,6 +199,7 @@ describe('download everything', () => {
       'company_name',
       'company_vat_number',
       'company_cro_number',
+      'role',
     ])
     expect(people[0]).toMatchObject({
       name: 'Seán Ó Briain',

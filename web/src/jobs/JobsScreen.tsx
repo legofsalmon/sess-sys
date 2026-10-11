@@ -17,6 +17,7 @@ import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Pending } from '../StatusPill.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday, useView, useWide } from '../view.ts'
 import { Beside, Choices, clientNamed, JobStatusPill, Top, useHash, venueNamed } from './common.tsx'
@@ -94,17 +95,21 @@ function JobList({ view }: { view: View }) {
 /** A new job, the clients and the venues: under the list on a phone, beside it on a laptop. */
 function JobsRest({ view }: { view: View }) {
   const { jobs, clients, venues } = view.jobs
+  // Taking a job in is the office's, so a role without jobs has no New job (ADR 0034).
+  const mayAdd = useAccess().can('jobs')
   return (
     <>
-      <section className="card">
-        <h2>New job</h2>
-        <NewJob view={view} />
-        {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
-          <p className="hint">
-            Jobs already on a Google calendar? <a href="#import">Bring them in</a> rather than typing them again.
-          </p>
-        )}
-      </section>
+      {mayAdd && (
+        <section className="card">
+          <h2>New job</h2>
+          <NewJob view={view} />
+          {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
+            <p className="hint">
+              Jobs already on a Google calendar? <a href="#import">Bring them in</a> rather than typing them again.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="card">
         <h2>Clients</h2>

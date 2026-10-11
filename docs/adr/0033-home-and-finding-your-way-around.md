@@ -83,6 +83,8 @@ The personas, the flows they follow and the problems rated are in
    has the same bar. Only on the passcode-locked demo (PR #61), never on
    the live app. The choice is kept on the device (`sh.preview`). It
    doesn't hide any tab, since there are no roles; the choice says so.
+   (Since [Decision 0034](0034-roles-and-what-each-can-change.md), each
+   persona is held to its role.)
 
 ## Considered
 

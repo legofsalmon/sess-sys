@@ -22,7 +22,7 @@ const person = (id: string, name: string, kind: Person['kind'] = 'freelancer'): 
   notes: '',
   linkToken: `${id}-link-token-000000000000`,
   archived: false,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: null,
   level: 1,
   knownAs: null,

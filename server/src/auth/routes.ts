@@ -1,19 +1,28 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import type { MeResponse, StaffUser } from '@sh/shared'
+import { refusalFor, roleCan, ROLES, type Ability, type MeResponse, type Role, type StaffUser } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Db } from '../db.ts'
 import { clearCookie, publicOrigin, readCookie, setCookie } from '../http.ts'
 import { isStaff, type AuthConfig } from './config.ts'
+import { roleOfAccount } from './roles.ts'
 import { createSession, endSession, SESSION_DAYS, sessionUser, upsertUser } from './sessions.ts'
 
 declare module 'fastify' {
   interface FastifyContextConfig {
     /** Reachable without signing in, even when sign-in is on. */
     public?: boolean
+    /** What a role has to be able to do to use it, once roles are on (ADR 0034). */
+    needs?: Ability
   }
   interface FastifyRequest {
     /** The signed-in member of staff; null when sign-in is off or on a public route. */
     user: StaffUser | null
+    /**
+     * What this request may change (ADR 0034): the signed-in person's role
+     * once roles are on, or a demo's chosen persona. Null when nothing is
+     * checked: roles off, sign-in off, or a public route.
+     */
+    role: Role | null
   }
 }
 
@@ -23,6 +32,9 @@ const ATTEMPT_COOKIE = 'sh_signin'
 const ATTEMPT_PATH = '/api/auth'
 /** Holds proof that this browser was given the demo passcode (never the passcode itself). */
 const PASSCODE_COOKIE = 'sh_passcode'
+/** On a demo copy, the persona chosen on "See it as…", as the role the server holds it to (ADR 0034). */
+const PREVIEW_COOKIE = 'sh_preview'
+const asRole = (v: unknown): Role | undefined => (ROLES as readonly unknown[]).includes(v) ? (v as Role) : undefined
 
 /** What the passcode cookie holds: changes whenever the passcode does, so changing it locks every device out. */
 const passcodeProof = (passcode: string) => createHmac('sha256', passcode).update('session-hire demo').digest('base64url')
@@ -45,6 +57,7 @@ const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\
  */
 export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | undefined, passcode?: string) {
   app.decorateRequest('user', null)
+  app.decorateRequest('role', null)
   // Google sign-in wins: a passcode is only for a demo copy before it is set up.
   const proof = !auth && passcode ? passcodeProof(passcode) : undefined
   const hasPasscode = (req: FastifyRequest) => !!proof && same(readCookie(req, PASSCODE_COOKIE) ?? '', proof)
@@ -61,20 +74,40 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     if (!req.routeOptions.url?.startsWith('/api/') || req.routeOptions.config.public) return
     if (proof) {
       if (!hasPasscode(req)) return reply.code(401).send({ error: 'Enter the passcode first.' })
-      return
+      req.role = asRole(readCookie(req, PREVIEW_COOKIE)) ?? null
+    } else if (auth) {
+      req.user = await signedIn(req, reply)
+      if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
+      const { role, on } = await roleOfAccount(db, req.user.email)
+      req.role = on ? role : null
     }
-    if (!auth) return
-    req.user = await signedIn(req, reply)
-    if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
+    const needs = req.routeOptions.config.needs
+    if (needs && req.role && !roleCan(req.role, needs)) return reply.code(403).send({ error: refusalFor(req.role, needs) })
   })
 
   app.get('/api/me', { config: { public: true } }, async (req, reply): Promise<MeResponse | void> => {
     reply.header('cache-control', 'no-store')
-    if (proof) return hasPasscode(req) ? { auth: 'passcode' } : reply.code(401).send({ auth: 'passcode', error: 'Enter the passcode first.' })
+    if (proof) {
+      if (!hasPasscode(req)) return reply.code(401).send({ auth: 'passcode', error: 'Enter the passcode first.' })
+      const role = asRole(readCookie(req, PREVIEW_COOKIE))
+      return { auth: 'passcode', ...(role ? { role } : {}) }
+    }
     if (!auth) return { auth: 'off' }
     const user = await signedIn(req, reply)
     if (!user) return reply.code(401).send({ auth: 'google', error: 'Sign in first.' })
-    return { auth: 'google', user }
+    const { role, on } = await roleOfAccount(db, user.email)
+    return { auth: 'google', user, role, rolesOn: on }
+  })
+
+  // A demo copy's "See it as…" (ADR 0033): the persona chosen is the role the server holds this browser to, so
+  // the demo turns down what that person couldn't do, as the live app will. None goes back to everything.
+  app.post<{ Body: { role?: unknown } }>('/api/auth/preview', async (req, reply) => {
+    reply.header('cache-control', 'no-store')
+    if (!proof) return reply.code(404).send({ error: 'Only a demo copy can be seen as someone else.' })
+    const role = asRole(req.body?.role)
+    if (role) setCookie(req, reply, PREVIEW_COOKIE, role, { maxAge: SESSION_DAYS * 86_400 })
+    else clearCookie(req, reply, PREVIEW_COOKIE)
+    return { role: role ?? null }
   })
 
   const callbackUrl = (req: FastifyRequest) => `${publicOrigin(req)}/api/auth/google/callback`
@@ -141,6 +174,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     const token = readCookie(req, SESSION_COOKIE)
     if (token) await endSession(db, token)
     clearCookie(req, reply, proof ? PASSCODE_COOKIE : SESSION_COOKIE)
+    if (proof) clearCookie(req, reply, PREVIEW_COOKIE)
     return { ok: true }
   })
 }

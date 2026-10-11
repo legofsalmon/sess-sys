@@ -3,6 +3,45 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 11 October 2026: roles, and what each can change
+
+**Done**
+
+- Colly asked for roles and permissions next. Each persona with an
+  account is now a role: **director**, **office and production**, **head
+  of department**, **warehouse** and **staff crew**. Freelancers keep
+  their link. A role decides what a member of staff can *change*; everyone
+  signed in still reads everything
+  ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)).
+- The server checks every change and every settings request against the
+  sender's role, and turns one down with who can and who to ask. The app
+  works the role out the same way from its own copy, so it holds offline,
+  turns a change down before keeping it, and doesn't offer what the role
+  can't do (New job, Ask for crew, Add person, Add product, the settings
+  cards).
+- A role is set by a director on the person's card on the Crew tab, found
+  by the email they sign in with. Admin shows **Your role**. Roles start
+  off: **Switch roles on** in Admin makes you the first director, and
+  there's always one after that. Who approves time off is now a
+  director's to give.
+- The demo's **See it as…** personas are the roles: the server holds the
+  browser to the one chosen.
+- Checked: typecheck, the unit tests (new ones for roles on the server
+  and the shared rules), the end-to-end tests for crew, jobs, Home,
+  leave, stock and refusals, and the demo in a browser as the warehouse
+  and as a director.
+
+**Waiting on Colly**
+
+- Once Google sign-in is on: switch roles on from Admin, then give the
+  office, heads and warehouse their roles on the Crew tab. Everyone needs
+  the email they sign in with on their own person.
+
+**Next**
+
+- Narrow what each role can read (rates, phone numbers and private links
+  for staff crew).
+
 ## 11 October 2026: Home, and finding your way around
 
 **Done**
@@ -37,7 +76,7 @@ waiting on someone.
 
 - A department on each crew call, so a department's Home narrows crew
   still needed too.
-- Decide whether the app needs roles and permissions (personas.md).
+- ~~Decide whether the app needs roles and permissions~~: built, above.
 
 ## 10 October 2026: screens checked against the shared behaviour rules
 

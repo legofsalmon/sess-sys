@@ -153,7 +153,7 @@ describe('an edit on a device', () => {
       notes: '',
       linkToken: 'abcdefghijklmnopqrstuvwx',
       archived: false,
-      approvesLeave: false,
+      approvesLeave: false, role: null,
       department: null,
       level: 3,
       knownAs: null,
