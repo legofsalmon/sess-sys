@@ -347,3 +347,19 @@ test('the page installs with PNG icons and is in Irish English', async ({ page, 
     }
   }
 })
+
+test('on a phone the page stops at its end and the bar steps aside while the page is pinched in', async ({ browser }) => {
+  const page = await (await browser.newContext({ viewport: phoneSize, isMobile: true, hasTouch: true })).newPage()
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).toBe('none')
+  const bar = page.getByRole('navigation', { name: 'Areas' })
+  await expect(bar).toBeVisible()
+
+  // Pinched in, the visible part is smaller than the page's frame, as it is with the keyboard up: the bar would float loose, so it goes.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 })
+  await expect(bar).toBeHidden()
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
+  await expect(bar).toBeVisible()
+})
