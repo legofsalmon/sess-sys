@@ -71,6 +71,8 @@
   :root { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
 }
 * { box-sizing: border-box; }
+/* The page stops at its end: iOS otherwise lets it be dragged on past the last card, and the bar pinned to the bottom drifts up with it, loose over a gap. */
+html { overscroll-behavior-y: none; background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--ink); }
 .app { max-width: 640px; margin: 0 auto; padding: max(var(--space-12), env(safe-area-inset-top)) var(--space-16) var(--space-40); display: grid; gap: var(--space-14); }
 .top { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }

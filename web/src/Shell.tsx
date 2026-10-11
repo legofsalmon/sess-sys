@@ -53,10 +53,31 @@ function headingIn(root: HTMLElement | null): { el: HTMLElement; name: string } 
 /** Fields a person types into, as against buttons, ticks and links. */
 const TYPED_INTO = 'input:not([type=button], [type=submit], [type=reset], [type=checkbox], [type=radio], [type=file], [type=range]), textarea, select, [contenteditable]'
 
+/**
+ * True while the phone's keyboard is up or the page is pinched in: the
+ * visible part of the page is then smaller than the page's frame. iOS keeps
+ * a fixed bar on that frame, so it would float loose over the page, half
+ * under the keyboard; the bar steps aside until the keyboard goes, as a
+ * phone's own tab bars do. 120px is more than Safari's own bars shrink by.
+ */
+function useBarAway(): boolean {
+  const [away, setAway] = useState(false)
+  useEffect(() => {
+    const seen = window.visualViewport
+    if (!seen) return
+    const look = () => setAway(document.documentElement.clientHeight - seen.height * seen.scale > 120 || seen.scale > 1.05)
+    look()
+    seen.addEventListener('resize', look)
+    return () => seen.removeEventListener('resize', look)
+  }, [])
+  return away
+}
+
 export function Shell() {
   const auth = useAuth()
   const unkept = useUnkept()
   const persona = usePreview()
+  const barAway = useBarAway()
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
     const on = () => setHash(location.hash)
@@ -122,7 +143,7 @@ export function Shell() {
       <main ref={main}>
         <Screen />
       </main>
-      <nav className="tabs" aria-label="Areas">
+      <nav className="tabs" aria-label="Areas" hidden={barAway}>
         {AREAS.map((a) => (
           <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>
             <AreaIcon area={a.hash} />
