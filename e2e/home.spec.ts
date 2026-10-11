@@ -30,7 +30,7 @@ test('Home is where the app opens, and says how things stand for whoever is look
   await expect(page).toHaveTitle('Home · Session Hire')
 
   const bar = page.getByRole('navigation', { name: 'Areas' })
-  await expect(bar.getByRole('link')).toHaveText(['Home', 'Jobs', 'Stock', /^Crew/, 'Admin'])
+  await expect(bar.getByRole('link')).toHaveText(['Home', 'Jobs', 'Stock', /^Crew/, 'Menu'])
   await expect(bar.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
 
   // The company: today's job, and counts that aren't nothing.
@@ -62,15 +62,27 @@ test('Home is where the app opens, and says how things stand for whoever is look
   await expect(page.getByRole('heading', { name: /^Working this week/ })).toBeVisible()
 })
 
-test('History lives under Admin, with the way back', async ({ browser }) => {
+test('the Menu names every place, and Admin, History and You keep its tab with the way back', async ({ browser }) => {
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await page.goto('/#account')
-  await expect(page.getByRole('heading', { level: 1, name: 'Admin' })).toBeVisible()
-  await page.getByRole('link', { name: /Open the history/ }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'History' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Admin' })).toHaveAttribute('aria-current', 'page')
-  await page.getByRole('link', { name: '‹ Admin' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Admin' })).toBeVisible()
+  await page.goto('/#home')
+  const bar = page.getByRole('navigation', { name: 'Areas' })
+  await bar.getByRole('link', { name: 'Menu' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Menu' })).toBeVisible()
+  const places = page.getByRole('navigation', { name: 'Every place' })
+  for (const group of ['Jobs', 'Stock', 'Crew', 'Company', 'You']) await expect(places.getByRole('group', { name: group })).toBeVisible()
+  await expect(places.getByRole('link', { name: /^Planner/ })).toHaveAttribute('href', '#plan')
+
+  for (const [link, title] of [
+    [/^History/, 'History'],
+    [/^Admin/, 'Admin'],
+    [/^You/, 'You'],
+  ] as const) {
+    await places.getByRole('link', { name: link }).click()
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+    await expect(bar.getByRole('link', { name: 'Menu' })).toHaveAttribute('aria-current', 'page')
+    await page.getByRole('link', { name: '‹ Menu' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Menu' })).toBeVisible()
+  }
 })
 
 test('a long screen names its parts at the top, and a tap goes to one', async ({ browser }) => {

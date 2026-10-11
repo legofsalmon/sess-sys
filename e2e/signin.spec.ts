@@ -82,7 +82,7 @@ test('shows who is signed in, and signing out clears the device', async ({ page 
     return route.fulfill({ json: { ok: true } })
   })
 
-  await page.goto('/#account')
+  await page.goto('/#me')
   await expect(page.getByText('Aoife Byrne')).toBeVisible()
   await expect(page.getByText('aoife@sessionhire.com')).toBeVisible()
   await expect.poll(() => deviceCopy(page)).not.toBeNull()

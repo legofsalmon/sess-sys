@@ -12,9 +12,9 @@ import { strFromU8, unzipSync } from 'fflate'
 
 const unique = () => Math.random().toString(36).slice(2, 8)
 
-/** The end of this device's own code, as the Account tab shows it. */
+/** The end of this device's own code, as You shows it. */
 async function deviceCode(page: Page) {
-  await page.goto('/#account')
+  await page.goto('/#me')
   const text = await page.getByText(/^Device \w{6} ·/).textContent()
   return /^Device (\w{6})/.exec(text ?? '')![1]!
 }
@@ -59,9 +59,9 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   await page.evaluate(() => dispatchEvent(new Event('online')))
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  // The history is kept under Admin (ADR 0033).
-  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Admin' }).click()
-  await page.getByRole('link', { name: 'History' }).click()
+  // The history is in the Menu (ADR 0035).
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Menu' }).click()
+  await page.getByRole('link', { name: /^History/ }).click()
   await expect(page.getByText('Names show once sign-in is on. Until then, changes are grouped by the device they came from.')).toBeVisible()
   // Two hours apart, so not one run: each its own line.
   const added = page.locator('.entry', { hasText: `Saved the place ${van}` })
@@ -133,6 +133,7 @@ test('says the history needs signal', async ({ page }) => {
 
 test('downloads everything in one file, and the download shows in the history', async ({ page }) => {
   const code = await deviceCode(page)
+  await page.goto('/#account')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download everything' }).click()
   const download = await downloading
@@ -146,6 +147,7 @@ test('downloads everything in one file, and the download shows in the history', 
   expect(strFromU8(files['README.txt']!)).toContain('Session Hire: everything, exported')
 
   // From 1,000 rows the count has a comma, as the history writes every number.
-  await page.getByRole('link', { name: 'History' }).click()
+  await page.goto('/#menu')
+  await page.getByRole('link', { name: /^History/ }).click()
   await expect(page.locator('.entry', { hasText: `Chrome on Linux, device ${code}` }).filter({ hasText: /^Downloaded everything \([\d,]+ rows\)/ })).not.toHaveCount(0)
 })

@@ -168,6 +168,7 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app .search { width: 100%; }
 .app .filters { display: flex; gap: var(--space-6); flex-wrap: wrap; }
 .app .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.menu .places { display: grid; gap: var(--space-14); }
 .app .job-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .app .job-row { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .app .job-list li:first-child .job-row { border-top: 0; padding-top: 0; }

@@ -12,8 +12,8 @@ const PATHS: Record<string, string> = {
   '#stock': 'M4 8h16v11H4zM9 8V5.5h6V8M4 13h16M11 13v2h2v-2',
   // Two people.
   '#crew': 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M16 11a2.5 2.5 0 1 0-1-4.8M16.5 14.6c2 .4 3.4 2 3.9 4.9',
-  // Sliders.
-  '#account': 'M5 7h8M17 7h2M5 12h2M11 12h8M5 17h10M19 17h0M15 5v4M9 10v4M17 15v4',
+  // Three lines.
+  '#menu': 'M4.5 7h15M4.5 12h15M4.5 17h15',
 }
 
 export function AreaIcon({ area }: { area: string }) {
