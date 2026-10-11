@@ -90,12 +90,13 @@ under `.app`, and each area adds a class of its own (`crew`, `jobs`,
   own with "‹ All jobs" or "‹ All stock". The other screens stay one
   column on a laptop. Not in Figma yet.
 - The connection badge is always on screen, and anything saved on the phone
-  but not yet on the server says **Waiting to sync**: one amber pill, the
-  same words everywhere, whatever the status under it.
+  but not yet on the server says **Waiting to sync**: one quiet pill with a
+  dashed grey edge, the same words everywhere, whatever the status under it.
 - Every status is the one pill ([audit finding 24](audit-2026-09-30.md)):
   amber when someone has to act (offered, accepted, waiting, to confirm, an
-  enquiry or a quote), green when it's settled (confirmed, booked, filled,
-  approved), grey when it's off (declined, cancelled, retired, offered on a
+  enquiry or a quote), quiet with a grey edge when it's settled (confirmed,
+  booked, filled, approved: healthy is quiet, so the colour is left for what
+  still needs someone), grey when it's off (declined, cancelled, retired, offered on a
   call sheet), and the **bad** tone for a clash in the planner.
 - An empty list says "Nothing here yet." in the hint style, then the
   screen's own line: what to do about it, or where its things come from
@@ -416,3 +417,15 @@ audit (finding 22):
   #6b7684 in dark, 3.6:1), not `line`, which at 1.4:1 let fields dissolve
   in daylight. WCAG asks 3:1 of a control's edge. The same token is on the
   freelancer's pages.
+
+## States
+
+Every press shows at once that it landed, and where a pointer hovers, what
+can be pressed says so first, drawn as the shared design system draws its
+states: a 6% wash on hover and 10% when pressed over a plain button, a step
+darker on a red or burnt-orange one, a word underlined on a row that opens,
+and the same 2px red ring on everything a keyboard reaches. Hover only shows
+on a device with a pointer. Work that takes longer than a second says what
+is working on its button ("Backing up…"); anything quicker shows only the
+press (`web/src/useLate.ts`). Every field's text is 16px, so iOS doesn't zoom
+into it.

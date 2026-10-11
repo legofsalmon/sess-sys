@@ -2,6 +2,7 @@ import type { BackupRun, BackupStatus } from '@sh/shared'
 import { useEffect, useState } from 'react'
 import { markSignedOut } from './auth.ts'
 import { size, when } from './format.ts'
+import { useLate } from './useLate.ts'
 
 /**
  * The nightly backup, as the Account tab shows it: when the last good one
@@ -16,6 +17,7 @@ type Loaded = { state: 'loading' } | { state: 'offline' } | { state: 'ready'; st
 export function BackupsCard() {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
   const [busy, setBusy] = useState(false)
+  const late = useLate(busy)
   const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>()
 
   const refresh = async () => {
@@ -90,8 +92,8 @@ export function BackupsCard() {
           The last try failed{failed.finishedAt ? ` ${when(failed.finishedAt)}` : ''}: {failed.error ?? 'no reason given'}
         </p>
       )}
-      <button type="button" onClick={backUpNow} disabled={busy}>
-        {busy ? 'Backing up…' : 'Back up now'}
+      <button type="button" onClick={backUpNow} disabled={busy} aria-busy={busy}>
+        {late ? 'Backing up…' : 'Back up now'}
       </button>
       {note && (
         <p className={note.ok ? 'hint' : 'alert'} role={note.ok ? 'status' : 'alert'}>

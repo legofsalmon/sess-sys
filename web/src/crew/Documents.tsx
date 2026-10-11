@@ -32,6 +32,7 @@ import { ask } from '../server.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
+import { useLate } from '../useLate.ts'
 
 /**
  * A person's documents on the Crew tab (ADR 0029): on their card, each
@@ -229,6 +230,7 @@ function DocumentForm({ person, doc, onDone }: { person: PersonView; doc?: Docum
   const [f, setF] = useState(doc ? { kind: doc.kind, title: doc.title, expires: doc.runsOut ?? '' } : blank)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const late = useLate(busy)
   const [added, setAdded] = useState('')
   const picker = useRef<HTMLInputElement>(null)
   const { run, error, refuse } = useAct()
@@ -281,8 +283,8 @@ function DocumentForm({ person, doc, onDone }: { person: PersonView; doc?: Docum
         </label>
       )}
       <Refusal error={error} className="wide" />
-      <button type="submit" className={doc ? 'primary' : 'wide'} disabled={busy}>
-        {busy && file ? 'Sending…' : doc ? 'Save' : 'Add document'}
+      <button type="submit" className={doc ? 'primary' : 'wide'} disabled={busy} aria-busy={busy}>
+        {late && file ? 'Sending…' : doc ? 'Save' : 'Add document'}
       </button>
       {doc && (
         <button type="button" onClick={onDone}>
