@@ -68,6 +68,7 @@ const withDefaults = (p: Person): Person => ({
   knownAs: p.knownAs ?? null,
   certificates: p.certificates ?? {},
   company: p.company ?? null,
+  role: p.role ?? null,
 })
 
 export function crewView(
@@ -139,9 +140,17 @@ export function crewView(
           // As the server lays them (ADR 0028).
           certificates: certificatesAfter(was?.certificates, a.certificates),
           company: a.company !== undefined ? a.company : (was?.company ?? null),
+          // Set only by person.role (ADR 0034); a freelancer has none.
+          role: a.kind === 'staff' ? (was?.role ?? null) : null,
           pending: true,
           worked: was?.worked ?? [],
         })
+        break
+      }
+      case 'person.role': {
+        const a = m.args as CommandArgs<'person.role'>
+        const p = people.get(a.id)
+        if (p && p.kind === 'staff') people.set(p.id, { ...p, role: a.role, pending: true })
         break
       }
       case 'person.level': {

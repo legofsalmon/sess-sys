@@ -190,7 +190,7 @@ export function registerStockImportRoutes(app: FastifyInstance, { db, onChange, 
   })
 
   /** The file as the app reads it, against what's in the catalogue. Saves nothing. */
-  app.post('/api/stock/import/preview', { bodyLimit: BODY_LIMIT }, async (req, reply): Promise<StockListReading | void> => {
+  app.post('/api/stock/import/preview', { bodyLimit: BODY_LIMIT, config: { needs: 'settings' } }, async (req, reply): Promise<StockListReading | void> => {
     reply.header('cache-control', 'no-store')
     const parsed = previewBody.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Choose a file first.' })
@@ -214,7 +214,7 @@ export function registerStockImportRoutes(app: FastifyInstance, { db, onChange, 
    * fails: the same file chosen again carries on, since what's in reads as
    * already as the list says.
    */
-  app.post<{ Querystring: { client?: string } }>('/api/stock/import', { bodyLimit: BODY_LIMIT }, async (req, reply): Promise<StockListResult | void> => {
+  app.post<{ Querystring: { client?: string } }>('/api/stock/import', { bodyLimit: BODY_LIMIT, config: { needs: 'settings' } }, async (req, reply): Promise<StockListResult | void> => {
     const started = Date.now()
     reply.header('cache-control', 'no-store')
     const parsed = importBody.safeParse(req.body)

@@ -1,4 +1,4 @@
-import { newId, type EntityName, type Rejection } from '@sh/shared'
+import { newId, type EntityName, type Rejection, type Role } from '@sh/shared'
 import type { Db, Queryable } from './db.ts'
 
 /**
@@ -54,6 +54,12 @@ export interface Ctx {
    * Absent while sign-in is off, when nothing checks who a device is.
    */
   user?: { id: string; email: string }
+  /**
+   * The sender's role once roles are on (ADR 0034); absent while they're
+   * off, on a demo with no persona, and for links and the calendar, where
+   * the person's own link or answer is the permission.
+   */
+  role?: Role
 }
 
 /**

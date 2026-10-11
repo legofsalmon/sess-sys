@@ -164,7 +164,7 @@ export function registerPeopleImportRoutes(app: FastifyInstance, { db, onChange 
   })
 
   /** The file as the app reads it, with who each row would update. Saves nothing. */
-  app.post('/api/people/import/preview', async (req, reply): Promise<CrewListPreview | void> => {
+  app.post('/api/people/import/preview', { config: { needs: 'settings' } }, async (req, reply): Promise<CrewListPreview | void> => {
     reply.header('cache-control', 'no-store')
     const parsed = previewBody.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Choose a file first.' })
@@ -176,7 +176,7 @@ export function registerPeopleImportRoutes(app: FastifyInstance, { db, onChange 
   })
 
   /** Bring the rows in as the office fixed them, all in one go or not at all. */
-  app.post<{ Querystring: { client?: string } }>('/api/people/import', async (req, reply): Promise<CrewListResult | void> => {
+  app.post<{ Querystring: { client?: string } }>('/api/people/import', { config: { needs: 'settings' } }, async (req, reply): Promise<CrewListResult | void> => {
     reply.header('cache-control', 'no-store')
     const parsed = importBody.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: "The rows couldn't be read. Choose the file again." })

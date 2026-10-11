@@ -343,7 +343,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     return { ...span, calendar: read.calendar, account: read.account, events: read.events.map(sourceEvent) }
   }
 
-  app.get('/api/calendar/import/calendars', async (_req, reply): Promise<ImportCalendar[] | void> => {
+  app.get('/api/calendar/import/calendars', { config: { needs: 'settings' } }, async (_req, reply): Promise<ImportCalendar[] | void> => {
     reply.header('cache-control', 'no-store')
     if (!sync) return noKey(reply)
     try {
@@ -354,7 +354,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
   })
 
   /** What the calendar holds as jobs. Saves nothing. */
-  app.post('/api/calendar/import/look', async (req, reply): Promise<ImportPreview | void> => {
+  app.post('/api/calendar/import/look', { config: { needs: 'settings' } }, async (req, reply): Promise<ImportPreview | void> => {
     reply.header('cache-control', 'no-store')
     if (!sync) return noKey(reply)
     const parsed = lookBody.safeParse(req.body)
@@ -366,7 +366,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
   })
 
   /** Bring in what the office ticked: the calendar is read again, and everything is saved in one go. */
-  app.post<{ Querystring: { client?: string } }>('/api/calendar/import/bring', async (req, reply): Promise<ImportResult | void> => {
+  app.post<{ Querystring: { client?: string } }>('/api/calendar/import/bring', { config: { needs: 'settings' } }, async (req, reply): Promise<ImportResult | void> => {
     reply.header('cache-control', 'no-store')
     if (!sync) return noKey(reply)
     const parsed = bringBody.safeParse(req.body)

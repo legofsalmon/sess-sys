@@ -28,7 +28,7 @@ const gráinne: Person = {
   notes: '',
   linkToken: 'abcdefghijklmnopqrstuvwx',
   archived: false,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: 'Video',
   level: 2,
   knownAs: null,

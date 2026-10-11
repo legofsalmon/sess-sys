@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
@@ -21,6 +21,7 @@ type CrewCommand =
   | 'person.upsert'
   | 'person.level'
   | 'person.newLink'
+  | 'person.role'
   | 'person.archive'
   | 'person.contact'
   | 'unavailability.add'
@@ -34,6 +35,12 @@ type CrewCommand =
   | 'offer.cancel'
   | 'offer.seen'
 type Handler<N extends CrewCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
+
+/** Once someone is a director there is always one, so nobody is locked out of roles (ADR 0034). */
+async function keepADirector(ctx: Ctx, leaving: string) {
+  const { rows } = await ctx.tx.query(`SELECT 1 FROM people WHERE role = 'director' AND kind = 'staff' AND NOT archived AND id <> $1 LIMIT 1`, [leaving])
+  if (!rows.length) throw new Refused({ code: 'conflict', message: 'There has to be at least one director. Make someone else a director first.' })
+}
 
 /** Answers that end an offer for good: the person can be offered the same call afresh. */
 const OVER: readonly Offer['status'][] = ['declined', 'filled', 'cancelled', 'pulled-out']
@@ -239,6 +246,11 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     // and one that says nothing about the profile (ADR 0025) keeps that as it is too.
     const was = await getPerson(ctx.tx, a.id)
     const approvesLeave = a.kind === 'staff' ? (a.approvesLeave ?? was?.approvesLeave ?? false) : false
+    // Who approves time off is a permission, so once roles are on only a director sets it (ADR 0034).
+    if (ctx.role && !roleCan(ctx.role, 'company') && approvesLeave !== (was?.approvesLeave ?? false))
+      throw new Refused({ code: 'forbidden', message: `Only directors can say who approves time off. Your role is ${ROLE_LABELS[ctx.role]}.` })
+    // A freelancer has no role, so someone made a freelancer loses theirs; the last director can't be.
+    if (a.kind !== 'staff' && was?.role === 'director') await keepADirector(ctx, a.id)
     const department = a.department !== undefined ? a.department : (was?.department ?? null)
     const level = a.level ?? was?.level ?? DEFAULT_LEVEL
     const knownAs = a.knownAs !== undefined ? a.knownAs : (was?.knownAs ?? null)
@@ -286,6 +298,16 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
 
+  async 'person.role'(ctx, a) {
+    const person = await getPerson(ctx.tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (person.kind !== 'staff') throw new Refused({ code: 'conflict', message: `${person.name} is a freelancer. Only staff have a role; freelancers use their link.` })
+    if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to change their role.` })
+    if (person.role === 'director' && a.role !== 'director') await keepADirector(ctx, a.id)
+    await ctx.tx.query('UPDATE people SET role = $2 WHERE id = $1', [a.id, a.role])
+    await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
+  },
+
   async 'person.newLink'(ctx, a) {
     const { rows } = await ctx.tx.query('UPDATE people SET link_token = $2 WHERE id = $1 RETURNING id', [a.id, newLinkToken()])
     if (!rows.length) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
@@ -297,6 +319,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (person.archived === a.archived) return
     if (a.archived) {
+      // Archiving the last director would switch roles off for everyone (ADR 0034).
+      if (person.role === 'director' && person.kind === 'staff') await keepADirector(ctx, person.id)
       // Nothing is left hanging: an offer waiting on them, or days they hold from today on, is settled first.
       const hold = await holdsFrom(ctx.tx, person.id, irishToday())
       if (hold) {

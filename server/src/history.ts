@@ -31,6 +31,7 @@ import {
 } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
+import { ROLE_LABELS, roleWords, type Role } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -384,6 +385,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'person.level':
       // An erased person's level went with the rest of their details (ADR 0027).
       return `Moved ${person(a.id)} to ${typeof a.level === 'number' ? levelLabel(a.level) : 'another level'}`
+    case 'person.role':
+      return `Made ${person(a.id)} ${typeof a.role === 'string' && a.role in ROLE_LABELS ? roleWords(a.role as Role) : 'another role'}`
     case 'person.newLink':
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':

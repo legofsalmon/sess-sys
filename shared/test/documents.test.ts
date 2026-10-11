@@ -44,7 +44,7 @@ const person = (id: string, name: string, certificates: Person['certificates'] =
   notes: '',
   linkToken: 'abcdefghijklmnopqrstuvwx',
   archived,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: null,
   level: 2,
   knownAs: null,

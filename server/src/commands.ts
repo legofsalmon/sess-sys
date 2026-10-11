@@ -1,6 +1,10 @@
 import {
   cleanText,
+  COMMAND_NEEDS,
   commandSchemas,
+  refusalFor,
+  roleMayRun,
+  type Role,
   type CommandArgs,
   type CommandName,
   type Mutation,
@@ -67,6 +71,12 @@ export interface From {
   userId?: string
   /** The same account with its email, for the handlers that check who is asking (ADR 0024). */
   user?: { id: string; email: string }
+  /**
+   * What the sender may change (ADR 0034): their role once roles are on, or
+   * the persona chosen on a demo. Absent while roles are off, and for links
+   * and the calendar, so nothing is checked.
+   */
+  role?: Role
   /** When the device sent it, by the device's own clock. */
   sentAt?: string
   /** The kind of device, such as "Safari on iPhone". */
@@ -94,7 +104,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // included: a resend gets the same answer anyway, and the rest of the push carries on.
   if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
 
-  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app', ...(from.user ? { user: from.user } : {}) }
+  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app', ...(from.user ? { user: from.user } : {}), ...(from.role ? { role: from.role } : {}) }
   let result: MutationResult
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
@@ -107,7 +117,10 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(stored), timestampOrNull(m.createdAt), from.sentAt ?? null, from.device ?? null]
   )
   const parsed = commandSchemas[m.name].safeParse(m.args)
-  if (!parsed.success) {
+  // A role that can't make this kind of change is told so, whatever is in it (ADR 0034).
+  if (from.role && !roleMayRun(from.role, m.name)) {
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
+  } else if (!parsed.success) {
     result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
   } else {
     try {

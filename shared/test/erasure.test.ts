@@ -35,7 +35,7 @@ const ciara: Person = {
   notes: 'Allergic to nuts',
   linkToken: 'abcdefghijklmnopqrstuvwx',
   archived: true,
-  approvesLeave: false,
+  approvesLeave: false, role: null,
   department: 'Rope access',
   level: 3,
   knownAs: 'Kiki B',
