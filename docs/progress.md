@@ -20,6 +20,8 @@ waiting on someone.
 - The header is the Session Hire mark and name. On the demo, "Seeing it as
   Director" sits under it, the name a link back to choosing someone else,
   in place of the black bar.
+- Home is the page's title, with today's date at the top right of the
+  header.
 - Checked: typecheck, unit tests, the full end-to-end suite with a new
   test for the sidebar and the theme, and the demo in a browser on a
   phone, a 1024px tablet and a 1440px desk, dark and light.

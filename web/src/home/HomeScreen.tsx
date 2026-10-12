@@ -64,11 +64,9 @@ export function HomeScreen() {
 
   return (
     <div className="app home">
-      <Top view={view} title="Home" root />
-      <p className="home-day">
-        {dayLabel(today)}
-        {me && ` · Hello, ${firstName(me)}`}
-      </p>
+      {/* Today's date top right, so Home is the page's one title (Colly, 12 October 2026). */}
+      <Top view={view} title="Home" root aside={<span className="top-date">{dayLabel(today)}</span>} />
+      {me && <p className="home-day">Hello, {firstName(me)}</p>}
 
       <div className="views home-for" role="group" aria-label="Show for">
         {FOR.map(([f, label]) => (

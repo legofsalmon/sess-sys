@@ -32,9 +32,10 @@ export function useHash(): string {
  * eyes it's seen through instead, the name taking you back to choose
  * again. On an area's own screen (`root`) the area's name follows as the
  * screen's title, so Jobs, Stock and Crew read as different places; a
- * record's page has its own title instead.
+ * record's page has its own title instead. `aside` goes top right, before
+ * the sync state: Home's date.
  */
-export function Top({ view, title = 'Jobs', root = false }: { view: View; title?: string; root?: boolean }) {
+export function Top({ view, title = 'Jobs', root = false, aside }: { view: View; title?: string; root?: boolean; aside?: ReactNode }) {
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
   const seenAs = useSeenAs()
@@ -62,6 +63,7 @@ export function Top({ view, title = 'Jobs', root = false }: { view: View; title?
           </span>
         </div>
         <div className="state">
+          {aside}
           {notDone.count}
           <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
             {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}

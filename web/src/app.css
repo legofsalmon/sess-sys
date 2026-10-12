@@ -102,6 +102,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 /* Changes on their way: nobody has to act, so quiet grey and dashed, never amber. */
 .conn.syncing { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
 .conn.offline { background: var(--ink); color: var(--bg); }
+/* Home's date, top right: plain words, the most specific thing a glance at the header wants after the company (ADR 0036). */
+.top .top-date { font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
+/* On a narrow phone the company's name needs the room: beside the date, "Up to date" goes quiet to the eye (still said to a screen reader); waiting and no signal still show. */
+@media (max-width: 479px) {
+  .top .top-date ~ .conn.online { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 .top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-6); }
 /* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
 .top .not-done { min-height: 0; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }

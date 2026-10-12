@@ -44,6 +44,11 @@ bar on desk too).
    screen. Under it is the area on the live app and, on the demo, "Seeing
    it as Director", the persona's name in the red (which means "you") and
    a link back to the chooser. The black bar is gone.
+5. **Home is the page's one title, and today's date is top right** in the
+   header (Colly, 12 October 2026), with "Hello, <name>" left under the
+   title. On a phone narrower than 480px the date takes the room "Up to
+   date" had, which stays for a screen reader; waiting and no signal still
+   show.
 
 ## Consequences
 
