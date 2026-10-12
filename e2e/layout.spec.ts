@@ -363,3 +363,35 @@ test('on a phone the page stops at its end and the bar steps aside while the pag
   await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
   await expect(bar).toBeVisible()
 })
+
+test('on a laptop the places are down the left, and the app opens dark with light a press away, kept on the device', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: laptopSize, colorScheme: 'light' })
+  const page = await context.newPage()
+  await page.goto('/#crew')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+
+  // A sidebar down the left, a picture beside each word, rather than a bar along the bottom (ADR 0036).
+  const places = page.getByRole('navigation', { name: 'Areas' })
+  const box = (await places.boundingBox())!
+  expect(box.x).toBe(0)
+  expect(box.height).toBe(laptopSize.height)
+  await expect(places.getByRole('link', { name: 'Crew' })).toHaveAttribute('aria-current', 'page')
+
+  // Dark, though the computer is set to light: the design system's default.
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme)
+  expect(await theme()).toBe('dark')
+  await page.getByRole('button', { name: 'Switch to light' }).click()
+  expect(await theme()).toBe('light')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Switch to dark' })).toBeVisible()
+  expect(await theme()).toBe('light')
+
+  // You offers the same, and following the device's own setting.
+  await page.goto('/#me')
+  await page.getByRole('radio', { name: /Match this device/ }).check()
+  expect(await theme()).toBe('auto')
+  await expect(page.getByRole('button', { name: 'Switch to dark' })).toBeVisible()
+  await page.getByRole('radio', { name: /^Dark/ }).check()
+  expect(await theme()).toBe('dark')
+  await context.close()
+})

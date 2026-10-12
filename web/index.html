@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-IE" data-theme="auto">
+<html lang="en-IE" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -7,6 +7,13 @@
     <link rel="icon" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Session Hire</title>
+    <!-- Dark unless this device chose light or to match the phone (web/src/theme.ts), set before anything is drawn so it never flicks over. -->
+    <script>
+      try {
+        var kept = localStorage.getItem('sh.theme')
+        if (kept === 'light' || kept === 'auto') document.documentElement.dataset.theme = kept
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

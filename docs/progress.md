@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 12 October 2026: a desk layout, a sidebar, and dark by default
+
+**Done**
+
+- Colly asked for better use of a desk's width, the bottom bar as a
+  sidebar there, a dark theme by default with a toggle top right, and the
+  header to be the company with "seeing it as Director" under it
+  ([Decision 0036](adr/0036-desk-layout-sidebar-and-dark-by-default.md)).
+- From 900px across, Home, Jobs, Stock, Crew and Menu are a sidebar down
+  the left; a phone keeps the bar along the bottom. From 1200px a screen's
+  cards stand two across, and the Menu's groups too.
+- The app opens dark. The sun or moon at the right of every header
+  switches to light, and You has the same with "match this device's
+  setting"; the choice stays on that device.
+- The header is the Session Hire mark and name. On the demo, "Seeing it as
+  Director" sits under it, the name a link back to choosing someone else,
+  in place of the black bar.
+- Checked: typecheck, unit tests, the full end-to-end suite with a new
+  test for the sidebar and the theme, and the demo in a browser on a
+  phone, a 1024px tablet and a 1440px desk, dark and light.
+
 ## 11 October 2026: roles, and what each can change
 
 **Done**

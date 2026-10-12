@@ -1,14 +1,16 @@
 import type { PersonView, View } from '@sh/shared'
 import { useEffect, useState } from 'react'
+import { useAuth } from '../auth.ts'
 import { chooseMe } from '../crew/Leave.tsx'
+import { ThemeButton } from '../ThemeButton.tsx'
 import { useView } from '../view.ts'
 import { saveHomeFor, type Saved } from './HomeScreen.tsx'
 
 /**
  * The demo copy's way in (ADR 0033): before the app, a choice of whose
- * eyes to see it through, from the personas in docs/personas.md, and a bar
- * on every screen after it saying whose they are, with the way back to
- * choose again. Only on the passcode-locked demo, which holds made-up data
+ * eyes to see it through, from the personas in docs/personas.md, and a line
+ * under the company's name on every screen after it saying whose they are,
+ * the name the way back to choose again (ADR 0036). Only on the passcode-locked demo, which holds made-up data
  * (ADR 0019): the live app has no such screen. Choosing one sets where the
  * app starts, how Home is shown and, where it matters, who "me" is, and
  * since roles (ADR 0034) it is the role that person has: the server holds
@@ -154,12 +156,15 @@ export function PreviewSplash() {
           <span className="mark">SH</span>
           <span>
             <b>Session Hire</b>
-            <small>Demo with made-up data</small>
+            <small className="where">Demo with made-up data</small>
           </span>
+        </div>
+        <div className="state">
+          <ThemeButton />
         </div>
       </header>
       <h1 className="area-title">See it as…</h1>
-      <p className="hint">Pick who you are, and the app opens where that person would start. A bar at the top takes you back here to choose someone else.</p>
+      <p className="hint">Pick who you are, and the app opens where that person would start. Their name, under Session Hire at the top, brings you back here to choose someone else.</p>
       <ul className="personas">
         {PERSONAS.map((p) => (
           <li key={p.key}>
@@ -178,24 +183,20 @@ export function PreviewSplash() {
   )
 }
 
-/** On every screen once a persona is chosen: whose eyes, and the way back to choose again. */
-export function PreviewBar({ persona }: { persona: Persona }) {
-  // Said again as the app opens, so a browser that chose before roles came in, or offline, is held to it too.
-  useEffect(() => tellServer(persona.key), [persona.key])
-  return (
-    <div className="preview-bar" role="note">
-      <span>
-        Seeing it as <b>{persona.name}</b>
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          set('')
-          location.hash = '#preview'
-        }}
-      >
-        Choose someone else
-      </button>
-    </div>
-  )
+/**
+ * Whose eyes the demo is seen through, for the header under the company's
+ * name (ADR 0036): only on the demo copy, and once someone is chosen.
+ */
+export function useSeenAs(): Persona | undefined {
+  const auth = useAuth()
+  const persona = usePreview()
+  return auth.status === 'open' && auth.passcode === true ? persona : undefined
+}
+
+/** Said again as the app opens, so a browser that chose before roles came in, or offline, is held to it too. */
+export function useHoldPersona(persona: Persona | undefined) {
+  const key = persona?.key
+  useEffect(() => {
+    if (key) tellServer(key)
+  }, [key])
 }

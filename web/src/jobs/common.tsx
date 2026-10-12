@@ -1,9 +1,11 @@
 import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueView, type View } from '@sh/shared'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useSeenAs } from '../home/Preview.tsx'
 import { useNotDone } from '../problems.tsx'
 import { OnThisScreen } from '../OnThisScreen.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { ThemeButton } from '../ThemeButton.tsx'
 
 /** What the Jobs screens share, and Stock and Crew too: the header, a record's page, and picking or adding a client or venue by name. */
 
@@ -24,14 +26,18 @@ export function useHash(): string {
  * the two stick to the top as one block and the list never covers the bar.
  */
 /**
- * The bar at the top of every screen: the app, the area and the sync state,
- * and the parts of the screen under it (ADR 0033). On an area's own screen
- * (`root`) the area's name follows as the screen's title, so Jobs, Stock and
- * Crew read as different places; a record's page has its own title instead.
+ * The bar at the top of every screen: the company's mark and name, the
+ * sync state and dark or light (ADR 0036), and the parts of the screen
+ * under it (ADR 0033). Under the name, the area; on the demo copy, whose
+ * eyes it's seen through instead, the name taking you back to choose
+ * again. On an area's own screen (`root`) the area's name follows as the
+ * screen's title, so Jobs, Stock and Crew read as different places; a
+ * record's page has its own title instead.
  */
 export function Top({ view, title = 'Jobs', root = false }: { view: View; title?: string; root?: boolean }) {
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
+  const seenAs = useSeenAs()
   return (
     <>
       <header className="top">
@@ -39,10 +45,20 @@ export function Top({ view, title = 'Jobs', root = false }: { view: View; title?
           <span className="mark">SH</span>
           <span>
             <b>Session Hire</b>
-            <small>
-              {title}
-              <MadeUp view={view} />
-            </small>
+            {seenAs ? (
+              <small className="seen-as">
+                Seeing it as{' '}
+                <a href="#preview" aria-label={`${seenAs.name}: choose someone else`}>
+                  {seenAs.name}
+                </a>
+                <MadeUp view={view} />
+              </small>
+            ) : (
+              <small className="where">
+                {title}
+                <MadeUp view={view} />
+              </small>
+            )}
           </span>
         </div>
         <div className="state">
@@ -50,6 +66,7 @@ export function Top({ view, title = 'Jobs', root = false }: { view: View; title?
           <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
             {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}
           </span>
+          <ThemeButton />
         </div>
         {notDone.list}
         <OnThisScreen />
