@@ -8,13 +8,14 @@ import { useAccess } from './role.ts'
 import { forgetCountDraft } from './stock/Counts.tsx'
 import { client, storage } from './sync.ts'
 import { tabRole } from './tabs.ts'
+import { setTheme, useTheme, type Theme } from './theme.ts'
 import { useLate } from './useLate.ts'
 import { useView } from './view.ts'
 
 /**
  * You (#me): what's this person's own rather than the company's. Their
  * role (ADR 0034), who this device is signed in as and signing out, their own bookings' calendar
- * feed, and the device's own sync state. Reached from the Menu; the
+ * feed, dark or light (ADR 0036), and the device's own sync state. Reached from the Menu; the
  * company's settings stay under Admin.
  */
 export function YouScreen() {
@@ -110,6 +111,8 @@ export function YouScreen() {
 
       {auth.status === 'signed-in' && <FeedCard view={view} email={auth.user.email} />}
 
+      <ThemeCard />
+
       <section className="card">
         <h2>This device</h2>
         <p className="hint">
@@ -170,6 +173,34 @@ function RoleCard() {
           ? 'You give everyone else their role on their person on the Crew tab.'
           : 'A director can change your role on your person on the Crew tab.'}
       </p>
+    </section>
+  )
+}
+
+const THEMES: readonly { theme: Theme; name: string; line: string }[] = [
+  { theme: 'dark', name: 'Dark', line: 'Easier on the eyes in a dark venue or van.' },
+  { theme: 'light', name: 'Light', line: 'Easier to read in daylight and the office.' },
+  { theme: 'auto', name: "Match this device's setting", line: 'Dark or light as the phone or computer is set.' },
+]
+
+/** Dark or light for this device (ADR 0036): the same as the button top right, with following the device's own setting as well. */
+function ThemeCard() {
+  const { theme } = useTheme()
+  return (
+    <section className="card">
+      <h2>Dark or light</h2>
+      <div className="choices" role="radiogroup" aria-label="Dark or light">
+        {THEMES.map((t) => (
+          <label key={t.theme} className="signal">
+            <input type="radio" name="theme" value={t.theme} checked={theme === t.theme} onChange={() => setTheme(t.theme)} />
+            <span>
+              <b>{t.name}</b>
+              <small>{t.line}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="hint">Kept on this device only. The button top right on every screen switches between the two.</p>
     </section>
   )
 }

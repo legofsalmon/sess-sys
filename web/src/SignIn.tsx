@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { enterPasscode, signInProblem, signInUrl, useAuth } from './auth.ts'
 import { client } from './sync.ts'
+import { ThemeButton } from './ThemeButton.tsx'
 
 const PROBLEMS = {
   denied: "That Google account isn't set up for Session Hire. Use your sessionhire.com account, or ask the office to add you.",
@@ -36,8 +37,11 @@ export function SignIn() {
           <span className="mark">SH</span>
           <span>
             <b>Session Hire</b>
-            <small>Staff sign-in</small>
+            <small className="where">Staff sign-in</small>
           </span>
+        </div>
+        <div className="state">
+          <ThemeButton />
         </div>
       </header>
       <section className="card">

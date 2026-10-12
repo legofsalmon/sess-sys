@@ -6,7 +6,7 @@ import { CrewScreen } from './crew/CrewScreen.tsx'
 import { HistoryScreen } from './HistoryScreen.tsx'
 import { HomeScreen } from './home/HomeScreen.tsx'
 import { AreaIcon } from './home/icons.tsx'
-import { PreviewBar, PreviewSplash, usePreview } from './home/Preview.tsx'
+import { PreviewSplash, useHoldPersona, usePreview } from './home/Preview.tsx'
 // Holds every change to the person's role (ADR 0034).
 import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
@@ -55,7 +55,7 @@ function headingIn(root: HTMLElement | null): { el: HTMLElement; name: string } 
   if (!root) return undefined
   const h1 = [...root.querySelectorAll<HTMLElement>('h1')].find((h) => h.getClientRects().length > 0)
   if (h1) return { el: h1, name: h1.textContent?.trim() ?? '' }
-  const name = root.querySelector<HTMLElement>('.top .brand small')
+  const name = root.querySelector<HTMLElement>('.top .brand .where')
   // The name is the first words; "· made-up data" (ADR 0019) sits beside it in a span of its own.
   if (name) return { el: name, name: name.firstChild?.textContent?.trim() ?? '' }
   return undefined
@@ -77,10 +77,16 @@ function useBarAway(): boolean {
   useEffect(() => {
     const seen = window.visualViewport
     if (!seen) return
-    const look = () => setAway(document.documentElement.clientHeight - seen.height * seen.scale > 120 || seen.scale > 1.05)
+    // From 900px across the places are a sidebar (ADR 0036), down the side rather than under the keyboard, so they stay.
+    const wide = matchMedia('(min-width: 900px)')
+    const look = () => setAway(!wide.matches && (document.documentElement.clientHeight - seen.height * seen.scale > 120 || seen.scale > 1.05))
     look()
     seen.addEventListener('resize', look)
-    return () => seen.removeEventListener('resize', look)
+    wide.addEventListener('change', look)
+    return () => {
+      seen.removeEventListener('resize', look)
+      wide.removeEventListener('change', look)
+    }
   }, [])
   return away
 }
@@ -90,6 +96,9 @@ export function Shell() {
   const unkept = useUnkept()
   const persona = usePreview()
   const barAway = useBarAway()
+  // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and the header says whose they are.
+  const demo = auth.status === 'open' && auth.passcode === true
+  useHoldPersona(demo ? persona : undefined)
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
     const on = () => setHash(location.hash)
@@ -142,8 +151,6 @@ export function Shell() {
         </main>
       </>
     )
-  // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and comes back to it from the bar.
-  const demo = auth.status === 'open' && auth.passcode === true
   if (demo && (!persona || persona.key === 'freelancer' || hash === '#preview'))
     return (
       <>
@@ -157,7 +164,6 @@ export function Shell() {
     <>
       <UpdateBar unkept={unkept} />
       <StorageBanner />
-      {demo && persona && <PreviewBar persona={persona} />}
       <main ref={main}>
         <Screen />
       </main>

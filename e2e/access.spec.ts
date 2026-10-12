@@ -234,12 +234,14 @@ test('every field on every screen has a name, and the not-done list is a live re
   await expect(page.getByRole('heading', { name: 'Harbour Lights Festival' })).toBeVisible()
   expect(await unnamedFields(page), 'a job').toEqual([])
 
-  // On a 320px phone the empty live region leaves the sync pill on the top bar's one line.
+  // On a 320px phone the empty live region leaves the sync pill on the top bar's one line, beside dark or light (ADR 0036).
   const narrow = await (await browser.newContext({ viewport: { width: 320, height: 640 } })).newPage()
   await narrow.goto('/#crew')
   await expect(narrow.getByRole('status')).toHaveText('Up to date')
-  const [row, pill] = await narrow.locator('.top .state').evaluate((el) => [el.getBoundingClientRect().height, el.querySelector('.conn')!.getBoundingClientRect().height])
-  expect(row).toBe(pill)
+  const [row, pill, theme] = await narrow
+    .locator('.top .state')
+    .evaluate((el) => [el, el.querySelector('.conn')!, el.querySelector('.theme-button')!].map((e) => e.getBoundingClientRect().height))
+  expect(row).toBe(Math.max(pill!, theme!))
 
   // A refusal from the server is counted and listed where a screen reader is told of it.
   await page.goto('/#crew')

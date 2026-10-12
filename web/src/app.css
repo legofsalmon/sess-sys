@@ -4,7 +4,8 @@
  * Colours come from the shared design system (shared/src/ds/tokens.css,
  * vendored by `npm run ds:sync`; never edit the copy), pointed at by Session
  * Hire's own names so the rest of the stylesheets read as they always have.
- * index.html sets data-theme="auto", so the theme still follows the phone.
+ * index.html sets data-theme="dark", the system's default, unless this
+ * device chose "light" or "auto", which follows the phone (theme.ts, ADR 0036).
  *
  * Two are Session Hire's own, not shared roles (Colly's call, 9 October 2026):
  * the red accent, which marks the one thing to do next, the current tab,
@@ -67,8 +68,9 @@
   --text-footer: .75rem;
   font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
+:root[data-theme='dark'] { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
 @media (prefers-color-scheme: dark) {
-  :root { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
+  :root[data-theme='auto'] { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
 }
 * { box-sizing: border-box; }
 /* The page stops at its end: iOS otherwise lets it be dragged on past the last card, and the bar pinned to the bottom drifts up with it, loose over a gap. */
@@ -89,6 +91,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
 .brand small, label small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .brand .made-up { color: var(--warn); font-weight: 600; }
+/* On the demo, whose eyes it's seen through, under the company's name (ADR 0036): the name in the accent, which means "you", and pressing it chooses again. */
+.brand .seen-as a { color: var(--accent-ink); font-weight: 700; text-underline-offset: 2px; padding-block: var(--space-12); margin-block: calc(-1 * var(--space-12)); }
+/* Dark or light, top right (ThemeButton.tsx): a picture, its words for a screen reader and a pointer's hover. */
+.theme-button { flex: none; display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
 .mark { flex: none; width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
 .conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
 /* Up to date is healthy, so it's quiet (the design system's "healthy is quiet"): muted words with no bubble round them. Only what's waiting or a lost signal gets a pill. */
@@ -96,6 +102,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 /* Changes on their way: nobody has to act, so quiet grey and dashed, never amber. */
 .conn.syncing { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
 .conn.offline { background: var(--ink); color: var(--bg); }
+/* Home's date, top right: plain words, the most specific thing a glance at the header wants after the company (ADR 0036). */
+.top .top-date { font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
+/* On a narrow phone the company's name needs the room: beside the date, "Up to date" goes quiet to the eye (still said to a screen reader); waiting and no signal still show. */
+@media (max-width: 479px) {
+  .top .top-date ~ .conn.online { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 .top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-6); }
 /* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
 .top .not-done { min-height: 0; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
@@ -256,12 +268,29 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .history .run > .entries { margin-left: .4em; padding-left: var(--space-12); border-left: 2px solid var(--line); }
 .history .older { display: grid; gap: var(--space-10); justify-items: start; }
 
+/*
+ * A desk's width (ADR 0036): from 900px the places are a sidebar (crew.css) and a screen's cards stand two
+ * across from 1200px, in the order they come, each pair as tall as the taller; the bar, titles, ways back,
+ * filters and anything that isn't a card keep the full width. History reads down the days, so stays one.
+ */
+@media (min-width: 900px) {
+  .app { max-width: 760px; }
+}
+@media (min-width: 1200px) {
+  .app:not(.beside, .plan, .history, .signin, .preview) { max-width: 1200px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .app:not(.beside, .plan, .history, .signin, .preview) > :not(.card) { grid-column: 1 / -1; }
+  .menu .places { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+
 /* Two columns on a laptop (audit finding 25, Beside in jobs/common.tsx): the list down the left, kept in reach as the record beside it scrolls. Below 960px nothing changes: the list and the record are separate pages. */
 .app.beside { max-width: 1400px; }
 .app.beside .columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--space-16); align-items: start; }
 .app.beside .column { display: grid; gap: var(--space-14); min-width: 0; }
-/* 64px is the top bar's height and 80px the tab bar's with a margin, so the whole list scrolls between the two. */
+/* 64px is the top bar's height and 80px the tab bar's with a margin, so the whole list scrolls between the two; with the sidebar there's no bar under it. */
 .app.beside .column.list { position: sticky; top: 64px; max-height: calc(100vh - 64px - 80px); overflow: auto; }
+@media (min-width: 900px) {
+  .app.beside .column.list { max-height: calc(100vh - 64px - var(--space-16)); }
+}
 .app.beside .job-row[aria-current='page'] { box-shadow: inset 3px 0 0 var(--accent); padding-left: var(--space-10); }
 
 /*
