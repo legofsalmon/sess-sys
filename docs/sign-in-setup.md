@@ -8,7 +8,13 @@ calendar then takes a minute in the app (step 4). Crew invites on the
 calendar ([Decision 0009](adr/0009-crew-invites.md)) are built too, behind a
 switch that starts off (step 5), and so is bringing in the jobs already on
 the organisers' calendars ([Decision 0011](adr/0011-calendar-import.md),
-step 6).
+step 6). Once you're in, step 7 clears the made-up data before real work goes in,
+and step 8 switches roles on.
+
+The app has moved around since these steps were first written: what was the
+Account tab is now **Admin**, and your own name, signing out and roles are on
+**You**. Both are in the **Menu**, the last place in the bar (or the
+sidebar on a desk).
 
 **Before you start:** the secret you create is a password for the app.
 Paste it only into Railway, never into a chat or an email.
@@ -16,7 +22,9 @@ Paste it only into Railway, never into a chat or an email.
 ## 1. Make the Google key
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com),
-   signed in with your **sessionhire.com** Google account if you have one.
+   signed in with your **sessionhire.com** Google Workspace account. Using
+   the Workspace account matters: it puts the project under the company, so
+   step 3 can make the app Internal.
 2. In the project picker at the top, choose **New project**, call it
    **Session Hire**, and create it. Make sure it's selected afterwards.
 3. Search for **Google Auth Platform** and open it, then **Get started**:
@@ -30,7 +38,7 @@ Paste it only into Railway, never into a chat or an email.
      person who should be able to sign in, and the account that will write
      the calendar, under **Audience**, **Test users**. Sign-in works the
      same, but while the app is in testing Google makes the calendar
-     connection lapse after seven days, and the Account tab then asks for
+     connection lapse after seven days, and Admin then asks for
      it to be connected again.
 4. Go to **Clients**, **Create client**:
    - Application type **Web application**, name **Session Hire app**.
@@ -54,9 +62,15 @@ In Railway, open the **shserver** service, then **Variables**, and add:
 |---|---|
 | `GOOGLE_CLIENT_ID` | The Client ID from step 1 |
 | `GOOGLE_CLIENT_SECRET` | The Client secret from step 1 |
+| `STAFF_DOMAINS` | Only if the Workspace's address isn't sessionhire.com: the domain your company accounts end in. Leave it out otherwise |
 | `STAFF_EMAILS` | Only if people outside sessionhire.com should sign in (for example a tester): their Google addresses, separated by commas |
 
 Railway then asks to deploy the change; let it.
+
+Add these to the **shserver** service only. The demo copy (the **demo**
+service) keeps its passcode and no Google key: once a server has the Google
+key, it ignores its passcode and only company accounts get in, so the demo
+would be closed to the people it's for.
 
 ## 3. Check it
 
@@ -67,7 +81,7 @@ Railway then asks to deploy the change; let it.
    **Cmd+K** (Mac) or **Ctrl+K** (Windows), type **Deploy Latest Commit**
    and choose it.
 2. Open the app. It shows **Sign in**; tap **Sign in with Google** and pick
-   your account. You land back in the app, and the **Account** tab shows
+   your account. You land back in the app, and **You** (in the Menu) shows
    your name.
 3. On an iPhone, sign in from the home-screen app itself, not Safari: the
    two keep separate cookies.
@@ -83,7 +97,8 @@ a sessionhire.com Workspace account and isn't in `STAFF_EMAILS`.
    today. For a first try, use your test calendar. If it belongs to a
    different account from the one connecting, share it with that account
    in Google Calendar first, with **Make changes to events**.
-2. In the app, open the **Account** tab and tap **Connect Google Calendar**.
+2. In the app, open the **Menu**, then **Admin**, and tap **Connect Google
+   Calendar**.
    Pick the account and allow both things Google asks: seeing the list of
    calendars, and changing events.
 3. Back in the app, pick the calendar and tap **Use this calendar**. Within
@@ -92,14 +107,14 @@ a sessionhire.com Workspace account and isn't in `STAFF_EMAILS`.
    calendar.
 4. Try it: rename a job or move a phase, and the calendar follows within
    seconds. Change or delete one of the app's events in Google Calendar,
-   then tap **Check the calendar** on the Account tab: it is put back (each night
+   then tap **Check the calendar** on Admin: it is put back (each night
    this happens by itself).
 
-**Change calendar** on the Account tab moves the app's days from today on
+**Change calendar** on Admin moves the app's days from today on
 to another calendar; **Disconnect** takes them off and hands the app's
 access back to Google. Days before today stay where they are in both cases.
 
-If the Account tab says the Google Calendar API is switched off, do step
+If Admin says the Google Calendar API is switched off, do step
 1.5, then tap **Check the calendar**.
 
 ## 5. Crew invites: try them on the test calendar first
@@ -115,7 +130,7 @@ before using it for real:
    week and ask for crew for it.
 2. In the **Crew** tab, add two or three people from the office as
    freelancers, with their own email addresses, and offer them the job.
-3. On the **Account** tab, under **Crew invites**, tap **Turn on crew
+3. On **Admin**, under **Crew invites**, tap **Turn on crew
    invites**. It first says how many invites go out and who has no email
    address; tap OK.
 4. Each person gets Google's invite email, and the days appear in their
@@ -134,7 +149,8 @@ writes to that calendar and never emails anyone, so it is safe to try on
 the organisers' own calendars.
 
 1. With a calendar connected (step 4), open the **Jobs** tab and tap
-   **Bring them in** (it is on the Account tab too).
+   **Bring them in** (it is on Admin too, and in the Menu as **Bring in from Google
+   Calendar**).
 2. Pick the calendar. The connected account's own is first. For another
    organiser's, they share theirs with that account first: in Google
    Calendar, the calendar's **Settings and sharing**, **Share with specific
@@ -174,11 +190,42 @@ Worth knowing before turning it on for **Session Hire Gigs**:
 - Disconnecting the calendar turns invites off, and the crew invited are
   told their days are cancelled.
 
+## 7. Clear the made-up data
+
+Everything in the app so far is made up, and every screen says so beside its
+name. Trying the calendar, invites and bringing jobs in (steps 4 to 6) on
+the made-up data is fine. When the office is ready to put real work in:
+
+1. On **Admin**, tap **Disconnect** on the Google Calendar card. Start fresh
+   won't run while a calendar is connected, so the made-up jobs' days come
+   off it first.
+2. Still on **Admin**, tap **Start fresh** and type the words it asks for
+   ([Decision 0019](adr/0019-made-up-data-and-starting-fresh.md)). It
+   deletes every job, person, product and the history, on the server and
+   on every device, and can't be undone. Who can sign in is kept, so nobody
+   signs in again.
+3. Connect the real calendar (step 4), and bring in the jobs already on the
+   organisers' calendars (step 6).
+
+## 8. Switch roles on
+
+Until someone is made a director, everyone signed in can change everything
+([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Roles live
+on the people on the Crew tab, so Start fresh clears them: do this after
+step 7, before the rest of the office signs in.
+
+1. On the **Crew** tab, add each member of staff as staff, with the Google
+   address they sign in with. Anyone signed in whose address isn't on a
+   person counts as staff crew.
+2. Signed in yourself, open **You** and tap **Switch roles on**. You become
+   the director.
+3. On the **Crew** tab, give the office, heads of department and warehouse
+   their roles on their own person.
+
 ## Good to know
 
-- Anyone signed in can do everything for now; roles come later.
-- A session lasts 60 days after the device was last used. Signing out (the
-  Account tab) also clears that device's copy of the data.
+- A session lasts 60 days after the device was last used. Signing out (on
+  You) also clears that device's copy of the data.
 - Once anyone has signed in, the server won't start without the two Google
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
@@ -194,5 +241,5 @@ Worth knowing before turning it on for **Session Hire Gigs**:
   the app. Emails are used only for crew invites (step 5), which start
   off, and crew can't see each other's addresses.
 - The app's access to the calendar is kept locked with the Client secret.
-  If the secret is ever replaced in Railway, the Account tab asks for the
+  If the secret is ever replaced in Railway, Admin asks for the
   calendar to be connected again; nothing is lost.

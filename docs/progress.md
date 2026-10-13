@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 13 October 2026: the Google steps brought up to date
+
+**Done**
+
+- Colly has a Google Workspace account for Session Hire now. The steps for
+  switching on sign-in and Google Calendar ([sign-in-setup.md](sign-in-setup.md))
+  were checked against the app as it is: what was the Account tab is now
+  Admin and You in the Menu, the demo copy keeps its passcode and no Google
+  key, `STAFF_DOMAINS` is there for a Workspace not on sessionhire.com, and
+  two new steps say when to start fresh and how to switch roles on.
+
+**Waiting on**
+
+- Colly: the Google key and the two Railway variables (steps 1 to 3), then
+  the office trial and the phone field test.
+
 ## 12 October 2026: a desk layout, a sidebar, and dark by default
 
 **Done**
