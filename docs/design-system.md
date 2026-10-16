@@ -74,6 +74,16 @@ lists of rows, filters, the grid form, a row that opens) is styled once
 under `.app`, and each area adds a class of its own (`crew`, `jobs`,
 `warehouse`) for what's only its.
 
+**Icons come from the shared design system too** (since 16 October 2026,
+[Decision 0038](adr/0038-icons-and-pictures.md)): one open set, Lucide,
+named by what each means (`audio`, `repair`, `pick-list`), vendored as
+`shared/src/ds/icons.js` and drawn by `web/src/Icon.tsx`. Session Hire draws
+no icons of its own; a missing one is added to the design system first.
+Kit and crew get pictures by its imagery rules, in Session Hire's own
+classes (`.thumb`, `.avatar`, `.avatars` in `app.css`, from
+`web/src/Picture.tsx`): a quiet grey tile with the thing's icon, or a
+person's initials on the same grey for everyone, until there are photos.
+
 ## Rules the components encode
 
 - Phone first: one column, 640px wide at most, 16px side margins.

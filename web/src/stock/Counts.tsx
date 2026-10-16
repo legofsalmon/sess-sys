@@ -34,6 +34,8 @@ import { useToday } from '../view.ts'
 import { atLabel, numberLabel, ProductChoices } from './common.tsx'
 import { reportFault } from './Faults.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
+import { Heading } from '../Icon.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
  * Stocktakes and rolling counts (ADR 0030): the Counts card on the Stock
@@ -186,7 +188,7 @@ export function CountsCard({ view }: { view: View }) {
   )
   return (
     <section className="card counts" aria-label="Counts">
-      <h2>Counts</h2>
+      <Heading icon="count">Counts</Heading>
       {d && (
         <div className="under-way">
           <p>
@@ -267,7 +269,7 @@ export function CountsOf({ view, where }: { view: View; where: Where }) {
   const last = counts[0]
   return (
     <section className="card counts" aria-label="Counts">
-      <h2>Counts</h2>
+      <Heading icon="count">Counts</Heading>
       <p className="last-counted">
         {last
           ? `Last counted ${dayLabel(last.day)} ${last.day.slice(0, 4)}${last.person ? ` by ${last.person.name}` : ''}: ${countSummaryWords(last.summary)}.`
@@ -289,10 +291,7 @@ export function CountScreen({ view }: { view: View }) {
   if (!d)
     return (
       <div className="app warehouse counting">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock">
-          ‹ All stock
-        </a>
+        <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'Counting' }} />
         <section className="card">
           <header className="title">
             <h1>Counting</h1>
@@ -388,10 +387,7 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
 
   return (
     <div className="app warehouse counting">
-      <Top view={view} title="Stock" />
-      <a className="back" href={d.placeId ? `#stock/place/${d.placeId}` : `#stock/item/${d.caseId}`}>
-        ‹ {name}
-      </a>
+      <Top view={view} title="Stock" up={{ steps: [STOCK, { href: d.placeId ? `#stock/place/${d.placeId}` : `#stock/item/${d.caseId}`, label: name }], here: 'Counting' }} />
       <section className="card" aria-label="Scanning">
         <header className="title">
           <h1>Counting {name}</h1>
@@ -645,16 +641,11 @@ function CountedKit({
 /** #stock/count/<id>: what a count found, each difference with its fix, worked out against what this phone holds now. */
 export function CountPage({ view, id }: { view: View; id: string }) {
   const c = view.counts.byId(id)
-  const back = (
-    <a className="back" href={c ? (c.placeId ? `#stock/place/${c.placeId}` : `#stock/item/${c.caseId}`) : '#stock'}>
-      ‹ {c ? c.what : 'All stock'}
-    </a>
-  )
+  const up = { steps: c ? [STOCK, { href: c.placeId ? `#stock/place/${c.placeId}` : `#stock/item/${c.caseId}`, label: c.what }] : [STOCK], here: c && 'Count' }
   if (!c)
     return (
       <div className="app warehouse counting">
-        <Top view={view} title="Stock" />
-        {back}
+        <Top view={view} title="Stock" up={up} />
         <section className="card">
           <header className="title">
             <h1>A count</h1>
@@ -667,8 +658,7 @@ export function CountPage({ view, id }: { view: View; id: string }) {
   const items = (...kinds: CountItem['said'][]) => c.items.filter((i) => kinds.includes(i.said))
   return (
     <div className="app warehouse counting">
-      <Top view={view} title="Stock" />
-      {back}
+      <Top view={view} title="Stock" up={up} />
       <section className="card">
         <header className="title">
           <h1>Count of {c.what}</h1>

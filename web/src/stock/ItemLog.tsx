@@ -5,6 +5,7 @@ import { ShowAll } from '../Fold.tsx'
 import { ask } from '../server.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { Heading } from '../Icon.tsx'
 
 /**
  * An item's log (ADR 0026): everything that happened to it, newest first.
@@ -64,7 +65,7 @@ export function ItemLog({ view, a }: { view: View; a: AssetView }) {
 
   return (
     <section className="card item-log" aria-label="Log">
-      <h2>Log</h2>
+      <Heading icon="history">Log</Heading>
       {offline && server.state !== 'got' ? (
         <p className="hint">{NO_SIGNAL}</p>
       ) : server.state === 'asking' ? (

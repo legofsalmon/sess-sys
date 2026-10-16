@@ -24,6 +24,8 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
+import { Heading } from '../Icon.tsx'
+import { CREW } from '../Up.tsx'
 
 /**
  * Timesheets (ADR 0022) as the office works with them: the ones sent to
@@ -44,7 +46,7 @@ export function TimesheetsCard({ view }: { view: View }) {
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
-      <h2>Timesheets</h2>
+      <Heading icon="timesheet">Timesheets</Heading>
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
         <div className="ts-group" role="group" aria-label="To approve">
@@ -138,10 +140,7 @@ export function TimesheetScreen({ view, offerId }: { view: View; offerId: string
   const restart = () => setFresh((n) => n + 1)
   return (
     <div className="app crew jobs timesheet-screen">
-      <Top view={view} title="Crew" />
-      <a className="back" href="#crew">
-        ‹ Crew
-      </a>
+      <Top view={view} title="Crew" up={{ steps: [CREW], here: 'Timesheet' }} />
       {!r ? (
         <section className="card">
           <p className="empty">This booking isn't on this device. It may have been removed, or still be on its way: check again once it says “Up to date”.</p>

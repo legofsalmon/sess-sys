@@ -2,6 +2,7 @@ import type { Ability } from '@sh/shared'
 import { Top } from './jobs/common.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
+import { Icon, type IconName } from './Icon.tsx'
 
 /**
  * The Menu (#menu, ADR 0035): every place in the app by name, grouped as
@@ -13,6 +14,8 @@ import { useView } from './view.ts'
 
 export interface Place {
   key: string
+  /** Its picture, from the shared set, beside its name. */
+  icon: IconName
   href: string
   label: string
   /** What's there, in a line. */
@@ -34,18 +37,21 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'jobs',
+        icon: 'calendar',
         href: '#jobs',
         label: 'Jobs',
         about: 'Every job, its phases, kit and crew',
       },
       {
         key: 'plan',
+        icon: 'planner',
         href: '#plan',
         label: 'Planner',
         about: 'The weeks and months ahead at a glance',
       },
       {
         key: 'import',
+        icon: 'download',
         href: '#import',
         label: 'Bring in from Google Calendar',
         about: 'Jobs already in the calendar',
@@ -59,24 +65,28 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'stock',
+        icon: 'warehouse',
         href: '#stock',
         label: 'Stock',
         about: 'The catalogue, places and what needs repair',
       },
       {
         key: 'labels',
+        icon: 'label',
         href: '#stock/labels',
         label: 'Labels',
         about: 'Print labels for kit',
       },
       {
         key: 'count',
+        icon: 'count',
         href: '#stock/count',
         label: 'Counting',
         about: 'Stocktakes and rolling counts',
       },
       {
         key: 'testing',
+        icon: 'inspection',
         href: '#stock/testing',
         label: 'PAT tests',
         about: 'Test a batch of kit',
@@ -89,12 +99,14 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'crew',
+        icon: 'people',
         href: '#crew',
         label: 'Crew',
         about: 'People, calls and answers to check',
       },
       {
         key: 'leave',
+        icon: 'leave',
         href: '#crew/leave',
         label: 'Leave',
         about: 'Time off for staff',
@@ -107,6 +119,7 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'admin',
+        icon: 'settings',
         href: '#account',
         label: 'Admin',
         about: 'The office, calendar, backups, data and bringing lists in',
@@ -114,6 +127,7 @@ export const MENU: PlaceGroup[] = [
       },
       {
         key: 'history',
+        icon: 'history',
         href: '#history',
         label: 'History',
         about: 'Every change, who made it and when',
@@ -126,6 +140,7 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'me',
+        icon: 'person',
         href: '#me',
         label: 'You',
         about: 'Signing out, your own calendar feed and this device',
@@ -152,12 +167,15 @@ export function MenuScreen() {
                 {places.map((p) => (
                   <li key={p.key}>
                     <a className="job-row" href={p.href}>
+                      <span className="place-icon" aria-hidden="true">
+                        <Icon name={p.icon} />
+                      </span>
                       <div>
                         <b>{p.label}</b>
                         <p>{p.about}</p>
                       </div>
                       <div className="side" aria-hidden="true">
-                        ›
+                        <Icon name="next" />
                       </div>
                     </a>
                   </li>

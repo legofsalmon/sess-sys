@@ -1,4 +1,4 @@
-# ADR 0039: A page for each person
+# ADR 0040: A page for each person
 
 - **Status:** accepted
 - **Date:** 16 October 2026

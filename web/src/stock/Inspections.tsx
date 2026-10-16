@@ -18,6 +18,8 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
+import { Heading } from '../Icon.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -81,7 +83,7 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
   const kinds = dues.length ? dues.map((d) => d.kind) : [...INSPECTION_KINDS]
   return (
     <section className="card inspections" aria-label="Inspections">
-      <h2>Inspections</h2>
+      <Heading icon="inspection">Inspections</Heading>
       {dues.length === 0 && (
         <p className="hint">
           {a.model?.name ?? 'Its product'} doesn't say how often its items need testing. Set it with Change details on{' '}
@@ -229,7 +231,7 @@ export function InspectionsDue({ view }: { view: View }) {
   for (const d of unrecorded) byProduct.set(d.asset.model?.name ?? 'A product', (byProduct.get(d.asset.model?.name ?? 'A product') ?? 0) + 1)
   return (
     <section className="card inspections-due" aria-label="Inspections due">
-      <h2>Inspections due</h2>
+      <Heading icon="inspection">Inspections due</Heading>
       {stopped.length === 0 && soon.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
       {stopped.length > 0 && (
         <>
@@ -418,10 +420,7 @@ export function TestingScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse pick">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'PAT tests' }} />
       <section className="card" aria-label="Testing">
         <header className="title">
           <h1>Test a batch</h1>

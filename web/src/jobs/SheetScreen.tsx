@@ -23,6 +23,8 @@ import { Empty } from '../Empty.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Top } from './common.tsx'
+import { Heading } from '../Icon.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * A phase's call sheet (ADR 0021), #jobs/<job>/sheet/<phase>, as the office
@@ -75,10 +77,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
   if (!job || !phase)
     return (
       <div className="app crew jobs">
-        <Top view={view} />
-        <a className="back" href={job ? `#jobs/${job.id}` : '#jobs'}>
-          ‹ {job?.name ?? 'All jobs'}
-        </a>
+        <Top view={view} up={{ steps: job ? [JOBS, { href: `#jobs/${job.id}`, label: job.name }] : [JOBS] }} />
         <section className="card">
           <p className="empty">This phase isn't on this device. It may have been removed, or still be on its way: check again once it says “Up to date”.</p>
         </section>
@@ -105,10 +104,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
 
   return (
     <div className="app crew jobs sheet-screen">
-      <Top view={view} />
-      <a className="back" href={`#jobs/${job.id}`}>
-        ‹ {job.name}
-      </a>
+      <Top view={view} up={{ steps: [JOBS, { href: `#jobs/${job.id}`, label: job.name }], here: `Call sheet · ${phase.name}` }} />
       <section className="card">
         <p className="kicker">Call sheet</p>
         <h1>
@@ -234,7 +230,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
     <>
       {sheet.venue && (
         <section className={print ? '' : 'card'} aria-label="Where">
-          <h2>Where</h2>
+          <Heading icon="venue">Where</Heading>
           <p>
             <b>{sheet.venue.name}</b>
             {sheet.venue.address && <span className="lines">{`\n${sheet.venue.address}`}</span>}
@@ -261,7 +257,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
       </section>
 
       <section className={print ? '' : 'card'} aria-label="Crew">
-        <h2>Crew</h2>
+        <Heading icon="people">Crew</Heading>
         {sheet.calls.length === 0 && <Empty>Crew are asked for on the job's page.</Empty>}
         {sheet.calls.map((c) => (
           <article key={c.id} className="sheet-call">
@@ -303,7 +299,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
 
       {sheet.kit && sheet.kit.length > 0 && (
         <section className={print ? '' : 'card'} aria-label="Kit">
-          <h2>Kit</h2>
+          <Heading icon="kit">Kit</Heading>
           {sheet.kit.map((d) => (
             <div key={d.department} className="sheet-kit">
               <h3>{d.department}</h3>

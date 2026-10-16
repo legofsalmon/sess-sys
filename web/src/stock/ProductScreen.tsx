@@ -48,6 +48,10 @@ import {
 } from './common.tsx'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText } from './Inspections.tsx'
+import { Heading } from '../Icon.tsx'
+import { Thumb } from '../Picture.tsx'
+import { kitIcon } from './kitIcon.ts'
+import { STOCK } from '../Up.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -62,14 +66,10 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
   const w = view.warehouse
   const m = w.models.find((x) => x.id === id)
   const mistake = w.mistakes.get(id)
-  const back = (
-    <a className="back" href="#stock">
-      ‹ All stock
-    </a>
-  )
+  const up = { steps: [STOCK], here: m?.name }
   if (!m)
     return (
-      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+      <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
         <section className="card">
           <p className="empty">
             {mistake
@@ -80,7 +80,7 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
       </Page>
     )
   return (
-    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+    <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
@@ -141,7 +141,10 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   return (
     <section className="card">
       <header className="title">
-        <h1>{m.name}</h1>
+        <div className="pictured">
+          <Thumb icon={kitIcon(m)} size="large" />
+          <h1>{m.name}</h1>
+        </div>
         <Pending pending={m.pending} />
       </header>
       <dl className="facts">
@@ -234,7 +237,7 @@ function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
   }
   return (
     <section className="card" aria-label="On jobs">
-      <h2>On jobs</h2>
+      <Heading icon="calendar">On jobs</Heading>
       <p className="hint">{m.total.toLocaleString('en-IE')} owned. Confirmed jobs hold them; enquiries and quotes are pencilled in.</p>
       {lines.length === 0 && <p className="empty">Not on any job coming up.</p>}
       <ul className="job-list">{lines.slice(0, 5).map(row)}</ul>

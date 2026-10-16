@@ -18,6 +18,7 @@ import { Empty } from '../Empty.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { numberLabel } from './common.tsx'
+import { Heading } from '../Icon.tsx'
 
 /**
  * Faults and missing kit (ADR 0018): reporting damage or kit that's
@@ -306,7 +307,7 @@ export function RepairList({ view }: { view: View }) {
   )
   return (
     <section className="card faults" aria-label="Faults and repairs">
-      <h2>Faults and repairs</h2>
+      <Heading icon="repair">Faults and repairs</Heading>
       <p className="hint">Kit that can't go out is taken off what's free for jobs until it's fixed or found.</p>
       {damaged.length > 0 && (
         <>

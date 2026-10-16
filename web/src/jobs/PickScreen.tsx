@@ -27,6 +27,7 @@ import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { JobStatusPill, Top } from './common.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * A job's pick list (ADR 0017): what its kit needs from Session Hire's
@@ -72,10 +73,7 @@ export function PickScreen({ view, id }: { view: View; id: string }) {
   if (!job)
     return (
       <div className="app jobs warehouse pick">
-        <Top view={view} />
-        <a className="back" href="#jobs">
-          ‹ All jobs
-        </a>
+        <Top view={view} up={{ steps: [JOBS] }} />
         <section className="card">
           <p className="empty">This job isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
@@ -167,10 +165,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
 
   return (
     <div className="app jobs warehouse pick">
-      <Top view={view} />
-      <a className="back" href={`#jobs/${job.id}`}>
-        ‹ {job.name}
-      </a>
+      <Top view={view} up={{ steps: [JOBS, { href: `#jobs/${job.id}`, label: job.name }], here: 'Pick list' }} />
 
       <section className="card" aria-label="Scanning">
         <header className="title">

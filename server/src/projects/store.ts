@@ -47,9 +47,28 @@ export async function getProject(q: Queryable, id: string, lock = false) {
   const { rows } = await q.query(`SELECT ${PROJECT} FROM projects WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id])
   return rows[0] ? toProject(rows[0]) : undefined
 }
+/** Several jobs at once, in the order asked for; ones that don't exist are left out. */
+export async function getProjects(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${PROJECT} FROM projects WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toProject), ids)
+}
 export async function getPhase(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${PHASE} FROM phases WHERE id = $1`, [id])
   return rows[0] ? toPhase(rows[0]) : undefined
+}
+
+/** Several phases at once, in the order asked for. */
+export async function getPhases(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${PHASE} FROM phases WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toPhase), ids)
+}
+
+/** Rows back in the order their ids were asked for. */
+export function sortByIds<T extends { id: string }>(rows: T[], ids: readonly string[]): T[] {
+  const at = new Map(ids.map((id, i) => [id, i]))
+  return rows.sort((a, b) => (at.get(a.id) ?? 0) - (at.get(b.id) ?? 0))
 }
 
 /**

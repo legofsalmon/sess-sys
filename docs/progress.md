@@ -3,6 +3,88 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: a page for each person
+
+**Done**
+
+- Colly asked for a page per crew member. Everything about a person was
+  already kept, but it only opened as a long fold inside the People list.
+  Each person now has a page of their own under Crew
+  ([Decision 0040](adr/0040-a-page-for-each-person.md)): their picture,
+  name and who they are, Call, WhatsApp and Email, their details, level
+  and role; what's coming up (bookings and offers, each opening its job,
+  and days off); certificates and documents; every job they've worked;
+  and their private link. The People list is one line each that opens
+  it, and a name on a call card or a person's lane in the planner opens
+  it too. Archive is one tap from the page and the list says so, with
+  the way back.
+
+**Waiting on**
+
+- Nothing new. Photos wait on the backup bucket, as the icons work says.
+
+## 16 October 2026: icons, and pictures of kit and crew
+
+**Done**
+
+- Colly found the app very text heavy. Every card heading now starts with
+  an icon, the Menu's places have one each, kit has a square picture
+  (a placeholder with the icon for what it is: speaker, spotlight, cable,
+  case…) in the stock list, on a job's kit lines and at the top of its
+  page, and crew have a round one with their initials in People, on crew
+  calls and on Home ([Decision 0038](adr/0038-icons-and-pictures.md)).
+- The icons live in the shared design system now (version 0.4.0): one open
+  set, Lucide, named by meaning, with the rules for icons and pictures, so
+  every app draws the same ones.
+
+**Waiting on**
+
+- Colly: merge the design system's pull request for the icons. Photos in
+  place of the placeholders wait on somewhere to keep files (the backup
+  bucket).
+
+## 16 October 2026: a way up from every page, and where things live
+
+**Done**
+
+- Colly asked for breadcrumbs or a back button. Every page under Jobs,
+  Stock, Crew and the Menu now has its way up in the top bar, so it stays
+  in view down a long page: one link to the page above on a phone ("‹ All
+  jobs"), and the whole way down as breadcrumbs on a desk (Jobs › Liffey
+  Brands Shoot › Pick list)
+  ([Decision 0039](adr/0039-the-way-up-and-breadcrumbs.md)).
+- Looked over where everything lives and wrote up a tidier structure
+  ([where things live](information-architecture.md)): addresses that start
+  with their area, each list brought in where it lives, list pages for
+  clients and venues, Stock's long screen split into its parts, and Admin
+  as settings only.
+
+**Waiting on**
+
+- Colly: say whether to move things as proposed.
+
+## 16 October 2026, later: a season comes in within the app's wait
+
+**Done**
+
+- Colly took the first bring-in back (141 jobs, in the history) and
+  brought Adam's calendar in from 19 December 2025: 767 jobs over 1,714
+  days, 678 crew bookings and offers, 73 people, 37 venues. The server
+  took 1 minute 47 seconds to save it, one row a round trip to the
+  database, and the app had stopped waiting at 60 seconds and said it
+  couldn't reach the server, though everything landed.
+- The bring-in now gathers the jobs, phases, calls, offers and event-days
+  and writes them a few hundred per statement, and the take-back removes
+  its rows the same way, so a season takes seconds. The app waits up to ten
+  minutes for a look, a bring-in or a take-back, says "Saving them all in
+  one go" while it does, and a slow answer says the server may still be
+  working rather than that there is no signal.
+
+**Waiting on**
+
+- Colly: bring Olan's calendar in from the same first day; then the backup
+  bucket and the Sentry key.
+
 ## 16 October 2026: the bring-in learns from the real calendars
 
 **Done**

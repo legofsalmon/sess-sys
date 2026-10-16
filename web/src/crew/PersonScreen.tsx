@@ -18,10 +18,13 @@ import { useId, useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
+import { Heading, Icon } from '../Icon.tsx'
 import { Page } from '../jobs/common.tsx'
+import { Avatar } from '../Picture.tsx'
 import { Pending, StatusPill } from '../StatusPill.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
+import { CREW } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { linkFor, PersonForm, STATUS } from './CrewScreen.tsx'
 import { Documents } from './Documents.tsx'
@@ -32,8 +35,7 @@ import { useFeedAddress } from './feed.ts'
  * how to reach them, what they're booked on, offered and off for, what
  * they hold, what they've worked, and their private link. The People list
  * on Crew is one line each and opens this; before, all of it opened in
- * place inside the list. The top of the page keeps a place for their
- * picture, beside their name.
+ * place inside the list. Their picture (ADR 0038) is beside their name.
  */
 
 /** Where a person's page is. */
@@ -44,25 +46,21 @@ const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
 
 export function PersonScreen({ view, id, onArchived }: { view: View; id: string; onArchived: (p: { id: string; name: string }) => void }) {
   const person = view.crew.people.find((p) => p.id === id)
-  const back = (
-    <a className="back" href="#crew">
-      ‹ Crew
-    </a>
-  )
+  const up = { steps: [CREW], here: person?.name }
   if (!person)
     return (
-      <Page view={view} title="Crew" className="crew person-page" back={back}>
+      <Page view={view} title="Crew" className="crew person-page" up={up}>
         <section className="card">
           <p className="empty">This person isn't on this device. They may still be on their way: check again once it says “Up to date”.</p>
         </section>
       </Page>
     )
   return (
-    <Page view={view} title="Crew" className="crew person-page" back={back}>
+    <Page view={view} title="Crew" className="crew person-page" up={up}>
       <Who person={person} />
       <ComingUp person={person} view={view} onArchived={onArchived} />
       <section className="card" aria-label="Certificates and documents">
-        <h2>Certificates and documents</h2>
+        <Heading icon="certificate">Certificates and documents</Heading>
         <CertificateLines person={person} />
         <Documents person={person} />
       </section>
@@ -86,11 +84,14 @@ function Who({ person }: { person: PersonView }) {
   return (
     <section className="card who-card" aria-label={person.name}>
       <header className="title">
-        {/* The picture goes here, before the name (thread "Icons and image placeholders"). */}
-        <div className="who-name">
-          <h1>{person.name}</h1>
-          <p className="muted">{[kind, person.department, levelLine(person.level)].filter(Boolean).join(' · ')}</p>
-          {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
+        {/* Their picture before their name (ADR 0038): their initials until there's somewhere to keep photos. */}
+        <div className="pictured">
+          <Avatar name={person.name} size="large" />
+          <div className="who-name">
+            <h1>{person.name}</h1>
+            <p className="muted">{[kind, person.department, levelLine(person.level)].filter(Boolean).join(' · ')}</p>
+            {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
+          </div>
         </div>
         <Pending pending={person.pending} />
       </header>
@@ -101,16 +102,19 @@ function Who({ person }: { person: PersonView }) {
         <div className="actions">
           {phone && (
             <a className="button" href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
+              <Icon name="phone" />
               Call {phone}
             </a>
           )}
           {phone && (
             <a className="button" href={`https://wa.me/${whatsappNumber(phone)}`} target="_blank" rel="noreferrer">
+              <Icon name="message" />
               WhatsApp
             </a>
           )}
           {email && (
             <a className="button" href={`mailto:${email}`}>
+              <Icon name="mail" />
               Email
             </a>
           )}
@@ -147,11 +151,19 @@ function Who({ person }: { person: PersonView }) {
             {person.company && (
               <div>
                 <dt>Company</dt>
-                <dd>
-                  {companyLine(person)}
-                  {person.company.vatNumber && <small className="muted"> · VAT {person.company.vatNumber}</small>}
-                  {person.company.croNumber && <small className="muted"> · CRO {person.company.croNumber}</small>}
-                </dd>
+                <dd>{companyLine(person)}</dd>
+              </div>
+            )}
+            {person.company?.vatNumber && (
+              <div>
+                <dt>VAT number</dt>
+                <dd>{person.company.vatNumber}</dd>
+              </div>
+            )}
+            {person.company?.croNumber && (
+              <div>
+                <dt>CRO number</dt>
+                <dd>{person.company.croNumber}</dd>
               </div>
             )}
             {person.kind === 'staff' && person.approvesLeave && (
@@ -239,7 +251,7 @@ function ComingUp({ person, view, onArchived }: { person: PersonView; view: View
   }
   return (
     <section className="card" aria-label="Coming up">
-      <h2>Coming up</h2>
+      <Heading icon="calendar">Coming up</Heading>
       {lines.length === 0 && off.length === 0 && <Empty>Nothing booked or offered, and no days off.</Empty>}
       {lines.length > 0 && (
         <ul className="job-list">
@@ -352,7 +364,7 @@ function TheirLink({ person }: { person: PersonView }) {
   if (!mayEdit) return null
   return (
     <section className="card" aria-label="Their link">
-      <h2>Their link</h2>
+      <Heading icon="link">Their link</Heading>
       <p className="hint">
         Where they answer offers, mark days off and send documents, with no app or login. Their bookings go to their own calendar from there too.
       </p>
@@ -467,7 +479,7 @@ function Worked({ person }: { person: PersonView }) {
   const { worked } = person
   return (
     <section className="card" aria-label={`Worked: ${person.name}`}>
-      <h2>Worked{worked.length > 0 && ` (${worked.length === 1 ? '1 job' : `${worked.length} jobs`})`}</h2>
+      <Heading icon="history">Worked{worked.length > 0 && ` (${worked.length === 1 ? '1 job' : `${worked.length} jobs`})`}</Heading>
       {worked.length === 0 && <Empty>No jobs worked yet. Each booking shows here from its first day.</Empty>}
       <ShowAll items={worked} limit={10} what="jobs">
         {(rows) => (

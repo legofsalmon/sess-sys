@@ -18,7 +18,7 @@
     "typecheck": "npm run typecheck -w shared -w server -w web",
     "test": "npm test -w shared -w server",
     "build:web": "npm run build -w web",
-    "ds:sync": "node ../design-system/scripts/sync.mjs --to shared/src/ds --files tokens.css,tokens.js,tokens.d.ts",
+    "ds:sync": "node ../design-system/scripts/sync.mjs --to shared/src/ds --files tokens.css,tokens.js,tokens.d.ts,icons.js,icons.d.ts",
     "ds:check": "node ../design-system/scripts/sync.mjs --check shared/src/ds"
   },
   "devDependencies": {

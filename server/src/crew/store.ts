@@ -1,5 +1,6 @@
 import { DEFAULT_LEVEL, eachDay, HOLDING, tidyNeeds, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
 import type { Queryable } from '../db.ts'
+import { sortByIds } from '../projects/store.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
@@ -91,6 +92,18 @@ export async function personByEmail(q: Queryable, email: string) {
 export async function getCall(q: Queryable, id: string, lock = false) {
   const { rows } = await q.query(`SELECT ${CALL} FROM crew_calls WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id])
   return rows[0] ? toCall(rows[0]) : undefined
+}
+/** Several calls at once, in the order asked for. */
+export async function getCalls(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${CALL} FROM crew_calls WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toCall), ids)
+}
+/** Several offers at once, in the order asked for. */
+export async function getOffers(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toOffer), ids)
 }
 export async function getOffer(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${OFFER} FROM offers WHERE id = $1`, [id])

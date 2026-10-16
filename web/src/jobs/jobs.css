@@ -17,10 +17,12 @@
 /* Kit on jobs (ADR 0014): lines by department, each saying whether there's enough; red when short on a confirmed job, amber when pencilled in. */
 .jobs .kit-group { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .jobs .kit .kit-group:first-of-type { padding-top: 0; border-top: 0; }
-.jobs .kit-group h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .kit-group h3 { display: flex; align-items: center; gap: var(--space-6); margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .kit-group h3 .icon { width: 16px; height: 16px; }
 .jobs .kit-line { display: grid; gap: var(--space-6); }
 .jobs .kit-line + .kit-line { padding-top: var(--space-8); border-top: 1px dashed var(--line); }
 .jobs .kit-line > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
+.jobs .kit-line > header > div { flex: 1; min-width: 0; }
 .jobs .kit-line > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
 .jobs .kit-line > button { justify-self: start; }
 .jobs .kit-state { margin: 0; font-size: .85rem; }

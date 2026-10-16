@@ -75,6 +75,23 @@ export async function emit(ctx: Ctx, entity: EntityName, id: string, data: unkno
   ctx.seq = Number(rows[0]!.seq)
 }
 
+/**
+ * Many records at once, in one statement per 500: a season's bring-in from
+ * a calendar writes thousands, and one round trip each is what made it take
+ * minutes (ADR 0011).
+ */
+export async function emitAll(ctx: Ctx, entity: EntityName, records: ReadonlyArray<{ id: string; data: unknown }>) {
+  for (let at = 0; at < records.length; at += 500) {
+    const chunk = records.slice(at, at + 500)
+    const values = chunk.map((_, i) => `($1, $${i * 2 + 3}, 'put', $${i * 2 + 4}, $2)`).join(', ')
+    const { rows } = await ctx.tx.query<{ seq: string }>(
+      `INSERT INTO changes (entity, entity_id, op, data, mutation_id) VALUES ${values} RETURNING seq`,
+      [entity, ctx.mutationId, ...chunk.flatMap((r) => [r.id, JSON.stringify(r.data)])]
+    )
+    ctx.seq = Math.max(ctx.seq, ...rows.map((r) => Number(r.seq)))
+  }
+}
+
 /** Tell devices a record is gone. */
 export async function emitRemoved(ctx: Ctx, entity: EntityName, id: string) {
   const { rows } = await ctx.tx.query<{ seq: string }>(
@@ -82,6 +99,16 @@ export async function emitRemoved(ctx: Ctx, entity: EntityName, id: string) {
     [entity, id, ctx.mutationId]
   )
   ctx.seq = Number(rows[0]!.seq)
+}
+
+/** Many records gone at once, in one statement per 500. */
+export async function emitRemovedAll(ctx: Ctx, entity: EntityName, ids: readonly string[]) {
+  for (let at = 0; at < ids.length; at += 500) {
+    const chunk = ids.slice(at, at + 500)
+    const values = chunk.map((_, i) => `($1, $${i + 3}, 'delete', NULL, $2)`).join(', ')
+    const { rows } = await ctx.tx.query<{ seq: string }>(`INSERT INTO changes (entity, entity_id, op, data, mutation_id) VALUES ${values} RETURNING seq`, [entity, ctx.mutationId, ...chunk])
+    ctx.seq = Math.max(ctx.seq, ...rows.map((r) => Number(r.seq)))
+  }
 }
 
 /** Something the server does at a person's request outside the sync commands, such as connecting a calendar. */

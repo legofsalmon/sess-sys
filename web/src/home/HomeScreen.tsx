@@ -6,6 +6,8 @@ import { Top } from '../jobs/common.tsx'
 import { JobRow } from '../jobs/JobsScreen.tsx'
 import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
+import { Heading } from '../Icon.tsx'
+import { Avatar } from '../Picture.tsx'
 
 /**
  * Home (ADR 0033): how things stand, for whoever is looking. One screen,
@@ -125,7 +127,7 @@ function Today({ view, today }: { view: View; today: string }) {
   const next = on.length === 0 ? weekAhead(view, today)[0] : undefined
   return (
     <section className="card">
-      <h2>Today{on.length > 0 ? ` (${on.length})` : ''}</h2>
+      <Heading icon="time">Today{on.length > 0 ? ` (${on.length})` : ''}</Heading>
       {on.length === 0 ? (
         <p className="empty">Nothing on today.{next?.span && ` Next: ${next.name}, ${dayLabel(next.span.start)}.`}</p>
       ) : (
@@ -145,7 +147,7 @@ function WeekAhead({ view, today }: { view: View; today: string }) {
   const week = weekAhead(view, today)
   return (
     <section className="card">
-      <h2>The week ahead{week.length > 0 ? ` (${week.length})` : ''}</h2>
+      <Heading icon="calendar">The week ahead{week.length > 0 ? ` (${week.length})` : ''}</Heading>
       {week.length === 0 ? (
         <Empty>Nothing starts in the next seven days.</Empty>
       ) : (
@@ -170,7 +172,7 @@ function ForCompany({ view, today, me }: { view: View; today: string; me: Person
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
       <WeekAhead view={view} today={today} />
       <section className="card">
-        <h2>Coming up</h2>
+        <Heading icon="calendar">Coming up</Heading>
         <p className="hint">
           {plural(confirmed, 'confirmed job')} from today on, and {plural(pencilled, 'enquiry or quote', 'enquiries and quotes')} not yet decided. <a href="#jobs">All jobs</a>
         </p>
@@ -226,7 +228,7 @@ function ForDepartment({
       <Tiles all={tiles(view, today, me, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
       <p className="hint">Crew still needed and kit still out after a job are for every department, on Crew and Stock: a call doesn't say its department yet.</p>
       <section className="card">
-        <h2>Working this week{working.length > 0 ? ` (${working.length})` : ''}</h2>
+        <Heading icon="people">Working this week{working.length > 0 ? ` (${working.length})` : ''}</Heading>
         {working.length === 0 ? (
           <Empty>Nobody in {department} is booked in the next seven days.</Empty>
         ) : (
@@ -234,6 +236,7 @@ function ForDepartment({
             {working.map(({ c, o }) => (
               <li key={o.id}>
                 <a className="job-row" href={c.projectId ? `#jobs/${c.projectId}` : '#crew'}>
+                  <Avatar name={o.person!.name} />
                   <div>
                     <b>{o.person!.name}</b>
                     <p>
@@ -252,11 +255,12 @@ function ForDepartment({
       </section>
       {away.length > 0 && (
         <section className="card">
-          <h2>Away this week ({away.length})</h2>
+          <Heading icon="leave">Away this week ({away.length})</Heading>
           <ul className="job-list">
             {away.map((u) => (
               <li key={u.id}>
                 <div className="job-row">
+                  <Avatar name={people.get(u.personId)?.name ?? ''} />
                   <div>
                     <b>{people.get(u.personId)?.name ?? 'Someone'}</b>
                     <p>{u.source === 'leave' ? 'Approved leave' : u.note || 'Away'}</p>
@@ -281,7 +285,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
   return (
     <>
       <section className="card">
-        <h2>Going out{out.length > 0 ? ` (${out.length})` : ''}</h2>
+        <Heading icon="van">Going out{out.length > 0 ? ` (${out.length})` : ''}</Heading>
         {out.length === 0 ? (
           <Empty>No confirmed job needs kit in the next seven days.</Empty>
         ) : (
@@ -310,7 +314,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
       {view.moves.stillOut.length > 0 && (
         <section className="card">
-          <h2>Coming back ({view.moves.stillOut.length})</h2>
+          <Heading icon="warehouse">Coming back ({view.moves.stillOut.length})</Heading>
           <ul className="job-list">
             {view.moves.stillOut.map((p) => (
               <li key={p.job.id}>
@@ -381,7 +385,7 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
   return (
     <>
       <section className="card">
-        <h2>Your work{mine.length > 0 ? ` (${mine.length})` : ''}</h2>
+        <Heading icon="calendar">Your work{mine.length > 0 ? ` (${mine.length})` : ''}</Heading>
         {mine.length === 0 ? (
           <Empty>No bookings coming up.</Empty>
         ) : (
@@ -410,7 +414,7 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
       </section>
       {balance && (
         <section className="card">
-          <h2>Your leave</h2>
+          <Heading icon="leave">Your leave</Heading>
           <p>
             {leaveDaysLabel(balance.annual.left)} of annual leave left this year, {leaveDaysLabel(balance.lieu.left)} in lieu to take.
             {waiting.length > 0 && ` ${plural(waiting.length, 'request')} waiting to be approved.`}

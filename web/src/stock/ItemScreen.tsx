@@ -40,6 +40,9 @@ import {
   WhereChoices,
   whereNamed,
 } from './common.tsx'
+import { Thumb } from '../Picture.tsx'
+import { kitIcon } from './kitIcon.ts'
+import { STOCK } from '../Up.tsx'
 
 /**
  * One numbered item: its label, its product, where it's kept, the labels
@@ -59,11 +62,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
         view={view}
         title="Stock"
         className="warehouse"
-        back={
-          <a className="back" href="#stock">
-            ‹ All stock
-          </a>
-        }
+        up={{ steps: [STOCK] }}
         bare={bare}
       >
         <section className="card">
@@ -76,11 +75,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
       view={view}
       title="Stock"
       className="warehouse"
-      back={
-        <a className="back" href={a.model && !a.model.mistake ? `#stock/product/${a.model.id}` : '#stock'}>
-          ‹ {a.model && !a.model.mistake ? a.model.name : 'All stock'}
-        </a>
-      }
+      up={{ steps: a.model && !a.model.mistake ? [STOCK, { href: `#stock/product/${a.model.id}`, label: a.model.name }] : [STOCK], here: numberLabel(a) }}
       bare={bare}
     >
       <Summary a={a} w={w} view={view} />
@@ -112,7 +107,10 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
   return (
     <section className="card">
       <header className="title">
-        <h1 className="number">{numberLabel(a)}</h1>
+        <div className="pictured">
+          <Thumb icon={kitIcon(a.model)} size="large" />
+          <h1 className="number">{numberLabel(a)}</h1>
+        </div>
         {a.pending ? <Pending pending /> : retired && <StatusPill tone="cancelled">Retired</StatusPill>}
       </header>
       <dl className="facts">
