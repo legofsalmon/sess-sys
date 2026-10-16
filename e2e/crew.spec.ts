@@ -12,7 +12,7 @@ const phoneSize = { width: 390, height: 844 }
 
 test('office offers a job, freelancer answers from their link', async ({ browser }) => {
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // The forms sit behind their buttons until wanted (audit finding 16).
@@ -26,6 +26,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await expect(office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Aoife Byrne/ })).toBeVisible()
 
   // A one-off, not in Jobs: the crew screen still takes the job's details as typed.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
   await office.getByRole('button', { name: 'Ask for crew' }).click()
   const job = office.locator('form').filter({ has: office.getByRole('button', { name: 'Ask for crew' }) })
   await job.getByLabel('Project').fill('Electric Picnic')

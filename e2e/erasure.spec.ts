@@ -17,7 +17,7 @@ const name = `Saoirse Erasure ${id}`
 
 test('archived, then erased through the question in place: the card says so and the old link stops', async ({ browser }) => {
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const people = office.getByRole('region', { name: 'People' })
 
@@ -35,7 +35,7 @@ test('archived, then erased through the question in place: the card says so and 
   expect(link).toMatch(/\/f\/[\w-]{24}$/)
   await office.getByRole('button', { name: 'Archive', exact: true }).click()
   // Back on the list, which says who was archived, with the way back.
-  await expect(office).toHaveURL(/#crew$/)
+  await expect(office).toHaveURL(/#crew\/people$/)
   await expect(people.locator('.added')).toHaveText(`Archived ${name}. Bring ${name} back`)
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
@@ -110,7 +110,7 @@ test('for a member of staff with leave records, the question keeps their leave, 
   expect(results.map((r: { status: string; reason?: { message: string } }) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
 
   const office = await context.newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const people = office.getByRole('region', { name: 'People' })
   await people.getByText(/^Archived \(\d+\)$/).click()

@@ -18,7 +18,7 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
 
   const office = await (await browser.newContext({ viewport: phoneSize, permissions: ['clipboard-read', 'clipboard-write'] })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/timesheets')
   const card = office.getByRole('region', { name: 'Timesheets' })
   const toApprove = card.getByRole('group', { name: 'To approve' })
   await expect(toApprove).toContainText('Dara Quinn')
@@ -41,7 +41,7 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // Laoise hasn't sent hers: asked for it, with a link straight to it.
-  await office.getByRole('link', { name: '‹ Crew' }).click()
+  await office.getByRole('link', { name: '‹ Timesheets' }).click()
   await card.getByRole('button', { name: 'Ask Laoise Keane for their timesheet' }).click()
   const ask = office.getByRole('region', { name: 'Send timesheet request to Laoise Keane' })
   const message = await ask.locator('textarea').inputValue()
@@ -65,6 +65,7 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   await expect(card.getByRole('group', { name: 'To approve' })).toContainText('Laoise Keane')
 
   // And Dara sees on their link what was approved, and what changed.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: 'People' }).click()
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
   await office.getByRole('button', { name: 'Copy link' }).click()
   const daraLink = await office.evaluate(() => navigator.clipboard.readText())

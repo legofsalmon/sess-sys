@@ -118,9 +118,9 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await expect(office.getByRole('heading', { name: 'Brought in' })).toBeVisible()
   await expect(office.getByRole('status').filter({ hasText: 'Added' })).toHaveText('Added 3, updated 0, skipped 0.')
 
-  // On the Crew tab, with their department and level.
-  await office.getByRole('link', { name: 'Crew tab' }).click()
-  await expect(office).toHaveURL(/#crew$/)
+  // On Crew's People, with their department and level.
+  await office.getByRole('link', { name: 'See the people' }).click()
+  await expect(office).toHaveURL(/#crew\/people$/)
   await expect(office.locator('.top').getByRole('status')).toHaveText('Up to date')
   const people = office.getByRole('region', { name: 'People' })
   await expect(people.getByRole('link', { name: new RegExp(`^Nuala Breen ${id}`) })).toContainText('Staff · Production · Level 3 · Production: Crew chief')
@@ -130,9 +130,10 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await people.getByRole('link', { name: new RegExp(`^Oisín Clarke ${id}`) }).click()
   await expect(office.getByRole('link', { name: 'Call +353877000102' })).toHaveAttribute('href', 'tel:+353877000102')
   await expect(office.locator('.person-page .facts')).toContainText(`oisin.${id}@example.com`)
-  await office.getByRole('link', { name: '‹ Crew' }).click()
+  await office.getByRole('link', { name: '‹ All people' }).click()
 
-  // The applicant is out of the Offer to… picker until asked for.
+  // The applicant is out of the Offer to… picker until asked for, on Calls.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
   const call = office.locator('.call-group', { hasText: `Import check ${id}` }).getByRole('article', { name: 'Stagehand' })
   await call.getByRole('button', { name: 'Offer…' }).click()
   const picker = call.getByLabel('Offer to')

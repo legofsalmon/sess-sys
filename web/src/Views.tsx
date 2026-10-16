@@ -2,7 +2,8 @@
  * An area's pages, side by side in one row under its header (ADR 0041's
  * tidy-up of where things live): Jobs' List, Week, Month, Clients and
  * Venues; Stock's Catalogue, Places, Labels, Counting, Testing and Repairs;
- * Crew's calls and people, and Leave. Moving along the row is lateral, so
+ * Crew's Calls, People, Leave and Timesheets
+ * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the
  * current one is marked. On a phone a row longer than the screen scrolls
  * sideways, keeping the current one in view.
@@ -52,20 +53,6 @@ export function StockViews({ view, current }: { view: View; current: string }) {
         { key: 'count', href: '#stock/count', label: 'Counting' },
         { key: 'testing', href: '#stock/testing', label: 'Testing', count: tests },
         { key: 'repairs', href: '#stock/repairs', label: 'Repairs', count: repairs },
-      ]}
-    />
-  )
-}
-
-/** Crew's row: the calls and people, and staff leave. */
-export function CrewViews({ current }: { current: string }) {
-  return (
-    <Views
-      label="Crew pages"
-      current={current}
-      pages={[
-        { key: 'crew', href: '#crew', label: 'Calls and people' },
-        { key: 'leave', href: '#crew/leave', label: 'Leave' },
       ]}
     />
   )

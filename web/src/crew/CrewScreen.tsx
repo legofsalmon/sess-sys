@@ -55,10 +55,10 @@ import { CertificateReminders, certificateWarnings, NeedsField } from './Certifi
 import { DocumentToCheck } from './Documents.tsx'
 import { ArchivedPerson } from './Erase.tsx'
 import { LateLines, LateRow, NoteLate } from './Late.tsx'
-import { LeaveCard, LeaveScreen } from './Leave.tsx'
+import { LeaveScreen } from './Leave.tsx'
 import { personHref, PersonScreen } from './PersonScreen.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
-import { CrewViews } from '../Views.tsx'
+import { CrewViews } from './CrewViews.tsx'
 import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
 import { Avatar, Avatars } from '../Picture.tsx'
@@ -273,6 +273,9 @@ export function CrewScreen() {
   // Bringing in the crew list (ADR 0025), under Crew where the list lives (ADR 0041).
   if (hash === '#crew/import') return <ImportPeopleScreen view={view} />
 
+  // Crew's row (ADR 0041): the calls and answers here, the people at #crew/people, the timesheets at #crew/timesheets.
+  const page = hash === '#crew/people' ? 'people' : hash === '#crew/timesheets' ? 'timesheets' : 'calls'
+
   /** Settle a yes or a counter, then tell them. */
   const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
     void answers.run(() => client.mutate(command, { id: o.id })).then((ok) => ok && o.person && setShare(promptFor(event, [tellTo(o.person, c, o)])))
@@ -281,9 +284,18 @@ export function CrewScreen() {
   return (
     <div className="app crew">
       <Top view={view} title="Crew" root />
-      <CrewViews current="crew" />
+      <CrewViews view={view} current={page} />
 
-      {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
+      {page === 'timesheets' &&
+        (view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
+          <TimesheetsCard view={view} />
+        ) : (
+          <section className="card">
+            <Empty>No timesheets yet. Crew send theirs from their own link once a booking's days are done.</Empty>
+          </section>
+        ))}
+
+      {page === 'calls' && (toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
         <section className="card">
           {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
           <Heading icon="message">Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</Heading>
@@ -384,41 +396,39 @@ export function CrewScreen() {
         </section>
       )}
 
-      <TimesheetsCard view={view} />
-      <LeaveCard view={view} />
-      <CertificateReminders view={view} />
-
-      <section className="card">
-        <Heading icon="calendar">Crew needed</Heading>
-        {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
-        {groupCalls(upcoming, view.jobs.jobs).map((g) => (
-          <div className="call-group" key={g.key}>
-            <header>
-              <div>
-                <b>{g.project}</b>
-                {g.venue && <p>{g.venue}</p>}
-              </div>
-              {g.projectId && (
-                <a className="link" href={`#jobs/${g.projectId}`}>
-                  Open job
-                </a>
-              )}
-            </header>
-            {[...g.dates].map(([when, calls]) => (
-              <div className="call-date" key={when}>
-                <h3>{when}</h3>
-                {calls.map((c) => (
-                  <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
-      </section>
+      {page === 'calls' && (
+        <section className="card">
+          <Heading icon="calendar">Crew needed</Heading>
+          {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
+          {groupCalls(upcoming, view.jobs.jobs).map((g) => (
+            <div className="call-group" key={g.key}>
+              <header>
+                <div>
+                  <b>{g.project}</b>
+                  {g.venue && <p>{g.venue}</p>}
+                </div>
+                {g.projectId && (
+                  <a className="link" href={`#jobs/${g.projectId}`}>
+                    Open job
+                  </a>
+                )}
+              </header>
+              {[...g.dates].map(([when, calls]) => (
+                <div className="call-date" key={when}>
+                  <h3>{when}</h3>
+                  {calls.map((c) => (
+                    <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
 
       {share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />}
 
-      {mayCrew && (
+      {page === 'calls' && mayCrew && (
         <section className="card">
           <h2>Crew for something not in Jobs</h2>
           <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
@@ -428,69 +438,75 @@ export function CrewScreen() {
         </section>
       )}
 
-      <section className="card" aria-label="People">
-        <Heading icon="people">People</Heading>
-        <Refusal error={roster.error} />
-        {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
-        <div aria-live="polite">
-          {archivedNow && people.get(archivedNow.id)?.archived && (
-            <p className="added">
-              Archived {archivedNow.name}.{' '}
-              <button
-                type="button"
-                className="link"
-                onClick={() => {
-                  const { id } = archivedNow
-                  setArchivedNow(undefined)
-                  void roster.run(() => client.mutate('person.archive', { id, archived: false }))
-                }}
-              >
-                Bring {archivedNow.name} back
-              </button>
-            </p>
-          )}
-        </div>
-        {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
-        {active.length > 0 && (
-          <input className="search" type="search" placeholder="Name, department or skill" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a person" />
-        )}
-        {departments.length > 0 && (
-          <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-            {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
-          </select>
-        )}
-        {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
-        <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
-          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
-        </ShowAll>
-        {archived.length > 0 && (
-          <details className="archived">
-            <summary>Archived ({archived.length})</summary>
-            {/* Each with "Erase details…" for when they ask (ADR 0027). */}
-            {archived.map((p) => (
-              <ArchivedPerson key={p.id} person={p} onBringBack={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))} />
-            ))}
-          </details>
-        )}
-        {mayCrew && (
-          <Fold label="Add person">
-            <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
-            {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
-            <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
-          </Fold>
-        )}
-      </section>
+      {page === 'people' && <CertificateReminders view={view} />}
 
-      <p className="hint">
-        Freelancers answer from their own private link: no app or login. Send it with an offer by WhatsApp, text or email.
-        {people.size > 0 && ' Their bookings also appear in their own calendar if they subscribe from that page.'}
-      </p>
+      {page === 'people' && (
+        <section className="card" aria-label="People">
+          <Heading icon="people">People</Heading>
+          <Refusal error={roster.error} />
+          {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
+          <div aria-live="polite">
+            {archivedNow && people.get(archivedNow.id)?.archived && (
+              <p className="added">
+                Archived {archivedNow.name}.{' '}
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    const { id } = archivedNow
+                    setArchivedNow(undefined)
+                    void roster.run(() => client.mutate('person.archive', { id, archived: false }))
+                  }}
+                >
+                  Bring {archivedNow.name} back
+                </button>
+              </p>
+            )}
+          </div>
+          {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
+          {active.length > 0 && (
+            <input className="search" type="search" placeholder="Name, department or skill" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a person" />
+          )}
+          {departments.length > 0 && (
+            <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
+              <option value="">All departments</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
+            </select>
+          )}
+          {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
+          <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
+            {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
+          </ShowAll>
+          {archived.length > 0 && (
+            <details className="archived">
+              <summary>Archived ({archived.length})</summary>
+              {/* Each with "Erase details…" for when they ask (ADR 0027). */}
+              {archived.map((p) => (
+                <ArchivedPerson key={p.id} person={p} onBringBack={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))} />
+              ))}
+            </details>
+          )}
+          {mayCrew && (
+            <Fold label="Add person">
+              <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
+              {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
+              <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
+            </Fold>
+          )}
+        </section>
+      )}
+
+      {page === 'people' && (
+        <p className="hint">
+          Freelancers answer from their own private link: no app or login. Send it with an offer by WhatsApp, text or email.
+          {people.size > 0 && ' Their bookings also appear in their own calendar if they subscribe from that page.'}
+        </p>
+      )}
     </div>
   )
 }

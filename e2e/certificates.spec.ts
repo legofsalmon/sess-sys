@@ -67,7 +67,7 @@ test('a call needing IPAF marks who lacks it in the picker, and Offer says why i
 test('the Crew tab lists certificates running out, soonest first, each with a message asking for the new card', async ({ browser }) => {
   // Proves: the reminders card counts them all, insurance among them (ADR 0029), shows the longest run out first, and opens a message to send by WhatsApp, text or email.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const reminders = office.getByRole('region', { name: 'Certificates and documents running out' })
   await expect(reminders.getByRole('heading')).toHaveText('Running out (6)')

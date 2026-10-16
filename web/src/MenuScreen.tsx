@@ -135,10 +135,17 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'crew',
-        icon: 'people',
+        icon: 'message',
         href: '#crew',
-        label: 'Crew',
-        about: 'People, calls and answers to check',
+        label: 'Calls',
+        about: 'Crew needed, and answers to check',
+      },
+      {
+        key: 'people',
+        icon: 'people',
+        href: '#crew/people',
+        label: 'People',
+        about: 'Everyone on the crew list, and certificates running out',
       },
       {
         key: 'leave',
@@ -146,6 +153,13 @@ export const MENU: PlaceGroup[] = [
         href: '#crew/leave',
         label: 'Leave',
         about: 'Time off for staff',
+      },
+      {
+        key: 'timesheets',
+        icon: 'timesheet',
+        href: '#crew/timesheets',
+        label: 'Timesheets',
+        about: 'To approve, and not in yet',
       },
       {
         key: 'import-crew',

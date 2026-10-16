@@ -24,7 +24,7 @@ import { Avatar } from '../Picture.tsx'
 import { Pending, StatusPill } from '../StatusPill.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
-import { CREW } from '../Up.tsx'
+import { CREW, PEOPLE } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { linkFor, PersonForm, STATUS } from './CrewScreen.tsx'
 import { Documents } from './Documents.tsx'
@@ -46,7 +46,7 @@ const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
 
 export function PersonScreen({ view, id, onArchived }: { view: View; id: string; onArchived: (p: { id: string; name: string }) => void }) {
   const person = view.crew.people.find((p) => p.id === id)
-  const up = { steps: [CREW], here: person?.name }
+  const up = { steps: [CREW, PEOPLE], here: person?.name }
   if (!person)
     return (
       <Page view={view} title="Crew" className="crew person-page" up={up}>
@@ -246,7 +246,7 @@ function ComingUp({ person, view, onArchived }: { person: PersonView; view: View
     void run(() => client.mutate('person.archive', { id: person.id, archived: true })).then((ok) => {
       if (!ok) return
       onArchived({ id: person.id, name: person.name })
-      location.hash = '#crew'
+      location.hash = '#crew/people'
     })
   }
   return (

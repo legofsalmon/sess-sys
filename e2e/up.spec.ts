@@ -116,7 +116,7 @@ test('every area names its pages in a row, and the old addresses land on the new
   await page.screenshot(shot('rows-phone'))
 
   await page.goto('/#crew')
-  await expect(page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link')).toHaveText(['Calls and people', 'Leave'])
+  await expect(page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link')).toHaveText([/^Calls/, 'People', /^Leave/, /^Timesheets/])
 
   for (const [old, now] of [
     ['#plan/week/2031-03-03', '#jobs/plan/week/2031-03-03'],

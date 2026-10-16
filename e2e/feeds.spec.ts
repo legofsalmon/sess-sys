@@ -14,7 +14,7 @@ const FEED = new RegExp(`^http://localhost:${process.env.E2E_PORT ?? '3099'}/cal
 
 test('the office copies a freelancer their calendar address, the same one their page gives', async ({ browser }) => {
   const office = await (await browser.newContext({ viewport: phoneSize, permissions: ['clipboard-read', 'clipboard-write'] })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   await office.getByRole('button', { name: 'Add person' }).click()
@@ -61,7 +61,7 @@ test('staff who also work jobs find their own bookings feed under You', async ({
   // Not in Crew yet: nothing to show.
   await expect(card).toHaveCount(0)
 
-  await page.goto('/#crew')
+  await page.goto('/#crew/people')
   await page.getByRole('button', { name: 'Add person' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
   await form.getByLabel('Name').fill('Ciara Walsh')
