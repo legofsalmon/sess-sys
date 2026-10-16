@@ -61,6 +61,8 @@ import { useFeedAddress } from './feed.ts'
 import { LateLines, LateRow, NoteLate } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
+import { Heading } from '../Icon.tsx'
+import { Avatar, Avatars } from '../Picture.tsx'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
@@ -282,7 +284,7 @@ export function CrewScreen() {
       {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
         <section className="card">
           {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
-          <h2>Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</h2>
+          <Heading icon="message">Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</Heading>
           <Refusal error={answers.error} />
           <ShowAll
             items={[
@@ -385,7 +387,7 @@ export function CrewScreen() {
       <CertificateReminders view={view} />
 
       <section className="card">
-        <h2>Crew needed</h2>
+        <Heading icon="calendar">Crew needed</Heading>
         {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
         {groupCalls(upcoming, view.jobs.jobs).map((g) => (
           <div className="call-group" key={g.key}>
@@ -425,7 +427,7 @@ export function CrewScreen() {
       )}
 
       <section className="card" aria-label="People">
-        <h2>People</h2>
+        <Heading icon="people">People</Heading>
         <Refusal error={roster.error} />
         {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
         <div aria-live="polite">
@@ -536,8 +538,8 @@ export function CallCard({
   const live = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
   // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn, Niamh Kelly (offered)".
-  const who = call.offers
-    .filter((o) => o.person && ON_CALL.includes(o.status))
+  const onIt = call.offers.filter((o) => o.person && ON_CALL.includes(o.status))
+  const who = onIt
     .map((o) => `${o.person!.name}${o.status === 'confirmed' ? '' : ` (${STATUS[o.status][0].toLowerCase()})`}`)
     .join(', ')
 
@@ -560,7 +562,12 @@ export function CallCard({
           {(!inJob || !call.phaseId) && call.phase && <span className="muted"> · {call.phase}</span>}
           {inJob && !phaseDays && <span className="muted"> · {daysLabel(call.days)}</span>}
         </b>
-        {who && <span className="who-line">{who}</span>}
+        {who && (
+          <span className="who-line">
+            <Avatars names={onIt.map((o) => o.person!.name)} />
+            <span>{who}</span>
+          </span>
+        )}
       </button>
       {/* The one word at rest on where it stands: a cancelled call kept for the record says so, and a change to it or an offer on it still on its way says that. */}
       <StatusPill tone={!live ? 'cancelled' : filled ? 'confirmed' : 'pending'} pending={call.pending || call.offers.some((o) => o.pending)}>
@@ -1124,24 +1131,27 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
   }
   return (
     <div className="row person">
-      <button type="button" className="who" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <b>{person.name}</b>
-        <small>
-          {[
-            // A role set says more than "Staff"; none set is staff crew, which is what "Staff" says (ADR 0034).
-            person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : null,
-            person.department,
-            levelLine(person.level),
-            person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
-            person.skills.join(', '),
-            person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-          {confirmed > 0 && ` · ${confirmed} booking${confirmed === 1 ? '' : 's'}`}
-          {toConfirm > 0 && ` · ${toConfirm} to confirm`}
-          {off.length > 0 && ' · has days off'}
-        </small>
+      <button type="button" className="who pictured" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Avatar name={person.name} />
+        <span>
+          <b>{person.name}</b>
+          <small>
+            {[
+              // A role set says more than "Staff"; none set is staff crew, which is what "Staff" says (ADR 0034).
+              person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : null,
+              person.department,
+              levelLine(person.level),
+              person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
+              person.skills.join(', '),
+              person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            {confirmed > 0 && ` · ${confirmed} booking${confirmed === 1 ? '' : 's'}`}
+            {toConfirm > 0 && ` · ${toConfirm} to confirm`}
+            {off.length > 0 && ' · has days off'}
+          </small>
+        </span>
       </button>
       <Pending pending={person.pending} />
       {open && editing && (

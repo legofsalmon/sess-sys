@@ -95,6 +95,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .brand .seen-as a { color: var(--accent-ink); font-weight: 700; text-underline-offset: 2px; padding-block: var(--space-12); margin-block: calc(-1 * var(--space-12)); }
 /* Dark or light, top right (ThemeButton.tsx): a picture, its words for a screen reader and a pointer's hover. */
 .theme-button { flex: none; display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
+.theme-button .icon { width: 22px; height: 22px; }
 .mark { flex: none; width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
 .conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
 /* Up to date is healthy, so it's quiet (the design system's "healthy is quiet"): muted words with no bubble round them. Only what's waiting or a lost signal gets a pill. */
@@ -125,6 +126,26 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--space-2); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-14); display: grid; gap: var(--space-10); }
 .card h2 { margin: 0; font-size: var(--text-heading); text-transform: uppercase; letter-spacing: .05em; }
+/* Icons and pictures, from the shared design system's set and its imagery rules: in the ink they sit in, beside their words. */
+.icon { flex: none; width: 1.25em; height: 1.25em; vertical-align: middle; }
+.card h2.with-icon { display: flex; align-items: center; gap: var(--space-8); }
+.card h2.with-icon .icon { width: 18px; height: 18px; }
+.thumb, .avatar { --pic: 44px; flex: none; display: inline-grid; place-items: center; width: var(--pic); height: var(--pic); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); color: var(--muted); }
+.avatar { border-radius: 50%; color: var(--ds-ink-secondary); font-weight: 600; font-size: calc(var(--pic) * .38); line-height: 1; letter-spacing: 0; user-select: none; }
+.avatar[data-initials]::before { content: attr(data-initials); }
+.avatar:has(> img)::before { display: none; }
+.thumb > img, .avatar > img { width: 100%; height: 100%; object-fit: cover; }
+.thumb > .icon, .avatar > .icon { width: 50%; height: 50%; }
+.thumb-small, .avatar-small { --pic: 32px; }
+.thumb-large, .avatar-large { --pic: 88px; }
+.avatars { display: inline-flex; vertical-align: middle; }
+.avatars > .avatar { border: 2px solid var(--panel); }
+.avatars > .avatar + .avatar { margin-left: calc(var(--pic) * -.3); }
+.app .job-row > .thumb, .app .job-row > .avatar, .warehouse .item-row > .thumb { align-self: flex-start; }
+.app .job-row > :is(.thumb, .avatar) + div, .warehouse .item-row > .thumb + div { flex: 1; min-width: 0; }
+/* The picture at the top of a thing's or a person's own page, beside its name. */
+.pictured { display: flex; align-items: center; gap: var(--space-14); }
+.pictured > :not(.thumb, .avatar) { min-width: 0; }
 .attention { border-color: var(--bad); }
 .attention h2 { color: var(--bad); }
 .row { display: flex; justify-content: space-between; gap: var(--space-12); align-items: flex-start; padding-top: var(--space-10); border-top: 1px solid var(--line); flex-wrap: wrap; }
@@ -179,8 +200,14 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app .card > button { justify-self: start; }
 .app .search { width: 100%; }
 .app .filters { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+.app .filters button { display: inline-flex; align-items: center; gap: var(--space-6); }
 .app .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .menu .places { display: grid; gap: var(--space-14); }
+.menu .job-row { justify-content: flex-start; }
+.menu .job-row > div:not(.side) { flex: 1; min-width: 0; }
+.menu .place-icon { flex: none; padding-top: var(--space-2); color: var(--muted); }
+.menu .place-icon .icon { width: 22px; height: 22px; }
+.menu .job-row .side { align-content: center; color: var(--muted); }
 .app .job-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .app .job-row { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .app .job-list li:first-child .job-row { border-top: 0; padding-top: 0; }

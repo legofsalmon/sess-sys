@@ -139,7 +139,8 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .call > .pill { grid-column: 2; grid-row: 1; justify-self: end; margin-top: var(--space-8); }
 .crew .call > button.offer { grid-column: 2; grid-row: 2; justify-self: end; }
 .crew .call-line { display: grid; gap: var(--space-2); justify-items: start; width: 100%; min-height: 44px; padding: var(--space-6) 0; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; font: inherit; }
-.crew .call-line .who-line { font-size: var(--text-small); }
+.crew .call-line .who-line { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-small); }
+.crew .call-line .who-line .avatar { --pic: 26px; }
 .crew .call .facts-line { margin: 0; color: var(--muted); font-size: var(--text-small); }
 /* The picker (ADR 0025) narrowed as you type: the search over the select, the select and Offer side by side. */
 .crew .offer-form .find { grid-column: 1 / -1; }

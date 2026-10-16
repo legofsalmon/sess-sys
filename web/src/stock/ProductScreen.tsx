@@ -48,6 +48,9 @@ import {
 } from './common.tsx'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText } from './Inspections.tsx'
+import { Heading } from '../Icon.tsx'
+import { Thumb } from '../Picture.tsx'
+import { kitIcon } from './kitIcon.ts'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -141,7 +144,10 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   return (
     <section className="card">
       <header className="title">
-        <h1>{m.name}</h1>
+        <div className="pictured">
+          <Thumb icon={kitIcon(m)} size="large" />
+          <h1>{m.name}</h1>
+        </div>
         <Pending pending={m.pending} />
       </header>
       <dl className="facts">
@@ -234,7 +240,7 @@ function OnJobs({ m, lines }: { m: ModelView; lines: readonly KitLineView[] }) {
   }
   return (
     <section className="card" aria-label="On jobs">
-      <h2>On jobs</h2>
+      <Heading icon="calendar">On jobs</Heading>
       <p className="hint">{m.total.toLocaleString('en-IE')} owned. Confirmed jobs hold them; enquiries and quotes are pencilled in.</p>
       {lines.length === 0 && <p className="empty">Not on any job coming up.</p>}
       <ul className="job-list">{lines.slice(0, 5).map(row)}</ul>
