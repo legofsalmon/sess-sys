@@ -184,8 +184,8 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await expect(page.getByRole('region', { name: 'Kit' })).toContainText('Short 1')
   await expect(page.getByRole('region', { name: 'Kit' })).toContainText('2 owned and fit to go out (1 damaged, missing or due a test)')
 
-  // The Stock tab's repair list.
-  await page.goto('/#stock')
+  // Stock's Repairs page.
+  await page.goto('/#stock/repairs')
   const repairs = page.getByRole('region', { name: 'Faults and repairs' })
   await expect(repairs.getByRole('listitem', { name: `${speakers[0]} ${speaker}` })).toContainText("Damaged, can't go out")
   await expect(repairs.getByRole('listitem', { name: `2 × ${cable}` })).toContainText('Cut near the plug')
@@ -211,7 +211,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await expect(faults.locator('summary')).toHaveText('One before')
 
   // The missing cables written off: off the count.
-  await page.goto('/#stock')
+  await page.goto('/#stock/repairs')
   await repairs.getByRole('link', { name: `3 × ${cable}` }).click()
   const cableFaults = page.getByRole('region', { name: 'Faults' })
   const cableFault = cableFaults.getByRole('listitem', { name: `3 × ${cable}` })

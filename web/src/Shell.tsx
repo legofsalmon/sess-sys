@@ -20,7 +20,7 @@ import { YouScreen } from './YouScreen.tsx'
 /**
  * Switches between the app's areas. The address keeps the area, and within
  * it the record open (#jobs/<id>, #stock/item/<id>), the planner's days
- * (#plan/week/<day>) or bringing jobs in (#import), so a reload or a shared
+ * (#jobs/plan/week/<day>) or bringing jobs in (#jobs/import), so a reload or a shared
  * link lands in the same place. Each move lands on the screen's heading
  * and names the tab after it (audit finding 22), so a screen reader says
  * where it is and the browser's history reads as pages.
@@ -28,7 +28,7 @@ import { YouScreen } from './YouScreen.tsx'
  * Five places, each a picture and a word (ADR 0033): Home first, the
  * three areas the work is done in, and the Menu (ADR 0035), which names
  * every place in the app and holds what's used now and then: Admin (the
- * company's settings, still at #account so links and bookmarks land),
+ * company's settings, at #admin; the old #account lands there, ADR 0041),
  * History and You (a person's own settings). Those keep the Menu's tab.
  */
 const AREAS = [
@@ -41,7 +41,7 @@ const AREAS = [
 
 /** Places reached from the Menu, which keep its tab. */
 const UNDER_MENU = [
-  { hash: '#account', Screen: AccountScreen },
+  { hash: '#admin', Screen: AccountScreen },
   { hash: '#history', Screen: HistoryScreen },
   { hash: '#me', Screen: YouScreen },
 ] as const
@@ -106,16 +106,10 @@ export function Shell() {
     return () => removeEventListener('hashchange', on)
   }, [])
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
-  // The planner (ADR 0010) and bringing jobs in from Google Calendar (ADR 0011) are part of Jobs, so they keep its tab; Admin, History and You keep the Menu's.
-  const jobs = AREAS[1]
+  // Every address starts with its area (ADR 0041), so its tab is the one it starts with; Admin, History and You keep the Menu's.
   const menu = AREAS[4]
   const under = UNDER_MENU.find((u) => within(u.hash))
-  const area =
-    within('#plan') || within('#import') || within('#venues') || within('#clients')
-      ? jobs
-      : under
-        ? menu
-        : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  const area = under ? menu : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
   const Screen = under?.Screen ?? area.Screen
 
   const main = useRef<HTMLElement>(null)

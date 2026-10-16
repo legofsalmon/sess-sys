@@ -42,7 +42,7 @@ test('shows who did what, on which device, and what was made offline', async ({ 
   const code = await deviceCode(page)
   const [bay, van] = [`Bay ${unique()}`, `Van ${unique()}`]
 
-  await page.goto('/#stock')
+  await page.goto('/#stock/places')
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await addPlace(page, bay)
   await expect(page.locator('.conn')).toHaveText('Up to date')
@@ -133,7 +133,7 @@ test('says the history needs signal', async ({ page }) => {
 
 test('downloads everything in one file, and the download shows in the history', async ({ page }) => {
   const code = await deviceCode(page)
-  await page.goto('/#account')
+  await page.goto('/#admin')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download everything' }).click()
   const download = await downloading

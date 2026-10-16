@@ -140,12 +140,12 @@ function row(page: Page, name: string) {
 test('a week by job on a phone, then by person with its clashes', async ({ browser }) => {
   const phone = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await ready(phone, '#jobs')
-  await phone.getByRole('navigation', { name: 'Show jobs as' }).getByRole('link', { name: 'Week' }).click()
-  await expect(phone).toHaveURL(/#plan\/week\/\d{4}-\d{2}-\d{2}$/)
+  await phone.getByRole('navigation', { name: 'Jobs pages' }).getByRole('link', { name: 'Week' }).click()
+  await expect(phone).toHaveURL(/#jobs\/plan\/week\/\d{4}-\d{2}-\d{2}$/)
   await expect(phone.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
 
   // Straight to the first week of March 2031, as a shared link would.
-  await ready(phone, '#plan/week/2031-03-05')
+  await ready(phone, '#jobs/plan/week/2031-03-05')
   await expect(phone.getByRole('heading', { name: 'Mon 3 Mar to Sun 9 Mar 2031' })).toBeVisible()
   const summit = row(phone, named('Web Summit'))
   await expect(summit.nth(0)).toHaveText('Build 1/22 of 3 crew, 1 asked')
@@ -172,7 +172,7 @@ test('a week by job on a phone, then by person with its clashes', async ({ brows
 
   // By person: who is where, with the clash and the check on their days.
   await phone.getByRole('button', { name: 'People' }).click()
-  await expect(phone).toHaveURL(/#plan\/week\/2031-03-03\/people$/)
+  await expect(phone).toHaveURL(/#jobs\/plan\/week\/2031-03-03\/people$/)
   const aoife = row(phone, named('Aoife Byrne'))
   await expect(aoife.nth(0)).toHaveText(`${named('Web Summit')}Build · Audio tech`)
   await expect(aoife.nth(1)).toHaveClass(/clash/)
@@ -194,8 +194,8 @@ test('a week by job on a phone, then by person with its clashes', async ({ brows
 
 test('a month on a laptop, whose dates open their week', async ({ browser }) => {
   const laptop = await (await browser.newContext({ viewport: laptopSize })).newPage()
-  await ready(laptop, '#plan/month/2031-03-20')
-  await expect(laptop).toHaveURL(/#plan\/month\/2031-03-20$/)
+  await ready(laptop, '#jobs/plan/month/2031-03-20')
+  await expect(laptop).toHaveURL(/#jobs\/plan\/month\/2031-03-20$/)
   await expect(laptop.getByRole('heading', { name: 'March 2031' })).toBeVisible()
   const paddys = row(laptop, named("St Patrick's Festival"))
   await expect(paddys.nth(13).locator('[aria-hidden]')).toHaveText('Bu')
@@ -227,12 +227,12 @@ test('a month on a laptop, whose dates open their week', async ({ browser }) => 
 
   // A date opens its week, still by person; Previous and Next move a week at a time.
   await laptop.getByRole('link', { name: 'Sat 8 Mar: open its week' }).click()
-  await expect(laptop).toHaveURL(/#plan\/week\/2031-03-03\/people$/)
+  await expect(laptop).toHaveURL(/#jobs\/plan\/week\/2031-03-03\/people$/)
   await expect(laptop.getByRole('heading', { name: 'Mon 3 Mar to Sun 9 Mar 2031' })).toBeVisible()
   await laptop.getByRole('link', { name: 'Next week' }).click()
   await expect(laptop.getByRole('heading', { name: 'Mon 10 Mar to Sun 16 Mar 2031' })).toBeVisible()
-  await laptop.getByRole('navigation', { name: 'Show jobs as' }).getByRole('link', { name: 'Month' }).click()
-  await expect(laptop).toHaveURL(/#plan\/month\/2031-03-01\/people$/)
-  await laptop.getByRole('navigation', { name: 'Show jobs as' }).getByRole('link', { name: 'List' }).click()
+  await laptop.getByRole('navigation', { name: 'Jobs pages' }).getByRole('link', { name: 'Month' }).click()
+  await expect(laptop).toHaveURL(/#jobs\/plan\/month\/2031-03-01\/people$/)
+  await laptop.getByRole('navigation', { name: 'Jobs pages' }).getByRole('link', { name: 'List' }).click()
   await expect(laptop.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible()
 })

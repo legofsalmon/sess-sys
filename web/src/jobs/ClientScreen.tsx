@@ -5,17 +5,17 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
 import { Page } from './common.tsx'
-import { JOBS } from '../Up.tsx'
+import { CLIENTS, JOBS } from '../Up.tsx'
 
 /**
- * One client on a page of its own (ADR 0032, #clients/<id>): who to talk
+ * One client on a page of its own (ADR 0032, #jobs/clients/<id>): who to talk
  * to there, the notes, the documents kept for them (their contract,
  * purchase orders, a brief…), and their jobs.
  */
 
 export function ClientScreen({ view, id }: { view: View; id: string }) {
   const found = view.jobs.clients.find((c) => c.id === id)
-  const up = { steps: [JOBS], here: found?.name }
+  const up = { steps: [JOBS, CLIENTS], here: found?.name }
   if (!found)
     return (
       <Page view={view} title="Client" className="crew jobs" up={up}>

@@ -56,8 +56,8 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.locator('.facts')).toContainText('Mon 7 Oct to Wed 9 Oct')
   // A phase's call sheet and calendar line wait behind a tap on its details (audit finding 16).
   for (const phase of ['Build', 'Show']) await office.getByRole('article', { name: phase }).locator('summary').click()
-  await expect(office.getByText(`Goes on the calendar as “${job} - Build 1/2” and “${job} - Build 2/2” once one is connected on the Admin tab.`)).toBeVisible()
-  await expect(office.getByText(`Goes on the calendar as “${job} - Show” once one is connected on the Admin tab.`)).toBeVisible()
+  await expect(office.getByText(`Goes on the calendar as “${job} - Build 1/2” and “${job} - Build 2/2” once one is connected in Admin.`)).toBeVisible()
+  await expect(office.getByText(`Goes on the calendar as “${job} - Show” once one is connected in Admin.`)).toBeVisible()
 
   // Crew for the build.
   await office.getByRole('button', { name: 'Ask for crew' }).click()

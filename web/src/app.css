@@ -159,6 +159,13 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
 .app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
+/* An area's pages in one row (Views.tsx): the current one filled. Each takes an equal share where they fit; on a phone a longer row scrolls sideways rather than squeezing a name. */
+.views { display: flex; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; }
+.views::-webkit-scrollbar { display: none; }
+.views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
+.views a:not([aria-current]):hover { color: var(--ink); }
+.views-count { font-weight: 600; opacity: .8; }
 /* The way up (Up.tsx), in the bar so it stays in view down a long page: one link to the parent on a phone, as tall as a thumb; from 900px, where the places are a sidebar, the whole way down as breadcrumbs, the page itself last and not a link. The separators are drawn here and not read out. */
 .top .up { grid-column: 1 / -1; min-width: 0; margin-top: calc(-1 * var(--space-6)); }
 .top .up-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; }

@@ -40,13 +40,25 @@ export const MENU: PlaceGroup[] = [
       },
       {
         key: 'plan',
-        href: '#plan',
+        href: '#jobs/plan',
         label: 'Planner',
         about: 'The weeks and months ahead at a glance',
       },
       {
+        key: 'clients',
+        href: '#jobs/clients',
+        label: 'Clients',
+        about: 'Who the jobs are for, their contacts and documents',
+      },
+      {
+        key: 'venues',
+        href: '#jobs/venues',
+        label: 'Venues',
+        about: 'Where the jobs are, their specs and documents',
+      },
+      {
         key: 'import',
-        href: '#import',
+        href: '#jobs/import',
         label: 'Bring in from Google Calendar',
         about: 'Jobs already in the calendar',
         needs: ['jobs'],
@@ -61,7 +73,13 @@ export const MENU: PlaceGroup[] = [
         key: 'stock',
         href: '#stock',
         label: 'Stock',
-        about: 'The catalogue, places and what needs repair',
+        about: 'The catalogue, and kit going out and coming back',
+      },
+      {
+        key: 'places',
+        href: '#stock/places',
+        label: 'Places',
+        about: 'Where kit is kept',
       },
       {
         key: 'labels',
@@ -78,8 +96,21 @@ export const MENU: PlaceGroup[] = [
       {
         key: 'testing',
         href: '#stock/testing',
-        label: 'PAT tests',
-        about: 'Test a batch of kit',
+        label: 'Testing',
+        about: 'Tests due, and testing a batch of kit',
+      },
+      {
+        key: 'repairs',
+        href: '#stock/repairs',
+        label: 'Repairs',
+        about: 'Faults and missing kit to sort out',
+      },
+      {
+        key: 'import-stock',
+        href: '#stock/import',
+        label: 'Bring in the stock list',
+        about: 'From a spreadsheet',
+        needs: ['settings'],
       },
     ],
   },
@@ -99,6 +130,13 @@ export const MENU: PlaceGroup[] = [
         label: 'Leave',
         about: 'Time off for staff',
       },
+      {
+        key: 'import-crew',
+        href: '#crew/import',
+        label: 'Bring in the crew list',
+        about: 'From a spreadsheet',
+        needs: ['settings'],
+      },
     ],
   },
   {
@@ -107,9 +145,9 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'admin',
-        href: '#account',
+        href: '#admin',
         label: 'Admin',
-        about: 'The office, calendar, backups, data and bringing lists in',
+        about: 'The office, Google Calendar, backups and data',
         needs: ['settings', 'company'],
       },
       {

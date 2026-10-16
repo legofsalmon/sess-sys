@@ -19,10 +19,10 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
 import { post } from '../server.ts'
-import { ADMIN, MENU } from '../Up.tsx'
+import { CREW } from '../Up.tsx'
 
 /**
- * Bringing in the crew list (ADR 0025), at #account/import-people: choose
+ * Bringing in the crew list (ADR 0025), at #crew/import: choose
  * the spreadsheet saved as a .csv file, see every row as the app read it
  * with anything it couldn't read marked, fix those in place or skip them,
  * then bring them all in at once. The server reads the file and matches
@@ -99,7 +99,7 @@ export function ImportPeopleScreen({ view }: { view: View }) {
 
   return (
     <div className="app crew jobs import import-people">
-      <Top view={view} title="Admin" up={{ steps: [MENU, ADMIN], here: 'Bring in the crew list' }} />
+      <Top view={view} title="Crew" up={{ steps: [CREW], here: 'Bring in the crew list' }} />
       <header className="title">
         {/* Where it's up to (rule 13): choosing the file, then checking every row before anything is saved. */}
         {step.at !== 'done' && <p className="kicker">{step.at === 'preview' ? 'Step 2 of 2: check every row' : 'Step 1 of 2: choose the file'}</p>}
@@ -204,7 +204,7 @@ function Preview(p: {
           <b>{plural(counts.rows, 'row', 'rows')}</b> read: {said.join(', ')}.
         </p>
         {p.preview.officeDomain === null ? (
-          <p className="warn-line">No office email is set on the Admin tab, so everyone comes in as a freelancer. Set it first to have company emails come in as staff.</p>
+          <p className="warn-line">No office email is set in Admin, so everyone comes in as a freelancer. Set it first to have company emails come in as staff.</p>
         ) : (
           <p className="hint">Emails at {p.preview.officeDomain} come in as staff; the rest as freelancers. Levels come from Preferred and Onboarded; the office's own level is kept for anyone already here.</p>
         )}

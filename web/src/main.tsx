@@ -4,9 +4,11 @@ import './app.css'
 import './crew/crew.css'
 import './jobs/jobs.css'
 import './home/home.css'
+import { followMovedAddresses } from './addresses.ts'
 import { startErrorReporting } from './errors.ts'
 import { watchForUpdates } from './update.tsx'
 
+followMovedAddresses()
 void startErrorReporting()
 watchForUpdates()
 

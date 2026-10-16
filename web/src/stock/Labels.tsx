@@ -23,9 +23,8 @@ import { Top } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
-import { STOCK, type Step } from '../Up.tsx'
-
-const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
+import { LABELS, STOCK } from '../Up.tsx'
+import { StockViews } from '../Views.tsx'
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
@@ -207,7 +206,8 @@ export function LabelsScreen({ view }: { view: View }) {
   const runs = view.labels.runs
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'Labels' }} />
+      <Top view={view} title="Stock" />
+      <StockViews view={view} current="labels" />
       <section className="card">
         <h1>Labels</h1>
         <p className="hint">

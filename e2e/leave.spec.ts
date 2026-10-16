@@ -194,7 +194,7 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await eoin.getByLabel('Your name').selectOption({ label: `Eoin Byrne ${id}` })
   await eoin.getByRole('button', { name: "That's me" }).click()
   await expect(crewBadge).toHaveText(String(before + 1))
-  await eoin.getByRole('link', { name: '‹ Crew' }).click()
+  await eoin.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: 'Calls and people' }).click()
   await expect(eoin.getByRole('region', { name: 'Leave' })).toContainText('1 request to approve.')
   await eoin.getByRole('link', { name: 'Open leave' }).click()
   const queue = eoin.getByRole('region', { name: 'To approve' })
@@ -233,7 +233,7 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   await expect(allowance).toContainText(FROM.slice(0, 4) === today.slice(0, 4) ? '3 days approved, 19 days left' : 'no days approved, 22 days left')
 
   // The planner shows her days off, as it shows any days off.
-  await eoin.goto(`/#plan/week/${FROM}/people`)
+  await eoin.goto(`/#jobs/plan/week/${FROM}/people`)
   await expect(eoin.getByRole('status')).toHaveText('Up to date')
   const cells = row(eoin, `Nora Walsh ${id}`)
   await expect(cells.nth(1)).toContainText('Unavailable')

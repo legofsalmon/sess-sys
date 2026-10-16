@@ -205,7 +205,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   // From the Jobs tab, with Google Calendar connected.
   await page.goto('/#jobs')
   await page.getByRole('link', { name: 'Bring them in' }).click()
-  await expect(page).toHaveURL(/#import$/)
+  await expect(page).toHaveURL(/#jobs\/import$/)
   await expect(page.getByRole('heading', { name: 'Bring in from Google Calendar' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
 
@@ -318,7 +318,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
       ],
     },
   ])
-  await expect(page.getByRole('link', { name: 'See them in the planner' })).toHaveAttribute('href', /^#plan\/month\/\d{4}-\d{2}-01$/)
+  await expect(page.getByRole('link', { name: 'See them in the planner' })).toHaveAttribute('href', /^#jobs\/plan\/month\/\d{4}-\d{2}-01$/)
 
   // Taking the first bring-in back: asked in the app, done in one go, and then the calendar can come in again.
   await page.getByRole('button', { name: 'Look at another calendar' }).click()
@@ -342,7 +342,7 @@ test('on a laptop, and when the calendar can’t be read', async ({ browser }) =
   await page.route(/\/api\/calendar\/import\/look/, (route) =>
     route.fulfill({ status: 409, json: { error: "The connected Google account can't see that calendar any more. Choose another, or share it with that account again." } })
   )
-  await page.goto('/#import')
+  await page.goto('/#jobs/import')
   const form = page.getByRole('form', { name: 'Calendar to bring in from' })
   await form.getByRole('radio', { name: /Aoife Byrne/ }).check()
   await form.getByRole('button', { name: 'Look at the calendar' }).click()

@@ -18,7 +18,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
-import { STOCK } from '../Up.tsx'
+import { StockViews } from '../Views.tsx'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -253,11 +253,6 @@ export function InspectionsDue({ view }: { view: View }) {
           . They can still go out; record their last test when you have it.
         </p>
       )}
-      <div className="actions">
-        <a className="button" href="#stock/testing">
-          Test a batch
-        </a>
-      </div>
     </section>
   )
 }
@@ -419,7 +414,8 @@ export function TestingScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse pick">
-      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'PAT tests' }} />
+      <Top view={view} title="Stock" />
+      <StockViews view={view} current="testing" />
       <section className="card" aria-label="Testing">
         <header className="title">
           <h1>Test a batch</h1>
@@ -510,6 +506,7 @@ export function TestingScreen({ view }: { view: View }) {
           </ul>
         </section>
       )}
+      <InspectionsDue view={view} />
     </div>
   )
 }

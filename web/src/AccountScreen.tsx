@@ -1,29 +1,21 @@
 import { useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
-import { ImportPeopleScreen } from './crew/ImportPeople.tsx'
 import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
-import { ImportPeopleCard } from './ImportPeopleCard.tsx'
-import { ImportStockCard } from './ImportStockCard.tsx'
-import { Top, useHash } from './jobs/common.tsx'
+import { ListsCard } from './ListsCard.tsx'
+import { Top } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
-import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
 import { MENU } from './Up.tsx'
 
-/** The company's settings, reached from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, and bringing in the crew and stock lists. A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
+/** The company's settings, at #admin from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, and the way to where each list is brought in (ADR 0041). A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
 
 export function AccountScreen() {
   const auth = useAuth()
   const view = useView()
-  const hash = useHash()
   const access = useAccess()
-  // Bringing in the crew list (ADR 0025) has a screen of its own under Account.
-  if (hash === '#account/import-people') return <ImportPeopleScreen view={view} />
-  // And the stock list (ADR 0026).
-  if (hash === '#account/import-stock') return <ImportStockScreen view={view} />
 
   return (
     <div className="app account">
@@ -69,12 +61,7 @@ export function AccountScreen() {
             </>
           )}
           {access.can('company') && <DataCard view={view} />}
-          {access.can('settings') && (
-            <>
-              <ImportPeopleCard />
-              <ImportStockCard />
-            </>
-          )}
+          {access.can('settings') && <ListsCard calendar={access.can('jobs')} />}
         </>
       )}
     </div>

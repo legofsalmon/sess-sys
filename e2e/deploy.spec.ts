@@ -24,7 +24,7 @@ test('a new version waits for Load the new version, which brings it in with an u
   // Proves: a deploy never takes the open page over by itself, and Load the new version brings the new build with nothing lost.
   const context = await browser.newContext()
   const tab = await context.newPage()
-  await tab.goto('/#stock')
+  await tab.goto('/#stock/places')
   await expect(tab.locator('.conn')).toHaveText('Up to date')
   // The service worker is in control, as it is on any phone that has opened the app before.
   await tab.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 }).catch(() => tab.reload())

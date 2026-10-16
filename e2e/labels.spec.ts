@@ -101,10 +101,9 @@ test('set aside, printed, sent to a label maker, and put on items by scanning', 
   await ready(page)
   await newProduct(page, speaker, bay, 3)
 
-  // From the Stock tab to setting twelve numbers aside.
+  // From Stock's row to setting twelve numbers aside.
   await page.goto('/#stock')
-  const card = page.getByRole('region', { name: 'Labels' })
-  await card.getByRole('link', { name: 'Print labels' }).click()
+  await page.getByRole('navigation', { name: 'Stock pages' }).getByRole('link', { name: 'Labels' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Labels' })).toBeVisible()
   const form = page.getByRole('form', { name: 'Set numbers aside' })
   await form.getByLabel('How many labels').fill('12')

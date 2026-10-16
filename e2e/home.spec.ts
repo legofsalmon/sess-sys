@@ -70,7 +70,7 @@ test('the Menu names every place, and Admin, History and You keep its tab with t
   await expect(page.getByRole('heading', { level: 1, name: 'Menu' })).toBeVisible()
   const places = page.getByRole('navigation', { name: 'Every place' })
   for (const group of ['Jobs', 'Stock', 'Crew', 'Company', 'You']) await expect(places.getByRole('group', { name: group })).toBeVisible()
-  await expect(places.getByRole('link', { name: /^Planner/ })).toHaveAttribute('href', '#plan')
+  await expect(places.getByRole('link', { name: /^Planner/ })).toHaveAttribute('href', '#jobs/plan')
 
   for (const [link, title] of [
     [/^History/, 'History'],
@@ -90,12 +90,11 @@ test('a long screen names its parts at the top, and a tap goes to one', async ({
   await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   const parts = page.getByRole('navigation', { name: 'On this screen' })
-  await expect(parts.getByRole('button', { name: 'Pick lists' })).toBeVisible()
-  await parts.getByRole('button', { name: 'Places' }).click()
-  const places = page.getByRole('heading', { name: 'Places', exact: true })
-  await expect(places).toBeFocused()
-  await expect(places).toBeInViewport()
-  await expect(parts.getByRole('button', { name: 'Places' })).toHaveAttribute('aria-current', 'location')
+  await parts.getByRole('button', { name: 'Pick lists' }).click()
+  const lists = page.getByRole('heading', { name: 'Pick lists', exact: true })
+  await expect(lists).toBeFocused()
+  await expect(lists).toBeInViewport()
+  await expect(parts.getByRole('button', { name: 'Pick lists' })).toHaveAttribute('aria-current', 'location')
   // A heading's count is the part's count.
   await page.goto('/#crew')
   await expect(parts.getByRole('button', { name: /^Answers to check/ }).locator('.count')).toHaveText(/^\d+$/)

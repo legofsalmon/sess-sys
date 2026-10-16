@@ -24,10 +24,10 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Top } from '../jobs/common.tsx'
 import { post } from '../server.ts'
-import { ADMIN, MENU } from '../Up.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
- * Bringing in the stock list (ADR 0026), at #account/import-stock: choose
+ * Bringing in the stock list (ADR 0026), at #stock/import: choose
  * the sheet saved as a .csv file; say which column is which when the app
  * doesn't know a header; see every row as the app read it, with what it
  * will add or change and anything it couldn't read marked; fix those in
@@ -125,7 +125,7 @@ export function ImportStockScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse jobs import import-stock">
-      <Top view={view} title="Admin" up={{ steps: [MENU, ADMIN], here: 'Bring in the stock list' }} />
+      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'Bring in the stock list' }} />
       <header className="title">
         <h1 ref={heading} tabIndex={-1}>
           {step.at === 'done' ? 'Brought in' : 'Bring in the stock list'}

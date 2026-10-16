@@ -286,7 +286,7 @@ export function CalendarCard({ view, available }: { view: View; available: boole
         </div>
       )}
       <p className="hint">
-        Jobs already on a calendar {link.account} can see? <a href="#import">Bring them in</a>.
+        Jobs already on a calendar {link.account} can see? <a href="#jobs/import">Bring them in</a>.
       </p>
       <p className="hint">
         {onIt === 0 ? 'Nothing' : onIt === 1 ? '1 day' : `${onIt} days`} on it from today.

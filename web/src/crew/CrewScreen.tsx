@@ -61,6 +61,8 @@ import { useFeedAddress } from './feed.ts'
 import { LateLines, LateRow, NoteLate } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
+import { CrewViews } from '../Views.tsx'
+import { ImportPeopleScreen } from './ImportPeople.tsx'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
@@ -269,6 +271,8 @@ export function CrewScreen() {
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
   // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
   if (hash === '#crew/leave') return <LeaveScreen view={view} />
+  // Bringing in the crew list (ADR 0025), under Crew where the list lives (ADR 0041).
+  if (hash === '#crew/import') return <ImportPeopleScreen view={view} />
 
   /** Settle a yes or a counter, then tell them. */
   const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
@@ -278,6 +282,7 @@ export function CrewScreen() {
   return (
     <div className="app crew">
       <Top view={view} title="Crew" root />
+      <CrewViews current="crew" />
 
       {(toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
         <section className="card">

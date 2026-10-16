@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
+import { Views } from '../Views.tsx'
 
 /**
  * The planner (ADR 0010): a week or a month of jobs, or of people, with the
@@ -37,37 +38,40 @@ interface Place {
   rows: Rows
 }
 
-/** What the address says is on screen: #plan/week/2026-10-05, or #plan/month/2026-10-01/people. */
+/** What the address says is on screen: #jobs/plan/week/2026-10-05, or #jobs/plan/month/2026-10-01/people. */
 function placeOf(hash: string, now: string): Place {
-  const [, scale, day, rows] = hash.split('/')
+  const [, , scale, day, rows] = hash.split('/')
   return { scale: scale === 'month' ? 'month' : 'week', day: day && isDay(day) ? day : now, rows: rows === 'people' ? 'people' : 'jobs' }
 }
 
 function hashOf(p: Place): string {
-  return `#plan/${p.scale}/${p.scale === 'week' ? mondayOf(p.day) : addMonths(p.day, 0)}${p.rows === 'people' ? '/people' : ''}`
+  return `#jobs/plan/${p.scale}/${p.scale === 'week' ? mondayOf(p.day) : addMonths(p.day, 0)}${p.rows === 'people' ? '/people' : ''}`
 }
 
 const daysOf = (scale: Scale, day: string) => (scale === 'week' ? weekOf(day) : monthOf(day))
 
-/** List, Week and Month: the same jobs three ways. From the planner, the other scale opens on the same days. */
-export function JobViews({ place }: { place?: Place }) {
+/**
+ * Jobs' row (Views.tsx): List, Week and Month, the same jobs three ways,
+ * then the clients and the venues they're for. From the planner, the other
+ * scale opens on the same days.
+ */
+export function JobViews({ place, current }: { place?: Place; current?: 'clients' | 'venues' }) {
   const now = useToday()
   const days = place && daysOf(place.scale, place.day)
   const day = days && !days.includes(now) ? days[0]! : now
   const rows = place?.rows ?? 'jobs'
-  const current = place?.scale ?? 'list'
   return (
-    <nav className="views" aria-label="Show jobs as">
-      <a href="#jobs" aria-current={current === 'list' ? 'page' : undefined}>
-        List
-      </a>
-      <a href={hashOf({ scale: 'week', day, rows })} aria-current={current === 'week' ? 'page' : undefined}>
-        Week
-      </a>
-      <a href={hashOf({ scale: 'month', day, rows })} aria-current={current === 'month' ? 'page' : undefined}>
-        Month
-      </a>
-    </nav>
+    <Views
+      label="Jobs pages"
+      current={current ?? place?.scale ?? 'list'}
+      pages={[
+        { key: 'list', href: '#jobs', label: 'List' },
+        { key: 'week', href: hashOf({ scale: 'week', day, rows }), label: 'Week' },
+        { key: 'month', href: hashOf({ scale: 'month', day, rows }), label: 'Month' },
+        { key: 'clients', href: '#jobs/clients', label: 'Clients' },
+        { key: 'venues', href: '#jobs/venues', label: 'Venues' },
+      ]}
+    />
   )
 }
 
