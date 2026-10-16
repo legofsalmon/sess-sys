@@ -159,6 +159,20 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
 .app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
+/* The way up (Up.tsx), in the bar so it stays in view down a long page: one link to the parent on a phone, as tall as a thumb; from 900px, where the places are a sidebar, the whole way down as breadcrumbs, the page itself last and not a link. The separators are drawn here and not read out. */
+.top .up { grid-column: 1 / -1; min-width: 0; margin-top: calc(-1 * var(--space-6)); }
+.top .up-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; }
+.top .crumbs { display: none; }
+.crumbs ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; min-width: 0; font-size: var(--text-small); color: var(--muted); }
+.crumbs li { display: flex; align-items: center; min-width: 0; flex: none; }
+.crumbs li:last-child { flex: 0 1 auto; }
+.crumbs li + li::before { content: '›' / ''; padding-inline: var(--space-8); }
+.crumbs a { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-block: var(--space-6); color: var(--muted); font-weight: 600; text-decoration: none; }
+.crumbs [aria-current] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
+@media (min-width: 900px) {
+  .top .up-link { display: none; }
+  .top .crumbs { display: block; }
+}
 .app .title { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
 /* An area's own screen says its name, large, so Home, Jobs, Stock, Crew and Admin read as different places (ADR 0033). */
@@ -305,7 +319,7 @@ button, a.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.li
 @media (hover: hover) {
   button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
   button.primary:not(:disabled):hover, a.button.primary:hover, button.danger:not(:disabled):hover { filter: brightness(.92); }
-  .app button.link:not(:disabled):hover, .app a.link:hover, .app .back:hover, .account button.link:not(:disabled):hover { color: var(--ink); }
+  .app button.link:not(:disabled):hover, .app a.link:hover, .app .back:hover, .top .up-link:hover, .crumbs a:hover, .account button.link:not(:disabled):hover { color: var(--ink); }
   .tabs a:not([aria-current='page']):hover { background: var(--ds-wash-hover); color: var(--ink); }
   .app .job-row:not([aria-current='page']):hover b, .app .who:not(:disabled):hover b, .history .run-line:hover .what { text-decoration: underline; text-underline-offset: 3px; }
 }

@@ -8,6 +8,7 @@ import { client } from '../sync.ts'
 import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, SavedLine, ScanMisses, ScanResult, useScanMisses, WhereChoices } from './common.tsx'
 import { CountsOf } from './Counts.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
  * One place: what's kept there, cases and what's in them, and what's
@@ -19,21 +20,17 @@ import { CameraScanner, primeSound } from './Scanner.tsx'
 export function PlaceScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
   const w = view.warehouse
   const p = w.places.find((x) => x.id === id)
-  const back = (
-    <a className="back" href="#stock">
-      ‹ All stock
-    </a>
-  )
+  const up = { steps: [STOCK], here: p?.name }
   if (!p)
     return (
-      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+      <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
         <section className="card">
           <p className="empty">This place isn't on this device. It may still be on its way, or it was removed: check again once it says “Up to date”.</p>
         </section>
       </Page>
     )
   return (
-    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+    <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
       <Summary p={p} w={w} />
       <CountsOf view={view} where={{ placeId: p.id, caseId: null }} />
       <Here p={p} w={w} />

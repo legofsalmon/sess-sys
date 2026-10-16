@@ -11,6 +11,7 @@ import { OfficeCard } from './OfficeCard.tsx'
 import { ImportStockScreen } from './stock/ImportStock.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
+import { MENU } from './Up.tsx'
 
 /** The company's settings, reached from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, and bringing in the crew and stock lists. A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
 
@@ -26,10 +27,7 @@ export function AccountScreen() {
 
   return (
     <div className="app account">
-      <Top view={view} title="Admin" />
-      <a className="back" href="#menu">
-        ‹ Menu
-      </a>
+      <Top view={view} title="Admin" up={{ steps: [MENU], here: 'Admin' }} />
       <h1>Admin</h1>
 
       {auth.status === 'open' && auth.passcode && (

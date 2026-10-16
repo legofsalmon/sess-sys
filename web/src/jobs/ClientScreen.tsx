@@ -5,6 +5,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
 import { Page } from './common.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * One client on a page of its own (ADR 0032, #clients/<id>): who to talk
@@ -14,21 +15,17 @@ import { Page } from './common.tsx'
 
 export function ClientScreen({ view, id }: { view: View; id: string }) {
   const found = view.jobs.clients.find((c) => c.id === id)
-  const back = (
-    <a className="back" href="#jobs">
-      ‹ All jobs
-    </a>
-  )
+  const up = { steps: [JOBS], here: found?.name }
   if (!found)
     return (
-      <Page view={view} title="Client" className="crew jobs" back={back}>
+      <Page view={view} title="Client" className="crew jobs" up={up}>
         <section className="card">
           <p className="empty">This client isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
       </Page>
     )
   return (
-    <Page view={view} title="Client" className="crew jobs" back={back}>
+    <Page view={view} title="Client" className="crew jobs" up={up}>
       <ClientSummary c={found} />
       <Attachments owner={{ owner: 'client', id: found.id, name: found.name }} />
       <JobsCard jobs={view.jobs.jobs.filter((j) => j.clientId === found.id)} title="Their jobs" />

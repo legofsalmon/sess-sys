@@ -23,6 +23,7 @@ import { Empty } from '../Empty.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Top } from './common.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * A phase's call sheet (ADR 0021), #jobs/<job>/sheet/<phase>, as the office
@@ -75,10 +76,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
   if (!job || !phase)
     return (
       <div className="app crew jobs">
-        <Top view={view} />
-        <a className="back" href={job ? `#jobs/${job.id}` : '#jobs'}>
-          ‹ {job?.name ?? 'All jobs'}
-        </a>
+        <Top view={view} up={{ steps: job ? [JOBS, { href: `#jobs/${job.id}`, label: job.name }] : [JOBS] }} />
         <section className="card">
           <p className="empty">This phase isn't on this device. It may have been removed, or still be on its way: check again once it says “Up to date”.</p>
         </section>
@@ -105,10 +103,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
 
   return (
     <div className="app crew jobs sheet-screen">
-      <Top view={view} />
-      <a className="back" href={`#jobs/${job.id}`}>
-        ‹ {job.name}
-      </a>
+      <Top view={view} up={{ steps: [JOBS, { href: `#jobs/${job.id}`, label: job.name }], here: `Call sheet · ${phase.name}` }} />
       <section className="card">
         <p className="kicker">Call sheet</p>
         <h1>

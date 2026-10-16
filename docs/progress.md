@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: a way up from every page, and where things live
+
+**Done**
+
+- Colly asked for breadcrumbs or a back button. Every page under Jobs,
+  Stock, Crew and the Menu now has its way up in the top bar, so it stays
+  in view down a long page: one link to the page above on a phone ("‹ All
+  jobs"), and the whole way down as breadcrumbs on a desk (Jobs › Liffey
+  Brands Shoot › Pick list)
+  ([Decision 0039](adr/0039-the-way-up-and-breadcrumbs.md)).
+- Looked over where everything lives and wrote up a tidier structure
+  ([where things live](information-architecture.md)): addresses that start
+  with their area, each list brought in where it lives, list pages for
+  clients and venues, Stock's long screen split into its parts, and Admin
+  as settings only.
+
+**Waiting on**
+
+- Colly: say whether to move things as proposed.
+
 ## 16 October 2026, later: a season comes in within the app's wait
 
 **Done**
