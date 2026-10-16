@@ -23,9 +23,9 @@ test('the office copies a freelancer their calendar address, the same one their 
   await form.getByLabel('Mobile').fill('+353 86 765 4321')
   await form.getByRole('button', { name: 'Add person' }).click()
   await expect(office.getByRole('status')).toHaveText('Up to date')
-  await office.getByRole('button', { name: 'Orla Murphy' }).click()
+  await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Orla Murphy/ }).click()
 
-  const row = office.locator('.row.person').filter({ hasText: 'Orla Murphy' })
+  const row = office.getByRole('region', { name: 'Their link' })
   await row.getByRole('button', { name: 'Copy calendar address' }).click()
   const feed = await office.evaluate(() => navigator.clipboard.readText())
   expect(feed).toMatch(FEED)
