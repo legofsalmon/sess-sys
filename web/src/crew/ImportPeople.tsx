@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
 import { post } from '../server.ts'
+import { ADMIN, MENU } from '../Up.tsx'
 
 /**
  * Bringing in the crew list (ADR 0025), at #account/import-people: choose
@@ -98,10 +99,7 @@ export function ImportPeopleScreen({ view }: { view: View }) {
 
   return (
     <div className="app crew jobs import import-people">
-      <Top view={view} title="Admin" />
-      <a className="back" href="#account">
-        ‹ Admin
-      </a>
+      <Top view={view} title="Admin" up={{ steps: [MENU, ADMIN], here: 'Bring in the crew list' }} />
       <header className="title">
         {/* Where it's up to (rule 13): choosing the file, then checking every row before anything is saved. */}
         {step.at !== 'done' && <p className="kicker">{step.at === 'preview' ? 'Step 2 of 2: check every row' : 'Step 1 of 2: choose the file'}</p>}

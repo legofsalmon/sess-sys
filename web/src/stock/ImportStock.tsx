@@ -24,6 +24,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Top } from '../jobs/common.tsx'
 import { post } from '../server.ts'
+import { ADMIN, MENU } from '../Up.tsx'
 
 /**
  * Bringing in the stock list (ADR 0026), at #account/import-stock: choose
@@ -124,10 +125,7 @@ export function ImportStockScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse jobs import import-stock">
-      <Top view={view} title="Admin" />
-      <a className="back" href="#account">
-        ‹ Admin
-      </a>
+      <Top view={view} title="Admin" up={{ steps: [MENU, ADMIN], here: 'Bring in the stock list' }} />
       <header className="title">
         <h1 ref={heading} tabIndex={-1}>
           {step.at === 'done' ? 'Brought in' : 'Bring in the stock list'}

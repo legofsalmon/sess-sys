@@ -34,6 +34,7 @@ import { JobViews, PlanScreen } from './PlanScreen.tsx'
 import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
 import { Heading } from '../Icon.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
@@ -75,7 +76,14 @@ export function JobsScreen() {
   // On a laptop the list keeps a column of its own (audit finding 25), with its search and filter, beside the open job or the rest of the tab; on a phone the job is a page of its own.
   if (wide)
     return (
-      <Beside view={view} className="crew jobs" head={<JobViews />} list={<JobsCard view={view} current={open} />} open={open}>
+      <Beside
+        view={view}
+        className="crew jobs"
+        head={<JobViews />}
+        list={<JobsCard view={view} current={open} />}
+        open={open}
+        up={{ steps: [JOBS], here: view.jobs.jobs.find((j) => j.id === open)?.name }}
+      >
         {/* Keyed by the job, so a form left open on one isn't still open on the next picked from the list. */}
         {open ? <JobScreen key={open} view={view} id={open} bare /> : <JobsRest view={view} />}
       </Beside>

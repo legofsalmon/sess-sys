@@ -19,6 +19,7 @@ import { useToday } from '../view.ts'
 import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { Heading } from '../Icon.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -419,10 +420,7 @@ export function TestingScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse pick">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'PAT tests' }} />
       <section className="card" aria-label="Testing">
         <header className="title">
           <h1>Test a batch</h1>

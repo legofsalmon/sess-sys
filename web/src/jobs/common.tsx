@@ -6,6 +6,7 @@ import { OnThisScreen } from '../OnThisScreen.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { ThemeButton } from '../ThemeButton.tsx'
+import { Up, type Trail } from '../Up.tsx'
 
 /** What the Jobs screens share, and Stock and Crew too: the header, a record's page, and picking or adding a client or venue by name. */
 
@@ -33,9 +34,10 @@ export function useHash(): string {
  * again. On an area's own screen (`root`) the area's name follows as the
  * screen's title, so Jobs, Stock and Crew read as different places; a
  * record's page has its own title instead. `aside` goes top right, before
- * the sync state: Home's date.
+ * the sync state: Home's date. Every page under an area's own screen has
+ * `up`, the way back up to it (Up.tsx), in the bar so it stays in view.
  */
-export function Top({ view, title = 'Jobs', root = false, aside }: { view: View; title?: string; root?: boolean; aside?: ReactNode }) {
+export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: View; title?: string; root?: boolean; aside?: ReactNode; up?: Trail }) {
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
   const seenAs = useSeenAs()
@@ -70,6 +72,7 @@ export function Top({ view, title = 'Jobs', root = false, aside }: { view: View;
           </span>
           <ThemeButton />
         </div>
+        {up && <Up {...up} />}
         {notDone.list}
         <OnThisScreen />
       </header>
@@ -85,15 +88,14 @@ export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
 
 /**
  * A record's page (a job, a product, an item, a place): on its own with the
- * top bar and a way back, or beside its list on a laptop (audit finding
- * 25), where the list is the way back, so just its cards.
+ * top bar and the way up, or beside its list on a laptop (audit finding
+ * 25), where the list's screen draws the bar, so just its cards.
  */
-export function Page({ view, title, className, back, bare, children }: { view: View; title?: string; className: string; back: ReactNode; bare?: boolean; children: ReactNode }) {
+export function Page({ view, title, className, up, bare, children }: { view: View; title?: string; className: string; up: Trail; bare?: boolean; children: ReactNode }) {
   if (bare) return <>{children}</>
   return (
     <div className={`app ${className}`}>
-      <Top view={view} title={title} />
-      {back}
+      <Top view={view} title={title} up={up} />
       {children}
     </div>
   )
@@ -107,6 +109,7 @@ export function Beside({
   head,
   list,
   open,
+  up,
   children,
 }: {
   view: View
@@ -116,6 +119,8 @@ export function Beside({
   list: ReactNode
   /** Which record is open, if any: another picked from the list starts at its top. */
   open?: string
+  /** The open record's breadcrumbs: the list beside it is its way back, so on a desk they only say where it is. */
+  up?: Trail
   children: ReactNode
 }) {
   // The window may be far down the last record, which would leave the next one's title out of sight; the list keeps its own place.
@@ -127,7 +132,7 @@ export function Beside({
   }, [open])
   return (
     <div className={`app ${className} beside`}>
-      <Top view={view} title={title} root={!open} />
+      <Top view={view} title={title} root={!open} up={open ? up : undefined} />
       {head}
       <div className="columns">
         <div className="column list">{list}</div>

@@ -9,12 +9,18 @@ import { client } from './sync.ts'
 
 const base = import.meta.env.VITE_API_BASE ?? ''
 
+/** How long to wait for an answer: a minute, or longer for work the server is asked to do in one go, such as bringing a season in. */
+export const A_MINUTE = 60_000
+export const AS_LONG_AS_IT_TAKES = 10 * 60_000
+
 /** The server's answer, or an error saying in words what went wrong. */
-export async function ask<T>(path: string, init?: RequestInit): Promise<T> {
+export async function ask<T>(path: string, init?: RequestInit, waitMs = A_MINUTE): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(60_000), ...init })
-  } catch {
+    res = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(waitMs), ...init })
+  } catch (err) {
+    // Giving up on a slow answer is not the same as no signal: the server may well finish what it was asked.
+    if ((err as Error).name === 'TimeoutError') throw new Error("The server hasn't answered yet. It may still be working on it: give it a minute, then look again.")
     throw new Error("Couldn't reach the server. Try again when you have signal.")
   }
   if (res.status === 401) {
@@ -30,11 +36,15 @@ export async function ask<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** The same, sending `body`, with this device's code for the history. */
-export const post = <T,>(path: string, body?: unknown) =>
-  ask<T>(`${path}?client=${encodeURIComponent(client.clientId)}`, {
-    method: 'POST',
-    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-  })
+export const post = <T,>(path: string, body?: unknown, waitMs?: number) =>
+  ask<T>(
+    `${path}?client=${encodeURIComponent(client.clientId)}`,
+    {
+      method: 'POST',
+      ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    },
+    waitMs
+  )
 
 /** The server's own address for a path, to send the browser to. */
 export const serverUrl = (path: string) => `${base}${path}`

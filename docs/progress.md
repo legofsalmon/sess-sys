@@ -23,6 +23,48 @@ waiting on someone.
   place of the placeholders wait on somewhere to keep files (the backup
   bucket).
 
+## 16 October 2026: a way up from every page, and where things live
+
+**Done**
+
+- Colly asked for breadcrumbs or a back button. Every page under Jobs,
+  Stock, Crew and the Menu now has its way up in the top bar, so it stays
+  in view down a long page: one link to the page above on a phone ("‹ All
+  jobs"), and the whole way down as breadcrumbs on a desk (Jobs › Liffey
+  Brands Shoot › Pick list)
+  ([Decision 0039](adr/0039-the-way-up-and-breadcrumbs.md)).
+- Looked over where everything lives and wrote up a tidier structure
+  ([where things live](information-architecture.md)): addresses that start
+  with their area, each list brought in where it lives, list pages for
+  clients and venues, Stock's long screen split into its parts, and Admin
+  as settings only.
+
+**Waiting on**
+
+- Colly: say whether to move things as proposed.
+
+## 16 October 2026, later: a season comes in within the app's wait
+
+**Done**
+
+- Colly took the first bring-in back (141 jobs, in the history) and
+  brought Adam's calendar in from 19 December 2025: 767 jobs over 1,714
+  days, 678 crew bookings and offers, 73 people, 37 venues. The server
+  took 1 minute 47 seconds to save it, one row a round trip to the
+  database, and the app had stopped waiting at 60 seconds and said it
+  couldn't reach the server, though everything landed.
+- The bring-in now gathers the jobs, phases, calls, offers and event-days
+  and writes them a few hundred per statement, and the take-back removes
+  its rows the same way, so a season takes seconds. The app waits up to ten
+  minutes for a look, a bring-in or a take-back, says "Saving them all in
+  one go" while it does, and a slow answer says the server may still be
+  working rather than that there is no signal.
+
+**Waiting on**
+
+- Colly: bring Olan's calendar in from the same first day; then the backup
+  bucket and the Sentry key.
+
 ## 16 October 2026: the bring-in learns from the real calendars
 
 **Done**

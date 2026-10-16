@@ -42,6 +42,7 @@ import {
 } from './common.tsx'
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
+import { STOCK } from '../Up.tsx'
 
 /**
  * One numbered item: its label, its product, where it's kept, the labels
@@ -61,11 +62,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
         view={view}
         title="Stock"
         className="warehouse"
-        back={
-          <a className="back" href="#stock">
-            ‹ All stock
-          </a>
-        }
+        up={{ steps: [STOCK] }}
         bare={bare}
       >
         <section className="card">
@@ -78,11 +75,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
       view={view}
       title="Stock"
       className="warehouse"
-      back={
-        <a className="back" href={a.model && !a.model.mistake ? `#stock/product/${a.model.id}` : '#stock'}>
-          ‹ {a.model && !a.model.mistake ? a.model.name : 'All stock'}
-        </a>
-      }
+      up={{ steps: a.model && !a.model.mistake ? [STOCK, { href: `#stock/product/${a.model.id}`, label: a.model.name }] : [STOCK], here: numberLabel(a) }}
       bare={bare}
     >
       <Summary a={a} w={w} view={view} />

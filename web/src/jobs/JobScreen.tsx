@@ -43,6 +43,7 @@ import { useToday } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
 import { Heading } from '../Icon.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * One job: what it is, its phases and how each will read on the calendar,
@@ -55,14 +56,10 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
   const job = view.jobs.jobs.find((j) => j.id === id)
   // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
   const [share, setShare] = useState<Share | undefined>()
-  const back = (
-    <a className="back" href="#jobs">
-      ‹ All jobs
-    </a>
-  )
+  const up = { steps: [JOBS], here: job?.name }
   if (!job)
     return (
-      <Page view={view} className="crew jobs" back={back} bare={bare}>
+      <Page view={view} className="crew jobs" up={up} bare={bare}>
         <section className="card">
           <p className="empty">This job isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
@@ -77,7 +74,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
   const inPhase = share?.kind === 'offer' && job.phases.some((p) => p.id === share.call.phaseId)
 
   return (
-    <Page view={view} className="crew jobs" back={back} bare={bare}>
+    <Page view={view} className="crew jobs" up={up} bare={bare}>
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
 
