@@ -23,6 +23,9 @@ import { Top } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
+import { STOCK, type Step } from '../Up.tsx'
+
+const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
@@ -204,10 +207,7 @@ export function LabelsScreen({ view }: { view: View }) {
   const runs = view.labels.runs
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock">
-        ‹ All stock
-      </a>
+      <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'Labels' }} />
       <section className="card">
         <h1>Labels</h1>
         <p className="hint">
@@ -333,10 +333,7 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
   if (!r)
     return (
       <div className="app warehouse">
-        <Top view={view} title="Stock" />
-        <a className="back" href="#stock/labels">
-          ‹ Labels
-        </a>
+        <Top view={view} title="Stock" up={{ steps: [STOCK, LABELS] }} />
         <section className="card">
           <p className="empty">These labels aren't on the list. They were cancelled, or they're still on their way: check again once it says “Up to date”.</p>
         </section>
@@ -344,10 +341,7 @@ export function RunScreen({ view, id }: { view: View; id: string }) {
     )
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <a className="back" href="#stock/labels">
-        ‹ Labels
-      </a>
+      <Top view={view} title="Stock" up={{ steps: [STOCK, LABELS] }} />
       <RunSummary r={r} />
       {r.firstNumber ? (
         <>

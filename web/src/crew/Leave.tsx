@@ -33,6 +33,7 @@ import { Top } from '../jobs/common.tsx'
 import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
+import { CREW } from '../Up.tsx'
 
 /**
  * Staff leave and time in lieu (ADR 0024), at #crew/leave: my year's
@@ -136,10 +137,7 @@ export function LeaveScreen({ view }: { view: View }) {
   const approver = canApproveLeave(me)
   return (
     <div className="app crew jobs leave-screen">
-      <Top view={view} title="Crew" />
-      <a className="back" href="#crew">
-        ‹ Crew
-      </a>
+      <Top view={view} title="Crew" up={{ steps: [CREW], here: 'Leave' }} />
       {/* Until it's someone's own leave, which their name heads, the screen says what it is, so the move here lands on that and names the tab (audit finding 22). */}
       {me?.kind !== 'staff' && (
         <header className="title">

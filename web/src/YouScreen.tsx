@@ -11,6 +11,7 @@ import { tabRole } from './tabs.ts'
 import { setTheme, useTheme, type Theme } from './theme.ts'
 import { useLate } from './useLate.ts'
 import { useView } from './view.ts'
+import { MENU } from './Up.tsx'
 
 /**
  * You (#me): what's this person's own rather than the company's. Their
@@ -62,10 +63,7 @@ export function YouScreen() {
 
   return (
     <div className="app you">
-      <Top view={view} title="You" />
-      <a className="back" href="#menu">
-        ‹ Menu
-      </a>
+      <Top view={view} title="You" up={{ steps: [MENU], here: 'You' }} />
       <h1>You</h1>
 
       {auth.status === 'open' && !auth.passcode && (

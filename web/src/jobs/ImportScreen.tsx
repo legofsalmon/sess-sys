@@ -25,6 +25,7 @@ import { syncSoon } from '../sync.ts'
 import { StatusPill } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
+import { JOBS } from '../Up.tsx'
 
 /**
  * Bringing in the jobs already on a Google calendar (ADR 0011): choose one
@@ -92,10 +93,7 @@ export function ImportScreen({ view }: { view: View }) {
 
   return (
     <div className="app crew jobs import">
-      <Top view={view} />
-      <a className="back" href="#jobs">
-        ‹ All jobs
-      </a>
+      <Top view={view} up={{ steps: [JOBS], here: 'Bring in from Google Calendar' }} />
       <header className="title">
         <h1 ref={heading} tabIndex={-1}>
           {step.at === 'done' ? 'Brought in' : 'Bring in from Google Calendar'}

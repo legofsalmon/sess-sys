@@ -48,6 +48,7 @@ import {
 } from './common.tsx'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText } from './Inspections.tsx'
+import { STOCK } from '../Up.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -62,14 +63,10 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
   const w = view.warehouse
   const m = w.models.find((x) => x.id === id)
   const mistake = w.mistakes.get(id)
-  const back = (
-    <a className="back" href="#stock">
-      ‹ All stock
-    </a>
-  )
+  const up = { steps: [STOCK], here: m?.name }
   if (!m)
     return (
-      <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+      <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
         <section className="card">
           <p className="empty">
             {mistake
@@ -80,7 +77,7 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
       </Page>
     )
   return (
-    <Page view={view} title="Stock" className="warehouse" back={back} bare={bare}>
+    <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
       <Summary m={m} w={w} view={view} />
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}

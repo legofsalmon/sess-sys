@@ -36,6 +36,7 @@ import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
+import { STOCK, type Trail } from '../Up.tsx'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
@@ -76,12 +77,30 @@ export function StockScreen() {
   if (wide) {
     const product = kind === 'product' ? open : kind === 'item' ? view.warehouse.assets.get(open)?.modelId : undefined
     return (
-      <Beside view={view} title="Stock" className="warehouse" list={<StockCard view={view} current={product} />} open={kind && `${kind}/${open}`}>
+      <Beside
+        view={view}
+        title="Stock"
+        className="warehouse"
+        list={<StockCard view={view} current={product} />}
+        open={kind && `${kind}/${open}`}
+        up={recordTrail(view, kind, open)}
+      >
         {record ?? <StockRest view={view} />}
       </Beside>
     )
   }
   return record ?? <Catalogue view={view} />
+}
+
+/** Where an open product, item or place sits under Stock, for the breadcrumbs beside the catalogue. */
+function recordTrail(view: View, kind: string | undefined, id: string): Trail {
+  const w = view.warehouse
+  if (kind === 'product') return { steps: [STOCK], here: w.models.find((m) => m.id === id)?.name }
+  if (kind === 'place') return { steps: [STOCK], here: w.places.find((p) => p.id === id)?.name }
+  const a = w.assets.get(id)
+  if (!a) return { steps: [STOCK] }
+  const model = a.model && !a.model.mistake ? a.model : undefined
+  return { steps: model ? [STOCK, { href: `#stock/product/${model.id}`, label: model.name }] : [STOCK], here: numberLabel(a) }
 }
 
 function Catalogue({ view }: { view: View }) {

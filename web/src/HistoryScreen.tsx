@@ -5,6 +5,7 @@ import { Empty } from './Empty.tsx'
 import { Top } from './jobs/common.tsx'
 import { useToday, useView } from './view.ts'
 import { useLate } from './useLate.ts'
+import { MENU } from './Up.tsx'
 
 /**
  * The history (ADR 0006): who did what, when, on which device, whether it
@@ -91,11 +92,8 @@ export function HistoryScreen() {
 
   return (
     <div className="app history">
-      <Top view={view} title="Menu" />
       {/* In the Menu (ADR 0035): a record for the directors and the office, used now and then. */}
-      <a className="back" href="#menu">
-        ‹ Menu
-      </a>
+      <Top view={view} title="Menu" up={{ steps: [MENU], here: 'History' }} />
       <h1>History</h1>
 
       <section className="card">
