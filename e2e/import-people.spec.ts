@@ -122,12 +122,15 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await office.getByRole('link', { name: 'Crew tab' }).click()
   await expect(office).toHaveURL(/#crew$/)
   await expect(office.locator('.top').getByRole('status')).toHaveText('Up to date')
-  await expect(office.getByRole('button', { name: `Nuala Breen ${id}` })).toContainText('Staff · Production · Level 3 · Production: Crew chief')
-  await expect(office.getByRole('button', { name: `Oisín Clarke ${id}` })).toContainText('Audio · Level 2 · Audio: Monitors, Audio: FOH')
-  await expect(office.getByRole('button', { name: `Ruth Devane ${id}` })).toContainText('LX · Level 0')
-  // Oisín's card holds the phone as it was fixed.
-  await office.getByRole('button', { name: `Oisín Clarke ${id}` }).click()
-  await expect(office.getByText(`+353877000102 · oisin.${id}@example.com`)).toBeVisible()
+  const people = office.getByRole('region', { name: 'People' })
+  await expect(people.getByRole('link', { name: new RegExp(`^Nuala Breen ${id}`) })).toContainText('Staff · Production · Level 3 · Production: Crew chief')
+  await expect(people.getByRole('link', { name: new RegExp(`^Oisín Clarke ${id}`) })).toContainText('Audio · Level 2 · Audio: Monitors, Audio: FOH')
+  await expect(people.getByRole('link', { name: new RegExp(`^Ruth Devane ${id}`) })).toContainText('LX · Level 0')
+  // Oisín's page holds the phone as it was fixed.
+  await people.getByRole('link', { name: new RegExp(`^Oisín Clarke ${id}`) }).click()
+  await expect(office.getByRole('link', { name: 'Call +353877000102' })).toHaveAttribute('href', 'tel:+353877000102')
+  await expect(office.locator('.person-page .facts')).toContainText(`oisin.${id}@example.com`)
+  await office.getByRole('link', { name: '‹ Crew' }).click()
 
   // The applicant is out of the Offer to… picker until asked for.
   const call = office.locator('.call-group', { hasText: `Import check ${id}` }).getByRole('article', { name: 'Stagehand' })

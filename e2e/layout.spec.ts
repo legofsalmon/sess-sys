@@ -135,7 +135,7 @@ test('the people list finds someone as the picker does, shows its first ten, and
   const list = office.getByRole('region', { name: 'People' })
   const find = list.getByLabel('Find a person')
   const rows = list.locator(':scope > .row.person')
-  const row = (first: string) => list.getByRole('button', { name: new RegExp(`^${name(first)}`) })
+  const row = (first: string) => list.getByRole('link', { name: new RegExp(`^${name(first)}`) })
 
   // Found by department: the first ten of the twelve, and the rest a tap away.
   await find.fill(dept.toLowerCase())

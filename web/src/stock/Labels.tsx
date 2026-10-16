@@ -25,6 +25,7 @@ import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
 import { LABELS, STOCK } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
+import { Heading } from '../Icon.tsx'
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
@@ -178,7 +179,7 @@ export function LabelsCard({ labels }: { labels: LabelsView }) {
   const used = labels.runs.reduce((n, r) => n + r.used, 0)
   return (
     <section className="card" aria-label="Labels">
-      <h2>Labels</h2>
+      <Heading icon="label">Labels</Heading>
       <p className="hint">
         {labels.runs.length === 0 ? (
           'Set numbers aside to print labels here or to send to a label maker. Scan or type a label in the search above to put it on an item.'

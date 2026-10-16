@@ -34,6 +34,7 @@ import { useToday } from '../view.ts'
 import { atLabel, numberLabel, ProductChoices } from './common.tsx'
 import { reportFault } from './Faults.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
+import { Heading } from '../Icon.tsx'
 import { STOCK } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
 
@@ -188,7 +189,7 @@ export function CountsCard({ view }: { view: View }) {
   )
   return (
     <section className="card counts" aria-label="Counts">
-      <h2>Counts</h2>
+      <Heading icon="count">Counts</Heading>
       {d && (
         <div className="under-way">
           <p>
@@ -269,7 +270,7 @@ export function CountsOf({ view, where }: { view: View; where: Where }) {
   const last = counts[0]
   return (
     <section className="card counts" aria-label="Counts">
-      <h2>Counts</h2>
+      <Heading icon="count">Counts</Heading>
       <p className="last-counted">
         {last
           ? `Last counted ${dayLabel(last.day)} ${last.day.slice(0, 4)}${last.person ? ` by ${last.person.name}` : ''}: ${countSummaryWords(last.summary)}.`

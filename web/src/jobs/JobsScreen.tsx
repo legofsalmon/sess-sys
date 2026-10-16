@@ -33,6 +33,7 @@ import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
+import { Heading, Icon } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
@@ -114,7 +115,7 @@ function JobsRest({ view }: { view: View }) {
     <>
       {mayAdd && (
         <section className="card">
-          <h2>New job</h2>
+          <Heading icon="add">New job</Heading>
           <NewJob view={view} />
           {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
             <p className="hint">
@@ -135,7 +136,10 @@ function ClientsScreen({ view }: { view: View }) {
       <Top view={view} />
       <JobViews current="clients" />
       <section className="card">
-        <h1>Clients</h1>
+        <h1 className="with-icon">
+          <Icon name="company" />
+          <span>Clients</span>
+        </h1>
         {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {clients.map((c) => (
@@ -157,7 +161,10 @@ function VenuesScreen({ view }: { view: View }) {
       <Top view={view} />
       <JobViews current="venues" />
       <section className="card">
-        <h1>Venues</h1>
+        <h1 className="with-icon">
+          <Icon name="venue" />
+          <span>Venues</span>
+        </h1>
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {venues.map((v) => (
@@ -189,7 +196,7 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
 
   return (
     <section className="card" aria-label="Jobs">
-      <h2>Jobs</h2>
+      <Heading icon="calendar">Jobs</Heading>
       <input className="search" type="search" placeholder="Find a job, client or venue" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find" />
       <div className="filters" role="group" aria-label="Show">
         {FILTERS.map(([f, label]) => (

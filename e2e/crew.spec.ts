@@ -23,7 +23,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await person.getByLabel('Skills').fill('audio, monitors')
   await person.getByRole('button', { name: 'Add person' }).click()
   // The other tests share this server, so the screen can also list their people and crew calls.
-  await expect(office.getByRole('button', { name: 'Aoife Byrne' })).toBeVisible()
+  await expect(office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Aoife Byrne/ })).toBeVisible()
 
   // A one-off, not in Jobs: the crew screen still takes the job's details as typed.
   await office.getByRole('button', { name: 'Ask for crew' }).click()

@@ -30,10 +30,13 @@ test('archived, then erased through the question in place: the card says so and 
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // Their private link, as it would have gone to them by WhatsApp.
-  await people.getByRole('button', { name }).click()
-  const link = await people.getByRole('link', { name: 'Open their page' }).getAttribute('href')
+  await people.getByRole('link', { name: new RegExp(`^${name}`) }).click()
+  const link = await office.getByRole('link', { name: 'Open their page' }).getAttribute('href')
   expect(link).toMatch(/\/f\/[\w-]{24}$/)
-  await people.getByRole('button', { name: 'Archive', exact: true }).click()
+  await office.getByRole('button', { name: 'Archive', exact: true }).click()
+  // Back on the list, which says who was archived, with the way back.
+  await expect(office).toHaveURL(/#crew$/)
+  await expect(people.locator('.added')).toHaveText(`Archived ${name}. Bring ${name} back`)
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // Archived first, then erased: the question says what goes, what stays, and about the backups, before anything is sent.

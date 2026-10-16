@@ -34,6 +34,7 @@ import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { CrewViews } from '../Views.tsx'
+import { Heading } from '../Icon.tsx'
 
 /**
  * Staff leave and time in lieu (ADR 0024), at #crew/leave: my year's
@@ -113,7 +114,7 @@ export function LeaveCard({ view }: { view: View }) {
   const balance = me?.kind === 'staff' ? view.leave.balance(me.id, yearOf(today)) : undefined
   return (
     <section className="card leave-card" aria-label="Leave">
-      <h2>Leave</h2>
+      <Heading icon="leave">Leave</Heading>
       <p className="hint">
         {balance ? `${me!.name}: ${days(balance.annual.left)} of annual leave left this year, ${days(balance.lieu.left)} in lieu to take.` : "Annual leave and days in lieu for staff: apply, see what's left, and approve."}
         {waiting > 0 && (

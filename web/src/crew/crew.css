@@ -52,9 +52,8 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 
 /* The profile (ADR 0025): the department filter over the list, the level on a card, what they've worked, the form's "More", and the picker's applicants tick. */
 .crew .dept-filter { justify-self: start; }
-.crew .detail .level-pick { display: flex; gap: var(--space-8); align-items: center; font-size: .85rem; color: var(--muted); }
-.crew .detail .level-pick select { min-width: 9em; }
-.crew .detail .worked { display: grid; gap: var(--space-2); }
+.crew .level-pick { display: flex; gap: var(--space-8); align-items: center; font-size: .85rem; color: var(--muted); }
+.crew .level-pick select { min-width: 9em; }
 .crew .grid-form details.more summary { display: flex; align-items: center; min-height: 44px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; padding-top: var(--space-4); }
 .crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
@@ -139,7 +138,8 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .call > .pill { grid-column: 2; grid-row: 1; justify-self: end; margin-top: var(--space-8); }
 .crew .call > button.offer { grid-column: 2; grid-row: 2; justify-self: end; }
 .crew .call-line { display: grid; gap: var(--space-2); justify-items: start; width: 100%; min-height: 44px; padding: var(--space-6) 0; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; font: inherit; }
-.crew .call-line .who-line { font-size: var(--text-small); }
+.crew .call-line .who-line { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-small); }
+.crew .call-line .who-line .avatar { --pic: 26px; }
 .crew .call .facts-line { margin: 0; color: var(--muted); font-size: var(--text-small); }
 /* The picker (ADR 0025) narrowed as you type: the search over the select, the select and Offer side by side. */
 .crew .offer-form .find { grid-column: 1 / -1; }
@@ -168,7 +168,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 
 /* People's documents (ADR 0029): a line each on the person's card, in the warn tone when one runs out soon and the bad tone once it has, the form to add or change one, and one sent from a link in "Answers to check". */
-.crew .detail .documents { display: grid; gap: var(--space-6); }
+.crew .documents { display: grid; gap: var(--space-6); }
 /* A card's detail sets its lines in ink; what's only a hint here keeps the hint's tone. */
 .crew .documents .hint, .crew .documents .row.doc p { color: var(--muted); }
 /* A title typed as one long word, such as a file's name, wraps rather than pushing the card wider than a phone. */
@@ -178,3 +178,13 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
 .crew .doc-form small { color: var(--muted); }
 .crew .doc-check .field { display: flex; gap: var(--space-6); align-items: center; font-size: var(--text-hint); color: var(--muted); }
+
+/* A person's page (#crew/person/<id>): their name with a place for their picture before it, a line of who they are under it, and cards for what's ahead, what they hold, what they've worked and their link. */
+.person-page .card p { margin: 0; }
+.person-page .who-card .title { align-items: center; }
+.person-page .who-name { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+.person-page .who-name p { font-size: var(--text-small); }
+.person-page .facts dd { overflow-wrap: anywhere; }
+.person-page .card > p, .person-page .documents p { font-size: var(--text-small); }
+.crew a.who { color: inherit; text-decoration: none; }
+.person-page .who-card a.button { gap: var(--space-6); }

@@ -24,6 +24,7 @@ import { ShowAll } from '../Fold.tsx'
 import { useToday } from '../view.ts'
 import { linkFor, SendButtons } from './CrewScreen.tsx'
 import { useDocumentStorage } from './Documents.tsx'
+import { Heading } from '../Icon.tsx'
 
 /**
  * Certificates on the Crew tab (ADR 0028): the ticks for what a call
@@ -81,7 +82,7 @@ export function CertificateReminders({ view }: { view: View }) {
   const key = (r: RunningOut<PersonView>) => (r.what === 'certificate' ? `${r.person.id} ${r.kind}` : `document ${r.document.id}`)
   return (
     <section className="card reminders" aria-label="Certificates and documents running out">
-      <h2>Running out ({reminders.length})</h2>
+      <Heading icon="certificate">Running out ({reminders.length})</Heading>
       <ShowAll items={reminders} limit={3} what="certificates and documents" keep={(r) => !!asking && key(r) === key(asking)}>
         {(rows) =>
           rows.map((r) => (

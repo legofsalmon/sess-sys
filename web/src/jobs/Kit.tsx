@@ -27,6 +27,9 @@ import { ProductChoices } from '../stock/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
+import { Heading, Icon } from '../Icon.tsx'
+import { Thumb } from '../Picture.tsx'
+import { departmentIcon, kitIcon } from '../stock/kitIcon.ts'
 
 /**
  * Kit on jobs (ADR 0014): what a job needs from the stock list, for the
@@ -136,7 +139,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
   }
   return (
     <section className="card kit" aria-label="Kit">
-      <h2>Kit</h2>
+      <Heading icon="kit">Kit</Heading>
       <PickLink job={job} view={view} lines={lines} />
       {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
@@ -145,7 +148,10 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
         {(shown) =>
           DEPARTMENTS.filter((d) => shown.some((l) => department(l) === d)).map((d) => (
             <div className="kit-group" key={d}>
-              <h3>{DEPARTMENT_LABELS[d]}</h3>
+              <h3>
+                <Icon name={departmentIcon(d)} />
+                {DEPARTMENT_LABELS[d]}
+              </h3>
               {shown
                 .filter((l) => department(l) === d)
                 .map((l) => (
@@ -275,6 +281,7 @@ function KitLine({ line, job, today }: { line: KitLineView; job: JobView; today:
   return (
     <article className="kit-line" aria-label={`${line.qty} × ${productName(line)}`}>
       <header>
+        <Thumb icon={kitIcon(line.model)} size="small" />
         <div>
           <b>
             {line.qty} × {productName(line)}

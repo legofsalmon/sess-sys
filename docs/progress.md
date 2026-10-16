@@ -24,6 +24,46 @@ waiting on someone.
 - Crew's split into To check, People and Timesheets waits for a person's
   own page (the crew member pages work).
 
+## 16 October 2026: a page for each person
+
+**Done**
+
+- Colly asked for a page per crew member. Everything about a person was
+  already kept, but it only opened as a long fold inside the People list.
+  Each person now has a page of their own under Crew
+  ([Decision 0040](adr/0040-a-page-for-each-person.md)): their picture,
+  name and who they are, Call, WhatsApp and Email, their details, level
+  and role; what's coming up (bookings and offers, each opening its job,
+  and days off); certificates and documents; every job they've worked;
+  and their private link. The People list is one line each that opens
+  it, and a name on a call card or a person's lane in the planner opens
+  it too. Archive is one tap from the page and the list says so, with
+  the way back.
+
+**Waiting on**
+
+- Nothing new. Photos wait on the backup bucket, as the icons work says.
+
+## 16 October 2026: icons, and pictures of kit and crew
+
+**Done**
+
+- Colly found the app very text heavy. Every card heading now starts with
+  an icon, the Menu's places have one each, kit has a square picture
+  (a placeholder with the icon for what it is: speaker, spotlight, cable,
+  case…) in the stock list, on a job's kit lines and at the top of its
+  page, and crew have a round one with their initials in People, on crew
+  calls and on Home ([Decision 0038](adr/0038-icons-and-pictures.md)).
+- The icons live in the shared design system now (version 0.4.0): one open
+  set, Lucide, named by meaning, with the rules for icons and pictures, so
+  every app draws the same ones.
+
+**Waiting on**
+
+- Colly: merge the design system's pull request for the icons. Photos in
+  place of the placeholders wait on somewhere to keep files (the backup
+  bucket).
+
 ## 16 October 2026: a way up from every page, and where things live
 
 **Done**

@@ -295,7 +295,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
     await person.getByLabel('Name').fill(name)
     await person.getByLabel('Email').fill(email)
     await person.getByRole('button', { name: 'Add person' }).click()
-    await expect(page.getByRole('button', { name })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'People' }).getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible()
   }
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })

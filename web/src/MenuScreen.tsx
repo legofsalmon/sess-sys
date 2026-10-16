@@ -2,6 +2,7 @@ import type { Ability } from '@sh/shared'
 import { Top } from './jobs/common.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
+import { Icon, type IconName } from './Icon.tsx'
 
 /**
  * The Menu (#menu, ADR 0035): every place in the app by name, grouped as
@@ -13,6 +14,8 @@ import { useView } from './view.ts'
 
 export interface Place {
   key: string
+  /** Its picture, from the shared set, beside its name. */
+  icon: IconName
   href: string
   label: string
   /** What's there, in a line. */
@@ -34,30 +37,35 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'jobs',
+        icon: 'calendar',
         href: '#jobs',
         label: 'Jobs',
         about: 'Every job, its phases, kit and crew',
       },
       {
         key: 'plan',
+        icon: 'planner',
         href: '#jobs/plan',
         label: 'Planner',
         about: 'The weeks and months ahead at a glance',
       },
       {
         key: 'clients',
+        icon: 'company',
         href: '#jobs/clients',
         label: 'Clients',
         about: 'Who the jobs are for, their contacts and documents',
       },
       {
         key: 'venues',
+        icon: 'venue',
         href: '#jobs/venues',
         label: 'Venues',
         about: 'Where the jobs are, their specs and documents',
       },
       {
         key: 'import',
+        icon: 'download',
         href: '#jobs/import',
         label: 'Bring in from Google Calendar',
         about: 'Jobs already in the calendar',
@@ -71,42 +79,49 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'stock',
+        icon: 'kit',
         href: '#stock',
         label: 'Stock',
         about: 'The catalogue, and kit going out and coming back',
       },
       {
         key: 'places',
+        icon: 'warehouse',
         href: '#stock/places',
         label: 'Places',
         about: 'Where kit is kept',
       },
       {
         key: 'labels',
+        icon: 'label',
         href: '#stock/labels',
         label: 'Labels',
         about: 'Print labels for kit',
       },
       {
         key: 'count',
+        icon: 'count',
         href: '#stock/count',
         label: 'Counting',
         about: 'Stocktakes and rolling counts',
       },
       {
         key: 'testing',
+        icon: 'inspection',
         href: '#stock/testing',
         label: 'Testing',
         about: 'Tests due, and testing a batch of kit',
       },
       {
         key: 'repairs',
+        icon: 'repair',
         href: '#stock/repairs',
         label: 'Repairs',
         about: 'Faults and missing kit to sort out',
       },
       {
         key: 'import-stock',
+        icon: 'download',
         href: '#stock/import',
         label: 'Bring in the stock list',
         about: 'From a spreadsheet',
@@ -120,18 +135,21 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'crew',
+        icon: 'people',
         href: '#crew',
         label: 'Crew',
         about: 'People, calls and answers to check',
       },
       {
         key: 'leave',
+        icon: 'leave',
         href: '#crew/leave',
         label: 'Leave',
         about: 'Time off for staff',
       },
       {
         key: 'import-crew',
+        icon: 'download',
         href: '#crew/import',
         label: 'Bring in the crew list',
         about: 'From a spreadsheet',
@@ -145,6 +163,7 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'admin',
+        icon: 'settings',
         href: '#admin',
         label: 'Admin',
         about: 'The office, Google Calendar, backups and data',
@@ -152,6 +171,7 @@ export const MENU: PlaceGroup[] = [
       },
       {
         key: 'history',
+        icon: 'history',
         href: '#history',
         label: 'History',
         about: 'Every change, who made it and when',
@@ -164,6 +184,7 @@ export const MENU: PlaceGroup[] = [
     places: [
       {
         key: 'me',
+        icon: 'person',
         href: '#me',
         label: 'You',
         about: 'Signing out, your own calendar feed and this device',
@@ -190,12 +211,15 @@ export function MenuScreen() {
                 {places.map((p) => (
                   <li key={p.key}>
                     <a className="job-row" href={p.href}>
+                      <span className="place-icon" aria-hidden="true">
+                        <Icon name={p.icon} />
+                      </span>
                       <div>
                         <b>{p.label}</b>
                         <p>{p.about}</p>
                       </div>
                       <div className="side" aria-hidden="true">
-                        ›
+                        <Icon name="next" />
                       </div>
                     </a>
                   </li>

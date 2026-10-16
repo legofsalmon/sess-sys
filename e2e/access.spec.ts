@@ -87,12 +87,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const page = await (await browser.newContext({ viewport: phoneSize, colorScheme })).newPage()
     await page.goto('/#crew')
     await expect(page.getByRole('status')).toHaveText('Up to date')
-    // Dara's card opens the days-off form and the level picker, which the list alone doesn't show. Her name heads her row; a call's line names her after its role.
-    await page.getByRole('button', { name: /^Dara Quinn/ }).click()
+    // Dara's page holds the days-off form and the level picker, which the list alone doesn't show. Her name heads her row in People.
+    await page.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
+    await page.getByRole('button', { name: 'Mark days off' }).click()
     await expect(page.getByLabel('Off from')).toBeVisible()
 
-    for (const hash of ['#crew', '#jobs', '#stock', '#admin']) {
-      if (hash !== '#crew') await page.goto(`/${hash}`)
+    for (const hash of ['#crew/person', '#crew', '#jobs', '#stock', '#admin']) {
+      if (hash !== '#crew/person') await page.goto(`/${hash}`)
       const fields = await fieldBorders(page)
       expect(fields.length, `${hash} has fields`).toBeGreaterThan(0)
       for (const f of fields) expect(contrast(f.border, f.behind), `${hash}: ${f.field} border ${f.border} on ${f.behind}`).toBeGreaterThanOrEqual(3)
@@ -221,10 +222,11 @@ test('every field on every screen has a name, and the not-done list is a live re
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await page.goto('/#crew')
   await expect(page.getByRole('status')).toHaveText('Up to date')
-  await page.getByRole('button', { name: /^Dara Quinn/ }).click()
+  await page.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
+  await page.getByRole('button', { name: 'Mark days off' }).click()
   await expect(page.getByLabel('Off from')).toBeVisible()
-  expect(await unnamedFields(page), '#crew').toEqual([])
-  for (const hash of ['#jobs', '#stock', '#menu', '#admin', '#me', '#history', '#crew/leave']) {
+  expect(await unnamedFields(page), '#crew/person').toEqual([])
+  for (const hash of ['#crew', '#jobs', '#stock', '#menu', '#admin', '#me', '#history', '#crew/leave']) {
     await page.goto(`/${hash}`)
     await expect(page.locator('.app')).toBeVisible()
     expect(await unnamedFields(page), hash).toEqual([])
