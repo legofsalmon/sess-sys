@@ -22,6 +22,7 @@ waiting on someone.
 **Waiting on**
 
 - Colly: say whether to move things as proposed.
+
 ## 16 October 2026, later: a season comes in within the app's wait
 
 **Done**
