@@ -65,6 +65,12 @@ export interface CalendarSyncOptions {
   pollMs?: number
   /** How long to wait before each try again after a run fails on something unexpected; for tests. */
   retryMs?: readonly number[]
+  /**
+   * False keeps the app off Google Calendar altogether: nothing is put on,
+   * changed or taken off it, and nobody is invited, while calendars can
+   * still be read to bring jobs in. Set on the server with CALENDAR_WRITES.
+   */
+  writes?: boolean
 }
 
 /** After Google was busy: a minute, five, a quarter of an hour, then hourly. */
@@ -80,6 +86,8 @@ const problems = {
     "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check the calendar.",
   noAccess: (calendar: string, account: string | null) =>
     `${account ?? 'The connected account'} can't change ${calendar} any more: it may have been deleted, or its sharing changed. Choose another calendar, or give that account permission to change it again.`,
+  writesOff:
+    "Writing to Google Calendar is switched off on the server, so the app puts nothing on the calendar and invites nobody. Bringing jobs in from Google still works. To switch writing on, set CALENDAR_WRITES to on in Railway.",
   busy: (at: Date) =>
     `Google Calendar isn't answering, so some days are still on their way. Trying again at ${at.toLocaleTimeString('en-IE', { timeZone: 'Europe/Dublin', hour: '2-digit', minute: '2-digit' })}.`,
   badClient:
@@ -154,6 +162,11 @@ export class CalendarSync {
 
   constructor(private readonly options: CalendarSyncOptions) {
     this.now = options.now ?? (() => new Date())
+  }
+
+  /** Whether the app may write to Google Calendar at all (CALENDAR_WRITES). */
+  get writes(): boolean {
+    return this.options.writes !== false
   }
 
   /** At start-up: find out whether a calendar is connected, and catch up on anything missed while the server was down. */
@@ -357,7 +370,7 @@ export class CalendarSync {
   /** Whether answers are being looked for: invites on, and a calendar being written to. */
   private polling(): boolean {
     const link = this.link
-    return this.active && !this.blocked && link?.state === 'on' && link.invites && link.calendarId !== null
+    return this.writes && this.active && !this.blocked && link?.state === 'on' && link.invites && link.calendarId !== null
   }
 
   /** Keep looking for answers every couple of minutes while invites are on, and stop when they aren't. */
@@ -415,6 +428,7 @@ export class CalendarSync {
       this.schedulePoll()
       return result
     }
+    if (!this.writes) return this.withoutWriting(link, result)
     let changed = false
     try {
       const token = await this.accessToken(link)
@@ -523,6 +537,24 @@ export class CalendarSync {
     }
     if (result.written || result.removed || result.failed) this.options.log?.info({ ...result }, 'Calendar sync')
     return result
+  }
+
+  /**
+   * A run while writing is switched off: nothing goes to Google. A
+   * disconnect still finishes, handing the key back without touching any
+   * event, and the calendar card says why nothing is being written.
+   */
+  private async withoutWriting(link: Link, result: CalendarCheck): Promise<CalendarCheck> {
+    if (link.state === 'stopping') {
+      await this.finishDisconnect(link)
+      this.options.onChange?.()
+      return result
+    }
+    if (link.problem !== problems.writesOff) {
+      this.link = await serverChange(this.options.db, undefined, (ctx) => saveLink(ctx, { problem: problems.writesOff }))
+      this.options.onChange?.()
+    }
+    return { ...result, problem: problems.writesOff }
   }
 
   /** Answers in Google that differ from the ones the app last took in, taken in offer by offer. Returns how many were taken. */

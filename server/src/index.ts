@@ -50,7 +50,8 @@ async function main() {
     commit,
     errorReporting,
     backupWatch: errorReporting ? backupWatch() : undefined,
-    calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, '') } : undefined,
+    // Writing to Google Calendar stays off until CALENDAR_WRITES is on: Colly's call, 16 October 2026.
+    calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, ''), writes: process.env.CALENDAR_WRITES?.trim().toLowerCase() === 'on' } : undefined,
   })
   await assertSignInKept(db, auth)
   if (backupStore) {

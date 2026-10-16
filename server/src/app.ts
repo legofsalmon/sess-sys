@@ -79,7 +79,7 @@ export interface AppOptions {
   stockImport?: StockImportRound
 }
 
-export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs'> {
+export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
   clientId: string
   clientSecret: string
   /** Stands in for the network in tests. */
@@ -227,6 +227,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       db: db.kind,
       auth: auth ? 'google' : passcode ? 'passcode' : 'off',
       errors: errorReporting ? 'sentry' : 'off',
+      // "read-only": calendars can be read to bring jobs in, but nothing is written to Google (CALENDAR_WRITES).
+      calendar: calendarSync ? (calendarSync.writes ? 'writing' : 'read-only') : 'off',
       // "fresh" false means the nightly backup has stopped working.
       backups: backup.configured ? { last: backup.lastOk?.finishedAt ?? null, fresh: backup.fresh } : 'off',
       cursor: await currentSeq(db),
