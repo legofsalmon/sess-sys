@@ -4,6 +4,8 @@ import {
   isDay,
   newId,
   PROJECT_KINDS,
+  STOPPED,
+  venueLabel,
   type GuestResponse,
   type ImportBrought,
   type ImportCalendar,
@@ -14,12 +16,12 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { crewHandlers } from '../crew/handlers.ts'
-import { getOffer } from '../crew/store.ts'
+import { getCalls, getOffers } from '../crew/store.ts'
 import type { Db, Queryable } from '../db.ts'
 import { describeDevice } from '../devices.ts'
-import { emit, emitRemoved, Refused, serverChange, type Ctx } from '../kernel.ts'
+import { emitAll, emitRemovedAll, Refused, serverChange, type Ctx } from '../kernel.ts'
 import { projectHandlers } from '../projects/handlers.ts'
-import { getProject } from '../projects/store.ts'
+import { getPhases, getProjects, namesForCall } from '../projects/store.ts'
 import type { GoogleEvent } from './google.ts'
 import { GAP_DAYS, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
 import { Halt, type CalendarSync } from './sync.ts'
@@ -203,8 +205,13 @@ class NothingToBring extends Error {}
  * people, venues, jobs, phases, crew calls and offers, then each event-day
  * as brought in. People and venues go through the same rules as the
  * app's own commands; jobs are marked with the calendar they came from.
+ *
+ * A season is thousands of rows, so jobs, phases, calls, offers and the
+ * event-days are gathered first and written a few hundred per statement:
+ * one round trip a row made a whole season take minutes, longer than the
+ * app waits.
  */
-async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar: ImportCalendar): Promise<Omit<ImportResult, 'missing'>> {
+async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar: ImportCalendar, app: AppData): Promise<Omit<ImportResult, 'missing'>> {
   const personIds = new Map<string, string>()
   for (const p of plan.people) {
     if (!people.has(p.email)) continue
@@ -222,6 +229,7 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
     personIds.set(p.email, id)
   }
 
+  const venues = new Map(app.venues.map((v) => [v.id, { name: v.name, address: v.address }]))
   const venueIds = new Map<string, string>()
   const venueId = async (v: VenueRef | null) => {
     if (!v) return null
@@ -229,23 +237,36 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
     const known = venueIds.get(v.key)
     if (known) return known
     const id = newId()
-    await projectHandlers['venue.upsert'](ctx, { id, name: v.name.slice(0, 200), address: v.address.slice(0, 500), notes: '' })
+    const venue = { name: v.name.slice(0, 200), address: v.address.slice(0, 500) }
+    await projectHandlers['venue.upsert'](ctx, { id, ...venue, notes: '' })
     venueIds.set(v.key, id)
+    venues.set(id, venue)
     return id
   }
+  /** What a crew call says its venue is: the phase's own, or else the job's (ADR 0007). */
+  const venueText = (id: string | null) => {
+    const v = id ? venues.get(id) : undefined
+    return v ? venueLabel(v) : ''
+  }
+  const jobsById = new Map(app.jobs.map((j) => [j.id, j]))
 
   const counts = { jobs: 0, added: 0, days: 0, crew: 0 }
   const extents = new Map<string, { start: string; end: string }>()
+  const rows = { projects: [] as unknown[][], phases: [] as unknown[][], calls: [] as unknown[][], offers: [] as unknown[][], seen: [] as unknown[][] }
+  const answered = new Date().toISOString()
   for (const j of plan.jobs) {
     let projectId = j.existing?.id
-    if (projectId) counts.added++
-    else {
+    let jobVenue: string | null
+    if (projectId) {
+      counts.added++
+      jobVenue = j.existing!.venueId
+      const was = jobsById.get(projectId)
+      if (was && STOPPED.includes(was.status))
+        throw new Refused({ code: 'conflict', message: `${was.name} has been ${was.status === 'lost' ? 'marked as lost' : 'cancelled'}, so it needs no crew.` })
+    } else {
       projectId = newId()
-      await ctx.tx.query(
-        `INSERT INTO projects (id, name, client_id, venue_id, status, kind, notes, source_calendar) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)`,
-        [projectId, j.name.slice(0, 200), await venueId(j.venue), j.status, j.kind, j.notes, calendar.name]
-      )
-      await emit(ctx, 'project', projectId, await getProject(ctx.tx, projectId))
+      jobVenue = await venueId(j.venue)
+      rows.projects.push([projectId, j.name.slice(0, 200), jobVenue, j.status, j.kind, j.notes, calendar.name])
       counts.jobs++
     }
 
@@ -254,6 +275,7 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
       const start = r.days[0]!
       const end = r.days.at(-1)!
       let phaseId: string
+      let names: { phase: string; venue: string }
       if (r.extend) {
         // Two runs can extend one phase, one either side of it.
         const was = extents.get(r.extend.id) ?? r.extend
@@ -261,73 +283,55 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
         await projectHandlers['phase.update'](ctx, { id: r.extend.id, ...span })
         extents.set(r.extend.id, span)
         phaseId = r.extend.id
+        const known = await namesForCall(ctx.tx, projectId, phaseId)
+        names = { phase: known?.phase ?? r.name.slice(0, 100), venue: known?.venue ?? '' }
       } else {
         phaseId = newId()
-        await projectHandlers['phase.add'](ctx, {
-          id: phaseId,
-          projectId,
-          name: r.name.slice(0, 100),
-          start,
-          end,
-          venueId: await venueId(r.venue),
-          notes: r.notes,
-        })
+        const phaseVenue = await venueId(r.venue)
+        rows.phases.push([phaseId, projectId, r.name.slice(0, 100), start, end, phaseVenue, r.notes])
+        names = { phase: r.name.slice(0, 100), venue: venueText(phaseVenue ?? jobVenue) }
       }
       counts.days += r.days.length
       for (const e of r.events) if (!phaseOf.has(`${e.uid}/${e.day}`)) phaseOf.set(`${e.uid}/${e.day}`, phaseId)
-      counts.crew += await bringCrew(ctx, { id: projectId, name: j.name }, phaseId, r, personIds)
+
+      // One crew call for the run, for everyone on its events, as many as were on the busiest day; each person's
+      // offer holds the days they were on. A hire, an errand or a meeting has nobody in `crew`, so no call (ADR 0037).
+      const offers = r.crew
+        .map((c) => ({ personId: 'id' in c.person ? c.person.id : personIds.get(c.person.email), ...offerFor(c.answers, r.days) }))
+        .filter((o): o is typeof o & { personId: string } => o.personId !== undefined && o.days.length > 0)
+      if (offers.length === 0) continue
+      const busiest = Math.max(1, ...r.days.map((d) => offers.filter((o) => o.status !== 'declined' && o.days.includes(d)).length))
+      const callId = newId()
+      rows.calls.push([callId, projectId, phaseId, (j.existing?.name ?? j.name).slice(0, 200), names.phase, names.venue, 'Crew', start, end, Math.min(busiest, 100), 'open'])
+      for (const o of offers)
+        rows.offers.push([newId(), callId, o.personId, o.status, JSON.stringify(o.days), o.status === 'offered' ? null : answered, o.status === 'offered' ? null : 'calendar'])
+      counts.crew += offers.length
     }
 
-    for (const e of j.seen)
-      await ctx.tx.query(
-        `INSERT INTO calendar_imports (uid, day, calendar_id, event_id, title, project_id, phase_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (uid, day) DO NOTHING`,
-        [e.uid, e.day, calendar.id, e.eventId, e.title.slice(0, 1000), projectId, phaseOf.get(`${e.uid}/${e.day}`) ?? null]
-      )
+    for (const e of j.seen) rows.seen.push([e.uid, e.day, calendar.id, e.eventId, e.title.slice(0, 1000), projectId, phaseOf.get(`${e.uid}/${e.day}`) ?? null])
   }
+
+  const ids = (list: unknown[][]) => list.map((r) => r[0] as string)
+  await insertRows(ctx.tx, 'projects', ['id', 'name', 'venue_id', 'status', 'kind', 'notes', 'source_calendar'], rows.projects)
+  await emitAll(ctx, 'project', (await getProjects(ctx.tx, ids(rows.projects))).map((p) => ({ id: p.id, data: p })))
+  await insertRows(ctx.tx, 'phases', ['id', 'project_id', 'name', 'start_day', 'end_day', 'venue_id', 'notes'], rows.phases)
+  await emitAll(ctx, 'phase', (await getPhases(ctx.tx, ids(rows.phases))).map((p) => ({ id: p.id, data: p })))
+  await insertRows(ctx.tx, 'crew_calls', ['id', 'project_id', 'phase_id', 'project', 'phase', 'venue', 'role', 'start_day', 'end_day', 'needed', 'status'], rows.calls)
+  await emitAll(ctx, 'crewCall', (await getCalls(ctx.tx, ids(rows.calls))).map((c) => ({ id: c.id, data: c })))
+  await insertRows(ctx.tx, 'offers', ['id', 'call_id', 'person_id', 'status', 'days', 'responded_at', 'responded_via'], rows.offers)
+  await emitAll(ctx, 'offer', (await getOffers(ctx.tx, ids(rows.offers))).map((o) => ({ id: o.id, data: o })))
+  await insertRows(ctx.tx, 'calendar_imports', ['uid', 'day', 'calendar_id', 'event_id', 'title', 'project_id', 'phase_id'], rows.seen, 'ON CONFLICT (uid, day) DO NOTHING')
   return { ...counts, venues: venueIds.size, people: personIds.size }
 }
 
-/**
- * One crew call for a phase's run of days, for everyone on its events, as
- * many as were on the busiest day; each person's offer holds the days
- * they were on. Returns the offers made. A hire, an errand or a meeting
- * has nobody in `crew`, so no call (ADR 0037).
- */
-async function bringCrew(ctx: Ctx, job: { id: string; name: string }, phaseId: string, r: PlanRun, personIds: ReadonlyMap<string, string>): Promise<number> {
-  const offers = r.crew
-    .map((c) => ({ personId: 'id' in c.person ? c.person.id : personIds.get(c.person.email), ...offerFor(c.answers, r.days) }))
-    .filter((o): o is typeof o & { personId: string } => o.personId !== undefined && o.days.length > 0)
-  if (offers.length === 0) return 0
-  const busiest = Math.max(1, ...r.days.map((d) => offers.filter((o) => o.status !== 'declined' && o.days.includes(d)).length))
-  const callId = newId()
-  await crewHandlers['call.create'](ctx, {
-    id: callId,
-    projectId: job.id,
-    phaseId,
-    project: job.name.slice(0, 200),
-    phase: r.name.slice(0, 100),
-    venue: '',
-    role: 'Crew',
-    start: r.days[0]!,
-    end: r.days.at(-1)!,
-    callTime: null,
-    needed: Math.min(busiest, 100),
-    dayRateCents: null,
-    details: '',
-    replyBy: null,
-  })
-  const answered = new Date().toISOString()
-  for (const o of offers) {
-    const id = newId()
-    await ctx.tx.query(
-      `INSERT INTO offers (id, call_id, person_id, status, days, day_rate_cents, override, responded_at, responded_via)
-       VALUES ($1, $2, $3, $4, $5, NULL, false, $6, $7)`,
-      [id, callId, o.personId, o.status, JSON.stringify(o.days), o.status === 'offered' ? null : answered, o.status === 'offered' ? null : 'calendar']
-    )
-    await emit(ctx, 'offer', id, await getOffer(ctx.tx, id))
+/** Rows into a table a few hundred per statement; the other columns take their defaults. */
+async function insertRows(q: Queryable, table: string, columns: readonly string[], rows: readonly unknown[][], suffix = '') {
+  const per = Math.max(1, Math.floor(2000 / columns.length))
+  for (let at = 0; at < rows.length; at += per) {
+    const chunk = rows.slice(at, at + per)
+    const values = chunk.map((_, i) => `(${columns.map((_, j) => `$${i * columns.length + j + 1}`).join(', ')})`).join(', ')
+    await q.query(`INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values} ${suffix}`, chunk.flat())
   }
-  return offers.length
 }
 
 /** What a bring-in made that is still in the app, and whether someone has acted on it since (ADR 0037). */
@@ -387,10 +391,10 @@ async function takeBack(ctx: Ctx): Promise<Omit<ImportBrought, 'blocked' | 'cale
   const offers = await ids(`SELECT o.id FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL ORDER BY o.id`)
   const days = Number((await ctx.tx.query<{ n: string }>(`SELECT coalesce(sum(end_day - start_day + 1), 0) AS n FROM phases ph JOIN projects p ON p.id = ph.project_id WHERE p.source_calendar IS NOT NULL`)).rows[0]!.n)
   const people = await importedPeopleToGo(ctx.tx)
-  const gone = async (table: string, entity: Parameters<typeof emitRemoved>[1], list: string[]) => {
+  const gone = async (table: string, entity: Parameters<typeof emitRemovedAll>[1], list: string[]) => {
     if (!list.length) return
     await ctx.tx.query(`DELETE FROM ${table} WHERE id = ANY($1::text[])`, [list])
-    for (const id of list) await emitRemoved(ctx, entity, id)
+    await emitRemovedAll(ctx, entity, list)
   }
   if (offers.length) await ctx.tx.query(`DELETE FROM calendar_guests WHERE offer_id = ANY($1::text[])`, [offers])
   await gone('offers', 'offer', offers)
@@ -511,7 +515,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           const found = new Set(planImport(read.events, app, options).jobs.map((j) => j.key))
           missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
-          const done = await bring(ctx, plan, people, read.calendar)
+          const done = await bring(ctx, plan, people, read.calendar, app)
           await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ calendar: read.calendar.name, ...done })])
           return done
         }

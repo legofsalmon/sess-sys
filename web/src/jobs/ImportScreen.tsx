@@ -20,7 +20,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Confirm } from '../act.tsx'
-import { ask, post } from '../server.ts'
+import { AS_LONG_AS_IT_TAKES, ask, post } from '../server.ts'
 import { syncSoon } from '../sync.ts'
 import { StatusPill } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
@@ -71,7 +71,7 @@ export function ImportScreen({ view }: { view: View }) {
     if (!calendarId || !isDay(from)) return
     setStep({ at: 'looking' })
     try {
-      const preview = await post<ImportPreview>('/api/calendar/import/look', { calendarId, from })
+      const preview = await post<ImportPreview>('/api/calendar/import/look', { calendarId, from }, AS_LONG_AS_IT_TAKES)
       setStep({ at: 'look', preview })
     } catch (err) {
       setStep({ at: 'choose', problem: (err as Error).message })
@@ -81,7 +81,7 @@ export function ImportScreen({ view }: { view: View }) {
   const bring = async (preview: ImportPreview, choices: ImportChoices) => {
     setStep({ at: 'bringing', preview })
     try {
-      const result = await post<ImportResult>('/api/calendar/import/bring', choices)
+      const result = await post<ImportResult>('/api/calendar/import/bring', choices, AS_LONG_AS_IT_TAKES)
       setStep({ at: 'done', preview, result })
     } catch (err) {
       setStep({ at: 'look', preview, problem: (err as Error).message })
@@ -375,6 +375,11 @@ function Look(p: {
           {blank && <p className="alert">Give {blank.name} a name, or untick it.</p>}
           {!blank && unnamed && <p className="alert">Give {unnamed} a name, or untick them.</p>}
           {p.offline && <p className="hint">This needs signal.</p>}
+          {p.bringing && (
+            <p className="hint" role="status">
+              Saving them all in one go. A whole season takes a little while: keep this page open.
+            </p>
+          )}
           {asking ? (
             <Confirm
               question={`${told} They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.`}
@@ -489,7 +494,12 @@ function Found(p: {
 /** The phase a day of a job is, when its title has no phase word: a Show for a gig, and the kind's own day otherwise. The server says the same. */
 const guessedPhase = (kind: ProjectKind) => ({ gig: 'Show', hire: 'Hire', errand: 'Errand', meeting: 'Meeting' })[kind]
 
-type BroughtState = { state: 'loading' } | { state: 'failed'; text: string } | { state: 'ready'; brought: ImportBrought } | { state: 'taking' } | { state: 'taken'; text: string }
+type BroughtState =
+  | { state: 'loading' }
+  | { state: 'failed'; text: string }
+  | { state: 'ready'; brought: ImportBrought; problem?: string }
+  | { state: 'taking'; brought: ImportBrought }
+  | { state: 'taken'; text: string }
 
 /**
  * What the bring-ins so far put in the app, and a way to take it all back
@@ -515,16 +525,17 @@ function Brought({ offline }: { offline: boolean }) {
       </section>
     )
   if (s.state === 'ready' && s.brought.jobs === 0) return null
-  const b = s.state === 'ready' ? s.brought : undefined
+  const b = s.state === 'ready' || s.state === 'taking' ? s.brought : undefined
   const take = async () => {
+    if (!b) return
     setAsking(false)
-    setS({ state: 'taking' })
+    setS({ state: 'taking', brought: b })
     try {
-      const done = await post<Omit<ImportBrought, 'blocked'>>('/api/calendar/import/take-back', {})
+      const done = await post<Omit<ImportBrought, 'blocked'>>('/api/calendar/import/take-back', {}, AS_LONG_AS_IT_TAKES)
       setS({ state: 'taken', text: `Taken back: ${plural(done.jobs, 'job', 'jobs')}, ${plural(done.days, 'day', 'days')} and ${plural(done.crew, 'crew booking or offer', 'crew bookings and offers')}${done.people ? `, and ${plural(done.people, 'person', 'people')} added from the invites` : ''}. Look at the calendar again to bring it in afresh.` })
     } catch (err) {
-      setS({ state: 'failed', text: (err as Error).message })
-      setAsking(false)
+      // The card stays, saying what went wrong, so it can be tried again.
+      setS({ state: 'ready', brought: b, problem: (err as Error).message })
     } finally {
       syncSoon()
     }
@@ -545,6 +556,11 @@ function Brought({ offline }: { offline: boolean }) {
         <p className="hint">
           If the first bring-in got things wrong (what kind of job, who was crew, people's names), take it all back and bring the calendars in again
           from the first day. Nothing is written to Google, and nobody is emailed.
+        </p>
+      )}
+      {s.state === 'ready' && s.problem && (
+        <p className="alert" role="alert">
+          {s.problem}
         </p>
       )}
       {b && !b.blocked && (
