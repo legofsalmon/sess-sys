@@ -3,6 +3,32 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: the bring-in learns from the real calendars
+
+**Done**
+
+- Colly said go on the audit's fix order. A job now has a kind: gig, dry
+  hire, errand or meeting ([Decision 0037](adr/0037-job-kinds-and-days-gone-as-history.md)),
+  guessed from the title on the import screen and corrected there before
+  saving; only a gig gets a crew call, and the invited are noted on the
+  rest. Days gone come in as the record of who worked: a Yes is a booking,
+  anything else is noted, so no call is still looking for crew for a gig
+  that happened, and a booking brought in after its day has no timesheet
+  to chase. "Build 4/9 & Client Walk Through" is a Build with a note, a
+  day naming two phases books its crew once, people's names are typed on
+  the import screen where Google had none, and a shared mailbox is never
+  crew.
+- The import screen says what has been brought in so far and can take it
+  all back in one go, so the calendars can come in again from the first
+  day with the new rules. It refuses once anyone has acted on those jobs
+  in the app.
+
+**Waiting on**
+
+- Colly: take the first bring-in back on the import screen and bring both
+  calendars in again from the start of the season, checking the kinds and
+  typing the names; then the backup bucket and the Sentry key.
+
 ## 16 October 2026: the real calendars are in, and audited
 
 **Done**

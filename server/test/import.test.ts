@@ -16,7 +16,8 @@ import type { LightMyRequestResponse } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
-import { nameFromEmail, nameKey, parseTitle, planImport, plainText, type AppData, type SourceEvent } from '../src/calendar/import-plan.ts'
+import { PERSON_NOTE, TAKE_BACK_ACTION } from '../src/calendar/import.ts'
+import { isMailbox, nameFromEmail, nameKey, parseTitle, planImport, plainText, type AppData, type SourceEvent } from '../src/calendar/import-plan.ts'
 import { pgliteDb } from '../src/db.ts'
 import { everythingJson, readEverything } from '../src/export.ts'
 import { FakeGoogle } from './fake-google-calendar.ts'
@@ -32,7 +33,7 @@ import { staff, WINDOWS } from './people.ts'
 describe('titles', () => {
   const t = (title: string) => {
     const p = parseTitle(title)
-    return `${p.job} | ${p.phases.join(' + ')}${p.guessed ? ' (guessed)' : ''}${p.pencilled ? ' (pencilled)' : ''}`
+    return `${p.job} | ${p.phases.join(' + ')}${p.note ? ` "${p.note}"` : ''}${p.guessed ? ' (guessed)' : ''}${p.pencilled ? ' (pencilled)' : ''}${p.kind === 'gig' ? '' : ` [${p.kind}]`}`
   }
 
   it('are the job, then the phase after the last " - ", in the app’s own words', () => {
@@ -75,6 +76,34 @@ describe('titles', () => {
     expect(t('Holdings AGM - Show')).toBe('Holdings AGM | Show')
   })
 
+  it('keep what follows a phase word as a note, and take a phase at the end of a name (ADR 0037)', () => {
+    expect(t('WL - Malahide Build 4/9 & Client Walk Through')).toBe('WL - Malahide | Build "Client Walk Through"')
+    expect(t('WL - Fota Build 7/7 & Final Changes')).toBe('WL - Fota | Build "Final Changes"')
+    expect(t('Mansion House - Load Out PA')).toBe('Mansion House | Load out "PA"')
+    expect(t('Mansion House - Launch Event')).toBe('Mansion House | Show')
+    expect(t('Coca Cola Truck - Live RDS')).toBe('Coca Cola Truck | Show "RDS"')
+    expect(t("St. Patrick's Cathedral Install")).toBe("St. Patrick's Cathedral | Build")
+    expect(t('Back 2 Basics Gym installation')).toBe('Back 2 Basics Gym | Build')
+    // A note is a few words; more than that is the job's name.
+    expect(t('Nissan - Show scope changes and more words than a note has here')).toBe('Nissan - Show scope changes and more words than a note has here | Show (guessed)')
+    expect(t('Nissan - Client & Build')).toBe('Nissan - Client | Build')
+    expect(t('Dan daly fit out in Back to basics meeting 3.45')).toBe('Dan daly fit out in Back to basics meeting 3.45 | Meeting (guessed) [meeting]')
+  })
+
+  it('say what kind of job a name is: a hire, an errand or a meeting is not a gig (ADR 0037)', () => {
+    expect(t('Murt lx hire')).toBe('Murt lx hire | Hire (guessed) [hire]')
+    expect(t('Show scope drape rental')).toBe('Show scope drape rental | Hire (guessed) [hire]')
+    expect(t('Bold Frontiers Dry hire')).toBe('Bold Frontiers Dry hire | Hire (guessed) [hire]')
+    expect(t('Davin lx hire - Load out')).toBe('Davin lx hire | Load out [hire]')
+    expect(t('Collect Screwfix')).toBe('Collect Screwfix | Errand (guessed) [errand]')
+    expect(t('Return PSI Truss Adapters')).toBe('Return PSI Truss Adapters | Errand (guessed) [errand]')
+    expect(t('Ryder Cup Meeting')).toBe('Ryder Cup Meeting | Meeting (guessed) [meeting]')
+    expect(t('Site visit Ryder cup')).toBe('Site visit Ryder cup | Meeting (guessed) [meeting]')
+    expect(t('Session Hire Christmas party')).toBe('Session Hire Christmas party | Show (guessed)')
+    // A phase word is still a phase of a gig: a collection after " - " is its Load out.
+    expect(t('Nissan - Collection')).toBe('Nissan | Load out')
+  })
+
   it('are compared ignoring case, accents, spacing and punctuation', () => {
     expect(nameKey('  Café  Olé!! ')).toBe(nameKey('cafe ole'))
     expect(nameKey('Tik-Tok')).toBe(nameKey('tik tok'))
@@ -87,6 +116,11 @@ describe('job sheets and names', () => {
       'Kit\n2x K2\n- Desk\n- Mics & stands\n\nGate 3 – ask for Tom'
     )
     expect(plainText('Access via the loading bay\r\nPower: 63A')).toBe('Access via the loading bay\nPower: 63A')
+  })
+
+  it('know a company mailbox from a person', () => {
+    expect(['info@sessionhire.com', 'Accounts@example.ie', 'hire@stagesupplies.ie', 'no-reply@x.com'].map(isMailbox)).toEqual([true, true, true, true])
+    expect(['aoife.byrne@gmail.com', 'sean@sessionhire.com', 'hired.hands@gmail.com'].map(isMailbox)).toEqual([false, false, false])
   })
 
   it('make a name from an address when Google has none', () => {
@@ -103,7 +137,7 @@ describe('planning', () => {
     return { id, uid: `${id}@google.com`, cancelled: false, title, days: { start, end }, location: '', description: '', guests: [], repeating: false, special: false, ours: false, ...more }
   }
   const empty: AppData = { people: [], venues: [], jobs: [], imported: [] }
-  const opts = { account: 'ops@sessionhire.com', calendarId: 'ops@sessionhire.com', from: '2031-01-01', to: '2033-01-01' }
+  const opts = { account: 'ops@sessionhire.com', calendarId: 'ops@sessionhire.com', from: '2031-01-01', to: '2033-01-01', today: '2031-03-05' }
   const phases = (j: { runs: { name: string; days: string[] }[] }) => j.runs.map((r) => `${r.name} ${r.days[0]}${r.days.length > 1 ? `–${r.days.at(-1)}` : ''}`)
 
   it('makes one job of a name’s days, and a phase of each run of days, unless a fortnight apart', () => {
@@ -145,8 +179,8 @@ describe('planning', () => {
     const app: AppData = {
       ...empty,
       jobs: [
-        { id: 'j1', name: 'Web Summit', status: 'confirmed', venueId: null, sourceCalendar: null, phases: [{ id: 'p1', name: 'Show', start: '2031-03-20', end: '2031-03-21' }] },
-        { id: 'j2', name: 'EY Awards', status: 'cancelled', venueId: null, sourceCalendar: null, phases: [{ id: 'p2', name: 'Show', start: '2031-05-01', end: '2031-05-01' }] },
+        { id: 'j1', name: 'Web Summit', status: 'confirmed', kind: 'gig', venueId: null, sourceCalendar: null, phases: [{ id: 'p1', name: 'Show', start: '2031-03-20', end: '2031-03-21' }] },
+        { id: 'j2', name: 'EY Awards', status: 'cancelled', kind: 'gig', venueId: null, sourceCalendar: null, phases: [{ id: 'p2', name: 'Show', start: '2031-05-01', end: '2031-05-01' }] },
       ],
     }
     const plan = planImport([ev('Web Summit - Show', '2031-03-20'), ev('EY Awards - Build', '2031-04-30'), ev('Web Summit - Show', '2031-09-20')], app, opts)
@@ -209,13 +243,70 @@ describe('planning', () => {
       [{ id: 'p2' }, 'needsAction'],
       [{ email: 'aoife.byrne@gmail.com' }, 'declined'],
       [{ email: 'sean@sessionhire.com' }, 'tentative'],
-      [{ email: 'hire@stagesupplies.ie' }, 'accepted'],
     ])
+    // A company's mailbox is never crew: it's noted on the phase for anyone looking.
+    expect(plan.jobs[0]!.runs[0]!.notes).toBe('Also on the invite: Stage Supplies')
     expect(plan.people).toEqual([
-      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, jobs: 1 },
-      { email: 'sean@sessionhire.com', name: 'Seán Óg', kind: 'staff', suggested: true, jobs: 1 },
-      { email: 'hire@stagesupplies.ie', name: 'Stage Supplies', kind: 'freelancer', suggested: false, jobs: 1 },
+      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, needsName: true, jobs: 1 },
+      { email: 'sean@sessionhire.com', name: 'Seán Óg', kind: 'staff', suggested: true, needsName: false, jobs: 1 },
     ])
+    // The office can give a name as it will show; a person's own address is suggested only once they're on a gig.
+    const named = planImport([ev('Gig - Show', '2031-06-01', { guests }), ev('Client meeting', '2031-06-02', { guests: [{ email: 'client@gmail.com', name: null, answer: 'accepted', notCrew: false }] })], app, {
+      ...opts,
+    }, { names: new Map(), include: new Set(['gig|2031-06-01', 'client meeting|2031-06-02']), people: new Map([['aoife.byrne@gmail.com', 'Aoife Ní Bhriain']]) })
+    expect(named.people.map((p) => [p.name, p.suggested, p.needsName])).toEqual([
+      ['Aoife Ní Bhriain', true, false],
+      ['Seán Óg', true, false],
+      ['Client', false, true],
+    ])
+  })
+
+  it('brings a hire, an errand or a meeting in with no crew, naming the invited in the notes, unless the office says it is a gig (ADR 0037)', () => {
+    const guests = [
+      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', answer: 'accepted' as const, notCrew: false },
+      { email: 'sean@sessionhire.com', name: null, answer: 'needsAction' as const, notCrew: false },
+    ]
+    const events = [ev('Murt lx hire', ['2031-06-01', '2031-06-03'], { guests }), ev('Collect Screwfix', '2031-06-02', { guests }), ev('Ryder Cup Meeting', '2031-06-04', { guests })]
+    const plan = planImport(events, empty, opts)
+    expect(plan.jobs.map((j) => [j.name, j.kind, j.runs.map((r) => `${r.name} ${r.crew.length} crew: ${r.notes}`)])).toEqual([
+      ['Murt lx hire', 'hire', ['Hire 0 crew: On the invite: Aoife Byrne, Sean']],
+      ['Collect Screwfix', 'errand', ['Errand 0 crew: On the invite: Aoife Byrne, Sean']],
+      ['Ryder Cup Meeting', 'meeting', ['Meeting 0 crew: On the invite: Aoife Byrne, Sean']],
+    ])
+    // Nobody is suggested for the crew list from a hire alone; Sean is staff, so always.
+    expect(plan.people.map((p) => [p.name, p.suggested])).toEqual([['Sean', true], ['Aoife Byrne', false]])
+
+    const gig = planImport(events, empty, opts, { names: new Map(), kinds: new Map([[plan.jobs[0]!.key, 'gig']]), include: new Set(plan.jobs.map((j) => j.key)) })
+    expect(gig.jobs[0]).toMatchObject({ name: 'Murt lx hire', kind: 'gig' })
+    expect(gig.jobs[0]!.runs.map((r) => `${r.name} ${r.crew.length} crew: ${r.notes}`)).toEqual(['Show 2 crew: '])
+    expect(gig.jobs[1]!.kind).toBe('errand')
+  })
+
+  it('treats days gone as the record of who worked: a Yes is a booking, the rest is noted, not offered (ADR 0037)', () => {
+    const guests = [
+      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', answer: 'accepted' as const, notCrew: false },
+      { email: 'dara@gmail.com', name: 'Dara Walsh', answer: 'needsAction' as const, notCrew: false },
+      { email: 'niall@gmail.com', name: 'Niall Kerr', answer: 'declined' as const, notCrew: false },
+    ]
+    const plan = planImport([ev('Gig - Show', ['2031-03-03', '2031-03-04'], { guests }), ev('Gig - Load out', '2031-03-05', { guests })], empty, opts)
+    const runs = plan.jobs[0]!.runs
+    expect(runs.map((r) => [r.name, r.crew.map((c) => `${'email' in c.person ? c.person.email : c.person.id} ${JSON.stringify(c.answers)}`)])).toEqual([
+      ['Show', ['aoife.byrne@gmail.com {"2031-03-03":"accepted","2031-03-04":"accepted"}']],
+      // Today is still to come: everyone's answer stands.
+      ['Load out', ['aoife.byrne@gmail.com {"2031-03-05":"accepted"}', 'dara@gmail.com {"2031-03-05":"needsAction"}', 'niall@gmail.com {"2031-03-05":"declined"}']],
+    ])
+    expect(runs[0]!.noted).toEqual([
+      { name: 'Dara Walsh', days: ['2031-03-03', '2031-03-04'], answer: 'none' },
+      { name: 'Niall Kerr', days: ['2031-03-03', '2031-03-04'], answer: 'declined' },
+    ])
+    expect(runs[0]!.notes).toBe('No answer on the invite: Dara Walsh (Mon 3 Mar to Tue 4 Mar)\n\nSaid no: Niall Kerr (Mon 3 Mar to Tue 4 Mar)')
+    expect(runs[1]!.notes).toBe('')
+  })
+
+  it('puts the crew of a day naming two phases on the first phase only (ADR 0037)', () => {
+    const guests = [{ email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', answer: 'accepted' as const, notCrew: false }]
+    const plan = planImport([ev('Nissan - Show Day 1/2', '2031-06-01', { guests }), ev('Nissan - Show Day 2/ Load Out', '2031-06-02', { guests })], empty, opts)
+    expect(plan.jobs[0]!.runs.map((r) => `${r.name} ${r.days.join(' ')}: ${r.crew.length} crew`)).toEqual(['Show 2031-06-01 2031-06-02: 1 crew', 'Load out 2031-06-02: 0 crew'])
   })
 
   it('says what it left out, and why', () => {
@@ -377,22 +468,23 @@ describe('bringing jobs in from Google Calendar', () => {
         status: 'confirmed',
         phases: ['Build 2031-03-10 2031-03-11', 'Show 2031-03-12 2031-03-13', 'Load out 2031-03-13 2031-03-13'],
         venue: { name: 'Convention Centre Dublin', isNew: true },
-        crew: { booked: 2, waiting: 1, declined: 1, notInApp: 3 },
+        crew: { booked: 1, waiting: 1, declined: 1, notInApp: 2, noted: 0 },
       },
-      { name: 'Web Summit', status: 'confirmed', phases: ['Show 2031-03-20 2031-03-21'], venue: null, crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0 } },
+      { name: 'Web Summit', status: 'confirmed', phases: ['Show 2031-03-20 2031-03-21'], venue: null, crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0, noted: 0 } },
       {
         name: 'Christmas party',
         status: 'enquiry',
         phases: ['Show 2031-12-12 2031-12-12'],
         venue: { name: 'The Marker Hotel', isNew: true },
-        crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0 },
+        crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0, noted: 0 },
       },
     ])
+    expect(preview.jobs.map((j) => j.kind)).toEqual(['gig', 'gig', 'gig'])
     expect(preview.jobs[1]!.phases[0]!.guessed).toBe(true)
+    // The supplier's hire@ mailbox is never crew.
     expect(preview.people).toEqual([
-      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, jobs: 1 },
-      { email: 'sean@sessionhire.com', name: 'Sean', kind: 'staff', suggested: true, jobs: 1 },
-      { email: 'hire@stagesupplies.ie', name: 'Hire', kind: 'freelancer', suggested: false, jobs: 1 },
+      { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, needsName: false, jobs: 1 },
+      { email: 'sean@sessionhire.com', name: 'Sean', kind: 'staff', suggested: true, needsName: true, jobs: 1 },
     ])
     expect(preview.leftOut.map((l) => leftOutLabel(l))).toEqual([
       '1 event with a start time (meetings, calls)',
@@ -414,13 +506,16 @@ describe('bringing jobs in from Google Calendar', () => {
     await s.colly.send('person.upsert', { id: 'ciara', name: 'Ciara Walsh', kind: 'freelancer', email: 'ciara@example.ie', phone: null, skills: [], dayRateCents: null, notes: '' })
     organisersCalendar(s.google)
     const preview = ok<ImportPreview>(await s.look(OPS))
-    const result = ok<ImportResult>(await s.bring(choose(preview, { 'Web Summit': false, 'Christmas party': 'EY Christmas party' })))
-    expect(result).toEqual({ jobs: 2, added: 0, days: 6, venues: 2, people: 2, crew: 5, missing: [] })
+    const choices = choose(preview, { 'Web Summit': false, 'Christmas party': 'EY Christmas party' })
+    // The office gives Sean his name as it will show.
+    choices.people = choices.people.map((p) => (p.email === 'sean@sessionhire.com' ? { ...p, name: 'Seán Mac Aodha' } : p))
+    const result = ok<ImportResult>(await s.bring(choices))
+    expect(result).toEqual({ jobs: 2, added: 0, days: 6, venues: 2, people: 2, crew: 4, missing: [] })
 
     const f = await s.feed()
     const nissan = f.projects.find((p) => p.name === 'Nissan')!
     const party = f.projects.find((p) => p.name === 'EY Christmas party')!
-    expect(nissan).toMatchObject({ status: 'confirmed', sourceCalendar: OPS, notes: 'Access via the Spencer Dock loading bay' })
+    expect(nissan).toMatchObject({ status: 'confirmed', kind: 'gig', sourceCalendar: OPS, notes: 'Access via the Spencer Dock loading bay' })
     expect(party).toMatchObject({ status: 'enquiry', sourceCalendar: OPS })
     expect(f.venues.map((v) => [v.name, v.address]).sort()).toEqual([
       ['Convention Centre Dublin', 'Convention Centre Dublin, Spencer Dock, Dublin 1'],
@@ -435,10 +530,13 @@ describe('bringing jobs in from Google Calendar', () => {
     expect(f.people.map((p) => [p.name, p.kind, p.email, p.notes]).sort()).toEqual([
       ['Aoife Byrne', 'freelancer', 'aoife.byrne@gmail.com', 'Added from the guests on Google Calendar.'],
       ['Ciara Walsh', 'freelancer', 'ciara@example.ie', ''],
-      ['Sean', 'staff', 'sean@sessionhire.com', 'Added from the guests on Google Calendar.'],
+      ['Seán Mac Aodha', 'staff', 'sean@sessionhire.com', 'Added from the guests on Google Calendar.'],
     ])
+    // The supplier on the Show's invite is noted on the phase.
+    expect(f.phases.find((p) => p.projectId === nissan.id && p.name === 'Show')!.notes).toBe('Also on the invite: hire@stagesupplies.ie')
 
     // A crew call per phase, for as many as were on its busiest day; a Yes is booked, no answer is offered, a No declined.
+    // The day naming Show and Load out puts its crew on the Show, so the Load out needs no call.
     const name = (id: string) => f.people.find((p) => p.id === id)!.name
     const crew = f.calls
       .filter((c) => c.projectId === nissan.id)
@@ -458,17 +556,16 @@ describe('bringing jobs in from Google Calendar', () => {
         role: 'Crew',
         needed: 2,
         days: '2031-03-10 2031-03-11',
-        offers: ['Aoife Byrne confirmed 2031-03-10 2031-03-11', 'Ciara Walsh declined 2031-03-11', 'Sean offered 2031-03-10'],
+        offers: ['Aoife Byrne confirmed 2031-03-10 2031-03-11', 'Ciara Walsh declined 2031-03-11', 'Seán Mac Aodha offered 2031-03-10'],
       },
       { phase: 'Show', role: 'Crew', needed: 1, days: '2031-03-12 2031-03-13', offers: ['Aoife Byrne confirmed 2031-03-12 2031-03-13'] },
-      { phase: 'Load out', role: 'Crew', needed: 1, days: '2031-03-13 2031-03-13', offers: ['Aoife Byrne confirmed 2031-03-13'] },
     ])
     expect(f.offers.find((o) => o.status === 'confirmed')!.respondedVia).toBe('calendar')
 
     // The history says who did it and how much came in.
     const history = await s.colly.history()
     expect(history.entries[0]!.what).toBe(
-      'Brought in 2 jobs from ops@sessionhire.com on Google Calendar: 6 days, 5 crew bookings and offers, 2 new people and 2 new venues'
+      'Brought in 2 jobs from ops@sessionhire.com on Google Calendar: 6 days, 4 crew bookings and offers, 2 new people and 2 new venues'
     )
     expect(history.entries[0]!.who.name).toBe('Colly Hewson')
 
@@ -564,6 +661,52 @@ describe('bringing jobs in from Google Calendar', () => {
     expect((await s.look(OPS)).json().error).toMatch(/Calendar API is switched off/)
     // Not signed in: no access at all.
     expect((await s.app.inject({ method: 'POST', url: '/api/calendar/import/look', payload: { calendarId: OPS, from: '2031-01-01' } })).statusCode).toBe(401)
+  })
+
+  it('takes back everything brought in, so it can be brought in again, unless someone has acted on it since (ADR 0037)', async () => {
+    const s = await setup()
+    await s.connect()
+    await s.colly.send('person.upsert', { id: 'ciara', name: 'Ciara Walsh', kind: 'freelancer', email: 'ciara@example.ie', phone: null, skills: [], dayRateCents: null, notes: '' })
+    organisersCalendar(s.google)
+    const preview = ok<ImportPreview>(await s.look(OPS))
+    ok<ImportResult>(await s.bring(choose(preview)))
+    const brought = () => s.app.inject({ url: '/api/calendar/import/brought', cookies: s.colly.cookies })
+    expect(ok(await brought())).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, calendars: [OPS], blocked: null })
+
+    // Sean answers in the app, so the bring-in can't be taken back as a whole any more: his answer would go with it.
+    const before = await s.feed()
+    const aoife = before.people.find((p) => p.name === 'Aoife Byrne')!
+    const sean = before.people.find((p) => p.email === 'sean@sessionhire.com')!
+    const seansOffer = before.offers.find((o) => o.personId === sean.id)!
+    await s.colly.send('offer.respond', { id: seansOffer.id, answer: 'decline', note: '' })
+    const blocked = ok<{ blocked: string }>(await brought())
+    expect(blocked.blocked).toBe("These jobs have been worked on in the app since (answers to offers), so they can't be taken back as a whole.")
+    const refused = await s.app.inject({ method: 'POST', url: '/api/calendar/import/take-back?client=collylaptop', cookies: s.colly.cookies, headers: { 'user-agent': WINDOWS } })
+    expect(refused.statusCode).toBe(409)
+    // Had the No come from the calendar instead, it would be the bring-in's own, and go with it.
+    await s.db.query(`UPDATE offers SET responded_via = 'calendar' WHERE id = $1`, [seansOffer.id])
+
+    const taken = ok<{ jobs: number; days: number; crew: number; people: number; calendars: string[] }>(
+      await s.app.inject({ method: 'POST', url: '/api/calendar/import/take-back?client=collylaptop', cookies: s.colly.cookies, headers: { 'user-agent': WINDOWS } })
+    )
+    expect(taken).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, calendars: [OPS] })
+    const f = await s.feed()
+    expect(f.projects).toEqual([])
+    expect(f.phases).toEqual([])
+    expect(f.calls).toEqual([])
+    expect(f.offers).toEqual([])
+    expect(f.people.map((p) => p.name)).toEqual(['Ciara Walsh'])
+    expect(f.venues).toHaveLength(2)
+    expect(aoife.notes).toBe(PERSON_NOTE)
+    const history = await s.colly.history()
+    expect(history.entries[0]!.what).toBe('Took back everything brought in from Google Calendar, to bring it in again: 3 jobs, 8 days, 4 crew bookings and offers and 2 people added from the invites')
+    expect(history.entries[0]!.command).toBe(TAKE_BACK_ACTION)
+    expect(ok(await brought())).toEqual({ jobs: 0, days: 0, crew: 0, people: 0, calendars: [], blocked: null })
+
+    // And the calendar can be brought in again, whole.
+    const again = ok<ImportPreview>(await s.look(OPS))
+    expect(again.jobs.map((j) => j.name)).toEqual(['Nissan', 'Web Summit', 'Christmas party'])
+    expect(again.leftOut.map((l) => l.reason)).not.toContain('before')
   })
 
   it('reports jobs that went from the calendar between looking and bringing in', async () => {

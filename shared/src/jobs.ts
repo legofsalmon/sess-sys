@@ -61,6 +61,25 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
 export const STOPPED: readonly ProjectStatus[] = ['cancelled', 'lost']
 
 /**
+ * What kind of job it is (ADR 0037): a gig needs crew and kit on days; a
+ * dry hire is kit going out with no crew; an errand is a van run or a
+ * collection; a meeting is people and no kit. A job with no kind is a gig,
+ * so jobs saved before kinds existed read as they were.
+ */
+export const PROJECT_KINDS = ['gig', 'hire', 'errand', 'meeting'] as const
+export type ProjectKind = (typeof PROJECT_KINDS)[number]
+
+export const KIND_LABELS: Record<ProjectKind, string> = {
+  gig: 'Gig',
+  hire: 'Dry hire',
+  errand: 'Errand',
+  meeting: 'Meeting',
+}
+
+/** A job's kind, a gig when it doesn't say. */
+export const kindOf = (p: { kind?: ProjectKind }): ProjectKind => p.kind ?? 'gig'
+
+/**
  * Getting a job's kit ready and checking it back in (ADR 0031): the whole
  * days before its kit is needed that it's held for the job too, and after.
  */
@@ -80,6 +99,8 @@ export const project = z.object({
   /** Where most of it happens; a phase can have its own. */
   venueId: id.nullable(),
   status: z.enum(PROJECT_STATUSES),
+  /** Missing means a gig (ADR 0037). */
+  kind: z.enum(PROJECT_KINDS).optional(),
   notes: text(4000, 'The notes'),
   /** Days its kit is held before it's needed, to get it ready; missing means the usual one (ADR 0031). */
   prepDays: kitDays.optional(),
@@ -159,6 +180,7 @@ export const jobCommandSchemas = {
       clientId: project.shape.clientId.optional(),
       venueId: project.shape.venueId.optional(),
       status: project.shape.status.optional(),
+      kind: z.enum(PROJECT_KINDS).optional(),
       notes: project.shape.notes.optional(),
       prepDays: kitDays.optional(),
       returnDays: kitDays.optional(),

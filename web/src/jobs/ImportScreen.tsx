@@ -4,14 +4,18 @@ import {
   importFromDefault,
   isDay,
   jobsAfterNaming,
+  KIND_LABELS,
   leftOutLabel,
+  PROJECT_KINDS,
   spanLabel,
+  type ImportBrought,
   type ImportCalendar,
   type ImportChanged,
   type ImportChoices,
   type ImportJob,
   type ImportPreview,
   type ImportResult,
+  type ProjectKind,
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
@@ -37,8 +41,8 @@ type Step =
   | { at: 'bringing'; preview: ImportPreview }
   | { at: 'done'; preview: ImportPreview; result: ImportResult }
 
-/** What was unticked, renamed and chosen on a calendar's list, kept while someone goes back to look at another and returns. */
-type Picks = { names: Record<string, string>; skip: ReadonlySet<string>; people: ReadonlySet<string> }
+/** What was unticked, renamed, re-kinded and chosen on a calendar's list, kept while someone goes back to look at another and returns. */
+type Picks = { names: Record<string, string>; kinds: Record<string, ProjectKind>; skip: ReadonlySet<string>; people: ReadonlySet<string>; personNames: Record<string, string> }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-IE')} ${n === 1 ? one : many}`
 
@@ -116,17 +120,20 @@ export function ImportScreen({ view }: { view: View }) {
           )}
         </section>
       ) : step.at === 'choose' || step.at === 'looking' ? (
-        <Choose
-          account={link.account ?? 'The connected account'}
-          calendarId={calendarId}
-          setCalendarId={setCalendarId}
-          from={from}
-          setFrom={setFrom}
-          looking={step.at === 'looking'}
-          offline={offline}
-          problem={step.at === 'choose' ? step.problem : undefined}
-          onLook={look}
-        />
+        <>
+          <Choose
+            account={link.account ?? 'The connected account'}
+            calendarId={calendarId}
+            setCalendarId={setCalendarId}
+            from={from}
+            setFrom={setFrom}
+            looking={step.at === 'looking'}
+            offline={offline}
+            problem={step.at === 'choose' ? step.problem : undefined}
+            onLook={look}
+          />
+          <Brought offline={offline} />
+        </>
       ) : step.at === 'done' ? (
         <Done preview={step.preview} result={step.result} onAgain={() => setStep({ at: 'choose' })} />
       ) : (
@@ -204,7 +211,7 @@ function Choose(p: {
       <label className="field">
         First day
         <input type="date" value={p.from} onChange={(e) => p.setFrom(e.target.value)} required />
-        <small>Everything from this day to two years ahead. Days gone come in too, as the record of who worked what.</small>
+        <small>Everything from this day to two years ahead. Days gone come in too, as the record of who worked: a Yes on the invite is a booking, and the rest is noted.</small>
       </label>
       {p.problem && (
         <p className="alert" role="alert">
@@ -233,12 +240,14 @@ function Look(p: {
   const year = useToday().slice(0, 4)
   // Back on a calendar and day already looked at, what was unticked, renamed and chosen is as it was left.
   const [names, setNames] = useState<Record<string, string>>(() => ({ ...Object.fromEntries(preview.jobs.map((j) => [j.key, j.name])), ...p.kept?.names }))
+  const [kinds, setKinds] = useState<Record<string, ProjectKind>>(() => ({ ...Object.fromEntries(preview.jobs.map((j) => [j.key, j.kind])), ...p.kept?.kinds }))
   const [skip, setSkip] = useState<ReadonlySet<string>>(() => p.kept?.skip ?? new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => p.kept?.people ?? new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
+  const [personNames, setPersonNames] = useState<Record<string, string>>(() => ({ ...Object.fromEntries(preview.people.map((x) => [x.email, x.name])), ...p.kept?.personNames }))
   const { onKeep } = p
   useEffect(() => {
-    onKeep({ names, skip, people })
-  }, [names, skip, people, onKeep])
+    onKeep({ names, kinds, skip, people, personNames })
+  }, [names, kinds, skip, people, personNames, onKeep])
   // The question before anything is saved, in the bar the button is in.
   const [asking, setAsking] = useState(false)
   const toggle = <T,>(set: ReadonlySet<T>, item: T) => {
@@ -255,12 +264,13 @@ function Look(p: {
   const more = ticked.length - newJobs.length
   const what = [count && plural(count, 'job', 'jobs'), more && `more days for ${plural(more, 'job', 'jobs')}`].filter(Boolean).join(' and ')
   const blank = newJobs.find((j) => !(names[j.key] ?? '').trim())
+  const unnamed = adding.find((e) => !(personNames[e] ?? '').trim())
 
   const choices: ImportChoices = {
     calendarId: preview.calendar.id,
     from: preview.from,
-    jobs: preview.jobs.map((j) => ({ key: j.key, name: (names[j.key] ?? j.name).trim() || j.name, include: !skip.has(j.key) })),
-    people: preview.people.map((x) => ({ email: x.email, include: people.has(x.email) })),
+    jobs: preview.jobs.map((j) => ({ key: j.key, name: (names[j.key] ?? j.name).trim() || j.name, kind: kinds[j.key] ?? j.kind, include: !skip.has(j.key) })),
+    people: preview.people.map((x) => ({ email: x.email, name: (personNames[x.email] ?? x.name).trim() || x.name, include: people.has(x.email) })),
   }
   const told = `Bring in ${what}${adding.length ? `, adding ${plural(adding.length, 'person', 'people')} to the crew list` : ''}?`
 
@@ -283,7 +293,10 @@ function Look(p: {
       {preview.jobs.length > 0 && (
         <section className="card" aria-label="Jobs found">
           <h2>Jobs</h2>
-          <p className="hint">Untick any that aren't jobs. Rename one to match another, and they come in as one job.</p>
+          <p className="hint">
+            Untick any that aren't jobs. Rename one to match another, and they come in as one job. A dry hire, an errand or a meeting comes in with no
+            crew call: whoever was on the invite is noted on it.
+          </p>
           <ul className="found">
             {preview.jobs.map((j) => (
               <Found
@@ -292,8 +305,10 @@ function Look(p: {
                 year={year}
                 on={!skip.has(j.key)}
                 name={names[j.key] ?? j.name}
+                kind={kinds[j.key] ?? j.kind}
                 onTick={() => setSkip(toggle(skip, j.key))}
                 onName={(name) => setNames({ ...names, [j.key]: name })}
+                onKind={(kind) => setKinds({ ...kinds, [j.key]: kind })}
               />
             ))}
           </ul>
@@ -304,21 +319,30 @@ function Look(p: {
         <section className="card" aria-label="People not in the app">
           <h2>On the invites, not in the app</h2>
           <p className="hint">
-            Ticked ones are added to the crew list, and to the crew of their jobs. Those ticked already have a person's own address (or a
-            sessionhire.com one); the rest are mostly suppliers and clients.
+            Ticked ones are added to the crew list, and to the crew of their jobs, under the name shown: change it where Google only had
+            their address. Those ticked already have a person's own address (or a sessionhire.com one) and are on a gig; the rest are mostly
+            suppliers and clients.
           </p>
           <ul className="found people">
             {preview.people.map((x) => (
-              <li key={x.email}>
-                <label className="tick">
-                  <input type="checkbox" checked={people.has(x.email)} onChange={() => setPeople(toggle(people, x.email))} />
+              <li key={x.email} className={people.has(x.email) ? 'is-on' : 'is-off'}>
+                <div className="tick">
+                  <input type="checkbox" checked={people.has(x.email)} onChange={() => setPeople(toggle(people, x.email))} aria-label={`Add ${x.name}`} />
                   <span>
-                    <b>{x.name}</b>
+                    <input
+                      className="name"
+                      value={personNames[x.email] ?? x.name}
+                      onChange={(e) => setPersonNames({ ...personNames, [x.email]: e.target.value })}
+                      aria-label={`Name for ${x.email}`}
+                      maxLength={200}
+                      disabled={!people.has(x.email)}
+                    />
                     <small>
                       {x.email} · {x.kind === 'staff' ? 'staff' : 'freelancer'} · on {plural(x.jobs, 'job', 'jobs')}
                     </small>
+                    {x.needsName && people.has(x.email) && <small className="guess">Named from their address: give them their name.</small>}
                   </span>
-                </label>
+                </div>
               </li>
             ))}
           </ul>
@@ -349,6 +373,7 @@ function Look(p: {
             </p>
           )}
           {blank && <p className="alert">Give {blank.name} a name, or untick it.</p>}
+          {!blank && unnamed && <p className="alert">Give {unnamed} a name, or untick them.</p>}
           {p.offline && <p className="hint">This needs signal.</p>}
           {asking ? (
             <Confirm
@@ -362,7 +387,12 @@ function Look(p: {
               onNo={() => setAsking(false)}
             />
           ) : (
-            <button type="button" className="primary" disabled={p.bringing || p.offline || ticked.length === 0 || blank !== undefined} onClick={() => setAsking(true)}>
+            <button
+              type="button"
+              className="primary"
+              disabled={p.bringing || p.offline || ticked.length === 0 || blank !== undefined || unnamed !== undefined}
+              onClick={() => setAsking(true)}
+            >
               {p.bringing ? 'Bringing in…' : ticked.length === 0 ? 'Nothing ticked' : `Bring in ${what}`}
             </button>
           )}
@@ -372,15 +402,27 @@ function Look(p: {
   )
 }
 
-/** One job found, to tick and rename. */
-function Found(p: { job: ImportJob; year: string; on: boolean; name: string; onTick: () => void; onName: (name: string) => void }) {
+/** One job found, to tick, rename and say what kind it is. */
+function Found(p: {
+  job: ImportJob
+  year: string
+  on: boolean
+  name: string
+  kind: ProjectKind
+  onTick: () => void
+  onName: (name: string) => void
+  onKind: (kind: ProjectKind) => void
+}) {
   const { job: j } = p
+  const gig = p.kind === 'gig'
   const crew = [
     j.crew.booked && `${j.crew.booked} booked`,
     j.crew.waiting && `${j.crew.waiting} not answered`,
     j.crew.declined && `${j.crew.declined} said no`,
+    j.crew.noted && `${j.crew.noted} on days gone, noted`,
   ].filter(Boolean)
   const guessed = j.phases.filter((ph) => ph.guessed)
+  const guessedName = guessed[0]?.name ?? 'Show'
   return (
     <li className={p.on ? 'is-on' : 'is-off'}>
       <div className="head">
@@ -402,24 +444,125 @@ function Found(p: { job: ImportJob; year: string; on: boolean; name: string; onT
           </>
         )}
       </p>
-      {j.adds && <p>More days for the job brought in before.</p>}
+      {j.adds ? (
+        <p>More days for the job brought in before{j.kind !== 'gig' ? `, a ${KIND_LABELS[j.kind].toLowerCase()}` : ''}.</p>
+      ) : (
+        <label className="kind">
+          Kind
+          <select value={p.kind} onChange={(e) => p.onKind(e.target.value as ProjectKind)} disabled={!p.on} aria-label={`Kind of ${j.name}`}>
+            {PROJECT_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <p className="phases">
         {j.phases.map((ph, i) => (
           <span key={`${ph.name} ${ph.start}`}>
             {i > 0 && ', '}
-            {ph.name} {ph.start === ph.end ? dayLabel(ph.start) : spanLabel(ph)}
+            {ph.guessed && !j.adds ? guessedPhase(p.kind) : ph.name} {ph.start === ph.end ? dayLabel(ph.start) : spanLabel(ph)}
+            {ph.note && ` (${ph.note})`}
             {ph.venue && ` at ${ph.venue}`}
             {ph.extends && ' (adding to it)'}
           </span>
         ))}
       </p>
-      {guessed.length > 0 && <p className="guess">No phase in the title, so it comes in as a Show. Change it on the job afterwards if not.</p>}
+      {guessed.length > 0 && (
+        <p className="guess">
+          No phase in the title, so {guessedName === 'Show' && gig ? 'it comes in as a Show' : `its days come in as ${guessedPhase(p.kind)}`}. Change
+          it on the job afterwards if not.
+        </p>
+      )}
       <p>
-        Crew: {crew.length ? crew.join(', ') : 'nobody on the invites'}
+        {gig ? 'Crew: ' : 'On the invites: '}
+        {crew.length ? crew.join(', ') : gig ? 'nobody on the invites' : 'nobody'}
         {j.crew.notInApp > 0 && <span className="muted"> ({j.crew.notInApp} not in the app yet)</span>}
+        {!gig && crew.length > 0 && <span className="muted"> (noted on the job, not booked)</span>}
         {j.phases.some((ph) => ph.sheet) && ' · job sheet in the notes'}
       </p>
     </li>
+  )
+}
+
+/** The phase a day of a job is, when its title has no phase word: a Show for a gig, and the kind's own day otherwise. The server says the same. */
+const guessedPhase = (kind: ProjectKind) => ({ gig: 'Show', hire: 'Hire', errand: 'Errand', meeting: 'Meeting' })[kind]
+
+type BroughtState = { state: 'loading' } | { state: 'failed'; text: string } | { state: 'ready'; brought: ImportBrought } | { state: 'taking' } | { state: 'taken'; text: string }
+
+/**
+ * What the bring-ins so far put in the app, and a way to take it all back
+ * so it can come in again with corrections (ADR 0037): one go, recorded in
+ * the history, refused once anyone has acted on those jobs in the app.
+ */
+function Brought({ offline }: { offline: boolean }) {
+  const [s, setS] = useState<BroughtState>({ state: 'loading' })
+  const [asking, setAsking] = useState(false)
+  const load = () => {
+    setS({ state: 'loading' })
+    ask<ImportBrought>('/api/calendar/import/brought').then(
+      (brought) => setS({ state: 'ready', brought }),
+      (err: Error) => setS({ state: 'failed', text: err.message })
+    )
+  }
+  useEffect(load, [])
+  if (s.state === 'loading' || s.state === 'failed') return null
+  if (s.state === 'taken')
+    return (
+      <section className="card" aria-label="Taken back">
+        <p role="status">{s.text}</p>
+      </section>
+    )
+  if (s.state === 'ready' && s.brought.jobs === 0) return null
+  const b = s.state === 'ready' ? s.brought : undefined
+  const take = async () => {
+    setAsking(false)
+    setS({ state: 'taking' })
+    try {
+      const done = await post<Omit<ImportBrought, 'blocked'>>('/api/calendar/import/take-back', {})
+      setS({ state: 'taken', text: `Taken back: ${plural(done.jobs, 'job', 'jobs')}, ${plural(done.days, 'day', 'days')} and ${plural(done.crew, 'crew booking or offer', 'crew bookings and offers')}${done.people ? `, and ${plural(done.people, 'person', 'people')} added from the invites` : ''}. Look at the calendar again to bring it in afresh.` })
+    } catch (err) {
+      setS({ state: 'failed', text: (err as Error).message })
+      setAsking(false)
+    } finally {
+      syncSoon()
+    }
+  }
+  return (
+    <section className="card" aria-label="Brought in so far">
+      <h2>Brought in so far</h2>
+      {b && (
+        <p>
+          {plural(b.jobs, 'job', 'jobs')} over {plural(b.days, 'day', 'days')}, with {plural(b.crew, 'crew booking or offer', 'crew bookings and offers')}, from{' '}
+          {b.calendars.join(' and ')}
+          {b.people > 0 && `, and ${plural(b.people, 'person', 'people')} added from the invites`}.
+        </p>
+      )}
+      {b?.blocked ? (
+        <p className="hint">{b.blocked}</p>
+      ) : (
+        <p className="hint">
+          If the first bring-in got things wrong (what kind of job, who was crew, people's names), take it all back and bring the calendars in again
+          from the first day. Nothing is written to Google, and nobody is emailed.
+        </p>
+      )}
+      {b && !b.blocked && (
+        asking ? (
+          <Confirm
+            question={`Take back ${plural(b.jobs, 'job', 'jobs')}, their crew bookings and offers${b.people ? ` and ${plural(b.people, 'person', 'people')} added from the invites` : ''}? Anything changed on those jobs in the app goes with them. The history keeps a record.`}
+            yes="Take it all back"
+            no="Keep it"
+            onYes={take}
+            onNo={() => setAsking(false)}
+          />
+        ) : (
+          <button type="button" disabled={s.state === 'taking' || offline} onClick={() => setAsking(true)}>
+            {s.state === 'taking' ? 'Taking back…' : 'Take it all back'}
+          </button>
+        )
+      )}
+    </section>
   )
 }
 

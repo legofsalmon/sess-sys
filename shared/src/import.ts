@@ -1,3 +1,5 @@
+import type { ProjectKind } from './jobs.ts'
+
 /**
  * Bringing jobs in from Google Calendar (ADR 0011): what the import screen
  * shows before anything is saved, what the office chooses, and what came
@@ -16,8 +18,10 @@ export interface ImportPhase {
   name: string
   start: string
   end: string
-  /** Its titles had no phase word, so Show is a guess. */
+  /** Its titles had no phase word, so the phase is a guess from the job's kind (ADR 0037). */
   guessed: boolean
+  /** What its titles said after the phase word: "Client walk through", "PA". */
+  note: string
   /** Its own venue, when it isn't the job's. */
   venue: string | null
   /** Its events had a job sheet, which goes into its notes. */
@@ -33,6 +37,8 @@ export interface ImportJob {
   name: string
   /** Pencilled in (TBC, hold…), so it comes in as an enquiry; otherwise confirmed. */
   status: 'confirmed' | 'enquiry'
+  /** Guessed from the title (ADR 0037): a hire, a collection or a meeting is not a gig. Days added to a job brought in before keep its kind. */
+  kind: ProjectKind
   /** A job brought in before that these days are added to. */
   adds: { id: string; name: string } | null
   phases: ImportPhase[]
@@ -40,7 +46,8 @@ export interface ImportJob {
   start: string
   end: string
   venue: { name: string; isNew: boolean } | null
-  crew: { booked: number; waiting: number; declined: number; notInApp: number }
+  /** Who is on its invites: booked and waiting on days to come; on days gone, only a Yes is a booking, and the rest are noted (ADR 0037). */
+  crew: { booked: number; waiting: number; declined: number; notInApp: number; noted: number }
   /** The events it is made of. */
   events: number
 }
@@ -50,8 +57,10 @@ export interface ImportPerson {
   email: string
   name: string
   kind: 'freelancer' | 'staff'
-  /** Ticked at first: their address looks like a person's own, not a supplier's or a client's. */
+  /** Ticked at first: their address looks like a person's own, not a supplier's or a client's, and they are on a gig. */
   suggested: boolean
+  /** Google had no name for them, so this one is made from their address and wants checking. */
+  needsName: boolean
   /** How many of the jobs found they are on. */
   jobs: number
 }
@@ -97,8 +106,22 @@ export interface ImportPreview {
 export interface ImportChoices {
   calendarId: string
   from: string
-  jobs: { key: string; name: string; include: boolean }[]
-  people: { email: string; include: boolean }[]
+  jobs: { key: string; name: string; kind?: ProjectKind; include: boolean }[]
+  /** The name as it will show, when the office changed it. */
+  people: { email: string; name?: string; include: boolean }[]
+}
+
+/** GET /api/calendar/import/brought: everything brought in from Google Calendar so far, to take back and bring in again (ADR 0037). */
+export interface ImportBrought {
+  jobs: number
+  days: number
+  /** Crew bookings and offers. */
+  crew: number
+  /** People added from the invites that nothing else in the app refers to: they go too. */
+  people: number
+  calendars: string[]
+  /** Why it can't be taken back, when it can't: someone has acted on it in the app since. */
+  blocked: string | null
 }
 
 /** POST /api/calendar/import/bring */

@@ -70,7 +70,10 @@ calendars directly, isn't available yet.
   TBC, pencil, hold or provisional (or end in a question mark) comes in as
   an enquiry, pencilled in, and the word comes off its name; a job with
   any firm day comes in as confirmed. Days that have gone come in too, as
-  the record of who worked what.
+  the record of who worked what: since [ADR 0037](0037-job-kinds-and-days-gone-as-history.md),
+  a Yes on a day gone is a booking and anything else is noted, not
+  offered; a title also says what kind of job it is, and a phase word can
+  carry a note.
 - **Venues.** The event's location is the venue: the part before the
   first comma is its name, and the whole of it the address. A venue
   already in the app with that name (or that address) is used; otherwise

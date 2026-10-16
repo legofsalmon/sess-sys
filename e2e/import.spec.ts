@@ -31,11 +31,14 @@ const phase = (name: string, start: string, end = start, more: Record<string, un
   start,
   end,
   guessed: false,
+  note: '',
   venue: null,
   sheet: false,
   extends: false,
   ...more,
 })
+
+const nobody = { booked: 0, waiting: 0, declined: 0, notInApp: 0, noted: 0 }
 
 /** What the server says the organiser's calendar holds. */
 const preview = () => ({
@@ -48,55 +51,77 @@ const preview = () => ({
       key: `nissan|${day(10)}`,
       name: 'Nissan',
       status: 'confirmed',
+      kind: 'gig',
       adds: null,
-      phases: [phase('Build', day(10), day(11), { sheet: true }), phase('Show', day(12), day(13), { sheet: true }), phase('Load out', day(13), day(13), { sheet: true })],
+      phases: [
+        phase('Build', day(10), day(11), { sheet: true, note: 'Client walk through' }),
+        phase('Show', day(12), day(13), { sheet: true }),
+        phase('Load out', day(13), day(13), { sheet: true }),
+      ],
       start: day(10),
       end: day(13),
       venue: { name: 'Convention Centre Dublin', isNew: true },
-      crew: { booked: 2, waiting: 1, declined: 1, notInApp: 3 },
+      crew: { booked: 2, waiting: 1, declined: 1, notInApp: 3, noted: 0 },
       events: 4,
     },
     {
       key: `aviva|${day(16)}`,
       name: 'Aviva',
       status: 'confirmed',
+      kind: 'gig',
       adds: { id: 'j-aviva', name: 'Aviva' },
       phases: [phase('Babysit', day(16), day(16), { extends: true })],
       start: day(16),
       end: day(16),
       venue: null,
-      crew: { booked: 1, waiting: 0, declined: 0, notInApp: 0 },
+      crew: { ...nobody, booked: 1 },
       events: 1,
     },
     {
       key: `web summit|${day(20)}`,
       name: 'Web Summit',
       status: 'confirmed',
+      kind: 'gig',
       adds: null,
       phases: [phase('Show', day(20), day(21), { guessed: true })],
       start: day(20),
       end: day(21),
       venue: null,
-      crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0 },
+      crew: nobody,
+      events: 1,
+    },
+    {
+      key: `murt lx hire|${day(-6)}`,
+      name: 'Murt lx hire',
+      status: 'confirmed',
+      kind: 'hire',
+      adds: null,
+      phases: [phase('Hire', day(-6), day(-2), { guessed: true })],
+      start: day(-6),
+      end: day(-2),
+      venue: null,
+      crew: { ...nobody, booked: 1, noted: 1 },
       events: 1,
     },
     {
       key: `christmas party|${day(70)}`,
       name: 'Christmas party',
       status: 'enquiry',
+      kind: 'gig',
       adds: null,
       phases: [phase('Show', day(70), day(70), { guessed: true })],
       start: day(70),
       end: day(70),
       venue: { name: 'The Marker Hotel', isNew: true },
-      crew: { booked: 0, waiting: 0, declined: 0, notInApp: 0 },
+      crew: nobody,
       events: 1,
     },
   ],
   people: [
-    { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, jobs: 2 },
-    { email: 'sean@sessionhire.com', name: 'Seán Murphy', kind: 'staff', suggested: true, jobs: 1 },
-    { email: 'hire@stagesupplies.ie', name: 'Stage Supplies', kind: 'freelancer', suggested: false, jobs: 1 },
+    { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', kind: 'freelancer', suggested: true, needsName: false, jobs: 2 },
+    { email: 'craicaudio@gmail.com', name: 'Craicaudio', kind: 'freelancer', suggested: true, needsName: true, jobs: 1 },
+    { email: 'sean@sessionhire.com', name: 'Seán Murphy', kind: 'staff', suggested: true, needsName: false, jobs: 1 },
+    { email: 'client@example.ie', name: 'Client', kind: 'freelancer', suggested: false, needsName: true, jobs: 1 },
   ],
   leftOut: [
     { reason: 'timed', count: 96, examples: ['Call with Nissan', 'Accounts meeting'] },
@@ -124,7 +149,7 @@ test.afterEach(async () => {
 /** Colly, signed in, on a server with Google Calendar connected, and one job brought in before. */
 async function signedIn(page: Page) {
   signedInPages.push(page)
-  const calls = { looked: [] as unknown[], brought: [] as unknown[] }
+  const calls = { looked: [] as unknown[], brought: [] as unknown[], takenBack: 0 }
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'google', user: { id: 'u1', email: 'colly@sessionhire.com', name: 'Colly Hewson' } } }))
   await page.route(/\/api\/sync\/pull/, async (route) => {
     const res = await route.fetch()
@@ -162,6 +187,14 @@ async function signedIn(page: Page) {
     calls.brought.push(route.request().postDataJSON())
     return route.fulfill({ json: { jobs: 2, added: 1, days: 8, venues: 2, people: 2, crew: 6, missing: [] } })
   })
+  // What the first bring-in put in, until it's taken back (ADR 0037).
+  await page.route(/\/api\/calendar\/import\/brought/, (route) =>
+    route.fulfill({ json: calls.takenBack ? { jobs: 0, days: 0, crew: 0, people: 0, calendars: [], blocked: null } : { jobs: 141, days: 157, crew: 179, people: 36, calendars: ['Adam', 'Olan'], blocked: null } })
+  )
+  await page.route(/\/api\/calendar\/import\/take-back/, (route) => {
+    calls.takenBack++
+    return route.fulfill({ json: { jobs: 141, days: 157, crew: 179, people: 36, calendars: ['Adam', 'Olan'] } })
+  })
   return calls
 }
 
@@ -181,34 +214,55 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(form.getByRole('radio')).toHaveCount(3)
   await expect(form.getByRole('radio', { name: /^ops@sessionhire\.com/ })).toBeChecked()
   await expect(form.getByLabel('First day')).toHaveValue(threeMonthsBack)
+  // The first bring-in is still in, and can be taken back to come in again with corrections.
+  const brought = page.getByRole('region', { name: 'Brought in so far' })
+  await expect(brought).toContainText('141 jobs over 157 days, with 179 crew bookings and offers, from Adam and Olan, and 36 people added from the invites.')
   await page.screenshot(shot('import-choose'))
   await form.getByRole('button', { name: 'Look at the calendar' }).click()
   // The request goes a moment after the press.
   await expect.poll(() => calls.looked).toEqual([{ calendarId: OPS, from: threeMonthsBack }])
 
   // What would come in, before anything is saved.
-  await expect(page.getByRole('region', { name: 'What was found' })).toContainText('4 jobs found in 148 events.')
+  await expect(page.getByRole('region', { name: 'What was found' })).toContainText('5 jobs found in 148 events.')
   const changed = page.getByRole('region', { name: 'Changed in Google' })
   await expect(changed).toContainText('“Aviva - Build”')
   await expect(changed).toContainText('no longer on the calendar')
   await expect(changed.getByRole('link', { name: 'Aviva' })).toHaveAttribute('href', '#jobs/j-aviva')
   const jobs = page.getByRole('region', { name: 'Jobs found' })
-  await expect(jobs.getByRole('listitem')).toHaveCount(4)
+  await expect(jobs.getByRole('listitem')).toHaveCount(5)
   const nissan = jobs.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for Nissan' }) })
   await expect(nissan).toContainText('Convention Centre Dublin (new venue)')
+  await expect(nissan).toContainText('Build ')
+  await expect(nissan).toContainText('(Client walk through)')
   await expect(nissan).toContainText('Crew: 2 booked, 1 not answered, 1 said no (3 not in the app yet)')
   await expect(nissan).toContainText('job sheet in the notes')
+  await expect(nissan.getByRole('combobox', { name: 'Kind of Nissan' })).toHaveValue('gig')
+  // A dry hire comes in with no crew call; the office can say it's a gig after all, and its guessed day follows.
+  const hire = jobs.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for Murt lx hire' }) })
+  await expect(hire.getByRole('combobox', { name: 'Kind of Murt lx hire' })).toHaveValue('hire')
+  await expect(hire).toContainText('Hire ')
+  await expect(hire).toContainText('its days come in as Hire')
+  await expect(hire).toContainText('On the invites: 1 booked, 1 on days gone, noted (noted on the job, not booked)')
+  await hire.getByRole('combobox', { name: 'Kind of Murt lx hire' }).selectOption('gig')
+  await expect(hire).toContainText('Show ')
+  await expect(hire).toContainText('Crew: 1 booked, 1 on days gone, noted')
+  await hire.getByRole('combobox', { name: 'Kind of Murt lx hire' }).selectOption('hire')
   await expect(jobs.getByRole('listitem').filter({ hasText: 'More days for the job brought in before.' })).toContainText('Babysit')
   await expect(jobs.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for Web Summit' }) })).toContainText(
     'No phase in the title, so it comes in as a Show.'
   )
   await expect(jobs.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for Christmas party' }) })).toContainText('Pencilled in')
 
-  // Suppliers and clients on the invites start unticked.
+  // Suppliers and clients on the invites start unticked; a name made from an address is flagged, and the office types the real one.
   const people = page.getByRole('region', { name: 'People not in the app' })
-  await expect(people.getByRole('checkbox', { name: /Aoife Byrne/ })).toBeChecked()
-  await expect(people.getByRole('checkbox', { name: /Seán Murphy/ })).toBeChecked()
-  await expect(people.getByRole('checkbox', { name: /Stage Supplies/ })).not.toBeChecked()
+  await expect(people.getByRole('checkbox', { name: 'Add Aoife Byrne' })).toBeChecked()
+  await expect(people.getByRole('checkbox', { name: 'Add Seán Murphy' })).toBeChecked()
+  await expect(people.getByRole('checkbox', { name: 'Add Client' })).not.toBeChecked()
+  const handle = people.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }) })
+  await expect(handle).toContainText('Named from their address: give them their name.')
+  await handle.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }).fill('')
+  await expect(page.getByText('Give craicaudio@gmail.com a name, or untick them.')).toBeVisible()
+  await handle.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }).fill('Cathal Craic')
 
   // What was left out, and why.
   const leftOut = page.getByRole('region', { name: 'Left out' })
@@ -219,7 +273,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   // Web Summit isn't a job this time; the party gets its real name.
   await jobs.getByRole('checkbox', { name: 'Bring in Web Summit' }).uncheck()
   await jobs.getByRole('textbox', { name: 'Name for Christmas party' }).fill('EY Christmas party')
-  const bring = page.getByRole('button', { name: 'Bring in 2 jobs and more days for 1 job' })
+  const bring = page.getByRole('button', { name: 'Bring in 3 jobs and more days for 1 job' })
   await expect(bring).toBeEnabled()
   await leftOut.getByText('What was left out, and why').click()
   await jobs.evaluate((e) => scrollTo(0, e.getBoundingClientRect().top + scrollY - 76))
@@ -228,7 +282,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
 
   // Renaming Nissan to the party's name would bring them in as one.
   await jobs.getByRole('textbox', { name: 'Name for Nissan' }).fill('EY Christmas party')
-  await expect(page.getByRole('button', { name: 'Bring in 1 job and more days for 1 job' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Bring in 2 jobs and more days for 1 job' })).toBeVisible()
   await jobs.getByRole('textbox', { name: 'Name for Nissan' }).fill('')
   await expect(page.getByText('Give Nissan a name, or untick it.')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Bring in/ })).toBeDisabled()
@@ -237,7 +291,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   // The question comes in the app, in the bar the button was in, with what will happen in words.
   await bring.click()
   const question = page.getByRole('group', {
-    name: 'Bring in 2 jobs and more days for 1 job, adding 2 people to the crew list? They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.',
+    name: 'Bring in 3 jobs and more days for 1 job, adding 3 people to the crew list? They can be changed or cancelled afterwards like any other job. Nothing is written to Google, and nobody is emailed.',
   })
   await expect(question).toBeVisible()
   await question.getByRole('button', { name: 'Bring them in' }).click()
@@ -250,19 +304,31 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
       calendarId: OPS,
       from: threeMonthsBack,
       jobs: [
-        { key: `nissan|${day(10)}`, name: 'Nissan', include: true },
-        { key: `aviva|${day(16)}`, name: 'Aviva', include: true },
-        { key: `web summit|${day(20)}`, name: 'Web Summit', include: false },
-        { key: `christmas party|${day(70)}`, name: 'EY Christmas party', include: true },
+        { key: `nissan|${day(10)}`, name: 'Nissan', kind: 'gig', include: true },
+        { key: `aviva|${day(16)}`, name: 'Aviva', kind: 'gig', include: true },
+        { key: `web summit|${day(20)}`, name: 'Web Summit', kind: 'gig', include: false },
+        { key: `murt lx hire|${day(-6)}`, name: 'Murt lx hire', kind: 'hire', include: true },
+        { key: `christmas party|${day(70)}`, name: 'EY Christmas party', kind: 'gig', include: true },
       ],
       people: [
-        { email: 'aoife.byrne@gmail.com', include: true },
-        { email: 'sean@sessionhire.com', include: true },
-        { email: 'hire@stagesupplies.ie', include: false },
+        { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', include: true },
+        { email: 'craicaudio@gmail.com', name: 'Cathal Craic', include: true },
+        { email: 'sean@sessionhire.com', name: 'Seán Murphy', include: true },
+        { email: 'client@example.ie', name: 'Client', include: false },
       ],
     },
   ])
   await expect(page.getByRole('link', { name: 'See them in the planner' })).toHaveAttribute('href', /^#plan\/month\/\d{4}-\d{2}-01$/)
+
+  // Taking the first bring-in back: asked in the app, done in one go, and then the calendar can come in again.
+  await page.getByRole('button', { name: 'Look at another calendar' }).click()
+  await brought.getByRole('button', { name: 'Take it all back' }).click()
+  const takeBack = page.getByRole('group', { name: /^Take back 141 jobs, their crew bookings and offers and 36 people added from the invites\?/ })
+  await takeBack.getByRole('button', { name: 'Take it all back' }).click()
+  await expect(page.getByRole('region', { name: 'Taken back' }).getByRole('status')).toHaveText(
+    'Taken back: 141 jobs, 157 days and 179 crew bookings and offers, and 36 people added from the invites. Look at the calendar again to bring it in afresh.'
+  )
+  expect(calls.takenBack).toBe(1)
 
   // A job brought in says where its days are: on the calendar it came from, not the jobs calendar.
   await page.goto('/#jobs/j-aviva')

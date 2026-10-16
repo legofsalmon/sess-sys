@@ -1,4 +1,4 @@
-import { kitDaysOf, MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
+import { kindOf, kitDaysOf, MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
 import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
 import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
@@ -25,6 +25,7 @@ const PROJECT_COLUMNS = {
   clientId: 'client_id',
   venueId: 'venue_id',
   status: 'status',
+  kind: 'kind',
   notes: 'notes',
   prepDays: 'prep_days',
   returnDays: 'return_days',
@@ -112,8 +113,8 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     await checkClient(ctx, a.clientId)
     await checkVenue(ctx, a.venueId)
     await ctx.tx.query(
-      'INSERT INTO projects (id, name, client_id, venue_id, status, notes, prep_days, return_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [a.id, a.name, a.clientId, a.venueId, a.status, a.notes, kitDaysOf(a).prep, kitDaysOf(a).back]
+      'INSERT INTO projects (id, name, client_id, venue_id, status, kind, notes, prep_days, return_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [a.id, a.name, a.clientId, a.venueId, a.status, kindOf(a), a.notes, kitDaysOf(a).prep, kitDaysOf(a).back]
     )
     await emit(ctx, 'project', a.id, await getProject(ctx.tx, a.id))
   },

@@ -1,7 +1,10 @@
 import {
   crewFill,
+  KIND_LABELS,
+  kindOf,
   newId,
   PHASE_NAMES,
+  PROJECT_KINDS,
   PROJECT_STATUSES,
   STATUS_LABELS,
   STOPPED,
@@ -9,6 +12,7 @@ import {
   type ClientView,
   type JobView,
   type KitLineView,
+  type ProjectKind,
   type ProjectStatus,
   type VenueView,
   type View,
@@ -186,6 +190,7 @@ export function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitL
         <b>{job.name}</b>
         <p>{[job.client?.name, job.venue?.name].filter(Boolean).join(' · ') || 'No client or venue yet'}</p>
         <p>
+          {kindOf(job) !== 'gig' && `${KIND_LABELS[kindOf(job)]} · `}
           {job.span ? spanLabel(job.span) : 'No dates yet'}
           {job.phases.length > 0 && ` · ${job.phases.map((p) => p.name).join(', ')}`}
         </p>
@@ -216,7 +221,7 @@ function NewJob({ view }: { view: View }) {
   const { clients, venues } = view.jobs
   const today = useToday()
   const first = (): PhaseDraft => ({ key: newId(), name: 'Show', start: today, end: today })
-  const [f, setF] = useState({ name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus })
+  const [f, setF] = useState({ name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus, kind: 'gig' as ProjectKind })
   const [phases, setPhases] = useState<PhaseDraft[]>(() => [first()])
   const { run, error } = useAct()
   const setPhase = (key: string, changes: Partial<PhaseDraft>) =>
@@ -234,14 +239,14 @@ function NewJob({ view }: { view: View }) {
     if (!f.name.trim()) return
     const id = newId()
     // A refusal brings what was typed back, unless the next thing has been typed since.
-    const cleared = { name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus }
+    const cleared = { name: '', client: '', venue: '', status: 'enquiry' as ProjectStatus, kind: 'gig' as ProjectKind }
     const clearedPhases = [first()]
     setF(cleared)
     setPhases(clearedPhases)
     void run(async () => {
       const clientId = await clientNamed(f.client, clients)
       const venueId = await venueNamed(f.venue, venues)
-      await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: f.status, notes: '' })
+      await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: f.status, kind: f.kind, notes: '' })
       for (const p of phases)
         if (p.name.trim()) await client.mutate('phase.add', { id: newId(), projectId: id, name: p.name.trim(), start: p.start, end: p.end, venueId: null, notes: '' })
     }).then((ok) => {
@@ -275,6 +280,16 @@ function NewJob({ view }: { view: View }) {
         </select>
       </label>
       {f.status === 'confirmed' && <p className="hint wide">A confirmed job goes on the jobs calendar and holds its kit.</p>}
+      <label className="wide">
+        Kind
+        <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as ProjectKind })}>
+          {PROJECT_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k]}
+            </option>
+          ))}
+        </select>
+      </label>
       <fieldset className="wide phase-rows">
         <legend>Phases</legend>
         {phases.map((p, i) => (

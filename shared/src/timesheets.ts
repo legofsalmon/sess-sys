@@ -113,7 +113,7 @@ export function timesheetChanges(t: Pick<Timesheet, 'days' | 'dayRateCents' | 'e
  * The server, the app and the freelancer's page all ask this, so they agree.
  */
 export function noTimesheetReason(
-  offer: Pick<Offer, 'status' | 'days'>,
+  offer: Pick<Offer, 'status' | 'days'> & Partial<Pick<Offer, 'respondedVia' | 'respondedAt'>>,
   call: Pick<CrewCall, 'status'>,
   person: Pick<Person, 'kind'> | undefined,
   today: string
@@ -121,8 +121,13 @@ export function noTimesheetReason(
   if (person?.kind === 'staff') return "Staff are paid through payroll, so there's no timesheet for this."
   if (call.status !== 'open') return 'This job was cancelled, so there is no timesheet for it. Talk to the office about any cancellation fee.'
   if (offer.status !== 'confirmed') return 'Only a confirmed booking has a timesheet.'
-  const first = [...offer.days].sort()[0]
+  const sorted = [...offer.days].sort()
+  const first = sorted[0]
   if (first && first > today) return `The timesheet opens on ${dayLabel(first)}, the first day of the booking.`
+  // Brought in from Google Calendar after its last day (ADR 0037): the record of who worked, paid some other way, not a timesheet to chase.
+  const last = sorted.at(-1)
+  if (offer.respondedVia === 'calendar' && last && offer.respondedAt && offer.respondedAt.slice(0, 10) > last)
+    return 'This booking was brought in from the calendar after it happened, so it has no timesheet.'
   return null
 }
 

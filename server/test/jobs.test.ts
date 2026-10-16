@@ -125,11 +125,15 @@ describe('a job, its phases, client and venue', () => {
       clientId: ids.client,
       venueId: ids.venue,
       status: 'confirmed',
+      kind: 'gig',
       notes: '',
       prepDays: 1,
       returnDays: 1,
     })
     expect(await latest<Phase>(app, 'phase', ids.build)).toMatchObject({ projectId: ids.job, name: 'Build', start: '2026-10-07', end: '2026-10-08', venueId: null })
+    // A job is a gig unless it says otherwise (ADR 0037), and its kind can change like any other field.
+    expect((await send(app, 'project.update', { id: ids.job, kind: 'hire' })).status).toBe('applied')
+    expect(await latest<Project>(app, 'project', ids.job)).toMatchObject({ kind: 'hire', status: 'confirmed' })
   })
 
   it('says how each phase-day will read on the calendar, the way crew know it', () => {
