@@ -3,6 +3,30 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: the real calendars are in, and audited
+
+**Done**
+
+- Sign-in is live, the company's Google account is connected, and Colly
+  brought in two organisers' calendars: 141 jobs, 149 phases, 66 crew
+  calls, 179 offers, 36 people and 12 venues, from 1 October 2026 on. The
+  app holds real data only; nothing has been written back to Google and
+  crew invites are off.
+- [The audit of the real data](audit-2026-10-16.md), read-only: what the
+  import made of the calendars, and what the office would see. The import
+  ran clean, but a calendar is not a job list: dry hires, collections and
+  meetings came in as gigs with crew calls; Google's unanswered invites
+  became 54 offers waiting and 41 timesheets to chase; most freelancers
+  are named from their email handle; the second organiser's tidy titles
+  split four jobs into thirteen. Nineteen findings, with the order to fix
+  them.
+
+**Waiting on**
+
+- Colly: the backup bucket and the Sentry key (still off, now with real
+  people in), and the go-ahead for the import fixes before the next
+  bring-in.
+
 ## 13 October 2026: the Google steps brought up to date
 
 **Done**
