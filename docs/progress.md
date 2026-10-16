@@ -3,6 +3,56 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: the bring-in learns from the real calendars
+
+**Done**
+
+- Colly said go on the audit's fix order. A job now has a kind: gig, dry
+  hire, errand or meeting ([Decision 0037](adr/0037-job-kinds-and-days-gone-as-history.md)),
+  guessed from the title on the import screen and corrected there before
+  saving; only a gig gets a crew call, and the invited are noted on the
+  rest. Days gone come in as the record of who worked: a Yes is a booking,
+  anything else is noted, so no call is still looking for crew for a gig
+  that happened, and a booking brought in after its day has no timesheet
+  to chase. "Build 4/9 & Client Walk Through" is a Build with a note, a
+  day naming two phases books its crew once, people's names are typed on
+  the import screen where Google had none, and a shared mailbox is never
+  crew.
+- The import screen says what has been brought in so far and can take it
+  all back in one go, so the calendars can come in again from the first
+  day with the new rules. It refuses once anyone has acted on those jobs
+  in the app.
+
+**Waiting on**
+
+- Colly: take the first bring-in back on the import screen and bring both
+  calendars in again from the start of the season, checking the kinds and
+  typing the names; then the backup bucket and the Sentry key.
+
+## 16 October 2026: the real calendars are in, and audited
+
+**Done**
+
+- Sign-in is live, the company's Google account is connected, and Colly
+  brought in two organisers' calendars: 141 jobs, 149 phases, 66 crew
+  calls, 179 offers, 36 people and 12 venues, from 1 October 2026 on. The
+  app holds real data only; nothing has been written back to Google and
+  crew invites are off.
+- [The audit of the real data](audit-2026-10-16.md), read-only: what the
+  import made of the calendars, and what the office would see. The import
+  ran clean, but a calendar is not a job list: dry hires, collections and
+  meetings came in as gigs with crew calls; Google's unanswered invites
+  became 54 offers waiting and 41 timesheets to chase; most freelancers
+  are named from their email handle; the second organiser's tidy titles
+  split four jobs into thirteen. Nineteen findings, with the order to fix
+  them.
+
+**Waiting on**
+
+- Colly: the backup bucket and the Sentry key (still off, now with real
+  people in), and the go-ahead for the import fixes before the next
+  bring-in.
+
 ## 16 October 2026: Google sign-in live, and calendar writing held off
 
 **Done**

@@ -531,6 +531,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       ])
       return `Brought in ${what.length ? inWords(what) : 'jobs'} from ${text(a.calendar, 'a calendar')} on Google Calendar${details.length ? `: ${inWords(details)}` : ''}`
     }
+    case 'calendar.takeBack': {
+      const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)
+      const details = [count(a.jobs, 'job', 'jobs'), count(a.days, 'day', 'days'), count(a.crew, 'crew booking or offer', 'crew bookings and offers'), count(a.people, 'person added from the invites', 'people added from the invites')].filter(
+        (p): p is string => p !== undefined
+      )
+      return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
+    }
     case 'model.create':
       return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isCase ? ', holds other kit' : ''})`
     case 'model.update': {

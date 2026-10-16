@@ -10,8 +10,12 @@ import {
   phaseOnCalendar,
   phaseOnlyGrew,
   PHASE_NAMES,
+  KIND_LABELS,
+  kindOf,
+  PROJECT_KINDS,
   PROJECT_STATUSES,
   STATUS_LABELS,
+  type ProjectKind,
   STOPPED,
   spanLabel,
   suggestedReplyBy,
@@ -145,6 +149,12 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
             )}
           </dd>
         </div>
+        {kindOf(job) !== 'gig' && (
+          <div>
+            <dt>Kind</dt>
+            <dd>{KIND_LABELS[kindOf(job)]}</dd>
+          </div>
+        )}
         <div>
           <dt>When</dt>
           <dd>{job.span ? spanLabel(job.span) : 'No dates yet'}</dd>
@@ -183,7 +193,7 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
 /** Only what was changed is sent, so someone else's change to another detail stands (ADR 0007). */
 function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDone: () => void; onTell: (share: Share | undefined) => void }) {
   const { clients, venues } = view.jobs
-  const [f, setF] = useState({ name: job.name, client: job.client?.name ?? '', venue: job.venue?.name ?? '', status: job.status, notes: job.notes })
+  const [f, setF] = useState({ name: job.name, client: job.client?.name ?? '', venue: job.venue?.name ?? '', status: job.status, kind: kindOf(job), notes: job.notes })
   // Stopping a job with crew out waits here until the office says so, with the fields held still.
   const [asking, setAsking] = useState(false)
   const { run, error } = useAct()
@@ -196,6 +206,7 @@ function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDo
       const changes: CommandInput<'project.update'> = { id: job.id }
       if (f.name.trim() !== job.name) changes.name = f.name.trim()
       if (f.status !== job.status) changes.status = f.status
+      if (f.kind !== kindOf(job)) changes.kind = f.kind
       if (f.notes.trim() !== job.notes) changes.notes = f.notes.trim()
       const clientId = await clientNamed(f.client, clients)
       if (clientId !== job.clientId) changes.clientId = clientId
@@ -231,6 +242,16 @@ function EditJob({ job, view, onDone, onTell }: { job: JobView; view: View; onDo
           {PROJECT_STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="wide">
+        Kind
+        <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as ProjectKind })} disabled={asking}>
+          {PROJECT_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k]}
             </option>
           ))}
         </select>

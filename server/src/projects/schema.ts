@@ -58,6 +58,10 @@ const MIGRATIONS: string[] = [
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS prep_days integer NOT NULL DEFAULT 1 CHECK (prep_days BETWEEN 0 AND 14);
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS return_days integer NOT NULL DEFAULT 1 CHECK (return_days BETWEEN 0 AND 14);
   `,
+  // What kind of job (ADR 0037): a gig, a dry hire, an errand or a meeting. Everything before kinds was a gig.
+  `
+  ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'gig' CHECK (kind IN ('gig', 'hire', 'errand', 'meeting'));
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }
