@@ -27,6 +27,24 @@ waiting on someone.
   people in), and the go-ahead for the import fixes before the next
   bring-in.
 
+## 16 October 2026: Google sign-in live, and calendar writing held off
+
+**Done**
+
+- Colly added the Google key. Sign-in is live (`"auth":"google"`), Colly
+  signed in, connected Google Calendar and brought in 141 real jobs from two
+  calendars. The app had written nothing to Google: it held no jobs of its
+  own before the import.
+- Colly asked that the app write nothing to Google Calendar and contact
+  nobody for now. Writing is now off unless `CALENDAR_WRITES` is `on` on the
+  server ([Decision 0008](adr/0008-calendar-sync.md), last section);
+  bringing jobs in still works. Nothing else in the app sends anything to
+  anyone: crew invites were its only way to email.
+
+**Waiting on**
+
+- Colly: say when the app may write to the calendar.
+
 ## 13 October 2026: the Google steps brought up to date
 
 **Done**

@@ -92,6 +92,15 @@ a sessionhire.com Workspace account and isn't in `STAFF_EMAILS`.
 
 ## 4. Connect Google Calendar
 
+**Writing is off for now.** Colly asked on 16 October 2026 that the app
+write nothing to Google Calendar and contact nobody yet. Until the
+**shserver** service has the variable `CALENDAR_WRITES` set to `on`, the app
+connects to a calendar and reads it (so step 6 works), but puts nothing on
+it, changes nothing, invites nobody, and Admin says so. The health page then
+shows `"calendar":"read-only"`. Steps 4.3 to 5 below describe how it works
+once writing is switched on.
+
+
 1. Choose the Google account that will write the jobs, and its calendar.
    The events are organised by that account, as they are by the ops staff
    today. For a first try, use your test calendar. If it belongs to a

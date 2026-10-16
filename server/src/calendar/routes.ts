@@ -167,6 +167,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })
     if (typeof req.body?.on !== 'boolean') return reply.code(400).send({ error: 'Say whether crew invites should be on or off.' })
     const on = req.body.on
+    if (on && !sync.writes) return reply.code(409).send({ error: 'Writing to Google Calendar is switched off on the server, so crew invites can\'t go out.' })
     const link = await readLink(db)
     if (on && (link?.state !== 'on' || !link.calendarId)) return reply.code(409).send({ error: 'Choose a calendar for jobs first.' })
     if (!link) return reply.code(409).send({ error: 'Google Calendar is not connected.' })
