@@ -108,3 +108,16 @@ the time it is awake, so the sync can't check the calendar every minute.
   connected again. Nothing is lost.
 - With admin access to Workspace later, the same sync can write as a
   service account instead of a person, without changing anything else.
+
+## Later: writing switched off until asked for (16 October 2026)
+
+When the Google key went in, Colly connected the real jobs calendar to bring
+jobs in, and asked that the app write nothing to Google Calendar and contact
+nobody for now. Writing is now behind a server setting, `CALENDAR_WRITES`,
+off unless set to `on`. Off, a run touches no event and only says on the
+calendar card why; crew invites can't be turned on; a disconnect still
+finishes and hands the key back; reading calendars to bring jobs in
+(Decision 0011) is unchanged. `/api/health` reports `calendar` as
+`writing`, `read-only` or `off`. It is a server setting rather than a switch
+on Admin so that nobody can turn writing on from a phone by mistake.
+

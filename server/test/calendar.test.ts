@@ -41,7 +41,7 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean; retryMs?: number[] } = {}) {
+async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean; retryMs?: number[]; writes?: boolean } = {}) {
   const db = await pgliteDb()
   const google = new FakeGoogle()
   let now = new Date(`${TODAY}T10:00:00Z`)
@@ -77,6 +77,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
             settleMs: opts.settleMs ?? 3_600_000,
             pollMs: opts.pollMs ?? 0,
             retryMs: opts.retryMs,
+            writes: opts.writes,
             now: () => now,
           },
         }),
@@ -448,6 +449,35 @@ describe('what goes on the calendar', () => {
     await s.sync()
     expect(titles(s.google)).toEqual(['2030-03-02 Nissan - Build 1/2', '2030-03-03 Nissan - Build 2/2', '2030-03-04 Nissan - Show'])
     expect([...s.google.events.get(TEST_CAL)!.values()]).toHaveLength(3)
+  })
+})
+
+describe('with writing switched off (CALENDAR_WRITES)', () => {
+  it('connects and reads calendars, but writes nothing, invites nobody, and says why', async () => {
+    const s = await setup({ writes: false })
+    await nissan(s)
+    await connectTo(s)
+    expect(await s.check()).toMatchObject({ written: 0, removed: 0, failed: 0, problem: expect.stringContaining('switched off') })
+    expect(eventWrites(s.google.calls)).toEqual([])
+    expect(s.google.visible(TEST_CAL)).toEqual([])
+    expect((await feed(s)).link?.problem).toContain('CALENDAR_WRITES')
+
+    // Crew invites can't be turned on.
+    const invites = await s.app.inject({ method: 'POST', url: '/api/calendar/invites?client=collylaptop', cookies: s.colly.cookies, payload: { on: true } })
+    expect(invites.statusCode).toBe(409)
+    expect((await feed(s)).link?.invites).toBe(false)
+
+    // The calendars can still be listed, to bring jobs in.
+    expect((await s.app.inject({ url: '/api/calendar/import/calendars', cookies: s.colly.cookies })).statusCode).toBe(200)
+    const health = await s.app.inject({ url: '/api/health' })
+    expect(health.json().calendar).toBe('read-only')
+
+    // Disconnecting still finishes, without touching Google's events.
+    const off = await s.app.inject({ method: 'POST', url: '/api/calendar/disconnect?client=collylaptop', cookies: s.colly.cookies })
+    expect(off.statusCode).toBe(200)
+    await s.sync()
+    expect((await feed(s)).link?.state).toBe('off')
+    expect(eventWrites(s.google.calls)).toEqual([])
   })
 })
 
