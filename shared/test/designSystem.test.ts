@@ -16,7 +16,7 @@ import { ownColours } from '../src/own-colours.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const DS = join(ROOT, 'shared', 'src', 'ds')
-const FILES = ['tokens.css', 'tokens.d.ts', 'tokens.js']
+const FILES = ['icons.d.ts', 'icons.js', 'tokens.css', 'tokens.d.ts', 'tokens.js']
 
 function* sources(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {
@@ -29,7 +29,7 @@ function* sources(dir: string): Generator<string> {
 const appSources = () => [...sources(join(ROOT, 'web', 'src')), ...sources(join(ROOT, 'server', 'src')), join(ROOT, 'web', 'index.html')]
 
 describe('the vendored design system', () => {
-  it('holds tokens.css, tokens.js and tokens.d.ts', () => {
+  it('holds the tokens and the icons', () => {
     expect(readdirSync(DS).sort()).toEqual(FILES)
   })
 

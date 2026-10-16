@@ -24,6 +24,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
+import { Heading } from '../Icon.tsx'
 import { CREW } from '../Up.tsx'
 
 /**
@@ -45,7 +46,7 @@ export function TimesheetsCard({ view }: { view: View }) {
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
-      <h2>Timesheets</h2>
+      <Heading icon="timesheet">Timesheets</Heading>
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
         <div className="ts-group" role="group" aria-label="To approve">

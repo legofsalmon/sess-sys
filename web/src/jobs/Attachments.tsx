@@ -31,6 +31,7 @@ import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { JobStatusPill } from './common.tsx'
 import { useLate } from '../useLate.ts'
+import { Heading } from '../Icon.tsx'
 
 /**
  * What a venue's page and a client's page share (ADR 0032): the documents
@@ -107,7 +108,7 @@ export function Attachments({ owner }: { owner: Owner }) {
   const [changing, setChanging] = useState<string | undefined>()
   return (
     <section className="card documents" aria-label="Documents">
-      <h2>Documents</h2>
+      <Heading icon="document">Documents</Heading>
       {docs.length === 0 && <Empty>{NONE_YET[owner.owner]}</Empty>}
       {docs.map((d) =>
         changing === d.id ? (

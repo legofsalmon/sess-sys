@@ -23,6 +23,7 @@ import { Empty } from '../Empty.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Top } from './common.tsx'
+import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
@@ -229,7 +230,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
     <>
       {sheet.venue && (
         <section className={print ? '' : 'card'} aria-label="Where">
-          <h2>Where</h2>
+          <Heading icon="venue">Where</Heading>
           <p>
             <b>{sheet.venue.name}</b>
             {sheet.venue.address && <span className="lines">{`\n${sheet.venue.address}`}</span>}
@@ -256,7 +257,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
       </section>
 
       <section className={print ? '' : 'card'} aria-label="Crew">
-        <h2>Crew</h2>
+        <Heading icon="people">Crew</Heading>
         {sheet.calls.length === 0 && <Empty>Crew are asked for on the job's page.</Empty>}
         {sheet.calls.map((c) => (
           <article key={c.id} className="sheet-call">
@@ -298,7 +299,7 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
 
       {sheet.kit && sheet.kit.length > 0 && (
         <section className={print ? '' : 'card'} aria-label="Kit">
-          <h2>Kit</h2>
+          <Heading icon="kit">Kit</Heading>
           {sheet.kit.map((d) => (
             <div key={d.department} className="sheet-kit">
               <h3>{d.department}</h3>

@@ -31,9 +31,10 @@ test('on a phone the way up is one link in the top bar, still there at the foot 
   await expect(page.locator('.top .up')).toHaveCount(0)
 
   await page.locator('.job-row').first().click()
-  const job = (await page.getByRole('heading', { level: 1 }).textContent())!.trim()
   const up = page.locator('.top').getByRole('link', { name: '‹ All jobs' })
+  // The job's page is up once its way up is: only then is the heading the job's name, not Jobs.
   await expect(up).toBeVisible()
+  const job = (await page.getByRole('heading', { level: 1 }).textContent())!.trim()
   expect((await up.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   // Breadcrumbs are for a desk: on a phone they aren't drawn or read out.
   await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(0)

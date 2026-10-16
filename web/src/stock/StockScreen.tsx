@@ -36,6 +36,9 @@ import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
+import { Thumb } from '../Picture.tsx'
+import { departmentIcon, kitIcon } from './kitIcon.ts'
+import { Heading, Icon } from '../Icon.tsx'
 import { STOCK, type Trail } from '../Up.tsx'
 
 /**
@@ -206,7 +209,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
 
   return (
     <section className="card" aria-label="Stock">
-      <h2>Stock</h2>
+      <Heading icon="warehouse">Stock</Heading>
       <form role="search" className="scan-row" onSubmit={go}>
         <input
           ref={searchField}
@@ -256,6 +259,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
         </button>
         {DEPARTMENTS.filter((d) => count(d) > 0).map((d) => (
           <button key={d} type="button" aria-pressed={department === d} onClick={() => setDepartment(d)}>
+            <Icon name={departmentIcon(d)} />
             {DEPARTMENT_LABELS[d]} ({count(d)})
           </button>
         ))}
@@ -265,6 +269,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           {[...(exact ? [exact] : []), ...items].map((a) => (
             <li key={a.id}>
               <a className="item-row" href={`#stock/item/${a.id}`}>
+                <Thumb icon={kitIcon(a.model)} />
                 <div>
                   <b>{numberLabel(a)}</b> {a.model?.name}
                   <p>
@@ -294,6 +299,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
             {rows.map((m) => (
               <li key={m.id}>
                 <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
+                  <Thumb icon={kitIcon(m)} />
                   <div>
                     <b>{m.name}</b>
                     <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
@@ -340,7 +346,7 @@ function ShortKit({ view }: { view: View }) {
   )
   return (
     <section className="card kit-short" aria-label="Kit short">
-      <h2>Kit short</h2>
+      <Heading icon="attention">Kit short</Heading>
       <p className="hint">
         On jobs from today on, once the confirmed jobs on the same days have theirs. Quotes and enquiries show what they'd need if they go ahead.
       </p>
@@ -374,7 +380,7 @@ function PickLists({ view }: { view: View }) {
   )
   return (
     <section className="card pick-lists" aria-label="Pick lists">
-      <h2>Pick lists</h2>
+      <Heading icon="pick-list">Pick lists</Heading>
       {stillOut.length > 0 && (
         <>
           <h3>Still out after the job</h3>
@@ -489,7 +495,7 @@ function Places({ view }: { view: View }) {
   }
   return (
     <section className="card">
-      <h2>Places</h2>
+      <Heading icon="venue">Places</Heading>
       {w.places.length === 0 && <Empty>Where kit is kept: the warehouse, its bays and shelves, the vans. Places are also added as you type them in.</Empty>}
       <ShowAll items={w.places} limit={5} what="places">
         {(rows) => (

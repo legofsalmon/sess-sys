@@ -23,6 +23,7 @@ import { Top } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
+import { Heading } from '../Icon.tsx'
 import { STOCK, type Step } from '../Up.tsx'
 
 const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
@@ -179,7 +180,7 @@ export function LabelsCard({ labels }: { labels: LabelsView }) {
   const used = labels.runs.reduce((n, r) => n + r.used, 0)
   return (
     <section className="card" aria-label="Labels">
-      <h2>Labels</h2>
+      <Heading icon="label">Labels</Heading>
       <p className="hint">
         {labels.runs.length === 0 ? (
           'Set numbers aside to print labels here or to send to a label maker. Scan or type a label in the search above to put it on an item.'

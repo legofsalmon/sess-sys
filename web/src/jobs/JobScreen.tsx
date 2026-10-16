@@ -42,6 +42,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
+import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
@@ -78,7 +79,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
       {telling}
 
       <section className="card" aria-label="Phases">
-        <h2>Phases</h2>
+        <Heading icon="time">Phases</Heading>
         {job.phases.length === 0 && <Empty>Add the first phase below, so the job has dates.</Empty>}
         {job.phases.map((p) => (
           <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} />
@@ -93,7 +94,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
       {!inPhase && offering}
 
       <section className="card" aria-label="Crew">
-        <h2>Crew</h2>
+        <Heading icon="people">Crew</Heading>
         {job.otherCalls.length > 0 && <p className="hint">Across phases:</p>}
         {job.otherCalls.map((c) => (
           <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} late={view.late} onShare={onShare(c)} onTell={setShare} inJob />
