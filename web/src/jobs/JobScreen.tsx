@@ -127,14 +127,14 @@ function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (sha
       <dl className="facts">
         <div>
           <dt>Client</dt>
-          <dd>{job.client ? <a href={`#clients/${encodeURIComponent(job.client.id)}`}>{job.client.name}</a> : 'None yet'}</dd>
+          <dd>{job.client ? <a href={`#jobs/clients/${encodeURIComponent(job.client.id)}`}>{job.client.name}</a> : 'None yet'}</dd>
         </div>
         <div>
           <dt>Venue</dt>
           <dd>
             {job.venue ? (
               <>
-                <a href={`#venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>
+                <a href={`#jobs/venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>
                 <span className="muted" aria-hidden="true">
                   {' · '}
                 </span>
@@ -308,9 +308,9 @@ function CalendarLine({ job, phase, on, today }: { job: JobView; phase: PhaseVie
     case 'past':
       return <p className="cal">Over, so the calendar keeps it as it was.</p>
     case 'unconnected':
-      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase, today)} once one is connected on the Admin tab.</p>
+      return <p className="cal">Goes on the calendar as {titlesLine(job.name, phase, today)} once one is connected in Admin.</p>
     case 'paused':
-      return <p className="warn-line">Not being updated on the calendar: it needs connecting again on the Admin tab.</p>
+      return <p className="warn-line">Not being updated on the calendar: it needs connecting again in Admin.</p>
     case 'going':
       return (
         <p className="cal">

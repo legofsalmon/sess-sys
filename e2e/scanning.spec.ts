@@ -249,7 +249,7 @@ test('testing a batch holds each pass for five seconds with Undo; a second read,
   // Leaving the screen while one is held records it at once: only Undo drops a pass.
   await typeIn(b!)
   await expect(held).toContainText(`Passed: ${b}`)
-  await page.getByRole('link', { name: '‹ All stock' }).click()
+  await page.getByRole('navigation', { name: 'Stock pages' }).getByRole('link', { name: 'Catalogue' }).click()
   await page.getByLabel('Find').fill(b!)
   await page.getByLabel('Find').press('Enter')
   await expect(page.getByRole('heading', { level: 1, name: b })).toBeVisible()
@@ -284,7 +284,7 @@ test('an item is put at a place or in a case by camera, and the camera stays on 
   const [box] = await newItems(page, bay, 1)
 
   // A new shelf, and two speakers put on it one after the other without touching the screen between.
-  await page.goto('/#stock')
+  await page.goto('/#stock/places')
   // The form waits behind its button, and the line saying the place was added leads to it, wherever the folded list has it (audit finding 16).
   await page.getByRole('button', { name: 'Add place' }).click()
   await page.getByLabel('New place').fill(shelf)

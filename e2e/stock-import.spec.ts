@@ -33,7 +33,7 @@ test('brings the made-up stock list in, fixing a row in place, and shows its ite
   const stock = office.getByRole('region', { name: 'Stock', exact: true })
   await expect(stock.locator('.empty')).toHaveText('Nothing here yet. Add the first product below, or bring in the stock list.')
   await stock.getByRole('link', { name: 'bring in the stock list' }).click()
-  await expect(office).toHaveURL(/#account\/import-stock$/)
+  await expect(office).toHaveURL(/#stock\/import$/)
   await expect(office.getByRole('heading', { name: 'Bring in the stock list' })).toBeVisible()
 
   // Supplier isn't a column the app knows, so it asks; the others are chosen already.

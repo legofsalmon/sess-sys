@@ -23,7 +23,13 @@ export const JOBS: Step = { href: '#jobs', label: 'Jobs', up: 'All jobs' }
 export const STOCK: Step = { href: '#stock', label: 'Stock', up: 'All stock' }
 export const CREW: Step = { href: '#crew', label: 'Crew' }
 export const MENU: Step = { href: '#menu', label: 'Menu' }
-export const ADMIN: Step = { href: '#account', label: 'Admin' }
+export const ADMIN: Step = { href: '#admin', label: 'Admin' }
+
+/** Pages along an area's row (Views.tsx) that have pages of their own beneath them. */
+export const CLIENTS: Step = { href: '#jobs/clients', label: 'Clients', up: 'All clients' }
+export const VENUES: Step = { href: '#jobs/venues', label: 'Venues', up: 'All venues' }
+export const PLACES: Step = { href: '#stock/places', label: 'Places', up: 'All places' }
+export const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
 
 export interface Trail {
   /** From the area down to the parent: [Jobs, Vicar Street]. */

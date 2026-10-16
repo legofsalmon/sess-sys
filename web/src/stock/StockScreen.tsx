@@ -27,19 +27,21 @@ import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useView, useWide } from '../view.ts'
 import { amountLabel, atLabel, mistakeLabel, numberLabel, ScanResult, TrackingChoice, whereLabel } from './common.tsx'
-import { CountPage, CountsCard, CountScreen } from './Counts.tsx'
+import { CountPage, CountScreen } from './Counts.tsx'
 import { ItemScreen } from './ItemScreen.tsx'
 import { RepairList } from './Faults.tsx'
-import { InspectionsDue, TestingScreen } from './Inspections.tsx'
-import { ClaimLabel, LabelsCard, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
+import { TestingScreen } from './Inspections.tsx'
+import { ImportStockScreen } from './ImportStock.tsx'
+import { ClaimLabel, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.tsx'
 import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import './stock.css'
+import { PLACES, STOCK, type Trail } from '../Up.tsx'
+import { StockViews } from '../Views.tsx'
 import { Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from './kitIcon.ts'
 import { Heading, Icon } from '../Icon.tsx'
-import { STOCK, type Trail } from '../Up.tsx'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
@@ -47,17 +49,22 @@ import { STOCK, type Trail } from '../Up.tsx'
  * short (ADR 0014); labels (ADR 0015); the camera, to scan them (ADR 0016);
  * the pick lists going out and still out (ADR 0017); and faults and
  * missing kit waiting to be sorted out (ADR 0018); and inspections due
- * (ADR 0020). A product, item or place opens on its own page
- * (#stock/product/<id>, #stock/item/<id>, #stock/place/<id>), labels on
- * theirs (#stock/labels, #stock/labels/<id>), and testing a batch on
- * #stock/testing. Counting a place or a case is #stock/count, and a count's
- * page #stock/count/<id> (ADR 0030).
+ * (ADR 0020). The catalogue, places, labels, counting, testing and repairs
+ * are pages along Stock's row (ADR 0041: #stock, #stock/places,
+ * #stock/labels, #stock/count, #stock/testing, #stock/repairs). A product,
+ * item or place opens on its own page (#stock/product/<id>,
+ * #stock/item/<id>, #stock/place/<id>), a run of labels on its own
+ * (#stock/labels/<id>), and a count's on #stock/count/<id> (ADR 0030).
+ * The stock list is brought in at #stock/import (ADR 0026).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 export function StockScreen() {
   const view = useView()
   const hash = useHash()
   const wide = useWide()
+  if (hash === '#stock/places') return <PlacesScreen view={view} />
+  if (hash === '#stock/repairs') return <RepairsScreen view={view} />
+  if (hash === '#stock/import') return <ImportStockScreen view={view} />
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
   if (hash === '#stock/testing') return <TestingScreen view={view} />
   if (hash === '#stock/count') return <CountScreen view={view} />
@@ -99,7 +106,7 @@ export function StockScreen() {
 function recordTrail(view: View, kind: string | undefined, id: string): Trail {
   const w = view.warehouse
   if (kind === 'product') return { steps: [STOCK], here: w.models.find((m) => m.id === id)?.name }
-  if (kind === 'place') return { steps: [STOCK], here: w.places.find((p) => p.id === id)?.name }
+  if (kind === 'place') return { steps: [STOCK, PLACES], here: w.places.find((p) => p.id === id)?.name }
   const a = w.assets.get(id)
   if (!a) return { steps: [STOCK] }
   const model = a.model && !a.model.mistake ? a.model : undefined
@@ -110,6 +117,7 @@ function Catalogue({ view }: { view: View }) {
   return (
     <div className="app warehouse">
       <Top view={view} title="Stock" root />
+      <StockViews view={view} current="catalogue" />
 
       <StockCard view={view} />
 
@@ -118,24 +126,43 @@ function Catalogue({ view }: { view: View }) {
   )
 }
 
-/** What the warehouse has to do, the labels and the places: under the catalogue on a phone, beside it on a laptop. */
+/** What goes out and comes back today: under the catalogue on a phone, beside it on a laptop. The rest is along the row. */
 function StockRest({ view }: { view: View }) {
   return (
     <>
       <PickLists view={view} />
 
-      <RepairList view={view} />
-
-      <InspectionsDue view={view} />
-
-      <CountsCard view={view} />
-
       <ShortKit view={view} />
-
-      <LabelsCard labels={view.labels} />
-
-      <Places view={view} />
     </>
+  )
+}
+
+/** Where kit is kept, on a page along Stock's row (ADR 0041). */
+function PlacesScreen({ view }: { view: View }) {
+  return (
+    <div className="app warehouse">
+      <Top view={view} title="Stock" />
+      <StockViews view={view} current="places" />
+      <Places view={view} />
+    </div>
+  )
+}
+
+/** Faults and missing kit waiting to be sorted out (ADR 0018), on a page along Stock's row. */
+function RepairsScreen({ view }: { view: View }) {
+  return (
+    <div className="app warehouse">
+      <Top view={view} title="Stock" />
+      <StockViews view={view} current="repairs" />
+      <h1 className="area-title">Repairs</h1>
+      {view.faults.open.length === 0 ? (
+        <section className="card">
+          <Empty>Nothing is waiting to be repaired or found. Faults and missing kit are reported from an item's or a product's page.</Empty>
+        </section>
+      ) : (
+        <RepairList view={view} />
+      )}
+    </div>
   )
 }
 
@@ -288,7 +315,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
         <Empty>
           {w.models.length === 0 && (
             <>
-              Add the first product below, or <a href="#account/import-stock">bring in the stock list</a>.
+              Add the first product below, or <a href="#stock/import">bring in the stock list</a>.
             </>
           )}
         </Empty>
@@ -495,9 +522,12 @@ function Places({ view }: { view: View }) {
   }
   return (
     <section className="card">
-      <Heading icon="venue">Places</Heading>
+      <h1 className="with-icon">
+        <Icon name="warehouse" />
+        <span>Places</span>
+      </h1>
       {w.places.length === 0 && <Empty>Where kit is kept: the warehouse, its bays and shelves, the vans. Places are also added as you type them in.</Empty>}
-      <ShowAll items={w.places} limit={5} what="places">
+      <ShowAll items={w.places} limit={50} what="places">
         {(rows) => (
           <ul className="job-list">
             {rows.map((p) => (

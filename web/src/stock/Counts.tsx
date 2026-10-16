@@ -36,6 +36,7 @@ import { reportFault } from './Faults.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { Heading } from '../Icon.tsx'
 import { STOCK } from '../Up.tsx'
+import { StockViews } from '../Views.tsx'
 
 /**
  * Stocktakes and rolling counts (ADR 0030): the Counts card on the Stock
@@ -291,13 +292,15 @@ export function CountScreen({ view }: { view: View }) {
   if (!d)
     return (
       <div className="app warehouse counting">
-        <Top view={view} title="Stock" up={{ steps: [STOCK], here: 'Counting' }} />
+        <Top view={view} title="Stock" />
+        <StockViews view={view} current="count" />
         <section className="card">
           <header className="title">
             <h1>Counting</h1>
           </header>
-          <p className="empty">No count is under way on this phone. Start one from a place's page, a case's page, or the Counts card on the Stock tab.</p>
+          <p className="empty">No count is under way on this phone. Start one from a place's page or a case's page, or from a place due below.</p>
         </section>
+        <CountsCard view={view} />
       </div>
     )
   return <Counting key={d.id} view={view} d={d} />

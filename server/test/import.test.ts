@@ -385,7 +385,7 @@ async function setup({ calendar = true }: { calendar?: boolean } = {}) {
       const attempt = start.cookies.find((c) => c.name === 'sh_calendar')!
       const { code, state } = google.consent(start.headers.location as string)
       const back = await app.inject({ url: `/api/calendar/callback?code=${code}&state=${state}`, cookies: { ...colly.cookies, sh_calendar: attempt.value } })
-      expect(back.headers.location).toBe('/?calendar=connected#account')
+      expect(back.headers.location).toBe('/?calendar=connected#admin')
     },
     look: (calendarId: string, from = '2031-01-01') => post('/api/calendar/import/look', { calendarId, from }),
     bring: (choices: ImportChoices) => post('/api/calendar/import/bring?client=collylaptop', choices),

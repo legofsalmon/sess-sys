@@ -109,11 +109,11 @@ export function ImportScreen({ view }: { view: View }) {
         <section className="card">
           {link?.state === 'reconnect' ? (
             <p>
-              Google Calendar needs connecting again on the <a href="#account">Admin tab</a> first.
+              Google Calendar needs connecting again on the <a href="#admin">Admin</a> first.
             </p>
           ) : (
             <p>
-              Jobs are read from the Google calendars of the account connected on the <a href="#account">Admin tab</a>. Connect one there first.
+              Jobs are read from the Google calendars of the account connected on the <a href="#admin">Admin</a>. Connect one there first.
             </p>
           )}
         </section>
@@ -626,7 +626,7 @@ function Done({ preview, result, onAgain }: { preview: ImportPreview; result: Im
         </p>
       )}
       <div className="actions">
-        <a className="button primary" href={`#plan/month/${addMonths(first, 0)}`}>
+        <a className="button primary" href={`#jobs/plan/month/${addMonths(first, 0)}`}>
           See them in the planner
         </a>
         <a className="button" href="#jobs">

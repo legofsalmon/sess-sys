@@ -55,12 +55,14 @@ test('on a phone the way up is one link in the top bar, still there at the foot 
 })
 
 test('on a desk the way up is breadcrumbs, from the area down to the page', async ({ browser }) => {
-  // Proves: an item beside the catalogue says Stock › its product › its number, each above it a link and the item itself the current page; a job's pick list says Jobs › the job › Pick list; Admin's crew list says Menu › Admin › Bring in the crew list; no phone link is drawn.
+  // Proves: an item opened from its product says Stock › its product › its number, each above it a link and the item itself the current page; a job's pick list says Jobs › the job › Pick list; Admin's crew list says Menu › Admin › Bring in the crew list; no phone link is drawn.
   const page = await (await browser.newContext({ viewport: deskSize })).newPage()
   await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(0)
 
+  // A product with numbered items, and the first of them.
+  await page.locator('a[href^="#stock/product/"]', { hasText: 'd&b Y10P' }).first().click()
   await page.locator('a[href^="#stock/item/"]').first().click()
   const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' })
   await expect(crumbs.getByRole('listitem')).toHaveCount(3)
@@ -82,8 +84,52 @@ test('on a desk the way up is breadcrumbs, from the area down to the page', asyn
   await crumbs.getByRole('link', { name: job }).click()
   await expect(page).toHaveURL(new RegExp(`#jobs/${id}$`))
 
-  await page.goto('/#account/import-people')
-  await expect(crumbs.getByRole('listitem')).toHaveText(['Menu', 'Admin', 'Bring in the crew list'])
-  await crumbs.getByRole('link', { name: 'Admin' }).click()
+  await page.goto('/#crew/import')
+  await expect(crumbs.getByRole('listitem')).toHaveText(['Crew', 'Bring in the crew list'])
+
+  // A client's page sits under the list of clients, a step along Jobs' row.
+  await page.goto('/#jobs/clients')
+  await expect(crumbs).toHaveCount(0)
+  await page.locator('a[href^="#jobs/clients/"]').first().click()
+  await expect(crumbs.getByRole('link')).toHaveText(['Jobs', 'Clients'])
+  await crumbs.getByRole('link', { name: 'Clients' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Clients' })).toBeVisible()
+})
+
+test('every area names its pages in a row, and the old addresses land on the new ones', async ({ browser }) => {
+  // Proves: Jobs, Stock and Crew each have a row with the current page marked; Repairs counts what's open; addresses from before the tidy-up (ADR 0041) are put to their new ones, in place, so Back doesn't return to them.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const jobs = page.getByRole('navigation', { name: 'Jobs pages' })
+  await expect(jobs.getByRole('link')).toHaveText(['List', 'Week', 'Month', 'Clients', 'Venues'])
+  await jobs.getByRole('link', { name: 'Venues' }).click()
+  await expect(page).toHaveURL(/#jobs\/venues$/)
+  await expect(jobs.getByRole('link', { name: 'Venues' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { level: 1, name: 'Venues' })).toBeVisible()
+
+  await page.goto('/#stock')
+  const stock = page.getByRole('navigation', { name: 'Stock pages' })
+  await expect(stock.getByRole('link')).toHaveText(['Catalogue', 'Places', 'Labels', 'Counting', /^Testing/, /^Repairs/])
+  await stock.getByRole('link', { name: /^Places/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Places' })).toBeVisible()
+  await page.screenshot(shot('rows-phone'))
+
+  await page.goto('/#crew')
+  await expect(page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link')).toHaveText(['Calls and people', 'Leave'])
+
+  for (const [old, now] of [
+    ['#plan/week/2031-03-03', '#jobs/plan/week/2031-03-03'],
+    ['#import', '#jobs/import'],
+    ['#account', '#admin'],
+    ['#account/import-people', '#crew/import'],
+    ['#account/import-stock', '#stock/import'],
+  ]) {
+    await page.goto(`/${old}`)
+    await expect(page).toHaveURL(new RegExp(`${now}$`))
+  }
+  // Moving within the app from an old address lands too.
+  await page.evaluate(() => (location.hash = '#account'))
   await expect(page.getByRole('heading', { level: 1, name: 'Admin' })).toBeVisible()
+  await expect(page).toHaveURL(/#admin$/)
 })

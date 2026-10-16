@@ -35,14 +35,9 @@
 .jobs .add-kit h3 { margin: 0; font-size: var(--text-subheading); }
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
-.jobs .views { display: flex; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); }
-.jobs .views a { flex: 1; display: grid; place-items: center; min-height: 44px; border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; }
-.jobs .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
-.jobs .views a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* The planner: the one screen that uses a laptop's full width. */
 .app.plan { max-width: 1400px; }
-.plan .views { max-width: 480px; width: 100%; }
 .plan .plan-title { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
 .plan .actions .button { flex: 1 1 auto; max-width: 180px; }
 .plan .checks { border-color: var(--warn); }

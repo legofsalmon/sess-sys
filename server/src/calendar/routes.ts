@@ -45,7 +45,7 @@ const deviceCode = (client: unknown) => (typeof client === 'string' && /^[a-z0-9
 
 export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync, secret, onChange }: CalendarRoutes) {
   const callbackUrl = (req: FastifyRequest) => `${publicOrigin(req)}/api/calendar/callback`
-  const back = (reply: FastifyReply, outcome: Outcome) => reply.redirect(`/?calendar=${outcome}#account`, 303)
+  const back = (reply: FastifyReply, outcome: Outcome) => reply.redirect(`/?calendar=${outcome}#admin`, 303)
   const action = (req: FastifyRequest, name: string, args: Record<string, unknown>, client?: string): ServerAction => ({
     name,
     args,

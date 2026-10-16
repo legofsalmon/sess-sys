@@ -92,7 +92,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Mark days off' }).click()
     await expect(page.getByLabel('Off from')).toBeVisible()
 
-    for (const hash of ['#crew/person', '#crew', '#jobs', '#stock', '#account']) {
+    for (const hash of ['#crew/person', '#crew', '#jobs', '#stock', '#admin']) {
       if (hash !== '#crew/person') await page.goto(`/${hash}`)
       const fields = await fieldBorders(page)
       expect(fields.length, `${hash} has fields`).toBeGreaterThan(0)
@@ -168,7 +168,7 @@ test('each move lands on the heading and names the tab, inside one main landmark
   expect(await page.evaluate(() => [document.activeElement?.tagName, document.activeElement?.textContent?.trim()])).toEqual(['H1', 'Leave'])
 
   // The planner's jobs or people is a toggle that keeps focus, though it changes the address; another week is a move.
-  await page.goto('/#plan')
+  await page.goto('/#jobs/plan')
   const heading = page.getByRole('heading', { level: 1 })
   await expect(heading).toBeFocused()
   const people = page.getByRole('group', { name: 'Rows' }).getByRole('button', { name: 'People' })
@@ -226,7 +226,7 @@ test('every field on every screen has a name, and the not-done list is a live re
   await page.getByRole('button', { name: 'Mark days off' }).click()
   await expect(page.getByLabel('Off from')).toBeVisible()
   expect(await unnamedFields(page), '#crew/person').toEqual([])
-  for (const hash of ['#crew', '#jobs', '#stock', '#menu', '#account', '#me', '#history', '#crew/leave']) {
+  for (const hash of ['#crew', '#jobs', '#stock', '#menu', '#admin', '#me', '#history', '#crew/leave']) {
     await page.goto(`/${hash}`)
     await expect(page.locator('.app')).toBeVisible()
     expect(await unnamedFields(page), hash).toEqual([])

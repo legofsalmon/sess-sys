@@ -31,10 +31,10 @@ const PDF = Buffer.from('%PDF-1.4\n% Made up for a test: not a real floor plan.\
 test("a venue opens on its own page, with its documents and its jobs, and keeps a link and a file", async ({ browser }) => {
   // Proves: the venue list links to the page; the page shows the address, the made-up links and the jobs there; a link is added with no file, a bad one refused in place; a file is added and opens as a download named for the venue; Remove asks first.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#jobs')
+  await office.goto('/#jobs/venues')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('link', { name: /^Northbank Conference Centre/ }).click()
-  await expect(office).toHaveURL(/#venues\//)
+  await expect(office).toHaveURL(/#jobs\/venues\//)
   await expect(office.getByRole('heading', { level: 1 })).toHaveText('Northbank Conference Centre')
   await expect(office.getByText('Loading bay 2, booked by the half hour.')).toBeVisible()
 
@@ -80,18 +80,18 @@ test("a venue opens on its own page, with its documents and its jobs, and keeps 
   await spec.getByRole('button', { name: 'Remove it' }).click()
   await expect(docs.locator('.row.doc', { hasText: 'Tech spec' })).toHaveCount(0)
 
-  // Up goes back to the jobs, where the venue's row counts its documents.
-  await office.getByRole('link', { name: '‹ All jobs' }).click()
+  // Up goes back to the venues, where its row counts its documents.
+  await office.getByRole('link', { name: '‹ All venues' }).click()
   await expect(office.getByRole('link', { name: /^Northbank Conference Centre/ })).toContainText('4 documents')
 })
 
 test('a client opens on its own page, with its contacts, its documents and its jobs', async ({ browser }) => {
   // Proves: the client list links to the page, also from a job; the page shows the contact, the made-up contract and purchase order, the client's own kinds of document, and their jobs; a contact is changed from the page.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#jobs')
+  await office.goto('/#jobs/clients')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('link', { name: /^Brightwater Conferences/ }).click()
-  await expect(office).toHaveURL(/#clients\//)
+  await expect(office).toHaveURL(/#jobs\/clients\//)
   await expect(office.getByRole('heading', { level: 1 })).toHaveText('Brightwater Conferences')
   await expect(office.getByText('Declan Moore')).toBeVisible()
 

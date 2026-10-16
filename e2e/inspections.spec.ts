@@ -83,14 +83,13 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await expect(page.locator('.facts')).toContainText(/TestingPAT overdue since .*: it can't go out until it passes/)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
-  // The Stock tab lists it, and the two not recorded yet.
-  await page.goto('/#stock')
+  // Stock's Testing page lists it, and the two not recorded yet.
+  await page.goto('/#stock/testing')
   const due = page.getByRole('region', { name: 'Inspections due' })
   await expect(due.locator('li', { hasText: speakers[0]! })).toContainText('PAT overdue since')
   await expect(due).toContainText(`2 × ${speaker}`)
 
   // A batch tested by scanning; the last with no signal.
-  await due.getByRole('link', { name: 'Test a batch' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Test a batch' })).toBeVisible()
   await page.getByLabel('By', { exact: true }).fill('Volt Testing Ltd')
   const said = page.getByRole('status', { name: 'Last scan' })
@@ -119,7 +118,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // The one that failed can't go out.
-  await page.goto('/#stock')
+  await page.goto('/#stock/testing')
   await expect(due.locator('li', { hasText: speakers[0]! })).toHaveCount(0)
   await expect(due.locator('li', { hasText: speakers[1]! })).toContainText('PAT failed on')
   await expect(due).not.toContainText(`× ${speaker}`)

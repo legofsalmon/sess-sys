@@ -5,10 +5,10 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
 import { Page } from './common.tsx'
-import { JOBS } from '../Up.tsx'
+import { JOBS, VENUES } from '../Up.tsx'
 
 /**
- * One venue on a page of its own (ADR 0032, #venues/<id>): where it is,
+ * One venue on a page of its own (ADR 0032, #jobs/venues/<id>): where it is,
  * what to know getting in, the documents kept for it (its tech spec, floor
  * plan, health and safety pack…), and the jobs there.
  */
@@ -18,7 +18,7 @@ export const jobsAt = (jobs: readonly JobView[], venueId: string) => jobs.filter
 
 export function VenueScreen({ view, id }: { view: View; id: string }) {
   const venue = view.jobs.venues.find((v) => v.id === id)
-  const up = { steps: [JOBS], here: venue?.name }
+  const up = { steps: [JOBS, VENUES], here: venue?.name }
   if (!venue)
     return (
       <Page view={view} title="Venue" className="crew jobs" up={up}>

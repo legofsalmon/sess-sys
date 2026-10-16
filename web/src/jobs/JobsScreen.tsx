@@ -33,7 +33,7 @@ import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
-import { Heading } from '../Icon.tsx'
+import { Heading, Icon } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
@@ -41,10 +41,10 @@ import { JOBS } from '../Up.tsx'
  * A job opens on its own page (#jobs/<id>) with its phases, kit and crew,
  * its pick list on another (#jobs/<id>/pick, ADR 0017), each phase's call
  * sheet on another (#jobs/<id>/sheet/<phase>, ADR 0021), the
- * planner (#plan, ADR 0010) shows them by week or month, each venue has a
- * page of its own with its documents (#venues/<id>, ADR 0032), as does each
- * client (#clients/<id>), and jobs already
- * on Google Calendar can be brought in (#import, ADR 0011).
+ * planner (#jobs/plan, ADR 0010) shows them by week or month, the clients
+ * and venues have a list each (#jobs/clients, #jobs/venues, ADR 0041) and
+ * a page each with its documents (#jobs/venues/<id>, ADR 0032), and jobs
+ * already on Google Calendar can be brought in (#jobs/import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 
@@ -64,10 +64,12 @@ export function JobsScreen() {
   const view = useView()
   const hash = useHash()
   const wide = useWide()
-  if (hash === '#plan' || hash.startsWith('#plan/')) return <PlanScreen view={view} hash={hash} />
-  if (hash === '#import') return <ImportScreen view={view} />
-  if (hash.startsWith('#venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#venues/'.length))} />
-  if (hash.startsWith('#clients/')) return <ClientScreen view={view} id={decodeURIComponent(hash.slice('#clients/'.length))} />
+  if (hash === '#jobs/plan' || hash.startsWith('#jobs/plan/')) return <PlanScreen view={view} hash={hash} />
+  if (hash === '#jobs/import') return <ImportScreen view={view} />
+  if (hash === '#jobs/clients') return <ClientsScreen view={view} />
+  if (hash === '#jobs/venues') return <VenuesScreen view={view} />
+  if (hash.startsWith('#jobs/venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#jobs/venues/'.length))} />
+  if (hash.startsWith('#jobs/clients/')) return <ClientScreen view={view} id={decodeURIComponent(hash.slice('#jobs/clients/'.length))} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
   if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []
@@ -105,9 +107,8 @@ function JobList({ view }: { view: View }) {
   )
 }
 
-/** A new job, the clients and the venues: under the list on a phone, beside it on a laptop. */
+/** A new job: under the list on a phone, beside it on a laptop. */
 function JobsRest({ view }: { view: View }) {
-  const { jobs, clients, venues } = view.jobs
   // Taking a job in is the office's, so a role without jobs has no New job (ADR 0034).
   const mayAdd = useAccess().can('jobs')
   return (
@@ -118,14 +119,27 @@ function JobsRest({ view }: { view: View }) {
           <NewJob view={view} />
           {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
             <p className="hint">
-              Jobs already on a Google calendar? <a href="#import">Bring them in</a> rather than typing them again.
+              Jobs already on a Google calendar? <a href="#jobs/import">Bring them in</a> rather than typing them again.
             </p>
           )}
         </section>
       )}
+    </>
+  )
+}
 
+/** Every client, on a page along Jobs' row (ADR 0041): each opens its own page, with its documents and its jobs. */
+function ClientsScreen({ view }: { view: View }) {
+  const { jobs, clients } = view.jobs
+  return (
+    <div className="app crew jobs">
+      <Top view={view} />
+      <JobViews current="clients" />
       <section className="card">
-        <Heading icon="company">Clients</Heading>
+        <h1 className="with-icon">
+          <Icon name="company" />
+          <span>Clients</span>
+        </h1>
         {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {clients.map((c) => (
@@ -135,9 +149,22 @@ function JobsRest({ view }: { view: View }) {
           ))}
         </ul>
       </section>
+    </div>
+  )
+}
 
+/** Every venue, on a page along Jobs' row (ADR 0041). */
+function VenuesScreen({ view }: { view: View }) {
+  const { jobs, venues } = view.jobs
+  return (
+    <div className="app crew jobs">
+      <Top view={view} />
+      <JobViews current="venues" />
       <section className="card">
-        <Heading icon="venue">Venues</Heading>
+        <h1 className="with-icon">
+          <Icon name="venue" />
+          <span>Venues</span>
+        </h1>
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {venues.map((v) => (
@@ -147,7 +174,7 @@ function JobsRest({ view }: { view: View }) {
           ))}
         </ul>
       </section>
-    </>
+    </div>
   )
 }
 
@@ -339,7 +366,7 @@ function NewJob({ view }: { view: View }) {
 /** A client in the list: opens their own page, with their documents and their jobs (ADR 0032). */
 function ClientRow({ c, jobs, docs }: { c: ClientView; jobs: number; docs: number }) {
   return (
-    <a className="job-row" href={`#clients/${encodeURIComponent(c.id)}`}>
+    <a className="job-row" href={`#jobs/clients/${encodeURIComponent(c.id)}`}>
       <div>
         <b>{c.name}</b>
         <p>
@@ -358,7 +385,7 @@ function ClientRow({ c, jobs, docs }: { c: ClientView; jobs: number; docs: numbe
 /** A venue in the list: opens its own page, with its documents and its jobs (ADR 0032). */
 function VenueRow({ v, jobs, docs }: { v: VenueView; jobs: number; docs: number }) {
   return (
-    <a className="job-row" href={`#venues/${encodeURIComponent(v.id)}`}>
+    <a className="job-row" href={`#jobs/venues/${encodeURIComponent(v.id)}`}>
       <div>
         <b>{v.name}</b>
         <p>

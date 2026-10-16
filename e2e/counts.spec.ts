@@ -72,7 +72,7 @@ async function openItem(page: Page, number: string) {
 
 /** A place's page, from the Stock tab's list of places. */
 async function openPlace(page: Page, name: string) {
-  await page.goto('/#stock')
+  await page.goto('/#stock/places')
   const all = page.getByRole('button', { name: /^Show all \d+ places$/ })
   if (await all.isVisible()) await all.click()
   await page.locator('.job-row', { hasText: name }).click()
@@ -109,7 +109,7 @@ test('a place counted with no signal, its differences put right, and the week mo
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // The Stock tab's Counts card lists the bay, never counted, for this week.
-  await page.goto('/#stock')
+  await page.goto('/#stock/count')
   const card = page.getByRole('region', { name: 'Counts' })
   const before = await countedThisQuarter(page)
   const showAll = card.getByRole('button', { name: /^Show all \d+ places to count$/ })
@@ -168,7 +168,7 @@ test('a place counted with no signal, its differences put right, and the week mo
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // The week's list moves on: the bay is counted this week, and the quarter's count is one up.
-  await page.goto('/#stock')
+  await page.goto('/#stock/count')
   await expect(card.locator('.count-due', { hasText: bay })).toHaveCount(0)
   await expect(card.getByRole('link', { name: new RegExp(bay) })).toContainText('2 of 3 found, 1 not found, 1 in the wrong place, 1 count short')
   expect(await countedThisQuarter(page)).toBe(before + 1)
@@ -335,6 +335,6 @@ test('two tabs of the app on one phone count the same count', async ({ browser }
   await expect(one.locator('.count-tally')).toHaveText('2 of 2 found')
   await one.getByRole('button', { name: 'Finish the count' }).click()
   await expect(one.locator('.facts')).toContainText('All 2 found, as recorded')
-  await expect(two.locator('.empty')).toHaveText("No count is under way on this phone. Start one from a place's page, a case's page, or the Counts card on the Stock tab.")
+  await expect(two.locator('.empty')).toHaveText("No count is under way on this phone. Start one from a place's page or a case's page, or from a place due below.")
   await context.close()
 })

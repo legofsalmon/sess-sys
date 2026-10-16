@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: everything moved to where it lives
+
+**Done**
+
+- Colly chose "Move it all". Jobs, Stock and Crew each name their pages in
+  a row under the header: List · Week · Month · Clients · Venues;
+  Catalogue · Places · Labels · Counting · Testing · Repairs (tests overdue
+  and repairs open counted); Calls and people · Leave
+  ([Decision 0041](adr/0041-where-things-live.md)).
+- Every address starts with its area (`#jobs/plan`, `#jobs/venues`,
+  `#admin`…). Old links and bookmarks land on the new pages.
+- The crew and stock lists are brought in under Crew and Stock; Admin
+  keeps a "Bring lists in" card linking to all three, and is otherwise
+  settings. Clients and venues have a list page each; the Menu names them.
+- Checked: the whole browser test suite, server tests and typecheck.
+
+**Waiting on**
+
+- Crew's split into To check, People and Timesheets waits for a person's
+  own page (the crew member pages work).
+
 ## 16 October 2026: a page for each person
 
 **Done**
@@ -61,7 +82,7 @@ waiting on someone.
 
 **Waiting on**
 
-- Colly: say whether to move things as proposed.
+- Nothing: Colly chose to move it all (next entry up).
 
 ## 16 October 2026, later: a season comes in within the app's wait
 
