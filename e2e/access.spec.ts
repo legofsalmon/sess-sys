@@ -85,14 +85,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test(`in ${colorScheme} mode, every field's border is 3:1 against its card and the current tab and grey pill read at 4.5:1`, async ({ browser, request }) => {
     // Proves: fields can be seen and the two known gaps are closed, in the app and on the freelancer's pages, as the browser draws them.
     const page = await (await browser.newContext({ viewport: phoneSize, colorScheme })).newPage()
-    await page.goto('/#crew')
+    await page.goto('/#crew/people')
     await expect(page.getByRole('status')).toHaveText('Up to date')
     // Dara's page holds the days-off form and the level picker, which the list alone doesn't show. Her name heads her row in People.
     await page.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
     await page.getByRole('button', { name: 'Mark days off' }).click()
     await expect(page.getByLabel('Off from')).toBeVisible()
 
-    for (const hash of ['#crew/person', '#crew', '#jobs', '#stock', '#admin']) {
+    for (const hash of ['#crew/person', '#crew/people', '#jobs', '#stock', '#admin']) {
       if (hash !== '#crew/person') await page.goto(`/${hash}`)
       const fields = await fieldBorders(page)
       expect(fields.length, `${hash} has fields`).toBeGreaterThan(0)
@@ -163,7 +163,7 @@ test('each move lands on the heading and names the tab, inside one main landmark
 
   // The leave screen, before anyone has said who they are, is named for what it is, not for the Crew tab it's under.
   await page.goto('/#crew')
-  await page.getByRole('link', { name: 'Open leave' }).click()
+  await page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Leave/ }).click()
   await expect(page).toHaveTitle('Leave · Session Hire')
   expect(await page.evaluate(() => [document.activeElement?.tagName, document.activeElement?.textContent?.trim()])).toEqual(['H1', 'Leave'])
 
@@ -220,13 +220,13 @@ test('every field on every screen has a name, and the not-done list is a live re
   // Proves: no field is named by its placeholder alone, and a refusal from the server is read out where it's counted and listed, from a live region that takes no room in the top bar while it's empty, even at 320px.
   const id = Math.random().toString(36).slice(2, 8)
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await page.goto('/#crew')
+  await page.goto('/#crew/people')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await page.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
   await page.getByRole('button', { name: 'Mark days off' }).click()
   await expect(page.getByLabel('Off from')).toBeVisible()
   expect(await unnamedFields(page), '#crew/person').toEqual([])
-  for (const hash of ['#crew', '#jobs', '#stock', '#menu', '#admin', '#me', '#history', '#crew/leave']) {
+  for (const hash of ['#crew', '#crew/people', '#crew/timesheets', '#jobs', '#stock', '#menu', '#admin', '#me', '#history', '#crew/leave']) {
     await page.goto(`/${hash}`)
     await expect(page.locator('.app')).toBeVisible()
     expect(await unnamedFields(page), hash).toEqual([])
@@ -246,7 +246,7 @@ test('every field on every screen has a name, and the not-done list is a live re
   expect(row).toBe(Math.max(pill!, theme!))
 
   // A refusal from the server is counted and listed where a screen reader is told of it.
-  await page.goto('/#crew')
+  await page.goto('/#crew/people')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await page.route(/\/api\/sync\/push/, async (route) => {
     const { mutations } = route.request().postDataJSON() as { mutations: { id: string }[] }

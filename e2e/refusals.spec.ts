@@ -19,7 +19,7 @@ const tag = () => Math.random().toString(36).slice(2, 8)
 test('a change the server turns down is counted in the top bar and listed from it, whatever the screen', async ({ browser }) => {
   const id = tag()
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await page.goto('/#crew')
+  await page.goto('/#crew/people')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 
   // The server turns the next changes down, as it would a double booking.

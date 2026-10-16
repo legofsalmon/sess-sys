@@ -4,8 +4,7 @@
 looked over and tidied, and for breadcrumbs or a back button. The way up is
 built (ADR 0039). This page is the rest: where each place lived, what was
 untidy about it, and the structure proposed. Colly chose "Move it all", and
-it is built (ADR 0041), apart from splitting Crew's screen, which waits for
-the crew member pages work (see the end).
+it is built (ADR 0041).
 
 ## How it was
 
@@ -84,9 +83,9 @@ place: Jobs › Clients › Liffey Brands, Stock › Labels › Run 12.
 - History stays under the Menu, where the directors and the office look
   for it now and then.
 
-## Built, and what waits
+## Built
 
 Built as proposed (ADR 0041), with every old address landing on its new
-one. Crew's row is Calls and people · Leave for now: the To check, People
-and Timesheets split waits until a person has a page of their own, since
-that work is changing the same screen.
+one. Crew's row came second, once each person had a page: Calls · People ·
+Leave · Timesheets, where Calls is the answers to check and the crew still
+needed (proposed as "To check", but crew needed belongs with it).

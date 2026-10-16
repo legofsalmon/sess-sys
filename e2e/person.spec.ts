@@ -38,7 +38,7 @@ test("a person's name opens their page, with what's ahead for them and the way b
   expect((await res.json()).results.filter((r: { status: string }) => r.status !== 'applied')).toEqual([])
 
   const office = await context.newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const people = office.getByRole('region', { name: 'People' })
   await people.getByLabel('Find a person').fill(`ciara page ${id}`)
@@ -72,8 +72,8 @@ test("a person's name opens their page, with what's ahead for them and the way b
   await expect(ahead.getByText(`${name} has an open offer for ${job} (Show); withdraw it first.`)).toBeVisible()
 
   // The way back is the list, as it was left.
-  await office.getByRole('link', { name: '‹ Crew' }).click()
-  await expect(office).toHaveURL(/#crew$/)
+  await office.getByRole('link', { name: '‹ All people' }).click()
+  await expect(office).toHaveURL(/#crew\/people$/)
   await expect(people.getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible()
 })
 
@@ -100,7 +100,7 @@ test('archiving from the page goes back to the list, which says so with the way 
   await expect(office.getByRole('heading', { level: 1 })).toHaveText(name)
   await office.getByRole('button', { name: 'Archive', exact: true }).click()
 
-  await expect(office).toHaveURL(/#crew$/)
+  await expect(office).toHaveURL(/#crew\/people$/)
   const people = office.getByRole('region', { name: 'People' })
   await expect(people.locator('.added')).toHaveText(`Archived ${name}. Bring ${name} back`)
   await people.getByRole('button', { name: `Bring ${name} back` }).click()

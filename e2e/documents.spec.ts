@@ -52,7 +52,7 @@ const PHOTO = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(
 test('the office adds a document with an expiry and a file on a card, and opens it again', async ({ browser }) => {
   // Proves: on a phone, Add document takes the kind, title, day and a PDF, says it was added, and lists it with its day and file; Open downloads it under the person's name and its title; a web page is refused in place, the form keeping what was typed.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
   const docs = office.getByRole('group', { name: 'Documents: Dara Quinn' })
@@ -87,7 +87,7 @@ test('the office adds a document with an expiry and a file on a card, and opens 
 test("a renewed card sent from the link is checked by the office, and the certificate's expiry follows", async ({ browser, request }) => {
   // Proves: the reminders list Dara's insurance beside Pádraig's IPAF, with a message pointing to his page; Pádraig sends a renewed IPAF card from his link with no script; it waits in "Answers to check" on the badge, saying what checking does; Checked moves his IPAF's day, takes the old card's place and his IPAF off the list.
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const reminders = office.getByRole('region', { name: 'Certificates and documents running out' })
   await expect(reminders.getByRole('heading')).toHaveText('Running out (6)')
@@ -115,7 +115,8 @@ test("a renewed card sent from the link is checked by the office, and the certif
   await expect(phone.getByRole('status')).toHaveText("Thanks, it's gone to the office. They'll check it, and it's on your list meanwhile.")
   await expect(phone.locator('#documents article', { hasText: 'With the office to check' })).toContainText(`Runs out on ${dayText(inDays(1095))} · JPEG, 1 KB`)
 
-  // The office's open Crew tab has it at once, on the badge, saying what checking it does.
+  // The office's open Crew tab has it at once, on the badge, and on Calls, saying what checking it does.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
   const answers = office.locator('section').filter({ has: office.getByRole('heading', { name: /^Answers to check/ }) })
   const row = answers.locator('.doc-check', { hasText: 'Pádraig Kenny sent a renewed IPAF card' })
   await expect(row).toContainText(`Runs out ${dayText(inDays(1095))}, they say · JPEG, 1 KB`)
@@ -127,6 +128,7 @@ test("a renewed card sent from the link is checked by the office, and the certif
   await expect(badge).toHaveText(String(before))
   await expect(office.getByRole('status')).toHaveText('Up to date')
   // His IPAF is off the list, its new day on his card, and one IPAF card left: the one he sent.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: 'People' }).click()
   await expect(reminders.getByRole('heading')).toHaveText('Running out (5)')
   await expect(reminders.locator('.reminder', { hasText: 'Pádraig Kenny' })).toHaveCount(0)
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Pádraig Kenny/ }).click()
@@ -150,7 +152,7 @@ test("a title typed as one long word wraps on a phone, on the person's card and 
   const wide = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth)
 
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
   await expect(office.getByRole('group', { name: 'Documents: Dara Quinn' })).toContainText(title)

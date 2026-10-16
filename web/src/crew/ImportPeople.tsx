@@ -329,8 +329,8 @@ function Done({ result, onAgain }: { result: CrewListResult; onAgain: () => void
         {result.unchanged > 0 && ` ${result.unchanged} ${result.unchanged === 1 ? 'was' : 'were'} already up to date.`}
       </p>
       <div className="actions">
-        <a className="button primary" href="#crew">
-          Crew tab
+        <a className="button primary" href="#crew/people">
+          See the people
         </a>
         <button type="button" onClick={onAgain}>
           Bring in another list

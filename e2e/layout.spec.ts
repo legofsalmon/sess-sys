@@ -20,7 +20,7 @@ const tag = () => Math.random().toString(36).slice(2, 8)
 test('on a phone a call is one line that opens on a tap, the picker narrows as you type, and forms wait behind their buttons', async ({ browser }) => {
   const id = tag()
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // Two people, from the form behind "Add person": not on the page until the button is tapped.
@@ -39,7 +39,8 @@ test('on a phone a call is one line that opens on a tap, the picker narrows as y
   }
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  // A one-day call for one person, from the form behind "Ask for crew".
+  // A one-day call for one person, from the form behind "Ask for crew", along Crew's row.
+  await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
   await office.getByRole('button', { name: 'Ask for crew' }).click()
   const ask = office.locator('form').filter({ has: office.getByRole('button', { name: 'Ask for crew' }) })
   await ask.getByLabel('Project').fill(`Layout check ${id}`)
@@ -130,7 +131,7 @@ test('the people list finds someone as the picker does, shows its first ten, and
     ['person.archive', { id: `p-${id}-gone`, archived: true }],
   ])
   const office = await context.newPage()
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   const list = office.getByRole('region', { name: 'People' })
   const find = list.getByLabel('Find a person')

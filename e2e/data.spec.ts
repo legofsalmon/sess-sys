@@ -30,7 +30,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   await expect(harbour.getByText('Kit short')).toBeVisible()
   await office.evaluate(() => scrollTo(0, 0))
   await office.screenshot(shot('data-jobs'))
-  await office.goto('/#crew')
+  await office.goto('/#crew/people')
   await expect(office.locator('.brand small')).toHaveText('Crew · made-up data')
   await expect(office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Fionn Gallagher/ })).toBeVisible()
   await office.goto('/#stock')

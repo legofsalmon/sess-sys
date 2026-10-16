@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: Crew's own pages
+
+**Done**
+
+- Crew's row now names four pages, now each person has a page of their
+  own: Calls (answers to check and crew still needed), People (the list and
+  certificates running out), Leave and Timesheets. Calls and Leave count
+  what the Crew tab's badge counts, so the badge says where to look; a
+  person's page reads Crew › People › their name
+  ([Decision 0041](adr/0041-where-things-live.md)).
+- Checked: the whole browser test suite and typecheck.
+
+**Waiting on**
+
+- Nothing.
+
 ## 16 October 2026: everything moved to where it lives
 
 **Done**
@@ -10,7 +26,7 @@ waiting on someone.
 - Colly chose "Move it all". Jobs, Stock and Crew each name their pages in
   a row under the header: List · Week · Month · Clients · Venues;
   Catalogue · Places · Labels · Counting · Testing · Repairs (tests overdue
-  and repairs open counted); Calls and people · Leave
+  and repairs open counted); Calls · People · Leave · Timesheets
   ([Decision 0041](adr/0041-where-things-live.md)).
 - Every address starts with its area (`#jobs/plan`, `#jobs/venues`,
   `#admin`…). Old links and bookmarks land on the new pages.
@@ -21,8 +37,7 @@ waiting on someone.
 
 **Waiting on**
 
-- Crew's split into To check, People and Timesheets waits for a person's
-  own page (the crew member pages work).
+- Nothing. Crew's split came in a second step, once each person had a page.
 
 ## 16 October 2026: a page for each person
 

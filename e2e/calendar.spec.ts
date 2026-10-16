@@ -287,7 +287,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   server.day = (phase, i, n) => ({ state: 'on', title: `${job} - ${phase} ${i + 1}/${n}`, problem: null, link: 'https://www.google.com/calendar/event?eid=abc' })
 
   // Three freelancers, one with no email address, offered the build.
-  await page.goto('/#crew')
+  await page.goto('/#crew/people')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })

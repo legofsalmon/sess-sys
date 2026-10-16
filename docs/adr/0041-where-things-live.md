@@ -25,7 +25,8 @@ with once-a-season work.
 2. **Each area names its pages in one row** under its header (`Views.tsx`):
    Jobs' List · Week · Month · Clients · Venues; Stock's Catalogue · Places
    · Labels · Counting · Testing · Repairs, with tests overdue and repairs
-   open counted; Crew's Calls and people · Leave. Moving along a row is
+   open counted; Crew's Calls · People · Leave · Timesheets, with Calls and
+   Leave counting what the Crew tab's badge counts between them. Moving along a row is
    lateral, so those pages have no way up; the current one is marked. A
    row wider than a phone scrolls sideways with the current one in view.
 3. **Stock's long screen splits** into those pages. The Catalogue keeps the
@@ -43,9 +44,10 @@ with once-a-season work.
   alone; a page along a row adds itself to the area's row in `Views.tsx`.
 - Breadcrumbs read as the page's place: Jobs › Clients › Liffey Brands,
   Stock › Places › Bay 3.
-- **Not done yet:** Crew's row was proposed as To check · People · Leave ·
-  Timesheets. The crew screen is being changed by the crew member pages
-  work, so it stays one page (Calls and people) beside Leave until that
-  lands, and splits then.
+- **Crew split second**, once a person had a page of their own (ADR 0040):
+  Calls holds the answers to check and the crew needed, since both are
+  about filling calls; People holds the list and certificates running
+  out; a person's page and a timesheet sit under People and Timesheets in
+  the breadcrumbs.
 - Old addresses must stay in `addresses.ts`: links to them are out in
   messages and calendars.

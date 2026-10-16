@@ -30,6 +30,8 @@ export const CLIENTS: Step = { href: '#jobs/clients', label: 'Clients', up: 'All
 export const VENUES: Step = { href: '#jobs/venues', label: 'Venues', up: 'All venues' }
 export const PLACES: Step = { href: '#stock/places', label: 'Places', up: 'All places' }
 export const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
+export const PEOPLE: Step = { href: '#crew/people', label: 'People', up: 'All people' }
+export const TIMESHEETS: Step = { href: '#crew/timesheets', label: 'Timesheets' }
 
 export interface Trail {
   /** From the area down to the parent: [Jobs, Vicar Street]. */
