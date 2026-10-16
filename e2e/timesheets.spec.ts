@@ -65,7 +65,7 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   await expect(card.getByRole('group', { name: 'To approve' })).toContainText('Laoise Keane')
 
   // And Dara sees on their link what was approved, and what changed.
-  await office.getByRole('button', { name: /^Dara Quinn/ }).click()
+  await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
   await office.getByRole('button', { name: 'Copy link' }).click()
   const daraLink = await office.evaluate(() => navigator.clipboard.readText())
   const dara = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()

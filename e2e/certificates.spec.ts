@@ -84,8 +84,8 @@ test('the Crew tab lists certificates running out, soonest first, each with a me
   await expect(panel.getByRole('link', { name: 'Email' })).toHaveAttribute('href', /^mailto:padraig@example\.com\?subject=Your%20IPAF/)
 
   // His card says it too, in the warn tone, with his card's categories.
-  await office.getByRole('button', { name: /^Pádraig Kenny/ }).click()
-  const card = office.locator('.row.person', { has: office.getByRole('button', { name: /^Pádraig Kenny/ }) })
+  await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Pádraig Kenny/ }).click()
+  const card = office.locator('.person-page')
   await expect(card).toContainText('IPAF 3a, 3b (to')
   await expect(card.locator('.warn-line')).toHaveText(/^IPAF runs out on/)
 })

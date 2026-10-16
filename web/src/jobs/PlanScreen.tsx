@@ -19,6 +19,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { personHref } from '../crew/PersonScreen.tsx'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
@@ -203,7 +204,9 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                   : people.map((lane) => (
                       <tr key={lane.person.id}>
                         <th scope="row">
-                          <b>{lane.person.name}</b>
+                          <a href={personHref(lane.person.id)}>
+                            <b>{lane.person.name}</b>
+                          </a>
                           {lane.person.kind === 'staff' && <small>Staff</small>}
                         </th>
                         {days.map((d) => (

@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 16 October 2026: a page for each person
+
+**Done**
+
+- Colly asked for a page per crew member. Everything about a person was
+  already kept, but it only opened as a long fold inside the People list.
+  Each person now has a page of their own under Crew
+  ([Decision 0040](adr/0040-a-page-for-each-person.md)): their picture,
+  name and who they are, Call, WhatsApp and Email, their details, level
+  and role; what's coming up (bookings and offers, each opening its job,
+  and days off); certificates and documents; every job they've worked;
+  and their private link. The People list is one line each that opens
+  it, and a name on a call card or a person's lane in the planner opens
+  it too. Archive is one tap from the page and the list says so, with
+  the way back.
+
+**Waiting on**
+
+- Nothing new. Photos wait on the backup bucket, as the icons work says.
+
 ## 16 October 2026: icons, and pictures of kit and crew
 
 **Done**

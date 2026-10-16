@@ -3,10 +3,7 @@ import {
   APPLICANT_LEVEL,
   CERTIFICATE_KINDS,
   CERTIFICATE_LABELS,
-  certificateState,
-  companyLine,
   CREW_DEPARTMENTS,
-  dayLabel,
   DEFAULT_LEVEL,
   daysLabel,
   eachDay,
@@ -43,8 +40,8 @@ import {
   type TellEvent,
   type View,
 } from '@sh/shared'
-import { blocks, CERTIFICATE_SOON_DAYS, certificateGaps, certificateName, certificateRefusal, certificateUnknowns, daysBetween, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
-import { ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
+import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
+import { ROLE_LABELS } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -55,11 +52,11 @@ import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
-import { Documents, DocumentToCheck } from './Documents.tsx'
+import { DocumentToCheck } from './Documents.tsx'
 import { ArchivedPerson } from './Erase.tsx'
-import { useFeedAddress } from './feed.ts'
 import { LateLines, LateRow, NoteLate } from './Late.tsx'
 import { LeaveCard, LeaveScreen } from './Leave.tsx'
+import { personHref, PersonScreen } from './PersonScreen.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 import { Heading } from '../Icon.tsx'
 import { Avatar, Avatars } from '../Picture.tsx'
@@ -80,7 +77,7 @@ import { Avatar, Avatars } from '../Picture.tsx'
  * turns down is counted in the top bar with every other screen's.
  */
 
-const STATUS: Record<OfferView['status'], [string, PillTone]> = {
+export const STATUS: Record<OfferView['status'], [string, PillTone]> = {
   offered: ['Offered', 'pending'],
   countered: ['Asked for more', 'pending'],
   accepted: ['Accepted', 'pending'],
@@ -95,9 +92,6 @@ export const linkFor = (p: Pick<Person, 'linkToken'>) => (p.linkToken ? `${locat
 
 /** The filter's choice for people with no department. */
 const NO_DEPARTMENT = '-'
-
-/** "Fri 3 Oct 2027": a certificate's expiry wants its year. */
-const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
 
 /** A department as compared: free text, so "audio" and "Audio" are one. */
 const dept = (p: Pick<PersonView, 'department'>) => (p.department ?? '').toLowerCase()
@@ -269,6 +263,9 @@ export function CrewScreen() {
   const [archivedNow, setArchivedNow] = useState<{ id: string; name: string } | undefined>()
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
+  // Each person has a page of their own (#crew/person/<id>); the People list is one line each that opens it.
+  const [, personId] = /^#crew\/person\/(.+)$/.exec(hash) ?? []
+  if (personId) return <PersonScreen view={view} id={decodeURIComponent(personId)} onArchived={setArchivedNow} />
   // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
   if (hash === '#crew/leave') return <LeaveScreen view={view} />
 
@@ -465,7 +462,7 @@ export function CrewScreen() {
         )}
         {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
         <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
-          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} onArchived={() => setArchivedNow({ id: p.id, name: p.name })} />)}
+          {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
         </ShowAll>
         {archived.length > 0 && (
           <details className="archived">
@@ -604,7 +601,13 @@ export function CallCard({
                 return (
                   <li key={o.id}>
                     <span>
-                      {o.person?.name ?? 'Unknown'}
+                      {o.person ? (
+                        <a className="link" href={personHref(o.personId)}>
+                          {o.person.name}
+                        </a>
+                      ) : (
+                        'Unknown'
+                      )}
                       {partial && <small> {daysLabel(o.days)}</small>}
                       {o.override && <small> (override)</small>}
                     </span>
@@ -1087,51 +1090,23 @@ export function TellPanel({ tell, onClose }: { tell: Tell; onClose: () => void }
   )
 }
 
-function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: CrewView; onArchived: () => void }) {
-  const [open, setOpen] = useState(false)
-  // Which address was just copied, said on its button (rule 10).
-  const [copied, setCopied] = useState<'link' | 'feed' | undefined>()
-  const copy = (what: 'link' | 'feed', text: string) => void navigator.clipboard?.writeText(text).then(() => setCopied(what))
-  const [editing, setEditing] = useState(false)
-  const [relinking, setRelinking] = useState(false)
-  const { run, error, refuse } = useAct()
-  const access = useAccess()
-  // Someone whose role doesn't cover crew sees a person as they are, with nothing to change (ADR 0034).
-  const mayEdit = access.can('crew')
-  const role = roleOfPerson(person)
+/**
+ * One person in the People list: their name and a line of who they are
+ * and what's ahead, opening their page (#crew/person/<id>), where
+ * everything else about them is.
+ */
+function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   const today = useToday()
-  const [away, setAway] = useState({ start: today, end: today, note: '' })
-  const booked = crew.calls.flatMap((c) =>
-    c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')).map((o) => ({ c, o })) : []
-  )
-  // Offers still waiting on them: like a booking, settled before they can be archived. The server checks the same.
-  const waiting = crew.calls.flatMap((c) =>
-    c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'offered' || o.status === 'countered')).map((o) => ({ c, o })) : []
+  const held = crew.calls.flatMap((c) =>
+    c.status === 'open' && c.end >= today ? c.offers.filter((o) => o.personId === person.id && (o.status === 'accepted' || o.status === 'confirmed')) : []
   )
   // Booked means confirmed; someone who has said yes is still to confirm.
-  const confirmed = booked.filter(({ o }) => o.status === 'confirmed').length
-  const toConfirm = booked.length - confirmed
-  const off = crew.unavailability.filter((u) => u.personId === person.id && u.end >= today)
-  const link = linkFor(person)
-  const feed = useFeedAddress(open ? person.linkToken : undefined)
-  const archive = () => {
-    // The same test as the server's: held days from today on, or any offer still waiting.
-    const hold = booked.find(({ o }) => o.days.some((d) => d >= today)) ?? waiting[0]
-    if (hold) {
-      const job = hold.c.phase ? `${hold.c.project} (${hold.c.phase})` : hold.c.project
-      return refuse(
-        hold.o.status === 'confirmed'
-          ? `${person.name} is booked on ${job}; release them first.`
-          : hold.o.status === 'accepted'
-            ? `${person.name} has accepted ${job}; release them first.`
-            : `${person.name} has an open offer for ${job}; withdraw it first.`
-      )
-    }
-    void run(() => client.mutate('person.archive', { id: person.id, archived: true })).then((ok) => ok && onArchived())
-  }
+  const confirmed = held.filter((o) => o.status === 'confirmed').length
+  const toConfirm = held.length - confirmed
+  const off = crew.unavailability.some((u) => u.personId === person.id && u.end >= today)
   return (
     <div className="row person">
-      <button type="button" className="who pictured" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <a className="who pictured" href={personHref(person.id)}>
         <Avatar name={person.name} />
         <span>
           <b>{person.name}</b>
@@ -1149,216 +1124,11 @@ function PersonRow({ person, crew, onArchived }: { person: PersonView; crew: Cre
               .join(' · ')}
             {confirmed > 0 && ` · ${confirmed} booking${confirmed === 1 ? '' : 's'}`}
             {toConfirm > 0 && ` · ${toConfirm} to confirm`}
-            {off.length > 0 && ' · has days off'}
+            {off && ' · has days off'}
           </small>
         </span>
-      </button>
+      </a>
       <Pending pending={person.pending} />
-      {open && editing && (
-        <div className="detail">
-          <PersonForm initial={person} submitLabel="Save" onSubmit={(fields) => client.mutate('person.upsert', { id: person.id, ...fields })} onDone={() => setEditing(false)} />
-        </div>
-      )}
-      {open && !editing && (
-        <div className="detail">
-          {(person.phone || person.email) && <p className="muted">{[person.phone, person.email].filter(Boolean).join(' · ')}</p>}
-          {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
-          {person.company && <p className="muted">{companyLine(person)}</p>}
-          <CertificateLines person={person} />
-          <Documents person={person} />
-          {person.notes && <p className="muted">{person.notes}</p>}
-          {mayEdit && (
-            <label className="level-pick">
-              Level
-              <select value={person.level} onChange={(e) => void run(() => client.mutate('person.level', { id: person.id, level: Number(e.target.value) }))} aria-label={`Level for ${person.name}`}>
-                {LEVELS.map((n) => (
-                  <option key={n} value={n}>
-                    {levelLine(n)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {role && <RolePick person={person} role={role} mayChange={access.can('company')} onChange={(next) => void run(() => client.mutate('person.role', { id: person.id, role: next }))} />}
-          <Worked person={person} />
-          {booked.map(({ c, o }) => (
-            <p key={o.id}>
-              {c.project} · {daysLabel(o.days)} · {STATUS[o.status][0]}
-            </p>
-          ))}
-          {off.map((u) => (
-            <p key={u.id}>
-              Off {daysLabel(eachDay(u.start, u.end))}
-              {u.note && ` (${u.note})`}
-              {u.source === 'self' && ' · said on their link'}
-              {/* Approved leave is cancelled on the Leave screen, so the two never disagree (ADR 0024). */}
-              {u.source === 'leave' || !mayEdit ? (
-                u.source === 'leave' && (
-                  <>
-                    {' · '}
-                    <a className="link" href="#crew/leave">
-                      approved leave
-                    </a>
-                  </>
-                )
-              ) : (
-                <>
-                  {' '}
-                  <button type="button" className="link" onClick={() => void run(() => client.mutate('unavailability.remove', { id: u.id }))}>
-                    Remove
-                  </button>
-                </>
-              )}
-            </p>
-          ))}
-          {mayEdit && (
-            <>
-              <form
-                className="away-form"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void run(() => client.mutate('unavailability.add', { id: newId(), personId: person.id, start: away.start, end: away.end < away.start ? away.start : away.end, note: away.note }))
-                }}
-              >
-                {/* Each field's name is over it, not only inside it, so it stays once something is typed (audit finding 22). */}
-                <label className="field">
-                  Off from <input type="date" value={away.start} onChange={(e) => setAway({ ...away, start: e.target.value })} />
-                </label>
-                <label className="field">
-                  Off until <input type="date" value={away.end} min={away.start} onChange={(e) => setAway({ ...away, end: e.target.value })} />
-                </label>
-                <label className="field wide">
-                  Note <input placeholder="e.g. on tour" value={away.note} onChange={(e) => setAway({ ...away, note: e.target.value })} />
-                </label>
-                <button type="submit">Mark days off</button>
-              </form>
-              <div className="actions">
-                {link && (
-                  <>
-                    <a className="button" href={link} target="_blank" rel="noreferrer">
-                      Open their page
-                    </a>
-                    <button type="button" onClick={() => copy('link', link)}>
-                      {copied === 'link' ? 'Copied' : 'Copy link'}
-                    </button>
-                  </>
-                )}
-                {feed && (
-                  <button type="button" onClick={() => copy('feed', feed)}>
-                    {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
-                  </button>
-                )}
-                {!relinking && (
-                  <button type="button" className="link" onClick={() => setRelinking(true)}>
-                    New link
-                  </button>
-                )}
-              </div>
-              {relinking && (
-                <Confirm
-                  question={`Make a new link for ${person.name}? The old one stops working, so anything sent with it no longer opens.`}
-                  yes="Make a new link"
-                  no="Keep the old one"
-                  onYes={() => {
-                    setRelinking(false)
-                    void run(() => client.mutate('person.newLink', { id: person.id }))
-                  }}
-                  onNo={() => setRelinking(false)}
-                />
-              )}
-              <div className="actions">
-                <button type="button" onClick={() => setEditing(true)}>
-                  Edit
-                </button>
-                <button type="button" className="link" onClick={archive}>
-                  Archive
-                </button>
-              </div>
-            </>
-          )}
-          <Refusal error={error} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * A member of staff's role (ADR 0034): what they can change once signed in.
- * A director picks it here, with what the role covers said under it; anyone
- * else sees it as a line. The server keeps at least one director.
- */
-function RolePick({ person, role, mayChange, onChange }: { person: PersonView; role: Role; mayChange: boolean; onChange: (role: Role) => void }) {
-  const hint = useId()
-  if (!mayChange) return <p className="muted">Role: {ROLE_LABELS[role]}</p>
-  return (
-    <div className="role-pick">
-      <label className="level-pick">
-        Role
-        <select value={role} onChange={(e) => onChange(e.target.value as Role)} aria-label={`Role for ${person.name}`} aria-describedby={hint}>
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="hint" id={hint}>
-        {ROLE_LINES[role]}
-      </p>
-    </div>
-  )
-}
-
-/**
- * The certificates someone holds, with any note such as an IPAF card's
- * categories, any running out in the next 30 days in the warn tone (ADR
- * 0028), and any run out in the bad tone (ADR 0025). Nothing for ones not
- * held or not known.
- */
-function CertificateLines({ person }: { person: PersonView }) {
-  const today = useToday()
-  const states = CERTIFICATE_KINDS.map((kind) => ({ kind, c: person.certificates[kind], state: certificateState(person.certificates[kind], today) }))
-  const held = states.filter((x) => x.state === 'held')
-  const expired = states.filter((x) => x.state === 'expired')
-  const soon = held.filter((x) => x.c?.expires && daysBetween(today, x.c.expires) <= CERTIFICATE_SOON_DAYS)
-  if (!held.length && !expired.length) return null
-  return (
-    <>
-      {held.length > 0 && (
-        <p className="muted">
-          Holds {held.map((x) => `${certificateName(x.kind)}${x.c?.note.trim() ? ` ${x.c.note.trim()}` : ''}${x.c?.expires ? ` (to ${dateLabel(x.c.expires)})` : ''}`).join(', ')}
-        </p>
-      )}
-      {soon.map((x) => (
-        <p key={x.kind} className="warn-line">
-          {CERTIFICATE_LABELS[x.kind]} runs out on {dateLabel(x.c!.expires!)}.
-        </p>
-      ))}
-      {expired.map((x) => (
-        <p key={x.kind} className="alert">
-          {CERTIFICATE_LABELS[x.kind]} ran out on {dateLabel(x.c!.expires!)}.
-        </p>
-      ))}
-    </>
-  )
-}
-
-/** The jobs someone was booked on, newest first (ADR 0025): the last few, and how many in all. */
-function Worked({ person }: { person: PersonView }) {
-  const { worked } = person
-  if (!worked.length) return null
-  return (
-    <div className="worked" role="group" aria-label={`Worked: ${person.name}`}>
-      <p className="muted">
-        <b>Worked on {worked.length === 1 ? '1 job' : `${worked.length} jobs`}</b>
-      </p>
-      {worked.slice(0, 3).map((w) => (
-        <p key={w.callId}>
-          {w.name}
-          {w.phase && <span className="muted"> · {w.phase}</span>} · {daysLabel(eachDay(w.start, w.end))}
-        </p>
-      ))}
     </div>
   )
 }
@@ -1490,7 +1260,7 @@ function certificatesOf(fields: CertFields): Certificates {
   return out
 }
 
-function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
+export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
   // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
   const mayApprove = useAccess().can('company')
   const blank = {
