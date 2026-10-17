@@ -44,6 +44,7 @@ import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
+import { VansCard } from './Vans.tsx'
 import { QuoteCard } from './Quote.tsx'
 import { ShowPackCard } from './ShowPack.tsx'
 import { Heading } from '../Icon.tsx'
@@ -96,6 +97,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
 
       {inPhase && offering}
       <KitCard job={job} view={view} />
+      <VansCard job={job} view={view} />
       {!inPhase && offering}
 
       <section className="card" aria-label="Crew">

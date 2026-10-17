@@ -18,6 +18,7 @@ import { TIMESHEET_ENTITY_NAMES, type TimesheetEntities } from './timesheets.ts'
 import { ATTACHMENT_ENTITY_NAMES, type AttachmentEntities } from './attachments.ts'
 import { QUOTE_ENTITY_NAMES, type QuoteEntities } from './quotes.ts'
 import { OWN_CALENDAR_ENTITY_NAMES, type OwnCalendarEntities } from './own-calendar.ts'
+import { VEHICLE_ENTITY_NAMES, type VehicleEntities } from './vehicles.ts'
 
 /** Every record a device keeps, by the name the change feed gives it, gathered from each module. */
 export interface Entities
@@ -40,7 +41,8 @@ export interface Entities
     CountEntities,
     AttachmentEntities,
     QuoteEntities,
-    OwnCalendarEntities {}
+    OwnCalendarEntities,
+    VehicleEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -63,4 +65,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...ATTACHMENT_ENTITY_NAMES,
   ...QUOTE_ENTITY_NAMES,
   ...OWN_CALENDAR_ENTITY_NAMES,
+  ...VEHICLE_ENTITY_NAMES,
 ]

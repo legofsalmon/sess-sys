@@ -6,6 +6,8 @@ import {
   lateDayWord,
   lateLine,
   sheetMessage,
+  vanLine,
+  vehicleName,
   type CallSheet,
   type CallView,
   type JobView,
@@ -54,6 +56,11 @@ export function sheetInput(view: View, job: JobView, phase: PhaseView): SheetInp
     late: view.late.current
       .filter((l) => phase.calls.some((c) => c.id === l.callId))
       .map((l) => ({ personId: l.personId, line: l.day === today ? lateLine(l) : `${lateLine(l)} (${lateDayWord(l.day, today)})` })),
+    // The vehicles on the phase or the whole job, and who drives (ADR 0047).
+    vans: view.vehicles
+      .ofJob(job.id)
+      .filter((b) => b.phaseId === null || b.phaseId === phase.id)
+      .map((b) => ({ name: b.vehicle ? vehicleName(b.vehicle) : 'A vehicle', start: b.start, end: b.end, driver: b.driver?.name ?? null, notes: b.notes })),
   }
 }
 
@@ -299,6 +306,18 @@ function Sheet({ sheet, calls, onSend, print }: { sheet: CallSheet; calls: reado
           </article>
         ))}
       </section>
+
+      {sheet.vans && (
+        <section className={print ? '' : 'card'} aria-label="Vehicles">
+          <Heading icon="van">Vehicles</Heading>
+          <ul className="sheet-vans">
+            {sheet.vans.map((v) => (
+              <li key={`${v.name}${v.days ?? ''}`}>{vanLine(v)}</li>
+            ))}
+          </ul>
+          {!print && <p className="hint">On everyone's sheet, so the crew know who's driving. Booked on the job's page.</p>}
+        </section>
+      )}
 
       {sheet.kit && sheet.kit.length > 0 && (
         <section className={print ? '' : 'card'} aria-label="Kit">

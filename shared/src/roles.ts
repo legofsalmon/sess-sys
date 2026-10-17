@@ -112,6 +112,10 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'kit.remove': 'kit',
   // Kit read from jobs' notes (ADR 0043): kit on jobs, with the names it remembers for the next job's notes.
   'kit.fromNotes': 'kit',
+  // A vehicle on a job, and who drives it (ADR 0047): kit on a job's people, as vans go out with the kit.
+  'vehicleBooking.add': 'kit',
+  'vehicleBooking.update': 'kit',
+  'vehicleBooking.remove': 'kit',
 
   'model.create': 'stock',
   'model.update': 'stock',
@@ -135,6 +139,10 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'fault.close': 'stock',
   'inspection.record': 'stock',
   'count.record': 'stock',
+  // The vehicles themselves and their checks (ADR 0047), kept by whoever keeps the stock.
+  'vehicle.save': 'stock',
+  'vehicle.offRoad': 'stock',
+  'vehicle.archive': 'stock',
 
   'fault.report': 'fault',
 

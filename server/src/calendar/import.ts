@@ -353,6 +353,7 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     [`SELECT count(*) AS n FROM kit_notes_read r JOIN projects p ON p.id = r.project_id WHERE p.source_calendar IS NOT NULL`, 'kit read from their notes'],
     [`SELECT count(*) AS n FROM movements m JOIN projects p ON p.id = m.project_id WHERE p.source_calendar IS NOT NULL`, 'kit movements'],
     [`SELECT count(*) AS n FROM faults f JOIN projects p ON p.id = f.project_id WHERE p.source_calendar IS NOT NULL`, 'faults on jobs'],
+    [`SELECT count(*) AS n FROM vehicle_bookings b JOIN projects p ON p.id = b.project_id WHERE p.source_calendar IS NOT NULL`, 'vehicles booked'],
   ] as const
   const found: string[] = []
   for (const [sql, what] of acted) if ((await one(sql)) > 0) found.push(what)
@@ -379,6 +380,7 @@ async function importedPeopleToGo(q: Queryable): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM lieu_entries l WHERE l.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM running_late r WHERE r.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM phases ph WHERE ph.contact_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM vehicle_bookings b WHERE b.driver_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM erasures e WHERE e.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM calendar_link cl WHERE cl.state <> 'off' AND lower(trim(cl.account_email)) = lower(trim(coalesce(p.email, ''))))
       ORDER BY p.id`,

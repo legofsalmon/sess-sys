@@ -276,6 +276,7 @@ design system asks (0 to 4; a 3 is fixed or named).
 | No money anywhere | D | 2 | Fixed: Jobs › Money and each job's quote, for the office and directors ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)) |
 | Everyone signed in can do everything | D | 2 | Fixed: five roles decide what each person can change ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Home stays a view anyone can switch |
 | Everyone signed in can read everything, rates and links included | D, S | 2 | Fixed for money (Decision 0042), and for crew rates, timesheet amounts and private links (Decision 0046). Phones and certificates are still read by all staff (Decision 0034, open) |
+| Nothing knows which van is free, or who can drive it | O, W | 3 | Fixed: Stock › Vehicles, booked on the job with a driver; clashes in the planner ([Decision 0047](adr/0047-vans-and-drivers.md)). Licence categories open |
 
 ## Seeing it as each of them
 

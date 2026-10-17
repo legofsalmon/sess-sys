@@ -312,7 +312,10 @@ faults reported on site are waiting in the warehouse repair queue on return.
 ## Phase 6: Grow
 
 - Utilisation and revenue per product (what to buy, what to sell).
-- Multi-warehouse and transfers, vehicle and driver scheduling.
+- Multi-warehouse and transfers.
+- Vehicle and driver scheduling: built ([Decision 0047](adr/0047-vans-and-drivers.md)).
+  Vehicles with their checks, booked on jobs with a driver, in the
+  planner and on call sheets. Licence categories are left.
 - Client portal (view quotes, sign, pay deposit).
 - RFID, native app store builds if the PWA falls short.
 - Turn off calendar-led mode once no live projects use it.

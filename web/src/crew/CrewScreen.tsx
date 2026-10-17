@@ -44,6 +44,7 @@ import {
   type View,
 } from '@sh/shared'
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
+import { VehicleReminders } from '../stock/Vehicles.tsx'
 import { ROLE_LABELS } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
@@ -494,6 +495,8 @@ export function CrewScreen() {
       )}
 
       {page === 'people' && <CertificateReminders view={view} />}
+      {/* Vehicles' checks running out, listed beside the crew's certificates and documents (ADR 0047). */}
+      {page === 'people' && <VehicleReminders view={view} />}
 
       {page === 'people' && (
         <section className="card" aria-label="People">

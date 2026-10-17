@@ -23,6 +23,7 @@ import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
 import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
+import { vehiclesView, type VehiclesView } from './vehicles-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
 import { READS_EVERYTHING, sameReading, type Reading } from '../reading.ts'
 
@@ -144,6 +145,8 @@ export interface View {
   ownCalendars: OwnCalendarsView
   /** What this device is sent of crew rates and private links (ADR 0046), as the server last said: a screen says what's hidden. */
   reading: Reading
+  /** The company's vehicles, their checks, and each booked on jobs with a driver (ADR 0047). */
+  vehicles: VehiclesView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -433,6 +436,7 @@ export class SyncClient {
       money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
       ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
       reading: this.state.reading ?? READS_EVERYTHING,
+      vehicles: vehiclesView(entities, outbox, this.state.cursor, jobs, crew, today),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

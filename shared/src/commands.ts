@@ -18,6 +18,7 @@ import { timesheetCommandSchemas } from './timesheets.ts'
 import { attachmentCommandSchemas } from './attachments.ts'
 import { quoteCommandSchemas } from './quotes.ts'
 import { ownCalendarCommandSchemas } from './own-calendar.ts'
+import { vehicleCommandSchemas } from './vehicles.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -48,6 +49,7 @@ export const commandSchemas = {
   ...attachmentCommandSchemas,
   ...quoteCommandSchemas,
   ...ownCalendarCommandSchemas,
+  ...vehicleCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

@@ -62,7 +62,13 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * - kit lists in jobs' notes (ADR 0043): the wedding's job sheet with lines
  *   that match by name, by model and not at all, and crew and a van under
  *   transport; the arts week's Show with a line that's only a guess; and
- *   the gala's, which all match, ready to add with the others.
+ *   the gala's, which all match, ready to add with the others;
+ * - vans and drivers (ADR 0047): a van whose motor tax runs out soon and
+ *   whose service is overdue, booked on the festival's load in, a van run
+ *   to collect stage decks, and both the festival's load out and the
+ *   summit's last day (a clash in the planner, booked anyway); and a Luton
+ *   in for a new clutch until the launch, with a driver whose licence isn't
+ *   known. Their registrations are in a county code no real one has (XX).
  */
 /** Where a store is set up, Róisín has sent her renewed Safe Pass card from her link, waiting for the office to check (ADR 0029). */
 export const MADE_UP_RENEWAL = { name: 'Róisín Farrell', kind: 'safe-pass', days: 377 } as const
@@ -456,5 +462,40 @@ export function madeUpData(today: string): Mutation[] {
   add('quote.answer', { id: harbourTwo, answer: 'accepted', on: day(-12) })
   const artsQuote = quote(arts, [line('kit', 'Robe Spiider', 'Lighting', 16, 3, 55), line('kit', 'Stage deck 2 × 1 m', 'Staging', 20, 3, 15)])
   add('quote.sent', { id: artsQuote, on: day(-3) })
+
+  // Vans and drivers (ADR 0047).
+  const check = (expires: number | null) => ({ needed: true, expires: expires === null ? null : day(expires) })
+  const not = { needed: false, expires: null }
+  const bigVan = add('vehicle.save', {
+    id: newId(),
+    name: 'Big Van',
+    registration: '241-XX-101',
+    kind: 'van',
+    seats: 3,
+    payloadKg: 1200,
+    notes: 'Roof rack for truss. Fuel card in the glovebox.',
+    checks: { test: check(200), tax: check(9), insurance: check(150), service: check(-3), tacho: not },
+  }).id
+  const luton = add('vehicle.save', {
+    id: newId(),
+    name: 'The Luton',
+    registration: '232-XX-202',
+    kind: 'luton',
+    seats: 3,
+    payloadKg: 1000,
+    notes: 'Tail lift: 500 kg at most.',
+    checks: { test: check(25), tax: check(100), insurance: check(150), service: check(60), tacho: not },
+  }).id
+  add('vehicle.offRoad', { id: luton, out: { since: day(-1), until: day(4), note: 'In for a new clutch' } })
+  const errand = add('project.create', { id: newId(), name: 'Collect stage decks from Murt', clientId: null, venueId: null, status: 'confirmed', kind: 'errand', notes: '20 decks and legs, ready from 10:00.' }).id
+  const errandDay = phase(errand, 'Errand', 1, 1)
+  const book = (vehicleId: string, p: { id: string; projectId: string; start: string; end: string }, driverId: string | null, notes = '', override = false) =>
+    add('vehicleBooking.add', { id: newId(), vehicleId, projectId: p.projectId, phaseId: p.id, start: p.start, end: p.end, driverId, notes, override })
+  book(bigVan, errandDay, cian, 'Ring Murt before leaving.')
+  book(bigVan, harbourIn, cian)
+  book(bigVan, harbourOut, cian)
+  // The summit wants it on its last day too, the same day as the festival's load out: booked anyway, a clash to sort out.
+  book(bigVan, summitShow, null, '', true)
+  book(luton, launchShow, dara, 'Back to the warehouse the same night.')
   return out
 }
