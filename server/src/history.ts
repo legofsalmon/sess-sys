@@ -33,6 +33,7 @@ import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUM
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
 import { OWN_CALENDAR_ACTIONS } from '@sh/shared'
+import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -249,6 +250,9 @@ const REFERENCES = [
   'contactId',
   'by',
   'offerId',
+  // Vans and drivers (ADR 0047).
+  'vehicleId',
+  'driverId',
 ] as const
 
 /**
@@ -348,6 +352,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
   const department = (d: unknown) => (typeof d === 'string' && d in DEPARTMENT_LABELS ? DEPARTMENT_LABELS[d as Department] : 'another department')
   const numberGiven = (typed: unknown) => (typeof typed === 'string' && normaliseNumber(typed)) || text(left?.number, 'a number')
   const phaseName = (id: unknown) => text(look('phase', id)?.name, 'a phase')
+  const vehicle = (id: unknown) => text(look('vehicle', id)?.name, 'a vehicle')
   /** ", 2 subhired from PRG". */
   const subhired = (n: unknown, from: unknown) =>
     typeof n === 'number' && n > 0 ? `, ${n} subhired${typeof from === 'string' && from.trim() ? ` from ${clip(from.trim())}` : ''}` : ''
@@ -801,6 +806,38 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'cost.paid': {
       const o = offer(a.id)
       return a.on === null ? `Took back the payment of ${o.who}'s timesheet for ${o.what}` : `Marked ${o.who}'s timesheet for ${o.what} paid on ${typeof a.on === 'string' ? dayLabel(a.on) : 'a day'}`
+    }
+    // Vans and drivers (ADR 0047).
+    case 'vehicle.save': {
+      const kind = typeof a.kind === 'string' && a.kind in VEHICLE_KIND_LABELS ? VEHICLE_KIND_LABELS[a.kind as VehicleKind].toLowerCase() : 'vehicle'
+      const reg = typeof a.registration === 'string' && a.registration.trim() ? ` (${a.registration.trim().toUpperCase()})` : ''
+      return `Saved the ${kind} ${text(a.name, 'a vehicle')}${reg}, with its checks`
+    }
+    case 'vehicle.offRoad': {
+      const out = a.out as Data | null | undefined
+      if (!out) return `Put ${vehicle(a.id)} back on the road`
+      const note = typeof out.note === 'string' && out.note.trim() ? `: ${clip(out.note.trim())}` : ''
+      return `Took ${vehicle(a.id)} off the road${typeof out.since === 'string' ? ` from ${dayLabel(out.since)}` : ''}${typeof out.until === 'string' ? ` until ${dayLabel(out.until)}` : ''}${note}`
+    }
+    case 'vehicle.archive':
+      return a.archived ? `Retired ${vehicle(a.id)}` : `Brought back ${vehicle(a.id)}`
+    case 'vehicleBooking.add': {
+      const driver = a.driverId ? `, ${person(a.driverId)} driving` : ', no driver yet'
+      return `Booked ${vehicle(a.vehicleId)} for ${job(a.projectId)} (${a.phaseId ? phaseName(a.phaseId) : 'whole job'}), ${dates(a.start, a.end)}${driver}${a.override ? ', though it clashed' : ''}`
+    }
+    case 'vehicleBooking.update': {
+      const b = look('vehicleBooking', a.id)
+      const parts: string[] = []
+      if (a.vehicleId !== undefined) parts.push(`vehicle to ${vehicle(a.vehicleId)}`)
+      if (a.phaseId !== undefined) parts.push(a.phaseId ? `for ${phaseName(a.phaseId)}` : 'for the whole job')
+      if (a.start !== undefined || a.end !== undefined) parts.push(`days to ${dates(a.start ?? b?.start, a.end ?? b?.end)}`)
+      if (a.driverId !== undefined) parts.push(a.driverId ? `${person(a.driverId)} driving` : 'no driver')
+      if (a.notes !== undefined) parts.push('the note')
+      return `Changed ${vehicle(a.vehicleId ?? b?.vehicleId)} on ${job(b?.projectId)}: ${inWords(parts)}${a.override ? ', though it clashed' : ''}`
+    }
+    case 'vehicleBooking.remove': {
+      const b = look('vehicleBooking', a.id)
+      return b ? `Took ${vehicle(b.vehicleId)} off ${job(b.projectId)}` : 'Took a vehicle off a job'
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

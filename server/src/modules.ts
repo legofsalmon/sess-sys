@@ -11,6 +11,7 @@ import { OFFICE } from './office/schema.ts'
 import { PROJECTS } from './projects/schema.ts'
 import { CORE } from './schema.ts'
 import { STOCK } from './stock/schema.ts'
+import { VEHICLES } from './vehicles/schema.ts'
 
 /**
  * Every module's tables, in the order they are set up: crew calls refer to
@@ -18,10 +19,11 @@ import { STOCK } from './stock/schema.ts'
  * The warehouse comes after: kit on jobs (ADR 0014) refers to jobs and their phases.
  * Leave (ADR 0024) refers to people. The office's settings refer to nothing,
  * so they come after. People's documents (ADR 0029) refer to people. Money
- * (ADR 0042) refers to jobs, clients, products and timesheets. The
+ * (ADR 0042) refers to jobs, clients, products and timesheets. Vehicles
+ * (ADR 0047) are booked on jobs and phases with a driver from the people. The
  * list of erasures (ADR 0027) refers to nothing, on purpose, and comes last.
  */
-export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, FINANCE, ERASURE]
+export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, FINANCE, VEHICLES, ERASURE]
 
 /** Set up or upgrade the whole database. */
 export async function migrateAll(db: Db) {

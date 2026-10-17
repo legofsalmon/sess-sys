@@ -6,6 +6,8 @@ import type { CallView, CrewView, PersonView } from './crew-view.ts'
 import type { JobsView } from './jobs-view.ts'
 import type { LateView } from './late-view.ts'
 import type { OwnCalendarsView } from './own-calendar-view.ts'
+import { checkOf, checkWords, ROAD_CHECKS } from '../vehicles.ts'
+import type { VehicleView, VehiclesView } from './vehicles-view.ts'
 
 /**
  * The planner (ADR 0010): a week or a month laid out by job and by person,
@@ -66,6 +68,8 @@ export interface JobCell {
   stray: boolean
   /** Who said they're running late that day (ADR 0028): "Gráinne: about 30 minutes late". Only there when someone did. */
   late?: string[]
+  /** The vehicles booked on it that day (ADR 0047), with who drives: "Big Van (Cian)". Only there when there are some. */
+  vans?: string[]
 }
 
 export interface JobLane {
@@ -131,6 +135,43 @@ export interface PlanProblem {
   jobId: string | null
 }
 
+/** One booking of a vehicle on one day (ADR 0047). */
+export interface VanWork {
+  bookingId: string
+  jobId: string
+  job: string
+  /** The phase's name, or empty for the whole job. */
+  phase: string
+  /** Who drives, by the name they go by; null while nobody is chosen. */
+  driver: string | null
+  /** On a confirmed job; otherwise pencilled in. */
+  held: boolean
+}
+
+/** One day of a vehicle's row. */
+export interface VanCell {
+  work: VanWork[]
+  /** Off the road that day: why, empty if not said; null when it's on the road. */
+  offRoad: string | null
+  problem: string | null
+  /** A clash is two jobs going ahead on it, or one while it's off the road or a road check has run out; a check is the same with a job pencilled in. */
+  severity: Severity | null
+}
+
+export interface VanLane {
+  vehicle: VehicleView
+  /** Only the days with something on. */
+  days: Record<string, VanCell>
+}
+
+export interface VanProblem {
+  vehicle: VehicleView
+  day: string
+  text: string
+  severity: Severity
+  jobId: string | null
+}
+
 export interface Plan {
   days: string[]
   /** Rows by job, in the order their first day comes. */
@@ -143,9 +184,13 @@ export interface Plan {
   short: number
   /** The public holidays among the days, by day (ADR 0024): shown as a band, never counted as leave. */
   holidays: Record<string, string>
+  /** A row for every vehicle not retired, by name (ADR 0047). */
+  vans: VanLane[]
+  /** Vehicles' clashes first, then checks, each by day. */
+  vanProblems: VanProblem[]
 }
 
-export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ownCalendars?: OwnCalendarsView }, days: readonly string[]): Plan {
+export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ownCalendars?: OwnCalendarsView; vehicles?: VehiclesView }, days: readonly string[], today?: string): Plan {
   const range = new Set(days)
   const calls = view.crew.calls.filter((c) => c.status === 'open')
   /** What a booking's person said about being late on a day, in the line the office reads. */
@@ -279,7 +324,69 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ow
   let short = 0
   for (const lane of jobs) for (const x of Object.values(lane.days)) if (x.booked < x.needed) short++
 
-  return { days: [...days], jobs, people, problems, short, holidays: publicHolidaysAmong(days) }
+  const { vans, vanProblems } = vansOn(view.vehicles, days, lanes, today)
+
+  return { days: [...days], jobs, people, problems, short, holidays: publicHolidaysAmong(days), vans, vanProblems }
+}
+
+/**
+ * Each vehicle's days (ADR 0047), the way a person's are: where it's
+ * booked, whether it's off the road, and a clash when two jobs going ahead
+ * have it on one day, or one has it on a day it's off the road or a road
+ * check has run out. With a job only pencilled in, it's a check. Two
+ * pencilled in on one day are normal while jobs are being decided, as two
+ * open offers are. Each job's day says which vehicles it has.
+ */
+function vansOn(vehicles: VehiclesView | undefined, days: readonly string[], jobs: ReadonlyMap<string, JobLane>, today = ''): { vans: VanLane[]; vanProblems: VanProblem[] } {
+  if (!vehicles) return { vans: [], vanProblems: [] }
+  const range = new Set(days)
+  const vans = vehicles.vehicles.map((vehicle): VanLane => ({ vehicle, days: {} }))
+  const at = (lane: VanLane, day: string) => (lane.days[day] ??= { work: [], offRoad: null, problem: null, severity: null })
+  for (const lane of vans) {
+    const v = lane.vehicle
+    for (const b of v.bookings) {
+      for (const d of b.days) {
+        if (!range.has(d)) continue
+        const driver = b.driver ? firstName(b.driver) : null
+        at(lane, d).work.push({ bookingId: b.id, jobId: b.projectId, job: b.job?.name ?? 'A job', phase: b.phase?.name ?? '', driver, held: b.hold === 'held' })
+        const cell = jobs.get(b.projectId)?.days[d]
+        if (cell) (cell.vans ??= []).push(`${v.name}${driver ? ` (${driver})` : ''}`)
+      }
+    }
+    const o = v.outOfService
+    if (o) for (const d of days) if (d >= o.since && (o.until === null || d <= o.until) && d >= today) at(lane, d).offRoad = o.note.trim()
+  }
+
+  const vanProblems: VanProblem[] = []
+  for (const lane of vans) {
+    const v = lane.vehicle
+    for (const [day, x] of Object.entries(lane.days)) {
+      const held = x.work.filter((w) => w.held)
+      const pencilled = x.work.filter((w) => !w.held)
+      const why = x.offRoad ? ` (${x.offRoad})` : ''
+      // Days gone by aren't held against a check, as for a booking.
+      const ranOut = day >= today ? ROAD_CHECKS.filter((k) => checkOf(v, k).needed && (checkOf(v, k).expires ?? '9999') < day) : []
+      const lapsed = ranOut.length ? `its ${list(ranOut.map((k) => checkWords(k, v.kind)))} ${ranOut.length === 1 ? 'has' : 'have'} run out` : ''
+      if (held.length > 1) {
+        const names = unique(held.map((w) => w.job))
+        x.severity = 'clash'
+        x.problem = names.length === 1 ? `On ${names[0]} twice` : `On ${list(names)}`
+      } else if (held.length === 1 && (x.offRoad !== null || lapsed)) {
+        x.severity = 'clash'
+        x.problem = `On ${held[0]!.job} but ${x.offRoad !== null ? `off the road${why}` : lapsed}`
+      } else if (pencilled.length && (held.length || x.offRoad !== null || lapsed)) {
+        x.severity = 'check'
+        x.problem = `Pencilled in for ${list(unique(pencilled.map((w) => w.job)))} ${held.length ? `while on ${held[0]!.job}` : x.offRoad !== null ? `but off the road${why}` : `but ${lapsed}`}`
+      }
+      if (x.problem && x.severity)
+        vanProblems.push({ vehicle: v, day, text: x.problem, severity: x.severity, jobId: (x.severity === 'check' ? pencilled[0] : held[0])?.jobId ?? null })
+    }
+  }
+  vanProblems.sort(
+    (a, b) =>
+      (a.severity === b.severity ? 0 : a.severity === 'clash' ? -1 : 1) || a.day.localeCompare(b.day) || a.vehicle.name.localeCompare(b.vehicle.name) || a.vehicle.id.localeCompare(b.vehicle.id)
+  )
+  return { vans, vanProblems }
 }
 
 function unique(names: string[]): string[] {

@@ -4,6 +4,7 @@ import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { kitOnPhase } from '../stock/kit.ts'
 import { getClient, getPhase, getProject, getVenue, namesForCall } from './store.ts'
+import { vehiclesOnPhase } from '../vehicles/store.ts'
 
 /**
  * The job rules the server keeps, whichever device a change comes from
@@ -175,6 +176,12 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
       throw new Refused({
         code: 'conflict',
         message: `${phase.name} still has kit: ${kit.join(', ')}. Put ${kit.length === 1 ? 'it' : 'them'} on the whole job or take ${kit.length === 1 ? 'it' : 'them'} off first.`,
+      })
+    const vans = await vehiclesOnPhase(ctx.tx, a.id)
+    if (vans.length)
+      throw new Refused({
+        code: 'conflict',
+        message: `${phase.name} still has ${vans.length === 1 ? 'a vehicle' : 'vehicles'}: ${vans.join(', ')}. Put ${vans.length === 1 ? 'it' : 'them'} on the whole job or take ${vans.length === 1 ? 'it' : 'them'} off first.`,
       })
     // Its cancelled calls stay with the job, without the phase.
     const { rows: kept } = await ctx.tx.query<{ id: string }>('UPDATE crew_calls SET phase_id = NULL WHERE phase_id = $1 RETURNING id', [a.id])

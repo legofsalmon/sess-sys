@@ -240,6 +240,10 @@ const ABOUT: Record<string, string> = {
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
+  // Vans and drivers (ADR 0047).
+  vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',
+  vehicles:
+    "The company's vehicles: name, registration, kind, seats, payload in kg, notes, each check (NCT or CVRT, motor tax, insurance, service, tachograph) with whether it's needed and the day it runs out, and when one is off the road and why.",
   venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',
 }
 
