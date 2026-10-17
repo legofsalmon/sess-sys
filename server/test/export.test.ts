@@ -96,7 +96,7 @@ describe('download everything', () => {
     expect(res.headers['content-disposition']).toBe(`attachment; filename="session-hire-${irishTime(new Date()).slice(0, 10)}.zip"`)
     expect(res.headers['cache-control']).toBe('no-store')
 
-    // Every table, running_late (ADR 0028), erasures (ADR 0027), documents (ADR 0029) and counts (ADR 0030) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
+    // Every table, running_late (ADR 0028), erasures (ADR 0027), documents (ADR 0029), counts (ADR 0030) and money's (ADR 0042) among them; the sync test's products, bookings, scans and issues went with it (ADR 0001).
     const tables = [
       'assets',
       'attachments',
@@ -106,7 +106,9 @@ describe('download everything', () => {
       'calendar_imports',
       'calendar_link',
       'changes',
+      'client_discounts',
       'clients',
+      'cost_payments',
       'counts',
       'crew_calls',
       'document_files_to_delete',
@@ -128,7 +130,10 @@ describe('download everything', () => {
       'people',
       'phases',
       'places',
+      'product_prices',
       'projects',
+      'quotes',
+      'role_prices',
       'running_late',
       'settings',
       'stock',

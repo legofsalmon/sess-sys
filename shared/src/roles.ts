@@ -5,7 +5,9 @@ import type { CommandName } from './commands.ts'
  * docs/personas.md, less the freelancer, who has a private link and no
  * account: a role says what a signed-in member of staff can change, on the
  * server, where it counts, and on the device, so a button that can't work
- * isn't offered. Everyone signed in still reads everything.
+ * isn't offered. Everyone signed in still reads everything, but money:
+ * prices, quotes and what's owed reach only the roles that can see them
+ * (ADR 0042).
  *
  * A role belongs to a staff person on the Crew tab, found by the email
  * their Google account signs in with, as leave already finds "me" (ADR
@@ -28,14 +30,14 @@ export const ROLE_LABELS: Record<Role, string> = {
 /** What each role is for, in a line, where a role is chosen. */
 export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',
-  office: 'Jobs, crew, kit and stock, and the settings: calendar, office details, bringing lists in, downloads.',
+  office: 'Jobs, crew, kit and stock, money, and the settings: calendar, office details, bringing lists in, downloads.',
   head: 'Crew and their bookings, kit on jobs, stock and the warehouse. Not jobs themselves, nor settings.',
   warehouse: 'Stock and the warehouse, and kit on jobs. Not jobs, crew or settings.',
   crew: 'Their own leave and days in lieu, and reporting a fault. Everything else they can look at.',
 }
 
 /** The kinds of change a role can make. Each command needs exactly one. */
-export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'settings', 'company'] as const
+export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'money', 'settings', 'company'] as const
 export type Ability = (typeof ABILITIES)[number]
 
 /** Each kind of change, as "Only … can ___". */
@@ -46,6 +48,7 @@ const ABILITY_WORDS: Record<Ability, string> = {
   stock: 'change stock and the warehouse',
   fault: 'report a fault',
   leave: 'ask for leave',
+  money: 'see and change prices, quotes and what is owed',
   settings: 'change settings, bring lists in or download everything',
   company: 'change roles, erase a person or start fresh',
 }
@@ -53,7 +56,7 @@ const ABILITY_WORDS: Record<Ability, string> = {
 /** What each role can change. A director can change everything. */
 export const ROLE_CAN: Record<Role, readonly Ability[]> = {
   director: ABILITIES,
-  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'settings'],
+  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'money', 'settings'],
   head: ['crew', 'kit', 'stock', 'fault', 'leave'],
   warehouse: ['kit', 'stock', 'fault', 'leave'],
   crew: ['fault', 'leave'],
@@ -138,6 +141,17 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'lieu.cancel': 'leave',
   'lieu.decide': 'leave',
 
+  // Money (ADR 0042): prices, quotes and what's owed are the office's and the directors'. A role without it isn't sent them either.
+  'quote.save': 'money',
+  'quote.sent': 'money',
+  'quote.answer': 'money',
+  'quote.invoiced': 'money',
+  'quote.paid': 'money',
+  'price.product': 'money',
+  'price.role': 'money',
+  'price.client': 'money',
+  'cost.paid': 'money',
+
   'office.update': 'settings',
 
   'person.role': 'company',
@@ -145,6 +159,9 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
 }
 
 export const roleCan = (role: Role, ability: Ability) => ROLE_CAN[role].includes(ability)
+
+/** Whether a role sees money at all (ADR 0042): without it, its devices are sent no prices or quotes. None is held to nothing. */
+export const roleSeesMoney = (role: Role | null | undefined) => !role || roleCan(role, 'money')
 export const roleMayRun = (role: Role, name: CommandName) => {
   const needs = COMMAND_NEEDS[name]
   return needs !== undefined && roleCan(role, needs)

@@ -28,7 +28,9 @@ import { Beside, Choices, clientNamed, JobStatusPill, Top, useHash, venueNamed }
 import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
+import { MoneyScreen, PricesScreen } from './Money.tsx'
 import { PickScreen } from './PickScreen.tsx'
+import { QuoteScreen } from './Quote.tsx'
 import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 import { ClientScreen } from './ClientScreen.tsx'
@@ -43,7 +45,8 @@ import { JOBS } from '../Up.tsx'
  * sheet on another (#jobs/<id>/sheet/<phase>, ADR 0021), the
  * planner (#jobs/plan, ADR 0010) shows them by week or month, the clients
  * and venues have a list each (#jobs/clients, #jobs/venues, ADR 0041) and
- * a page each with its documents (#jobs/venues/<id>, ADR 0032), and jobs
+ * a page each with its documents (#jobs/venues/<id>, ADR 0032), each job's
+ * quote is on #jobs/<id>/quote and money on #jobs/money (ADR 0042), and jobs
  * already on Google Calendar can be brought in (#jobs/import, ADR 0011).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -68,8 +71,12 @@ export function JobsScreen() {
   if (hash === '#jobs/import') return <ImportScreen view={view} />
   if (hash === '#jobs/clients') return <ClientsScreen view={view} />
   if (hash === '#jobs/venues') return <VenuesScreen view={view} />
+  if (hash === '#jobs/money') return <MoneyScreen view={view} />
+  if (hash === '#jobs/money/prices') return <PricesScreen view={view} />
   if (hash.startsWith('#jobs/venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#jobs/venues/'.length))} />
   if (hash.startsWith('#jobs/clients/')) return <ClientScreen view={view} id={decodeURIComponent(hash.slice('#jobs/clients/'.length))} />
+  const [, quote] = /^#jobs\/([^/]+)\/quote$/.exec(hash) ?? []
+  if (quote) return <QuoteScreen view={view} jobId={decodeURIComponent(quote)} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
   if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []

@@ -20,6 +20,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { personHref } from '../crew/PersonScreen.tsx'
+import { useAccess } from '../role.ts'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
@@ -56,8 +57,10 @@ const daysOf = (scale: Scale, day: string) => (scale === 'week' ? weekOf(day) : 
  * then the clients and the venues they're for. From the planner, the other
  * scale opens on the same days.
  */
-export function JobViews({ place, current }: { place?: Place; current?: 'clients' | 'venues' }) {
+export function JobViews({ place, current }: { place?: Place; current?: 'clients' | 'venues' | 'money' }) {
   const now = useToday()
+  // Money is the office's and directors' (ADR 0042): a role that isn't sent it has no page for it.
+  const money = useAccess().can('money')
   const days = place && daysOf(place.scale, place.day)
   const day = days && !days.includes(now) ? days[0]! : now
   const rows = place?.rows ?? 'jobs'
@@ -71,6 +74,7 @@ export function JobViews({ place, current }: { place?: Place; current?: 'clients
         { key: 'month', href: hashOf({ scale: 'month', day, rows }), label: 'Month' },
         { key: 'clients', href: '#jobs/clients', label: 'Clients' },
         { key: 'venues', href: '#jobs/venues', label: 'Venues' },
+        ...(money ? [{ key: 'money', href: '#jobs/money', label: 'Money' }] : []),
       ]}
     />
   )

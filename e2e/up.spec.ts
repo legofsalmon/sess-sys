@@ -102,7 +102,7 @@ test('every area names its pages in a row, and the old addresses land on the new
   await page.goto('/#jobs')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   const jobs = page.getByRole('navigation', { name: 'Jobs pages' })
-  await expect(jobs.getByRole('link')).toHaveText(['List', 'Week', 'Month', 'Clients', 'Venues'])
+  await expect(jobs.getByRole('link')).toHaveText(['List', 'Week', 'Month', 'Clients', 'Venues', 'Money'])
   await jobs.getByRole('link', { name: 'Venues' }).click()
   await expect(page).toHaveURL(/#jobs\/venues$/)
   await expect(jobs.getByRole('link', { name: 'Venues' })).toHaveAttribute('aria-current', 'page')

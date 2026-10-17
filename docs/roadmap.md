@@ -249,6 +249,13 @@ calendar invite is a courtesy rather than the record.
 
 ## Phase 4: Light finance
 
+**Status: started** ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)).
+Built: the price list, quotes with versions as an A4 PDF, the client's
+answer, invoice and payment recorded, freelancer costs and margin, the
+money view and the accountant's files. Nothing is sent from the app.
+Still to come: invoices made in the app, deposits and credit notes,
+overdue invoices, accepting online, and Excel files with the PDFs.
+
 - Price lists, rate rules, client discounts.
 - Quotes with versions and PDF output; accept online.
 - Invoices, deposits and credit notes in EUR with Irish VAT.

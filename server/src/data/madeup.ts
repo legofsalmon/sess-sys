@@ -53,7 +53,10 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *   Riverside Park and Brightwater Conferences, to example.com, so their
  *   pages have something to open;
  * - counts (ADR 0030): three places counted, one with a speaker not found
- *   and a count short, and one never counted, first on the week's list.
+ *   and a count short, and one never counted, first on the week's list;
+ * - money (ADR 0042): a price list for kit and crew, a client's discount,
+ *   and quotes sent, replaced, accepted and invoiced, with the gala's still
+ *   owed and a freelancer still to pay.
  */
 /** Where a store is set up, Róisín has sent her renewed Safe Pass card from her link, waiting for the office to check (ADR 0029). */
 export const MADE_UP_RENEWAL = { name: 'Róisín Farrell', kind: 'safe-pass', days: 377 } as const
@@ -399,5 +402,33 @@ export function madeUpData(today: string): Mutation[] {
     [[y10p, 4, 3]],
     { expected: 10, found: 9, ...none, notFound: 1, short: 1 }
   )
+
+  // Money (ADR 0042): a price list, Brightwater's usual discount, and quotes at each stage. The gala's was accepted and
+  // invoiced and is still owed, with Tadhg's approved timesheet still to pay; Harbour Lights went to a second version,
+  // which was accepted; Corrib Arts Week's is with the client.
+  for (const [modelId, euro] of [[y10p, 45], [d20, 60], [rack, 20], [sm58, 8], [xlr, 3], [spiider, 55], [powercon, 2.5], [deck, 15], [led, 35]] as const)
+    add('price.product', { modelId, dayCents: euro * 100 })
+  for (const [role, euro] of [['Rigger', 380], ['Stagehand', 260], ['Sound No.1', 420], ['LX op', 360]] as const) add('price.role', { role, dayCents: euro * 100 })
+  add('price.client', { clientId: brightwater, pct: 10 })
+  const line = (kind: 'kit' | 'crew' | 'other', what: string, group: string, qty: number, days: number, euro: number) =>
+    ({ id: newId(), kind, what, ref: null, group, qty, days, unitCents: euro * 100, vat: '23' as const })
+  const quote = (projectId: string, lines: ReturnType<typeof line>[], discountPct = 0, notes = '') => add('quote.save', { id: newId(), projectId, lines, discountPct, notes }).id
+  const galaQuote = quote(
+    gala,
+    [line('kit', 'd&b Y10P', 'Audio', 8, 2, 45), line('crew', 'Sound No.1 (Show)', 'Crew', 1, 2, 420), line('crew', 'Stagehand (Show)', 'Crew', 2, 2, 260), line('other', 'Delivery and collection', 'Other', 1, 1, 150)],
+    10,
+    'Prices held for 30 days.'
+  )
+  add('quote.sent', { id: galaQuote, on: day(-30) })
+  add('quote.answer', { id: galaQuote, answer: 'accepted', on: day(-25) })
+  add('quote.invoiced', { id: galaQuote, on: day(-8), ref: 'SH-1042' })
+  const harbourKit = [line('kit', 'd&b Y10P', 'Audio', 12, 5, 45), line('kit', 'd&b D20', 'Audio', 4, 5, 60), line('kit', 'Robe Spiider', 'Lighting', 8, 5, 55)]
+  const harbourOne = quote(harbour, [...harbourKit, line('crew', 'Rigger (Load in)', 'Crew', 2, 2, 380)])
+  add('quote.sent', { id: harbourOne, on: day(-20) })
+  const harbourTwo = quote(harbour, [...harbourKit.map((l) => ({ ...l, id: newId(), days: 3 })), line('crew', 'Rigger (Load in)', 'Crew', 2, 2, 380), line('crew', 'LX op (Show)', 'Crew', 1, 2, 360)], 0, 'Kit for five days, charged as three.')
+  add('quote.sent', { id: harbourTwo, on: day(-14) })
+  add('quote.answer', { id: harbourTwo, answer: 'accepted', on: day(-12) })
+  const artsQuote = quote(arts, [line('kit', 'Robe Spiider', 'Lighting', 16, 3, 55), line('kit', 'Stage deck 2 × 1 m', 'Staging', 20, 3, 15)])
+  add('quote.sent', { id: artsQuote, on: day(-3) })
   return out
 }

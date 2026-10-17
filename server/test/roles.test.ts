@@ -163,6 +163,33 @@ describe('roles', () => {
     expect((await send(app, c, 'person.role', { id: 'colly', role: 'office' })).status).toBe('applied')
   })
 
+  it('send prices and quotes only to the office and directors, and keep the cursor moving for everyone else', async () => {
+    const { app, signIn, c } = await company()
+    expect((await send(app, c, 'project.create', { id: 'gala', name: 'Autumn Gala', clientId: null, venueId: null, status: 'confirmed', notes: '' })).status).toBe('applied')
+    const lines = [{ id: 'l1', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '23' }]
+    expect((await send(app, c, 'quote.save', { id: 'q1', projectId: 'gala', lines, discountPct: 0, notes: '' })).status).toBe('applied')
+    expect((await send(app, c, 'price.role', { role: 'Rigger', dayCents: 38000 })).status).toBe('applied')
+    const all = (await app.inject({ url: '/api/sync/pull?after=0', cookies: c })).json()
+    expect(all.money).toBeUndefined()
+    expect(all.changes.map((ch: { entity: string }) => ch.entity)).toEqual(expect.arrayContaining(['quote', 'rolePrice']))
+
+    // Seán is staff crew: the rest of the job, and no money; his cursor still reaches the end.
+    const s = { sh_session: await signIn(sean) }
+    const his = (await app.inject({ url: '/api/sync/pull?after=0', cookies: s })).json()
+    expect(his).toMatchObject({ money: false, cursor: all.cursor })
+    expect(his.changes.map((ch: { entity: string }) => ch.entity)).toContain('project')
+    expect(his.changes.some((ch: { entity: string }) => ['quote', 'rolePrice', 'productPrice', 'clientDiscount', 'costPaid'].includes(ch.entity))).toBe(false)
+    const no = await send(app, s, 'price.role', { role: 'Rigger', dayCents: 1 })
+    expect(no).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
+    expect(no.reason!.message).toMatch(/^Only the office and directors can see and change prices, quotes and what is owed\./)
+
+    // Made office, he's sent it all.
+    expect((await send(app, c, 'person.role', { id: 'sean', role: 'office' })).status).toBe('applied')
+    const now = (await app.inject({ url: '/api/sync/pull?after=0', cookies: s })).json()
+    expect(now.money).toBeUndefined()
+    expect(now.changes.some((ch: { entity: string }) => ch.entity === 'quote')).toBe(true)
+  })
+
   it('give a role only to staff, and leave who approves time off to a director', async () => {
     const { app, signIn, c } = await company()
     await send(app, c, 'person.upsert', { ...staff('dara', 'Dara Kelly', null), kind: 'freelancer' })

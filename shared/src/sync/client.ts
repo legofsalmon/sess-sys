@@ -20,6 +20,8 @@ import { officeView, type OfficeView } from './office-view.ts'
 import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
+import { moneyView, type MoneyView } from './money-view.ts'
+import { MONEY_ENTITY_NAMES } from '../quotes.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -50,6 +52,12 @@ export interface Snapshot {
   sent?: SentMutation[]
   /** The server holds made-up data (ADR 0019). */
   madeUp?: boolean
+  /**
+   * False when the server leaves money out of what it sends this device
+   * (ADR 0042), for a role that can't see it; absent from copies saved
+   * before, which hold everything.
+   */
+  money?: boolean
 }
 
 export interface Storage {
@@ -119,6 +127,8 @@ export interface View {
   attachments: AttachmentsView
   /** Counts of places and cases, when each was last counted, and this week's list (ADR 0030). */
   counts: CountsView
+  /** Prices, quotes, what's owed and each job's margin (ADR 0042); empty for a role the server sends no money to. */
+  money: MoneyView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -385,6 +395,7 @@ export class SyncClient {
     let kit: KitView | undefined
     const moves = movesView(entities, outbox, this.state.cursor, jobs, warehouse, () => kit!, today, faults)
     kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults, moves.lateOut)
+    const timesheets = timesheetsView(entities, outbox, this.state.cursor, crew, today)
     return {
       problems: [...this.state.problems],
       crew,
@@ -395,7 +406,7 @@ export class SyncClient {
       moves,
       faults,
       inspections,
-      timesheets: timesheetsView(entities, outbox, this.state.cursor, crew, today),
+      timesheets,
       office: officeView(entities, outbox, this.state.cursor),
       leave: leaveView(entities, outbox, this.state.cursor, crew, today, erasures),
       late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
@@ -403,6 +414,7 @@ export class SyncClient {
       documents: documentsView(entities, outbox, this.state.cursor, crew, erasures),
       attachments: attachmentsView(entities, outbox, this.state.cursor),
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
+      money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
@@ -465,8 +477,23 @@ export class SyncClient {
       const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
       const behind = res.head !== undefined && res.head < this.state.cursor
       if (restored || behind) return this.restart(res.generation, restored && res.cleared === true)
+      // What the server sends this device's role changed (ADR 0042). Given money, the copy is read again from the start for
+      // the records it was never sent; what it has stays, as reading it again only lands it as it is. Without, it lets go of
+      // the money it holds.
+      const money = res.money !== false
+      const rescoped = money !== (this.state.money !== false)
+      if (rescoped) {
+        this.state.money = money
+        if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
+        else if (this.state.cursor > 0) {
+          this.state.cursor = 0
+          this.version++
+          await this.persist()
+          continue
+        }
+      }
       // Nothing new, most of the time: then nothing is saved and nobody is told.
-      let changed = res.changes.length > 0
+      let changed = res.changes.length > 0 || rescoped
       if (res.generation && res.generation !== this.state.generation) [this.state.generation, changed] = [res.generation, true]
       // Copies saved before made-up data existed have no flag, which means no.
       if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]

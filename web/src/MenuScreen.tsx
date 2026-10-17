@@ -7,9 +7,10 @@ import { Icon, type IconName } from './Icon.tsx'
 /**
  * The Menu (#menu, ADR 0035): every place in the app by name, grouped as
  * the work is, so the bar keeps only the places used all day and the rest
- * is one tap behind it. Everyone reads everything (ADR 0034), so a place
- * is left out only when it is for changing things the person's role can't:
- * `needs` names the kinds of change, checked as the screens check theirs.
+ * is one tap behind it. Everyone reads everything (ADR 0034) but money
+ * (ADR 0042), so a place is left out only when it is for changing things
+ * the person's role can't, or for money: `needs` names the kinds of change,
+ * checked as the screens check theirs.
  */
 
 export interface Place {
@@ -62,6 +63,14 @@ export const MENU: PlaceGroup[] = [
         href: '#jobs/venues',
         label: 'Venues',
         about: 'Where the jobs are, their specs and documents',
+      },
+      {
+        key: 'money',
+        icon: 'document',
+        href: '#jobs/money',
+        label: 'Money',
+        about: "Quotes, what's owed, and files for the accountant",
+        needs: ['money'],
       },
       {
         key: 'import',
