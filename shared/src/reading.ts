@@ -71,8 +71,7 @@ export function personAsRead(p: Person, r: Reading): Person {
   if (readsEverything(r) || p.id === r.personId) return p
   const out: Person = { ...p }
   if (!r.rates) Object.assign(out, { dayRateCents: null, rateHidden: true })
-  const link = r.links === 'all' || (r.links === 'department' && sameDepartment(p.department, r.department))
-  if (!link) Object.assign(out, { linkToken: '', linkHidden: true })
+  if (!readsLinkOf(r, p)) Object.assign(out, { linkToken: '', linkHidden: true })
   return out
 }
 
@@ -115,6 +114,24 @@ export function setsRates(name: CommandName, args: unknown): boolean {
       return false
   }
 }
+
+/**
+ * The person whose private link a change makes anew, so it's for someone
+ * who reads that link (ADR 0046): a new link stops the old one, and one
+ * this role isn't sent couldn't be sent on. None for any other change.
+ */
+export function changesLinkOf(name: CommandName, args: unknown): string | undefined {
+  return name === 'person.newLink' ? ((args ?? {}) as { id?: string }).id : undefined
+}
+
+/** Whether this reader is sent the link of someone in this department, or it's their own. */
+export function readsLinkOf(r: Reading, person: { id: string; department?: string | null }): boolean {
+  return r.links === 'all' || person.id === r.personId || (r.links === 'department' && sameDepartment(person.department, r.department))
+}
+
+/** Why a role can't make a new link for someone whose link it isn't sent, and who can. */
+export const LINKS_REFUSAL =
+  "Only the office and directors see every freelancer's private link, and a head of department those of people in their own department, so a new link for this person is theirs to make and send."
 
 /** Why a role that doesn't read rates can't set one, and who can. */
 export const RATES_REFUSAL =

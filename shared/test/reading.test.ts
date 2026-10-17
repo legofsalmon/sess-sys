@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Mutation } from '../src/commands.ts'
 import { departmentForRole, departmentOf, departmentOfPeople, type CrewCall, type Offer, type Person } from '../src/crew.ts'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { callAsRead, offerAsRead, personAsRead, READS_EVERYTHING, readingFor, readsEverything, sameReading, setsRates, timesheetAsRead, type Reading } from '../src/reading.ts'
+import { callAsRead, changesLinkOf, offerAsRead, readsLinkOf, personAsRead, READS_EVERYTHING, readingFor, readsEverything, sameReading, setsRates, timesheetAsRead, type Reading } from '../src/reading.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import type { Timesheet } from '../src/timesheets.ts'
@@ -159,6 +159,16 @@ describe('what each role reads', () => {
     expect(setsRates('call.update', { id: 'c', dayRateCents: null })).toBe(true)
     expect(setsRates('timesheet.approve', {})).toBe(true)
     expect(setsRates('call.department', { ids: ['c'], department: 'LX' })).toBe(false)
+  })
+
+  it('knows a new link from other changes, and whose link a reader is sent', () => {
+    expect(changesLinkOf('person.newLink', { id: 'p1' })).toBe('p1')
+    expect(changesLinkOf('person.archive', { id: 'p1', archived: true })).toBeUndefined()
+    expect(readsLinkOf(head, { id: 'x', department: 'AUDIO' })).toBe(true)
+    expect(readsLinkOf(head, { id: 'x', department: 'LX' })).toBe(false)
+    expect(readsLinkOf(head, { id: own, department: null })).toBe(true)
+    expect(readsLinkOf(crew, { id: 'x', department: 'Audio' })).toBe(false)
+    expect(readsLinkOf(READS_EVERYTHING, { id: 'x' })).toBe(true)
   })
 
   it('compares readings by what they leave out', () => {

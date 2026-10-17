@@ -7,6 +7,11 @@ import {
   refusalFor,
   roleMayRun,
   setsRates,
+  changesLinkOf,
+  readsLinkOf,
+  LINKS_REFUSAL,
+  type ReaderOf,
+  type Reading,
   type Role,
   type CommandArgs,
   type CommandName,
@@ -69,6 +74,15 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...ownCalendarHandlers,
 }
 
+/** Whether this reader may make a new link for the person a change names: one whose link they're sent (ADR 0046). */
+async function mayChangeLink(q: Queryable, reading: Reading, name: CommandName, args: unknown): Promise<boolean> {
+  const id = changesLinkOf(name, args)
+  if (!id || reading.links === 'all') return true
+  const { rows } = await q.query<{ department: string | null }>('SELECT department FROM people WHERE id = $1', [id])
+  // Nobody by that id: the handler says so.
+  return !rows[0] || readsLinkOf(reading, { id, department: rows[0].department })
+}
+
 /** Where a command came from, kept on it for the history (ADR 0006). */
 export interface From {
   /**
@@ -87,6 +101,8 @@ export interface From {
    * and the calendar, so nothing is checked.
    */
   role?: Role
+  /** Who the sender is, for what they read (ADR 0046): their person on the Crew tab and their department. */
+  reader?: ReaderOf
   /** When the device sent it, by the device's own clock. */
   sentAt?: string
   /** The kind of device, such as "Safari on iPhone". */
@@ -115,7 +131,8 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
 
   // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them.
-  const seesRates = !from.role || readingFor(from.role, { headsSeeRates: from.role === 'head' && (await headsSeeRates(tx)) }).rates
+  const reading = readingFor(from.role, { ...from.reader, headsSeeRates: from.role === 'head' && (await headsSeeRates(tx)) })
+  const seesRates = reading.rates
   const ctx: Ctx = {
     tx,
     mutationId: m.id,
@@ -145,6 +162,9 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   } else if (!seesRates && setsRates(m.name, parsed.data)) {
     // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: RATES_REFUSAL } }
+  } else if (!(await mayChangeLink(tx, reading, m.name, parsed.data))) {
+    // A new link for someone is for a role that reads their link (ADR 0046).
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: LINKS_REFUSAL } }
   } else {
     try {
       await tx.query('SAVEPOINT cmd')

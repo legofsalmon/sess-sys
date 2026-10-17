@@ -135,7 +135,8 @@ the crew screens for everyone.
   read their copy again at their next sync, with nothing for them to do.
 - A head of department can no longer make a new link for someone whose
   link they aren't sent: it would stop the old one with no new one to
-  send.
+  send. The server refuses it (`person.newLink`), saying who can, and the
+  device refuses it first; the button isn't offered.
 
 ## Open
 

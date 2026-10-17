@@ -385,6 +385,19 @@ describe('what each role reads', () => {
     expect((await pull(c)).of('person', 'dara')).toMatchObject({ notes: 'Has a van', dayRateCents: 25000 })
     expect((await pull(c)).of('crewCall', 'foh')).toMatchObject({ department: 'Audio' })
 
+    // Nor make a new link for someone outside her department, which would stop theirs with none to send; her department's and her own she can.
+    const niamhsLink = (await pull(c)).of('person', 'niamh').linkToken
+    const relink = await send(app, h, 'person.newLink', { id: 'niamh' })
+    expect(relink).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
+    expect(relink.reason!.message).toMatch(/^Only the office and directors see every freelancer's private link, and a head of department those of people in their own department/)
+    expect((await pull(c)).of('person', 'niamh').linkToken).toBe(niamhsLink)
+    const darasLink = (await pull(c)).of('person', 'dara').linkToken
+    expect(await send(app, h, 'person.newLink', { id: 'dara' })).toMatchObject({ status: 'applied' })
+    expect((await pull(h)).of('person', 'dara').linkToken).not.toBe(darasLink)
+    expect(await send(app, h, 'person.newLink', { id: 'aine' })).toMatchObject({ status: 'applied' })
+    // The office makes Niamh's, as ever.
+    expect(await send(app, c, 'person.newLink', { id: 'niamh' })).toMatchObject({ status: 'applied' })
+
     // Nor agree a rate someone asked for.
     await ok('call.create', callFor('build', 'Stagehand', { start: day(-3), end: day(-3), department: 'LX' }))
     await ok('offer.send', { id: 'dara-lx', callId: 'build', personId: 'dara', override: false })

@@ -1,4 +1,4 @@
-import { COMMAND_NEEDS, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
+import { changesLinkOf, COMMAND_NEEDS, LINKS_REFUSAL, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
 import { currentAuth, useAuth, type Auth } from './auth.ts'
 import { previewKey, usePreview } from './home/Preview.tsx'
 import { client } from './sync.ts'
@@ -59,6 +59,9 @@ client.guard = (name, args) => {
   const view = client.view()
   const { role } = accessOf(currentAuth(), view, previewKey())
   if (role && !roleCan(role, COMMAND_NEEDS[name])) return refusalFor(role, COMMAND_NEEDS[name])
+  // A new link is for a role that is sent the person's link (ADR 0046); the server says the same.
+  const relinked = changesLinkOf(name, args)
+  if (relinked && view.crew.people.some((p) => p.id === relinked && p.linkHidden)) return LINKS_REFUSAL
   // Crew pay is for a role that reads it (ADR 0046): setting a rate, agreeing a counter-offer or deciding a timesheet.
   if (view.reading.rates) return undefined
   const countered = name === 'offer.confirm' && view.crew.calls.some((c) => c.offers.some((o) => o.id === (args as CommandArgs<'offer.confirm'>).id && o.status === 'countered'))

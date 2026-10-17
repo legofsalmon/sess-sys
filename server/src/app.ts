@@ -266,7 +266,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       userId: req.user?.id,
       ...(req.user ? { user: { id: req.user.id, email: req.user.email } } : {}),
       // What they may change (ADR 0034); nothing is checked while roles are off.
-      ...(req.role ? { role: req.role } : {}),
+      ...(req.role ? { role: req.role, reader: req.reader ?? {} } : {}),
       sentAt,
       device: describeDevice(req.headers['user-agent']),
     }
