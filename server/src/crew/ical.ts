@@ -11,6 +11,10 @@ import { eachDay, euro, leaveLabel, type CrewCall, type LeaveRequest, type Offer
  * so nothing in it opens their private link.
  */
 
+/** How our feed names itself, and where its events' ids are from: how a freelancer's own calendar is known to hold our bookings (ADR 0044). */
+export const FEED_PRODID = '-//Session Hire//Crew//EN'
+export const FEED_UID_DOMAIN = 'crew.sessionhire.com'
+
 const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
 /** RFC 5545 lines are at most 75 octets; longer ones continue after CRLF + space. */
@@ -54,7 +58,7 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Session Hire//Crew//EN',
+    `PRODID:${FEED_PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${esc(`Session Hire: ${person.name}`)}`,
@@ -79,7 +83,7 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
         .join('\n')
       lines.push(
         'BEGIN:VEVENT',
-        `UID:${offer.id}-${i}@crew.sessionhire.com`,
+        `UID:${offer.id}-${i}@${FEED_UID_DOMAIN}`,
         `DTSTAMP:${stamp}`,
         `DTSTART;VALUE=DATE:${compact(block[0]!)}`,
         `DTEND;VALUE=DATE:${compact(nextDay(block[block.length - 1]!))}`,
@@ -96,7 +100,7 @@ export function calendarFeed(person: Person, jobs: { offer: Offer; call: CrewCal
     if (r.status !== 'approved') continue
     lines.push(
       'BEGIN:VEVENT',
-      `UID:${r.id}@crew.sessionhire.com`,
+      `UID:${r.id}@${FEED_UID_DOMAIN}`,
       `DTSTAMP:${stamp}`,
       `DTSTART;VALUE=DATE:${compact(r.start)}`,
       `DTEND;VALUE=DATE:${compact(nextDay(r.end))}`,

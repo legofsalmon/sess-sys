@@ -166,7 +166,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
             {rows === 'jobs'
               ? `Nothing on this ${scale}.`
               : p.people.length
-                ? `No one is booked, offered work or unavailable this ${scale}.`
+                ? `No one is booked, offered work, unavailable or busy this ${scale}.`
                 : 'No people yet: add them on the Crew tab.'}
           </p>
         )}
@@ -310,13 +310,15 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
       tag && `${tag}: ${cell.problem}`,
       ...cell.work.map((w) => `${w.confirmed ? 'Booked on' : w.booked ? 'To confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}${w.late ? `, ${w.late}` : ''}`),
       cell.away !== null && `Unavailable${cell.away ? ` (${cell.away})` : ''}`,
+      cell.busy !== null && `Busy in their own calendar (${cell.busy})`,
     ]
       .filter(Boolean)
       .join('. ')
     return (
       <td className={cls}>
-        <div className={`code ${first ? (first.booked ? 'booked' : 'offered') : 'away'}`} title={words}>
-          <span aria-hidden="true">{first ? initials(first.job) : 'Off'}</span>
+        {/* Busy in their own calendar and nothing else: hatched and empty, the words for a screen reader and on hover (ADR 0044). */}
+        <div className={`code ${first ? (first.booked ? 'booked' : 'offered') : cell.away !== null ? 'away' : 'busy'}`} title={words}>
+          <span aria-hidden="true">{first ? initials(first.job) : cell.away !== null ? 'Off' : ''}</span>
           <span className="sr-only">{words}</span>
         </div>
       </td>
@@ -338,6 +340,13 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
           {cell.away && <small>{cell.away}</small>}
         </div>
       )}
+      {/* Read from their own calendar (ADR 0044): shown, never a clash, since it may be something they can move. */}
+      {cell.busy !== null && (
+        <div className="item busy">
+          <b>Busy (own calendar)</b>
+          <small>{cell.busy}</small>
+        </div>
+      )}
     </td>
   )
 }
@@ -357,6 +366,7 @@ function Legend({ rows }: { rows: Rows }) {
           ['item booked', 'Booked, or to confirm'],
           ['item offered', 'Offered, no answer yet'],
           ['item away', 'Unavailable, or on leave'],
+          ['item busy', 'Busy in their own calendar: they may still say yes'],
           ['swatch clash', 'Clash: booked twice, or while unavailable'],
           ['swatch check', 'Check: would clash if they said yes'],
           ['swatch holiday', 'Public holiday'],

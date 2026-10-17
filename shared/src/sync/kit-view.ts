@@ -108,6 +108,25 @@ function patch<T extends object>(target: T, changes: object): T {
   return out
 }
 
+/**
+ * Kit read from a job's notes (ADR 0043), as the server will apply it: each
+ * line says how many of a product the job should have for exactly those
+ * days, so only what's missing is added, onto the line already there (the
+ * first, by id) or as a new one. The same notes twice change nothing.
+ */
+export function fromNotes(lines: Map<string, KitLine & { pending: boolean }>, projectId: string, wanted: CommandArgs<'kit.fromNotes'>['jobs'][number]['lines']) {
+  // Each product appears once for each phase in a change, so the job's own lines are looked at once.
+  const mine = [...lines.values()].filter((l) => l.projectId === projectId)
+  for (const w of wanted) {
+    const same = mine.filter((l) => l.phaseId === w.phaseId && l.modelId === w.modelId).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    const has = same.reduce((n, l) => n + l.qty, 0)
+    if (has >= w.qty) continue
+    const first = same[0]
+    if (first) lines.set(first.id, { ...first, qty: first.qty + w.qty - has, pending: true })
+    else if (!lines.has(w.id)) lines.set(w.id, { id: w.id, projectId, phaseId: w.phaseId, modelId: w.modelId, qty: w.qty, subhireQty: 0, supplier: '', notes: w.notes, pending: true })
+  }
+}
+
 /** Product names in order, as the Stock tab has them: one collator, not one made for every comparison. */
 const byProductName = new Intl.Collator('en-IE', { sensitivity: 'base' })
 
@@ -147,6 +166,9 @@ export function kitView(
       }
       case 'kit.remove':
         lines.delete((m.args as CommandArgs<'kit.remove'>).id)
+        break
+      case 'kit.fromNotes':
+        for (const j of (m.args as CommandArgs<'kit.fromNotes'>).jobs) fromNotes(lines, j.projectId, j.lines)
         break
     }
   }

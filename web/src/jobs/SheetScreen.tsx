@@ -25,6 +25,7 @@ import { client } from '../sync.ts'
 import { Top } from './common.tsx'
 import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
+import { ShowPackCard } from './ShowPack.tsx'
 
 /**
  * A phase's call sheet (ADR 0021), #jobs/<job>/sheet/<phase>, as the office
@@ -135,6 +136,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
 
       <Contact view={view} phase={phase} sheet={sheet} />
       <Sheet sheet={sheet} calls={phase.calls} onSend={send} />
+      <ShowPackCard view={view} job={job} phase={phase} />
       {share && (
         <SharePanel
           {...share}

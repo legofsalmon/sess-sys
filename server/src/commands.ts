@@ -24,12 +24,14 @@ import { officeHandlers } from './office/handlers.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
+import { notesKitHandlers } from './stock/notes-kit.ts'
 import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
 import { inspectionHandlers } from './stock/inspections.ts'
 import { moveHandlers } from './stock/moves.ts'
 import { countHandlers } from './stock/counts.ts'
 import { financeHandlers } from './finance/handlers.ts'
+import { ownCalendarHandlers } from './crew/own-calendars.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -46,6 +48,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...projectHandlers,
   ...stockHandlers,
   ...kitHandlers,
+  ...notesKitHandlers,
   ...labelHandlers,
   ...moveHandlers,
   ...faultHandlers,
@@ -59,6 +62,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...countHandlers,
   ...attachmentHandlers,
   ...financeHandlers,
+  ...ownCalendarHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */

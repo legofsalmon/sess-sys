@@ -14,6 +14,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { notesKitView, type NotesKitView } from './notes-kit-view.ts'
 import { lateView, type LateView } from './late-view.ts'
 import { leaveView, type LeaveView } from './leave-view.ts'
 import { officeView, type OfficeView } from './office-view.ts'
@@ -21,6 +22,7 @@ import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
+import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
 
 /**
@@ -103,6 +105,8 @@ export interface View {
   warehouse: WarehouseView
   /** Kit on jobs, and what's short (ADR 0014). */
   kit: KitView
+  /** Kit lists in jobs' notes, matched to the stock list, and the jobs whose notes hold kit not on them yet (ADR 0043). */
+  notesKit: NotesKitView
   /** Numbers set aside for printing labels (ADR 0015). */
   labels: LabelsView
   /** Kit out with jobs and back, and each job's pick list (ADR 0017). */
@@ -129,6 +133,8 @@ export interface View {
   counts: CountsView
   /** Prices, quotes, what's owed and each job's margin (ADR 0042); empty for a role the server sends no money to. */
   money: MoneyView
+  /** When freelancers are busy in their own calendars, read only (ADR 0044). */
+  ownCalendars: OwnCalendarsView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -402,6 +408,7 @@ export class SyncClient {
       jobs,
       warehouse,
       kit,
+      notesKit: notesKitView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
       moves,
       faults,
@@ -415,6 +422,7 @@ export class SyncClient {
       attachments: attachmentsView(entities, outbox, this.state.cursor),
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
+      ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

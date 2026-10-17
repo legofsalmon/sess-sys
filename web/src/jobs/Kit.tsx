@@ -30,6 +30,7 @@ import { useToday } from '../view.ts'
 import { Heading, Icon } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from '../stock/kitIcon.ts'
+import { NotesKitLink } from './NotesKit.tsx'
 
 /**
  * Kit on jobs (ADR 0014): what a job needs from the stock list, for the
@@ -141,6 +142,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
     <section className="card kit" aria-label="Kit">
       <Heading icon="kit">Kit</Heading>
       <PickLink job={job} view={view} lines={lines} />
+      <NotesKitLink job={job} view={view} />
       {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
       {lines.length === 0 && <Empty>Add what the job needs from the stock list, for the whole job or one phase.</Empty>}

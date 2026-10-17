@@ -65,3 +65,4 @@ freelancers to sign up for anything.
   Session Hire Gigs event.
 - Reading freelancers' own free/busy (Google, Outlook or iCal) is a later
   step; days off are marked by the freelancer on their link or by ops for now.
+  *Built 17 October 2026: [ADR 0044](0044-freelancers-own-calendars-read-only.md).*

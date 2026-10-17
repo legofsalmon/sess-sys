@@ -32,6 +32,7 @@ import {
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
+import { OWN_CALENDAR_ACTIONS } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -408,6 +409,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const who = person(a.id)
       return from === 'link' ? `${who} changed their ${inWords(parts)}` : `Changed ${who}'s ${inWords(parts)}`
     }
+    // Their own calendar (ADR 0044), never with its address, which no entry carries.
+    case OWN_CALENDAR_ACTIONS.share: {
+      const who = person(a.personId)
+      if (from === 'link') return `${who} ${a.replaced ? 'shared a different calendar' : "shared when they're busy in their own calendar"}, to be read only`
+      return `${a.replaced ? 'Changed' : 'Added'} ${who}'s own calendar, from the address they sent, to read when they're busy`
+    }
+    case 'ownCalendar.stop': {
+      const who = person(a.personId)
+      return from === 'link' ? `${who} stopped sharing their own calendar` : `Stopped reading ${who}'s own calendar`
+    }
     case 'unavailability.add':
       return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${typeof a.note === 'string' && a.note ? ` (${clip(a.note)})` : ''}`
     case 'unavailability.remove': {
@@ -606,6 +617,15 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'kit.remove': {
       const k = look('kitLine', a.id)
       return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
+    }
+    case 'kit.fromNotes': {
+      // Kit read from jobs' notes (ADR 0043): each line is how many there should be, so it may have added fewer, or none.
+      const jobs = (Array.isArray(a.jobs) ? a.jobs : []) as Data[]
+      const lines = jobs.reduce((n, j) => n + (Array.isArray(j.lines) ? j.lines.length : 0), 0)
+      const names = Array.isArray(a.names) ? a.names.length : 0
+      const whose = jobs.length === 1 ? job(jobs[0]?.projectId) : plural(jobs.length, 'job')
+      const what = lines ? `Put kit from the notes on ${whose} (${plural(lines, 'line')})` : `Read the notes of ${whose} for kit, with nothing to add`
+      return names ? `${what}, and remembered ${plural(names, 'name')} the notes use` : what
     }
     case 'labels.reserve': {
       const r = look('labelRun', a.id)

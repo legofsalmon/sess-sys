@@ -16,6 +16,8 @@ import { renderNoSheet, renderSheet, sheetFor } from './sheet.ts'
 import { awayFor, endedOn, getAway, getCall, getOffer, getPerson, heldByCall, heldElsewhereIn, offersFor, personByToken } from './store.ts'
 import { renderTimesheet } from './timesheet-page.ts'
 import { getTimesheet, timesheetsFor } from './timesheets.ts'
+import { Refused } from '../kernel.ts'
+import { getOwnCalendar, type OwnCalendars } from './own-calendars.ts'
 
 /**
  * A freelancer's private link, /f/<token>: their page, the answers they
@@ -37,8 +39,8 @@ type Form = URLSearchParams
  */
 type Req = FastifyRequest<{ Params: { token: string; id?: string }; Querystring: { m?: string; r?: string; o?: string; s?: string } }>
 
-/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), their documents (ADR 0029), their days off, or else the offer's card. */
-const SECTIONS = ['details', 'late', 'documents', 'away'] as const
+/** Where a post's message goes: a section of its own, the running-late card (ADR 0028), their documents (ADR 0029), their days off, their own calendar (ADR 0044), or else the offer's card. */
+const SECTIONS = ['details', 'late', 'documents', 'away', 'calendar'] as const
 
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
 
@@ -89,6 +91,9 @@ const SAID = {
   'doc-not-on': { ok: false, text: "Sending documents here isn't switched on yet. For now, send a photo or a PDF of it to the office by WhatsApp or email." },
   'doc-not-yours': { ok: false, text: "That document isn't one of yours." },
   'doc-not-kept': { ok: false, text: "The file couldn't be kept just now, so nothing was sent. Try again in a minute." },
+  // Their own calendar (ADR 0044).
+  'calendar-shared': { ok: true, text: "Thanks. We've read your calendar, and the office can see when you're busy." },
+  'calendar-stopped': { ok: true, text: "Stopped. We've deleted your calendar's address and the times we read from it." },
 } satisfies Record<string, { ok: boolean; text: string }>
 type Said = keyof typeof SAID
 type Refusal = Extract<MutationResult, { status: 'rejected' }>
@@ -97,7 +102,7 @@ type Refusal = Extract<MutationResult, { status: 'rejected' }>
 const told = (what: Said | Refusal): Record<string, string> => (typeof what === 'string' ? { m: what } : { r: what.id })
 
 /** `demo`: the passcode-locked demo copy (ADR 0033), whose freelancer pages say so and lead back to choosing whose eyes to see the app through. */
-export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void, feeds: Feeds, { demo = false }: { demo?: boolean } = {}) {
+export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => void, feeds: Feeds, { demo = false, ownCalendars }: { demo?: boolean; ownCalendars?: OwnCalendars } = {}) {
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) =>
     done(null, new URLSearchParams(String(body)))
   )
@@ -205,6 +210,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       office: await officeFor(db),
       onTheDay,
       demo,
+      ownCalendar: await getOwnCalendar(db, person.id),
       // Their documents (ADR 0029), with forms to send a new one where the server can keep files.
       documents: documentsSection({ person, list: await documentsOf(db, person.id), files: app.documents.on, base: base(req, person.linkToken), today: now, flash }),
     })
@@ -411,6 +417,34 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     return back(reply, person.linkToken, 'days-off-removed')
   })
 
+  /**
+   * Share their own calendar (ADR 0044): read there and then, so a wrong
+   * address is said beside where it was pasted, with what was pasted kept
+   * (rule 11). The address goes in the body, which no log writes down.
+   */
+  app.post('/f/:token/calendar', async (req: Req, reply) => {
+    const person = await personByToken(db, req.params.token)
+    if (!person) return gone(reply)
+    const form = (req.body ?? new URLSearchParams()) as Form
+    const inSection = (what: Said) => reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ ...told(what), s: 'calendar' })}#calendar`, 303)
+    if (!ownCalendars) return back(reply, person.linkToken, 'try-again')
+    try {
+      await ownCalendars.share({ personId: person.id, address: form.get('address') ?? '', by: 'self', who: { link: person.id, device: describeDevice(req.headers['user-agent']) } })
+    } catch (err) {
+      if (!(err instanceof Refused)) throw err
+      return refused(req, reply, person, { id: '', status: 'rejected', reason: err.reason }, { form: 'calendar', values: form }, { section: 'calendar' })
+    }
+    return inSection('calendar-shared')
+  })
+
+  // Stop sharing it, in one tap: the address and the busy times deleted.
+  app.post('/f/:token/calendar/stop', async (req: Req, reply) => {
+    const person = await personByToken(db, req.params.token)
+    if (!person) return gone(reply)
+    const result = await run(req, person.id, 'ownCalendar.stop', { personId: person.id })
+    return reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ ...told(result.status === 'rejected' ? result : 'calendar-stopped'), s: 'calendar' })}#calendar`, 303)
+  })
+
   // Both feed addresses answer from memory, so calendar apps looking every hour don't wake the database.
   app.get('/cal/:token', async (req: Req, reply) => {
     const code = req.params.token.replace(/\.ics$/, '')
@@ -438,6 +472,8 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       runningLate: await lateOf(db, person.id),
       // The details; each file is on their page (ADR 0029).
       documents: await documentsOf(db, person.id),
+      // When they're busy, as read from their own calendar (ADR 0044); its address stays out, as their link does.
+      ownCalendar: (await getOwnCalendar(db, person.id)) ?? null,
     })
   })
 }

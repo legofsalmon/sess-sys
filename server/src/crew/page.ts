@@ -1,6 +1,7 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
 import { dsColor, ownColours } from '@sh/shared'
+import { busyByDay, type OwnCalendar } from '@sh/shared'
 
 /**
  * The freelancer's private page. Plain server-rendered HTML with ordinary
@@ -21,8 +22,8 @@ export interface Flash {
   ok: boolean
   text: string
   offer?: string
-  /** Their details, the running-late card for the offer (ADR 0028), their documents (ADR 0029), or their days off. */
-  section?: 'details' | 'late' | 'documents' | 'away'
+  /** Their details, the running-late card for the offer (ADR 0028), their documents (ADR 0029), their days off, or their own calendar (ADR 0044). */
+  section?: 'details' | 'late' | 'documents' | 'away' | 'calendar'
 }
 
 /**
@@ -93,6 +94,8 @@ export interface PageData {
   documents?: string
   /** On the demo copy (ADR 0033): a bar saying this is a freelancer's page, with the way back to choosing another view. */
   demo?: boolean
+  /** Their own calendar, when they share it (ADR 0044): never its address, which the page doesn't show again. */
+  ownCalendar?: OwnCalendar
 }
 
 const STATUS_TEXT: Record<Offer['status'], string> = {
@@ -398,6 +401,64 @@ function feedBlock(feed: string): string {
     </script>`
 }
 
+/** How long a list of busy days the page shows: the next few are what someone checks. */
+const BUSY_SHOWN = 8
+
+/** Where each calendar keeps the address to share, in the words its own settings use. */
+const WHERE_TO_FIND = `<details class="where"><summary>Where do I find it?</summary>
+      <ul>
+        <li><b>Google Calendar</b>, on a laptop: Settings, then your calendar's name on the left, then <i>Integrate calendar</i>. Copy the <i>Secret address in iCal format</i>.</li>
+        <li><b>Outlook</b>: Settings, Calendar, <i>Shared calendars</i>, then <i>Publish a calendar</i>. Pick <i>Can view when I'm busy</i>, publish, and copy the ICS link.</li>
+        <li><b>iPhone or Mac (iCloud)</b>: in Calendar, the <i>i</i> beside the calendar, then turn on <i>Public Calendar</i> and share the link. Anyone with it can see the calendar, so keep it to us.</li>
+      </ul>
+    </details>`
+
+/**
+ * Their own calendar, read only (ADR 0044): share it by pasting its
+ * private address, see what we read from it, and stop in one tap. What is
+ * kept is said plainly before anything is pasted: only when they're busy,
+ * never what, where or who with, and nothing is ever written to it.
+ */
+function ownCalendarBlock(d: PageData): string {
+  const mine = d.flash?.section === 'calendar' ? d.flash : undefined
+  // What a refused share typed, back in the field (rule 11): it's their own page, kept from every cache.
+  const typed = keptIn(d, 'calendar')
+  const cal = d.ownCalendar
+  const field = (label: string, button: string) => `<form method="post" action="${d.base}/calendar#calendar" class="share-cal">
+      <label>${label} <input name="address" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="2000" placeholder="e.g. webcal://… or https://….ics" value="${h(typed?.get('address'))}"></label>
+      ${WHERE_TO_FIND}
+      <button${cal ? '' : ' class="yes"'}>${button}</button>
+    </form>`
+  const promise = 'We keep only the times you\'re busy: never what, where or who with. Nothing is ever added to your calendar, and Session Hire bookings in it aren\'t counted.'
+  if (!cal)
+    return `<section id="calendar">
+    <h2>Your own calendar</h2>
+    ${mine ? flash(mine) : ''}
+    <p class="small">Rather than marking days here, you can let us see when you're busy in the calendar you already use, so the office knows before it asks. ${promise} You can stop at any time.</p>
+    ${field("Your calendar's private address", "Share when I'm busy")}
+  </section>`
+  const busy = [...busyByDay(cal)].filter(([day]) => day >= d.today)
+  const read = cal.readAt ? (new Date(cal.readAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }) === d.today ? 'today' : `on ${onDay(cal.readAt)}`) : ''
+  return `<section id="calendar">
+    <h2>Your own calendar</h2>
+    ${mine ? flash(mine) : ''}
+    <p class="small">You're sharing when you're busy${cal.addedBy === 'office' ? ', from the address you sent the office' : ''}. We read it every few hours${read ? `, last ${read}` : ''}. ${promise} The office sees "busy" on those days: you can still be offered work, and still say yes.</p>
+    ${cal.problem ? `<p class="flash warn" role="status">We couldn't read it last time: ${h(cal.problem)} What we read before still shows.</p>` : ''}
+    ${
+      busy.length
+        ? `<ul class="away busy">${busy
+            .slice(0, BUSY_SHOWN)
+            .map(([day, words]) => `<li><span>${h(dayLabel(day))} <small>Busy ${h(words)}</small></span></li>`)
+            .join('')}</ul>${busy.length > BUSY_SHOWN ? `<p class="small">And ${busy.length - BUSY_SHOWN} more busy day${busy.length - BUSY_SHOWN === 1 ? '' : 's'} in the next four months.</p>` : ''}`
+        : '<p class="empty">Nothing busy in the next four months.</p>'
+    }
+    <form method="post" action="${d.base}/calendar/stop#calendar"><button>Stop sharing my calendar</button></form>
+    <details class="again"${typed ? ' open' : ''}><summary>Share a different calendar</summary>
+      ${field('Its private address', 'Share this one instead')}
+    </details>
+  </section>`
+}
+
 export function renderPage(d: PageData): string {
   const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
@@ -412,7 +473,7 @@ export function renderPage(d: PageData): string {
   const inCard =
     d.flash?.section === 'late'
       ? (d.onTheDay ?? []).some((t) => t.offer.id === d.flash?.offer)
-      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details' || d.flash?.section === 'documents' || d.flash?.section === 'away'
+      : [...waiting, ...booked].some((j) => j.offer.id === d.flash?.offer) || d.flash?.section === 'details' || d.flash?.section === 'documents' || d.flash?.section === 'away' || d.flash?.section === 'calendar'
 
   return `<!doctype html>
 <html lang="en-IE">
@@ -473,6 +534,8 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
       <button>Add days off</button>
     </form>
   </section>
+
+  ${ownCalendarBlock(d)}
 
   ${d.documents ?? ''}
 
@@ -587,4 +650,7 @@ fieldset.choice{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}
 fieldset.choice label{display:flex;gap:6px;align-items:center;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 fieldset.choice input{width:20px;height:20px;accent-color:var(--accent)}
 .doc h3{overflow-wrap:anywhere}
+.share-cal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.share-cal input{font-size:.92rem}
+.where ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:.92rem}
+.again{border:0;padding:0}
 `

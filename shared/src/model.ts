@@ -7,6 +7,7 @@ import { FAULT_ENTITY_NAMES, type FaultEntities } from './faults.ts'
 import { INSPECTION_ENTITY_NAMES, type InspectionEntities } from './inspections.ts'
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
 import { KIT_ENTITY_NAMES, type KitEntities } from './kit.ts'
+import { NOTES_KIT_ENTITY_NAMES, type NotesKitEntities } from './kit-notes.ts'
 import { LABEL_ENTITY_NAMES, type LabelEntities } from './labels.ts'
 import { LATE_ENTITY_NAMES, type LateEntities } from './late.ts'
 import { LEAVE_ENTITY_NAMES, type LeaveEntities } from './leave.ts'
@@ -16,6 +17,7 @@ import { STOCK_ENTITY_NAMES, type StockEntities } from './stock.ts'
 import { TIMESHEET_ENTITY_NAMES, type TimesheetEntities } from './timesheets.ts'
 import { ATTACHMENT_ENTITY_NAMES, type AttachmentEntities } from './attachments.ts'
 import { QUOTE_ENTITY_NAMES, type QuoteEntities } from './quotes.ts'
+import { OWN_CALENDAR_ENTITY_NAMES, type OwnCalendarEntities } from './own-calendar.ts'
 
 /** Every record a device keeps, by the name the change feed gives it, gathered from each module. */
 export interface Entities
@@ -24,6 +26,7 @@ export interface Entities
     CalendarEntities,
     StockEntities,
     KitEntities,
+    NotesKitEntities,
     LabelEntities,
     MoveEntities,
     FaultEntities,
@@ -36,7 +39,8 @@ export interface Entities
     DocumentEntities,
     CountEntities,
     AttachmentEntities,
-    QuoteEntities {}
+    QuoteEntities,
+    OwnCalendarEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -44,6 +48,7 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...CALENDAR_ENTITY_NAMES,
   ...STOCK_ENTITY_NAMES,
   ...KIT_ENTITY_NAMES,
+  ...NOTES_KIT_ENTITY_NAMES,
   ...LABEL_ENTITY_NAMES,
   ...MOVE_ENTITY_NAMES,
   ...FAULT_ENTITY_NAMES,
@@ -57,4 +62,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...COUNT_ENTITY_NAMES,
   ...ATTACHMENT_ENTITY_NAMES,
   ...QUOTE_ENTITY_NAMES,
+  ...OWN_CALENDAR_ENTITY_NAMES,
 ]

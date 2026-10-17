@@ -19,6 +19,8 @@ import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
+import { OwnCalendars, type OwnCalendarsOptions } from './crew/own-calendars.ts'
+import { registerOwnCalendarRoutes } from './crew/own-calendar-routes.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { DocumentFiles } from './documents/files.ts'
@@ -77,6 +79,8 @@ export interface AppOptions {
   feeds?: FeedsOptions
   /** How much one call bringing in the stock list does (ADR 0026), for tests. */
   stockImport?: StockImportRound
+  /** Reading freelancers' own calendars (ADR 0044): how often, and the local stand-ins tests may read from. */
+  ownCalendars?: OwnCalendarsOptions
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -98,6 +102,8 @@ declare module 'fastify' {
     dueErasures: DueErasures
     /** Documents' files (ADR 0029): where they're kept, and the list of files to delete; the caller starts its daily look. */
     documents: DocumentFiles
+    /** Freelancers' own calendars, read only (ADR 0044); the caller starts reading them on a schedule. */
+    ownCalendars: OwnCalendars
   }
 }
 
@@ -179,6 +185,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     void erasures?.keep()
     void documents.tidy()
   }
+  // Their own calendars (ADR 0044): read again every few hours, from the time the caller starts it.
+  const ownCalendars = new OwnCalendars(db, { ...options.ownCalendars, onChange: changed, report: (err) => reportError(err, { area: 'own-calendar' }) })
+  app.decorate('ownCalendars', ownCalendars)
   app.decorate('dueErasures', new DueErasures(db, { changed, log: app.log, report: (err) => reportError(err, { area: 'erasure' }) }))
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
@@ -325,7 +334,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
-  registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode })
+  registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode, ownCalendars })
+  registerOwnCalendarRoutes(app, { ownCalendars })
   registerDocumentRoutes(app, { db, files: documents, onChange: changed })
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, documents, onChange: changed })
@@ -405,6 +415,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     app.dueErasures.stop()
     documents.stop()
     calendarSync?.stop()
+    ownCalendars.stop()
     for (const ws of sockets) ws.close()
   })
   return app

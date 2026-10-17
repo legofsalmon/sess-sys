@@ -3,6 +3,102 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: the Crewbox show pack
+
+**Done**
+
+- Show pack, on each phase's call sheet and on the job's page: one .zip
+  for the Crewbox, made on the device from what it holds, so it works with
+  no signal, and sent nowhere. In it: the crew who said yes (what they go
+  by, role, department, call time, days), the running order as Crewbox
+  acts read from the phase's notes and the run of show as typed, the kit
+  with the Session Hire numbers scanned out, the venue and its access
+  notes, who to ring on the day and the office, a crew list to print, and
+  a manifest with the format's version
+  ([Decision 0045](adr/0045-the-crewbox-show-pack.md)).
+- The join QR: typing the box's address (and the event PIN) when making
+  it puts a QR code of the box's join page on the crew list. Neither is
+  kept in the app.
+- Crew numbers are in it only for the office, heads and directors, as the
+  contact on the day's call sheet has them; anyone else's pack has the
+  contact's number only. No rates or prices in any pack.
+- The patch and lighting sheets are empty, with their columns: the app
+  doesn't plan either yet. Every file's layout is written down in
+  [crewbox-show-pack.md](crewbox-show-pack.md) for the Crewbox side.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- The Crewbox side: a running-order import that reads
+  `running-order.csv`, and a check of the patch and lighting columns
+  against Crewbox's own export layout, which couldn't be read from here.
+
+## 17 October 2026: kit lists from the notes
+
+**Done**
+
+- Jobs brought in from the calendars keep their job sheets in the notes;
+  the kit lists in them (`4 x d&b Y10P`, `2x d20 amp`, `Shure ULXD x 2`)
+  can now become kit lines. A job's Kit card says what its notes list and
+  opens Kit from the notes: each line as written, the product it matched
+  (by name, by its model or code, or a close match), how many, and in
+  words what it will do. Any line can take another product, another
+  number, Not kit, or New product… (for roles that can change stock).
+  Nothing goes on until it's added.
+- A line from a phase's notes goes on that phase; from the job's notes,
+  on the whole job. What the job already has counts, so nothing is
+  doubled, even when the same notes are read twice or by two phones with
+  no signal. The notes stay as written.
+- Names chosen are remembered: "d20 amp" chosen as the D20 once matches
+  it on every job after, and a name said to be not kit stays not kit.
+- Kit in the notes (from the Jobs list, the bring-in and the Menu) lists
+  the jobs whose notes hold kit not on them yet, coming up first: those
+  where everything matched go on together, asked first; the rest each
+  open their own lines. Matching runs on the phone and works with no
+  signal; a season goes in batches of 50 jobs a change
+  ([Decision 0043](adr/0043-kit-lists-from-the-notes.md)).
+- The made-up data has three jobs with kit in their notes: one to check,
+  one with a phase's notes, and one ready to add.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Adam or the office: a look at a few real job sheets on the made-up
+  data's pattern once the stock list is in, to see how many lines match
+  by name and which names need choosing once.
+
+## 17 October 2026: freelancers' own calendars, read only
+
+**Done**
+
+- A freelancer can share when they're busy from their private link, by
+  pasting their calendar's private address (Google's secret iCal address,
+  Outlook's or iCloud's published link, or a webcal:// one). The page says
+  first that only busy times are kept, never what, where or who with, and
+  that nothing is added to their calendar. One tap stops it.
+- The office can add the address a freelancer sent on their page, in a
+  card "Their own calendar", read it again now, or stop reading it.
+- The server reads each calendar at once, then every three hours: busy
+  times only, four months ahead, repeating events worked out, our own
+  Session Hire bookings left out.
+- Busy days show in the planner as "Busy (own calendar)", on the person's
+  page, and as a warning when offering work; the offer can still go.
+- The address is kept on the server as a secret: not on devices, not in
+  the history, not in Download everything, and blanked in error reports.
+  The server reads only public https addresses, checked again after each
+  redirect, with time and size limits
+  ([Decision 0044](adr/0044-freelancers-own-calendars-read-only.md)).
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Nothing to set up: no keys or accounts are needed. Colly: whether four
+  months ahead and every three hours are right for how far out work is
+  offered.
+
 ## 17 October 2026: quotes and a money view
 
 **Done**

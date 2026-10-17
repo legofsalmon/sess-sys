@@ -73,6 +73,14 @@ export const MENU: PlaceGroup[] = [
         needs: ['money'],
       },
       {
+        key: 'notes-kit',
+        icon: 'kit',
+        href: '#jobs/notes-kit',
+        label: 'Kit in the notes',
+        about: "Kit lists in jobs' notes, turned into kit lines",
+        needs: ['kit'],
+      },
+      {
         key: 'import',
         icon: 'download',
         href: '#jobs/import',

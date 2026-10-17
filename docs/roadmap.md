@@ -112,7 +112,9 @@ faults, missing kit and repairs
   pencilled in; short is warned about, never refused; each job holds its
   kit a day before and after by default, to get it ready and check it
   back in, and kit still out after its job isn't free; whole days, since
-  phases have no hours yet).
+  phases have no hours yet; kit lists in jobs' notes, as the calendar's
+  bring-in kept them, turned into kit lines after a look at each, a season
+  at a time: [ADR 0043](adr/0043-kit-lists-from-the-notes.md)).
 - Scanning with the phone's camera in the app, offline (built: labels and
   makers' barcodes in the Stock search, one after another).
 - Pick lists per project, **scan out and scan in on a phone, offline**,
@@ -216,7 +218,12 @@ over by rule are later.
   orders and brief; each document a file or a link to where it's shared;
   links work now, files with the bucket).
 - Availability: read free/busy from the freelancer's own calendar if they
-  share it, or they mark days off by link.
+  share it, or they mark days off by link (built, 17 October 2026,
+  [ADR 0044](adr/0044-freelancers-own-calendars-read-only.md): they paste
+  their calendar's private iCal address on their link, or the office adds
+  the one they sent; only busy times are kept, read every few hours, and
+  shown in the planner, on their page and as a warning when offering work;
+  one tap stops it).
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
   call sheet; partial acceptance of multi-day jobs; rate counter-offers.
 - Invoicing made easy, not made for them: freelancers write their own
@@ -242,7 +249,12 @@ over by rule are later.
   freelancer's link or filled in by the office, changed if need be and
   approved in one step, with what changed shown to the freelancer).
 - **Crewbox show pack** (files: patch CSV, lighting CSV, running order,
-  crew list with the join QR).
+  crew list with the join QR) (built, [Decision 0045](adr/0045-the-crewbox-show-pack.md):
+  one .zip from a phase's call sheet or the job's page, made on the device
+  and sent nowhere, with the crew, running order, kit, venue and contacts;
+  the patch and lighting sheets are empty templates until the app plans
+  them, and the join QR comes from the box's address typed when making it;
+  layout in [crewbox-show-pack.md](crewbox-show-pack.md)).
 
 **Done when:** crew are booked, briefed and paid from the system, and the
 calendar invite is a courtesy rather than the record.
@@ -273,6 +285,10 @@ system, and the accountant gets a VAT period's figures from one export
 without re-keying.
 
 ## Phase 5: Crewbox link and on-site mode
+
+**Not started.** Step 1 of the handoff, the show pack of files, is built
+([Decision 0045](adr/0045-the-crewbox-show-pack.md)); its layout is the
+contract the Crewbox running-order import can be built to.
 
 - Crewbox changes (on that repo): keyed event import, control-key show-log
   read, asset tags on fault reports, optionally crew clock-in.

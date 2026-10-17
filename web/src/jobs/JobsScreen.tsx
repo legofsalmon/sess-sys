@@ -29,6 +29,7 @@ import { ImportScreen } from './ImportScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
 import { MoneyScreen, PricesScreen } from './Money.tsx'
+import { NotesKitListScreen, NotesKitNudge, NotesKitScreen } from './NotesKit.tsx'
 import { PickScreen } from './PickScreen.tsx'
 import { QuoteScreen } from './Quote.tsx'
 import { SheetScreen } from './SheetScreen.tsx'
@@ -46,8 +47,10 @@ import { JOBS } from '../Up.tsx'
  * planner (#jobs/plan, ADR 0010) shows them by week or month, the clients
  * and venues have a list each (#jobs/clients, #jobs/venues, ADR 0041) and
  * a page each with its documents (#jobs/venues/<id>, ADR 0032), each job's
- * quote is on #jobs/<id>/quote and money on #jobs/money (ADR 0042), and jobs
- * already on Google Calendar can be brought in (#jobs/import, ADR 0011).
+ * quote is on #jobs/<id>/quote and money on #jobs/money (ADR 0042), jobs
+ * already on Google Calendar can be brought in (#jobs/import, ADR 0011), and
+ * the kit their notes list turned into kit lines, a job at a time
+ * (#jobs/<id>/notes-kit) or a season at a time (#jobs/notes-kit, ADR 0043).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
 
@@ -73,8 +76,11 @@ export function JobsScreen() {
   if (hash === '#jobs/venues') return <VenuesScreen view={view} />
   if (hash === '#jobs/money') return <MoneyScreen view={view} />
   if (hash === '#jobs/money/prices') return <PricesScreen view={view} />
+  if (hash === '#jobs/notes-kit') return <NotesKitListScreen view={view} />
   if (hash.startsWith('#jobs/venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#jobs/venues/'.length))} />
   if (hash.startsWith('#jobs/clients/')) return <ClientScreen view={view} id={decodeURIComponent(hash.slice('#jobs/clients/'.length))} />
+  const [, fromNotes] = /^#jobs\/([^/]+)\/notes-kit$/.exec(hash) ?? []
+  if (fromNotes) return <NotesKitScreen view={view} jobId={decodeURIComponent(fromNotes)} />
   const [, quote] = /^#jobs\/([^/]+)\/quote$/.exec(hash) ?? []
   if (quote) return <QuoteScreen view={view} jobId={decodeURIComponent(quote)} />
   const [, pick] = /^#jobs\/(.+)\/pick$/.exec(hash) ?? []
@@ -120,6 +126,7 @@ function JobsRest({ view }: { view: View }) {
   const mayAdd = useAccess().can('jobs')
   return (
     <>
+      <NotesKitNudge view={view} />
       {mayAdd && (
         <section className="card">
           <Heading icon="add">New job</Heading>
