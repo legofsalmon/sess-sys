@@ -249,7 +249,12 @@ over by rule are later.
   freelancer's link or filled in by the office, changed if need be and
   approved in one step, with what changed shown to the freelancer).
 - **Crewbox show pack** (files: patch CSV, lighting CSV, running order,
-  crew list with the join QR).
+  crew list with the join QR) (built, [Decision 0045](adr/0045-the-crewbox-show-pack.md):
+  one .zip from a phase's call sheet or the job's page, made on the device
+  and sent nowhere, with the crew, running order, kit, venue and contacts;
+  the patch and lighting sheets are empty templates until the app plans
+  them, and the join QR comes from the box's address typed when making it;
+  layout in [crewbox-show-pack.md](crewbox-show-pack.md)).
 
 **Done when:** crew are booked, briefed and paid from the system, and the
 calendar invite is a courtesy rather than the record.
@@ -280,6 +285,10 @@ system, and the accountant gets a VAT period's figures from one export
 without re-keying.
 
 ## Phase 5: Crewbox link and on-site mode
+
+**Not started.** Step 1 of the handoff, the show pack of files, is built
+([Decision 0045](adr/0045-the-crewbox-show-pack.md)); its layout is the
+contract the Crewbox running-order import can be built to.
 
 - Crewbox changes (on that repo): keyed event import, control-key show-log
   read, asset tags on fault reports, optionally crew clock-in.

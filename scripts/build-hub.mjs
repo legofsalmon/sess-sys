@@ -27,6 +27,7 @@ const DOCS = [
   ['Competitor audit', 'docs/research/competitor-audit.md'],
   ['How booking works today', 'docs/research/current-process.md'],
   ['Crewbox handoff', 'docs/research/crewbox-handoff.md'],
+  ['The Crewbox show pack', 'docs/crewbox-show-pack.md'],
   // Every decision record, in order, titled from its first heading.
   ...readdirSync(join(root, 'docs/adr'))
     .filter((f) => f.endsWith('.md'))

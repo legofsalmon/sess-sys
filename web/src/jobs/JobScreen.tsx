@@ -43,6 +43,7 @@ import { useToday } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
 import { QuoteCard } from './Quote.tsx'
+import { ShowPackCard } from './ShowPack.tsx'
 import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
@@ -111,6 +112,9 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
           </Fold>
         )}
       </section>
+
+      {/* The files for the on-site box (ADR 0045), once there's a phase to have a crew and a running order. */}
+      {job.phases.length > 0 && <ShowPackCard view={view} job={job} />}
 
       {/* Its quote, after the kit and crew it's built from, for the roles that see money (ADR 0042). */}
       {seesMoney && <QuoteCard job={job} view={view} />}

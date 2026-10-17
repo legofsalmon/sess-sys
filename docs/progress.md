@@ -3,6 +3,37 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: the Crewbox show pack
+
+**Done**
+
+- Show pack, on each phase's call sheet and on the job's page: one .zip
+  for the Crewbox, made on the device from what it holds, so it works with
+  no signal, and sent nowhere. In it: the crew who said yes (what they go
+  by, role, department, call time, days), the running order as Crewbox
+  acts read from the phase's notes and the run of show as typed, the kit
+  with the Session Hire numbers scanned out, the venue and its access
+  notes, who to ring on the day and the office, a crew list to print, and
+  a manifest with the format's version
+  ([Decision 0045](adr/0045-the-crewbox-show-pack.md)).
+- The join QR: typing the box's address (and the event PIN) when making
+  it puts a QR code of the box's join page on the crew list. Neither is
+  kept in the app.
+- Crew numbers are in it only for the office, heads and directors, as the
+  contact on the day's call sheet has them; anyone else's pack has the
+  contact's number only. No rates or prices in any pack.
+- The patch and lighting sheets are empty, with their columns: the app
+  doesn't plan either yet. Every file's layout is written down in
+  [crewbox-show-pack.md](crewbox-show-pack.md) for the Crewbox side.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- The Crewbox side: a running-order import that reads
+  `running-order.csv`, and a check of the patch and lighting columns
+  against Crewbox's own export layout, which couldn't be read from here.
+
 ## 17 October 2026: kit lists from the notes
 
 **Done**
