@@ -255,7 +255,9 @@ describe('a count', () => {
     // Proves: a database at the stock list's migration, with a place and an item, takes the counts table on the next
     // start, and the place, the item and its number are as they were; a count of the place is then kept.
     const db = await pgliteDb()
-    for (const mod of MODULES) await runMigrations(db, mod, mod === STOCK ? STOCK.migrations.length - 1 : undefined)
+    const before = STOCK.migrations.findIndex((sql) => sql.includes('CREATE TABLE IF NOT EXISTS counts'))
+    for (const mod of MODULES) await runMigrations(db, mod, mod === STOCK ? before : undefined)
+    expect(before).toBeGreaterThan(0)
     expect((await db.query(`SELECT to_regclass('counts')::text AS found`)).rows).toEqual([{ found: null }])
     await db.query(`INSERT INTO places (id, name) VALUES ('a3', 'Bay A3')`)
     await db.query(`INSERT INTO models (id, name, department, tracking) VALUES ('y10p', 'd&b Y10P', 'audio', 'serialised')`)

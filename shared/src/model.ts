@@ -7,6 +7,7 @@ import { FAULT_ENTITY_NAMES, type FaultEntities } from './faults.ts'
 import { INSPECTION_ENTITY_NAMES, type InspectionEntities } from './inspections.ts'
 import { JOB_ENTITY_NAMES, type JobEntities } from './jobs.ts'
 import { KIT_ENTITY_NAMES, type KitEntities } from './kit.ts'
+import { NOTES_KIT_ENTITY_NAMES, type NotesKitEntities } from './kit-notes.ts'
 import { LABEL_ENTITY_NAMES, type LabelEntities } from './labels.ts'
 import { LATE_ENTITY_NAMES, type LateEntities } from './late.ts'
 import { LEAVE_ENTITY_NAMES, type LeaveEntities } from './leave.ts'
@@ -24,6 +25,7 @@ export interface Entities
     CalendarEntities,
     StockEntities,
     KitEntities,
+    NotesKitEntities,
     LabelEntities,
     MoveEntities,
     FaultEntities,
@@ -44,6 +46,7 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...CALENDAR_ENTITY_NAMES,
   ...STOCK_ENTITY_NAMES,
   ...KIT_ENTITY_NAMES,
+  ...NOTES_KIT_ENTITY_NAMES,
   ...LABEL_ENTITY_NAMES,
   ...MOVE_ENTITY_NAMES,
   ...FAULT_ENTITY_NAMES,

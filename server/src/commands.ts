@@ -24,6 +24,7 @@ import { officeHandlers } from './office/handlers.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
+import { notesKitHandlers } from './stock/notes-kit.ts'
 import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
 import { inspectionHandlers } from './stock/inspections.ts'
@@ -46,6 +47,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...projectHandlers,
   ...stockHandlers,
   ...kitHandlers,
+  ...notesKitHandlers,
   ...labelHandlers,
   ...moveHandlers,
   ...faultHandlers,

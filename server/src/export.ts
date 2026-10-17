@@ -212,6 +212,8 @@ const ABOUT: Record<string, string> = {
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
+  kit_names: 'Names that jobs\' notes use for kit, as chosen once in Kit from the notes: the product each means, or blank for not kit.',
+  kit_notes_read: 'Jobs whose notes have been turned into kit lines, with a fingerprint of the notes as they were, so a job comes back to the list only when its notes change.',
   label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, what they were for, and when one was cancelled before any of its labels went on an item. A cancelled run is off the list, but its numbers are never given out again.',
   leave_allowances: "Each staff member's annual leave for a year: the days, what was carried over, and a note; 20 days when none is set.",
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',

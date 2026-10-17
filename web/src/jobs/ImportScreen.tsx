@@ -25,6 +25,7 @@ import { syncSoon } from '../sync.ts'
 import { StatusPill } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
+import { NotesKitNudge } from './NotesKit.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
@@ -133,7 +134,11 @@ export function ImportScreen({ view }: { view: View }) {
           <Brought offline={offline} />
         </>
       ) : step.at === 'done' ? (
-        <Done preview={step.preview} result={step.result} onAgain={() => setStep({ at: 'choose' })} />
+        <>
+          <Done preview={step.preview} result={step.result} onAgain={() => setStep({ at: 'choose' })} />
+          {/* Their events' descriptions came in as notes, and many list kit (ADR 0043). */}
+          <NotesKitNudge view={view} />
+        </>
       ) : (
         <Look
           preview={step.preview}

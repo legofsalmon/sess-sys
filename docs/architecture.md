@@ -479,9 +479,9 @@ of it before anything is saved. Bringing in saves the ticked jobs in one
 change, with a crew call per phase and offers from the guests' answers,
 and remembers each event-day by the id Google gives it on every calendar,
 so looking again shows only what is new and lists what changed in Google.
-Job sheets go into the notes as written; turning kit lists into kit lines
-can come once the stock list has the products to match them against
-([ADR 0014](adr/0014-kit-on-jobs.md)). A job brought in stays
+Job sheets go into the notes as written; their kit lists become kit lines
+on the device, after a look at each, matched against the stock list
+([ADR 0043](adr/0043-kit-lists-from-the-notes.md)). A job brought in stays
 with the calendar it came from, which keeps its events, so the app doesn't
 write it to the jobs calendar.
 

@@ -346,6 +346,7 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     [`SELECT count(*) AS n FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL AND o.responded_via IN ('link', 'app', 'ops')`, 'answers to offers'],
     [`SELECT count(*) AS n FROM timesheets t JOIN offers o ON o.id = t.id JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL`, 'timesheets'],
     [`SELECT count(*) AS n FROM kit_lines k JOIN projects p ON p.id = k.project_id WHERE p.source_calendar IS NOT NULL`, 'kit on jobs'],
+    [`SELECT count(*) AS n FROM kit_notes_read r JOIN projects p ON p.id = r.project_id WHERE p.source_calendar IS NOT NULL`, 'kit read from their notes'],
     [`SELECT count(*) AS n FROM movements m JOIN projects p ON p.id = m.project_id WHERE p.source_calendar IS NOT NULL`, 'kit movements'],
     [`SELECT count(*) AS n FROM faults f JOIN projects p ON p.id = f.project_id WHERE p.source_calendar IS NOT NULL`, 'faults on jobs'],
   ] as const

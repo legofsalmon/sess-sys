@@ -14,6 +14,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { notesKitView, type NotesKitView } from './notes-kit-view.ts'
 import { lateView, type LateView } from './late-view.ts'
 import { leaveView, type LeaveView } from './leave-view.ts'
 import { officeView, type OfficeView } from './office-view.ts'
@@ -103,6 +104,8 @@ export interface View {
   warehouse: WarehouseView
   /** Kit on jobs, and what's short (ADR 0014). */
   kit: KitView
+  /** Kit lists in jobs' notes, matched to the stock list, and the jobs whose notes hold kit not on them yet (ADR 0043). */
+  notesKit: NotesKitView
   /** Numbers set aside for printing labels (ADR 0015). */
   labels: LabelsView
   /** Kit out with jobs and back, and each job's pick list (ADR 0017). */
@@ -402,6 +405,7 @@ export class SyncClient {
       jobs,
       warehouse,
       kit,
+      notesKit: notesKitView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
       moves,
       faults,

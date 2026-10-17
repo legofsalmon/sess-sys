@@ -7,6 +7,7 @@ import { faultCommandSchemas } from './faults.ts'
 import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
+import { notesKitCommandSchemas } from './kit-notes.ts'
 import { labelCommandSchemas } from './labels.ts'
 import { lateCommandSchemas } from './late.ts'
 import { leaveCommandSchemas } from './leave.ts'
@@ -31,6 +32,7 @@ export const commandSchemas = {
   ...jobCommandSchemas,
   ...stockCommandSchemas,
   ...kitCommandSchemas,
+  ...notesKitCommandSchemas,
   ...labelCommandSchemas,
   ...moveCommandSchemas,
   ...faultCommandSchemas,

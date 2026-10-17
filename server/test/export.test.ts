@@ -118,6 +118,8 @@ describe('download everything', () => {
       'identifiers',
       'inspections',
       'kit_lines',
+      'kit_names',
+      'kit_notes_read',
       'label_runs',
       'leave_allowances',
       'leave_requests',

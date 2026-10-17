@@ -112,7 +112,9 @@ faults, missing kit and repairs
   pencilled in; short is warned about, never refused; each job holds its
   kit a day before and after by default, to get it ready and check it
   back in, and kit still out after its job isn't free; whole days, since
-  phases have no hours yet).
+  phases have no hours yet; kit lists in jobs' notes, as the calendar's
+  bring-in kept them, turned into kit lines after a look at each, a season
+  at a time: [ADR 0043](adr/0043-kit-lists-from-the-notes.md)).
 - Scanning with the phone's camera in the app, offline (built: labels and
   makers' barcodes in the Stock search, one after another).
 - Pick lists per project, **scan out and scan in on a phone, offline**,

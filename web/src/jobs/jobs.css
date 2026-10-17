@@ -273,3 +273,11 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
 .money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
+
+/* Kit from the notes (ADR 0043): each line as the notes write it, over what it matched. */
+.jobs .note-line .written { font-weight: 600; overflow-wrap: anywhere; }
+.jobs .note-line .grid-form { grid-template-columns: 2fr 1fr; }
+.jobs .note-line .new-product { grid-template-columns: 1fr 1fr; padding: var(--space-10); border-radius: var(--radius-control); background: var(--bg); }
+.jobs .notes-kit-add > p:first-child { margin: 0 0 var(--space-8); }
+.jobs .notes-kit-add .actions { margin-top: var(--space-8); }
+.app .notes-kit-nudge p { margin: 0; }

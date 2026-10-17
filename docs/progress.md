@@ -3,6 +3,41 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: kit lists from the notes
+
+**Done**
+
+- Jobs brought in from the calendars keep their job sheets in the notes;
+  the kit lists in them (`4 x d&b Y10P`, `2x d20 amp`, `Shure ULXD x 2`)
+  can now become kit lines. A job's Kit card says what its notes list and
+  opens Kit from the notes: each line as written, the product it matched
+  (by name, by its model or code, or a close match), how many, and in
+  words what it will do. Any line can take another product, another
+  number, Not kit, or New product… (for roles that can change stock).
+  Nothing goes on until it's added.
+- A line from a phase's notes goes on that phase; from the job's notes,
+  on the whole job. What the job already has counts, so nothing is
+  doubled, even when the same notes are read twice or by two phones with
+  no signal. The notes stay as written.
+- Names chosen are remembered: "d20 amp" chosen as the D20 once matches
+  it on every job after, and a name said to be not kit stays not kit.
+- Kit in the notes (from the Jobs list, the bring-in and the Menu) lists
+  the jobs whose notes hold kit not on them yet, coming up first: those
+  where everything matched go on together, asked first; the rest each
+  open their own lines. Matching runs on the phone and works with no
+  signal; a season goes in batches of 50 jobs a change
+  ([Decision 0043](adr/0043-kit-lists-from-the-notes.md)).
+- The made-up data has three jobs with kit in their notes: one to check,
+  one with a phase's notes, and one ready to add.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Adam or the office: a look at a few real job sheets on the made-up
+  data's pattern once the stock list is in, to see how many lines match
+  by name and which names need choosing once.
+
 ## 17 October 2026: quotes and a money view
 
 **Done**

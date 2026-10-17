@@ -106,6 +106,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'kit.add': 'kit',
   'kit.update': 'kit',
   'kit.remove': 'kit',
+  // Kit read from jobs' notes (ADR 0043): kit on jobs, with the names it remembers for the next job's notes.
+  'kit.fromNotes': 'kit',
 
   'model.create': 'stock',
   'model.update': 'stock',

@@ -607,6 +607,15 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const k = look('kitLine', a.id)
       return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
     }
+    case 'kit.fromNotes': {
+      // Kit read from jobs' notes (ADR 0043): each line is how many there should be, so it may have added fewer, or none.
+      const jobs = (Array.isArray(a.jobs) ? a.jobs : []) as Data[]
+      const lines = jobs.reduce((n, j) => n + (Array.isArray(j.lines) ? j.lines.length : 0), 0)
+      const names = Array.isArray(a.names) ? a.names.length : 0
+      const whose = jobs.length === 1 ? job(jobs[0]?.projectId) : plural(jobs.length, 'job')
+      const what = lines ? `Put kit from the notes on ${whose} (${plural(lines, 'line')})` : `Read the notes of ${whose} for kit, with nothing to add`
+      return names ? `${what}, and remembered ${plural(names, 'name')} the notes use` : what
+    }
     case 'labels.reserve': {
       const r = look('labelRun', a.id)
       const what = typeof a.name === 'string' && a.name.trim() ? ` (${clip(a.name.trim())})` : ''
