@@ -95,7 +95,9 @@ async function asHeadOfAudio(page: Page) {
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'passcode', role: 'head' } }))
   await page.route('**/api/auth/preview', (route) => route.fulfill({ json: { role: 'head' } }))
   await page.route('**/api/sync/pull**', async (route) => {
-    const res = await route.fetch()
+    // A pull still on its way when the test ends finds the page closed: nothing to answer.
+    const res = await route.fetch().catch(() => null)
+    if (!res) return
     const body = await res.json()
     type Change = { entity: string; op: string; data: Record<string, unknown> }
     for (const c of body.changes as Change[]) {
