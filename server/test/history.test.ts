@@ -1,4 +1,4 @@
-import { COMMAND_NAMES, DOCUMENT_ACTIONS, newId, waitLabel, type Person } from '@sh/shared'
+import { COMMAND_NAMES, DOCUMENT_ACTIONS, OWN_CALENDAR_ACTIONS, newId, waitLabel, type Person } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
 import { IMPORT_ACTION } from '../src/calendar/import.ts'
 import { CALENDAR_ACTIONS } from '../src/calendar/routes.ts'
@@ -193,7 +193,7 @@ describe('every command', () => {
   it('has its words in the history, so one added without any fails here before it ships', () => {
     // Proves: no command, nor anything the server records itself, falls to the default, which shows a person the command's own name.
     const nothing = () => undefined
-      const recorded = [EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, LATE_CLEARED_ACTION, IMPORT_ACTION, ...Object.values(CALENDAR_ACTIONS), ...Object.values(DATA_ACTIONS), ...Object.values(DOCUMENT_ACTIONS)]
+      const recorded = [EXPORT_COMMAND, IMPORT_PEOPLE_ACTION, IMPORT_STOCK_ACTION, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION, LATE_CLEARED_ACTION, IMPORT_ACTION, ...Object.values(CALENDAR_ACTIONS), ...Object.values(DATA_ACTIONS), ...Object.values(DOCUMENT_ACTIONS), ...Object.values(OWN_CALENDAR_ACTIONS)]
     for (const name of [...COMMAND_NAMES, ...recorded]) {
       const what = inWords(name, {}, nothing)
       expect(what, name).not.toBe(name)

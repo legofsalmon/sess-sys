@@ -87,7 +87,9 @@ also work for other companies, so the system bends to them instead:
 - **Their calendar, not ours.** A freelancer can share free/busy from
   their own calendar (Google, Apple, Outlook, any iCal) so ops see real
   availability without the freelancer filling in a second calendar. Only
-  busy or free is read; never who else they work for.
+  busy or free is read; never who else they work for. Built as their
+  calendar's private iCal address, read only
+  ([ADR 0044](adr/0044-freelancers-own-calendars-read-only.md)).
 - **Enter things once.** Certificates, insurance, bank details and rates
   are uploaded once and kept up to date by expiry reminders, not re-asked
   per job. A freelancer can download everything the company holds on

@@ -85,6 +85,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'person.contact': 'crew',
   'unavailability.add': 'crew',
   'unavailability.remove': 'crew',
+  // Their own calendar (ADR 0044): stopping it is the office's, like their days off. Adding one is a server route that needs crew too.
+  'ownCalendar.stop': 'crew',
   'call.create': 'crew',
   'call.update': 'crew',
   'call.cancel': 'crew',

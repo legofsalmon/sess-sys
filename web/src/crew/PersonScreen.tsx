@@ -29,6 +29,7 @@ import { useToday } from '../view.ts'
 import { linkFor, PersonForm, STATUS } from './CrewScreen.tsx'
 import { Documents } from './Documents.tsx'
 import { useFeedAddress } from './feed.ts'
+import { OwnCalendarCard } from './OwnCalendar.tsx'
 
 /**
  * One person on a page of their own (#crew/person/<id>): who they are and
@@ -59,6 +60,7 @@ export function PersonScreen({ view, id, onArchived }: { view: View; id: string;
     <Page view={view} title="Crew" className="crew person-page" up={up}>
       <Who person={person} />
       <ComingUp person={person} view={view} onArchived={onArchived} />
+      <OwnCalendarCard person={person} view={view} />
       <section className="card" aria-label="Certificates and documents">
         <Heading icon="certificate">Certificates and documents</Heading>
         <CertificateLines person={person} />

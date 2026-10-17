@@ -203,6 +203,7 @@ describe('the week by person', () => {
     expect(row(aoife)[MON!]).toEqual({
       work: [expect.objectContaining({ job: 'Web Summit', phase: 'Build', role: 'Audio tech', booked: true, confirmed: true })],
       away: null,
+      busy: null,
       problem: null,
       severity: null,
     })
@@ -210,7 +211,7 @@ describe('the week by person', () => {
     expect(row(niamh)[TUE!]).toMatchObject({ severity: 'check', problem: 'Offered Electric Picnic while booked on Web Summit' })
     expect(row(niamh)[MON!]!.severity).toBeNull()
     expect(row(conor)[TUE!]).toMatchObject({ work: [{ booked: false }, { booked: false }], severity: null })
-    expect(row(dara)).toEqual({ [WED!]: { work: [], away: '', problem: null, severity: null }, [THU!]: { work: [], away: '', problem: null, severity: null } })
+    expect(row(dara)).toEqual({ [WED!]: { work: [], away: '', busy: null, problem: null, severity: null }, [THU!]: { work: [], away: '', busy: null, problem: null, severity: null } })
 
     // Clashes first, with the job to open: the booking for a clash, the offer for a check.
     expect(week.problems.map((x) => [x.person.name, x.day, x.severity, x.jobId])).toEqual([

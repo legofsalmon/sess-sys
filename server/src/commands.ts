@@ -31,6 +31,7 @@ import { inspectionHandlers } from './stock/inspections.ts'
 import { moveHandlers } from './stock/moves.ts'
 import { countHandlers } from './stock/counts.ts'
 import { financeHandlers } from './finance/handlers.ts'
+import { ownCalendarHandlers } from './crew/own-calendars.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -61,6 +62,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...countHandlers,
   ...attachmentHandlers,
   ...financeHandlers,
+  ...ownCalendarHandlers,
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */
