@@ -502,7 +502,9 @@ See [research/crewbox-handoff.md](research/crewbox-handoff.md). In short:
 a **show pack** of files first (no Crewbox changes needed), then a keyed
 push of event, crew and running order into the box and a pull of technical
 incidents back as repair tickets, which needs four small additions to
-Crewbox.
+Crewbox. The show pack is built
+([Decision 0045](adr/0045-the-crewbox-show-pack.md)); what's in it, file by
+file, is [crewbox-show-pack.md](crewbox-show-pack.md).
 
 ## Mobile
 
