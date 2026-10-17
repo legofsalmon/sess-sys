@@ -904,6 +904,9 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   const candidates = everyone.filter((p) => applicants || p.level !== APPLICANT_LEVEL).sort(byDepartmentThenLevel)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
+  // Busy in their own calendar (ADR 0044): said, never in the way. It may be something they can move, and they may still say yes.
+  const own = useView().ownCalendars
+  const busy = chosen ? own.warning(chosen.id, call.days) : null
   const { run, error, refuse } = useAct()
   // What the call needs (ADR 0028): those who hold it first, then those not known, then those missing one, each in the order above.
   const today = useToday()
@@ -923,6 +926,7 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
         {pickerLabel(p)}
         {marks && ` · ${marks}`}
         {personConflicts(crew, p.id, call.days, call.id).length ? ' ⚠' : ''}
+        {own.busyOn(p.id, call.days).size ? ' · busy in own calendar' : ''}
       </option>
     )
   }
@@ -989,6 +993,7 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
           </span>
         </label>
       )}
+      {busy && <p className="warn-line">{busy}. The offer can still go: it may be something they can move, and they can still say yes.</p>}
       {chosen &&
         certificateUnknowns(chosen, needs, call.days, today).map((w) => (
           <p key={w} className="warn-line">

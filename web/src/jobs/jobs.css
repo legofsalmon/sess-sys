@@ -100,6 +100,9 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .item.booked, .plan .code.booked { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
 .plan .item.offered, .plan .code.offered { border: 1px dashed var(--muted); }
 .plan .item.away, .plan .code.away { background: var(--line); color: var(--on-line); }
+/* Busy in their own calendar (ADR 0044): neutral and hatched, like time blocked out in a calendar, so it reads apart from "unavailable" and is never mistaken for a clash. */
+.plan .item.busy, .plan .code.busy { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--line) 80%, transparent) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1px var(--line); }
+.plan .item.busy b { font-weight: 600; }
 .plan .timeline td.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .timeline td.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
 .plan .tag { display: block; margin-bottom: 3px; font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
+import { stopOwnCalendar } from './own-calendars.ts'
 import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
 
 /**
@@ -330,6 +331,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       }
     }
     await ctx.tx.query('UPDATE people SET archived = $2 WHERE id = $1', [person.id, a.archived])
+    // Their link stops, so they couldn't stop sharing their own calendar themselves: it stops with it (ADR 0044).
+    if (a.archived) await stopOwnCalendar(ctx, person.id)
     await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
   },
 

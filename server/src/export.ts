@@ -25,8 +25,11 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * links since replaced. Whoever held the file could otherwise act as them.
  * Likewise the app's key to the connected Google calendar (ADR 0008), even
  * though it is stored locked; devices never see it, so the feed has no copies.
+ * And a freelancer's own calendar's private address (ADR 0044): whoever held
+ * it could read their whole calendar. Devices never see it either; the busy
+ * times stay in.
  */
-const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'] }
+const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'], own_calendars: ['address'] }
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>

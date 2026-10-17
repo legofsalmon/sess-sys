@@ -3,6 +3,36 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: freelancers' own calendars, read only
+
+**Done**
+
+- A freelancer can share when they're busy from their private link, by
+  pasting their calendar's private address (Google's secret iCal address,
+  Outlook's or iCloud's published link, or a webcal:// one). The page says
+  first that only busy times are kept, never what, where or who with, and
+  that nothing is added to their calendar. One tap stops it.
+- The office can add the address a freelancer sent on their page, in a
+  card "Their own calendar", read it again now, or stop reading it.
+- The server reads each calendar at once, then every three hours: busy
+  times only, four months ahead, repeating events worked out, our own
+  Session Hire bookings left out.
+- Busy days show in the planner as "Busy (own calendar)", on the person's
+  page, and as a warning when offering work; the offer can still go.
+- The address is kept on the server as a secret: not on devices, not in
+  the history, not in Download everything, and blanked in error reports.
+  The server reads only public https addresses, checked again after each
+  redirect, with time and size limits
+  ([Decision 0044](adr/0044-freelancers-own-calendars-read-only.md)).
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Nothing to set up: no keys or accounts are needed. Colly: whether four
+  months ahead and every three hours are right for how far out work is
+  offered.
+
 ## 17 October 2026: quotes and a money view
 
 **Done**

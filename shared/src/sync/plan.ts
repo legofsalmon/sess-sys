@@ -5,6 +5,7 @@ import { lateLine } from '../late.ts'
 import type { CallView, CrewView, PersonView } from './crew-view.ts'
 import type { JobsView } from './jobs-view.ts'
 import type { LateView } from './late-view.ts'
+import type { OwnCalendarsView } from './own-calendar-view.ts'
 
 /**
  * The planner (ADR 0010): a week or a month laid out by job and by person,
@@ -103,6 +104,12 @@ export interface PersonCell {
   work: PersonWork[]
   /** Marked unavailable: the note, empty if none; null when not. */
   away: string | null
+  /**
+   * Busy in their own calendar (ADR 0044), in words ("all day", "09:00 to
+   * 17:00"); null when not. Shown, never a clash: a hold there may be
+   * something they can move, and our own bookings are left out of it.
+   */
+  busy: string | null
   /** What needs sorting out, in words; null when nothing does. */
   problem: string | null
   /** A clash is booked twice, or booked while marked unavailable; a check is an offer that would clash if they said yes. */
@@ -138,7 +145,7 @@ export interface Plan {
   holidays: Record<string, string>
 }
 
-export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView }, days: readonly string[]): Plan {
+export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ownCalendars?: OwnCalendarsView }, days: readonly string[]): Plan {
   const range = new Set(days)
   const calls = view.crew.calls.filter((c) => c.status === 'open')
   /** What a booking's person said about being late on a day, in the line the office reads. */
@@ -210,7 +217,7 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView }, 
   // Archived people have left: no lane, even with "Show everyone".
   const people = view.crew.people.filter((p) => !p.archived).map((person): PersonLane => ({ person, days: {} }))
   const byId = new Map(people.map((l) => [l.person.id, l]))
-  const at = (lane: PersonLane, day: string) => (lane.days[day] ??= { work: [], away: null, problem: null, severity: null })
+  const at = (lane: PersonLane, day: string) => (lane.days[day] ??= { work: [], away: null, busy: null, problem: null, severity: null })
   for (const c of calls) {
     for (const o of c.offers) {
       const booked = HOLDING.includes(o.status)
@@ -232,6 +239,7 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView }, 
       x.away = x.away === null ? u.note : [x.away, u.note].filter(Boolean).join('; ')
     }
   }
+  for (const lane of people) for (const [d, words] of view.ownCalendars?.busyOn(lane.person.id, days) ?? []) at(lane, d).busy = words
 
   const problems: PlanProblem[] = []
   for (const lane of people) {

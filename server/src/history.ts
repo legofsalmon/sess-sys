@@ -32,6 +32,7 @@ import {
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
+import { OWN_CALENDAR_ACTIONS } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -407,6 +408,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.phone !== undefined) parts.push('phone number')
       const who = person(a.id)
       return from === 'link' ? `${who} changed their ${inWords(parts)}` : `Changed ${who}'s ${inWords(parts)}`
+    }
+    // Their own calendar (ADR 0044), never with its address, which no entry carries.
+    case OWN_CALENDAR_ACTIONS.share: {
+      const who = person(a.personId)
+      if (from === 'link') return `${who} ${a.replaced ? 'shared a different calendar' : "shared when they're busy in their own calendar"}, to be read only`
+      return `${a.replaced ? 'Changed' : 'Added'} ${who}'s own calendar, from the address they sent, to read when they're busy`
+    }
+    case 'ownCalendar.stop': {
+      const who = person(a.personId)
+      return from === 'link' ? `${who} stopped sharing their own calendar` : `Stopped reading ${who}'s own calendar`
     }
     case 'unavailability.add':
       return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${typeof a.note === 'string' && a.note ? ` (${clip(a.note)})` : ''}`

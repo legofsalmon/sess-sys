@@ -216,7 +216,12 @@ over by rule are later.
   orders and brief; each document a file or a link to where it's shared;
   links work now, files with the bucket).
 - Availability: read free/busy from the freelancer's own calendar if they
-  share it, or they mark days off by link.
+  share it, or they mark days off by link (built, 17 October 2026,
+  [ADR 0044](adr/0044-freelancers-own-calendars-read-only.md): they paste
+  their calendar's private iCal address on their link, or the office adds
+  the one they sent; only busy times are kept, read every few hours, and
+  shown in the planner, on their page and as a warning when offering work;
+  one tap stops it).
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
   call sheet; partial acceptance of multi-day jobs; rate counter-offers.
 - Invoicing made easy, not made for them: freelancers write their own

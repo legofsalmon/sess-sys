@@ -21,6 +21,7 @@ import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
+import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
 
 /**
@@ -129,6 +130,8 @@ export interface View {
   counts: CountsView
   /** Prices, quotes, what's owed and each job's margin (ADR 0042); empty for a role the server sends no money to. */
   money: MoneyView
+  /** When freelancers are busy in their own calendars, read only (ADR 0044). */
+  ownCalendars: OwnCalendarsView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -415,6 +418,7 @@ export class SyncClient {
       attachments: attachmentsView(entities, outbox, this.state.cursor),
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
+      ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },

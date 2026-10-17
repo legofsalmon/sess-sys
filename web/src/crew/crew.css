@@ -37,6 +37,10 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .share { border-color: var(--accent); }
 .crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
 .crew .away-form .wide, .crew .away-form button { grid-column: 1 / -1; }
+/* Their own calendar (ADR 0044): the address to add, and the busy days read from it, one line each. */
+.crew .share-calendar { display: grid; gap: var(--space-6); }
+.crew .share-calendar .hint { margin: 0; }
+.crew .busy-days { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
 /* Leavers, folded away under the list (audit finding 7). */
 .crew details.archived { padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .crew details.archived summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
