@@ -3,6 +3,47 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: vans and drivers
+
+**Done**
+
+- Stock › Vehicles: the company's vans, Lutons, trucks, cars and trailers,
+  each with its registration, seats, payload and notes, and its checks:
+  NCT or CVRT, motor tax, insurance, service due and, for a truck, the
+  tachograph. Each has its own page, where it's taken off the road (in for
+  repair, until a day or until it's back) and retired
+  ([Decision 0047](adr/0047-vans-and-drivers.md)).
+- A Vehicles card on each job's page books a van on the whole job or one
+  phase, for given days, with a driver from the crew; errands are booked
+  the same way. A road check run out on the booking's days is refused by
+  name, before anything is sent and again on the server; so is a driver
+  with no licence, or one run out. Another job on the same van that day,
+  or a day off the road, asks first and is booked anyway. A licence not
+  recorded, a check not recorded and a service overdue warn.
+- Each booking says what's wrong with it from today on, worst first, and
+  nothing is taken off later: a check that lapses after booking shows on
+  it.
+- The planner has Vans rows: one per vehicle, the jobs it's on and who
+  drives, off the road, and a van on two jobs as a clash in To sort out.
+  A job's day names its vans and drivers.
+- Call sheets, in the app and on a freelancer's link, list the vehicles on
+  that phase and who's driving.
+- Checks running out are listed on the Vehicles page, beside the
+  certificates and documents on Crew › People, and counted on Home for
+  the company and the warehouse. The app asks nobody for anything.
+- The made-up data has Big Van (motor tax running out, service overdue,
+  booked on two jobs on one day) and The Luton (in for a new clutch, its
+  driver's licence not recorded), and an errand to collect stage decks.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- The office: the real vehicles and their check dates, and drivers'
+  licences on their cards.
+- A decision on licence categories (C1 for a heavy Luton, C for a truck),
+  which aren't checked yet.
+
 ## 17 October 2026: the Crewbox show pack
 
 **Done**
