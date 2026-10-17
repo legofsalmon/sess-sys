@@ -36,6 +36,7 @@ import { ClaimLabel, LabelsScreen, RunScreen, type ClaimMemory } from './Labels.
 import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
+import { VehicleScreen, VehiclesScreen } from './Vehicles.tsx'
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
@@ -55,6 +56,8 @@ import { Heading, Icon } from '../Icon.tsx'
  * item or place opens on its own page (#stock/product/<id>,
  * #stock/item/<id>, #stock/place/<id>), a run of labels on its own
  * (#stock/labels/<id>), and a count's on #stock/count/<id> (ADR 0030).
+ * The company's vehicles are along the row too (#stock/vehicles), each on
+ * #stock/vehicles/<id> (ADR 0047).
  * The stock list is brought in at #stock/import (ADR 0026).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -68,6 +71,9 @@ export function StockScreen() {
   if (hash === '#stock/labels') return <LabelsScreen view={view} />
   if (hash === '#stock/testing') return <TestingScreen view={view} />
   if (hash === '#stock/count') return <CountScreen view={view} />
+  if (hash === '#stock/vehicles') return <VehiclesScreen view={view} />
+  const [, vehicle] = /^#stock\/vehicles\/(.+)$/.exec(hash) ?? []
+  if (vehicle) return <VehicleScreen key={vehicle} view={view} id={decodeURIComponent(vehicle)} />
   const [, count] = /^#stock\/count\/(.+)$/.exec(hash) ?? []
   if (count) return <CountPage key={count} view={view} id={decodeURIComponent(count)} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []

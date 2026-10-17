@@ -1,7 +1,7 @@
 /**
  * An area's pages, side by side in one row under its header (ADR 0041's
  * tidy-up of where things live): Jobs' List, Week, Month, Clients and
- * Venues, and Money for the roles that see it (ADR 0042); Stock's Catalogue, Places, Labels, Counting, Testing and Repairs;
+ * Venues, and Money for the roles that see it (ADR 0042); Stock's Catalogue, Places, Labels, Counting, Testing, Repairs and Vehicles;
  * Crew's Calls, People, Leave and Timesheets
  * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the
@@ -42,6 +42,8 @@ export function Views({ label, pages, current }: { label: string; pages: readonl
 export function StockViews({ view, current }: { view: View; current: string }) {
   const tests = view.inspections.attention.filter((d) => d.state !== 'soon').length
   const repairs = view.faults.open.length
+  // Vehicles whose road checks have run out: they can't be booked until someone updates them (ADR 0047).
+  const vehicles = new Set(view.vehicles.reminders.filter((r) => r.ranOut && r.kind !== 'service').map((r) => r.vehicle.id)).size
   return (
     <Views
       label="Stock pages"
@@ -53,6 +55,7 @@ export function StockViews({ view, current }: { view: View; current: string }) {
         { key: 'count', href: '#stock/count', label: 'Counting' },
         { key: 'testing', href: '#stock/testing', label: 'Testing', count: tests },
         { key: 'repairs', href: '#stock/repairs', label: 'Repairs', count: repairs },
+        { key: 'vehicles', href: '#stock/vehicles', label: 'Vehicles', count: vehicles },
       ]}
     />
   )
