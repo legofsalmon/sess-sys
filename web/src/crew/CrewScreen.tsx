@@ -6,6 +6,8 @@ import {
   CREW_DEPARTMENTS,
   DEFAULT_LEVEL,
   daysLabel,
+  departmentForRole,
+  departmentOf,
   eachDay,
   euro,
   euroText,
@@ -21,6 +23,7 @@ import {
   parseEuro,
   personConflicts,
   REPLY_BY_AFTER,
+  sameDepartment,
   suggestedReplyBy,
   tellMessage,
   tidyDepartment,
@@ -48,7 +51,9 @@ import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { Top, useHash } from '../jobs/common.tsx'
 import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
-import { useAccess } from '../role.ts'
+import { useAccess, useSeesRates } from '../role.ts'
+import { rateText } from '../format.ts'
+import { callDepartments, DepartmentField } from './Department.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
@@ -248,6 +253,22 @@ export function CrewScreen() {
   const words = wordsOf(find)
   const shown = active.filter((p) => justAdded(p) || ((!chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase())) && found(p, words)))
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
+  // Crew needed narrowed to a department (ADR 0046). A head of department starts on their own, everyone else on all.
+  const access = useAccess()
+  const myDepartment = access.role === 'head' ? (access.personId && people.get(access.personId)?.department) || view.reading.department || '' : ''
+  const [narrowedTo, setNarrowedTo] = useState<string | undefined>()
+  // Said after calls are given a department, which takes the list to it, so what was done stays in view (ADR 0046).
+  const [gave, setGave] = useState('')
+  const setCallsFor = (d: string) => {
+    setGave('')
+    setNarrowedTo(d)
+  }
+  const callDepts = callDepartments(view)
+  const wanted = narrowedTo ?? myDepartment
+  // A department no call is in any more is no filter at all until it's back, as for people.
+  const callsFor =
+    wanted === NO_DEPARTMENT ? (upcoming.some((c) => !departmentOf(c)) ? wanted : '') : callDepts.find((d) => sameDepartment(d, wanted)) ?? ''
+  const shownCalls = upcoming.filter((c) => !callsFor || (callsFor === NO_DEPARTMENT ? !departmentOf(c) : sameDepartment(departmentOf(c), callsFor)))
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
   const toCheck = answersToCheck(crew, today).map((a) => ({ ...a, warning: onCalendar(a.offer)?.warning }))
@@ -330,7 +351,9 @@ export function CrewScreen() {
                     {kind === 'accepted'
                       ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
                       : kind === 'countered'
-                        ? `asks ${euro(o.counterRateCents)} a day (offered ${euro(c.dayRateCents)})`
+                        ? o.rateHidden
+                          ? 'asks for a different rate'
+                          : `asks ${euro(o.counterRateCents)} a day (offered ${rateText(c.dayRateCents, c.rateHidden)})`
                         : kind === 'declined'
                           ? 'declined'
                           : "can't make it any more"}
@@ -345,7 +368,7 @@ export function CrewScreen() {
                     <Confirm
                       question={
                         kind === 'countered'
-                          ? `Say no to ${o.person?.name ?? 'them'} at ${euro(o.counterRateCents)}? The offer is withdrawn, and their link says so at once.`
+                          ? `Say no to ${o.person?.name ?? 'them'}${o.rateHidden ? '' : ` at ${euro(o.counterRateCents)}`}? The offer is withdrawn, and their link says so at once.`
                           : `Release ${o.person?.name ?? 'them'} from ${c.project}? Their place goes back to the call, and their link says so at once.`
                       }
                       yes={kind === 'countered' ? 'Withdraw the offer' : `Release ${o.person ? firstName(o.person) : 'them'}`}
@@ -356,6 +379,14 @@ export function CrewScreen() {
                       }}
                       onNo={() => setTurningDown(undefined)}
                     />
+                  ) : kind === 'countered' && o.rateHidden ? (
+                    // Agreeing a rate is for someone who sees it (ADR 0046): said here, with Say no still to hand.
+                    <div className="actions">
+                      <p className="hint">The office agrees rates: your role doesn't see them.</p>
+                      <button type="button" onClick={() => setTurningDown(o.id)}>
+                        Say no
+                      </button>
+                    </div>
                   ) : kind === 'accepted' || kind === 'countered' ? (
                     <div className="actions">
                       <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
@@ -400,7 +431,31 @@ export function CrewScreen() {
         <section className="card">
           <Heading icon="calendar">Crew needed</Heading>
           {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
-          {groupCalls(upcoming, view.jobs.jobs).map((g) => (
+          {/* Narrowed to a department (ADR 0046), the ones calls are in, and "No department" for the calls nobody has given one. */}
+          {upcoming.length > 0 && (callDepts.length > 0 || upcoming.some((c) => !departmentOf(c))) && (
+            <select className="dept-filter" value={callsFor} onChange={(e) => setCallsFor(e.target.value)} aria-label="Calls for department">
+              <option value="">All departments</option>
+              {callDepts.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              {upcoming.some((c) => !departmentOf(c)) && <option value={NO_DEPARTMENT}>No department</option>}
+            </select>
+          )}
+          <div aria-live="polite">{gave && <p className="added">{gave}</p>}</div>
+          {callsFor === NO_DEPARTMENT && mayCrew && shownCalls.length > 0 && (
+            <GiveDepartment
+              view={view}
+              calls={shownCalls}
+              onGiven={(said, department) => {
+                setNarrowedTo(department)
+                setGave(said)
+              }}
+            />
+          )}
+          {upcoming.length > 0 && shownCalls.length === 0 && <p className="empty">No calls for {callsFor === NO_DEPARTMENT ? 'no department' : callsFor} still to come.</p>}
+          {groupCalls(shownCalls, view.jobs.jobs).map((g) => (
             <div className="call-group" key={g.key}>
               <header>
                 <div>
@@ -511,6 +566,61 @@ export function CrewScreen() {
   )
 }
 
+/**
+ * Calls with no department given one, many at a time (ADR 0046): those
+ * brought in from the calendar come with none when their people are mixed.
+ * Nothing is ticked to start with, as giving every one the same department
+ * is rarely right; "Tick all" is there when it is. One command for them all,
+ * so the history says it once.
+ */
+function GiveDepartment({ view, calls, onGiven }: { view: View; calls: readonly CallView[]; onGiven: (said: string, department: string) => void }) {
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
+  const [department, setDepartment] = useState<string | null>(null)
+  const { run, error } = useAct()
+  // Only calls still shown: one given a department elsewhere leaves the list, and its tick with it.
+  const chosen = calls.filter((c) => ticked.has(c.id))
+  const tick = (id: string, on: boolean) => setTicked((was) => (on ? new Set([...was, id]) : new Set([...was].filter((x) => x !== id))))
+  const give = (e: FormEvent) => {
+    e.preventDefault()
+    if (!chosen.length || !department) return
+    const n = chosen.length
+    void run(() => client.mutate('call.department', { ids: chosen.map((c) => c.id), department })).then((ok) => {
+      if (!ok) return
+      setTicked(new Set())
+      // The list moves to the department given, where the calls now are.
+      onGiven(`Gave ${n === 1 ? '1 call' : `${n} calls`} ${department}.`, department)
+    })
+  }
+  return (
+    <Fold label={calls.length === 1 ? 'Give it a department…' : `Give these ${calls.length} a department…`} className="give-department">
+      <form className="grid-form" onSubmit={give} aria-label="Give calls a department">
+        <fieldset className="wide ticks">
+          <legend>Calls with no department</legend>
+          {calls.map((c) => (
+            <label key={c.id} className="tick">
+              <input type="checkbox" checked={ticked.has(c.id)} onChange={(e) => tick(c.id, e.target.checked)} />
+              <span>
+                {c.needed} × {c.role} · {c.project}
+                <small>{[c.phase, daysLabel(c.days)].filter(Boolean).join(' · ')}</small>
+              </span>
+            </label>
+          ))}
+          {calls.length > 1 && (
+            <button type="button" className="link start" onClick={() => setTicked(new Set(chosen.length === calls.length ? [] : calls.map((c) => c.id)))}>
+              {chosen.length === calls.length ? 'Untick all' : 'Tick all'}
+            </button>
+          )}
+        </fieldset>
+        <DepartmentField view={view} value={department} onChange={setDepartment} />
+        <Refusal error={error} className="wide" />
+        <button type="submit" className="primary wide" disabled={!chosen.length || !department}>
+          {!chosen.length ? 'Tick the calls to give it' : !department ? 'Pick a department' : `Give ${chosen.length === 1 ? '1 call' : `${chosen.length} calls`} ${department}`}
+        </button>
+      </form>
+    </Fold>
+  )
+}
+
 /** Offered, holding or booked: the people a call's one line names. */
 const ON_CALL: readonly OfferView['status'][] = [...OPEN, ...HOLDING]
 
@@ -610,7 +720,15 @@ export function CallCard({
       {open && (
         <>
           <p className="facts-line">
-            {[daysLabel(call.days), call.callTime && `call ${call.callTime}`, euro(call.dayRateCents), needsOf(call).length && `needs ${needsLabel(needsOf(call))}`].filter(Boolean).join(' · ')}
+            {[
+              daysLabel(call.days),
+              call.callTime && `call ${call.callTime}`,
+              rateText(call.dayRateCents, call.rateHidden),
+              departmentOf(call) ?? 'no department',
+              needsOf(call).length && `needs ${needsLabel(needsOf(call))}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
           {call.offers.length > 0 && (
             <ul className="offers">
@@ -764,6 +882,10 @@ function afterChange(call: CallView, changes: CommandInput<'call.update'>): Call
 
 function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => void; onSaved?: (after: CallView, datesMoved: boolean) => void }) {
   const tied = !!call.projectId
+  const view = useView()
+  // A rate this device isn't sent stays the office's to change (ADR 0046).
+  const seesRates = useSeesRates() && !call.rateHidden
+  const [department, setDepartment] = useState<string | null>(departmentOf(call))
   const [f, setF] = useState({
     project: call.project,
     phase: call.phase,
@@ -799,7 +921,8 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
     if (f.replyBy && f.replyBy > end) return refuse(REPLY_BY_AFTER)
     if ((f.callTime || null) !== call.callTime) changes.callTime = f.callTime || null
     if (Math.max(1, f.needed) !== call.needed) changes.needed = Math.max(1, f.needed)
-    if (rateChanged) changes.dayRateCents = rate.cents
+    if (rateChanged && seesRates) changes.dayRateCents = rate.cents
+    if (department !== departmentOf(call)) changes.department = department
     if (f.details.trim() !== call.details) changes.details = f.details.trim()
     if ((f.replyBy || null) !== call.replyBy) changes.replyBy = f.replyBy || null
     if (needs.join() !== needsOf(call).join()) changes.needsCertificates = needs
@@ -846,9 +969,14 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
       <label>
         Call time <input type="time" value={f.callTime} onChange={set('callTime')} />
       </label>
-      <label>
-        Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
-      </label>
+      {seesRates ? (
+        <label>
+          Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
+        </label>
+      ) : (
+        <p className="hint">The office sets the rate: your role doesn't see crew rates.</p>
+      )}
+      <DepartmentField view={view} value={department} onChange={setDepartment} />
       <label className="wide">
         Reply by <input type="date" value={f.replyBy} onChange={set('replyBy')} />
       </label>
@@ -865,7 +993,7 @@ function EditCall({ call, onDone, onSaved }: { call: CallView; onDone: () => voi
           change, so release them first or keep their days.
         </p>
       )}
-      {rateChanged && agreed > 0 && (
+      {rateChanged && seesRates && agreed > 0 && (
         <p className="hint wide">
           The new rate goes to offers still waiting on an answer. {agreed === 1 ? 'The 1 person who has' : `The ${agreed} people who have`} accepted, asked for
           a rate or been confirmed keep what was agreed.
@@ -1037,12 +1165,20 @@ export function SendButtons({ person, text, subject }: { person: Pick<Person, 'p
   )
 }
 
-/** Their private link isn't on this device yet: it's made by the server when the person first syncs. */
-function NoLinkYet({ person, onClose }: { person: Pick<Person, 'name'>; onClose: () => void }) {
+/**
+ * Their private link isn't on this device: not made yet (the server makes it
+ * when the person first syncs), or not sent to this role (ADR 0046), when
+ * the office sends it, and whatever was done is already on their page.
+ */
+function NoLinkYet({ person, onClose }: { person: Pick<Person, 'name'> & Partial<Pick<Person, 'linkHidden'>>; onClose: () => void }) {
   return (
     <section className="card share">
       <h2>Send to {person.name}</h2>
-      <p className="empty">Their private link is made when this device next syncs. Try again once it says “Up to date”.</p>
+      <p className="empty">
+        {person.linkHidden
+          ? `Your role doesn't see ${person.name}'s private link, so the office sends this one. It's already on their page.`
+          : 'Their private link is made when this device next syncs. Try again once it says “Up to date”.'}
+      </p>
       <button type="button" onClick={onClose}>
         Close
       </button>
@@ -1144,7 +1280,8 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
               levelLine(person.level),
               person.kind === 'staff' && person.approvesLeave ? 'approves time off' : null,
               person.skills.join(', '),
-              person.dayRateCents !== null ? `${euro(person.dayRateCents)}/day` : null,
+              // A rate this device isn't sent (ADR 0046) isn't said in the list; their page says it's hidden.
+              person.dayRateCents !== null && !person.rateHidden ? `${euro(person.dayRateCents)}/day` : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -1161,11 +1298,28 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
 
 function NewCall() {
   const today = useToday()
-  // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
-  const blank = { project: '', phase: '', venue: '', role: '', start: today, end: today, callTime: '', needed: 1, rate: '', details: '', replyBy: undefined as string | undefined, needs: [] as CertificateKind[] }
+  const view = useView()
+  const seesRates = useSeesRates()
+  // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21); the department from the role until picked (ADR 0046).
+  const blank = {
+    project: '',
+    phase: '',
+    venue: '',
+    role: '',
+    start: today,
+    end: today,
+    callTime: '',
+    needed: 1,
+    rate: '',
+    details: '',
+    replyBy: undefined as string | undefined,
+    needs: [] as CertificateKind[],
+    department: undefined as string | null | undefined,
+  }
   const [f, setF] = useState(blank)
   const { run, error, refuse } = useAct()
-  const set = (k: Exclude<keyof typeof blank, 'needs'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const set = (k: Exclude<keyof typeof blank, 'needs' | 'department'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: k === 'needed' ? Number(e.target.value) : e.target.value })
+  const suggested = departmentForRole(f.role, { calls: view.crew.calls, people: view.crew.people })
   const replyBy = f.replyBy ?? suggestedReplyBy(f.start, f.end < f.start ? f.start : f.end, today) ?? ''
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -1186,10 +1340,11 @@ function NewCall() {
         end: f.end < f.start ? f.start : f.end,
         callTime: f.callTime || null,
         needed: Math.max(1, f.needed),
-        dayRateCents: rate.cents,
+        dayRateCents: seesRates ? rate.cents : null,
         details: f.details.trim(),
         replyBy: replyBy || null,
         needsCertificates: f.needs,
+        department: f.department === undefined ? suggested : f.department,
       })
     ).then((ok) => {
       if (!ok) setF((now) => (now === cleared ? f : now))
@@ -1218,12 +1373,17 @@ function NewCall() {
       <label>
         How many <input type="number" min={1} value={f.needed} onChange={set('needed')} />
       </label>
-      <label>
-        Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
-      </label>
+      {seesRates ? (
+        <label>
+          Day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} placeholder="250" />
+        </label>
+      ) : (
+        <p className="hint">The office sets the rate: your role doesn't see crew rates.</p>
+      )}
       <label>
         Venue <input value={f.venue} onChange={set('venue')} />
       </label>
+      <DepartmentField view={view} value={f.department} suggested={suggested} onChange={(department) => setF({ ...f, department })} className="wide" />
       <label className="wide">
         Reply by <input type="date" value={replyBy} onChange={set('replyBy')} />
       </label>
@@ -1289,6 +1449,8 @@ function certificatesOf(fields: CertFields): Certificates {
 export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
   // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
   const mayApprove = useAccess().can('company')
+  // A rate this device isn't sent (ADR 0046) isn't in the form, and the server keeps the one it has.
+  const seesRates = useSeesRates() && !initial?.rateHidden
   const blank = {
     name: '',
     phone: '',
@@ -1346,7 +1508,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
         phone: f.phone.trim() || null,
         email: f.email.trim() || null,
         skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
-        dayRateCents: rate.cents,
+        ...(seesRates ? { dayRateCents: rate.cents } : {}),
         notes: f.notes.trim(),
         // Only staff approve time off (ADR 0024).
         approvesLeave: f.kind === 'staff' && f.approvesLeave,
@@ -1376,9 +1538,11 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
       <label>
         Skills <input value={f.skills} onChange={set('skills')} placeholder="audio, rigger" />
       </label>
-      <label>
-        Usual day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} />
-      </label>
+      {seesRates && (
+        <label>
+          Usual day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} />
+        </label>
+      )}
       <label>
         Type
         <select value={f.kind} onChange={set('kind')}>

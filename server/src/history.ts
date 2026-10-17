@@ -114,7 +114,7 @@ const SELECT = `
                        OR (m.client_id LIKE 'calendar:%' AND p.id = substr(m.client_id, 10))`
 
 /** One page of the history, newest first. */
-export async function readHistory(q: Queryable, query: HistoryQuery = {}): Promise<HistoryPage> {
+export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true): Promise<HistoryPage> {
   const limit = Math.min(Math.max(1, Math.floor(Number(query.limit) || PAGE)), MAX_PAGE)
   const where: string[] = []
   const params: unknown[] = []
@@ -141,7 +141,7 @@ export async function readHistory(q: Queryable, query: HistoryQuery = {}): Promi
   const page = rows.slice(0, limit)
   const last = page.at(-1)
   return {
-    entries: await toEntries(q, page),
+    entries: await toEntries(q, page, rates),
     ...(rows.length > limit && last ? { next: writeCursor(last.received, last.id) } : {}),
     ...(query.before ? {} : { people: await historyPeople(q) }),
   }
@@ -195,7 +195,7 @@ function readCursor(text: string): { at: string; id: string } {
   throw new BadCursor('That page of the history no longer exists; start again from the newest.')
 }
 
-async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
+async function toEntries(q: Queryable, rows: Row[], rates = true): Promise<HistoryEntry[]> {
   const look = await lookup(q, rows)
   const left = await itemsAsLeft(q, rows)
   return rows.map((r) => {
@@ -205,7 +205,7 @@ async function toEntries(q: Queryable, rows: Row[]): Promise<HistoryEntry[]> {
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app'),
+      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app', rates),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -314,7 +314,11 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
  * give an item its number. `from` says whether a freelancer did it on their
  * own link, for the few commands that read differently in their voice.
  */
-export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar'): string {
+/**
+ * In words. `rates` false leaves crew pay out (ADR 0046), for a reader whose
+ * role doesn't see it: the history says a rate changed, never to what.
+ */
+export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar', rates = true): string {
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
     const c = look('crewCall', id)
@@ -429,6 +433,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Asked for ${a.needed} × ${text(a.role, 'crew')} for ${text(a.project, 'a job')}${typeof a.phase === 'string' && a.phase ? ` (${a.phase})` : ''}, ${dates(a.start, a.end)}${needing(a.needsCertificates)}`
     case 'call.cancel':
       return `Cancelled the call for ${call(a.id)}`
+    case 'call.department': {
+      const n = Array.isArray(a.ids) ? a.ids.length : 0
+      const to = typeof a.department === 'string' && a.department ? `the department ${clip(a.department)}` : 'no department'
+      return n === 1 ? `Gave the call for ${call((a.ids as unknown[])[0])} ${to}` : `Gave ${n} crew calls ${to}`
+    }
     case 'call.update': {
       const c = look('crewCall', a.id)
       const parts: string[] = []
@@ -436,7 +445,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.start !== undefined || a.end !== undefined) parts.push(`dates to ${dates(a.start ?? c?.start, a.end ?? c?.end)}`)
       if (a.callTime !== undefined) parts.push(typeof a.callTime === 'string' ? `call time to ${a.callTime}` : 'no call time')
       if (a.needed !== undefined) parts.push(`how many to ${a.needed}`)
-      if (a.dayRateCents !== undefined) parts.push(typeof a.dayRateCents === 'number' ? `day rate to ${euro(a.dayRateCents)}` : 'rate to agree')
+      if (a.dayRateCents !== undefined) parts.push(!rates ? 'the day rate' : typeof a.dayRateCents === 'number' ? `day rate to ${euro(a.dayRateCents)}` : 'rate to agree')
+      if (a.department !== undefined) parts.push(typeof a.department === 'string' && a.department ? `department to ${clip(a.department)}` : 'no department')
       if (a.details !== undefined) parts.push('the details')
       if (a.replyBy !== undefined) parts.push(typeof a.replyBy === 'string' ? `reply by ${dayLabel(a.replyBy)}` : 'no reply-by day')
       if (a.project !== undefined) parts.push(`job to ${text(a.project, 'a job')}`)
@@ -450,7 +460,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'offer.respond': {
       const o = offer(a.id)
       if (a.answer === 'decline') return `${o.who} declined ${o.what}`
-      if (a.answer === 'counter') return `${o.who} asked for ${euro(a.counterRateCents as number)} a day for ${o.what}`
+      if (a.answer === 'counter') return rates ? `${o.who} asked for ${euro(a.counterRateCents as number)} a day for ${o.what}` : `${o.who} asked for a different rate for ${o.what}`
       if (a.answer === 'pullOut') return `${o.who} can't make it any more: ${o.what}${typeof a.note === 'string' && a.note.trim() ? ` (${clip(a.note.trim())})` : ''}`
       return `${o.who} accepted ${o.what}${Array.isArray(a.days) && a.days.length ? `, ${daysLabel(a.days as string[])}` : ''}`
     }
@@ -463,6 +473,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'office.update':
       return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
+    case 'reading.heads':
+      return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`
@@ -686,11 +698,12 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const o = offer(a.id)
       const n = Array.isArray(a.days) ? a.days.length : 0
       const extras = Array.isArray(a.extras) ? (a.extras as { cents?: unknown }[]).reduce((sum, e) => sum + (typeof e.cents === 'number' ? e.cents : 0), 0) : 0
-      return `Sent ${o.who}'s timesheet for ${o.what}: ${n} day${n === 1 ? '' : 's'}${extras ? `, and ${euro(extras)} of extras` : ''}`
+      return `Sent ${o.who}'s timesheet for ${o.what}: ${n} day${n === 1 ? '' : 's'}${extras ? (rates ? `, and ${euro(extras)} of extras` : ', and extras') : ''}`
     }
     case 'timesheet.approve': {
       const o = offer(a.id)
       const figures = { days: Array.isArray(a.days) ? (a.days as string[]) : [], dayRateCents: typeof a.dayRateCents === 'number' ? a.dayRateCents : null, extras: Array.isArray(a.extras) ? (a.extras as { what: string; cents: number }[]) : [] }
+      if (!rates) return `Approved ${o.who}'s timesheet for ${o.what}: ${figures.days.length} day${figures.days.length === 1 ? '' : 's'}${figures.extras.length ? ', and extras' : ''}`
       return `Approved ${o.who}'s timesheet for ${o.what}: ${timesheetSummary(figures)}`
     }
     case 'timesheet.reopen': {

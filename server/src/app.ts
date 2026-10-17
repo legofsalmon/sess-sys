@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { MONEY_ENTITY_NAMES, plural, pushRequest, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -34,6 +34,7 @@ import { CHARACTERS, isCharacterError } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
+import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 
@@ -309,9 +310,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // Money (ADR 0042) goes only to the roles that see it: for the rest its changes are left out, and the cursor still
     // moves past them, so a phone never holds a price or a quote it couldn't show.
     const money = roleSeesMoney(req.role)
-    const changes: Change[] = page
-      .filter((r) => money || !MONEY_ENTITY_NAMES.includes(r.entity))
-      .map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data }))
+    // Crew rates and private links (ADR 0046) are on records every role needs, so those go to everyone, cut down to what
+    // the role reads: a booking without its rate, a person without their link.
+    const reading = await readingOf(db, req.role, req.reader ?? {})
+    const changes: Change[] = await asRead(
+      db,
+      page.filter((r) => money || !MONEY_ENTITY_NAMES.includes(r.entity)).map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data })),
+      reading
+    )
     // Where the feed ends, and which copy of the data this is: a device ahead of the
     // head, or holding another generation, has seen data this server no longer has.
     // Read each time, so a new generation counts at once, without a restart.
@@ -324,7 +330,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const cursor = page.length ? Number(page[page.length - 1]!.seq) : Math.max(after, head)
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
-    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, ...(money ? {} : { money: false }) }
+    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, ...(money ? {} : { money: false }), ...(readsEverything(reading) ? {} : { reading }) }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {
@@ -348,7 +354,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
     try {
-      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined })
+      // Read by every member of staff, so in words without crew pay for a role that doesn't see it (ADR 0046).
+      const { rates } = await readingOf(db, req.role, req.reader ?? {})
+      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, rates)
     } catch (err) {
       if (err instanceof BadCursor) return reply.code(400).send({ error: err.message })
       throw err

@@ -3,6 +3,43 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: a department on every call, and what each role reads
+
+**Done**
+
+- Every crew call has a department from the crew profiles' list, or none.
+  Asking for crew starts it on the one its role suggests (from calls for
+  the same role, then people with the role as a skill, then the role's
+  words), with a line saying so; it changes on the call's edit form.
+  Calls brought in from the calendar take the one most of their people
+  are in, or none
+  ([Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
+- Crew › Calls narrows to a department, a head of department starting on
+  their own. Narrowed to "No department", it gives many calls one at once,
+  nothing ticked to start. Home for a department counts the crew its calls
+  still need. Call sheets and the show pack carry the call's department.
+- Crew rates, timesheet amounts and freelancers' private links go only to
+  the roles that need them: all to the office and directors; a head of
+  department their own department's links, and rates if a director
+  allows it in Admin; the warehouse and staff crew none but their own.
+  Records still go to everyone with those fields left out, and every
+  screen says what's hidden for the role. Setting or agreeing a rate, and
+  deciding a timesheet, are refused for a role without rates, with who
+  can. The history leaves the figures out for them; Download everything
+  stays with the office and directors.
+- The demo's personas are sent what the person they stand for would be
+  sent, and You says what each role reads.
+- Checked: typecheck, unit tests (shared and server, with each role's
+  feed checked for rates and links it shouldn't hold), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Colly: whether heads of department should see crew rates (Admin, off
+  to start).
+- The office trial: whether the warehouse and staff crew still need every
+  phone number and certificate, the last of the reading left open.
+
 ## 17 October 2026: the Crewbox show pack
 
 **Done**

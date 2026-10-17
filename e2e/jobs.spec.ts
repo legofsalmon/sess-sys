@@ -69,9 +69,9 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await ask.getByRole('button', { name: 'Ask for crew' }).click()
   const build = office.getByRole('article', { name: 'Build' })
   await expect(build.locator('.job b')).toHaveText('2 × Audio tech')
-  // The call is one line under its phase (audit finding 16); a tap opens its days and rate.
+  // The call is one line under its phase (audit finding 16); a tap opens its days, rate and department (ADR 0046), which "Audio tech" suggests.
   await build.getByRole('button', { name: '2 × Audio tech' }).click()
-  await expect(build.locator('.job p').first()).toHaveText('Mon 7 Oct to Tue 8 Oct · €250')
+  await expect(build.locator('.job p').first()).toHaveText('Mon 7 Oct to Tue 8 Oct · €250 · Audio')
   await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(office.locator('.facts')).toContainText('0 of 2 booked')
   await office.evaluate(() => scrollTo(0, 0))

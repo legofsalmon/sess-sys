@@ -219,9 +219,15 @@ describe('the office’s details', () => {
 
   it('lay this device’s own change over what the server said', () => {
     const entities = { setting: { office: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: null } } }
-    expect(officeView(entities, [], 0)).toEqual({ details: entities.setting.office, pending: false })
+    expect(officeView(entities, [], 0)).toEqual({ details: entities.setting.office, pending: false, headsSeeRates: false, headsPending: false })
     const changed = officeView(entities, [m('office.update', { name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' })], 0)
-    expect(changed).toEqual({ details: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' }, pending: true })
-    expect(officeView({}, [], 0)).toEqual({ details: undefined, pending: false })
+    expect(changed).toEqual({ details: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' }, pending: true, headsSeeRates: false, headsPending: false })
+    expect(officeView({}, [], 0)).toEqual({ details: undefined, pending: false, headsSeeRates: false, headsPending: false })
+  })
+
+  it("say whether heads of department see rates (ADR 0046), with this device's own choice over the server's", () => {
+    const entities = { setting: { reading: { id: 'reading', name: '', phone: null, email: null, headsSeeRates: true } } }
+    expect(officeView(entities, [], 0)).toMatchObject({ headsSeeRates: true, headsPending: false })
+    expect(officeView(entities, [m('reading.heads', { rates: false })], 0)).toMatchObject({ headsSeeRates: false, headsPending: true, pending: false })
   })
 })

@@ -57,6 +57,8 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * - money (ADR 0042): a price list for kit and crew, a client's discount,
  *   and quotes sent, replaced, accepted and invoiced, with the gala's still
  *   owed and a freelancer still to pay;
+ * - a department on each crew call (ADR 0046), the one its role suggests,
+ *   but the Harbour Lights load out's hands, left with none to give them;
  * - kit lists in jobs' notes (ADR 0043): the wedding's job sheet with lines
  *   that match by name, by model and not at all, and crew and a van under
  *   transport; the arts week's Show with a line that's only a guess; and
@@ -222,7 +224,18 @@ export function madeUpData(today: string): Mutation[] {
 
   // Crew asked for from the jobs, and what each person said.
   const venues = new Map([riverside, northbank, granary, pier3, clonmore].map((v) => [v.id, venueLabel(v)]))
-  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number | null, callTime = '08:00', needsCertificates: CertificateKind[] = []) =>
+  // Each call's department (ADR 0046) is the one its role suggests, as when the office asks for crew, unless it's given.
+  const call = (
+    p: CommandInput<'phase.add'>,
+    project: string,
+    venueId: string,
+    role: string,
+    needed: number,
+    euroADay: number | null,
+    callTime = '08:00',
+    needsCertificates: CertificateKind[] = [],
+    department?: string | null
+  ) =>
     add('call.create', {
       id: newId(),
       projectId: p.projectId,
@@ -239,6 +252,7 @@ export function madeUpData(today: string): Mutation[] {
       details: 'Food on site. Blacks, please.',
       replyBy: null,
       needsCertificates,
+      ...(department !== undefined ? { department } : {}),
     }).id
   const offer = (callId: string, personId: string, override = false) => add('offer.send', { id: newId(), callId, personId, override }).id
   const booked = (callId: string, personId: string) => {
@@ -260,7 +274,8 @@ export function madeUpData(today: string): Mutation[] {
   const lx = call(harbourShow, 'Harbour Lights Festival', riverside.id, 'LX op', 1, 280, '12:00')
   add('offer.respond', { id: offer(lx, fionn), answer: 'counter', counterRateCents: 32000, days: null, note: 'Two long days; can you do 320?' })
   // Tadhg was booked for the load out, then rang to say he can't: the call is short again, for the office to see.
-  add('offer.respond', { id: booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00'), tadhg), answer: 'pullOut', note: 'Away that Monday now, sorry.' })
+  // The load out's hands were asked for with no department, as a call brought in from the calendar comes: one for the office to give one (ADR 0046).
+  add('offer.respond', { id: booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00', [], null), tadhg), answer: 'pullOut', note: 'Away that Monday now, sorry.' })
   booked(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Video', 1, 300), grainne)
   // Dara is booked at Harbour Lights then: offered anyway, so the planner shows it as a check.
   offer(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Sound No.1', 1, 320), dara, true)

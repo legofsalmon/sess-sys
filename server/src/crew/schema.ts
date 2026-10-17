@@ -161,6 +161,8 @@ const MIGRATIONS: string[] = [
     CHECK (id = person_id)
   );
   `,
+  // A department on every crew call (ADR 0046), from the crew profiles' list; none for a call nobody has given one.
+  `ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS department text;`,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

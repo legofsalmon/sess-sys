@@ -1,4 +1,4 @@
-import { COMMAND_NEEDS, refusalFor, roleCan, roleForEmail, type Ability, type Role, type View } from '@sh/shared'
+import { COMMAND_NEEDS, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
 import { currentAuth, useAuth, type Auth } from './auth.ts'
 import { previewKey, usePreview } from './home/Preview.tsx'
 import { client } from './sync.ts'
@@ -47,8 +47,20 @@ export function useAccess(): Access & { can: (ability: Ability) => boolean } {
   return { ...access, can: (ability) => canWith(access, ability) }
 }
 
+/**
+ * Whether this device is sent crew rates (ADR 0046), as the server last
+ * said: a screen without them says they're hidden, and doesn't offer to set
+ * or agree one.
+ */
+export const useSeesRates = () => useView().reading.rates
+
 // Every change goes through the client, so a role's limits hold on every screen, offline too, before anything is kept.
-client.guard = (name) => {
-  const { role } = accessOf(currentAuth(), client.view(), previewKey())
-  return role && !roleCan(role, COMMAND_NEEDS[name]) ? refusalFor(role, COMMAND_NEEDS[name]) : undefined
+client.guard = (name, args) => {
+  const view = client.view()
+  const { role } = accessOf(currentAuth(), view, previewKey())
+  if (role && !roleCan(role, COMMAND_NEEDS[name])) return refusalFor(role, COMMAND_NEEDS[name])
+  // Crew pay is for a role that reads it (ADR 0046): setting a rate, agreeing a counter-offer or deciding a timesheet.
+  if (view.reading.rates) return undefined
+  const countered = name === 'offer.confirm' && view.crew.calls.some((c) => c.offers.some((o) => o.id === (args as CommandArgs<'offer.confirm'>).id && o.status === 'countered'))
+  return setsRates(name, args) || countered ? RATES_REFUSAL : undefined
 }

@@ -40,6 +40,8 @@ export interface SheetCall {
   offers: readonly { personId: string; status: OfferStatus; days: readonly string[] }[]
   /** The certificates it needs (ADR 0028); missing on a call that needs none. */
   needsCertificates?: readonly CertificateKind[]
+  /** Its department (ADR 0046); missing or null on a call with none. */
+  department?: string | null
 }
 
 export interface SheetKitLine {
@@ -85,6 +87,8 @@ export interface SheetCrew {
 export interface SheetCallView {
   id: string
   role: string
+  /** Its department (ADR 0046), "Audio", for everyone; only when it has one. */
+  department?: string
   callTime: string | null
   /** Only when not the phase's days. */
   days?: string
@@ -166,6 +170,7 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
       return {
         id: c.id,
         role: c.role,
+        ...(c.department?.trim() ? { department: c.department.trim() } : {}),
         callTime: c.callTime,
         ...(c.start !== start || c.end !== end ? { days: daysLabel(callDays) } : {}),
         details: c.details.trim(),

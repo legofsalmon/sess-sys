@@ -99,8 +99,9 @@ a reader never has to ask whether one is missing.
 job for a whole-job pack. `venue` and `contactOnTheDay` are `null` when
 the phase has none. A venue's `address` leaves out a first line that is
 only its name again; `notes` are its access, load-in, power and parking.
-`departments` are those of the crew on the pack, as typed on their
-profiles, for one channel each (as step 2 would seed them). `box` is
+`departments` are those of the crew on the pack, each from the crew
+call they're on, or their profile for a call with none (ADR 0046), for
+one channel each (as step 2 would seed them). `box` is
 `null` unless the box's address was given.
 
 ### crew.csv
@@ -113,7 +114,7 @@ profiles, for one channel each (as step 2 would seed them). `box` is
 | `name` | Their full name |
 | `known_as` | What they go by: their "known as", or else their first name. What they'd type joining the box |
 | `role` | The crew call's role, such as `Sound No.1` |
-| `department` | Their department, as typed on their profile; may be empty |
+| `department` | The crew call's department ([Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)); for a call with none, theirs as typed on their profile; may be empty |
 | `call_time` | `HH:MM`, or empty |
 | `days` | The days they're on, `YYYY-MM-DD` separated by spaces |
 | `status` | `booked` (confirmed by the office) or `to confirm` (they said yes, the office hasn't confirmed) |

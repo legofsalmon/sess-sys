@@ -6,6 +6,7 @@ import { ExportCard } from './ExportCard.tsx'
 import { ListsCard } from './ListsCard.tsx'
 import { Top } from './jobs/common.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
+import { ReadingCard } from './ReadingCard.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
 import { MENU } from './Up.tsx'
@@ -61,6 +62,7 @@ export function AccountScreen() {
             </>
           )}
           {access.can('company') && <DataCard view={view} />}
+          {access.can('company') && !access.rolesOff && <ReadingCard office={view.office} />}
           {access.can('settings') && <ListsCard calendar={access.can('jobs')} />}
         </>
       )}

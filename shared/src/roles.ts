@@ -5,9 +5,10 @@ import type { CommandName } from './commands.ts'
  * docs/personas.md, less the freelancer, who has a private link and no
  * account: a role says what a signed-in member of staff can change, on the
  * server, where it counts, and on the device, so a button that can't work
- * isn't offered. Everyone signed in still reads everything, but money:
+ * isn't offered. Everyone signed in reads the company's work, but money:
  * prices, quotes and what's owed reach only the roles that can see them
- * (ADR 0042).
+ * (ADR 0042), and crew rates and private links only the roles that need
+ * them (ADR 0046, reading.ts).
  *
  * A role belongs to a staff person on the Crew tab, found by the email
  * their Google account signs in with, as leave already finds "me" (ADR
@@ -90,6 +91,7 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'call.create': 'crew',
   'call.update': 'crew',
   'call.cancel': 'crew',
+  'call.department': 'crew',
   'offer.send': 'crew',
   'offer.respond': 'crew',
   'offer.confirm': 'crew',
@@ -157,6 +159,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'cost.paid': 'money',
 
   'office.update': 'settings',
+  // Whether heads of department see crew rates (ADR 0046): what a role reads is a director's to decide, like the role.
+  'reading.heads': 'company',
 
   'person.role': 'company',
   'person.erase': 'company',

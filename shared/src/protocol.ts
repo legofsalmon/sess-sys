@@ -1,3 +1,4 @@
+import type { Reading } from './reading.ts'
 import { z } from 'zod'
 import type { Role } from './roles.ts'
 import { mutationSchema, type Rejection } from './commands.ts'
@@ -84,6 +85,13 @@ export interface PullResponse {
    * reads its copy again from the start, for what it was never sent.
    */
   money?: boolean
+  /**
+   * What this device's role reads of crew rates and private links (ADR
+   * 0046), when anything is left out; absent when it reads everything. A
+   * device told something different from last time reads its copy again
+   * from the start, so every record it holds is as it would be sent now.
+   */
+  reading?: Reading
 }
 
 /** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0019). */

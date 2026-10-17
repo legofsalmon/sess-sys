@@ -224,6 +224,15 @@ over by rule are later.
   the one they sent; only busy times are kept, read every few hours, and
   shown in the planner, on their page and as a warning when offering work;
   one tap stops it).
+- A department on every crew call, and what each role reads (built,
+  17 October 2026, [Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md):
+  each call has a department from the crew profiles' list, suggested from
+  its role when it's asked for and changeable; calls brought in from the
+  calendar take the one most of their people are in, or none, given many
+  at once on Crew › Calls; a head of department's Home and Calls narrow to
+  their own; call sheets and the show pack carry it. Crew rates, timesheet
+  amounts and private links go only to the roles that need them, the rest
+  told plainly that they're hidden).
 - One-tap links in SMS, WhatsApp and email for accept, decline and the
   call sheet; partial acceptance of multi-day jobs; rate counter-offers.
 - Invoicing made easy, not made for them: freelancers write their own

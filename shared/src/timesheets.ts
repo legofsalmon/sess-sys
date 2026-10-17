@@ -50,6 +50,12 @@ export interface Timesheet {
   /** Sent by the freelancer on their link, or put in by the office in the app. */
   sentVia: 'link' | 'app'
   approvedAt: string | null
+  /**
+   * Set by the server on what it sends a role that doesn't read rates (ADR
+   * 0046): the rate is left out (null) and each extra's amount is 0, so a
+   * screen says the amounts are hidden rather than adding them up. Never stored.
+   */
+  amountsHidden?: boolean
 }
 
 export interface TimesheetEntities {

@@ -1,4 +1,5 @@
 import {
+  departmentOfPeople,
   addDays,
   cleanText,
   isDay,
@@ -249,6 +250,8 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
     return v ? venueLabel(v) : ''
   }
   const jobsById = new Map(app.jobs.map((j) => [j.id, j]))
+  // Each call's department (ADR 0046) from the people on it, as its role says only "Crew"; new people have none yet.
+  const departments = new Map((await ctx.tx.query<{ id: string; department: string | null }>('SELECT id, department FROM people')).rows.map((r) => [r.id, r.department]))
 
   const counts = { jobs: 0, added: 0, days: 0, crew: 0 }
   const extents = new Map<string, { start: string; end: string }>()
@@ -302,7 +305,8 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
       if (offers.length === 0) continue
       const busiest = Math.max(1, ...r.days.map((d) => offers.filter((o) => o.status !== 'declined' && o.days.includes(d)).length))
       const callId = newId()
-      rows.calls.push([callId, projectId, phaseId, (j.existing?.name ?? j.name).slice(0, 200), names.phase, names.venue, 'Crew', start, end, Math.min(busiest, 100), 'open'])
+      const department = departmentOfPeople(offers.map((o) => departments.get(o.personId)))
+      rows.calls.push([callId, projectId, phaseId, (j.existing?.name ?? j.name).slice(0, 200), names.phase, names.venue, 'Crew', start, end, Math.min(busiest, 100), 'open', department])
       for (const o of offers)
         rows.offers.push([newId(), callId, o.personId, o.status, JSON.stringify(o.days), o.status === 'offered' ? null : answered, o.status === 'offered' ? null : 'calendar'])
       counts.crew += offers.length
@@ -316,7 +320,7 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
   await emitAll(ctx, 'project', (await getProjects(ctx.tx, ids(rows.projects))).map((p) => ({ id: p.id, data: p })))
   await insertRows(ctx.tx, 'phases', ['id', 'project_id', 'name', 'start_day', 'end_day', 'venue_id', 'notes'], rows.phases)
   await emitAll(ctx, 'phase', (await getPhases(ctx.tx, ids(rows.phases))).map((p) => ({ id: p.id, data: p })))
-  await insertRows(ctx.tx, 'crew_calls', ['id', 'project_id', 'phase_id', 'project', 'phase', 'venue', 'role', 'start_day', 'end_day', 'needed', 'status'], rows.calls)
+  await insertRows(ctx.tx, 'crew_calls', ['id', 'project_id', 'phase_id', 'project', 'phase', 'venue', 'role', 'start_day', 'end_day', 'needed', 'status', 'department'], rows.calls)
   await emitAll(ctx, 'crewCall', (await getCalls(ctx.tx, ids(rows.calls))).map((c) => ({ id: c.id, data: c })))
   await insertRows(ctx.tx, 'offers', ['id', 'call_id', 'person_id', 'status', 'days', 'responded_at', 'responded_via'], rows.offers)
   await emitAll(ctx, 'offer', (await getOffers(ctx.tx, ids(rows.offers))).map((o) => ({ id: o.id, data: o })))

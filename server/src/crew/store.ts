@@ -5,7 +5,7 @@ import { sortByIds } from '../projects/store.ts'
 /** Reading crew rows back as the entities devices and pages see. */
 
 const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role`
-const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status, needs_certificates`
+const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status, needs_certificates, department`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
 
@@ -48,6 +48,7 @@ export const toCall = (r: Row): CrewCall => ({
   replyBy: r.reply_by,
   status: r.status,
   needsCertificates: tidyNeeds(r.needs_certificates),
+  department: r.department ?? null,
 })
 export const toOffer = (r: Row): Offer => ({
   id: r.id,
@@ -148,7 +149,8 @@ const OFFER_WITH_CALL = `o.id, o.call_id, o.person_id, o.status, o.days, o.day_r
             c.project AS c_project, c.phase AS c_phase, c.venue AS c_venue, c.role AS c_role,
             c.start_day::text AS c_start_day, c.end_day::text AS c_end_day, c.call_time AS c_call_time,
             c.needed AS c_needed, c.day_rate_cents AS c_day_rate_cents, c.details AS c_details,
-            c.reply_by::text AS c_reply_by, c.status AS c_status, c.needs_certificates AS c_needs_certificates`
+            c.reply_by::text AS c_reply_by, c.status AS c_status, c.needs_certificates AS c_needs_certificates,
+            c.department AS c_department`
 
 const withCalls = (rows: Row[]) =>
   rows.map((r) => {

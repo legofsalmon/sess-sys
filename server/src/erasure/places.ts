@@ -155,9 +155,10 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
 /**
  * Each field of a person, by its column. Typed against Person, so a field
  * added to a person fails to compile here until it has a column (and
- * `erasedPerson` says whether it goes). The company is three columns.
+ * `erasedPerson` says whether it goes). The company is three columns;
+ * the hidden flags (ADR 0046) are only ever on what's sent, never stored.
  */
-const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company'>]: string } = {
+const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden'>]: string } = {
   name: 'name',
   email: 'email',
   phone: 'phone',

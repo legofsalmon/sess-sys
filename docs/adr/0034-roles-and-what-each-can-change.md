@@ -144,7 +144,11 @@ down.
   piece of this work. **Money came first** ([ADR 0042](0042-quotes-prices-and-a-money-view.md)):
   a sixth kind of change, `money`, for the office and directors, and the
   feed leaves prices, quotes and payments out for every other role.
-  Rates, phones, certificates and links are still to narrow.
-- Heads of department aren't narrowed to their department (above).
+  **Rates and links came next** ([ADR 0046](0046-departments-on-calls-and-what-each-role-reads.md)):
+  crew rates, timesheet amounts and private links go only to the roles
+  that need them, each person's own always. Phones and certificates are
+  still to narrow.
+- Heads of department aren't narrowed to their department (above), except
+  that they read their own department's links (ADR 0046).
 - The office trial will show whether five roles fit; anything crew did
   that the roles didn't predict goes in the design system's learnings.

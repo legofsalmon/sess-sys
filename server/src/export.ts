@@ -205,7 +205,7 @@ const ABOUT: Record<string, string> = {
   // Counts of places and cases (ADR 0030). The fixes a count led to are in the tables they changed: assets, stock and faults.
   counts:
     'Counts of places and cases: where, when they started and finished on the phone, who counted, what the count said of each item (found, not found, away, or found though kept elsewhere), the numbers no item had, each product counted against what was recorded and how many were out, and a summary in numbers.',
-  crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, and the certificates each needs, such as IPAF.',
+  crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, the department each is for, and the certificates each needs, such as IPAF.',
   // People's documents (ADR 0029): the details here, the files in the storage.
   document_files_to_delete: "Files the storage still holds for documents that have gone, or for uploads that didn't finish, waiting to be deleted: the storage's name for each, when, and why one couldn't be deleted yet. Nothing says whose it was.",
   documents:
@@ -235,7 +235,7 @@ const ABOUT: Record<string, string> = {
     "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, when it was sent, the client's answer, and the invoice and payment the office recorded for it.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
-  settings: "The office's own details: the name, phone and email shown to freelancers on their pages.",
+  settings: "The office's own details: the name, phone and email shown to freelancers on their pages; and whether heads of department see crew rates.",
   stock: 'Counted stock: how many of a product are at a place or in a case.',
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",

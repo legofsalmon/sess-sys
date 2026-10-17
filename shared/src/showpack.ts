@@ -229,7 +229,8 @@ export function showPack(input: ShowPackInput): ShowPackFile[] {
           p.name,
           who?.knownAs ?? p.name,
           c.role,
-          who?.department ?? '',
+          // The call's own department (ADR 0046); a call with none yet goes by the person's profile, as before.
+          c.department ?? who?.department ?? '',
           c.callTime ?? '',
           (days.length ? days : callDays).join(' '),
           p.status === 'booked' ? 'booked' : 'to confirm',

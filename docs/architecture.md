@@ -572,9 +572,14 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
   from the personas; freelancers keep their link. A role decides what a
   member of staff can change, checked by the server on every command and
   request, and the app offers only what it covers. They start off and come
-  on when a director is named from Admin. Not built yet: narrowing what
-  each role can *read* (the sync scopes), and an accountant's role, which
-  waits on finance.
+  on when a director is named from Admin. What each role *reads* is
+  narrowed in the change feed: money's tables go only to the office and
+  directors ([ADR 0042](adr/0042-quotes-prices-and-a-money-view.md)), and
+  crew rates, timesheet amounts and private links are left out of the
+  records sent to roles that don't need them, each person's own always
+  sent ([ADR 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
+  Not built yet: narrowing phones and certificates, and an accountant's
+  role, which waits on finance.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
   details, documents) kept in separate tables with tighter access. Not
   built yet either, for the same reason.

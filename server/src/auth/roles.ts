@@ -6,13 +6,16 @@ import type { Queryable } from '../db.ts'
  * request so a change a director makes counts at once: the people who
  * could decide it (the directors, and whoever has the account's email)
  * are read, and the shared rule decides, as a device does with its copy.
+ * With it, who they are on the Crew tab and their department, which decide
+ * what they read of rates and links (ADR 0046).
  */
-export async function roleOfAccount(q: Queryable, email: string): Promise<{ role: Role; on: boolean }> {
-  const { rows } = await q.query<RolePerson>(
-    `SELECT id, kind, email, archived, role FROM people
+export async function roleOfAccount(q: Queryable, email: string): Promise<{ role: Role; on: boolean; personId?: string; department?: string | null }> {
+  const { rows } = await q.query<RolePerson & { department: string | null }>(
+    `SELECT id, kind, email, archived, role, department FROM people
      WHERE (role = 'director' AND kind = 'staff' AND NOT archived) OR lower(trim(email)) = $1`,
     [email.trim().toLowerCase()]
   )
-  const { role, on } = roleForEmail(rows, email)
-  return { role, on }
+  const { role, on, personId } = roleForEmail(rows, email)
+  const me = personId ? rows.find((r) => r.id === personId) : undefined
+  return { role, on, ...(personId ? { personId, department: me?.department ?? null } : {}) }
 }

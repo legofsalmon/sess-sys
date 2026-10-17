@@ -146,6 +146,16 @@ describe('the show pack', () => {
     ])
   })
 
+  it("gives each person the department of the call they're on, and their own only for a call with none (ADR 0046)", () => {
+    const withDept: SheetInput = { ...sheet, calls: [{ ...sheet.calls[0]!, department: 'Audio' }] }
+    const pack = showPack(input({ phases: [{ id: 'show', name: 'Show', start: '2026-10-08', end: '2026-10-09', sheet: withDept }] }))
+    expect(rows(file(pack, 'crew.csv').text).slice(1).map((r) => [r[2], r[5]])).toEqual([
+      ['Dara Quinn', 'Audio'],
+      ['Eimear Nolan', 'Audio'],
+    ])
+    expect(JSON.parse(file(pack, 'event.json').text).departments).toEqual(['Audio'])
+  })
+
   it('for anyone else, lists those confirmed by name, and no number but the contact’s', () => {
     const pack = showPack(input({ phones: false }))
     const crew = rows(file(pack, 'crew.csv').text)

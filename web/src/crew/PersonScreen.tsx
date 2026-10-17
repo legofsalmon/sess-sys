@@ -138,10 +138,11 @@ function Who({ person }: { person: PersonView }) {
                 <dd>{email}</dd>
               </div>
             )}
-            {person.dayRateCents !== null && (
+            {(person.dayRateCents !== null || person.rateHidden) && (
               <div>
                 <dt>Day rate</dt>
-                <dd>{euro(person.dayRateCents)}</dd>
+                {/* Not sent to a role that doesn't see crew rates (ADR 0046): said, so it isn't taken for none. */}
+                <dd>{person.rateHidden ? 'Hidden for your role' : euro(person.dayRateCents)}</dd>
               </div>
             )}
             {person.skills.length > 0 && (
@@ -370,6 +371,8 @@ function TheirLink({ person }: { person: PersonView }) {
       <p className="hint">
         Where they answer offers, mark days off and send documents, with no app or login. Their bookings go to their own calendar from there too.
       </p>
+      {/* Not sent to this role (ADR 0046): said plainly, so it isn't taken for a link not made yet. */}
+      {person.linkHidden && <p className="hint">Your role doesn't see {person.name}'s link. The office or a director can open it or send it.</p>}
       <div className="actions">
         {link && (
           <>
@@ -386,7 +389,8 @@ function TheirLink({ person }: { person: PersonView }) {
             {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
           </button>
         )}
-        {!relinking && (
+        {/* A new link for someone whose link this role isn't sent would stop theirs working with nothing to send them (ADR 0046). */}
+        {!relinking && !person.linkHidden && (
           <button type="button" className="link" onClick={() => setRelinking(true)}>
             New link
           </button>

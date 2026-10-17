@@ -2,8 +2,11 @@ import {
   cleanText,
   COMMAND_NEEDS,
   commandSchemas,
+  RATES_REFUSAL,
+  readingFor,
   refusalFor,
   roleMayRun,
+  setsRates,
   type Role,
   type CommandArgs,
   type CommandName,
@@ -21,6 +24,7 @@ import { CHARACTERS, isCharacterError, Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
 import { officeHandlers } from './office/handlers.ts'
+import { headsSeeRates } from './office/store.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
@@ -110,7 +114,17 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // included: a resend gets the same answer anyway, and the rest of the push carries on.
   if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
 
-  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app', ...(from.user ? { user: from.user } : {}), ...(from.role ? { role: from.role } : {}) }
+  // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them.
+  const seesRates = !from.role || readingFor(from.role, { headsSeeRates: from.role === 'head' && (await headsSeeRates(tx)) }).rates
+  const ctx: Ctx = {
+    tx,
+    mutationId: m.id,
+    seq: 0,
+    via: from.via ?? 'app',
+    ...(from.user ? { user: from.user } : {}),
+    ...(from.role ? { role: from.role } : {}),
+    ...(seesRates ? {} : { seesRates: false }),
+  }
   let result: MutationResult
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
@@ -128,6 +142,9 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
   } else if (!parsed.success) {
     result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
+  } else if (!seesRates && setsRates(m.name, parsed.data)) {
+    // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: RATES_REFUSAL } }
   } else {
     try {
       await tx.query('SAVEPOINT cmd')

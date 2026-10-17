@@ -24,6 +24,7 @@ import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
 import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
+import { READS_EVERYTHING, sameReading, type Reading } from '../reading.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -60,6 +61,12 @@ export interface Snapshot {
    * before, which hold everything.
    */
   money?: boolean
+  /**
+   * What the server leaves out of crew rates and private links for this
+   * device's role (ADR 0046); absent when it sends everything, and on
+   * copies saved before, which then read their copy again once.
+   */
+  reading?: Reading
 }
 
 export interface Storage {
@@ -135,6 +142,8 @@ export interface View {
   money: MoneyView
   /** When freelancers are busy in their own calendars, read only (ADR 0044). */
   ownCalendars: OwnCalendarsView
+  /** What this device is sent of crew rates and private links (ADR 0046), as the server last said: a screen says what's hidden. */
+  reading: Reading
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -274,7 +283,7 @@ export class SyncClient {
    * nothing when it can. Set by the app from the person's role (ADR 0034);
    * the server checks the same, so this only saves a change it would turn down.
    */
-  guard?: (name: CommandName) => string | undefined
+  guard?: (name: CommandName, args: unknown) => string | undefined
 
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
@@ -287,10 +296,10 @@ export class SyncClient {
    * shown straight away as pending.
    */
   async mutate<N extends CommandName>(name: N, args: CommandInput<N>): Promise<Mutation<N>> {
-    // A change this person's role can't make is said so here, before it's kept, as the server would (ADR 0034).
-    const refused = this.guard?.(name)
-    if (refused) throw new Error(refused)
     const parsed = commandSchemas[name].safeParse(args)
+    // A change this person's role can't make is said so here, before it's kept, as the server would (ADR 0034, ADR 0046).
+    const refused = this.guard?.(name, parsed.success ? parsed.data : args)
+    if (refused) throw new Error(refused)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
     this.state.outbox.push(mutation)
@@ -423,6 +432,7 @@ export class SyncClient {
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
       ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
+      reading: this.state.reading ?? READS_EVERYTHING,
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
@@ -489,11 +499,17 @@ export class SyncClient {
       // the records it was never sent; what it has stays, as reading it again only lands it as it is. Without, it lets go of
       // the money it holds.
       const money = res.money !== false
-      const rescoped = money !== (this.state.money !== false)
+      const gainedMoney = money && this.state.money === false
+      // What it reads of rates and links changed too (ADR 0046): the copy is read again from the start, which lands every
+      // person, call, offer and timesheet as it's sent now, with what's hidden left out, or what's newly shown put back.
+      const reread = !sameReading(res.reading, this.state.reading)
+      const rescoped = money !== (this.state.money !== false) || reread
       if (rescoped) {
         this.state.money = money
+        if (res.reading) this.state.reading = res.reading
+        else delete this.state.reading
         if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
-        else if (this.state.cursor > 0) {
+        if ((gainedMoney || reread) && this.state.cursor > 0) {
           this.state.cursor = 0
           this.version++
           await this.persist()

@@ -12,6 +12,8 @@ const id = z.string().min(1).max(64)
 const phone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.')
 
 export const OFFICE_SETTING_ID = 'office'
+/** What heads of department read (ADR 0046): the second setting, with only `headsSeeRates` to it. */
+export const READING_SETTING_ID = 'reading'
 
 export const setting = z.object({
   id,
@@ -19,6 +21,8 @@ export const setting = z.object({
   name: z.string().max(200),
   phone: phone.nullable(),
   email: z.string().email().max(200).nullable(),
+  /** On the "reading" setting (ADR 0046): a director lets heads of department see crew rates. Off unless said. */
+  headsSeeRates: z.boolean().optional(),
 })
 export type Setting = z.infer<typeof setting>
 
@@ -37,6 +41,8 @@ export const officeCommandSchemas = {
     phone: phone.nullable(),
     email: z.string().trim().email('That email address doesn’t look right.').max(200, 'The email address can be up to 200 characters.').nullable(),
   }),
+  /** Whether heads of department see crew rates and timesheet amounts (ADR 0046). A director's to decide. */
+  'reading.heads': z.object({ rates: z.boolean() }),
 } as const
 
 /** The details when there is a way back in them: a phone or an email. A name alone is nothing to show. */
