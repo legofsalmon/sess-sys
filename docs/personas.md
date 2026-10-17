@@ -46,8 +46,10 @@ need to know about?"*
   the bottom (Crew is over five phone screens long). **Gap rated 3.**
 - **Now:** Home, shown for *the whole company*: today, what needs
   attention across every area with a count, and the week ahead.
-- **Still open:** money. Finance is Phase 4 (quotes, invoices, the
-  finance dashboard); its numbers join Home when it lands.
+- **Money:** Jobs › Money, by month (quoted, confirmed, invoiced), who
+  owes, freelancers owed and each job's margin; Home's whole-company view
+  has a short Money card ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)).
+  Only the office and directors see it.
 
 ### O. Office and production
 
@@ -161,8 +163,10 @@ timesheet?"*
 
 ### Not a user yet: clients
 
-Clients see what Session Hire sends them (call sheets, and later quotes
-and invoices). A client page to accept a quote online is Phase 4.
+Clients see what Session Hire sends them: call sheets, and quotes as a
+PDF the office sends itself (Decision 0042). A client page to accept a
+quote online is still Phase 4, and waits on the rule that the app contacts
+nobody.
 
 ## How a job moves through them
 
@@ -172,7 +176,7 @@ step where. **Bold** is a step the app does today.
 | Step | Who | Where in the app |
 |---|---|---|
 | **Enquiry logged** | O | Jobs › New job (starts as an enquiry) |
-| Quote sent | O, D | Planned (Phase 4) |
+| **Quote sent** | O, D | A job's Quote card › its quote, printed as a PDF the office sends itself |
 | **Confirmed, phases dated** | O | A job's page; the planner (Jobs › Week, Month); Google Calendar (on with the key) |
 | **Crew asked** | O, H | A job's crew card › Ask for crew |
 | **Offer answered** | F, S | Their link › Offers waiting on you |
@@ -184,7 +188,7 @@ step where. **Bold** is a step the app does today.
 | **Kit scanned back, faults logged** | W | The pick list; Stock › Faults and repairs |
 | **Timesheet sent** | F | Their link › Timesheets |
 | **Timesheet approved** | O, H | Crew › Timesheets; Home |
-| Invoiced, paid | D, O | Planned (Phase 4) |
+| **Invoiced, paid** | D, O | Recorded on the job's quote; owed and paid on Jobs › Money |
 
 ### A day for each
 
@@ -269,9 +273,9 @@ design system asks (0 to 4; a 3 is fixed or named).
 | Crew needed can't be narrowed to a department | H | 2 | Open: calls need a department |
 | A freelancer's page doesn't say what's waiting | F | 2 | Fixed: the line at the top |
 | Staff can't see their own bookings in the app | S | 2 | Fixed: Home for me |
-| No money anywhere | D | 2 | Phase 4 |
+| No money anywhere | D | 2 | Fixed: Jobs › Money and each job's quote, for the office and directors ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)) |
 | Everyone signed in can do everything | D | 2 | Fixed: five roles decide what each person can change ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Home stays a view anyone can switch |
-| Everyone signed in can read everything, rates and links included | D, S | 2 | Open: reading isn't narrowed by role yet (Decision 0034) |
+| Everyone signed in can read everything, rates and links included | D, S | 2 | Open: money is narrowed to the office and directors (Decision 0042); rates and links aren't yet (Decision 0034) |
 
 ## Seeing it as each of them
 

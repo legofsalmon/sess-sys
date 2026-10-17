@@ -1,4 +1,4 @@
-import { canApproveLeave, crewFill, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, plural, spanLabel, type PersonView, type View } from '@sh/shared'
+import { canApproveLeave, crewFill, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, type PersonView, type View } from '@sh/shared'
 import { useState } from 'react'
 import { useMe } from '../crew/Leave.tsx'
 import { Empty } from '../Empty.tsx'
@@ -8,6 +8,7 @@ import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar } from '../Picture.tsx'
+import { useAccess } from '../role.ts'
 
 /**
  * Home (ADR 0033): how things stand, for whoever is looking. One screen,
@@ -177,7 +178,27 @@ function ForCompany({ view, today, me }: { view: View; today: string; me: Person
           {plural(confirmed, 'confirmed job')} from today on, and {plural(pencilled, 'enquiry or quote', 'enquiries and quotes')} not yet decided. <a href="#jobs">All jobs</a>
         </p>
       </section>
+      <MoneyCard view={view} today={today} />
     </>
+  )
+}
+
+/** For the director and the office (ADR 0042): this month's quotes and who owes, a tap from Money. */
+function MoneyCard({ view, today }: { view: View; today: string }) {
+  const sees = useAccess().can('money')
+  const m = view.money
+  if (!sees || !m.any) return null
+  const month = m.months.find((x) => x.key === moneyMonth(today).key)
+  const owed = m.owed.reduce((s, o) => s + o.cents, 0)
+  const toFreelancers = m.costsOwed.reduce((s, c) => s + c.cents, 0)
+  return (
+    <section className="card" aria-label="Money">
+      <Heading icon="document">Money</Heading>
+      <p className="hint">
+        {money(month?.confirmed ?? 0)} confirmed of {money(month?.quoted ?? 0)} quoted for {moneyMonth(today).label}, before VAT. {money(owed)} owed by{' '}
+        {plural(m.owed.length, 'client')}, and {money(toFreelancers)} to freelancers. <a href="#jobs/money">Money</a>
+      </p>
+    </section>
   )
 }
 

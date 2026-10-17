@@ -1,7 +1,7 @@
 /**
  * An area's pages, side by side in one row under its header (ADR 0041's
  * tidy-up of where things live): Jobs' List, Week, Month, Clients and
- * Venues; Stock's Catalogue, Places, Labels, Counting, Testing and Repairs;
+ * Venues, and Money for the roles that see it (ADR 0042); Stock's Catalogue, Places, Labels, Counting, Testing and Repairs;
  * Crew's Calls, People, Leave and Timesheets
  * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the

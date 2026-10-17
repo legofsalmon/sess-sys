@@ -4,6 +4,7 @@ import { CREW } from './crew/schema.ts'
 import type { Db, Queryable } from './db.ts'
 import { DOCUMENTS } from './documents/schema.ts'
 import { ERASURE } from './erasure/schema.ts'
+import { FINANCE } from './finance/schema.ts'
 import { LEAVE } from './leave/schema.ts'
 import { runMigrations, runMigrationsIn, type Module } from './migrations.ts'
 import { OFFICE } from './office/schema.ts'
@@ -16,10 +17,11 @@ import { STOCK } from './stock/schema.ts'
  * jobs, so jobs come first, and the calendar connection names staff accounts.
  * The warehouse comes after: kit on jobs (ADR 0014) refers to jobs and their phases.
  * Leave (ADR 0024) refers to people. The office's settings refer to nothing,
- * so they come after. People's documents (ADR 0029) refer to people. The
+ * so they come after. People's documents (ADR 0029) refer to people. Money
+ * (ADR 0042) refers to jobs, clients, products and timesheets. The
  * list of erasures (ADR 0027) refers to nothing, on purpose, and comes last.
  */
-export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, ERASURE]
+export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, FINANCE, ERASURE]
 
 /** Set up or upgrade the whole database. */
 export async function migrateAll(db: Db) {

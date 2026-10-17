@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { plural, pushRequest, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { MONEY_ENTITY_NAMES, plural, pushRequest, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -296,8 +296,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       [after, PULL_LIMIT + 1]
     )
     const more = rows.length > PULL_LIMIT
-    const changes: Change[] = rows
-      .slice(0, PULL_LIMIT)
+    const page = rows.slice(0, PULL_LIMIT)
+    // Money (ADR 0042) goes only to the roles that see it: for the rest its changes are left out, and the cursor still
+    // moves past them, so a phone never holds a price or a quote it couldn't show.
+    const money = roleSeesMoney(req.role)
+    const changes: Change[] = page
+      .filter((r) => money || !MONEY_ENTITY_NAMES.includes(r.entity))
       .map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data }))
     // Where the feed ends, and which copy of the data this is: a device ahead of the
     // head, or holding another generation, has seen data this server no longer has.
@@ -308,10 +312,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     )
     const head = Number(meta[0]?.head ?? 0)
     const generation = meta[0]?.generation ?? undefined
-    const cursor = changes.length ? changes[changes.length - 1]!.seq : Math.max(after, head)
+    const cursor = page.length ? Number(page[page.length - 1]!.seq) : Math.max(after, head)
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
-    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head }
+    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, ...(money ? {} : { money: false }) }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {

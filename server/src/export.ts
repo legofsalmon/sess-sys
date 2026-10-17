@@ -196,6 +196,9 @@ const ABOUT: Record<string, string> = {
   calendar_link: 'The Google calendar confirmed jobs are written to, the account that writes them, and who connected it.',
   changes: 'Every change to every record, in order: what phones and laptops receive.',
   clients: 'Who jobs are for, with their contacts.',
+  // Money (ADR 0042).
+  client_discounts: "Each client's usual discount on a quote, as a percentage.",
+  cost_payments: "The day each freelancer was paid for an approved timesheet, as the office recorded it.",
   // Counts of places and cases (ADR 0030). The fixes a count led to are in the tables they changed: assets, stock and faults.
   counts:
     'Counts of places and cases: where, when they started and finished on the phone, who counted, what the count said of each item (found, not found, away, or found though kept elsewhere), the numbers no item had, each product counted against what was recorded and how many were out, and a summary in numbers.',
@@ -221,7 +224,11 @@ const ABOUT: Record<string, string> = {
   people: 'Staff and freelancers on the crew list: contact details, department, level, the name they go by, certificates, the company and VAT and CRO numbers they trade through, skills and rates, whether they have been archived, and which staff can approve time off.',
   phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
+  product_prices: "The price list: each product's price for a day, in cents.",
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
+  quotes:
+    "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, when it was sent, the client's answer, and the invoice and payment the office recorded for it.",
+  role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages.",
   stock: 'Counted stock: how many of a product are at a place or in a case.',

@@ -3,6 +3,39 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 17 October 2026: quotes and a money view
+
+**Done**
+
+- A price list: a day price on each product and each crew role, and a
+  client's usual discount, at Jobs › Money › Price list.
+- Quotes on a job, at the job's Quote card: built from its kit and crew at
+  those prices, every line open to change (what, how many, days charged,
+  price, VAT at 23%, 13.5% or 0%), the kit's days set at once, and the
+  client's discount. Once it's marked sent it stays as it went, and a
+  change is a new version. It prints as an A4 page to save as a PDF; the
+  app sends nothing. The office records the client's answer, the invoice
+  (day and number) and the payment.
+- Money, a page along Jobs' row for the director and the office: by month,
+  quoted, confirmed and invoiced; who owes, by client; freelancers owed,
+  marked paid from approved timesheets; and each job's margin. Home's
+  whole-company view has a short Money card.
+- Files for the accountant, for a VAT period or a year: invoices by VAT
+  rate, VAT by period and rate, and freelancer costs. The new tables are in
+  Download everything.
+- Only the office and directors are sent money: the server leaves it out
+  of every other role's copy ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)).
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Colly: the company's VAT number, address and quote terms, if the PDF
+  should carry them (the office details have no field for them yet; the
+  quote's notes do for now).
+- Colly: whether invoice numbers should be made in the app one day, or
+  stay the accounts package's.
+
 ## 16 October 2026: Crew's own pages
 
 **Done**

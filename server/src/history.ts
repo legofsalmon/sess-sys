@@ -755,6 +755,33 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'attachment.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
       return a.added ? `Added ${whose}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
     }
+    // Money (ADR 0042), in words with no amounts: every member of staff reads the history, and only some see money.
+    case 'quote.save':
+    case 'quote.sent':
+    case 'quote.answer':
+    case 'quote.invoiced':
+    case 'quote.paid': {
+      const q = look('quote', a.id)
+      const version = typeof q?.version === 'number' ? `version ${q.version} of ` : ''
+      const of = `${version}the quote for ${job(q?.projectId ?? a.projectId)}`
+      const on = typeof a.on === 'string' ? ` on ${dayLabel(a.on)}` : ''
+      if (command === 'quote.save') return `Saved ${of}`
+      if (command === 'quote.sent') return `Marked ${of} as sent to the client${on}`
+      if (command === 'quote.answer')
+        return a.answer === 'none' ? `Took back the client's answer to ${of}` : `Recorded that the client ${a.answer === 'accepted' ? 'accepted' : 'turned down'} ${of}${on}`
+      if (command === 'quote.invoiced') return a.on === null ? `Took back the invoice for ${of}` : `Marked ${of} invoiced${on}${typeof a.ref === 'string' && a.ref.trim() ? `, as ${clip(a.ref.trim())}` : ''}`
+      return a.on === null ? `Took back the payment for ${of}` : `Marked ${of} paid${on}`
+    }
+    case 'price.product':
+      return a.dayCents === null ? `Took ${model(a.modelId)} off the price list` : `Set the day price of ${model(a.modelId)}`
+    case 'price.role':
+      return a.dayCents === null ? `Took ${text(a.role, 'a role')} off the price list, to quote it at its booked rate` : `Set the day price for ${text(a.role, 'a role')}`
+    case 'price.client':
+      return a.pct === null ? `Took ${client(a.clientId)}'s discount off` : `Set ${client(a.clientId)}'s discount`
+    case 'cost.paid': {
+      const o = offer(a.id)
+      return a.on === null ? `Took back the payment of ${o.who}'s timesheet for ${o.what}` : `Marked ${o.who}'s timesheet for ${o.what} paid on ${typeof a.on === 'string' ? dayLabel(a.on) : 'a day'}`
+    }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`
     default:

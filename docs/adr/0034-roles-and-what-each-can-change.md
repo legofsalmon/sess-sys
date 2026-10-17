@@ -141,7 +141,10 @@ down.
   company staff on company accounts, as today, but a staff crew account
   doesn't need any of it. The fix is a change feed narrowed by role, with
   a device starting its copy afresh when its role changes; it's the next
-  piece of this work.
+  piece of this work. **Money came first** ([ADR 0042](0042-quotes-prices-and-a-money-view.md)):
+  a sixth kind of change, `money`, for the office and directors, and the
+  feed leaves prices, quotes and payments out for every other role.
+  Rates, phones, certificates and links are still to narrow.
 - Heads of department aren't narrowed to their department (above).
 - The office trial will show whether five roles fit; anything crew did
   that the roles didn't predict goes in the design system's learnings.

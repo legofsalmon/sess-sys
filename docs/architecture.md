@@ -376,6 +376,15 @@ says product and item; the code says model and asset.
 
 **Finance (light)**
 
+Built so far ([ADR 0042](adr/0042-quotes-prices-and-a-money-view.md)): the
+price list (a day price per product and crew role, a discount per client),
+quotes on each job with versions, VAT per line and an A4 PDF from the
+browser, the client's answer, invoice and payment as records, freelancer
+costs from approved timesheets, the money view and the accountant's CSV
+files. Money is sent only to roles with the `money` ability: the change
+feed leaves the finance tables out for the rest. What follows is the
+whole plan.
+
 - Price lists and discounts per client, day and week rates, multi-day
   factors.
 - Quotes and invoices in EUR with Irish VAT (23% and 13.5%, rate per line

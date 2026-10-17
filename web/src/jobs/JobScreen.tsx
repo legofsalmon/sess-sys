@@ -42,6 +42,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
+import { QuoteCard } from './Quote.tsx'
 import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
@@ -56,6 +57,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
   const job = view.jobs.jobs.find((j) => j.id === id)
   // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
   const [share, setShare] = useState<Share | undefined>()
+  const seesMoney = useAccess().can('money')
   const up = { steps: [JOBS], here: job?.name }
   if (!job)
     return (
@@ -109,6 +111,9 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
           </Fold>
         )}
       </section>
+
+      {/* Its quote, after the kit and crew it's built from, for the roles that see money (ADR 0042). */}
+      {seesMoney && <QuoteCard job={job} view={view} />}
     </Page>
   )
 }

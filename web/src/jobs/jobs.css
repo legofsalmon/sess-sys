@@ -208,3 +208,68 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .scan-failed { display: grid; gap: var(--space-6); justify-items: start; }
 .pick .scan-failed p, .pick .scan-failed ul { margin: 0; }
 .pick .scan-failed ul { padding-left: var(--space-16); }
+
+/* Quotes and money (ADR 0042): the lines as a table, typed in a row each while a draft, the sums under them, and the A4 page. */
+.quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
+.quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
+.quote-screen .quote-line { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
+.quote-screen .quote-line label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-line label input, .quote-screen .quote-line label select { min-width: 0; width: 100%; color: var(--ink); }
+.quote-screen .quote-line .what { grid-column: 1 / -1; }
+.quote-screen .quote-line .amount { grid-column: 1 / 3; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
+.quote-screen .quote-line button.link { grid-column: 3 / -1; justify-self: end; }
+@media (min-width: 720px) {
+  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) repeat(4, minmax(4.5em, 1fr)) minmax(6em, 1fr) auto; }
+  .quote-screen .quote-line .what, .quote-screen .quote-line .amount, .quote-screen .quote-line button.link { grid-column: auto; }
+  .quote-screen .quote-line .amount { text-align: right; }
+}
+.quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
+.quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-screen .kit-days-all input { width: 4.5em; }
+.quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
+.quote-screen .quote-send label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-send .hint { flex-basis: 100%; }
+.quote-table-wrap { overflow-x: auto; }
+.quote-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.quote-table th, .quote-table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); vertical-align: top; }
+.quote-table thead th { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.quote-table .group th { padding-top: var(--space-10); font-weight: 700; }
+.quote-table .n { text-align: right; white-space: nowrap; }
+.quote-table small { display: block; color: var(--muted); font-weight: 400; }
+.quote-table th a { color: var(--accent-ink); font-weight: 600; }
+.quote-table .bad { color: var(--bad); font-weight: 700; }
+.quote-totals { margin: var(--space-10) 0 0 auto; display: grid; gap: var(--space-2); max-width: 22em; font-variant-numeric: tabular-nums; }
+.quote-totals div { display: flex; justify-content: space-between; gap: var(--space-12); }
+.quote-totals dt { color: var(--muted); }
+.quote-totals dd { margin: 0; }
+.quote-totals .total { border-top: 1px solid var(--line); padding-top: var(--space-4); font-weight: 700; }
+.quote-totals .total dt { color: var(--ink); }
+.jobs .margin-line { margin: 0; }
+.jobs .margin-line.bad b { color: var(--bad); }
+.money .money-facts { grid-template-columns: repeat(auto-fit, minmax(9em, 1fr)); }
+.money .money-facts dd { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.money .owed { display: grid; gap: var(--space-6); padding-top: var(--space-8); }
+.money .owed + .owed { border-top: 1px solid var(--line); }
+.money .owed .amount, .money .price-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.money .owed ul.plain { list-style: none; margin: 0; padding: 0 0 0 var(--space-12); display: grid; gap: var(--space-6); }
+.money .owed a { color: var(--accent-ink); font-weight: 600; }
+.money .price-group h3 { margin: var(--space-12) 0 var(--space-6); }
+.money .price-row { align-items: center; }
+.money .price-row > div:first-child { flex: 1 1 12em; }
+.money .price-row .euro { display: inline-flex; align-items: center; gap: var(--space-4); }
+.money .price-row .euro input { width: 6.5em; }
+.money .price-row .alert { flex-basis: 100%; }
+@media print {
+  .print-sheet.quote-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
+  .quote-sheet h1 { font-size: 17pt; margin: 2pt 0; }
+  .quote-sheet p { margin: 0; }
+  .quote-sheet .muted, .quote-sheet .kicker { color: #444; }
+  .quote-sheet .quote-table th, .quote-sheet .quote-table td { border-bottom: 1px solid #bbb; padding: 3pt 4pt; color: #000; }
+  .quote-sheet .quote-table thead th { color: #444; }
+  .quote-sheet .quote-table tr { break-inside: avoid; }
+  .quote-sheet .quote-totals dt { color: #444; }
+  .quote-sheet .quote-totals .total { border-top: 1px solid #000; }
+  .quote-sheet .quote-totals .total dt { color: #000; }
+  .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
+}
+.money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }

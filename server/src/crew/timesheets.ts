@@ -134,6 +134,9 @@ export const timesheetHandlers: { [N in TimesheetCommand]: Handler<N> } = {
     const was = await getTimesheet(ctx.tx, a.id)
     if (!was) throw new Refused({ code: 'not-found', message: "There's no timesheet for this booking." })
     if (was.status !== 'approved') return
+    // Paid is settled for good (ADR 0042): the figures it was paid on stay as approved.
+    const { rows: paid } = await ctx.tx.query('SELECT 1 FROM cost_payments WHERE timesheet_id = $1', [a.id])
+    if (paid.length) throw new Refused({ code: 'conflict', message: 'This timesheet is marked paid, so it stays as approved. Take the payment back on Money first.' })
     await ctx.tx.query(`UPDATE timesheets SET status = 'sent', approved_at = NULL WHERE id = $1`, [a.id])
     await emitTimesheet(ctx, a.id)
   },

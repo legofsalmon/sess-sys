@@ -78,6 +78,12 @@ export interface PullResponse {
   madeUp?: boolean
   /** The server's latest change number. Lower than a device's cursor means the server has lost changes. */
   head?: number
+  /**
+   * False when this device's role can't see money (ADR 0042), so the
+   * changes leave out prices and quotes. A device that's given money later
+   * reads its copy again from the start, for what it was never sent.
+   */
+  money?: boolean
 }
 
 /** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0019). */
