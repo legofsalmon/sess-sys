@@ -68,6 +68,14 @@ export interface Mutation<N extends CommandName = CommandName> {
   args: CommandArgs<N>
   /** Device clock when the person did it. Kept for the audit trail. */
   createdAt: string
+  /**
+   * How far the device's copy had read the change feed when the person made
+   * it: what they were looking at. An edit to a record someone else has
+   * changed since is turned down rather than saved over theirs (audit, 18
+   * October 2026). Absent from older versions of the app, whose edits apply
+   * in the order they arrive, as before.
+   */
+  seen?: number
 }
 
 export const mutationSchema = z.object({
@@ -76,6 +84,8 @@ export const mutationSchema = z.object({
   name: z.string().min(1).max(64),
   args: z.unknown(),
   createdAt: z.string().max(40),
+  // Anything but a change number counts as not said, so the change applies as from an older version rather than failing the push.
+  seen: z.number().int().nonnegative().optional().catch(undefined),
 })
 
 /** Why the server turned a command down, in words for the person who sent it. */
