@@ -59,7 +59,7 @@ test('on a phone a call is one line that opens on a tap, the picker narrows as y
   const call = group.getByRole('article', { name: '1 × Audio tech' })
   const line = call.getByRole('button', { name: '1 × Audio tech' })
   await expect(line).toHaveAttribute('aria-expanded', 'false')
-  await expect(call).toContainText('0/1')
+  await expect(call).toContainText('0 of 1')
   await expect(call).not.toContainText('€260')
   await expect(call.getByLabel('Offer to')).toHaveCount(0)
 
@@ -247,7 +247,7 @@ test('a call says where it stands at rest, the picker only searches on Enter, an
   await context.setOffline(false)
   await office.evaluate(() => dispatchEvent(new Event('online')))
   await expect(office.getByRole('status')).toHaveText('Up to date', { timeout: 20_000 })
-  await expect(sound.locator('.pill')).toHaveText('0/1')
+  await expect(sound.locator('.pill')).toHaveText('0 of 1')
 
   // On the job's page the cancelled call says so, and each phase's details open on a tap.
   await office.goto(`/#jobs/j-${id}`)
