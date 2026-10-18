@@ -318,9 +318,10 @@ export function CrewScreen() {
   const atHand = (c: CallView) => c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
   const inView = shownCalls.filter(atHand)
   const filled = shownCalls.filter((c) => !atHand(c))
-  const callGroups = (calls: readonly CallView[]) =>
+  // A long list (audit finding 11): each job's group is drawn as it nears the screen, and Back finds its place by them (places.ts).
+  const callGroups = (calls: readonly CallView[], list: string) =>
     groupCalls(calls, view.jobs.jobs).map((g) => (
-      <div className="call-group" key={g.key}>
+      <div className="call-group" key={g.key} data-place={`${list}:${g.key}`}>
         <header>
           <div>
             <b>{g.project}</b>
@@ -502,14 +503,14 @@ export function CrewScreen() {
           {shownCalls.length > 0 && short.length === 0 && (
             <p className="empty">No calls{callsFor ? ` for ${callsFor === NO_DEPARTMENT ? 'no department' : callsFor}` : ''} are short of people: every one still to come is filled.</p>
           )}
-          {callGroups(inView)}
+          {callGroups(inView, 'short')}
           {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
           {filled.length > 0 && (
             <details className="filled-calls">
               <summary>
                 Show {filled.length} filled {filled.length === 1 ? 'call' : 'calls'}
               </summary>
-              {callGroups(filled)}
+              {callGroups(filled, 'filled')}
             </details>
           )}
         </section>

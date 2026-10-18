@@ -64,6 +64,47 @@ test('a new screen opens at its top, and Back finds the place the last one was l
   await expect.poll(() => scrollY(page)).toBe(0)
 })
 
+test('a long list draws its rows as they near the screen, and Back finds a place deep in it', async ({ browser, request }) => {
+  // Proves (audit finding 11): Jobs' rows are left undrawn until they near the screen, yet every one is still in the page for a
+  // screen reader, and Back from a job opened deep in the list puts its row back where it was, though the rows above it stand in
+  // at a guessed height when the list is drawn again. Some names wrap onto a second line, so the guess is wrong for those.
+  const mutations = Array.from({ length: 160 }, (_, i) => {
+    const day = new Date(Date.UTC(2031, 0, 1 + i)).toISOString().slice(0, 10)
+    const name = i % 5 === 0 ? `Long list job ${i} with a name long enough to wrap onto a second line on a phone` : `Long list job ${i}`
+    return [
+      { id: `long-${i}-a`, name: 'project.create', args: { id: `long-${i}`, name, clientId: null, venueId: null, status: 'confirmed', notes: '' } },
+      { id: `long-${i}-b`, name: 'phase.add', args: { id: `long-${i}-show`, projectId: `long-${i}`, name: 'Show', start: day, end: day, venueId: null, notes: '' } },
+    ]
+  }).flat()
+  const res = await request.post('/api/sync/push', { data: { clientId: 'long-list', mutations: mutations.map((m) => ({ ...m, createdAt: new Date().toISOString() })) } })
+  expect((await res.json()).results.every((r: { status: string }) => r.status === 'applied')).toBe(true)
+
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const list = page.getByRole('region', { name: 'Jobs' }).getByRole('list')
+  await expect(list.getByRole('link', { name: /Long list job 159\b/ })).toHaveCount(1)
+  expect(await list.locator('li').first().evaluate((li) => getComputedStyle(li).contentVisibility)).toBe('auto')
+
+  // Scrolled by hand to a row far down, which is opened from where it is on the screen.
+  const row = list.getByRole('link', { name: /Long list job 140\b/ })
+  for (let i = 0; i < 100; i++) {
+    const at = await row.evaluate((a) => a.getBoundingClientRect().top)
+    if (at < 500) break
+    await page.mouse.wheel(0, Math.min(600, at - 400))
+    await drawn(page)
+  }
+  await page.waitForTimeout(300)
+  const top = await row.evaluate((a) => Math.round(a.getBoundingClientRect().top))
+  expect(top).toBeGreaterThan(100)
+  expect(top).toBeLessThan(700)
+  await row.click()
+  await expect(page.getByRole('heading', { level: 1, name: /Long list job 140\b/ })).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveTitle('Jobs · Session Hire')
+  await expect.poll(() => row.evaluate((a) => Math.round(a.getBoundingClientRect().top))).toBe(top)
+})
+
 /** The demo copy, seen as one of its personas: this server has no passcode, so the test answers for it as a demo copy would. */
 async function as(page: Page, role: 'crew' | 'warehouse', button: RegExp) {
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'passcode', role } }))
