@@ -8,16 +8,52 @@
  * off, as it puts the place back before the screen is drawn, on a page
  * too short to hold it. Kept for the tab's life in session storage, so a
  * reload keeps its place too.
+ *
+ * A long list's rows (marked `data-place`) are drawn only as they near the
+ * screen, and until then stand in at about their height, so the same
+ * distance down a newly drawn list may be a different row. A place on such
+ * a list is kept by the row in the middle of the screen as well, and Back
+ * puts that row back where it was on the screen.
  */
 
 const STORE = 'session-hire-places'
 
-/** A step's place, by its number. */
-let places: Record<string, number> = {}
+/** How far down the page, and the long list's row in the middle of the screen, with how far it was from the top of the screen. */
+interface Place {
+  y: number
+  row?: string
+  top?: number
+}
+
+/** A step's place, by its number. A plain number is a place kept before rows were. */
+let places: Record<string, Place | number> = {}
 try {
-  places = JSON.parse(sessionStorage.getItem(STORE) ?? '{}') as Record<string, number>
+  places = JSON.parse(sessionStorage.getItem(STORE) ?? '{}') as Record<string, Place | number>
 } catch {
   // Storage that's off or full keeps the places for this page only.
+}
+
+/** Whether moving the page moves this, rather than a column scrolled on its own (a list beside an open job on a laptop). */
+function movesWithPage(el: Element): boolean {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return false
+  return true
+}
+
+/** The place now: a few points down the middle of the screen are tried for a long list's row, as a gap between rows has none. */
+function placeNow(): Place {
+  const y = scrollY
+  for (const at of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+    const row = document.elementFromPoint(innerWidth / 2, innerHeight * at)?.closest<HTMLElement>('[data-place]')
+    if (row?.dataset.place !== undefined && movesWithPage(row)) return { y, row: row.dataset.place, top: Math.round(row.getBoundingClientRect().top) }
+  }
+  return { y }
+}
+
+/** Where the page goes for a place: its row back where it was on the screen, or the same distance down if the row isn't drawn. */
+function yOf(place: Place | number): number {
+  if (typeof place === 'number') return place
+  const row = place.row === undefined ? null : document.querySelector(`[data-place="${CSS.escape(place.row)}"]`)
+  return row ? Math.max(0, Math.round(scrollY + row.getBoundingClientRect().top - (place.top ?? 0))) : place.y
 }
 
 const numberOf = (state: unknown): string | undefined => {
@@ -35,7 +71,7 @@ function number(): string {
 
 let current = ''
 /** What to do once the next screen is drawn: go to a place, or nothing. */
-let next: number | undefined
+let next: Place | number | undefined
 
 function keep() {
   try {
@@ -56,7 +92,7 @@ export function keepPlaces() {
   addEventListener('scroll', () => {
     cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => {
-      places[current] = scrollY
+      places[current] = placeNow()
       keep()
     })
   })
@@ -81,7 +117,7 @@ export function settlePlace(stay = false) {
   next = undefined
   if (to === undefined) return
   if (stay) {
-    places[current] = scrollY
+    places[current] = placeNow()
     return
   }
   // A screen still filling in may be too short at first, and the strip of its parts under the title comes a frame after it,
@@ -95,7 +131,9 @@ export function settlePlace(stay = false) {
       for (const e of events) removeEventListener(e, moved)
       return
     }
-    if (Math.abs(scrollY - to) > 1) scrollTo(0, to)
+    // Found again each frame: rows drawn as they come near the screen take their own height, moving the one kept.
+    const y = yOf(to)
+    if (Math.abs(scrollY - y) > 1) scrollTo(0, y)
     requestAnimationFrame(hold)
   }
   hold()

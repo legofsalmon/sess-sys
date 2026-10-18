@@ -220,9 +220,10 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
         ))}
       </div>
       {shown.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
+      {/* A long list (audit finding 11): its rows are drawn as they near the screen, and Back finds its place by them (places.ts). */}
       <ul className="job-list">
         {shown.map((j) => (
-          <li key={j.id}>
+          <li key={j.id} data-place={j.id}>
             <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={j.id === current} />
           </li>
         ))}
