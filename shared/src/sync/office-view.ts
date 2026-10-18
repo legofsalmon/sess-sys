@@ -1,5 +1,5 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { OFFICE_SETTING_ID, READING_SETTING_ID, type Setting, type SettingEntities } from '../office.ts'
+import { MESSAGES_SETTING_ID, OFFICE_SETTING_ID, READING_SETTING_ID, type Setting, type SettingEntities } from '../office.ts'
 
 /**
  * The office's details on a device: what the server has said, with this
@@ -14,6 +14,10 @@ export interface OfficeView {
   headsSeeRates: boolean
   /** That choice changed on this device and not yet on the server. */
   headsPending: boolean
+  /** The app prompts messages to crew (ADR 0048): Offer, Send, Tell and Ask open a WhatsApp, text or email. Off unless the office said. */
+  promptMessages: boolean
+  /** That choice changed on this device and not yet on the server. */
+  messagesPending: boolean
 }
 
 type Tables = { [E in keyof SettingEntities]: Record<string, SettingEntities[E]> }
@@ -24,15 +28,21 @@ export function officeView(entities: Partial<Tables>, outbox: readonly (Mutation
   let pending = false
   let headsSeeRates = entities.setting?.[READING_SETTING_ID]?.headsSeeRates === true
   let headsPending = false
+  let promptMessages = entities.setting?.[MESSAGES_SETTING_ID]?.promptMessages === true
+  let messagesPending = false
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     if (m.name === 'reading.heads') {
       headsSeeRates = (m.args as CommandArgs<'reading.heads'>).rates
       headsPending = true
     }
+    if (m.name === 'messages.prompt') {
+      promptMessages = (m.args as CommandArgs<'messages.prompt'>).on
+      messagesPending = true
+    }
     if (m.name !== 'office.update') continue
     details = { id: OFFICE_SETTING_ID, ...(m.args as CommandArgs<'office.update'>) }
     pending = true
   }
-  return { details, pending, headsSeeRates, headsPending }
+  return { details, pending, headsSeeRates, headsPending, promptMessages, messagesPending }
 }

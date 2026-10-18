@@ -443,8 +443,9 @@ describe('what each role reads', () => {
     expect(await send(app, h, 'offer.confirm', { id: 'dara-lx' })).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
     expect((await pull(h)).of('offer', 'dara-lx')).toMatchObject({ status: 'countered', counterRateCents: null, rateHidden: true })
 
-    // Only a director says whether heads see rates.
+    // Only a director says whether heads see rates, and the office or a director whether messages to crew are prompted (ADR 0048).
     expect((await send(app, h, 'reading.heads', { rates: true })).reason?.code).toBe('forbidden')
+    expect((await send(app, h, 'messages.prompt', { on: true })).reason?.code).toBe('forbidden')
     await ok('reading.heads', { rates: true })
     feed = await pull(h)
     expect(feed.reading).toMatchObject({ rates: true, links: 'department' })

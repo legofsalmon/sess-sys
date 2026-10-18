@@ -5,6 +5,7 @@ import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { ListsCard } from './ListsCard.tsx'
 import { Top } from './jobs/common.tsx'
+import { MessagesCard } from './MessagesCard.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { useAccess } from './role.ts'
@@ -56,6 +57,7 @@ export function AccountScreen() {
           {access.can('settings') && (
             <>
               <OfficeCard office={view.office} />
+              <MessagesCard office={view.office} />
               <CalendarCard view={view} available={auth.status === 'signed-in'} />
               <BackupsCard />
               <ExportCard />

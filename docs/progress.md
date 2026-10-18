@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, later: messages to crew are off until the office says
+
+**Done**
+
+- A company-wide switch under Admin › Messages to crew
+  ([Decision 0048](adr/0048-messages-to-crew-off-until-said.md)), off by
+  default: while it's off, Offer, Send, Tell and Ask open nothing. The
+  offer is still made and the change still reaches the person's private
+  link; in the Send panel's place a card says messages are off, who would
+  have been sent what, and where to turn them on. Finding 3 of the
+  [audit of 16 October](audit-2026-10-16.md), now that the two real
+  calendars are in.
+- Checked: typecheck, 774 unit tests, and the crew booking browser test,
+  which now starts quiet, turns messages on through Admin, then sends.
+
+**Waiting on**
+
+- Colly: the backup variables and the Sentry key; and, once the imported
+  lists are tidy, turning messages to crew on under Admin.
+
 ## 18 October 2026: a full audit, from reliability to the screens
 
 **Done**

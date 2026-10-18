@@ -1,4 +1,4 @@
-import { OFFICE_SETTING_ID, READING_SETTING_ID, type CommandArgs } from '@sh/shared'
+import { MESSAGES_SETTING_ID, OFFICE_SETTING_ID, READING_SETTING_ID, type CommandArgs } from '@sh/shared'
 import { emit, type Ctx } from '../kernel.ts'
 import { getSetting } from './store.ts'
 
@@ -7,7 +7,7 @@ import { getSetting } from './store.ts'
  * on every freelancer page. One office, so the command replaces them whole.
  */
 
-type OfficeCommand = 'office.update' | 'reading.heads'
+type OfficeCommand = 'office.update' | 'reading.heads' | 'messages.prompt'
 type Handler<N extends OfficeCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
@@ -32,5 +32,15 @@ export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
       [READING_SETTING_ID, a.rates]
     )
     await emit(ctx, 'setting', READING_SETTING_ID, await getSetting(ctx.tx, READING_SETTING_ID))
+  },
+
+  /** Whether Offer, Send, Tell and Ask open a message to a real person (ADR 0048). Every device hears at its next sync. */
+  async 'messages.prompt'(ctx, a) {
+    await ctx.tx.query(
+      `INSERT INTO settings (id, prompt_messages) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET prompt_messages = EXCLUDED.prompt_messages, updated_at = now()`,
+      [MESSAGES_SETTING_ID, a.on]
+    )
+    await emit(ctx, 'setting', MESSAGES_SETTING_ID, await getSetting(ctx.tx, MESSAGES_SETTING_ID))
   },
 }

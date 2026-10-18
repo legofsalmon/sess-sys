@@ -10,7 +10,10 @@ import { expect, test } from '@playwright/test'
 const shot = (name: string) => (process.env.SHOTS ? { path: `docs/hub/img/${name}.png` } : undefined)
 const phoneSize = { width: 390, height: 844 }
 
-test('office offers a job, freelancer answers from their link', async ({ browser }) => {
+test('office offers a job, freelancer answers from their link', async ({ browser, request }) => {
+  // Messages to crew start off (ADR 0048), whatever another test left: the office turns them on below.
+  const quiet = await request.post('/api/sync/push', { data: { clientId: 'e2e-crew', mutations: [{ id: `e2e-crew-quiet-${Date.now()}`, name: 'messages.prompt', args: { on: false }, createdAt: new Date().toISOString() }] } })
+  expect(((await quiet.json()) as { results: { status: string }[] }).results.map((r) => r.status)).toEqual(['applied'])
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
@@ -48,6 +51,19 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   await call.getByRole('button', { name: 'Offer…' }).click()
   await call.getByLabel('Offer to').selectOption({ label: 'Aoife Byrne · Level 1 (audio, monitors)' })
   await call.getByRole('button', { name: 'Offer', exact: true }).click()
+  // The offer is made, but with messages to crew off nothing opens to send it (ADR 0048): the card says so, and where to turn them on.
+  const quietCard = office.getByRole('region', { name: 'Messages to crew are off: offer for Aoife Byrne' })
+  await expect(quietCard).toContainText('Nothing opened to send Aoife Byrne the offer.')
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await quietCard.getByRole('link', { name: 'Admin' }).click()
+  const prompt = office.getByRole('region', { name: 'Messages to crew' }).getByRole('switch', { name: 'Prompt messages to crew' })
+  await expect(prompt).not.toBeChecked()
+  await prompt.click()
+  await expect(prompt).toBeChecked()
+  await expect(office.getByRole('status')).toHaveText('Up to date')
+  await office.goto('/#crew/calls')
+  await call.getByRole('button', { name: '1 × Audio tech' }).click()
+  await call.getByRole('button', { name: 'Send' }).click()
   const share = office.getByRole('region', { name: 'Send offer to Aoife Byrne' })
   await expect(share.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\/353871234567\?text=/)
   await expect(office.getByRole('status')).toHaveText('Up to date')

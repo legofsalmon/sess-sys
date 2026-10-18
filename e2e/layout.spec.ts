@@ -17,8 +17,10 @@ const phoneSize = { width: 390, height: 844 }
 const laptopSize = { width: 1280, height: 800 }
 const tag = () => Math.random().toString(36).slice(2, 8)
 
-test('on a phone a call is one line that opens on a tap, the picker narrows as you type, and forms wait behind their buttons', async ({ browser }) => {
+test('on a phone a call is one line that opens on a tap, the picker narrows as you type, and forms wait behind their buttons', async ({ browser, request }) => {
   const id = tag()
+  // Messages to crew are off until said (ADR 0048), and another test may have left them so: this one wants the Send panel.
+  await request.post('/api/sync/push', { data: { clientId: `layout-${id}`, mutations: [{ id: `layout-${id}-prompt`, name: 'messages.prompt', args: { on: true }, createdAt: new Date().toISOString() }] } })
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
