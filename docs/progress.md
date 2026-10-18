@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, night: Google is the only way in for staff
+
+**Done**
+
+- A member of staff's own page (their link) now asks for their Google
+  sign-in before it opens, in [Decision 0052](adr/0052-google-only-for-staff.md)
+  (Colly's "log in with Google is the only option for them"). It opens for
+  them, or the office or a director once roles are on; anyone else gets one
+  Sign in with Google button that comes back to the page. Freelancers'
+  links and calendar feeds are unchanged; the demo keeps its passcode.
+- Staff stay signed in for 400 days after they last used the app, renewed
+  each day (was 60), so in practice until they sign out (Colly's "persist
+  their login for as long as possible"). 400 days is the most a browser
+  keeps.
+- Checked: typecheck, 290 shared and 514 server tests, including new ones
+  for a staff page signed out, signed in, signed in as someone else, and
+  turned away by Google.
+
+**Waiting on**
+
+- Staff: their email on the Crew tab must be the Google address they sign
+  in with, as roles already need.
+
 ## 18 October 2026, night: long lists drawn in a window
 
 **Done**
