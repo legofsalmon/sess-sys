@@ -41,9 +41,9 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .share-calendar { display: grid; gap: var(--space-6); }
 .crew .share-calendar .hint { margin: 0; }
 .crew .busy-days { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
-/* Leavers, folded away under the list (audit finding 7). */
-.crew details.archived { padding-top: var(--space-10); border-top: 1px solid var(--line); }
-.crew details.archived summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
+/* Leavers, folded away under the list (audit finding 7), and filled calls under the ones short of people (audit finding 10). */
+.crew details.archived, .crew details.filled-calls { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.crew details.archived summary, .crew details.filled-calls summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
 .crew details.archived .row { padding-top: var(--space-8); }
 /* Bring back and "Erase details…" beside the name where there's room (ADR 0027); under it on a phone. */
 .crew details.archived .row > .who { min-width: 50%; }
