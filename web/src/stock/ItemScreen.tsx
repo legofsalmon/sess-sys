@@ -15,6 +15,7 @@ import { act, Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { when } from '../format.ts'
+import { useAccess } from '../role.ts'
 import { Pending, StatusPill } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
@@ -104,6 +105,9 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
   const done = () => setMode(undefined)
   const { run, error } = useAct()
   const reinstate = () => void run(() => client.mutate('asset.reinstate', { id: a.id }))
+  // Changing an item is stock's (audit finding 9); printing its label is anyone's.
+  const mayChange = useAccess().can('stock')
+  const modes = mayChange ? (['move', 'details', 'label', 'print', 'retire'] as const) : (['print'] as const)
   return (
     <section className="card">
       <header className="title">
@@ -179,24 +183,26 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
         a.model?.mistake ? (
           <p className="hint">{a.model.name} was marked as added by mistake, so this is kept for the history only.</p>
         ) : (
-          <div className="actions">
-            <button type="button" onClick={reinstate}>
-              Bring back
-            </button>
-          </div>
+          mayChange && (
+            <div className="actions">
+              <button type="button" onClick={reinstate}>
+                Bring back
+              </button>
+            </div>
+          )
         )
       ) : (
         <div className="actions">
-          {(['move', 'details', 'label', 'print', 'retire'] as const).map((m) => (
+          {modes.map((m) => (
             <button key={m} type="button" aria-pressed={mode === m} onClick={() => toggle(m)}>
               {{ move: 'Move', details: 'Change details', label: 'New label', print: 'Print label', retire: 'Retire' }[m]}
             </button>
           ))}
         </div>
       )}
-      {!retired && mode === 'move' && <Move a={a} w={w} onDone={done} />}
-      {!retired && mode === 'details' && <Details a={a} w={w} onDone={done} />}
-      {!retired && mode === 'label' && <Relabel a={a} w={w} onDone={done} />}
+      {!retired && mayChange && mode === 'move' && <Move a={a} w={w} onDone={done} />}
+      {!retired && mayChange && mode === 'details' && <Details a={a} w={w} onDone={done} />}
+      {!retired && mayChange && mode === 'label' && <Relabel a={a} w={w} onDone={done} />}
       {!retired &&
         mode === 'print' &&
         (a.number ? (
@@ -204,7 +210,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
         ) : (
           <p className="hint">It gets its number when it syncs, and its label can be printed then.</p>
         ))}
-      {!retired && mode === 'retire' && <Retire a={a} onDone={done} />}
+      {!retired && mayChange && mode === 'retire' && <Retire a={a} onDone={done} />}
     </section>
   )
 }
@@ -482,6 +488,8 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
     refuse('')
   }
   const empty = c.items.length === 0 && c.counted.length === 0
+  // Putting kit in a case is stock's (audit finding 9): a role without it sees what's in it.
+  const mayPut = useAccess().can('stock')
   return (
     <section className="card" aria-label="In it">
       <h2>In it</h2>
@@ -508,49 +516,51 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
         </CountRow>
       ))}
       <SavedLine text={said} />
-      <form className="grid-form" onSubmit={submit}>
-        <h3 className="wide">Put an item in</h3>
-        <div className="wide scan-row">
-          <label>
-            Its number
-            <input
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              placeholder="e.g. SH-000123"
-              autoComplete="off"
-              autoCapitalize="characters"
-              enterKeyHint="done"
-            />
-          </label>
-          <button
-            type="button"
-            aria-pressed={camera}
-            onClick={() => {
-              if (!camera) primeSound()
-              if (camera) close()
-              else setCamera(true)
-            }}
-          >
-            Scan
-          </button>
-        </div>
-        {camera && (
-          <div className="wide">
-            <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
+      {mayPut && (
+        <form className="grid-form" onSubmit={submit}>
+          <h3 className="wide">Put an item in</h3>
+          <div className="wide scan-row">
+            <label>
+              Its number
+              <input
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder="e.g. SH-000123"
+                autoComplete="off"
+                autoCapitalize="characters"
+                enterKeyHint="done"
+              />
+            </label>
+            <button
+              type="button"
+              aria-pressed={camera}
+              onClick={() => {
+                if (!camera) primeSound()
+                if (camera) close()
+                else setCamera(true)
+              }}
+            >
+              Scan
+            </button>
           </div>
-        )}
-        <Refusal error={error} className="wide" />
-        <ScanMisses misses={misses} onDismiss={dismiss} />
-        {putIn && !error && (
-          <ScanResult label="Put in" onClose={camera ? close : undefined}>
-            {putIn}
-            {camera && ' Scan the next label.'}
-          </ScanResult>
-        )}
-        <button type="submit" className="wide">
-          Put it in {numberLabel(c)}
-        </button>
-      </form>
+          {camera && (
+            <div className="wide">
+              <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
+            </div>
+          )}
+          <Refusal error={error} className="wide" />
+          <ScanMisses misses={misses} onDismiss={dismiss} />
+          {putIn && !error && (
+            <ScanResult label="Put in" onClose={camera ? close : undefined}>
+              {putIn}
+              {camera && ' Scan the next label.'}
+            </ScanResult>
+          )}
+          <button type="submit" className="wide">
+            Put it in {numberLabel(c)}
+          </button>
+        </form>
+      )}
       <CountHere w={w} at={{ placeId: null, caseId: c.id }} title="Count what's in it" onSaid={setSaid} />
     </section>
   )

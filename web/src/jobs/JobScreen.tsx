@@ -61,7 +61,11 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
   const job = view.jobs.jobs.find((j) => j.id === id)
   // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
   const [share, setShare] = useState<Share | undefined>()
-  const seesMoney = useAccess().can('money')
+  const access = useAccess()
+  const seesMoney = access.can('money')
+  // A button the role can't use isn't drawn (audit finding 9): phases are the job's, asking for crew is crew's.
+  const mayJobs = access.can('jobs')
+  const mayCrew = access.can('crew')
   const up = { steps: [JOBS], here: job?.name }
   if (!job)
     return (
@@ -86,13 +90,15 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
 
       <section className="card" aria-label="Phases">
         <Heading icon="time">Phases</Heading>
-        {job.phases.length === 0 && <Empty>Add the first phase below, so the job has dates.</Empty>}
+        {job.phases.length === 0 && <Empty>{mayJobs && 'Add the first phase below, so the job has dates.'}</Empty>}
         {job.phases.map((p) => (
-          <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} />
+          <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} mayChange={mayJobs} />
         ))}
-        <Fold label="Add phase">
-          <AddPhase job={job} />
-        </Fold>
+        {mayJobs && (
+          <Fold label="Add phase">
+            <AddPhase job={job} />
+          </Fold>
+        )}
       </section>
 
       {inPhase && offering}
@@ -108,6 +114,8 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
         ))}
         {stopped ? (
           <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p>
+        ) : !mayCrew ? (
+          job.calls.length === 0 && <p className="empty">No crew asked for yet.</p>
         ) : !job.span ? (
           <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
         ) : (
@@ -359,12 +367,14 @@ function Phase({
   view,
   onShare,
   onTell,
+  mayChange,
 }: {
   job: JobView
   phase: PhaseView
   view: View
   onShare: (c: CallView) => (p: PersonView) => void
   onTell: (share: Share | undefined) => void
+  mayChange: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const today = useToday()
@@ -384,9 +394,11 @@ function Phase({
         {/* A phase still waiting to sync can be changed too: the change waits behind it, in order. */}
         <div className="actions">
           <Pending pending={phase.pending} />
-          <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
-            Change
-          </button>
+          {mayChange && (
+            <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+              Change
+            </button>
+          )}
         </div>
       </header>
       {calendarWarns && <CalendarLine job={job} phase={phase} on={on} today={today} />}
@@ -403,7 +415,7 @@ function Phase({
           </div>
         </div>
       </details>
-      {editing && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
+      {editing && mayChange && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
       {outside.map((c) => (
         <p className="warn-line" key={c.id}>
           The {c.role} crew are asked for {daysLabel(c.days)}, outside {phase.name}.

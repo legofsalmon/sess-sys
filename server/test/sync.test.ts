@@ -367,7 +367,7 @@ function steppedDb(db: Db, before: (sql: string) => Promise<void>): Db {
     },
     exec: (sql) => q.exec(sql),
   })
-  return { ...db, ...stepped(db), transaction: (fn) => db.transaction((tx) => fn(stepped(tx))) }
+  return { ...db, ...stepped(db), reads: stepped(db.reads), transaction: (fn) => db.transaction((tx) => fn(stepped(tx))) }
 }
 
 describe('a pull answered while another change lands (audit, 18 October 2026)', () => {

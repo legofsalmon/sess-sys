@@ -78,6 +78,11 @@ export interface PushResponse {
   results: MutationResult[]
   /** Nothing applied: the app started fresh after the device's copy (see `generation`). Its next pull starts it afresh too. */
   stale?: boolean
+  /**
+   * The server is in the middle of a long change (bringing a calendar in, say) and couldn't take these in time: the
+   * ones not in `results` go again shortly, without the device showing a problem.
+   */
+  busy?: boolean
 }
 
 export interface Change {

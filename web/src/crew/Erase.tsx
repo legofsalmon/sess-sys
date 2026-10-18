@@ -1,6 +1,7 @@
 import { dayLabel, ERASED_NAME, eraseRefusal, irishToday, LEAVE_RECORD_YEARS, PAID_WORK_YEARS, type NameKept, type PersonView } from '@sh/shared'
 import { useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
@@ -44,6 +45,10 @@ export function ArchivedPerson({ person, onBringBack }: { person: PersonView; on
   const today = useToday()
   const [asking, setAsking] = useState(false)
   const { run, error, refuse } = useAct()
+  // Bringing back is crew's, erasing a director's (audit finding 9): neither is drawn for a role that can't.
+  const access = useAccess()
+  const mayBringBack = access.can('crew')
+  const mayErase = access.can('company')
   const erased = view.erasures[person.id]
   // As the server will decide it, from their pay and leave records (ADR 0027); once erased, as it was decided that day.
   const kept = view.keptFor(person.id, erased ? irishToday(new Date(erased.erasedAt)) : today)
@@ -84,14 +89,19 @@ export function ArchivedPerson({ person, onBringBack }: { person: PersonView; on
       {person.pending ? (
         <Pending pending />
       ) : (
-        !asking && (
+        !asking &&
+        (mayBringBack || mayErase) && (
           <div className="actions">
-            <button type="button" onClick={onBringBack}>
-              Bring back
-            </button>
-            <button type="button" className="link" onClick={erase}>
-              Erase details…
-            </button>
+            {mayBringBack && (
+              <button type="button" onClick={onBringBack}>
+                Bring back
+              </button>
+            )}
+            {mayErase && (
+              <button type="button" className="link" onClick={erase}>
+                Erase details…
+              </button>
+            )}
           </div>
         )
       )}

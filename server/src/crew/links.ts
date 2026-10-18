@@ -369,7 +369,8 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     return reply.redirect(`/f/${person.linkToken}?${new URLSearchParams({ ...told(result.status === 'rejected' ? result : 'late-here'), s: 'late', o: late.offerId })}#late-${late.offerId}`, 303)
   })
 
-  // Their own email and phone (audit finding 7). Only what differs is sent, so the history can say which changed.
+  // Their own phone (audit finding 7). Only what differs is sent, so the history can say which changed; an email from a page
+  // from before audit finding 12 is sent too, and refused in plain words.
   app.post('/f/:token/details', async (req: Req, reply) => {
     const person = await personByToken(db, req.params.token)
     if (!person) return gone(reply)
@@ -384,7 +385,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (phone !== undefined && phone !== person.phone) changes.phone = phone
     if (changes.email === undefined && changes.phone === undefined) return inSection('details-same')
     const result = await run(req, person.id, 'person.contact', changes)
-    // A refusal keeps the number and email as they were typed (rule 11).
+    // A refusal keeps the number as it was typed (rule 11).
     if (result.status === 'rejected') return refused(req, reply, person, result, { form: 'details', values: form }, { section: 'details' })
     return inSection('details-saved')
   })

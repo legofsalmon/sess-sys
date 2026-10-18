@@ -21,6 +21,7 @@ import {
 } from '@sh/shared'
 import { useState } from 'react'
 import { ShowAll } from '../Fold.tsx'
+import { useAccess } from '../role.ts'
 import { useToday } from '../view.ts'
 import { linkFor, QuietPanel, SendButtons, usePromptsMessages } from './CrewScreen.tsx'
 import { useDocumentStorage } from './Documents.tsx'
@@ -78,6 +79,8 @@ export function CertificateReminders({ view }: { view: View }) {
   const today = useToday()
   const reminders = runningOut(view.crew.people, view.documents.all, today)
   const [asking, setAsking] = useState<RunningOut<PersonView> | undefined>()
+  // Asking for the new one is crew's (audit finding 9): a role without it sees what's running out.
+  const mayAsk = useAccess().can('crew')
   if (!reminders.length) return null
   const key = (r: RunningOut<PersonView>) => (r.what === 'certificate' ? `${r.person.id} ${r.kind}` : `document ${r.document.id}`)
   return (
@@ -93,7 +96,7 @@ export function CertificateReminders({ view }: { view: View }) {
               </div>
               <div className="actions">
                 {/* The name starts with what the button says, so it can be asked for by voice. */}
-                {r.what === 'certificate' ? (
+                {!mayAsk ? null : r.what === 'certificate' ? (
                   <button type="button" onClick={() => setAsking(r)} aria-label={`Ask for the new card: ${r.person.name}'s ${certificateName(r.kind)}`}>
                     Ask for the new card
                   </button>

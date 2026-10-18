@@ -189,16 +189,14 @@ describe('telling devices about a change', () => {
     // reported rather than left as an unhandled rejection, which would end the process (audit finding 20).
     const db = await pgliteDb()
     const fault = { next: false }
-    const app = await server({
-      ...db,
-      query: (sql, params) => {
-        if (fault.next && sql.includes('max(seq)')) {
-          fault.next = false
-          return db.query('SELECT 1/0')
-        }
-        return db.query(sql, params)
-      },
-    })
+    const query: Queryable['query'] = (sql, params) => {
+      if (fault.next && sql.includes('max(seq)')) {
+        fault.next = false
+        return db.query('SELECT 1/0')
+      }
+      return db.query(sql, params)
+    }
+    const app = await server({ ...db, query, reads: { ...db.reads, query } })
     await app.ready()
     const told: string[] = []
     const ws = await app.injectWS('/api/sync/live', {}, { onInit: (socket) => socket.on('message', (data) => told.push(String(data))) })
@@ -291,7 +289,8 @@ describe('a character the database cannot hold', () => {
     expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ code: '22P02' }), { area: 'commands', command: 'place.upsert' })
 
     vi.mocked(reportError).mockClear()
-    const app2 = await server({ ...db, query: (sql, params) => (sql.includes('max(seq)') ? db.query(BUILT_WRONG) : db.query(sql, params)) })
+    const builtWrong: Queryable['query'] = (sql, params) => (sql.includes('max(seq)') ? db.query(BUILT_WRONG) : db.query(sql, params))
+    const app2 = await server({ ...db, query: builtWrong, reads: { ...db.reads, query: builtWrong } })
     const res = await app2.inject({ method: 'GET', url: '/api/health' })
     expect([res.statusCode, res.json()]).toEqual([500, { error: 'Something went wrong on the server.' }])
     expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ code: '22P02' }), { route: '/api/health', method: 'GET' })

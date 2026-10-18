@@ -28,6 +28,7 @@ import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers
 import { CHARACTERS, isCharacterError, Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
+import { notOverwriting } from './seen.ts'
 import { officeHandlers } from './office/handlers.ts'
 import { headsSeeRates } from './office/store.ts'
 import { projectHandlers } from './projects/handlers.ts'
@@ -171,7 +172,9 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     try {
       await tx.query('SAVEPOINT cmd')
       await refuseIfErased(tx, m.name, parsed.data)
-      await (handlers[m.name] as Handler<CommandName>)(ctx, parsed.data as never)
+      // An edit made against an older copy isn't saved over what someone else has changed since (seen.ts).
+      const args = await notOverwriting(tx, clientId, m, parsed.data as Record<string, unknown>, { seesRates })
+      await (handlers[m.name] as Handler<CommandName>)(ctx, args as never)
       await tx.query('RELEASE SAVEPOINT cmd')
       if (ctx.seq === 0) ctx.seq = await currentSeq(tx)
       result = { id: m.id, status: 'applied', seq: ctx.seq }

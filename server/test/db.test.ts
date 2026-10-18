@@ -107,7 +107,12 @@ describe('a connection that fails in the middle of a transaction', () => {
       await expect(work).rejects.toThrow('Connection terminated unexpectedly')
       await new Promise((r) => setTimeout(r, 50))
       expect(uncaught).toEqual([])
-      expect(pretend.queries).toEqual(['BEGIN', 'SELECT 1', 'SELECT 2 -- the connection drops here'])
+      // The time limits go with BEGIN, in the same trip (audit finding 7).
+      expect(pretend.queries).toEqual([
+        'BEGIN; SET LOCAL statement_timeout = 60000; SET LOCAL lock_timeout = 30000; SET LOCAL idle_in_transaction_session_timeout = 60000',
+        'SELECT 1',
+        'SELECT 2 -- the connection drops here',
+      ])
     } finally {
       process.off('uncaughtException', heard)
     }

@@ -220,6 +220,22 @@ describe('bringing the list in', () => {
     expect(none.json().error).toBe('Every row is skipped, so there is nothing to bring in.')
   })
 
+  it('marks a second row with the same email, which the server would refuse (audit finding 12), and brings the rest in once it is skipped', async () => {
+    const { app, db, colly } = await company()
+    const text = [HEADER, 'Rory,Breen,LX,0877000005,rory@example.ie,,,,,,,,,,,,', 'Rory,Breen,LX,,Rory@Example.ie,,,,,,,,,,,,'].join('\r\n')
+    const p = await preview(app, colly.cookies, text)
+    expect(p.rows.map((r) => [r.name, r.matched, r.problems])).toEqual([
+      ['Rory Breen', null, []],
+      ['Rory Breen', null, ['The same email as row 2.']],
+    ])
+    const both = await bringIn(app, colly.cookies, p.rows.map((r) => ({ ...r, skip: false })))
+    expect(both.statusCode).toBe(400)
+    expect(both.json().error).toBe('Row 3 (Rory Breen): The same email as row 2. Nothing was brought in.')
+    const one = await bringIn(app, colly.cookies, p.rows.map((r) => ({ ...r, skip: r.row === 3 })))
+    expect(one.json()).toMatchObject({ added: 1, skipped: 1 })
+    expect(await peopleNamed(db)).toEqual(['Dara Quinn', 'Eimear Nolan', 'Old Timer', 'Rory Breen'])
+  })
+
   it('refuses a row whose match is not what the preview showed, so a phone fixed to someone else never overwrites them unseen', async () => {
     const { app, colly } = await company()
     const p = await preview(app, colly.cookies)

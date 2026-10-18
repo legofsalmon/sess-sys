@@ -72,7 +72,9 @@ async function main() {
     }
     case 'restore': {
       const { name, data } = await load(store, from)
-      const db = await dbFromEnv()
+      // Run by hand into an empty database, with nobody else on it: a whole table checked in one statement may take
+      // longer than the server's own limits allow (db.ts), so it has none.
+      const db = await dbFromEnv(process.env, { limits: false })
       try {
         const report = await restoreBackup(db, data, key)
         console.log(`Restored ${name} (made ${report.header.createdAt}): ${report.rows} rows.`)

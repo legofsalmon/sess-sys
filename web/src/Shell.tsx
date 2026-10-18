@@ -11,6 +11,7 @@ import { PreviewSplash, useHoldPersona, usePreview } from './home/Preview.tsx'
 import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { MenuScreen } from './MenuScreen.tsx'
+import { settlePlace } from './places.ts'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
 import { StorageBanner, useUnkept } from './StorageBanner.tsx'
@@ -23,7 +24,8 @@ import { YouScreen } from './YouScreen.tsx'
  * (#jobs/plan/week/<day>) or bringing jobs in (#jobs/import), so a reload or a shared
  * link lands in the same place. Each move lands on the screen's heading
  * and names the tab after it (audit finding 22), so a screen reader says
- * where it is and the browser's history reads as pages.
+ * where it is and the browser's history reads as pages; it starts at the
+ * screen's top, and Back finds the place it was left at (places.ts).
  *
  * Five places, each a picture and a word (ADR 0033): Home first, the
  * three areas the work is done in, and the Menu (ADR 0035), which names
@@ -126,6 +128,8 @@ export function Shell() {
       // Someone already typing on the new screen, in its search say, keeps their place: this runs a frame after the move, and a quick
       // hand can be in a field by then. Taking the focus away would send the rest of what they type, and their Enter, nowhere.
       const typing = !!active && !!main.current?.contains(active) && active.matches(TYPED_INTO)
+      // A new screen starts at its top, Back finds its place again (audit finding 8); the toggle keeps the page where it is.
+      settlePlace(toggled)
       if (movedTo.current !== undefined && movedTo.current !== hash && heading && !toggled && !typing) {
         heading.el.tabIndex = -1
         heading.el.focus({ preventScroll: true })

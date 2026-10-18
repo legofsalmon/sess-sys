@@ -203,6 +203,44 @@ describe('roles', () => {
     expect((await send(app, s, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@sessionhire.com', { notes: 'Van keys' }))).status).toBe('applied')
     expect((await send(app, c, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@sessionhire.com', { approvesLeave: true }))).status).toBe('applied')
   })
+
+  it("keep the email and type of someone who holds a role to the office and directors, and each email to one person (audit finding 12)", async () => {
+    const { app, signIn, c } = await company()
+    await send(app, c, 'person.role', { id: 'sean', role: 'head' })
+    const s = { sh_session: await signIn(sean) }
+    const said = (r: { reason?: { message: string } }) => r.reason?.message
+
+    // A head can't move the director's account, take it, or move his own.
+    const moved = await send(app, s, 'person.upsert', staff('colly', 'Colly', 'sean.two@sessionhire.com'))
+    expect(moved).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
+    expect(said(moved)).toBe("Only the office and directors can change Colly's email or type: it's how they sign in as Director. Your role is Head of department.")
+    expect((await send(app, s, 'person.upsert', staff('colly', 'Colly', 'colly@sessionhire.com', { kind: 'freelancer' }))).reason?.code).toBe('forbidden')
+    expect((await send(app, s, 'person.contact', { id: 'colly', email: 'sean.two@sessionhire.com' })).reason?.code).toBe('forbidden')
+    expect(said(await send(app, s, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@elsewhere.ie')))).toMatch(/^Only the office and directors can change Seán Ó Briain's email or type/)
+    // The same email in other letters, with anything else changed, is fine.
+    expect((await send(app, s, 'person.upsert', staff('colly', 'Colly', 'Colly@SessionHire.com', { notes: 'Keys to the yard' }))).status).toBe('applied')
+
+    // Nobody gets an email someone here already has, however it's written: from the form, or a phone change.
+    const taken = await send(app, s, 'person.upsert', staff('dara', 'Dara Kelly', 'COLLY@sessionhire.com'))
+    expect(taken).toMatchObject({ status: 'rejected', reason: { code: 'conflict', message: 'Colly already has that email. Each person needs their own, as it\'s how the app knows who signs in.' } })
+    expect((await send(app, c, 'person.upsert', staff('dara', 'Dara Kelly', 'sean@sessionhire.com'))).reason?.code).toBe('conflict')
+    // Staff crew's own, a head of department changes, as before.
+    expect((await send(app, s, 'person.upsert', staff('dara', 'Dara Kelly', 'dara@sessionhire.com'))).status).toBe('applied')
+    expect((await send(app, s, 'person.contact', { id: 'dara', email: 'dara.kelly@sessionhire.com' })).status).toBe('applied')
+    expect((await send(app, s, 'person.contact', { id: 'dara', email: 'colly@sessionhire.com' })).reason?.code).toBe('conflict')
+    // Someone who has left keeps theirs, and it can be given again.
+    expect((await send(app, s, 'person.archive', { id: 'dara', archived: true })).status).toBe('applied')
+    expect((await send(app, s, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com'))).status).toBe('applied')
+
+    // A role kept by someone made a freelancer comes back if they're made staff again, so that's the office's too.
+    expect((await send(app, c, 'person.role', { id: 'dara2', role: 'office' })).status).toBe('applied')
+    expect((await send(app, c, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com', { kind: 'freelancer' }))).status).toBe('applied')
+    expect((await send(app, s, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com'))).reason?.code).toBe('forbidden')
+
+    // A director can, and Seán's account is then nobody's.
+    expect((await send(app, c, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@elsewhere.ie'))).status).toBe('applied')
+    expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'crew' })
+  })
 })
 
 describe('the demo, seen as someone', () => {

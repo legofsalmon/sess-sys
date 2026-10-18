@@ -108,7 +108,8 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
 
   async function signedIn(req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
     const token = readCookie(req, SESSION_COOKIE)
-    const found = token ? await sessionUser(db, token) : undefined
+    // Asked on every request, so on the reads' own connections: never queued behind writes waiting for the write lock.
+    const found = token ? await sessionUser(db.reads, token) : undefined
     if (!found) return null
     if (found.renewed) setCookie(req, reply, SESSION_COOKIE, token!, { maxAge: SESSION_DAYS * 86_400 })
     return found.user
@@ -125,7 +126,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     } else if (auth) {
       req.user = await signedIn(req, reply)
       if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
-      const { role, on, personId, department } = await roleOfAccount(db, req.user.email)
+      const { role, on, personId, department } = await roleOfAccount(db.reads, req.user.email)
       req.role = on ? role : null
       if (on && personId) req.reader = { personId, department: department ?? null }
     }

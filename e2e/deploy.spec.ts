@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { brotliCompressSync, gzipSync } from 'node:zlib'
 
 /**
  * A deploy while the app is open (audit findings 4 and 27), in a real
@@ -14,9 +15,15 @@ const dist = join(process.cwd(), 'web', 'dist')
 const files = { page: join(dist, 'index.html'), sw: join(dist, 'sw.js') }
 const before = { page: readFileSync(files.page, 'utf8'), sw: readFileSync(files.sw, 'utf8') }
 
+// The build serves pre-compressed copies (ADR 0049), so a file swapped here has its .br and .gz swapped with it.
+const put = (file: string, text: string) => {
+  writeFileSync(file, text)
+  if (existsSync(`${file}.br`)) writeFileSync(`${file}.br`, brotliCompressSync(text))
+  if (existsSync(`${file}.gz`)) writeFileSync(`${file}.gz`, gzipSync(text))
+}
 const putBack = () => {
-  writeFileSync(files.page, before.page)
-  writeFileSync(files.sw, before.sw)
+  put(files.page, before.page)
+  put(files.sw, before.sw)
 }
 test.afterEach(putBack)
 
@@ -49,8 +56,8 @@ test('a new version waits for Load the new version, which brings it in with an u
   }
   expect(next.page).not.toBe(before.page)
   expect(next.sw).not.toBe(before.sw)
-  writeFileSync(files.page, next.page)
-  writeFileSync(files.sw, next.sw)
+  put(files.page, next.page)
+  put(files.sw, next.sw)
   await tab.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()))
   await expect(tab.getByText('A new version is ready.')).toBeVisible({ timeout: 20_000 })
   // Still the old page, with the change still waiting: nothing happens until someone taps.

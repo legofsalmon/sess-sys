@@ -21,6 +21,7 @@ import {
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Fold } from '../Fold.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 
@@ -32,7 +33,8 @@ import { useToday } from '../view.ts'
  */
 
 /** "Gráinne Power is running late": what they said, the job and the day, a way to ring them, and Noted. */
-export function LateRow({ note, today, onNoted }: { note: LateNote; today: string; onNoted: () => void }) {
+/** Without `onNoted`, for a role that can't note it (audit finding 9), there's no Noted: the Ring is still to hand. */
+export function LateRow({ note, today, onNoted }: { note: LateNote; today: string; onNoted?: () => void }) {
   const name = note.person?.name ?? 'Someone'
   const c = note.call
   return (
@@ -51,17 +53,27 @@ export function LateRow({ note, today, onNoted }: { note: LateNote; today: strin
             Ring
           </a>
         )}
-        <button type="button" onClick={onNoted} aria-label={`Noted: ${name} is running late`}>
-          Noted
-        </button>
+        {onNoted && (
+          <button type="button" onClick={onNoted} aria-label={`Noted: ${name} is running late`}>
+            Noted
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
+/** What's been said about anyone on a call running late, as its line shows it. */
+export const lateNotesOn = (call: CallView, late: LateView | undefined) =>
+  call.offers.flatMap((o) => (o.status === 'accepted' || o.status === 'confirmed' ? (late?.forOffer(o.id) ?? []) : []))
+
+/** Who on a call could be noted as running late now: booked, on a day it can be said for (today, and tomorrow from 6pm). */
+export const lateToNote = (call: CallView) =>
+  call.status === 'open' ? call.offers.filter((o) => o.person && HOLDING.includes(o.status) && lateDays(o.days).length > 0) : []
+
 /** On a call's line, at rest: "Gráinne: about 30 minutes late, “Traffic on the M50”", or "Gráinne: there now". */
 export function LateLines({ call, late, today }: { call: CallView; late: LateView | undefined; today: string }) {
-  const notes = call.offers.flatMap((o) => (o.status === 'accepted' || o.status === 'confirmed' ? (late?.forOffer(o.id) ?? []) : []))
+  const notes = lateNotesOn(call, late)
   if (!notes.length) return null
   return (
     <>
@@ -83,7 +95,8 @@ export function LateLines({ call, late, today }: { call: CallView; late: LateVie
  * it can be said for now, as on the link: today, and tomorrow from 6pm.
  */
 export function NoteLate({ call, late }: { call: CallView; late: LateView | undefined }) {
-  const booked = call.status === 'open' ? call.offers.filter((o) => o.person && HOLDING.includes(o.status) && lateDays(o.days).length > 0) : []
+  const mayNote = useAccess().can('crew')
+  const booked = mayNote ? lateToNote(call) : []
   if (!booked.length) return null
   return (
     <Fold label="Running late…" className="link late-open">

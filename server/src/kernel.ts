@@ -37,6 +37,24 @@ export function isCharacterError(err: unknown): boolean {
   return (e.code === '22021' && says(e.message, /0x00$/)) || e.code === '22P05' || (e.code === '22P02' && says(e.detail, /surrogate/))
 }
 
+/**
+ * Take the write lock that keeps the change feed in order (see `emit`), waiting
+ * at most `waitMs` for it. Another change holding it longer (a bring-in, a
+ * restore) fails the wait with `isLockBusy`, and the caller answers "busy, try
+ * again" rather than holding a connection and the device waiting (audit
+ * finding 7). Without `waitMs`, the transaction's own lock limit applies.
+ */
+export async function takeWriteLock(tx: Queryable, waitMs?: number) {
+  if (waitMs === undefined) await tx.query('SELECT pg_advisory_xact_lock(7331)')
+  // One trip: the limit, for the rest of this transaction only, then the lock.
+  else await tx.exec(`SET LOCAL lock_timeout = ${Math.max(1, Math.round(waitMs))}; SELECT pg_advisory_xact_lock(7331)`)
+}
+
+/** A lock not got in the time allowed (55P03, lock_not_available): the database is busy, not broken. */
+export function isLockBusy(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === '55P03'
+}
+
 export interface Ctx {
   tx: Queryable
   /** The command the changes belong to, for the history; null for the server's own bookkeeping. */

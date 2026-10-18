@@ -1,9 +1,9 @@
 import { addDays, ADDRESS_WORDS, BUSY_AHEAD_DAYS, busyByDay, irishToday, redact, type HistoryPage, type OwnCalendar } from '@sh/shared'
 import { afterEach, describe, expect, it } from 'vitest'
-import { dublinWallTime, readBusy } from '../src/crew/busy.ts'
+import { dublinWallTime, NotACalendar, readBusy, readBusyApart, TooMuch } from '../src/crew/busy.ts'
 import { fetchCalendar, isPublic, NotRead, READ_WORDS } from '../src/crew/calendar-fetch.ts'
 import { calendarFeed } from '../src/crew/ical.ts'
-import { NOT_A_CALENDAR } from '../src/crew/own-calendars.ts'
+import { NOT_A_CALENDAR, TOO_MUCH, type OwnCalendarsOptions } from '../src/crew/own-calendars.ts'
 import { everythingJson, readEverything } from '../src/export.ts'
 import { fakeCalendar, ics, type FakeCalendar } from './fake-calendar.ts'
 import { ANDROID, flashOf, IPHONE, server, staff } from './people.ts'
@@ -132,6 +132,93 @@ describe('reading busy times from a calendar', () => {
   it('says when what came back is not a calendar', () => {
     expect(() => readBusy('<!doctype html><title>Sign in</title>', TODAY)).toThrow()
   })
+
+  it('works out repeats from years back from near today, on the same days and times, with an old one moved into the months ahead', () => {
+    const got = readBusy(
+      ics([
+        // Every day since 2010: far past where working through from the start would have stopped.
+        { uid: 'daily@google.com', start: '2010-03-01T09:00', end: '2010-03-01T10:00', rrule: 'FREQ=DAILY' },
+        // Every second Tuesday since 2010.
+        { uid: 'fortnight@google.com', start: '2010-01-05T19:00', end: '2010-01-05T21:00', rrule: 'FREQ=WEEKLY;INTERVAL=2' },
+        // One from 2015 moved to next week.
+        { uid: 'fortnight@google.com', start: `${day(5)}T06:00`, end: `${day(5)}T07:00`, recurrenceId: '2015-06-02T19:00' },
+      ]),
+      TODAY
+    )
+    if (got.ours) throw new Error('not ours')
+    const at = (d: string, h: number) => new Date(dublinWallTime(...ymd(d), h, 0, 0)).toISOString()
+    const starts = new Set(got.busy.map((b) => b.start))
+    for (let n = 0; n <= 30; n++) {
+      expect(starts.has(at(day(n), 9))).toBe(true)
+      const fortnightly = (Date.parse(day(n)) - Date.parse('2010-01-05')) % (14 * 86_400_000) === 0
+      expect(starts.has(at(day(n), 19))).toBe(fortnightly)
+    }
+    expect(starts.has(at(day(5), 6))).toBe(true)
+  })
+
+  it("reads each file's time zones as its own, not one read before it", () => {
+    const zone = ['BEGIN:VTIMEZONE', 'TZID:Studio/Time', 'BEGIN:STANDARD', 'TZOFFSETFROM:+0500', 'TZOFFSETTO:+0500', 'DTSTART:19700101T000000', 'END:STANDARD', 'END:VTIMEZONE']
+    const event = (uid: string) => ['BEGIN:VEVENT', `UID:${uid}`, `DTSTART;TZID=Studio/Time:${day(3).replace(/-/g, '')}T120000`, `DTEND;TZID=Studio/Time:${day(3).replace(/-/g, '')}T130000`, 'END:VEVENT']
+    const file = (lines: string[]) => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//x//EN', ...lines, 'END:VCALENDAR'].join('\r\n')
+    const first = readBusy(file([...zone, ...event('a@x')]), TODAY)
+    const second = readBusy(file(event('b@x')), TODAY)
+    if (first.ours || second.ours) throw new Error('not ours')
+    expect(Date.parse(first.busy[0]!.start)).toBe(Date.parse(`${day(3)}T07:00:00Z`))
+    // The second file doesn't say what Studio/Time is, so its times are Irish ones.
+    expect(Date.parse(second.busy[0]!.start)).toBe(dublinWallTime(...ymd(day(3)), 12, 0, 0))
+  })
+})
+
+/** Three hundred events every day since 2012: 64 KB, and what held the server up for most of a minute when worked through from the start. */
+const SLOW = ics(
+  Array.from({ length: 300 }, (_, i) => {
+    const h = String(7 + (i % 12)).padStart(2, '0')
+    return { uid: `daily-${i}@google.com`, start: `2012-01-01T${h}:00`, end: `2012-01-01T${h}:30`, rrule: 'FREQ=DAILY' }
+  })
+)
+
+describe('a calendar that takes a lot of working out', () => {
+  it('is read apart from the server, quickly, while the server keeps answering', async () => {
+    let last = performance.now()
+    let longest = 0
+    const tick = setInterval(() => {
+      const now = performance.now()
+      longest = Math.max(longest, now - last)
+      last = now
+    }, 10)
+    const began = performance.now()
+    try {
+      // Limits wide enough for a machine running many tests at once; on its own it takes two or three seconds.
+      const got = await readBusyApart(SLOW, TODAY, { maxMs: 60_000, timeoutMs: 60_000 })
+      if (got.ours) throw new Error('not ours')
+      expect(busyByDay({ busy: got.busy.filter((b) => !b.allDay) }).get(day(1))).toBe('07:00 to 07:30; 08:00 to 08:30; 09:00 to 09:30; 10:00 to 10:30; 11:00 to 11:30; 12:00 to 12:30; 13:00 to 13:30; 14:00 to 14:30; 15:00 to 15:30; 16:00 to 16:30; 17:00 to 17:30; 18:00 to 18:30')
+    } finally {
+      clearInterval(tick)
+    }
+    // On the server's own thread, worked through from 2012, it took most of a minute.
+    expect(performance.now() - began).toBeLessThan(30_000)
+    // And the server's own thread was never held for more than a moment, even on a busy machine.
+    expect(longest).toBeLessThan(1_000)
+  })
+
+  it('reads a big file of single events in a moment, not one look through the file for each', () => {
+    const many = ics(Array.from({ length: 10_000 }, (_, i) => ({ uid: `e${i}@google.com`, start: `${day(i % 100)}T09:00`, end: `${day(i % 100)}T10:00` })))
+    const began = performance.now()
+    const got = readBusy(many, TODAY)
+    // Over a minute when each event looked through the whole file.
+    expect(performance.now() - began).toBeLessThan(10_000)
+    if (got.ours) throw new Error('not ours')
+    expect(got.busy).toHaveLength(100)
+  })
+
+  it('past the cap on repeats, or the time, is too much: said, not half read', async () => {
+    expect(() => readBusy(SLOW, TODAY, { maxSteps: 1000 })).toThrow(TooMuch)
+    const hourly = ics([{ uid: 'hourly@google.com', start: '2000-01-01T09:00', end: '2000-01-01T09:15', rrule: 'FREQ=HOURLY' }])
+    expect(() => readBusy(hourly, TODAY, { maxMs: 50 })).toThrow(TooMuch)
+    // A worker that runs past its time is stopped.
+    await expect(readBusyApart(SLOW, TODAY, { timeoutMs: 50 })).rejects.toThrow(TooMuch)
+    await expect(readBusyApart('<!doctype html>', TODAY)).rejects.toThrow(NotACalendar)
+  })
 })
 
 const ymd = (d: string) => [Number(d.slice(0, 4)), Number(d.slice(5, 7)), Number(d.slice(8, 10))] as const
@@ -239,9 +326,9 @@ describe('reading an address someone pasted', () => {
 })
 
 /** The office signed in, with Aoife on the crew list, and a calendar host on this machine. */
-async function office() {
+async function office(reading?: OwnCalendarsOptions['reading']) {
   const cal = await host()
-  const { app, db } = await server({ ownCalendars: { testHosts: [cal.host] } })
+  const { app, db } = await server({ ownCalendars: { testHosts: [cal.host], reading } })
   const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
   expect(await colly.send('person.upsert', { id: 'aoife', name: 'Aoife Byrne', kind: 'freelancer', email: 'aoife@example.com', phone: null, skills: [], dayRateCents: 30000, notes: '' })).toMatchObject({
     status: 'applied',
@@ -313,6 +400,21 @@ describe('sharing their own calendar', () => {
     expect(await words(cal.url('/ours.ics'))).toBe(ADDRESS_WORDS.ours)
     expect((await db.query(`SELECT 1 FROM own_calendars`)).rows).toHaveLength(0)
     expect((await db.query(`SELECT 1 FROM changes WHERE entity = 'ownCalendar'`)).rows).toHaveLength(0)
+  })
+
+  it('says a calendar that takes too much working out as it says any other read that failed, and keeps what was read before', async () => {
+    const { app, db, cal, post, record } = await office({ maxSteps: 2000 })
+    cal.set('/slow.ics', { ics: SLOW })
+    const res = await post('/calendar', { address: cal.url('/slow.ics') })
+    expect(res.statusCode).toBe(422)
+    expect(flashOf(res.body).message).toBe(TOO_MUCH)
+    expect((await db.query(`SELECT 1 FROM own_calendars`)).rows).toHaveLength(0)
+
+    cal.set(SECRET_PATH, { ics: ics([{ uid: 'a@google.com', start: `${day(2)}T09:00`, end: `${day(2)}T13:00` }]) })
+    expect((await post('/calendar', { address: cal.url(SECRET_PATH) })).statusCode).toBe(303)
+    cal.set(SECRET_PATH, { ics: SLOW })
+    await app.ownCalendars.readNow('aoife')
+    expect(await record()).toMatchObject({ problem: TOO_MUCH, busy: [{ allDay: false }] })
   })
 
   it('from their page in the app, with the address they sent: read now, read again, and a problem said without losing what was read', async () => {

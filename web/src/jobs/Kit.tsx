@@ -24,6 +24,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { ProductChoices } from '../stock/common.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
@@ -131,6 +132,9 @@ export function kitShort(lines: readonly KitLineView[] | undefined): Tone | unde
 export function KitCard({ job, view }: { job: JobView; view: View }) {
   const lines = view.kit.byJob.get(job.id) ?? []
   const today = useToday()
+  // A button the role can't use isn't drawn (audit finding 9): the lines are kit's, the days held are the job's own.
+  const access = useAccess()
+  const mayKit = access.can('kit')
   const department = (l: KitLineView): Department => l.model?.department ?? 'other'
   // In the order they're shown, so "Show all" adds to the end, not in among them; a line short or at risk stays in view.
   const byDepartment = DEPARTMENTS.flatMap((d) => lines.filter((l) => department(l) === d))
@@ -143,9 +147,9 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
       <Heading icon="kit">Kit</Heading>
       <PickLink job={job} view={view} lines={lines} />
       <NotesKitLink job={job} view={view} />
-      {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} />}
+      {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} mayChange={access.can('jobs')} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
-      {lines.length === 0 && <Empty>Add what the job needs from the stock list, for the whole job or one phase.</Empty>}
+      {lines.length === 0 && <Empty>{mayKit && 'Add what the job needs from the stock list, for the whole job or one phase.'}</Empty>}
       <ShowAll items={byDepartment} limit={3} what="lines" keep={toAct}>
         {(shown) =>
           DEPARTMENTS.filter((d) => shown.some((l) => department(l) === d)).map((d) => (
@@ -157,15 +161,17 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
               {shown
                 .filter((l) => department(l) === d)
                 .map((l) => (
-                  <KitLine key={l.id} line={l} job={job} today={today} />
+                  <KitLine key={l.id} line={l} job={job} today={today} mayChange={mayKit} />
                 ))}
             </div>
           ))
         }
       </ShowAll>
-      <Fold label="Add kit">
-        <AddKit job={job} view={view} lines={lines} />
-      </Fold>
+      {mayKit && (
+        <Fold label="Add kit">
+          <AddKit job={job} view={view} lines={lines} />
+        </Fold>
+      )}
       <ProductChoices w={view.warehouse} />
       <datalist id="supplier-names">
         {view.kit.suppliers.map((s) => (
@@ -206,7 +212,7 @@ const daysWord = (n: number) => (n === 0 ? 'no days' : n === 1 ? 'a day' : `${n}
  * When the job's kit is held (ADR 0031): its days, with the days before to
  * get it ready and after to check it back in, which the job can change.
  */
-function KitDays({ job }: { job: JobView }) {
+function KitDays({ job, mayChange }: { job: JobView; mayChange: boolean }) {
   const { prep, back } = kitDaysOf(job)
   const [editing, setEditing] = useState(false)
   const [f, setF] = useState({ prep: String(prep), back: String(back) })
@@ -235,7 +241,7 @@ function KitDays({ job }: { job: JobView }) {
           'Kit held '
         )}
         {daysWord(prep)} before to get it ready, {daysWord(back)} after to check it back in.{' '}
-        {!editing && (
+        {!editing && mayChange && (
           <button type="button" className="link" onClick={() => setEditing(true)}>
             Change
           </button>
@@ -276,7 +282,7 @@ function KitDays({ job }: { job: JobView }) {
   )
 }
 
-function KitLine({ line, job, today }: { line: KitLineView; job: JobView; today: string }) {
+function KitLine({ line, job, today, mayChange }: { line: KitLineView; job: JobView; today: string; mayChange: boolean }) {
   // Open with how many to subhire already filled in, from "Subhire the 2 short".
   const [editing, setEditing] = useState<{ subhire?: number } | undefined>()
   const state = kitState(line, today)
@@ -292,12 +298,14 @@ function KitLine({ line, job, today }: { line: KitLineView; job: JobView; today:
           <p>{forLabel(line)}</p>
           {line.notes && <p>{line.notes}</p>}
         </div>
-        <button type="button" className="link" onClick={() => setEditing(editing ? undefined : {})} aria-expanded={!!editing}>
-          Change
-        </button>
+        {mayChange && (
+          <button type="button" className="link" onClick={() => setEditing(editing ? undefined : {})} aria-expanded={!!editing}>
+            Change
+          </button>
+        )}
       </header>
       {state && <p className={`kit-state ${state.tone}`}>{state.text}</p>}
-      {line.short > 0 && !editing && (
+      {line.short > 0 && !editing && mayChange && (
         <button type="button" onClick={() => setEditing({ subhire: Math.min(line.qty, line.subhireQty + line.short) })}>
           Subhire the {line.short} short
         </button>

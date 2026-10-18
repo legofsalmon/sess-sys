@@ -285,7 +285,9 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           {(justClaimed.placeId || justClaimed.caseId) && ` ${atLabel(justClaimed, w)}`}. Scan the next label.
         </p>
       )}
-      {unclaimed && <ClaimLabel key={unclaimed} number={unclaimed} view={view} memory={memory} productField={claimField} onClaimed={onClaimed} />}
+      {/* Putting a label on an item is stock's (audit finding 9): a role without it is told the label is free. */}
+      {unclaimed && !mayAdd && <p className="hint">{unclaimed} isn't on an item yet.</p>}
+      {unclaimed && mayAdd && <ClaimLabel key={unclaimed} number={unclaimed} view={view} memory={memory} productField={claimField} onClaimed={onClaimed} />}
       <div className="filters" role="group" aria-label="Department">
         <button type="button" aria-pressed={department === 'all'} onClick={() => setDepartment('all')}>
           All ({w.models.length})
@@ -511,6 +513,7 @@ function Places({ view }: { view: View }) {
   // Said in a green line, with the way to it, as the list may be folded past it.
   const [added, setAdded] = useState<{ id: string; name: string }>()
   const { run, error, refuse } = useAct()
+  const mayAdd = useAccess().can('stock')
   const add = (e: FormEvent) => {
     e.preventDefault()
     const n = name.trim()
@@ -556,18 +559,20 @@ function Places({ view }: { view: View }) {
           </ul>
         )}
       </ShowAll>
-      <Fold label="Add place">
-        <form className="inline-add" onSubmit={add}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bay A3, Van 1" aria-label="New place" />
-          <button type="submit">Add place</button>
-        </form>
-        {added && (
-          <p className="added" role="status">
-            Added <a href={`#stock/place/${added.id}`}>{added.name}</a>.
-          </p>
-        )}
-        <Refusal error={error} />
-      </Fold>
+      {mayAdd && (
+        <Fold label="Add place">
+          <form className="inline-add" onSubmit={add}>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bay A3, Van 1" aria-label="New place" />
+            <button type="submit">Add place</button>
+          </form>
+          {added && (
+            <p className="added" role="status">
+              Added <a href={`#stock/place/${added.id}`}>{added.name}</a>.
+            </p>
+          )}
+          <Refusal error={error} />
+        </Fold>
+      )}
     </section>
   )
 }

@@ -45,7 +45,7 @@ import {
 } from '@sh/shared'
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
-import { ROLE_LABELS } from '@sh/shared'
+import { emailInUseRefusal, emailTakenBy, holdsARole, ROLE_LABELS, sameEmail, whoSignsInRefusal } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -60,7 +60,7 @@ import { useToday, useView } from '../view.ts'
 import { CertificateReminders, certificateWarnings, NeedsField } from './Certificates.tsx'
 import { DocumentToCheck } from './Documents.tsx'
 import { ArchivedPerson } from './Erase.tsx'
-import { LateLines, LateRow, NoteLate } from './Late.tsx'
+import { LateLines, lateNotesOn, LateRow, lateToNote, NoteLate } from './Late.tsx'
 import { LeaveScreen } from './Leave.tsx'
 import { personHref, PersonScreen } from './PersonScreen.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
@@ -303,6 +303,38 @@ export function CrewScreen() {
     void answers.run(() => client.mutate(command, { id: o.id })).then((ok) => ok && o.person && setShare(promptFor(event, [tellTo(o.person, c, o)])))
   }
 
+  // Only the calls short of people at rest, with the filled ones a tap away under them (audit finding 10). A filled call with
+  // something to act on stays out too, as ShowAll keeps a line to act on: someone short of a certificate it needs, or running
+  // late, or the day itself, when someone who rings to say they're late is noted on its line (ADR 0028).
+  const short = shownCalls.filter((c) => c.openDays.length > 0)
+  const atHand = (c: CallView) => c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
+  const inView = shownCalls.filter(atHand)
+  const filled = shownCalls.filter((c) => !atHand(c))
+  const callGroups = (calls: readonly CallView[]) =>
+    groupCalls(calls, view.jobs.jobs).map((g) => (
+      <div className="call-group" key={g.key}>
+        <header>
+          <div>
+            <b>{g.project}</b>
+            {g.venue && <p>{g.venue}</p>}
+          </div>
+          {g.projectId && (
+            <a className="link" href={`#jobs/${g.projectId}`}>
+              Open job
+            </a>
+          )}
+        </header>
+        {[...g.dates].map(([when, calls]) => (
+          <div className="call-date" key={when}>
+            <h3>{when}</h3>
+            {calls.map((c) => (
+              <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+            ))}
+          </div>
+        ))}
+      </div>
+    ))
+
   return (
     <div className="app crew">
       <Top view={view} title="Crew" root />
@@ -324,7 +356,9 @@ export function CrewScreen() {
           <Refusal error={answers.error} />
           <ShowAll
             items={[
-              ...late.map((l) => <LateRow key={l.id} note={l} today={today} onNoted={() => void answers.run(() => client.mutate('late.seen', { id: l.id, offerId: l.offerId, day: l.day }))} />),
+              ...late.map((l) => (
+                <LateRow key={l.id} note={l} today={today} onNoted={mayCrew ? () => void answers.run(() => client.mutate('late.seen', { id: l.id, offerId: l.offerId, day: l.day })) : undefined} />
+              )),
               ...docs.map((d) => <DocumentToCheck key={d.id} doc={d} />),
               ...toSortOut.map(({ c, o, text }) => (
                 <div className="row" key={o.id}>
@@ -365,7 +399,8 @@ export function CrewScreen() {
                       {warning && <><br />{warning}</>}
                     </p>
                   </div>
-                  {(kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
+                  {/* Settling an answer is crew's (audit finding 9): a role without it sees the answer, and nothing to press. */}
+                  {!mayCrew ? null : (kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
                     <Confirm
                       question={
                         kind === 'countered'
@@ -456,29 +491,19 @@ export function CrewScreen() {
             />
           )}
           {upcoming.length > 0 && shownCalls.length === 0 && <p className="empty">No calls for {callsFor === NO_DEPARTMENT ? 'no department' : callsFor} still to come.</p>}
-          {groupCalls(shownCalls, view.jobs.jobs).map((g) => (
-            <div className="call-group" key={g.key}>
-              <header>
-                <div>
-                  <b>{g.project}</b>
-                  {g.venue && <p>{g.venue}</p>}
-                </div>
-                {g.projectId && (
-                  <a className="link" href={`#jobs/${g.projectId}`}>
-                    Open job
-                  </a>
-                )}
-              </header>
-              {[...g.dates].map(([when, calls]) => (
-                <div className="call-date" key={when}>
-                  <h3>{when}</h3>
-                  {calls.map((c) => (
-                    <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
+          {shownCalls.length > 0 && short.length === 0 && (
+            <p className="empty">No calls{callsFor ? ` for ${callsFor === NO_DEPARTMENT ? 'no department' : callsFor}` : ''} are short of people: every one still to come is filled.</p>
+          )}
+          {callGroups(inView)}
+          {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
+          {filled.length > 0 && (
+            <details className="filled-calls">
+              <summary>
+                Show {filled.length} filled {filled.length === 1 ? 'call' : 'calls'}
+              </summary>
+              {callGroups(filled)}
+            </details>
+          )}
         </section>
       )}
 
@@ -757,12 +782,12 @@ export function CallCard({
                       <StatusPill tone={tone} pending={o.pending}>
                         {label}
                       </StatusPill>
-                      {o.status === 'offered' && o.person && (
+                      {mayOffer && o.status === 'offered' && o.person && (
                         <button type="button" className="link" onClick={() => onShare(o.person as PersonView)}>
                           Send
                         </button>
                       )}
-                      {(o.status === 'offered' || o.status === 'confirmed') && withdrawing !== o.id && (
+                      {mayOffer && (o.status === 'offered' || o.status === 'confirmed') && withdrawing !== o.id && (
                         <button type="button" className="link" onClick={() => setWithdrawing(o.id)}>
                           Withdraw
                         </button>
@@ -809,7 +834,7 @@ export function CallCard({
 
       {open && (
         <>
-          {editing && (
+          {editing && mayOffer && (
             <EditCall
               call={call}
               onDone={() => setEditing(false)}
@@ -817,7 +842,7 @@ export function CallCard({
             />
           )}
           <Refusal error={error} />
-          {cancelling ? (
+          {!mayOffer ? null : cancelling ? (
             <Confirm
               question={`Cancel the call for ${call.needed} × ${call.role} on ${call.project}? Everyone offered is told it's withdrawn.`}
               yes="Cancel it"
@@ -1480,8 +1505,12 @@ function certificatesOf(fields: CertFields): Certificates {
 }
 
 export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
+  const access = useAccess()
   // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
-  const mayApprove = useAccess().can('company')
+  const mayApprove = access.can('company')
+  // The email and type of someone who holds a role are how they sign in as it, so only the office and directors change them (audit finding 12).
+  const whoFixed = initial && initial.role && holdsARole(initial) && !access.can('settings') ? initial.role : null
+  const people = useView().crew.people
   // A rate this device isn't sent (ADR 0046) isn't in the form, and the server keeps the one it has.
   const seesRates = useSeesRates() && !initial?.rateHidden
   const blank = {
@@ -1534,12 +1563,16 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     const rate = parseEuro(f.rate)
     if (rate.reason !== undefined) return refuse(rate.reason)
     const company = f.companyName.trim() || f.vatNumber.trim() || f.croNumber.trim()
+    const email = f.email.trim() || null
+    // Each email is one person's, as the server checks it (audit finding 12).
+    const other = sameEmail(email, initial?.email) ? undefined : emailTakenBy(people, initial?.id ?? '', email)
+    if (other) return refuse(emailInUseRefusal(other.name))
     void run(() =>
       onSubmit({
         name: f.name.trim(),
         kind: f.kind,
         phone: f.phone.trim() || null,
-        email: f.email.trim() || null,
+        email,
         skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
         ...(seesRates ? { dayRateCents: rate.cents } : {}),
         notes: f.notes.trim(),
@@ -1566,7 +1599,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
         Mobile <input type="tel" value={f.phone} onChange={set('phone')} placeholder="+353 87…" />
       </label>
       <label>
-        Email <input type="email" value={f.email} onChange={set('email')} />
+        Email <input type="email" value={f.email} onChange={set('email')} readOnly={!!whoFixed} />
       </label>
       <label>
         Skills <input value={f.skills} onChange={set('skills')} placeholder="audio, rigger" />
@@ -1578,11 +1611,12 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
       )}
       <label>
         Type
-        <select value={f.kind} onChange={set('kind')}>
+        <select value={f.kind} onChange={set('kind')} disabled={!!whoFixed}>
           <option value="freelancer">Freelancer</option>
           <option value="staff">Staff</option>
         </select>
       </label>
+      {whoFixed && <p className="hint wide">{whoSignsInRefusal(initial!.name, whoFixed)}</p>}
       {f.kind === 'staff' && mayApprove && (
         <label className="wide tick">
           <input type="checkbox" checked={f.approvesLeave} onChange={(e) => setF({ ...f, approvesLeave: e.target.checked })} />

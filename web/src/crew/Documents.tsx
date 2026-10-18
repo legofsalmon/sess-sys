@@ -28,6 +28,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { markSignedOut } from '../auth.ts'
 import { Fold } from '../Fold.tsx'
+import { useAccess } from '../role.ts'
 import { ask } from '../server.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
@@ -139,6 +140,8 @@ export function Documents({ person }: { person: PersonView }) {
   const storage = useDocumentStorage()
   const docs = view.documents.of(person.id)
   const [changing, setChanging] = useState<string | undefined>()
+  // Adding, changing and removing them is crew's (audit finding 9); anyone can open one.
+  const mayChange = useAccess().can('crew')
   return (
     <div className="documents" role="group" aria-label={`Documents: ${person.name}`}>
       <p className="muted">
@@ -146,14 +149,14 @@ export function Documents({ person }: { person: PersonView }) {
       </p>
       {docs.length === 0 && <p className="hint">None yet: their insurance, and a photo of each certificate's card.</p>}
       {docs.map((d) =>
-        changing === d.id ? (
+        changing === d.id && mayChange ? (
           <DocumentForm key={d.id} person={person} doc={d} onDone={() => setChanging(undefined)} />
         ) : (
-          <DocumentLine key={d.id} doc={d} onChange={() => setChanging(d.id)} />
+          <DocumentLine key={d.id} doc={d} onChange={mayChange ? () => setChanging(d.id) : undefined} />
         )
       )}
       {storage && !storage.files && <p className="hint">{FILES_WAIT}</p>}
-      {!person.archived && (
+      {!person.archived && mayChange && (
         <Fold label="Add document">
           <DocumentForm person={person} />
         </Fold>
@@ -162,8 +165,8 @@ export function Documents({ person }: { person: PersonView }) {
   )
 }
 
-/** One document: what it is, when it runs out, its file, and Open, Change and Remove. */
-function DocumentLine({ doc, onChange }: { doc: DocumentView; onChange: () => void }) {
+/** One document: what it is, when it runs out, its file, and Open, Change and Remove; without `onChange`, Open alone. */
+function DocumentLine({ doc, onChange }: { doc: DocumentView; onChange?: () => void }) {
   const today = useToday()
   const { run, error } = useAct()
   const [removing, setRemoving] = useState(false)
@@ -187,12 +190,12 @@ function DocumentLine({ doc, onChange }: { doc: DocumentView; onChange: () => vo
             Open
           </button>
         )}
-        {doc.checkedAt && (
+        {doc.checkedAt && onChange && (
           <button type="button" className="link" onClick={onChange} aria-label={`Change ${name}'s ${titleInSentence(doc.title)}`}>
             Change
           </button>
         )}
-        {!removing && (
+        {!removing && onChange && (
           <button type="button" className="link" onClick={() => setRemoving(true)} aria-label={`Remove ${name}'s ${titleInSentence(doc.title)}`}>
             Remove
           </button>
@@ -311,6 +314,8 @@ export function DocumentToCheck({ doc }: { doc: DocumentView }) {
   const cert = certificateOf(doc.kind)
   const name = doc.person?.name ?? 'Someone'
   const what = titleInSentence(doc.title)
+  // Checking it is crew's (audit finding 9): anyone else can open it, and the rest isn't drawn.
+  const mayCheck = useAccess().can('crew')
   return (
     <div className="row doc-check">
       <div>
@@ -331,19 +336,23 @@ export function DocumentToCheck({ doc }: { doc: DocumentView }) {
             Open
           </button>
         )}
-        <label className="field">
-          Runs out <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} aria-label={`Runs out: the ${what} ${name} sent`} />
-        </label>
-        <button type="button" className="primary" onClick={() => void run(() => client.mutate('document.check', { id: doc.id, expires: expires || null }))} aria-label={`Checked: the ${what} ${name} sent`}>
-          Checked
-        </button>
-        {!wrong && (
+        {mayCheck && (
+          <>
+            <label className="field">
+              Runs out <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} aria-label={`Runs out: the ${what} ${name} sent`} />
+            </label>
+            <button type="button" className="primary" onClick={() => void run(() => client.mutate('document.check', { id: doc.id, expires: expires || null }))} aria-label={`Checked: the ${what} ${name} sent`}>
+              Checked
+            </button>
+          </>
+        )}
+        {mayCheck && !wrong && (
           <button type="button" onClick={() => setWrong(true)} aria-label={`Not right: the ${what} ${name} sent`}>
             Not right
           </button>
         )}
       </div>
-      {wrong && (
+      {wrong && mayCheck && (
         <Confirm
           question={`Remove the ${what} ${name} sent? Its file is deleted, and they aren't told: ask them for the right one yourself.`}
           yes="Remove it"

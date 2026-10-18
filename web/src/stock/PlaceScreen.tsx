@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { act, Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, SavedLine, ScanMisses, ScanResult, useScanMisses, WhereChoices } from './common.tsx'
@@ -44,6 +45,8 @@ function Summary({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const [removing, setRemoving] = useState(false)
   const [f, setF] = useState({ name: p.name, notes: p.notes })
   const { run, error, refuse } = useAct()
+  // Changing places is stock's (audit finding 9): a role without it reads them.
+  const mayChange = useAccess().can('stock')
   const empty = p.items.length === 0 && p.counted.length === 0
   const save = (e: FormEvent) => {
     e.preventDefault()
@@ -77,7 +80,7 @@ function Summary({ p, w }: { p: PlaceView; w: WarehouseView }) {
         </div>
       </dl>
       {p.notes && <p className="notes">{p.notes}</p>}
-      {editing ? (
+      {!mayChange ? null : editing ? (
         <form className="grid-form" onSubmit={save}>
           <label className="wide">
             Name <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
@@ -128,6 +131,7 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
   const empty = p.items.length === 0 && p.counted.length === 0
   // What a count or a move of what's counted here just did.
   const [said, setSaid] = useState('')
+  const mayPut = useAccess().can('stock')
   return (
     <section className="card" aria-label="Here">
       <h2>Here</h2>
@@ -173,7 +177,7 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
         </CountRow>
       ))}
       <SavedLine text={said} />
-      <PutHere p={p} w={w} />
+      {mayPut && <PutHere p={p} w={w} />}
       <CountHere w={w} at={{ placeId: p.id, caseId: null }} title="Count something here" onSaid={setSaid} />
     </section>
   )

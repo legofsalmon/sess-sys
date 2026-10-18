@@ -9,7 +9,7 @@
     "web"
   ],
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   },
   "scripts": {
     "build": "npm run build:hub",

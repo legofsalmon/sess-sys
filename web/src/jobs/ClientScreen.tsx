@@ -1,6 +1,7 @@
 import { type ClientView, type Contact, type View } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
@@ -35,6 +36,7 @@ export function ClientScreen({ view, id }: { view: View; id: string }) {
 
 function ClientSummary({ c }: { c: ClientView }) {
   const [editing, setEditing] = useState(false)
+  const mayChange = useAccess().can('jobs')
   return (
     <section className="card">
       <header className="title">
@@ -71,7 +73,8 @@ function ClientSummary({ c }: { c: ClientView }) {
         ))}
       </dl>
       {c.notes && <p className="notes">{c.notes}</p>}
-      {editing ? (
+      {/* Changing it is the jobs' (audit finding 9): a role without them reads it. */}
+      {!mayChange ? null : editing ? (
         <EditClient c={c} onDone={() => setEditing(false)} />
       ) : (
         <button type="button" onClick={() => setEditing(true)}>

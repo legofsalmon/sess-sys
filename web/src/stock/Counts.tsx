@@ -21,6 +21,7 @@ import {
   type View,
   type WarehouseView,
   type Where,
+  type Ability,
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
@@ -28,6 +29,7 @@ import { useMe } from '../crew/Leave.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Top } from '../jobs/common.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
@@ -137,12 +139,15 @@ export function StartCount({ view, where, label, className }: { view: View; wher
   const d = useDraft()
   const { me } = useMe(view)
   const [asking, setAsking] = useState(false)
+  // Counting is stock's (audit finding 9): not offered to a role without it.
+  const mayCount = useAccess().can('stock')
   const w = view.warehouse
   const same = d && d.placeId === where.placeId && d.caseId === where.caseId
   const start = () => {
     saveDraft({ id: newId(), ...where, startedAt: new Date().toISOString(), by: me?.id ?? null, scanned: [], unknown: [], counted: {}, added: [] })
     location.hash = '#stock/count'
   }
+  if (!mayCount) return null
   if (asking && d && !same) {
     const other = targetName(w, d)
     return (
@@ -693,14 +698,19 @@ export function CountPage({ view, id }: { view: View; id: string }) {
   )
 }
 
-/** A fix: one existing command (or two), with its refusal under it. Held while it's being kept, so a second tap can't send it twice. */
-function Fix({ label, act, className }: { label: string; act: () => Promise<unknown>; className?: string }) {
+/**
+ * A fix: one existing command (or two), with its refusal under it. Held while it's being kept, so a second tap can't send it twice.
+ * Not drawn for a role without what it `needs` (audit finding 9): stock's, but for reporting kit missing, which anyone can.
+ */
+function Fix({ label, act, className, needs = 'stock' }: { label: string; act: () => Promise<unknown>; className?: string; needs?: Ability }) {
   const { run, error } = useAct()
   const [busy, setBusy] = useState(false)
+  const may = useAccess().can(needs)
   const go = () => {
     setBusy(true)
     void run(act).finally(() => setBusy(false))
   }
+  if (!may) return null
   return (
     <>
       <button type="button" className={className} onClick={go} disabled={busy}>
@@ -751,11 +761,11 @@ function NotFound({ view, c, at, list }: { view: View; c: CountView; at: Where; 
       <ul className="count-lines">
         {rows.map(({ i, a, done }) => (
           <Line key={i.assetId} title={itemName(a)} href={a && `#stock/item/${a.id}`} said={done ?? 'Not scanned.'}>
-            {!done && a && <Fix label="Report missing" act={() => report(a)} />}
+            {!done && a && <Fix label="Report missing" act={() => report(a)} needs="fault" />}
           </Line>
         ))}
       </ul>
-      {toDo.length > 1 && <Fix className="all" label={`Report all ${toDo.length} missing`} act={async () => { for (const a of toDo) await report(a) }} />}
+      {toDo.length > 1 && <Fix className="all" label={`Report all ${toDo.length} missing`} act={async () => { for (const a of toDo) await report(a) }} needs="fault" />}
     </section>
   )
 }

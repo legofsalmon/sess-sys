@@ -1,7 +1,7 @@
 import { ADDRESS_WORDS, irishToday, type CommandArgs, OWN_CALENDAR_ACTIONS, type BusyTime, type CalendarAddedBy, type OwnCalendar } from '@sh/shared'
 import type { Db, Queryable } from '../db.ts'
 import { emit, emitRemoved, Refused, serverChange, type Ctx, type ServerAction } from '../kernel.ts'
-import { NotACalendar, readBusy } from './busy.ts'
+import { NotACalendar, readBusyApart, TooMuch, type ReadLimits } from './busy.ts'
 import { fetchCalendar, NotRead, tidyAddress, type FetchOptions } from './calendar-fetch.ts'
 import { getPerson } from './store.ts'
 
@@ -14,6 +14,7 @@ import { getPerson } from './store.ts'
  */
 
 export const NOT_A_CALENDAR = "That address gave us something that isn't a calendar. Use the private address in iCal format, the one ending in .ics."
+export const TOO_MUCH = "That calendar has more repeating events than can be worked through here. A calendar with only what's coming up will do."
 const ARCHIVED = "They're archived, so their calendar isn't read. Bring them back first."
 
 const COLUMNS = 'id, person_id, address, added_by, added_at, read_at, problem, busy, until_day::text AS until_day'
@@ -57,8 +58,8 @@ export async function getOwnCalendar(q: Queryable, personId: string): Promise<Ow
 /** What was read: the busy times, or why not, in words. */
 type Read = { busy: BusyTime[]; until: string } | { problem: string }
 
-/** Fetch and read a calendar, with every failure said in words and none with the address in it. */
-async function read(address: string, options: FetchOptions, today: string): Promise<Read> {
+/** Fetch and read a calendar, with every failure said in words and none with the address in it. The reading is done apart, in a worker thread, so no file holds the server up. */
+async function read(address: string, options: OwnCalendarsOptions, today: string): Promise<Read> {
   let text: string
   try {
     text = await fetchCalendar(address, options)
@@ -67,11 +68,12 @@ async function read(address: string, options: FetchOptions, today: string): Prom
     throw err
   }
   try {
-    const got = readBusy(text, today)
+    const got = await readBusyApart(text, today, options.reading)
     if (got.ours) return { problem: ADDRESS_WORDS.ours }
     return { busy: got.busy, until: got.until }
   } catch (err) {
     if (err instanceof NotACalendar) return { problem: NOT_A_CALENDAR }
+    if (err instanceof TooMuch) return { problem: TOO_MUCH }
     throw err
   }
 }
@@ -82,6 +84,8 @@ export interface OwnCalendarsOptions extends FetchOptions {
   /** How often the server looks for ones due. */
   lookMs?: number
   now?: () => Date
+  /** How much work reading one file may take, and how long its worker may run (busy.ts): the defaults, but for tests. */
+  reading?: ReadLimits & { timeoutMs?: number }
 }
 
 const THREE_HOURS = 3 * 60 * 60 * 1000

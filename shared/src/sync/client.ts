@@ -12,7 +12,8 @@ import { erasuresView, forgetErased, keptRecordsOf, withErasures, type ErasuresV
 import { faultsView, type FaultsView } from './faults-view.ts'
 import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
-import { kitView, type KitView } from './kit-view.ts'
+import { Derived } from './derive.ts'
+import { kitView, type KitMemo, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
 import { notesKitView, type NotesKitView } from './notes-kit-view.ts'
 import { lateView, type LateView } from './late-view.ts'
@@ -73,11 +74,24 @@ export interface Snapshot {
    * from copies saved before, which then read their copy again once.
    */
   feed?: number
+  /**
+   * How far the copy had read when it began reading the feed again from the
+   * start (`FEED`, money, what its role reads), keeping what it held; gone
+   * once it's read that far again. What the person sees meanwhile is as of
+   * this, so a change made then says it was made against this.
+   */
+  held?: number
 }
 
 export interface Storage {
   load(): Promise<Snapshot | undefined>
-  save(snapshot: Snapshot): Promise<void>
+  /**
+   * Keep the copy. `changed` names the tables changed since the last save
+   * that worked, so a storage that keeps each table apart need write only
+   * those; everything else in the snapshot is small and always written.
+   * Absent, or 'all', means every table.
+   */
+  save(snapshot: Snapshot, changed?: ReadonlySet<string> | 'all'): Promise<void>
 }
 
 export interface PendingMutation extends Mutation {
@@ -109,6 +123,18 @@ export interface Problem {
 }
 
 export type Connection = 'idle' | 'syncing' | 'offline'
+
+/**
+ * The server answered, but was in the middle of a long change and couldn't take
+ * this device's changes in time (audit finding 7). Not a problem to show: the
+ * connection is fine and they wait to go again, which `keepSyncing` does shortly,
+ * as does the poke the server sends when the long change is done.
+ */
+export class ServerBusy extends Error {
+  constructor() {
+    super('The server is busy with a long change; sending again shortly.')
+  }
+}
 
 export interface View {
   problems: Problem[]
@@ -167,6 +193,37 @@ export interface View {
   madeUp: boolean
 }
 
+/** The parts of the view built only once a screen reads them. */
+const LAZY = [
+  'crew',
+  'jobs',
+  'warehouse',
+  'kit',
+  'notesKit',
+  'labels',
+  'moves',
+  'faults',
+  'inspections',
+  'timesheets',
+  'office',
+  'leave',
+  'late',
+  'erasures',
+  'documents',
+  'attachments',
+  'counts',
+  'money',
+  'ownCalendars',
+  'vehicles',
+] as const satisfies readonly (keyof View)[]
+type Lazy = (typeof LAZY)[number]
+type MovesKit = { moves: MovesView; kit: KitView }
+
+/** The same view for another state of the connection, its parts still built only when read. */
+function withConnection(view: Omit<View, 'connection'>, connection: Connection): View {
+  return Object.defineProperties({ connection } as View, Object.getOwnPropertyDescriptors(view))
+}
+
 export function emptySnapshot(clientId: string): Snapshot {
   return {
     clientId,
@@ -182,8 +239,16 @@ export class MemoryStorage implements Storage {
   async load() {
     return this.snapshot ? structuredClone(this.snapshot) : undefined
   }
-  async save(snapshot: Snapshot) {
-    this.snapshot = structuredClone(snapshot)
+  async save(snapshot: Snapshot, changed?: ReadonlySet<string> | 'all') {
+    if (!this.snapshot || !changed || changed === 'all') {
+      this.snapshot = structuredClone(snapshot)
+      return
+    }
+    // The tables not changed are as they were kept.
+    const { entities, ...rest } = snapshot
+    const kept = { ...this.snapshot.entities } as Record<string, unknown>
+    for (const name of changed) kept[name] = structuredClone((entities as Record<string, unknown>)[name])
+    this.snapshot = { ...structuredClone(rest), entities: kept as Snapshot['entities'] }
   }
 }
 
@@ -216,6 +281,12 @@ export class SyncClient {
   private version = 0
   private built: { version: number; today: string; view: Omit<View, 'connection'> } | undefined
   private views: Partial<Record<Connection, View>> = {}
+  /** The parts of the view kept between changes, and what each was built from (derive.ts). */
+  private derived = new Derived()
+  /** Each product's kit days, kept between builds of the kit (kit-view.ts). */
+  private kitMemo: KitMemo = new Map()
+  /** The tables changed since the copy was last saved, so a save writes only those; all of them after anything else. */
+  private dirty: Set<string> | 'all' = new Set()
   private readonly storage: Storage
   private readonly transport: Transport
   private readonly now: () => Date
@@ -227,7 +298,9 @@ export class SyncClient {
   }
 
   async open(): Promise<this> {
-    this.state = (await this.storage.load()) ?? emptySnapshot(this.options.clientId ?? newId())
+    const saved = await this.storage.load()
+    this.state = saved ?? emptySnapshot(this.options.clientId ?? newId())
+    if (!saved) this.dirty = 'all'
     await this.unbrick()
     return this
   }
@@ -241,7 +314,7 @@ export class SyncClient {
   private async unbrick() {
     if (this.state.outbox.length === 0) return
     try {
-      this.build()
+      this.check()
       return
     } catch {
       // Something is in the way. If the view works without the outbox, the outbox holds it.
@@ -249,7 +322,7 @@ export class SyncClient {
     const all = this.state.outbox
     this.state.outbox = []
     try {
-      this.build()
+      this.check()
     } catch {
       this.state.outbox = all
       return
@@ -257,7 +330,7 @@ export class SyncClient {
     for (const m of all) {
       this.state.outbox.push(m)
       try {
-        this.build()
+        this.check()
       } catch (err) {
         this.state.outbox.pop()
         const why = err instanceof Error ? err.message : String(err)
@@ -309,7 +382,9 @@ export class SyncClient {
     const refused = this.guard?.(name, parsed.success ? parsed.data : args)
     if (refused) throw new Error(refused)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
-    const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
+    // What the person was looking at, so the server can tell an edit to something changed elsewhere since (audit, 18 October 2026).
+    const seen = Math.max(this.state.cursor, this.state.held ?? 0)
+    const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString(), seen }
     this.state.outbox.push(mutation)
     this.version++
     const takeBack = () => {
@@ -319,7 +394,7 @@ export class SyncClient {
     // A change the view can't lay over the rest would leave every screen blank
     // until the device's storage was wiped, so it's taken back before it's saved.
     try {
-      this.view()
+      this.check()
     } catch (err) {
       takeBack()
       throw new Error(`This change can't be shown on this device, so it wasn't kept: ${err instanceof Error ? err.message : String(err)}`)
@@ -328,7 +403,7 @@ export class SyncClient {
     // data) would be lost on the next reload, so it isn't taken either: the
     // storage says why, and the person tries again once that's sorted.
     try {
-      await this.storage.save(this.state)
+      await this.saveChanged()
     } catch (err) {
       takeBack()
       throw err
@@ -400,55 +475,91 @@ export class SyncClient {
       this.views = {}
     }
     let view = this.views[this.connection]
-    if (!view) this.views[this.connection] = view = { ...this.built.view, connection: this.connection }
+    if (!view) this.views[this.connection] = view = withConnection(this.built.view, this.connection)
     return view
   }
 
-  /** The device's data model, built from scratch. Throws if a change can't be laid over the rest. */
+  /**
+   * The device's data model, each part built only as a screen reads it and
+   * kept until what it's built from changes (derive.ts, audit finding 11).
+   * A part that can't lay a change over the rest throws as it's read; `check`
+   * reads them all.
+   */
   private build(today = irishToday(this.now())): Omit<View, 'connection'> {
     const { entities, outbox } = this.state
+    const cursor = this.state.cursor
+    // Only what's still to land is laid over the copy: what the server has applied and this copy has pulled is in it already.
+    const waiting = outbox.filter((m) => m.appliedSeq === undefined || m.appliedSeq > cursor)
+    const derived = this.derived
+    const kitMemo = this.kitMemo
+    const lazy = {} as { [K in Lazy]: () => View[K] }
+    /** Built once for this version of the copy, from the parts kept unless what they read has changed. */
+    const part = <K extends Lazy | 'movesKit'>(key: K, deps: () => readonly unknown[], make: (e: typeof entities, o: readonly PendingMutation[]) => K extends Lazy ? View[K] : MovesKit) => {
+      let got: { value: unknown } | undefined
+      return () => {
+        if (!got) {
+          const ds = deps()
+          got = { value: derived.part(key, { entities, waiting, today, deps: ds }, make as (e: typeof entities, o: readonly Mutation[]) => unknown) }
+        }
+        return got.value as K extends Lazy ? View[K] : MovesKit
+      }
+    }
     // Someone erased on this device is shown erased at once, everywhere the crew reaches (ADR 0027).
-    const erasures = erasuresView(entities, outbox, this.state.cursor, today)
-    const crew = withErasures(crewView(entities, outbox, this.state.cursor, today), erasures)
-    const jobs = jobsView(entities, outbox, this.state.cursor, crew.calls)
-    const warehouse = warehouseView(entities, outbox, this.state.cursor)
-    const inspections = inspectionsView(entities, outbox, this.state.cursor, warehouse, today)
-    const faults = faultsView(entities, outbox, this.state.cursor, jobs, warehouse, (id) => !!inspections.blocks(id))
-    // Kit still out after its job comes off what's free (ADR 0031), and the pick lists need the kit: so the moves first, reading the kit only when a pick list is.
-    let kit: KitView | undefined
-    const moves = movesView(entities, outbox, this.state.cursor, jobs, warehouse, () => kit!, today, faults)
-    kit = kitView(entities, outbox, this.state.cursor, jobs, warehouse, today, faults, moves.lateOut)
-    const timesheets = timesheetsView(entities, outbox, this.state.cursor, crew, today)
-    return {
+    lazy.erasures = part('erasures', () => [], (e, o) => erasuresView(e, o, cursor, today))
+    lazy.crew = part('crew', () => [lazy.erasures()], (e, o) => withErasures(crewView(e, o, cursor, today), lazy.erasures()))
+    lazy.jobs = part('jobs', () => [lazy.crew().calls], (e, o) => jobsView(e, o, cursor, lazy.crew().calls))
+    lazy.warehouse = part('warehouse', () => [], (e, o) => warehouseView(e, o, cursor))
+    lazy.inspections = part('inspections', () => [lazy.warehouse()], (e, o) => inspectionsView(e, o, cursor, lazy.warehouse(), today))
+    lazy.faults = part('faults', () => [lazy.jobs(), lazy.warehouse(), lazy.inspections()], (e, o) => {
+      const inspections = lazy.inspections()
+      return faultsView(e, o, cursor, lazy.jobs(), lazy.warehouse(), (id) => !!inspections.blocks(id))
+    })
+    // Kit still out after its job comes off what's free (ADR 0031), and the pick lists need the kit: so the moves first,
+    // reading the kit only when a pick list is. Kept together, as each reads the other.
+    const movesKit = part('movesKit', () => [lazy.jobs(), lazy.warehouse(), lazy.faults()], (e, o) => {
+      const [jobs, warehouse, faults] = [lazy.jobs(), lazy.warehouse(), lazy.faults()]
+      let kit: KitView | undefined
+      const moves = movesView(e, o, cursor, jobs, warehouse, () => kit!, today, faults)
+      kit = kitView(e, o, cursor, jobs, warehouse, today, faults, moves.lateOut, kitMemo)
+      return { moves, kit }
+    })
+    lazy.moves = () => movesKit().moves
+    lazy.kit = () => movesKit().kit
+    lazy.timesheets = part('timesheets', () => [lazy.crew()], (e, o) => timesheetsView(e, o, cursor, lazy.crew(), today))
+    lazy.notesKit = part('notesKit', () => [lazy.jobs(), lazy.warehouse(), lazy.kit()], (e, o) => notesKitView(e, o, cursor, lazy.jobs(), lazy.warehouse(), lazy.kit(), today))
+    lazy.labels = part('labels', () => [lazy.warehouse()], (e, o) => labelsView(e, o, cursor, lazy.warehouse()))
+    lazy.office = part('office', () => [], (e, o) => officeView(e, o, cursor))
+    lazy.leave = part('leave', () => [lazy.crew(), lazy.erasures()], (e, o) => leaveView(e, o, cursor, lazy.crew(), today, lazy.erasures()))
+    lazy.late = part('late', () => [lazy.crew(), lazy.erasures()], (e, o) => lateView(e, o, cursor, lazy.crew(), today, lazy.erasures()))
+    lazy.documents = part('documents', () => [lazy.crew(), lazy.erasures()], (e, o) => documentsView(e, o, cursor, lazy.crew(), lazy.erasures()))
+    lazy.attachments = part('attachments', () => [], (e, o) => attachmentsView(e, o, cursor))
+    lazy.counts = part('counts', () => [lazy.warehouse(), lazy.crew()], (e, o) => countsView(e, o, cursor, lazy.warehouse(), lazy.crew(), today))
+    lazy.money = part('money', () => [lazy.jobs(), lazy.crew(), lazy.kit(), lazy.timesheets()], (e, o) =>
+      moneyView(e, o, cursor, lazy.jobs(), lazy.crew(), lazy.kit(), lazy.timesheets())
+    )
+    lazy.ownCalendars = part('ownCalendars', () => [], (e, o) => ownCalendarsView(e, o, cursor))
+    lazy.vehicles = part('vehicles', () => [lazy.jobs(), lazy.crew()], (e, o) => vehiclesView(e, o, cursor, lazy.jobs(), lazy.crew(), today))
+
+    const view = {
       problems: [...this.state.problems],
-      crew,
-      jobs,
-      warehouse,
-      kit,
-      notesKit: notesKitView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
-      labels: labelsView(entities, outbox, this.state.cursor, warehouse),
-      moves,
-      faults,
-      inspections,
-      timesheets,
-      office: officeView(entities, outbox, this.state.cursor),
-      leave: leaveView(entities, outbox, this.state.cursor, crew, today, erasures),
-      late: lateView(entities, outbox, this.state.cursor, crew, today, erasures),
-      erasures,
-      documents: documentsView(entities, outbox, this.state.cursor, crew, erasures),
-      attachments: attachmentsView(entities, outbox, this.state.cursor),
-      counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
-      money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
-      ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
       reading: this.state.reading ?? READS_EVERYTHING,
-      vehicles: vehiclesView(entities, outbox, this.state.cursor, jobs, crew, today),
-      keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
+      keptFor: (personId: string, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
-      cursor: this.state.cursor,
+      cursor,
       madeUp: this.state.madeUp === true,
-    }
+    } as Omit<View, 'connection'>
+    for (const key of LAZY) Object.defineProperty(view, key, { enumerable: true, get: lazy[key] })
+    return view
+  }
+
+  /** Build every part, so a change that can't be laid over the rest throws here rather than on a screen. */
+  private check() {
+    // Built afresh for the copy as it is now, which may have been changed in place; the parts it reads are still kept.
+    this.built = undefined
+    const view = this.view()
+    for (const key of LAZY) void view[key]
   }
 
   private async round() {
@@ -466,17 +577,19 @@ export class SyncClient {
       } catch (err) {
         failed = { err }
       }
-      // When both fail, the push's failure is the one said, so being signed out still stops the retries.
+      // When both fail, the push's failure is the one said, so being signed out still stops the retries; unless the
+      // push was only told the server was busy, which says nothing of the signal, so then it's the pull's.
       await this.pull().catch((err: unknown) => {
-        throw failed ? failed.err : err
+        throw failed && !(failed.err instanceof ServerBusy) ? failed.err : err
       })
       if (failed) throw failed.err
       this.setConnection('idle')
     } catch (err) {
       // No signal, server down, or a response lost on the way back. The
       // outbox is untouched, and every mutation carries its own id, so
-      // sending it all again later is safe.
-      this.setConnection('offline')
+      // sending it all again later is safe. A busy server answered, and the
+      // pull came through: nothing is wrong to show, and the changes wait.
+      this.setConnection(err instanceof ServerBusy ? 'idle' : 'offline')
       throw err
     }
   }
@@ -487,9 +600,9 @@ export class SyncClient {
     // each answered and saved before the next is sent.
     for (let from = 0; from < waiting.length; from += PUSH_SLICE) {
       const slice = waiting.slice(from, from + PUSH_SLICE)
-      const { results, stale } = await this.transport.push({
+      const { results, stale, busy } = await this.transport.push({
         clientId: this.state.clientId,
-        mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
+        mutations: slice.map(({ id, name, args, createdAt, seen }) => ({ id, name, args, createdAt, ...(seen !== undefined ? { seen } : {}) })),
         // On the same clock as each createdAt, so the server can tell how long each waited here.
         sentAt: this.now().toISOString(),
         ...(this.state.generation ? { generation: this.state.generation } : {}),
@@ -509,6 +622,8 @@ export class SyncClient {
       this.state.outbox = kept
       this.version++
       await this.persist()
+      // In the middle of a long change, the server answered what it could: the rest go again shortly, in order.
+      if (busy) throw new ServerBusy()
       // Answered only in part: nothing after the rest may go before them, so this round pulls, and the next one, straight
       // after, sends them. An answer to none of them, which no server gives, would only end the round.
       if (results.length < slice.length) {
@@ -541,8 +656,9 @@ export class SyncClient {
         this.state.money = money
         if (res.reading) this.state.reading = res.reading
         else delete this.state.reading
-        if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
+        if (!money) for (const name of MONEY_ENTITY_NAMES) this.replaceTable(name)
         if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
+          this.state.held = Math.max(this.state.held ?? 0, this.state.cursor)
           this.state.cursor = 0
           this.version++
           await this.persist()
@@ -556,10 +672,16 @@ export class SyncClient {
       if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]
       for (const change of res.changes) {
         // An erasure arrives before the records it changes, so whose each change still held here is can be told (ADR 0027).
-        if (change.entity === 'erasure' && change.op === 'put') forgetErased(this.state, change.data as Erasure, this.now().toISOString())
+        if (change.entity === 'erasure' && change.op === 'put') {
+          forgetErased(this.state, change.data as Erasure, this.now().toISOString())
+          // It rewrites changes waiting, under the same ids.
+          this.derived.touchedAll()
+        }
         applyChange(this.state, change)
+        this.touched(change.entity)
       }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
+      if (this.state.held !== undefined && this.state.cursor >= this.state.held) delete this.state.held
       // Applied mutations leave the outbox once their result has arrived.
       const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)
       if (done.length) {
@@ -606,6 +728,8 @@ export class SyncClient {
       replay.push(strip(m))
     }
     this.state = { ...emptySnapshot(this.state.clientId), generation, outbox: replay, problems: cleared ? [] : this.state.problems }
+    this.derived.touchedAll()
+    this.dirty = 'all'
     this.version++
     await this.persist()
     this.again = true
@@ -632,10 +756,35 @@ export class SyncClient {
    */
   private async save() {
     try {
-      await this.storage.save(this.state)
+      await this.saveChanged()
     } catch {
       // Said to the person by the storage; the copy in memory carries on.
     }
+  }
+
+  /** Save the copy: everything but the tables, and of those only the ones changed since the last save that worked. */
+  private async saveChanged() {
+    const changed = this.dirty
+    this.dirty = new Set()
+    try {
+      await this.storage.save(this.state, changed)
+    } catch (err) {
+      // Still to be saved, with whatever has changed since.
+      const since = this.dirty as Set<string> | 'all'
+      if (changed === 'all' || since === 'all') this.dirty = 'all'
+      else for (const t of changed) since.add(t)
+      throw err
+    }
+  }
+
+  private touched(table: string) {
+    this.derived.touched(table)
+    if (this.dirty !== 'all') this.dirty.add(table)
+  }
+
+  private replaceTable(table: string) {
+    ;(this.state.entities as Record<string, unknown>)[table] = {}
+    this.touched(table)
   }
 
   /** Tell the screens. The view is cached, so this rebuilds only when something has changed. */
@@ -646,6 +795,11 @@ export class SyncClient {
   }
 }
 
+/**
+ * Without `seen` too: a change sent again after the server's data is put
+ * back (`restart`) was made against change numbers from the copy that was
+ * lost, so it applies in the order it arrives, as from an older version.
+ */
 function strip(m: PendingMutation): Mutation {
   return { id: m.id, name: m.name, args: m.args, createdAt: m.createdAt }
 }
