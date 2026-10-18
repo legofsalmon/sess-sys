@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, late: charts on Home
+
+**Done**
+
+- Charts on Home, in [Decision 0054](adr/0054-charts-on-home.md) (Colly's
+  "more visuals and graphs to the dashboard"): jobs by week, crew booked
+  and still needed each day for a fortnight, the season month by month,
+  and money by month (money ability only) for the company; crew and kit
+  for a department; kit booked out each day for the warehouse; your own
+  days by week for Me. Coloured by the shared grammar: ink settled, grey
+  not yet, amber only for crew still needed. Each column is a button that
+  says itself in words.
+- Checked: typecheck, all tests (7 new unit, 1 new end-to-end), and the
+  page on a phone and a laptop in both themes.
+
+**Waiting on**
+
+- Colly: the Railway start command, the backup variables and the Sentry
+  key, as before.
+
 ## 18 October 2026, night: tidying what came in
 
 **Done**

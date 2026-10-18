@@ -1,14 +1,15 @@
-import { canApproveLeave, crewFill, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, type PersonView, type View } from '@sh/shared'
+import { canApproveLeave, crewByDay, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, type Department, type PersonView, type View } from '@sh/shared'
 import { useState } from 'react'
 import { useMe } from '../crew/Leave.tsx'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
 import { JobRow } from '../jobs/JobsScreen.tsx'
 import { useToday, useView } from '../view.ts'
-import { addDays, departmentsIn, jobsOn, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
+import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar } from '../Picture.tsx'
 import { useAccess } from '../role.ts'
+import { Chart, type Series } from './Chart.tsx'
 
 /**
  * Home (ADR 0033): how things stand, for whoever is looking. One screen,
@@ -171,13 +172,21 @@ function ForCompany({ view, today, me }: { view: View; today: string; me: Person
     <>
       <Today view={view} today={today} />
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
+      <Chart title="Jobs by week" icon="calendar" series={JOBS} columns={jobsByWeek(view.jobs.jobs, today)} empty="No gigs or hires in the next eight weeks." />
+      <CrewChart view={view} today={today} />
       <WeekAhead view={view} today={today} />
-      <section className="card">
-        <Heading icon="calendar">Coming up</Heading>
-        <p className="hint">
-          {plural(confirmed, 'confirmed job')} from today on, and {plural(pencilled, 'enquiry or quote', 'enquiries and quotes')} not yet decided. <a href="#jobs">All jobs</a>
-        </p>
-      </section>
+      <Chart
+        title="The season"
+        icon="calendar"
+        series={JOBS}
+        columns={jobsByMonth(view.jobs.jobs, today)}
+        empty="No gigs or hires in the six months either side of this one."
+        more={
+          <p className="hint">
+            {plural(confirmed, 'confirmed job')} from today on, and {plural(pencilled, 'enquiry or quote', 'enquiries and quotes')} not yet decided. <a href="#jobs">All jobs</a>
+          </p>
+        }
+      />
       <MoneyCard view={view} today={today} />
     </>
   )
@@ -192,13 +201,82 @@ function MoneyCard({ view, today }: { view: View; today: string }) {
   const owed = m.owed.reduce((s, o) => s + o.cents, 0)
   const toFreelancers = m.costsOwed.reduce((s, c) => s + c.cents, 0)
   return (
-    <section className="card" aria-label="Money">
-      <Heading icon="document">Money</Heading>
-      <p className="hint">
-        {money(month?.confirmed ?? 0)} confirmed of {money(month?.quoted ?? 0)} quoted for {moneyMonth(today).label}, before VAT. {money(owed)} owed by{' '}
-        {plural(m.owed.length, 'client')}, and {money(toFreelancers)} to freelancers. <a href="#jobs/money">Money</a>
-      </p>
-    </section>
+    <Chart
+      title="Money"
+      icon="document"
+      series={MONEY}
+      columns={moneyByMonth(m.months, today)}
+      format={wholeEuro}
+      empty="No quotes in the three months either side of this one."
+      more={
+        <p className="hint">
+          {money(month?.confirmed ?? 0)} confirmed of {money(month?.quoted ?? 0)} quoted for {moneyMonth(today).label}, before VAT. {money(owed)} owed by{' '}
+          {plural(m.owed.length, 'client')}, and {money(toFreelancers)} to freelancers. <a href="#jobs/money">Money</a>
+        </p>
+      }
+    />
+  )
+}
+
+/** Each chart's parts, bottom up: settled first, then not yet, then short (ADR 0054). */
+const JOBS: Series[] = [
+  { name: 'confirmed', tone: 'settled' },
+  { name: 'not yet decided', tone: 'pending' },
+]
+const CREW: Series[] = [
+  { name: 'booked', tone: 'settled' },
+  { name: 'waiting to confirm', tone: 'pending' },
+  { name: 'still needed', tone: 'short' },
+]
+const KIT: Series[] = [
+  { name: 'for confirmed jobs', tone: 'settled' },
+  { name: 'pencilled in', tone: 'pending' },
+]
+const DAYS: Series[] = [
+  { name: 'confirmed', tone: 'settled' },
+  { name: 'waiting to confirm', tone: 'pending' },
+]
+const MONEY: Series[] = [
+  { name: 'confirmed', tone: 'settled' },
+  { name: 'still a quote', tone: 'pending' },
+]
+/** A chart's money to the euro: the cents are in the money screen. */
+const wholeEuro = (cents: number) => `€${Math.round(cents / 100).toLocaleString('en-IE')}`
+
+/** Crew on each of the next fourteen days, for everyone or one department's calls. */
+function CrewChart({ view, today, department }: { view: View; today: string; department?: string }) {
+  return (
+    <Chart
+      title={department ? `${department} crew, the next fortnight` : 'Crew, the next fortnight'}
+      icon="people"
+      series={CREW}
+      columns={crewByDay(view.crew.calls, today, 14, department)}
+      empty={department ? `No ${department} calls in the next fourteen days.` : 'No crew called in the next fourteen days.'}
+      more={
+        <a className="chart-more" href="#crew">
+          Crew calls
+        </a>
+      }
+    />
+  )
+}
+
+/** Items held for jobs on each of the next fourteen days, for all the kit or one department's. */
+function KitChart({ view, today, department }: { view: View; today: string; department?: Department }) {
+  return (
+    <Chart
+      title="Kit booked out, the next fortnight"
+      icon="kit"
+      series={KIT}
+      columns={kitByDay(view.kit.lines, today, 14, department ? (l) => l.model?.department === department : undefined)}
+      format={(n) => n.toLocaleString('en-IE')}
+      empty="No kit held for jobs in the next fourteen days."
+      more={
+        <a className="chart-more" href="#stock">
+          Stock
+        </a>
+      }
+    />
   )
 }
 
@@ -248,6 +326,8 @@ function ForDepartment({
       </label>
       <Tiles all={tiles(view, today, me, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
       <p className="hint">Crew still needed and kit still out after a job are for every department, on Crew and Stock: a call doesn't say its department yet.</p>
+      <CrewChart view={view} today={today} department={department} />
+      {kitOf(department) && <KitChart view={view} today={today} department={kitOf(department)} />}
       <section className="card">
         <Heading icon="people">Working this week{working.length > 0 ? ` (${working.length})` : ''}</Heading>
         {working.length === 0 ? (
@@ -332,6 +412,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
           </ul>
         )}
       </section>
+      <KitChart view={view} today={today} />
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
       {view.moves.stillOut.length > 0 && (
         <section className="card">
@@ -433,6 +514,7 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
         )}
         {asked > 0 && <p className="hint">{plural(asked, 'offer')} waiting on your answer, on your own link.</p>}
       </section>
+      <Chart title="Your weeks" icon="calendar" series={DAYS} columns={myWeeks(view.crew.calls, me.id, today)} format={(n) => plural(n, 'day')} empty="No days booked in the next eight weeks." />
       {balance && (
         <section className="card">
           <Heading icon="leave">Your leave</Heading>

@@ -61,6 +61,7 @@ export * from './sync/documents-view.ts'
 export * from './sync/attachments-view.ts'
 export * from './sync/counts-view.ts'
 export * from './sync/money-view.ts'
+export * from './sync/home-charts.ts'
 export * from './sync/own-calendar-view.ts'
 export * from './sync/vehicles-view.ts'
 // The shared design system's colour roles, by theme (vendored in ds/; see web/src/app.css for how the app names them).

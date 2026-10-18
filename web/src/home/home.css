@@ -23,3 +23,35 @@
 .preview .personas b { font-size: var(--text-heading); }
 .preview .personas small { color: var(--muted); font-size: var(--text-hint); font-weight: 600; }
 .preview .personas span { color: var(--ink); font-weight: 400; font-size: var(--text-small); }
+
+/* Charts (ADR 0054): columns in HTML, coloured by the grammar. Settled is ink, not yet a lighter grey, short is amber. */
+.home .chart { --chart-settled: var(--on-line); --chart-pending: var(--field-line); --chart-short: var(--ds-warn); }
+.home .chart-readout { margin: 0; font-size: var(--text-small); color: var(--on-line); min-height: 1.3em; }
+.home .chart-plot { position: relative; padding-top: var(--space-16); }
+.home .chart-max { position: absolute; top: 0; left: 0; font-size: var(--text-pill); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* A hairline at the top of the scale and one along the baseline: the only grid. */
+.home .chart-columns { display: grid; gap: var(--space-2); background: linear-gradient(var(--line), var(--line)) top / 100% 1px no-repeat; }
+.home .chart-col { display: grid; grid-template-rows: 120px auto; gap: var(--space-4); min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.home .chart-bar { display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--field-line); }
+.home .chart-stack { display: flex; flex-direction: column-reverse; gap: var(--space-2); width: min(24px, 70%); min-height: 3px; border-radius: 4px 4px 0 0; overflow: hidden; }
+.home .chart-part { min-height: 2px; }
+.home .chart-part.settled, .home .chart-swatch.settled { background: var(--chart-settled); }
+.home .chart-part.pending, .home .chart-swatch.pending { background: var(--chart-pending); }
+.home .chart-part.short, .home .chart-swatch.short { background: var(--chart-short); }
+.home .chart-tick { font-size: var(--text-pill); line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.home .chart-col.now .chart-tick { color: var(--ink); font-weight: 700; }
+/* The column being read: a wash behind it, as a hovered row has. */
+.home .chart-col[aria-pressed='true'] { background: var(--ds-wash-hover); }
+.home .chart-col[aria-pressed='true'] .chart-tick { color: var(--ink); }
+.home .chart-col:active { background: var(--ds-wash-pressed); }
+.home .chart-col:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home .chart-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-14); font-size: var(--text-hint); color: var(--on-line); }
+.home .chart-key li { display: flex; align-items: center; gap: var(--space-6); }
+.home .chart-swatch { width: 10px; height: 10px; border-radius: 2px; }
+@media (forced-colors: active) {
+  .home .chart-part, .home .chart-swatch { forced-color-adjust: none; }
+  .home .chart-part.settled, .home .chart-swatch.settled { background: CanvasText; }
+  .home .chart-part.pending, .home .chart-swatch.pending { background: GrayText; }
+  .home .chart-part.short, .home .chart-swatch.short { background: Highlight; }
+}
+.home .chart-more { justify-self: start; font-size: var(--text-link); }

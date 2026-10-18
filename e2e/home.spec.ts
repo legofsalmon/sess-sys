@@ -99,3 +99,39 @@ test('a long screen names its parts at the top, and a tap goes to one', async ({
   await page.goto('/#crew')
   await expect(parts.getByRole('button', { name: /^Answers to check/ }).locator('.count')).toHaveText(/^\d+$/)
 })
+
+test('Home draws the weeks, days and months ahead as charts, each column said in words (ADR 0054)', async ({ browser }) => {
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Company', exact: true }).click()
+
+  // Crew: today first, then a finger on another day says that day's crew in the line above.
+  const crew = page.locator('section', { has: page.getByRole('heading', { name: 'Crew, the next fortnight' }) })
+  const days = crew.getByRole('group', { name: 'Crew, the next fortnight' }).getByRole('button')
+  await expect(days).toHaveCount(14)
+  await expect(days.first()).toHaveAttribute('aria-pressed', 'true')
+  await expect(crew.locator('.chart-readout')).toHaveText(/^Today: /)
+  await days.nth(3).click()
+  await expect(days.nth(3)).toHaveAttribute('aria-pressed', 'true')
+  await expect(crew.locator('.chart-readout')).toHaveText(/still needed/)
+  await expect(crew.getByRole('listitem')).toHaveText(['booked', 'waiting to confirm', 'still needed'])
+
+  // One stop for the keyboard; the arrows move along.
+  await days.nth(3).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(days.nth(4)).toBeFocused()
+  await expect(days.nth(4)).toHaveAttribute('aria-pressed', 'true')
+  await expect(days.nth(4)).toHaveAttribute('tabindex', '0')
+  await expect(days.nth(3)).toHaveAttribute('tabindex', '-1')
+
+  await expect(page.getByRole('heading', { name: 'Jobs by week' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The season' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Money' })).toBeVisible()
+
+  // The warehouse: kit booked out each day.
+  await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Warehouse' }).click()
+  const kit = page.locator('section', { has: page.getByRole('heading', { name: 'Kit booked out, the next fortnight' }) })
+  await expect(kit.getByRole('button').filter({ hasText: /./ })).toHaveCount(14)
+  await expect(kit.getByRole('button', { name: /for confirmed jobs/ }).first()).toBeVisible()
+})
