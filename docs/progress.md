@@ -3,6 +3,34 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, evening: the audit's P1 fixes
+
+**Done**
+
+- All nine P1 findings of the [audit of 18 October](audit-2026-10-18.md),
+  findings 4 to 12, in [Decision 0049](adr/0049-holding-up-at-real-size.md)
+  (PR #88, live on Railway 14:28): the app's files and the copy go
+  compressed (1.3 MB of app to 0.33 MB); database time limits, a busy
+  answer after 3 s instead of a stalled phone, and a read pool of its own;
+  freelancers' calendars read in a worker from near today and capped; an
+  edit made against an old copy turned down in words, the typed text kept
+  to copy; only the office and directors change a role-holder's email,
+  never from a link, and no two people share one; a new screen opens at
+  its top and Back finds its place; a role sees only the buttons it can
+  use; Crew › Calls shows the short calls, filled ones folded; views kept
+  between changes and the saved copy written a table at a time (an own
+  edit 130 ms to 45 ms, the Crew tab 3.8 s to 2.4 s on a slowed phone).
+  Node pinned to 22.
+- Checked: typecheck, 801 unit tests, 112 browser tests, CI with real
+  Postgres; live, health answers and the app's files come back as Brotli.
+
+**Waiting on**
+
+- Colly: clear the start command in the Railway dashboard (finding 25),
+  plus the backup variables and the Sentry key as before.
+- Next: windowed long lists (the Jobs tab tap), and checking a person
+  brought back from the archive against everyone's emails.
+
 ## 18 October 2026, later: messages to crew are off until the office says
 
 **Done**
