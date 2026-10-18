@@ -120,7 +120,7 @@ describe('staff sign-in', () => {
     expect(back.headers.location).toBe('/#crew')
     const set = cookie(back, 'sh_session')!
     expect(set).toMatchObject({ httpOnly: true, sameSite: 'Lax', path: '/' })
-    expect(set.maxAge).toBe(60 * 86_400)
+    expect(set.maxAge).toBe(400 * 86_400)
 
     const me = await app.inject({ url: '/api/me', cookies: { sh_session: session! } })
     // Nobody is a director yet, so roles are off and she can do everything (ADR 0034).
@@ -220,11 +220,11 @@ describe('staff sign-in', () => {
     const quiet = await pull(app, session)
     expect(cookie(quiet, 'sh_session')).toBeUndefined()
 
-    await db.query("UPDATE sessions SET last_seen_at = now() - interval '2 days', expires_at = now() + interval '58 days'")
+    await db.query("UPDATE sessions SET last_seen_at = now() - interval '2 days', expires_at = now() + interval '398 days'")
     const renewed = await pull(app, session)
-    expect(cookie(renewed, 'sh_session')).toMatchObject({ value: session, maxAge: 60 * 86_400 })
+    expect(cookie(renewed, 'sh_session')).toMatchObject({ value: session, maxAge: 400 * 86_400 })
     const { rows } = await db.query<{ days: number }>("SELECT round(extract(epoch FROM expires_at - now()) / 86400)::int AS days FROM sessions")
-    expect(rows[0]!.days).toBe(60)
+    expect(rows[0]!.days).toBe(400)
   })
 
   it('keeps only a hash of the session secret', async () => {
@@ -243,6 +243,72 @@ describe('staff sign-in', () => {
     const { session } = await signIn(app, google, aoife)
     const ws = await app.injectWS('/api/sync/live', { headers: { cookie: `sh_session=${session}` } })
     ws.terminate()
+  })
+})
+
+describe("staff's own pages (ADR 0052)", () => {
+  const niamh: Identity = { subject: '1002', email: 'niamh@sessionhire.com', emailVerified: true, name: 'Niamh Walsh', hostedDomain: 'sessionhire.com' }
+
+  /** Aoife adds Niamh as staff and Dara as a freelancer; their links, as the office would send them. */
+  async function withPeople() {
+    const s = await server()
+    const { session } = await signIn(s.app, s.google, aoife)
+    const add = (id: string, name: string, kind: string, email: string | null) =>
+      push(s.app, session, 'person.upsert', { id, name, kind, email, phone: null, skills: [], dayRateCents: null, notes: '' })
+    expect((await add('p-niamh', 'Niamh Walsh', 'staff', 'Niamh@SessionHire.com')).json().results[0].status).toBe('applied')
+    expect((await add('p-dara', 'Dara Kelly', 'freelancer', null)).json().results[0].status).toBe('applied')
+    const people = (await pull(s.app, session)).json().changes.filter((c: { entity: string }) => c.entity === 'person')
+    const link = (id: string) => people.findLast((c: { data: { id: string } }) => c.data.id === id).data.linkToken as string
+    return { ...s, aoifeSession: session!, niamhLink: link('p-niamh'), daraLink: link('p-dara') }
+  }
+
+  it("asks for Google before a member of staff's link opens, and comes back to it", async () => {
+    const { app, google, niamhLink, daraLink } = await withPeople()
+    // A freelancer's link is still all they need.
+    expect((await app.inject(`/f/${daraLink}`)).statusCode).toBe(200)
+
+    const page = await app.inject(`/f/${niamhLink}`)
+    expect(page.statusCode).toBe(401)
+    expect(page.body).toContain('Sign in with Google')
+    expect(page.body).toContain(`/api/auth/google/start?next=%2Ff%2F${niamhLink}`)
+    // Nothing of hers shows, and nothing can be sent from it.
+    expect(page.body).not.toContain('data.json')
+    const post = await app.inject({ method: 'POST', url: `/f/${niamhLink}/details`, payload: 'phone=0871234567', headers: { 'content-type': 'application/x-www-form-urlencoded' } })
+    expect(post.statusCode).toBe(401)
+    expect((await app.inject(`/f/${niamhLink}/data.json`)).statusCode).toBe(401)
+    // A calendar app can't sign in, so the feed stays as it was.
+    expect((await app.inject(`/f/${niamhLink}/calendar.ics`)).statusCode).not.toBe(401)
+
+    const { back, session } = await signIn(app, google, niamh, `/f/${niamhLink}`)
+    expect(back.headers.location).toBe(`/f/${niamhLink}`)
+    const mine = await app.inject({ url: `/f/${niamhLink}`, cookies: { sh_session: session! } })
+    expect(mine.statusCode).toBe(200)
+    expect(mine.body).toContain('Niamh')
+  })
+
+  it("lets the office in, but not another member of staff once roles are on", async () => {
+    const { app, google, aoifeSession, niamhLink } = await withPeople()
+    const sean: Identity = { subject: '1003', email: 'sean@sessionhire.com', emailVerified: true, name: 'Sean Roche', hostedDomain: 'sessionhire.com' }
+    const { session: seanSession } = await signIn(app, google, sean)
+    // Roles off: everyone signed in can do everything, here too.
+    expect((await app.inject({ url: `/f/${niamhLink}`, cookies: { sh_session: seanSession! } })).statusCode).toBe(200)
+
+    // Aoife names herself director; roles are on, and Sean is staff crew.
+    await push(app, aoifeSession, 'person.upsert', { id: 'p-aoife', name: 'Aoife Byrne', kind: 'staff', email: 'aoife@sessionhire.com', phone: null, skills: [], dayRateCents: null, notes: '' })
+    expect((await push(app, aoifeSession, 'person.role', { id: 'p-aoife', role: 'director' })).json().results[0].status).toBe('applied')
+
+    const theirs = await app.inject({ url: `/f/${niamhLink}`, cookies: { sh_session: seanSession! } })
+    expect(theirs.statusCode).toBe(403)
+    expect(theirs.body).toContain("You're signed in as sean@sessionhire.com, which isn't Niamh's account.")
+    expect((await app.inject({ url: `/f/${niamhLink}`, cookies: { sh_session: aoifeSession } })).statusCode).toBe(200)
+  })
+
+  it('says why, back on the page, when Google turned the account away', async () => {
+    const { app, google, niamhLink } = await withPeople()
+    const outsider: Identity = { subject: '2001', email: 'niamh@gmail.com', emailVerified: true, name: 'Niamh Walsh' }
+    const { back } = await signIn(app, google, outsider, `/f/${niamhLink}`)
+    expect(back.headers.location).toBe(`/f/${niamhLink}?signin=denied`)
+    expect((await app.inject(back.headers.location!)).body).toContain("That account can't open Session Hire.")
   })
 })
 

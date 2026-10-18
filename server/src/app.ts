@@ -8,6 +8,7 @@ import { constants as zlib } from 'node:zlib'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
+import { guardStaffPages } from './auth/staff-pages.ts'
 import { registerBackupRoutes } from './backup/routes.ts'
 import { Backups, type BackupWatch } from './backup/service.ts'
 import type { BackupStore } from './backup/store.ts'
@@ -264,6 +265,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   registerAuth(app, db, auth, passcode)
+  // Staff's own pages need Google too, once it is on (ADR 0052).
+  if (auth) guardStaffPages(app, db)
 
   app.get('/api/health', { config: { public: true } }, async () => {
     const backup = backups.status()
