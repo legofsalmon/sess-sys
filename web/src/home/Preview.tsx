@@ -65,7 +65,7 @@ const api = `${import.meta.env.VITE_API_BASE ?? ''}/api/auth/preview`
 
 /** Tell the server which role to hold this browser to, and who it stands in for; with no signal the device still holds the role (web/src/role.ts). */
 function tellServer(key: string) {
-  const role = key && key !== 'freelancer' ? (key === 'staff' ? 'crew' : key) : null
+  const role = key && key !== 'freelancer' ? (key === 'staff' ? 'crew' : key === 'warehouse' ? 'head' : key) : null
   void fetch(api, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
