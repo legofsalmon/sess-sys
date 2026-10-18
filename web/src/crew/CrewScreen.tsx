@@ -47,7 +47,8 @@ import {
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
 import { emailBackRefusal, emailInUseRefusal, emailTakenBy, holdsARole, ROLE_LABELS, sameEmail, whoSignsInRefusal } from '@sh/shared'
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useWindowed } from '../windowed.ts'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
@@ -193,6 +194,23 @@ function whatItNeeds(kind: AnswerKind, offer: OfferView, short: number): string 
 }
 
 /** The calls still open, by job and then by days (audit finding 16), jobs in the order of their first day. */
+type CallGroup = ReturnType<typeof groupCalls>[number]
+const groupKey = (g: CallGroup) => g.key
+
+/** A job's calls, a group to each job, drawn in a window: the first has no line above it, wherever the window starts. */
+function Groups({ name, groups, children }: { name: string; groups: readonly CallGroup[]; children: (g: CallGroup) => ReactNode }) {
+  const win = useWindowed(`calls:${name}`, groups, groupKey, 300)
+  return (
+    <div className="call-groups windowed" ref={win.list} style={win.style}>
+      {win.rows.map((g, i) => (
+        <div className="call-group" key={g.key} ref={win.row(g.key)} data-place={`${name}:${g.key}`} data-first={win.start + i === 0 || undefined}>
+          {children(g)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function groupCalls(calls: readonly CallView[], inJobs: readonly JobView[]) {
   // A job's own venue heads its group, whichever phase comes first; one not on this device yet goes by its first call's.
   const venueOf = new Map(inJobs.map((j) => [j.id, j.venue ? venueLabel(j.venue) : '']))
@@ -284,6 +302,8 @@ export function CrewScreen() {
   const roster = useAct()
   // The yes or counter being turned down, asked first in its row: it can't be taken back, and their link says so at once (rule 1).
   const [turningDown, setTurningDown] = useState<string | undefined>()
+  // Whether the filled calls are unfolded (audit finding 10).
+  const [filledOpen, setFilledOpen] = useState(false)
   // Who was just archived, said where the list was, with the way back (rule 10).
   const [archivedNow, setArchivedNow] = useState<{ id: string; name: string } | undefined>()
   // Back from the archive only while their email is still theirs alone, as the server checks (ADR 0049).
@@ -319,31 +339,34 @@ export function CrewScreen() {
   const atHand = (c: CallView) => c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
   const inView = shownCalls.filter(atHand)
   const filled = shownCalls.filter((c) => !atHand(c))
-  // A long list (audit finding 11): each job's group is drawn as it nears the screen, and Back finds its place by them (places.ts).
-  const callGroups = (calls: readonly CallView[], list: string) =>
-    groupCalls(calls, view.jobs.jobs).map((g) => (
-      <div className="call-group" key={g.key} data-place={`${list}:${g.key}`}>
-        <header>
-          <div>
-            <b>{g.project}</b>
-            {g.venue && <p>{g.venue}</p>}
-          </div>
-          {g.projectId && (
-            <a className="link" href={`#jobs/${g.projectId}`}>
-              Open job
-            </a>
-          )}
-        </header>
-        {[...g.dates].map(([when, calls]) => (
-          <div className="call-date" key={when}>
-            <h3>{when}</h3>
-            {calls.map((c) => (
-              <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
-            ))}
-          </div>
-        ))}
-      </div>
-    ))
+  // A long list (audit finding 11, ADR 0050): only the jobs' groups near the screen are drawn, and Back finds its place by them (places.ts).
+  const callGroups = (calls: readonly CallView[], list: string) => (
+    <Groups name={list} groups={groupCalls(calls, view.jobs.jobs)}>
+      {(g) => (
+        <>
+          <header>
+            <div>
+              <b>{g.project}</b>
+              {g.venue && <p>{g.venue}</p>}
+            </div>
+            {g.projectId && (
+              <a className="link" href={`#jobs/${g.projectId}`}>
+                Open job
+              </a>
+            )}
+          </header>
+          {[...g.dates].map(([when, calls]) => (
+            <div className="call-date" key={when}>
+              <h3>{when}</h3>
+              {calls.map((c) => (
+                <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+              ))}
+            </div>
+          ))}
+        </>
+      )}
+    </Groups>
+  )
 
   return (
     <div className="app crew">
@@ -507,11 +530,12 @@ export function CrewScreen() {
           {callGroups(inView, 'short')}
           {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
           {filled.length > 0 && (
-            <details className="filled-calls">
+            <details className="filled-calls" open={filledOpen} onToggle={(e) => setFilledOpen(e.currentTarget.open)}>
               <summary>
                 Show {filled.length} filled {filled.length === 1 ? 'call' : 'calls'}
               </summary>
-              {callGroups(filled, 'filled')}
+              {/* Built only once opened: folded, they'd be built for nothing, and a window can't tell what's on a screen it isn't on. */}
+              {filledOpen && callGroups(filled, 'filled')}
             </details>
           )}
         </section>

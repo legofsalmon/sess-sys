@@ -41,6 +41,7 @@ import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
 import { Heading, Icon } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
+import { useWindowed } from '../windowed.ts'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
@@ -198,6 +199,8 @@ function VenuesScreen({ view }: { view: View }) {
   )
 }
 
+const jobKey = (j: JobView) => j.id
+
 /** Every job, searched and filtered; `current` marks the one open beside the list. */
 function JobsCard({ view, current }: { view: View; current?: string }) {
   const { jobs } = view.jobs
@@ -213,6 +216,7 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
   // Past jobs newest first; everything else soonest first.
   if (filter === 'past') shown.reverse()
   const count = (f: Filter) => jobs.filter((j) => filterOf(j, day) === f).length
+  const win = useWindowed('jobs', shown, jobKey, 110)
 
   return (
     <section className="card" aria-label="Jobs">
@@ -226,10 +230,10 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
         ))}
       </div>
       {shown.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
-      {/* A long list (audit finding 11): its rows are drawn as they near the screen, and Back finds its place by them (places.ts). */}
-      <ul className="job-list">
-        {shown.map((j) => (
-          <li key={j.id} data-place={j.id}>
+      {/* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, and Back finds its place by them (places.ts). */}
+      <ul className="job-list windowed" ref={win.list} style={win.style}>
+        {win.rows.map((j, i) => (
+          <li key={j.id} ref={win.row(j.id)} data-place={j.id} aria-setsize={shown.length} aria-posinset={win.start + i + 1}>
             <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={j.id === current} />
           </li>
         ))}
