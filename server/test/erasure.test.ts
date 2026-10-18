@@ -947,13 +947,13 @@ describe('their staff account, found by their addresses', () => {
     // Cian changed his address on his card after he first signed in.
     await colly.send('person.upsert', person('cian', 'Cian Murphy', cian.email))
     await colly.send('person.contact', { id: 'cian', email: 'cian.murphy@example.ie' })
-    // Aoife freelanced before she joined: her old card, archived, has her work address too.
-    await colly.send('person.upsert', person('aoife', 'Aoife Byrne', aoife.email))
+    // Aoife freelanced before she joined: her old card, archived, has her work address too. Archived first, as two people
+    // here can't share an email (audit finding 12).
     await colly.send('person.upsert', person('aoife-old', 'Aoife Byrne (freelance)', aoife.email, 'freelancer'))
-    for (const id of ['cian', 'aoife-old']) {
-      expect(await colly.send('person.archive', { id, archived: true })).toMatchObject({ status: 'applied' })
-      expect(await colly.send('person.erase', { id })).toMatchObject({ status: 'applied' })
-    }
+    expect(await colly.send('person.archive', { id: 'aoife-old', archived: true })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('person.upsert', person('aoife', 'Aoife Byrne', aoife.email))).toMatchObject({ status: 'applied' })
+    expect(await colly.send('person.archive', { id: 'cian', archived: true })).toMatchObject({ status: 'applied' })
+    for (const id of ['cian', 'aoife-old']) expect(await colly.send('person.erase', { id })).toMatchObject({ status: 'applied' })
 
     expect((await app.inject({ url: '/api/me', cookies: cian.cookies })).statusCode).toBe(401)
     expect((await db.query(`SELECT name, email, disabled FROM users WHERE id = $1`, [cian.id])).rows[0]).toEqual({ name: ERASED_NAME, email: '', disabled: true })

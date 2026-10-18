@@ -230,3 +230,30 @@ export function roleForEmail(people: readonly RolePerson[], email: string): { ro
   const me = personForEmail(people, email)
   return { role: (me && roleOfPerson(me)) ?? 'crew', on: true, ...(me ? { personId: me.id } : {}) }
 }
+
+/** Two emails as an account is matched to a person: trimmed, in any case. */
+export const sameEmail = (a: string | null | undefined, b: string | null | undefined) => (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase()
+
+/**
+ * Whether a person's email and kind decide a role above staff crew (audit
+ * finding 12): the email is how their account finds them, and a freelancer
+ * has none. Read from the role as kept, so a freelancer who was one counts.
+ */
+export const holdsARole = (p: Pick<RolePerson, 'role'>) => p.role !== null && p.role !== 'crew'
+
+/** Who can change the email or kind of someone who holds a role: a role that changes settings, or anyone while roles are off. */
+export const mayChangeWhoSignsIn = (role: Role | null | undefined) => !role || roleCan(role, 'settings')
+
+/** Why someone can't change the email or kind of a person who holds a role. */
+export function whoSignsInRefusal(name: string, held: Role, role?: Role): string {
+  return `Only ${whoCan('settings')} can change ${name}'s email or type: it's how they sign in as ${ROLE_LABELS[held]}.${role ? ` Your role is ${ROLE_LABELS[role]}.` : ''}`
+}
+
+/** Why an email someone else on the Crew tab has can't be given to another person: the account would find the wrong one. */
+export const emailInUseRefusal = (other: string) => `${other} already has that email. Each person needs their own, as it's how the app knows who signs in.`
+
+/** Someone else, not archived, with this email, as the server checks it before keeping one. */
+export function emailTakenBy<P extends Pick<RolePerson, 'id' | 'email' | 'archived'>>(people: readonly P[], id: string, email: string | null | undefined): P | undefined {
+  if (!email?.trim()) return undefined
+  return people.find((p) => p.id !== id && !p.archived && sameEmail(p.email, email))
+}

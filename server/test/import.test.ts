@@ -224,7 +224,8 @@ describe('planning', () => {
     const app: AppData = {
       ...empty,
       people: [
-        { id: 'p1', name: 'Ciara Walsh', email: 'Ciara@example.ie' },
+        // Kept with a space, as an older version could: still her (audit finding 12).
+        { id: 'p1', name: 'Ciara Walsh', email: ' Ciara@example.ie' },
         { id: 'p2', name: 'Tom Kelly', email: null },
       ],
     }
