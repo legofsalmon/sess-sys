@@ -45,7 +45,7 @@ import {
 } from '@sh/shared'
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
-import { emailInUseRefusal, emailTakenBy, holdsARole, ROLE_LABELS, sameEmail, whoSignsInRefusal } from '@sh/shared'
+import { emailBackRefusal, emailInUseRefusal, emailTakenBy, holdsARole, ROLE_LABELS, sameEmail, whoSignsInRefusal } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -285,6 +285,14 @@ export function CrewScreen() {
   const [turningDown, setTurningDown] = useState<string | undefined>()
   // Who was just archived, said where the list was, with the way back (rule 10).
   const [archivedNow, setArchivedNow] = useState<{ id: string; name: string } | undefined>()
+  // Back from the archive only while their email is still theirs alone, as the server checks (ADR 0049).
+  const bringBack = (id: string) =>
+    void roster.run(() => {
+      const p = crew.people.find((x) => x.id === id)
+      const other = p && emailTakenBy(crew.people, id, p.email)
+      if (p && other) throw new Error(emailBackRefusal(p.name, other.name))
+      return client.mutate('person.archive', { id, archived: false })
+    })
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
   // Each person has a page of their own (#crew/person/<id>); the People list is one line each that opens it.
@@ -538,7 +546,7 @@ export function CrewScreen() {
                   onClick={() => {
                     const { id } = archivedNow
                     setArchivedNow(undefined)
-                    void roster.run(() => client.mutate('person.archive', { id, archived: false }))
+                    bringBack(id)
                   }}
                 >
                   Bring {archivedNow.name} back
@@ -570,7 +578,7 @@ export function CrewScreen() {
               <summary>Archived ({archived.length})</summary>
               {/* Each with "Erase details…" for when they ask (ADR 0027). */}
               {archived.map((p) => (
-                <ArchivedPerson key={p.id} person={p} onBringBack={() => void roster.run(() => client.mutate('person.archive', { id: p.id, archived: false }))} />
+                <ArchivedPerson key={p.id} person={p} onBringBack={() => bringBack(p.id)} />
               ))}
             </details>
           )}

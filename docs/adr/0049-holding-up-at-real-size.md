@@ -112,7 +112,7 @@ lists are the next step.
   go on the next round.
 - A head can no longer correct a role-holder's email, their own
   included; the office does it. Bringing a person back from the archive
-  doesn't yet check their email against everyone else's.
+  is refused, in words, while someone else now has their email.
 - An hourly, monthly or yearly repeat from years ago is still worked
   through from its first day and may now make a whole file fail as "too
   much" where before its repeats were silently missing.

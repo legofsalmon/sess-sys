@@ -253,6 +253,8 @@ export function whoSignsInRefusal(name: string, held: Role, role?: Role): string
 
 /** Why an email someone else on the Crew tab has can't be given to another person: the account would find the wrong one. */
 export const emailInUseRefusal = (other: string) => `${other} already has that email. Each person needs their own, as it's how the app knows who signs in.`
+export const emailBackRefusal = (name: string, other: string) =>
+  `${other} now has ${name}'s email, so ${name} can't be brought back until one of them has another. Each person needs their own, as it's how the app knows who signs in.`
 
 /** Someone else, not archived, with this email, as the server checks it before keeping one. */
 export function emailTakenBy<P extends Pick<RolePerson, 'id' | 'email' | 'archived'>>(people: readonly P[], id: string, email: string | null | undefined): P | undefined {

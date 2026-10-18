@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, holdsARole, mayChangeWhoSignsIn, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, emailBackRefusal, holdsARole, mayChangeWhoSignsIn, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { stopOwnCalendar } from './own-calendars.ts'
@@ -376,6 +376,13 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
           hold.status === 'confirmed' ? `is booked on ${hold.project}; release them first` : hold.status === 'accepted' ? `has accepted ${hold.project}; release them first` : `has an open offer for ${hold.project}; withdraw it first`
         throw new Refused({ code: 'conflict', message: `${person.name} ${what}.` })
       }
+    } else if (person.email?.trim()) {
+      // Back from the archive, their email must still be theirs alone, or an account could find either of them (ADR 0049).
+      const { rows } = await ctx.tx.query<{ name: string }>(
+        'SELECT name FROM people WHERE id <> $1 AND NOT archived AND lower(trim(email)) = lower(trim($2)) ORDER BY id LIMIT 1',
+        [person.id, person.email]
+      )
+      if (rows[0]) throw new Refused({ code: 'conflict', message: emailBackRefusal(person.name, rows[0].name) })
     }
     await ctx.tx.query('UPDATE people SET archived = $2 WHERE id = $1', [person.id, a.archived])
     // Their link stops, so they couldn't stop sharing their own calendar themselves: it stops with it (ADR 0044).

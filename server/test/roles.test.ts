@@ -231,6 +231,10 @@ describe('roles', () => {
     // Someone who has left keeps theirs, and it can be given again.
     expect((await send(app, s, 'person.archive', { id: 'dara', archived: true })).status).toBe('applied')
     expect((await send(app, s, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com'))).status).toBe('applied')
+    // Bringing the old one back would give the email to two people, so it waits until one of them has another.
+    const back = await send(app, s, 'person.archive', { id: 'dara', archived: false })
+    expect(back).toMatchObject({ status: 'rejected', reason: { code: 'conflict' } })
+    expect(said(back)).toBe("Dara Kelly now has Dara Kelly's email, so Dara Kelly can't be brought back until one of them has another. Each person needs their own, as it's how the app knows who signs in.")
 
     // A role kept by someone made a freelancer comes back if they're made staff again, so that's the office's too.
     expect((await send(app, c, 'person.role', { id: 'dara2', role: 'office' })).status).toBe('applied')
