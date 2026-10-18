@@ -104,6 +104,16 @@ describe('titles', () => {
     expect(t('Nissan - Collection')).toBe('Nissan | Load out')
   })
 
+  it("make a department's day after \" - \" a day of the job, not a job of its own (ADR 0050)", () => {
+    expect(t('EP - Smirnoff LX')).toBe('EP | Smirnoff LX')
+    expect(t('EP - Audio')).toBe('EP | Audio')
+    expect(t('District X - Video D8 Upstage')).toBe('District X | Video D8 Upstage')
+    expect(t('ATN - LX Stage 1, 2 & 3')).toBe('ATN | LX Stage 1, 2 & 3')
+    // Not a department: still a job of its own, for the Tidy up page to offer to put together.
+    expect(t('Sreenath - CCD')).toBe('Sreenath - CCD | Show (guessed)')
+    expect(t('Coca Cola Truck - Install')).toBe('Coca Cola Truck | Build')
+  })
+
   it('are compared ignoring case, accents, spacing and punctuation', () => {
     expect(nameKey('  Café  Olé!! ')).toBe(nameKey('cafe ole'))
     expect(nameKey('Tik-Tok')).toBe(nameKey('tik tok'))
@@ -566,7 +576,7 @@ describe('bringing jobs in from Google Calendar', () => {
     // The history says who did it and how much came in.
     const history = await s.colly.history()
     expect(history.entries[0]!.what).toBe(
-      'Brought in 2 jobs from ops@sessionhire.com on Google Calendar: 6 days, 4 crew bookings and offers, 2 new people and 2 new venues'
+      'Brought in 2 jobs from ops@sessionhire.com on Google Calendar, from 1 Jan 2031: 6 days, 4 crew bookings and offers, 2 new people and 2 new venues. Left out: 1 event with a start time (meetings, calls), 1 repeating event (birthdays, reminders) and 1 out-of-office or other special event'
     )
     expect(history.entries[0]!.who.name).toBe('Colly Hewson')
 
@@ -639,7 +649,7 @@ describe('bringing jobs in from Google Calendar', () => {
     const nissan = f.projects.find((p) => p.name === 'Nissan')!
     expect(f.phases.filter((p) => p.projectId === nissan.id).map((p) => `${p.name} ${p.start} ${p.end}`)).toContain('Load out 2031-03-13 2031-03-14')
     expect(f.projects).toHaveLength(2)
-    expect((await s.colly.history()).entries[0]!.what).toBe('Brought in more days for 1 job from ops@sessionhire.com on Google Calendar: 1 day')
+    expect((await s.colly.history()).entries[0]!.what).toBe('Brought in more days for 1 job from ops@sessionhire.com on Google Calendar, from 1 Jan 2031: 1 day. Left out: 1 event with a start time (meetings, calls), 1 repeating event (birthdays, reminders) and 1 out-of-office or other special event')
   })
 
   it('reads a colleague’s calendar shared with the account, and knows events it has already brought in from another', async () => {

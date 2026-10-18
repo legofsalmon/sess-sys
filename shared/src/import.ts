@@ -200,3 +200,13 @@ export function leftOutLabel({ reason, count }: Pick<ImportLeftOut, 'reason' | '
       return `${plural(count, 'day', 'days')} of jobs cancelled or lost in the app`
   }
 }
+
+/** "aoife.byrne92@gmail.com" → "Aoife Byrne", when Google has no name for a guest. */
+export function nameFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? email
+  const words = local
+    .split(/[._\-+]+/)
+    .map((w) => w.replace(/\d+/g, ''))
+    .filter(Boolean)
+  return words.length ? words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : local
+}

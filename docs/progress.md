@@ -3,6 +3,31 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, night: tidying what came in
+
+**Done**
+
+- Jobs › Tidy up, in [Decision 0053](adr/0053-tidying-what-came-in.md)
+  (Colly's "tidy-ups for the imported data"): the jobs brought in as
+  several made one (EP was 22 jobs), people named from their address
+  given names, venues and clients found in job names, and names given a
+  capital. Each group is a suggestion the office ticks; only sure ones
+  come ticked. Joining moves phases, crew, kit, vans, quotes and the
+  calendar's days, naming each day for its title.
+- The next bring-in reads "EP - Smirnoff LX" as EP's Smirnoff LX day.
+- Staff on several jobs a day are no longer clashes; calls say "25 of 40,
+  both days"; "No client or venue yet" only on jobs in the next fortnight;
+  "Show 3 times"; a bring-in's history keeps its start date and what it
+  left out.
+- Checked: typecheck, all server and shared tests (13 new), and the page
+  on a local copy of the live data on a phone and a laptop, no console
+  errors. Nothing in the live data was changed.
+
+**Waiting on**
+
+- The office: going through Tidy up on the live app.
+- Colly: the Railway start command, the backup variables and the Sentry
+  key, as before.
 ## 18 October 2026, night: Google is the only way in for staff
 
 **Done**

@@ -34,7 +34,7 @@ const toFault = (r: Row): Fault => ({
 
 const iso = (col: string) => `to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
 
-async function getFault(q: Queryable, id: string, lock = false) {
+export async function getFault(q: Queryable, id: string, lock = false) {
   const { rows } = await q.query(
     `SELECT id, kind, asset_id, model_id, qty, project_id, usable, note, repair, ${iso('at')} AS at, outcome, ${iso('closed_at')} AS closed_at
        FROM faults WHERE id = $1${lock ? ' FOR UPDATE' : ''}`,

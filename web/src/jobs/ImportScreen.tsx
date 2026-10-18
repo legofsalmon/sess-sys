@@ -634,8 +634,8 @@ function Done({ preview, result, onAgain }: { preview: ImportPreview; result: Im
         <a className="button primary" href={`#jobs/plan/month/${addMonths(first, 0)}`}>
           See them in the planner
         </a>
-        <a className="button" href="#jobs">
-          All jobs
+        <a className="button" href="#jobs/tidy">
+          Tidy up what came in
         </a>
         <button type="button" onClick={onAgain}>
           Look at another calendar

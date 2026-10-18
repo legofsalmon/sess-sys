@@ -1,9 +1,12 @@
 import {
   addDays,
   daysLabel,
+  departmentInWords,
   eachDay,
   MAX_PHASE_DAYS,
   nameKey,
+  nameFromEmail,
+  KIND_PHASE,
   PHASE_NAMES,
   type GuestResponse,
   type ImportChanged,
@@ -157,7 +160,7 @@ export const LONGEST_EVENT_DAYS = 31
 const PHASE_NOTES = 2000
 const JOB_NOTES = 4000
 
-export { nameKey }
+export { nameKey, nameFromEmail, KIND_PHASE }
 
 /** Phase words and the app's name for each. Those marked `strict` are also safe to split off the end of a title with no " - " ("Fairview Build"). */
 const PHASE_WORDS: { re: RegExp; name: string; strict: boolean }[] = [
@@ -274,6 +277,17 @@ export function phasesAndNote(text: string): { phases: string[]; note: string } 
   return { phases: [...new Set(phases)], note }
 }
 
+/** The departments whose name after " - " makes a day of the job rather than a job of its own. */
+const DAY_DEPARTMENTS: readonly string[] = ['Audio', 'LX', 'Video', 'Laser', 'LED Tech', 'Backline', 'SFX', 'Rigger']
+
+/** "Smirnoff LX" → the day "Smirnoff LX": a few words naming a department, numbering dropped. Undefined for anything else. */
+export function departmentDay(text: string): string | undefined {
+  const words = text.replace(NUMBERING, ' ').replace(/\s+/g, ' ').trim()
+  const department = departmentInWords(words)
+  if (!words || !department || !DAY_DEPARTMENTS.includes(department) || words.split(' ').length > NOTE_WORDS) return undefined
+  return capitalised(words).slice(0, 100)
+}
+
 /** Words in a job's name that say what kind of job it is (ADR 0037); the company's own name says nothing. */
 const COMPANY_NAME = /\bsession hire\b/gi
 const HIRE_WORDS = /\b(?:dry ?hire|hire|rental|rent)\b/i
@@ -289,8 +303,6 @@ export function kindFromName(name: string): ProjectKind {
   return 'gig'
 }
 
-/** The phase a day of each kind of job is, when its title has no phase word. */
-export const KIND_PHASE: Record<ProjectKind, string> = { gig: 'Show', hire: 'Hire', errand: 'Errand', meeting: 'Meeting' }
 
 export interface ParsedTitle {
   job: string
@@ -355,6 +367,9 @@ function parseJobAndPhases(title: string): Omit<ParsedTitle, 'kind'> {
   if (segments.length >= 2) {
     const tail = phasesAndNote(segments.at(-1)!)
     if (tail) return { job: job(segments.slice(0, -1).join(' - ')), phases: tail.phases, note: tail.note, guessed: false, pencilled }
+    // "EP - Smirnoff LX", "District X - Audio Main": a day for one department of the job, which is the day's name (ADR 0050).
+    const day = departmentDay(segments.at(-1)!)
+    if (day) return { job: job(segments.slice(0, -1).join(' - ')), phases: [day], note: '', guessed: false, pencilled }
   }
   const whole = segments.join(' - ')
   const words = whole.split(' ')
@@ -439,16 +454,6 @@ const MAILBOXES = /^(?:info|accounts|office|hello|admin|bookings?|sales|support|
 /** "info@sessionhire.com": a company's mailbox, not someone who can be on a crew. */
 export function isMailbox(email: string): boolean {
   return MAILBOXES.test(email.split('@')[0] ?? '')
-}
-
-/** "aoife.byrne92@gmail.com" → "Aoife Byrne", when Google has no name for a guest. */
-export function nameFromEmail(email: string): string {
-  const local = email.split('@')[0] ?? email
-  const words = local
-    .split(/[._\-+]+/)
-    .map((w) => w.replace(/\d+/g, ''))
-    .filter(Boolean)
-  return words.length ? words.map(capitalised).join(' ') : local
 }
 
 const RANK: Record<GuestResponse, number> = { declined: 0, needsAction: 1, tentative: 2, accepted: 3 }

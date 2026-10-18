@@ -1,4 +1,6 @@
 import {
+  departmentInWords,
+  withCapital,
   departmentOfPeople,
   addDays,
   cleanText,
@@ -269,7 +271,7 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
     } else {
       projectId = newId()
       jobVenue = await venueId(j.venue)
-      rows.projects.push([projectId, j.name.slice(0, 200), jobVenue, j.status, j.kind, j.notes, calendar.name])
+      rows.projects.push([projectId, withCapital(j.name).slice(0, 200), jobVenue, j.status, j.kind, j.notes, calendar.name])
       counts.jobs++
     }
 
@@ -305,7 +307,8 @@ async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar
       if (offers.length === 0) continue
       const busiest = Math.max(1, ...r.days.map((d) => offers.filter((o) => o.status !== 'declined' && o.days.includes(d)).length))
       const callId = newId()
-      const department = departmentOfPeople(offers.map((o) => departments.get(o.personId)))
+      // Or, when they don't agree, the department the day is named for ("Smirnoff LX", ADR 0050).
+      const department = departmentOfPeople(offers.map((o) => departments.get(o.personId))) ?? departmentInWords(names.phase ?? '')
       rows.calls.push([callId, projectId, phaseId, (j.existing?.name ?? j.name).slice(0, 200), names.phase, names.venue, 'Crew', start, end, Math.min(busiest, 100), 'open', department])
       for (const o of offers)
         rows.offers.push([newId(), callId, o.personId, o.status, JSON.stringify(o.days), o.status === 'offered' ? null : answered, o.status === 'offered' ? null : 'calendar'])
@@ -540,7 +543,9 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
           const done = await bring(ctx, plan, people, read.calendar, app)
-          await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ calendar: read.calendar.name, ...done })])
+          // The history keeps the first day asked for and what was left out, which the screen showed and is gone once brought in (audit finding 10).
+          const leftOut = plan.leftOut.map((l) => ({ reason: l.reason, count: l.count }))
+          await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ calendar: read.calendar.name, from: read.from, ...done, leftOut })])
           return done
         }
       )

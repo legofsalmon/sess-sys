@@ -80,6 +80,7 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'phase.add': 'jobs',
   'phase.update': 'jobs',
   'phase.remove': 'jobs',
+  'project.merge': 'jobs',
   'venue.upsert': 'jobs',
   'client.upsert': 'jobs',
   'attachment.save': 'jobs',
