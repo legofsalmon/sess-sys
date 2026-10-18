@@ -6,15 +6,17 @@ import { expect, test, type Page } from '@playwright/test'
  * here: 401 for a device that isn't signed in, or a signed-in person.
  */
 
-/** The device's saved copy of the data, straight from IndexedDB. */
+/** The device's saved copy of the data, straight from IndexedDB: the record beside its tables (web/src/storage.ts), or null when nothing is kept. */
 const deviceCopy = (page: Page) =>
   page.evaluate(
     () =>
       new Promise((resolve) => {
         const req = indexedDB.open('session-hire', 1)
         req.onsuccess = () => {
-          const get = req.result.transaction('sync').objectStore('sync').get('snapshot')
-          get.onsuccess = () => resolve(get.result ?? null)
+          const store = req.result.transaction('sync').objectStore('sync')
+          const get = store.get('copy')
+          const count = store.count()
+          count.onsuccess = () => resolve(count.result > 0 ? (get.result ?? 'only tables') : null)
         }
       })
   )

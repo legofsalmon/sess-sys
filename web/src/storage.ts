@@ -2,9 +2,18 @@ import { MemoryStorage, type Snapshot, type Storage } from '@sh/shared'
 import { tabRole, tellTabs } from './tabs.ts'
 
 /**
- * The device's copy, in IndexedDB: one record holding the whole snapshot.
- * Enough for the Phase 0 test; the real app moves to SQLite in the browser
- * once the data outgrows a single record (see docs/architecture.md).
+ * The device's copy, in IndexedDB: a record for each table of the snapshot
+ * and one for the rest (the outbox, the cursor and the like), so a change
+ * writes the small record and the tables it changed rather than the whole
+ * copy, megabytes once the company's year is on it (audit, 18 October 2026,
+ * finding 11). The real app moves to SQLite in the browser once the data
+ * outgrows this (see docs/architecture.md).
+ *
+ * Copies saved before were one record holding everything (`snapshot`). One
+ * is read as it is, and the first save after writes it out table by table
+ * and deletes it, in one go, so the copy is never half in each. Should that
+ * record turn up beside the new ones (a build from before was opened in
+ * between, and saved), it's the newer, and is read and written out again.
  *
  * When IndexedDB is missing or won't open, the copy is kept in memory for
  * the session instead, and a bar at the top says so: the app still works,
@@ -14,7 +23,12 @@ import { tabRole, tellTabs } from './tabs.ts'
  */
 const DB = 'session-hire'
 const STORE = 'sync'
-const KEY = 'snapshot'
+/** Where builds before kept the whole copy, as one record. */
+const WHOLE = 'snapshot'
+/** Everything but the tables. */
+const REST = 'copy'
+/** Each table's record is its name after this. */
+const TABLE = 'table:'
 /** IndexedDB has been known to never answer at all; past this the copy is kept in memory. */
 const OPEN_MS = 15_000
 
@@ -47,6 +61,10 @@ function failed(err: unknown): Error {
 
 export class IndexedDbStorage implements Storage {
   private wiped = false
+  /** The copy is kept table by table already, so a save can write only the tables changed. */
+  private split = false
+  /** The tables each save still under way is writing. */
+  private unfinished = new Set<{ tables: ReadonlySet<string> | 'all' }>()
 
   private constructor(private readonly db: IDBDatabase) {}
 
@@ -56,37 +74,86 @@ export class IndexedDbStorage implements Storage {
 
   async load(): Promise<Snapshot | undefined> {
     return new Promise((resolve, reject) => {
-      const req = this.db.transaction(STORE).objectStore(STORE).get(KEY)
-      req.onsuccess = () => resolve(req.result as Snapshot | undefined)
-      req.onerror = () => reject(req.error)
+      const store = this.db.transaction(STORE).objectStore(STORE)
+      const TABLES = IDBKeyRange.bound(TABLE, `${TABLE}\uffff`)
+      const whole = store.get(WHOLE)
+      const rest = store.get(REST)
+      const names = store.getAllKeys(TABLES)
+      const tables = store.getAll(TABLES)
+      // Read in one transaction, so the tables and the rest are from the same save.
+      tables.onsuccess = () => {
+        // Nothing kept, or kept the old way: the next save writes every table.
+        this.split = false
+        if (whole.result) return resolve(whole.result as Snapshot)
+        if (!rest.result) return resolve(undefined)
+        const entities = Object.fromEntries((names.result as string[]).map((k, i) => [k.slice(TABLE.length), tables.result[i]]))
+        this.split = true
+        resolve({ ...(rest.result as Omit<Snapshot, 'entities'>), entities: entities as Snapshot['entities'] })
+      }
+      for (const req of [whole, rest, names, tables]) req.onerror = () => reject(req.error)
     })
   }
 
-  async save(snapshot: Snapshot): Promise<void> {
+  async save(snapshot: Snapshot, changed?: ReadonlySet<string> | 'all'): Promise<void> {
     if (this.wiped) return
-    return this.write((store) => store.put(snapshot, KEY))
+    // The tables of saves not finished yet go again with this one: should one of those fail, this one, which writes the
+    // rest from the same moment, still leaves a copy whose tables and cursor agree.
+    const tables = new Set<string>()
+    let every = !this.split || !changed || changed === 'all'
+    for (const t of every ? [] : [changed as ReadonlySet<string>, ...[...this.unfinished].map((u) => u.tables)])
+      if (t === 'all') every = true
+      else for (const name of t) tables.add(name)
+    const mine = { tables: every ? ('all' as const) : tables }
+    this.unfinished.add(mine)
+    const { entities, ...rest } = snapshot
+    try {
+      await this.write((store) => {
+        // Every table: the old record, and any table no longer in the copy, go with the clear, in the same transaction.
+        if (every) store.clear()
+        store.put(rest, REST)
+        for (const name of every ? Object.keys(entities) : tables) {
+          const table = (entities as Record<string, unknown>)[name]
+          if (table === undefined) store.delete(TABLE + name)
+          else store.put(table, TABLE + name)
+        }
+      })
+      this.split = true
+    } catch (err) {
+      // What's kept may be behind in some table now: the next save writes them all.
+      this.split = false
+      throw err
+    } finally {
+      this.unfinished.delete(mine)
+    }
   }
 
   /** Forget this device's copy and stop saving, ahead of reloading the app signed out. */
   async wipe(): Promise<void> {
     this.wiped = true
-    return this.write((store) => store.delete(KEY))
+    return this.write((store) => store.clear())
   }
 
   private write(fn: (store: IDBObjectStore) => void): Promise<void> {
     return new Promise((resolve, reject) => {
+      let tx: IDBTransaction | undefined
       try {
-        const tx = this.db.transaction(STORE, 'readwrite')
-        fn(tx.objectStore(STORE))
-        tx.oncomplete = () => resolve()
+        const t = (tx = this.db.transaction(STORE, 'readwrite'))
+        fn(t.objectStore(STORE))
+        t.oncomplete = () => resolve()
         // A write that fails at commit (no room left) aborts rather than errors.
         // Without this it never settled, and every form after it hung with no message.
-        tx.onabort = () => reject(failed(tx.error))
+        t.onabort = () => reject(failed(t.error))
         // A request that fails says why on itself first; the transaction's own
         // error is only set once it aborts after that, so it's read from the request.
-        tx.onerror = (e) => reject(failed((e.target as IDBRequest | IDBTransaction | null)?.error ?? tx.error))
+        t.onerror = (e) => reject(failed((e.target as IDBRequest | IDBTransaction | null)?.error ?? t.error))
       } catch (err) {
-        // The connection closed under us, or the record can't be stored.
+        // The connection closed under us, or a record can't be stored. What was asked before it is taken back with it:
+        // a copy cleared and then not written out would otherwise be kept.
+        try {
+          tx?.abort()
+        } catch {
+          // Already over.
+        }
         reject(failed(err))
       }
     })
@@ -131,11 +198,11 @@ export class DeviceStorage implements Storage {
     }
   }
 
-  async save(snapshot: Snapshot): Promise<void> {
+  async save(snapshot: Snapshot, changed?: ReadonlySet<string> | 'all'): Promise<void> {
     if (this.wiped) return
     if (tabRole() !== 'writer') throw new Error(OTHER_TAB)
     try {
-      await this.inner.save(snapshot)
+      await this.inner.save(snapshot, changed)
       if (this.problem) this.set({ problem: undefined })
     } catch (err) {
       this.set({ problem: err instanceof Error ? err.message : String(err) })

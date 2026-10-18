@@ -21,7 +21,21 @@ export function isDay(s: string): boolean {
 
 export const day = z.string().refine(isDay, "That isn't a real date.")
 
+/**
+ * One formatter for the day in Ireland, made once: one made on every call
+ * was a quarter of the time the Crew tab took to draw on a phone, asked for
+ * on every row (audit, 18 October 2026, finding 11).
+ */
+const irish = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Dublin' })
+/** The last minute asked about and its day: Ireland's day only turns on the hour, so a minute has one day. */
+let last: { minute: number; day: string } | undefined
+
 /** Today in Ireland, as 2026-10-05: the one place the app and the server read the day from. */
 export function irishToday(now = new Date()): string {
-  return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' })
+  const ms = now.getTime()
+  // A time that isn't one reads as it always has.
+  if (Number.isNaN(ms)) return 'Invalid Date'
+  const minute = Math.floor(ms / 60_000)
+  if (last?.minute !== minute) last = { minute, day: irish.format(now) }
+  return last.day
 }

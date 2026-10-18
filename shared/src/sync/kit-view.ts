@@ -25,7 +25,39 @@ import type { ModelView, WarehouseView } from './stock-view.ts'
 /** The days a job's kit is held around some of its days: those, with its days to get it ready before and check it back after. */
 export function heldAround(job: { prepDays?: number; returnDays?: number }, span: { start: string; end: string }) {
   const { prep, back } = kitDaysOf(job)
-  return { start: addDays(span.start, -prep), end: addDays(span.end, back) }
+  return { start: shift(span.start, -prep), end: shift(span.end, back) }
+}
+
+/**
+ * Days worked out once and kept (audit, 18 October 2026, finding 11): a
+ * copy of 5,400 kit lines asked for the same few hundred spans over and
+ * over, and making each day afresh was a third of the kit's time. What's
+ * kept is the same for everyone, so it's shared, and let go of when there's
+ * a lot of it. The lists handed out are shared too, so they're never changed.
+ */
+const KEEP_DAYS = 20_000
+const shifted = new Map<string, string>()
+const spans = new Map<string, readonly string[]>()
+
+function shift(day: string, n: number): string {
+  if (n === 0) return day
+  const key = `${day}|${n}`
+  let out = shifted.get(key)
+  if (out === undefined) {
+    if (shifted.size >= KEEP_DAYS) shifted.clear()
+    shifted.set(key, (out = addDays(day, n)))
+  }
+  return out
+}
+
+function daysFrom(start: string, end: string): readonly string[] {
+  const key = `${start}|${end}`
+  let out = spans.get(key)
+  if (!out) {
+    if (spans.size >= KEEP_DAYS) spans.clear()
+    spans.set(key, (out = eachDay(start, end)))
+  }
+  return out
 }
 
 /** Whether a job's kit should all be back by `today`: it isn't going ahead, has no days, or its last day to check kit back is past. */
@@ -137,6 +169,70 @@ interface DayUse {
   lines: KitLineView[]
 }
 
+/** Each product's days worked out, kept from one build of the kit to the next by whoever builds it: the words they came from, and what each of its lines got. */
+export type KitMemo = Map<string, KitDays>
+interface KitDays {
+  key: readonly unknown[]
+  lines: Map<string, Pick<KitLineView, 'short' | 'shortDay' | 'shortDays' | 'ifPencilled' | 'pencilledDay' | 'spare' | 'others'>>
+}
+
+function sameKey(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+function othersOn(x: DayUse | undefined, v: KitLineView): KitOther[] {
+  const byJob = new Map<string, KitOther>()
+  for (const o of x?.lines ?? []) {
+    if (o === v) continue
+    const found = byJob.get(o.projectId)
+    if (found) found.qty += o.own
+    else byJob.set(o.projectId, { jobId: o.projectId, name: o.job?.name ?? 'Another job', qty: o.own, hold: o.hold, same: o.projectId === v.projectId })
+  }
+  return [...byJob.values()].sort((a, b) => (a.hold === b.hold ? 0 : a.hold === 'held' ? -1 : 1) || b.qty - a.qty || a.name.localeCompare(b.name) || a.jobId.localeCompare(b.jobId))
+}
+
+/** One product's lines that count, worked out against each other day by day: how short each is, its spare, and who else has it out. */
+function shortOf(list: readonly KitLineView[], daysOf: (v: KitLineView) => readonly string[]): KitDays['lines'] {
+  // What the product has out, day by day.
+  const byDay = new Map<string, DayUse>()
+  for (const v of list) {
+    for (const d of daysOf(v)) {
+      let x = byDay.get(d)
+      if (!x) byDay.set(d, (x = { held: 0, pencilled: 0, lines: [] }))
+      if (v.hold === 'held') x.held += v.own
+      else x.pencilled += v.own
+      x.lines.push(v)
+    }
+  }
+  const out: KitDays['lines'] = new Map()
+  for (const v of list) {
+    const r = { short: 0, shortDay: undefined as string | undefined, shortDays: 0, ifPencilled: 0, pencilledDay: undefined as string | undefined, spare: undefined as number | undefined, others: [] as KitOther[] }
+    out.set(v.id, r)
+    let tightest: string | undefined
+    let least = Infinity
+    for (const d of daysOf(v)) {
+      const x = byDay.get(d)!
+      const heldByOthers = x.held - (v.hold === 'held' ? v.own : 0)
+      const pencilledByOthers = x.pencilled - (v.hold === 'pencilled' ? v.own : 0)
+      const free = Math.max(0, v.owned - heldByOthers)
+      const short = Math.max(0, v.own - free)
+      if (short > 0) {
+        r.shortDays++
+        if (short > r.short) [r.short, r.shortDay] = [short, d]
+      }
+      const ifPencilled = Math.max(0, v.own - Math.max(0, v.owned - heldByOthers - pencilledByOthers))
+      if (ifPencilled > short && ifPencilled > r.ifPencilled) [r.ifPencilled, r.pencilledDay] = [ifPencilled, d]
+      if (free - v.own < least) [least, tightest] = [free - v.own, d]
+    }
+    if (tightest === undefined) continue
+    if (r.short === 0) r.spare = least
+    r.others = othersOn(byDay.get(r.shortDay ?? r.pencilledDay ?? tightest), v)
+  }
+  return out
+}
+
 export function kitView(
   entities: Partial<Tables>,
   outbox: readonly (Mutation & { appliedSeq?: number })[],
@@ -146,7 +242,9 @@ export function kitView(
   today: string,
   faults?: FaultsView,
   /** How many of a product are out with jobs whose kit should be back by now (ADR 0031). */
-  lateOut?: (modelId: string) => number
+  lateOut?: (modelId: string) => number,
+  /** What was worked out for each product last time, kept by the device's copy so a change rebuilds only the products it touches. */
+  memo?: KitMemo
 ): KitView {
   const lines = new Map<string, KitLine & { pending: boolean }>()
   for (const l of Object.values(entities.kitLine ?? {})) lines.set(l.id, { ...l, pending: false })
@@ -175,12 +273,15 @@ export function kitView(
 
   const jobById = new Map(jobs.jobs.map((j) => [j.id, j]))
   const modelById = new Map(warehouse.models.map((m) => [m.id, m]))
+  const perProduct = new Map<string, { unusable: number; late: number }>()
   const views: KitLineView[] = [...lines.values()].map((l) => {
     const job = jobById.get(l.projectId)
     const phase = l.phaseId ? job?.phases.find((p) => p.id === l.phaseId) : undefined
     const model = modelById.get(l.modelId)
-    const unusable = faults?.unusable(l.modelId) ?? 0
-    const late = lateOut?.(l.modelId) ?? 0
+    // Asked once for each product, not for each of its lines: each goes through the product's items.
+    let product = perProduct.get(l.modelId)
+    if (!product) perProduct.set(l.modelId, (product = { unusable: faults?.unusable(l.modelId) ?? 0, late: lateOut?.(l.modelId) ?? 0 }))
+    const { unusable, late } = product
     const span = l.phaseId ? phase && { start: phase.start, end: phase.end } : job?.span
     return {
       ...l,
@@ -205,57 +306,31 @@ export function kitView(
   })
 
   /** The days a line's kit is held from today on. */
-  const daysOf = (v: KitLineView) => (v.held && v.held.end >= today ? eachDay(v.held.start < today ? today : v.held.start, v.held.end) : [])
+  const daysOf = (v: KitLineView): readonly string[] => (v.held && v.held.end >= today ? daysFrom(v.held.start < today ? today : v.held.start, v.held.end) : [])
   const counts = (v: KitLineView) => v.hold !== 'none' && v.own > 0
 
-  // What each product has out, day by day.
-  const use = new Map<string, Map<string, DayUse>>()
+  // Each product's lines, and what they hold, in a few words: a product whose words are as they were last time has the same
+  // days out, so what was worked out for its lines then still holds (audit, 18 October 2026, finding 11). Its job's name is
+  // in them for the others on the day that matters, and how many there are to go out for what's free.
+  const byProduct = new Map<string, KitLineView[]>()
   for (const v of views) {
     if (!counts(v)) continue
-    let byDay = use.get(v.modelId)
-    if (!byDay) use.set(v.modelId, (byDay = new Map()))
-    for (const d of daysOf(v)) {
-      let x = byDay.get(d)
-      if (!x) byDay.set(d, (x = { held: 0, pencilled: 0, lines: [] }))
-      if (v.hold === 'held') x.held += v.own
-      else x.pencilled += v.own
-      x.lines.push(v)
-    }
+    const list = byProduct.get(v.modelId)
+    if (list) list.push(v)
+    else byProduct.set(v.modelId, [v])
   }
-
-  const othersOn = (x: DayUse | undefined, v: KitLineView): KitOther[] => {
-    const byJob = new Map<string, KitOther>()
-    for (const o of x?.lines ?? []) {
-      if (o === v) continue
-      const found = byJob.get(o.projectId)
-      if (found) found.qty += o.own
-      else byJob.set(o.projectId, { jobId: o.projectId, name: o.job?.name ?? 'Another job', qty: o.own, hold: o.hold, same: o.projectId === v.projectId })
-    }
-    return [...byJob.values()].sort((a, b) => (a.hold === b.hold ? 0 : a.hold === 'held' ? -1 : 1) || b.qty - a.qty || a.name.localeCompare(b.name) || a.jobId.localeCompare(b.jobId))
+  const kept = new Map<string, KitDays>()
+  for (const [modelId, list] of byProduct) {
+    const key: unknown[] = [today, list[0]!.owned]
+    for (const v of list) key.push(v.id, v.hold, v.own, v.held?.start, v.held?.end, v.projectId, v.job?.name)
+    const before = memo?.get(modelId)
+    const found = before && sameKey(before.key, key) ? before : { key, lines: shortOf(list, daysOf) }
+    kept.set(modelId, found)
+    for (const v of list) Object.assign(v, found.lines.get(v.id))
   }
-
-  for (const v of views) {
-    if (!counts(v)) continue
-    const byDay = use.get(v.modelId)!
-    let tightest: string | undefined
-    let least = Infinity
-    for (const d of daysOf(v)) {
-      const x = byDay.get(d)!
-      const heldByOthers = x.held - (v.hold === 'held' ? v.own : 0)
-      const pencilledByOthers = x.pencilled - (v.hold === 'pencilled' ? v.own : 0)
-      const free = Math.max(0, v.owned - heldByOthers)
-      const short = Math.max(0, v.own - free)
-      if (short > 0) {
-        v.shortDays++
-        if (short > v.short) [v.short, v.shortDay] = [short, d]
-      }
-      const ifPencilled = Math.max(0, v.own - Math.max(0, v.owned - heldByOthers - pencilledByOthers))
-      if (ifPencilled > short && ifPencilled > v.ifPencilled) [v.ifPencilled, v.pencilledDay] = [ifPencilled, d]
-      if (free - v.own < least) [least, tightest] = [free - v.own, d]
-    }
-    if (tightest === undefined) continue
-    if (v.short === 0) v.spare = least
-    v.others = othersOn(byDay.get(v.shortDay ?? v.pencilledDay ?? tightest), v)
+  if (memo) {
+    memo.clear()
+    for (const [modelId, days] of kept) memo.set(modelId, days)
   }
 
   const department = (v: KitLineView) => {
