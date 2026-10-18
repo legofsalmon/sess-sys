@@ -1,0 +1,161 @@
+import { expect, test, type Page } from '@playwright/test'
+
+/**
+ * Moving about the screens (audit findings 8, 9 and 10): a new screen
+ * opens at its top, and Back finds the place it was left at; a button the
+ * role can't use isn't drawn, for staff crew and the warehouse on a job
+ * and on Crew; and Crew's calls show only those short of people, with the
+ * filled ones folded under them. Uses the made-up data (ADR 0019), so it
+ * starts fresh before and after: the other tests share this server.
+ */
+
+const phoneSize = { width: 390, height: 844 }
+const fresh = { data: { confirm: 'delete everything' } }
+
+test.beforeAll(async ({ request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+})
+
+test.afterAll(async ({ request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+const scrollY = (page: Page) => page.evaluate(() => Math.round(window.scrollY))
+/** Two frames: the Shell settles the page a frame after the new screen is drawn. */
+const drawn = (page: Page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+
+test('a new screen opens at its top, and Back finds the place the last one was left at', async ({ browser }) => {
+  // Proves: moving on from a page scrolled down starts the next at its top, by a tab or a link; the browser's Back and Forward put each screen back where it was.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#crew/calls')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await expect(page.getByRole('link', { name: 'Open job' }).first()).toBeVisible()
+  const far = await page.evaluate(() => Math.min(700, document.documentElement.scrollHeight - innerHeight))
+  expect(far).toBeGreaterThan(200)
+  await page.evaluate((y) => scrollTo(0, y), far)
+  await drawn(page)
+  expect(await scrollY(page)).toBe(far)
+
+  // A tab: Home opens at its top, with its title in view.
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Home' }).click()
+  await expect(page).toHaveTitle('Home · Session Hire')
+  await drawn(page)
+  expect(await scrollY(page)).toBe(0)
+
+  // Back: the calls, where they were left.
+  await page.goBack()
+  await expect(page).toHaveTitle('Crew · Session Hire')
+  await expect.poll(() => scrollY(page)).toBe(far)
+
+  // A link from far down the page: the job opens at its top, with its title in view, and Back comes back to the link.
+  const link = page.getByRole('link', { name: 'Open job' }).last()
+  await link.scrollIntoViewIfNeeded()
+  const at = await scrollY(page)
+  expect(at).toBeGreaterThan(0)
+  await link.click()
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
+  await drawn(page)
+  expect(await scrollY(page)).toBe(0)
+  await page.goBack()
+  await expect.poll(() => scrollY(page)).toBe(at)
+  // And Forward to the job, at the top where it was left.
+  await page.goForward()
+  await expect.poll(() => scrollY(page)).toBe(0)
+})
+
+/** The demo copy, seen as one of its personas: this server has no passcode, so the test answers for it as a demo copy would. */
+async function as(page: Page, role: 'crew' | 'warehouse', button: RegExp) {
+  await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'passcode', role } }))
+  await page.route('**/api/auth/preview', (route) => route.fulfill({ json: { role } }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'See it as…' })).toBeVisible()
+  await page.getByRole('button', { name: button }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+}
+
+async function openJob(page: Page, name: string) {
+  await page.goto('/#jobs')
+  await page.getByRole('link', { name: new RegExp(name) }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+}
+
+test('staff crew are offered nothing on a job or on Crew they could only be refused', async ({ browser }) => {
+  // Proves: staff crew, who can change only their leave and report faults, see a job's phases, kit and crew with no Change, Add kit, Add phase or Ask for crew, and Crew's answers and calls with nothing to settle or offer.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await as(page, 'crew', /^Staff crew/)
+  await openJob(page, 'Harbour Lights Festival')
+  const main = page.getByRole('main')
+  await expect(main.getByRole('region', { name: 'Phases' })).toBeVisible()
+  for (const name of ['Change', 'Change details', 'Add phase', 'Add kit', 'Ask for crew', 'Offer…', 'Running late…', 'Book a vehicle']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
+  // A call opened still says who's on it, without Withdraw, Send, Change or Cancel.
+  await main.getByRole('button', { name: /× Rigger/ }).first().click()
+  await expect(main.getByRole('link', { name: 'Pádraig Kenny' })).toBeVisible()
+  for (const name of ['Withdraw', 'Send', 'Cancel crew call']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
+
+  await page.goto('/#crew/calls')
+  await expect(page.getByRole('heading', { name: /^Answers to check/ })).toBeVisible()
+  for (const name of [/^Noted/, /^Confirm$/, /^Release$/, /^Offer…$/, /^Checked:/, /^Not right:/, /^Ask for crew$/]) await expect(main.getByRole('button', { name })).toHaveCount(0)
+  // Reporting a fault is still theirs.
+  await page.goto('/#stock')
+  await page.getByRole('link', { name: /Shure SM58|d&b/ }).first().click()
+  await expect(main.getByRole('button', { name: 'Change details' })).toHaveCount(0)
+})
+
+test('the warehouse can add kit to a job, but not change the job or its crew', async ({ browser }) => {
+  // Proves: the warehouse, who keep the stock and the kit on jobs, are offered Add kit and the kit lines' Change, and nothing of the job's own or its crew's.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await as(page, 'warehouse', /^Warehouse/)
+  await openJob(page, 'Harbour Lights Festival')
+  const main = page.getByRole('main')
+  await expect(main.getByRole('button', { name: 'Add kit' })).toBeVisible()
+  const kit = main.getByRole('region', { name: 'Kit' })
+  await expect(kit.getByRole('button', { name: 'Change', exact: true }).first()).toBeVisible()
+  const phases = main.getByRole('region', { name: 'Phases' })
+  for (const name of ['Change', 'Add phase']) await expect(phases.getByRole('button', { name, exact: true })).toHaveCount(0)
+  for (const name of ['Change details', 'Ask for crew', 'Offer…']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
+})
+
+test('Crew needed lists only the calls short of people, with the filled ones folded under them', async ({ browser }) => {
+  // Proves: at rest every call shown is short; "Show N filled calls" says how many are folded and opens them; a department with none short says so plainly.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#crew/calls')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const needed = page.locator('section.card', { has: page.getByRole('heading', { name: 'Crew needed' }) })
+  const fold = needed.locator('details.filled-calls')
+  const summary = fold.locator('summary')
+  await expect(summary).toHaveText(/^Show \d+ filled calls?$/)
+  const n = Number((await summary.textContent())!.match(/\d+/)![0])
+  // At rest: the calls short of people, and a filled one only with something on it to act on today; the folded ones are all filled.
+  const inView = needed.locator(':scope > .call-group article.call')
+  const onlyShortOrToActOn = async (shortOnes: boolean) => {
+    for (const call of await inView.all()) {
+      const filled = /^Filled/.test((await call.locator(':scope > .pill').textContent()) ?? '')
+      if (!filled && shortOnes) continue
+      expect(filled, `${await call.getAttribute('aria-label')} is filled`).toBe(true)
+      expect(await call.locator('.late-line, .warn-line, .late-open').count(), `${await call.getAttribute('aria-label')} has something to act on`).toBeGreaterThan(0)
+    }
+  }
+  expect(await inView.count()).toBeGreaterThan(0)
+  await onlyShortOrToActOn(true)
+  await expect(fold.locator('article.call')).toHaveCount(n)
+  await expect(fold.locator('article.call').first()).toBeHidden()
+  await summary.click()
+  await expect(fold.locator('article.call').first()).toBeVisible()
+  for (const t of await fold.locator('.pill').allTextContents()) expect(t).toMatch(/^Filled/)
+
+  // A department whose calls are all filled says there are none short, and still has them a tap away.
+  const filter = page.getByLabel('Calls for department')
+  const options = await filter.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value).filter(Boolean))
+  let found = false
+  for (const value of options) {
+    await filter.selectOption(value)
+    if (await needed.getByText(/are short of people: every one still to come is filled\.$/).count()) {
+      found = true
+      await onlyShortOrToActOn(false)
+      await expect(summary).toBeVisible()
+      break
+    }
+  }
+  expect(found, 'a department with every call filled').toBe(true)
+})

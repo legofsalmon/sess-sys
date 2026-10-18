@@ -91,9 +91,12 @@ test('on a phone a call is one line that opens on a tap, the picker narrows as y
   await expect(answer).toHaveCount(0)
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  // On a fresh look the filled call is one line saying who's on it, with nobody left to offer it to.
+  // On a fresh look the filled call is folded under the ones short of people (audit finding 10), and there it is one line
+  // saying who's on it, with nobody left to offer it to.
   await office.reload()
   await expect(office.getByRole('status')).toHaveText('Up to date')
+  await expect(line).toBeHidden()
+  await office.locator('details.filled-calls > summary').click()
   await expect(line).toHaveAttribute('aria-expanded', 'false')
   await expect(call).toContainText('Filled')
   await expect(line).toContainText(`Maeve Doyle ${id}`)

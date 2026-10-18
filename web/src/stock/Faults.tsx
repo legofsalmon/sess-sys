@@ -15,6 +15,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
 import { Empty } from '../Empty.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { numberLabel } from './common.tsx'
@@ -176,6 +177,8 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   // Closing a fault can't be undone (there's no reopening one), so each way of closing it asks first, in place.
   const [closing, setClosing] = useState<FaultOutcome>()
   const { run, error } = useAct()
+  // Anyone can report one; sorting it out is stock's (audit finding 9).
+  const maySort = useAccess().can('stock')
   const closeAs = (outcome: FaultOutcome) => {
     setClosing(undefined)
     void run(() => client.mutate('fault.close', { id: f.id, outcome, at: new Date().toISOString() }))
@@ -224,7 +227,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
           <b>Repair notes:</b> {f.repair}
         </p>
       )}
-      {editing ? (
+      {!maySort ? null : editing ? (
         <EditFault f={f} onDone={() => setEditing(false)} />
       ) : closing ? (
         <Confirm question={asks[closing].question} yes={asks[closing].yes} onYes={() => closeAs(closing)} onNo={() => setClosing(undefined)} />

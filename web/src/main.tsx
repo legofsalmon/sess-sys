@@ -6,9 +6,11 @@ import './jobs/jobs.css'
 import './home/home.css'
 import { followMovedAddresses } from './addresses.ts'
 import { startErrorReporting } from './errors.ts'
+import { keepPlaces } from './places.ts'
 import { watchForUpdates } from './update.tsx'
 
 followMovedAddresses()
+keepPlaces()
 void startErrorReporting()
 watchForUpdates()
 

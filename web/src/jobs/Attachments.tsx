@@ -26,6 +26,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { ACCEPT, refusal, useDocumentStorage } from '../crew/Documents.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
@@ -106,27 +107,31 @@ export function Attachments({ owner }: { owner: Owner }) {
   const docs = view.attachments.of(owner.owner, owner.id)
   const storage = useDocumentStorage()
   const [changing, setChanging] = useState<string | undefined>()
+  // A venue's and a client's documents are the jobs' to change (audit finding 9); anyone can open one.
+  const mayChange = useAccess().can('jobs')
   return (
     <section className="card documents" aria-label="Documents">
       <Heading icon="document">Documents</Heading>
       {docs.length === 0 && <Empty>{NONE_YET[owner.owner]}</Empty>}
       {docs.map((d) =>
-        changing === d.id ? (
+        changing === d.id && mayChange ? (
           <AttachmentForm key={d.id} owner={owner} doc={d} onDone={() => setChanging(undefined)} />
         ) : (
-          <AttachmentLine key={d.id} owner={owner} doc={d} onChange={() => setChanging(d.id)} />
+          <AttachmentLine key={d.id} owner={owner} doc={d} onChange={mayChange ? () => setChanging(d.id) : undefined} />
         )
       )}
       {storage && !storage.files && <p className="hint">{FILES_WAIT_LINK}</p>}
-      <Fold label="Add document">
-        <AttachmentForm owner={owner} />
-      </Fold>
+      {mayChange && (
+        <Fold label="Add document">
+          <AttachmentForm owner={owner} />
+        </Fold>
+      )}
     </section>
   )
 }
 
-/** One document: what it is, its file or where its link goes, and Open, Change and Remove. */
-function AttachmentLine({ owner, doc, onChange }: { owner: Owner; doc: AttachmentView; onChange: () => void }) {
+/** One document: what it is, its file or where its link goes, and Open, Change and Remove; without `onChange`, Open alone. */
+function AttachmentLine({ owner, doc, onChange }: { owner: Owner; doc: AttachmentView; onChange?: () => void }) {
   const { run, error } = useAct()
   const [removing, setRemoving] = useState(false)
   const what = `${owner.name}'s ${attachmentTitleInSentence(doc.title)}`
@@ -148,10 +153,12 @@ function AttachmentLine({ owner, doc, onChange }: { owner: Owner; doc: Attachmen
             {doc.file ? 'Link' : 'Open'}
           </a>
         )}
-        <button type="button" className="link" onClick={onChange} aria-label={`Change ${what}`}>
-          Change
-        </button>
-        {!removing && (
+        {onChange && (
+          <button type="button" className="link" onClick={onChange} aria-label={`Change ${what}`}>
+            Change
+          </button>
+        )}
+        {!removing && onChange && (
           <button type="button" className="link" onClick={() => setRemoving(true)} aria-label={`Remove ${what}`}>
             Remove
           </button>

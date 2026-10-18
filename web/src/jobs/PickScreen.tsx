@@ -24,6 +24,7 @@ import { mistakeLabel } from '../stock/common.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
+import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { JobStatusPill, Top } from './common.tsx'
@@ -93,6 +94,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const [failed, setFailed] = useState<string[]>([])
   const field = useRef<HTMLInputElement>(null)
   const pick = view.moves.pickList(job.id)!
+  // Sending kit out and back is stock's (audit finding 9): a role without it reads the list, and can still report damage or a loss.
+  const mayMove = useAccess().can('stock')
   const say = (tone: Tone, text: string, back?: AssetView) => setSaid({ tone, text, at: Date.now(), back })
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
@@ -193,29 +196,32 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               ? `${pick.back} back, ${pick.stillOut} still out${pick.missing ? `, ${pick.missing} missing` : ''}`
               : 'Nothing has gone out yet.'}
         </p>
-        <form className="scan-row" onSubmit={submit}>
-          <input
-            ref={field}
-            type="search"
-            enterKeyHint="go"
-            autoComplete="off"
-            placeholder={mode === 'out' ? 'Scan or type a number to send out' : 'Scan or type a number coming back'}
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            aria-label="Number or serial"
-          />
-          <button
-            type="button"
-            aria-pressed={camera}
-            onClick={() => {
-              if (!camera) primeSound()
-              setCamera(!camera)
-            }}
-          >
-            Scan
-          </button>
-        </form>
-        {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
+        {!mayMove && <p className="hint">Whoever keeps the stock scans kit out and back here.</p>}
+        {mayMove && (
+          <form className="scan-row" onSubmit={submit}>
+            <input
+              ref={field}
+              type="search"
+              enterKeyHint="go"
+              autoComplete="off"
+              placeholder={mode === 'out' ? 'Scan or type a number to send out' : 'Scan or type a number coming back'}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              aria-label="Number or serial"
+            />
+            <button
+              type="button"
+              aria-pressed={camera}
+              onClick={() => {
+                if (!camera) primeSound()
+                setCamera(!camera)
+              }}
+            >
+              Scan
+            </button>
+          </form>
+        )}
+        {camera && mayMove && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
         {said && (
           <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
             {said.text}
@@ -254,7 +260,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
                 .get(d)!
                 .filter((r) => shown.includes(r))
                 .map((r) => (
-                  <Row key={r.modelId} row={r} job={job} mode={mode} say={say} />
+                  <Row key={r.modelId} row={r} job={job} mode={mode} say={say} mayMove={mayMove} />
                 ))}
             </div>
           ))}
@@ -280,7 +286,7 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
 /** What a tap on the list did, said in the scan line at the top, where the eye already goes. */
 type Say = (tone: Tone, text: string) => void
 
-function Row({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Direction; say: Say }) {
+function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mode: Direction; say: Say; mayMove: boolean }) {
   const name = rowName(row)
   const extra = row.lines.length === 0
   const missing = row.missing ? `, ${row.missing} missing` : ''
@@ -332,14 +338,16 @@ function Row({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Direct
           {row.items.map((a) => (
             <li key={a.id}>
               <a href={`#stock/item/${a.id}`}>{a.number || 'no number yet'}</a>
-              <button type="button" className="link" onClick={() =>
-                  void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId })).then(
-                    (ok) => ok && say('ok', mode === 'out' ? `${a.number || name} isn't going: it's back in stock.` : `${a.number || name} back.`)
-                  )
-                }
-              >
-                {mode === 'out' ? 'Not going' : 'Back'}
-              </button>
+              {mayMove && (
+                <button type="button" className="link" onClick={() =>
+                    void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId })).then(
+                      (ok) => ok && say('ok', mode === 'out' ? `${a.number || name} isn't going: it's back in stock.` : `${a.number || name} back.`)
+                    )
+                  }
+                >
+                  {mode === 'out' ? 'Not going' : 'Back'}
+                </button>
+              )}
               {mode === 'in' && (
                 <button
                   type="button"
@@ -367,7 +375,7 @@ function Row({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Direct
           ))}
         </ul>
       )}
-      {countable && <Count row={row} job={job} mode={mode} say={say} />}
+      {countable && mayMove && <Count row={row} job={job} mode={mode} say={say} />}
       {mode === 'in' && countable && row.countedBack > 0 && !damage && (
         <button type="button" className="link" onClick={() => setDamage(true)}>
           Report damage to counted {name}
