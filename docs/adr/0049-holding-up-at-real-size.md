@@ -101,8 +101,20 @@ opens and is written out table by table on its first save, in one
 transaction. Measured on 900 jobs: an own edit 130 ms to 45 ms with no
 table rewritten (it was 3.4 MB every time); a pulled change on Jobs 1.3 s
 to 0.75 s and the Crew tab 3.8 s to 2.4 s on a CPU slowed four times. The
-Jobs tab tap is unchanged, as what's left is drawing a long page; windowed
-lists are the next step.
+Jobs tab tap was unchanged, as what was left was drawing a long page.
+
+**Long lists drawn as they near the screen (finding 11, the next step).**
+The Jobs list's rows and Crew's call groups (marked `data-place`) are
+`content-visibility: auto`: the browser lays out and paints only those
+near the screen, and until then each stands in at about its height
+(110 px, 300 px). Every row stays in the page, so find in page, Tab and a
+screen reader reach every job, which windowed drawing would have broken.
+Because rows above a place stand in at a guess when the list is drawn
+again, `web/src/places.ts` also keeps the marked row in the middle of the
+screen and its height there, and Back puts that row back (navigation.md's
+"the same row"). On 900 jobs, CPU slowed four times, phone size: the Jobs
+tab 855 ms to 462 ms, Crew 2.8 s to 1.0 s. iOS Safari before 18 ignores
+the property and draws everything, as before.
 
 ## Consequences
 
@@ -112,7 +124,7 @@ lists are the next step.
   go on the next round.
 - A head can no longer correct a role-holder's email, their own
   included; the office does it. Bringing a person back from the archive
-  doesn't yet check their email against everyone else's.
+  is refused, in words, while someone else now has their email.
 - An hourly, monthly or yearly repeat from years ago is still worked
   through from its first day and may now make a whole file fail as "too
   much" where before its repeats were silently missing.
