@@ -6,7 +6,8 @@
   (compression, time limits, a busy answer, freelancers' calendars read
   apart), what an edit made against an old copy does, who can change the
   email that decides a role, and what the screens draw for a role and at
-  volume. These are the P1 findings 4 to 12 of the
+  volume, and how the phone keeps its view and its saved copy up to
+  date cheaply. These are the P1 findings 4 to 12 of the
   [18 October audit](../audit-2026-10-18.md).
 
 ## Context
@@ -88,6 +89,21 @@ short of people; filled calls fold under "Show N filled calls", except
 one with something to act on today (a missing certificate, a late note,
 someone to note as late).
 
+**Jobs and Crew on a phone (finding 11).** The view's parts are built when
+a screen first reads them and kept between changes: each part notes the
+tables it read, and is rebuilt only when one of those tables, or a part it
+was built from, changes (`shared/src/sync/derive.ts`). Kit days are worked
+out per product and reused when nothing deciding them changed, and the
+Irish "today" is worked out once a minute. The saved copy in IndexedDB is
+one record for everything but the tables plus one record per table, and a
+save writes only the tables that changed. An old single-record copy still
+opens and is written out table by table on its first save, in one
+transaction. Measured on 900 jobs: an own edit 130 ms to 45 ms with no
+table rewritten (it was 3.4 MB every time); a pulled change on Jobs 1.3 s
+to 0.75 s and the Crew tab 3.8 s to 2.4 s on a CPU slowed four times. The
+Jobs tab tap is unchanged, as what's left is drawing a long page; windowed
+lists are the next step.
+
 ## Consequences
 
 - No environment variables. The server opens up to 13 Postgres
@@ -103,5 +119,9 @@ someone to note as late).
 - An edit refused as a conflict is redone as a whole, with the text kept
   to copy. Other edit commands (kit, assets, faults, office) aren't
   checked yet; each is one entry in `server/src/seen.ts`.
+- Rolling back to a build before this one after phones have moved their
+  saved copy: the old build sees no copy, starts afresh and pulls again,
+  and changes still waiting on the phone stay hidden until the new build
+  is back.
 - Node should be pinned to 22 on Railway (finding 25): the worker's tsx
   start was checked on Node 22 only.
