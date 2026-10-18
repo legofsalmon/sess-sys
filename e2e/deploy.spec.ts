@@ -15,7 +15,7 @@ const dist = join(process.cwd(), 'web', 'dist')
 const files = { page: join(dist, 'index.html'), sw: join(dist, 'sw.js') }
 const before = { page: readFileSync(files.page, 'utf8'), sw: readFileSync(files.sw, 'utf8') }
 
-// The build serves pre-compressed copies (ADR 0048), so a file swapped here has its .br and .gz swapped with it.
+// The build serves pre-compressed copies (ADR 0049), so a file swapped here has its .br and .gz swapped with it.
 const put = (file: string, text: string) => {
   writeFileSync(file, text)
   if (existsSync(`${file}.br`)) writeFileSync(`${file}.br`, brotliCompressSync(text))

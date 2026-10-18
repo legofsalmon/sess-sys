@@ -1,4 +1,4 @@
-# ADR 0048: Holding up at real size
+# ADR 0049: Holding up at real size
 
 - **Status:** accepted
 - **Date:** 18 October 2026
