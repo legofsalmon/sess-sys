@@ -85,6 +85,8 @@ export function madeUpData(today: string): Mutation[] {
 
   // The office, as freelancers reach it from their pages: a number from the range Ofcom keeps for drama too.
   add('office.update', { name: 'Session Hire office', phone: '+44 20 7946 0999', email: 'office@example.com' })
+  // Made-up people can be messaged: the demo shows the Send panel, which a real company turns on under Admin (ADR 0048).
+  add('messages.prompt', { on: true })
 
   // Clients and venues.
   const client = (name: string, contact: string, role: string) =>

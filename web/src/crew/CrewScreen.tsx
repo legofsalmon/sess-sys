@@ -1168,6 +1168,32 @@ export function SendButtons({ person, text, subject }: { person: Pick<Person, 'p
   )
 }
 
+/** Whether Offer, Send, Tell and Ask open a message to a real person (ADR 0048): off until the office says so under Admin. */
+export const usePromptsMessages = () => useView().office.promptMessages
+
+/**
+ * In a Send panel's place while messages to crew are off (ADR 0048): what
+ * would have opened, for whom, that their link carries it regardless, and
+ * where it's turned on. The mode shows itself where it bites, not only on
+ * Admin (rule 14).
+ */
+export function QuietPanel({ names, what, onLink = true, onClose }: { names: readonly string[]; what: string; onLink?: boolean; onClose: () => void }) {
+  const admin = useAccess().can('settings')
+  const who = names.length === 1 ? names[0] : `${names.length} people`
+  return (
+    <section className="card share" aria-label={`Messages to crew are off: ${what} for ${who}`}>
+      <h2>Messages to crew are off</h2>
+      <p className="empty">
+        Nothing opened to send {who} the {what}.{onLink ? ` ${names.length === 1 ? 'Their link' : 'Their links'} already say${names.length === 1 ? 's' : ''} so.` : ''} Messages
+        are turned on under {admin ? <a href="#admin">Admin</a> : 'Admin, by the office'}.
+      </p>
+      <button type="button" onClick={onClose}>
+        Done
+      </button>
+    </section>
+  )
+}
+
 /**
  * Their private link isn't on this device: not made yet (the server makes it
  * when the person first syncs), or not sent to this role (ADR 0046), when
@@ -1201,6 +1227,8 @@ export function SharePanel({
   onClose: () => void
   message?: (link: string) => { text: string; subject: string; what: string }
 }) {
+  const prompts = usePromptsMessages()
+  if (!prompts) return <QuietPanel names={[person.name]} what={message?.('').what ?? 'offer'} onClose={onClose} />
   const link = linkFor(person)
   if (!link) return <NoLinkYet person={person} onClose={onClose} />
   const custom = message?.(link)
@@ -1228,8 +1256,10 @@ export function SharePanel({
  */
 export function TellPanel({ tell, onClose }: { tell: Tell; onClose: () => void }) {
   const [at, setAt] = useState(0)
+  const prompts = usePromptsMessages()
   const to = tell.to[at]
   if (!to) return null
+  if (!prompts) return <QuietPanel names={tell.to.map((t) => t.person.name)} what={tellMessage(tell.event, to.person, to.context, '').what} onClose={onClose} />
   const { person, context } = to
   const n = tell.to.length
   const next = () => (at + 1 < n ? setAt(at + 1) : onClose())

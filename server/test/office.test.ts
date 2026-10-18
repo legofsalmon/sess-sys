@@ -105,6 +105,22 @@ describe('the office’s details', () => {
     expect(exported.settings).toEqual([expect.objectContaining({ id: 'office', name: 'Session Hire', phone: null, email: 'office@sessionhire.com' })])
   })
 
+  it('prompt no messages to crew until the office says so (ADR 0048)', async () => {
+    const { app } = await company()
+    const settings = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'setting')
+    // Nothing is said until it is: a device reads the missing row as off.
+    expect(await settings()).toEqual([])
+
+    const [on] = await send(app, m('messages.prompt', { on: true }))
+    expect(on).toMatchObject({ status: 'applied' })
+    expect((await settings()).at(-1)).toMatchObject({ id: 'messages', data: { id: 'messages', promptMessages: true } })
+    await send(app, m('messages.prompt', { on: false }))
+    expect((await settings()).at(-1)).toMatchObject({ id: 'messages', data: { id: 'messages', promptMessages: false } })
+
+    const history: HistoryPage = (await app.inject({ url: '/api/history' })).json()
+    expect(history.entries.map((e) => e.what).slice(0, 2)).toEqual(['Turned off messages to crew', 'Turned on messages to crew'])
+  })
+
   it('are on every freelancer page as links to ring and email, and nowhere until they are set', async () => {
     const { app, pages } = await company()
     for (const [name, html] of Object.entries(await pages())) expect(html, name).not.toContain('class="office"')

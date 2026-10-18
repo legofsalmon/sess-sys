@@ -480,6 +480,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
     case 'reading.heads':
       return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
+    case 'messages.prompt':
+      return a.on === true ? 'Turned on messages to crew' : 'Turned off messages to crew'
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`

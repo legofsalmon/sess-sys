@@ -22,7 +22,7 @@ import {
 import { useState } from 'react'
 import { ShowAll } from '../Fold.tsx'
 import { useToday } from '../view.ts'
-import { linkFor, SendButtons } from './CrewScreen.tsx'
+import { linkFor, QuietPanel, SendButtons, usePromptsMessages } from './CrewScreen.tsx'
 import { useDocumentStorage } from './Documents.tsx'
 import { Heading } from '../Icon.tsx'
 
@@ -119,9 +119,11 @@ export function CertificateReminders({ view }: { view: View }) {
 /** The message asking for the new one, to send as the other prompted messages are; with their page, once files can be sent from it. The app sends nothing itself. */
 function AskPanel({ reminder, today, onClose }: { reminder: RunningOut<PersonView>; today: string; onClose: () => void }) {
   const { person } = reminder
+  const prompts = usePromptsMessages()
   const storage = useDocumentStorage()
   const link = storage?.files ? linkFor(person) || undefined : undefined
   const { text, subject, what } = reminder.what === 'certificate' ? renewalMessage(person, reminder, today, link) : documentRenewalMessage(person, reminder, today, link)
+  if (!prompts) return <QuietPanel names={[person.name]} what={what} onLink={false} onClose={onClose} />
   return (
     <section className="card share" aria-label={`Send ${what} to ${person.name}`}>
       <h2>Ask {person.name}</h2>

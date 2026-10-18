@@ -79,6 +79,8 @@ test('a freelancer shares when they are busy from their link, the office sees it
   // Proves: sharing works with no script and keeps no title; busy shows on the person's page, in the planner and as a warning on an offer that can still go; stopping clears it everywhere.
   const name = `Orla Brennan ${id}`
   const mutations: [string, Record<string, unknown>][] = [
+    // Messages to crew are off until said (ADR 0048): the offer below wants its Send panel.
+    ['messages.prompt', { on: true }],
     ['person.upsert', { id: `orla-${id}`, name, kind: 'freelancer', email: null, phone: null, skills: ['audio'], dayRateCents: 25000, notes: '' }],
     [
       'call.create',
@@ -88,7 +90,7 @@ test('a freelancer shares when they are busy from their link, the office sees it
   const pushed = await request.post('/api/sync/push', {
     data: { clientId: `own-calendar-${id}`, mutations: mutations.map(([n, args], i) => ({ id: `m-${id}-${i}`, name: n, args, createdAt: new Date().toISOString() })) },
   })
-  expect((await pushed.json()).results.map((r: { status: string }) => r.status)).toEqual(['applied', 'applied'])
+  expect((await pushed.json()).results.map((r: { status: string }) => r.status)).toEqual(mutations.map(() => 'applied'))
   const { changes } = (await (await request.get('/api/sync/pull?after=0')).json()) as { changes: { entity: string; id: string; data: { linkToken?: string } }[] }
   const token = changes.find((c) => c.entity === 'person' && c.id === `orla-${id}`)!.data.linkToken!
 
