@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { AuthConfig } from '../src/auth/config.ts'
 import type { Identity, IdentityProvider } from '../src/auth/google.ts'
+import { CREW, migrateCrew } from '../src/crew/schema.ts'
 import { pgliteDb } from '../src/db.ts'
+import { migrateAll } from '../src/modules.ts'
 
 /**
  * Roles (ADR 0034), as the people involved meet them: off until someone is
@@ -104,6 +106,20 @@ async function company() {
 }
 
 describe('roles', () => {
+  it('make whoever was the warehouse a head of department, who keeps all the warehouse could change (ADR 0050)', async () => {
+    const db = await pgliteDb()
+    cleanup.push(() => db.close())
+    await migrateAll(db)
+    // As the database was the day before: warehouse still a role.
+    await db.query('ALTER TABLE people DROP CONSTRAINT people_role_check')
+    await db.query(`UPDATE crew_schema_version SET version = $1`, [CREW.migrations.length - 1])
+    await db.query(`INSERT INTO people (id, name, kind, link_token, role) VALUES ('w', 'Wes', 'staff', 'tw', 'warehouse'), ('h', 'Áine', 'staff', 'th', 'head')`)
+    await migrateCrew(db)
+    expect((await db.query(`SELECT id, role FROM people ORDER BY id`)).rows).toEqual([{ id: 'h', role: 'head' }, { id: 'w', role: 'head' }])
+    await expect(db.query(`UPDATE people SET role = 'warehouse' WHERE id = 'w'`)).rejects.toThrow()
+    await db.query(`UPDATE people SET role = 'freelancer' WHERE id = 'w'`)
+  })
+
   it('are off until someone is a director, so everyone signed in can do everything as before', async () => {
     const { app, signIn } = await server()
     const s = { sh_session: await signIn(sean) }
@@ -124,14 +140,19 @@ describe('roles', () => {
     const refused = await send(app, s, 'place.upsert', bay('a2'))
     expect(refused).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
     expect(refused.reason!.message).toBe(
-      'Only the office, heads of department, the warehouse and directors can change stock and the warehouse. Your role is Staff crew; a director can change it on your person on the Crew tab.'
+      'Only the office, heads of department and directors can change stock and the warehouse. Your role is Staff crew; a director can change it on your person on the Crew tab.'
     )
 
-    // Made warehouse, he can, at once; jobs, crew and settings stay out of reach.
-    expect((await send(app, c, 'person.role', { id: 'sean', role: 'warehouse' })).status).toBe('applied')
+    // Made a freelancer, he can only report a fault: not stock, not leave (ADR 0050).
+    expect((await send(app, c, 'person.role', { id: 'sean', role: 'freelancer' })).status).toBe('applied')
+    expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'freelancer', rolesOn: true })
+    expect((await send(app, s, 'place.upsert', bay('a2'))).reason?.code).toBe('forbidden')
+    expect((await send(app, s, 'leave.request', { id: 'l1', personId: 'sean', start: '2026-12-01', end: '2026-12-02', type: 'annual', note: '' })).reason?.code).toBe('forbidden')
+
+    // Made a head of department, he can, at once; jobs and settings stay out of reach.
+    expect((await send(app, c, 'person.role', { id: 'sean', role: 'head' })).status).toBe('applied')
     expect((await send(app, s, 'place.upsert', bay('a2'))).status).toBe('applied')
     expect((await send(app, s, 'project.create', { id: 'j1' })).reason?.code).toBe('forbidden')
-    expect((await send(app, s, 'person.upsert', staff('p2', 'Dara', null))).reason?.code).toBe('forbidden')
     expect((await send(app, s, 'person.role', { id: 'sean', role: 'director' })).reason?.code).toBe('forbidden')
     const download = await app.inject({ url: '/api/export', cookies: s })
     expect(download.statusCode).toBe(403)
@@ -266,10 +287,10 @@ describe('the demo, seen as someone', () => {
     expect((await app.inject({ url: '/api/me', cookies })).json()).toEqual({ auth: 'passcode' })
     expect((await send(app, cookies, 'place.upsert', bay('a1'))).status).toBe('applied')
 
-    const chose = await see(app, cookies, 'warehouse')
+    const chose = await see(app, cookies, 'head')
     expect(chose.statusCode).toBe(200)
     const as = { ...cookies, sh_preview: cookie(chose, 'sh_preview')!.value }
-    expect((await app.inject({ url: '/api/me', cookies: as })).json()).toEqual({ auth: 'passcode', role: 'warehouse' })
+    expect((await app.inject({ url: '/api/me', cookies: as })).json()).toEqual({ auth: 'passcode', role: 'head' })
     expect((await send(app, as, 'place.upsert', bay('a2'))).status).toBe('applied')
     expect((await send(app, as, 'project.create', { id: 'j1' })).reason?.code).toBe('forbidden')
 
@@ -277,6 +298,8 @@ describe('the demo, seen as someone', () => {
     const none = await see(app, as, null)
     expect(cookie(none, 'sh_preview')!.maxAge).toBe(0)
     expect((await see(app, cookies, 'janitor')).json()).toEqual({ role: null })
+    // Warehouse was a role until ADR 0050: a browser still saying so is held to nothing it chose.
+    expect((await see(app, cookies, 'warehouse')).json()).toEqual({ role: null })
   })
 
   it("isn't there on a copy without a passcode", async () => {
@@ -397,9 +420,9 @@ describe('what each role reads', () => {
     expect((await app.inject({ url: '/api/export', cookies: s })).statusCode).toBe(403)
   })
 
-  it('sends the warehouse no rate or link', async () => {
+  it('sends a freelancer no rate or link but their own', async () => {
     const { signIn, ok, pull } = await crewed()
-    await ok('person.role', { id: 'sean', role: 'warehouse' })
+    await ok('person.role', { id: 'sean', role: 'freelancer' })
     const feed = await pull({ sh_session: await signIn(sean) })
     expect(feed.reading).toMatchObject({ rates: false, links: 'own' })
     expect(leaks(feed, 'sean')).toEqual({ rates: [], links: [] })

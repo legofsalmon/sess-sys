@@ -106,7 +106,7 @@ test('a long list draws its rows as they near the screen, and Back finds a place
 })
 
 /** The demo copy, seen as one of its personas: this server has no passcode, so the test answers for it as a demo copy would. */
-async function as(page: Page, role: 'crew' | 'warehouse', button: RegExp) {
+async function as(page: Page, role: 'crew' | 'head', button: RegExp) {
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'passcode', role } }))
   await page.route('**/api/auth/preview', (route) => route.fulfill({ json: { role } }))
   await page.goto('/')
@@ -143,10 +143,10 @@ test('staff crew are offered nothing on a job or on Crew they could only be refu
   await expect(main.getByRole('button', { name: 'Change details' })).toHaveCount(0)
 })
 
-test('the warehouse can add kit to a job, but not change the job or its crew', async ({ browser }) => {
-  // Proves: the warehouse, who keep the stock and the kit on jobs, are offered Add kit and the kit lines' Change, and nothing of the job's own or its crew's.
+test('the warehouse can add kit to a job, but not change the job itself', async ({ browser }) => {
+  // Proves: the warehouse, held to a head of department's role since ADR 0050, are offered Add kit and the kit lines' Change, and nothing of the job's own.
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await as(page, 'warehouse', /^Warehouse/)
+  await as(page, 'head', /^Warehouse/)
   await openJob(page, 'Harbour Lights Festival')
   const main = page.getByRole('main')
   await expect(main.getByRole('button', { name: 'Add kit' })).toBeVisible()
@@ -154,7 +154,7 @@ test('the warehouse can add kit to a job, but not change the job or its crew', a
   await expect(kit.getByRole('button', { name: 'Change', exact: true }).first()).toBeVisible()
   const phases = main.getByRole('region', { name: 'Phases' })
   for (const name of ['Change', 'Add phase']) await expect(phases.getByRole('button', { name, exact: true })).toHaveCount(0)
-  for (const name of ['Change details', 'Ask for crew', 'Offer…']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
+  await expect(main.getByRole('button', { name: 'Change details', exact: true })).toHaveCount(0)
 })
 
 test('Crew needed lists only the calls short of people, with the filled ones folded under them', async ({ browser }) => {

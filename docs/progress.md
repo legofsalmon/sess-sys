@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, evening: Freelancer in the list of roles
+
+**Done**
+
+- Warehouse is out of the staff role list and Freelancer is in, on Colly's
+  ask, in [Decision 0050](adr/0050-freelancer-in-place-of-warehouse.md): a
+  freelancer signed in can look and report a fault, reads only their own
+  rate and link, and asks for no leave; their offers, timesheets and days
+  off still go through their private link. Anyone on the Crew tab as a
+  freelancer signs in as one. Whoever had the warehouse role is now a head
+  of department, so keeps the stock and kit. The demo's Warehouse persona
+  stays, held to a head's role.
+- Checked: typecheck, 802 unit tests, the two role browser tests.
+
 ## 18 October 2026, evening: the audit's P1 fixes
 
 **Done**

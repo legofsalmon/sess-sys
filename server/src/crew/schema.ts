@@ -163,6 +163,14 @@ const MIGRATIONS: string[] = [
   `,
   // A department on every crew call (ADR 0046), from the crew profiles' list; none for a call nobody has given one.
   `ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS department text;`,
+  // The freelancer in the warehouse's place in the list of roles (ADR 0050). Whoever was the warehouse becomes a head of
+  // department, which keeps everything the warehouse could change (kit, stock, faults, leave), so nobody is locked out of
+  // their work the morning after; a director can narrow it on their page.
+  `
+  ALTER TABLE people DROP CONSTRAINT IF EXISTS people_role_check;
+  UPDATE people SET role = 'head' WHERE role = 'warehouse';
+  ALTER TABLE people ADD CONSTRAINT people_role_check CHECK (role IN ('director', 'office', 'head', 'crew', 'freelancer'));
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

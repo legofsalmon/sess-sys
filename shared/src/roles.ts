@@ -1,9 +1,8 @@
 import type { CommandName } from './commands.ts'
 
 /**
- * Roles and what each may change (ADR 0034). The six personas in
- * docs/personas.md, less the freelancer, who has a private link and no
- * account: a role says what a signed-in member of staff can change, on the
+ * Roles and what each may change (ADR 0034). A role says what someone
+ * signed in can change, on the
  * server, where it counts, and on the device, so a button that can't work
  * isn't offered. Everyone signed in reads the company's work, but money:
  * prices, quotes and what's owed reach only the roles that can see them
@@ -17,15 +16,22 @@ import type { CommandName } from './commands.ts'
  * switches them on, and there is always at least one after that.
  */
 
-export const ROLES = ['director', 'office', 'head', 'warehouse', 'crew'] as const
+/**
+ * The freelancer took the warehouse's place in the list (ADR 0050): the
+ * warehouse is a department, run by its head, and a freelancer is who the
+ * company books most. A freelancer's own offers, bookings, timesheets and
+ * days off go through their private link; signed in, they can look and
+ * report a fault, and read nobody's pay or link but their own.
+ */
+export const ROLES = ['director', 'office', 'head', 'crew', 'freelancer'] as const
 export type Role = (typeof ROLES)[number]
 
 export const ROLE_LABELS: Record<Role, string> = {
   director: 'Director',
   office: 'Office and production',
   head: 'Head of department',
-  warehouse: 'Warehouse',
   crew: 'Staff crew',
+  freelancer: 'Freelancer',
 }
 
 /** What each role is for, in a line, where a role is chosen. */
@@ -33,8 +39,8 @@ export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',
   office: 'Jobs, crew, kit and stock, money, and the settings: calendar, office details, bringing lists in, downloads.',
   head: 'Crew and their bookings, kit on jobs, stock and the warehouse. Not jobs themselves, nor settings.',
-  warehouse: 'Stock and the warehouse, and kit on jobs. Not jobs, crew or settings.',
   crew: 'Their own leave and days in lieu, and reporting a fault. Everything else they can look at.',
+  freelancer: "Reporting a fault. Their offers, bookings, timesheets and days off go through their private link; everything else they can look at, but nobody else's pay or link.",
 }
 
 /** The kinds of change a role can make. Each command needs exactly one. */
@@ -59,8 +65,8 @@ export const ROLE_CAN: Record<Role, readonly Ability[]> = {
   director: ABILITIES,
   office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'money', 'settings'],
   head: ['crew', 'kit', 'stock', 'fault', 'leave'],
-  warehouse: ['kit', 'stock', 'fault', 'leave'],
   crew: ['fault', 'leave'],
+  freelancer: ['fault'],
 }
 
 /**
@@ -187,7 +193,7 @@ export const roleMayRun = (role: Role, name: CommandName) => {
 
 /** "the office and directors", the roles that can, in the order of the list. */
 function whoCan(ability: Ability): string {
-  const names = ROLES.filter((r) => roleCan(r, ability)).map((r) => (r === 'director' ? 'directors' : r === 'crew' ? 'staff crew' : r === 'office' ? 'the office' : r === 'head' ? 'heads of department' : 'the warehouse'))
+  const names = ROLES.filter((r) => roleCan(r, ability)).map((r) => (r === 'director' ? 'directors' : r === 'crew' ? 'staff crew' : r === 'office' ? 'the office' : r === 'head' ? 'heads of department' : 'freelancers'))
   // Directors last: "the office and directors".
   const ordered = [...names.filter((n) => n !== 'directors'), ...names.filter((n) => n === 'directors')]
   return ordered.length < 2 ? (ordered[0] ?? 'directors') : `${ordered.slice(0, -1).join(', ')} and ${ordered.at(-1)}`
@@ -207,7 +213,7 @@ export interface RolePerson {
   role: Role | null
 }
 
-/** A staff person's role as it stands: none set is staff crew. A freelancer has none. */
+/** A staff person's role as it stands, as picked on their page: none set is staff crew. A freelancer has none to pick. */
 export const roleOfPerson = (p: Pick<RolePerson, 'kind' | 'role'>): Role | null => (p.kind === 'staff' ? (p.role ?? 'crew') : null)
 
 /** Whether roles are on: someone, not archived, is a director. */
@@ -223,14 +229,15 @@ export function personForEmail<P extends RolePerson>(people: readonly P[], email
 
 /**
  * The role a signed-in account acts with. While roles are off, everyone is
- * treated as a director. An account matched to nobody, or to a freelancer,
- * is staff crew: it can look, report a fault, and nothing that needs a
- * person of its own.
+ * treated as a director. An account matched to a freelancer is a freelancer
+ * (ADR 0050); one matched to nobody is staff crew: it can look, report a
+ * fault, and nothing that needs a person of its own.
  */
 export function roleForEmail(people: readonly RolePerson[], email: string): { role: Role; on: boolean; personId?: string } {
   if (!rolesOn(people)) return { role: 'director', on: false }
   const me = personForEmail(people, email)
-  return { role: (me && roleOfPerson(me)) ?? 'crew', on: true, ...(me ? { personId: me.id } : {}) }
+  const role: Role = !me ? 'crew' : me.kind === 'freelancer' ? 'freelancer' : (roleOfPerson(me) ?? 'crew')
+  return { role, on: true, ...(me ? { personId: me.id } : {}) }
 }
 
 /** Two emails as an account is matched to a person: trimmed, in any case. */
@@ -241,7 +248,7 @@ export const sameEmail = (a: string | null | undefined, b: string | null | undef
  * finding 12): the email is how their account finds them, and a freelancer
  * has none. Read from the role as kept, so a freelancer who was one counts.
  */
-export const holdsARole = (p: Pick<RolePerson, 'role'>) => p.role !== null && p.role !== 'crew'
+export const holdsARole = (p: Pick<RolePerson, 'role'>) => p.role !== null && p.role !== 'crew' && p.role !== 'freelancer'
 
 /** Who can change the email or kind of someone who holds a role: a role that changes settings, or anyone while roles are off. */
 export const mayChangeWhoSignsIn = (role: Role | null | undefined) => !role || roleCan(role, 'settings')

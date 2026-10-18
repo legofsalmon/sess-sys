@@ -121,7 +121,7 @@ describe('what each role reads', () => {
     for (const role of ['director', 'office', null] as const) expect(readsEverything(readingFor(role))).toBe(true)
     expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio' })
     expect(readingFor('head', { department: 'Audio', headsSeeRates: true }).rates).toBe(true)
-    expect(readingFor('warehouse')).toEqual({ rates: false, links: 'own' })
+    expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own' })
     expect(crew).toEqual({ rates: false, links: 'own', personId: own })
   })
 
