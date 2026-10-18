@@ -20,6 +20,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
@@ -205,6 +206,8 @@ export function LabelsCard({ labels }: { labels: LabelsView }) {
 /** Every run of numbers set aside, and setting more aside. */
 export function LabelsScreen({ view }: { view: View }) {
   const runs = view.labels.runs
+  // Setting numbers aside is stock's (audit finding 9); printing them is anyone's.
+  const mayReserve = useAccess().can('stock')
   return (
     <div className="app warehouse">
       <Top view={view} title="Stock" />
@@ -215,7 +218,7 @@ export function LabelsScreen({ view }: { view: View }) {
           Numbers are set aside before their labels are printed, here or by a label maker, so no other item gets them. Once a label is stuck on, scan
           or type it in the Stock search to put it on its item.
         </p>
-        <SetAside labels={view.labels} />
+        {mayReserve && <SetAside labels={view.labels} />}
       </section>
       <section className="card" aria-label="Set aside">
         <h2>Set aside</h2>
@@ -362,6 +365,7 @@ function RunSummary({ r }: { r: LabelRunView }) {
   const [editing, setEditing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const { run, error } = useAct()
+  const mayChange = useAccess().can('stock')
   const cancel = () => {
     setCancelling(false)
     void run(() => client.mutate('labels.cancel', { id: r.id })).then((ok) => {
@@ -396,7 +400,7 @@ function RunSummary({ r }: { r: LabelRunView }) {
       </dl>
       {r.notes && <p className="notes">{r.notes}</p>}
       <Refusal error={error} />
-      {editing ? (
+      {!mayChange ? null : editing ? (
         <EditRun r={r} onDone={() => setEditing(false)} />
       ) : cancelling ? (
         <Confirm

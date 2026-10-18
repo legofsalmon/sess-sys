@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
@@ -79,6 +80,8 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
   const dues = view.inspections.dueOf(a.id)
   const done = view.inspections.ofAsset(a.id)
   const [open, setOpen] = useState(false)
+  // Recording a test is stock's (audit finding 9): a role without it reads what's due and done.
+  const mayRecord = useAccess().can('stock')
   if (dues.length === 0 && done.length === 0) return null
   const kinds = dues.length ? dues.map((d) => d.kind) : [...INSPECTION_KINDS]
   return (
@@ -109,6 +112,7 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
         </ul>
       )}
       {a.status === 'active' &&
+        mayRecord &&
         (open ? (
           <RecordOne a={a} kinds={kinds} onDone={() => setOpen(false)} />
         ) : (
@@ -412,86 +416,90 @@ export function TestingScreen({ view }: { view: View }) {
     if (h) failed(h)
   }
   const left = held ? Math.max(1, Math.ceil((held.until - now) / 1000)) : 0
+  // Testing a batch is stock's (audit finding 9): a role without it sees what's due.
+  const mayTest = useAccess().can('stock')
 
   return (
     <div className="app warehouse pick">
       <Top view={view} title="Stock" />
       <StockViews view={view} current="testing" />
-      <section className="card" aria-label="Testing">
-        <header className="title">
-          <h1>Test a batch</h1>
-        </header>
-        <p className="hint">
-          Scan each item as it passes. Each pass waits five seconds with Undo, then it's recorded, with no signal too. If one fails, press It failed.
-        </p>
-        {held && (
-          <div className="held" role="status" aria-label="Held">
-            <p>
-              <b>Passed: {numberLabel(held.a)}</b>
-              {/* Not read out every second; the help line says how long. */}
-              <span aria-hidden="true"> · recorded in {left} s</span>
-            </p>
-            <div className="actions">
-              <button type="button" onClick={undo}>
-                Undo
+      {mayTest && (
+        <section className="card" aria-label="Testing">
+          <header className="title">
+            <h1>Test a batch</h1>
+          </header>
+          <p className="hint">
+            Scan each item as it passes. Each pass waits five seconds with Undo, then it's recorded, with no signal too. If one fails, press It failed.
+          </p>
+          {held && (
+            <div className="held" role="status" aria-label="Held">
+              <p>
+                <b>Passed: {numberLabel(held.a)}</b>
+                {/* Not read out every second; the help line says how long. */}
+                <span aria-hidden="true"> · recorded in {left} s</span>
+              </p>
+              <div className="actions">
+                <button type="button" onClick={undo}>
+                  Undo
+                </button>
+                <button type="button" onClick={failedHeld}>
+                  It failed
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="filters" role="group" aria-label="Which test">
+            {INSPECTION_KINDS.map((k) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
+                {k === 'pat' ? 'PAT' : 'Thorough examination'}
               </button>
-              <button type="button" onClick={failedHeld}>
+            ))}
+          </div>
+          <div className="grid-form">
+            <label>
+              By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
+            </label>
+            <label>
+              When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
+            </label>
+          </div>
+          <form className="scan-row" onSubmit={submit}>
+            <input
+              type="search"
+              enterKeyHint="go"
+              autoComplete="off"
+              placeholder="Scan or type a number"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              aria-label="Number or serial"
+            />
+            <button
+              type="button"
+              aria-pressed={camera}
+              onClick={() => {
+                if (!camera) primeSound()
+                setCamera(!camera)
+              }}
+            >
+              Scan
+            </button>
+          </form>
+          {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
+          {said && (
+            <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
+              {said.text}
+            </p>
+          )}
+          <ScanMisses misses={misses} onDismiss={dismiss} />
+          {said?.last && !held && (
+            <div className="actions">
+              <button type="button" onClick={() => failed(said.last!)}>
                 It failed
               </button>
             </div>
-          </div>
-        )}
-        <div className="filters" role="group" aria-label="Which test">
-          {INSPECTION_KINDS.map((k) => (
-            <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
-              {k === 'pat' ? 'PAT' : 'Thorough examination'}
-            </button>
-          ))}
-        </div>
-        <div className="grid-form">
-          <label>
-            By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
-          </label>
-          <label>
-            When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
-          </label>
-        </div>
-        <form className="scan-row" onSubmit={submit}>
-          <input
-            type="search"
-            enterKeyHint="go"
-            autoComplete="off"
-            placeholder="Scan or type a number"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            aria-label="Number or serial"
-          />
-          <button
-            type="button"
-            aria-pressed={camera}
-            onClick={() => {
-              if (!camera) primeSound()
-              setCamera(!camera)
-            }}
-          >
-            Scan
-          </button>
-        </form>
-        {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
-        {said && (
-          <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
-            {said.text}
-          </p>
-        )}
-        <ScanMisses misses={misses} onDismiss={dismiss} />
-        {said?.last && !held && (
-          <div className="actions">
-            <button type="button" onClick={() => failed(said.last!)}>
-              It failed
-            </button>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
       {done.length > 0 && (
         <section className="card" aria-label="Tested">
           <h2>Tested here: {done.length}</h2>

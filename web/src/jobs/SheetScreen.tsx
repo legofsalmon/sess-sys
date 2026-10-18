@@ -22,6 +22,7 @@ import { createPortal } from 'react-dom'
 import { Refusal, useAct } from '../act.tsx'
 import { linkFor, SharePanel } from '../crew/CrewScreen.tsx'
 import { Empty } from '../Empty.tsx'
+import { useAccess } from '../role.ts'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Top } from './common.tsx'
@@ -70,6 +71,8 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
   const [share, setShare] = useState<{ person: PersonView; call: CallView } | undefined>()
   const [copied, setCopied] = useState<'yes' | 'failed'>()
   const [printing, setPrinting] = useState(false)
+  // Sending crew their sheet is crew's to do (audit finding 9); anyone can print it or copy it.
+  const mayTell = useAccess().can('crew')
   useEffect(() => {
     if (!printing) return
     const done = () => setPrinting(false)
@@ -142,7 +145,7 @@ export function SheetScreen({ view, jobId, phaseId }: { view: View; jobId: strin
       </section>
 
       <Contact view={view} phase={phase} sheet={sheet} />
-      <Sheet sheet={sheet} calls={phase.calls} onSend={send} />
+      <Sheet sheet={sheet} calls={phase.calls} onSend={mayTell ? send : undefined} />
       <ShowPackCard view={view} job={job} phase={phase} />
       {share && (
         <SharePanel
@@ -195,33 +198,38 @@ function Contact({ view, phase, sheet }: { view: View; phase: PhaseView; sheet: 
   const others = pickable.filter((p) => !on.has(p.id)).sort((a, b) => Number(b.kind === 'staff') - Number(a.kind === 'staff') || byName(a, b))
   const { run, error } = useAct()
   const choose = (id: string) => void run(() => client.mutate('phase.update', { id: phase.id, contactId: id || null }))
+  // Choosing them is the job's (audit finding 9): a role without it is told who it is.
+  const mayChoose = useAccess().can('jobs')
   return (
     <section className="card" aria-label="On the day">
       <h2>On the day</h2>
       <Refusal error={error} />
-      <label className="field">
-        Contact on the day
-        <select value={phase.contactId ?? ''} onChange={(e) => choose(e.target.value)}>
-          <option value="">Nobody yet</option>
-          {onPhase.length > 0 && (
-            <optgroup label={`On ${phase.name}`}>
-              {onPhase.map((p) => (
+      {!mayChoose && <p>{sheet.contact ? `${sheet.contact.name}${sheet.contact.phone ? `, ${sheet.contact.phone}` : ''}` : 'Nobody yet.'}</p>}
+      {mayChoose && (
+        <label className="field">
+          Contact on the day
+          <select value={phase.contactId ?? ''} onChange={(e) => choose(e.target.value)}>
+            <option value="">Nobody yet</option>
+            {onPhase.length > 0 && (
+              <optgroup label={`On ${phase.name}`}>
+                {onPhase.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label={onPhase.length ? 'Everyone else' : 'Everyone'}>
+              {others.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                  {p.kind === 'staff' ? ' (staff)' : ''}
                 </option>
               ))}
             </optgroup>
-          )}
-          <optgroup label={onPhase.length ? 'Everyone else' : 'Everyone'}>
-            {others.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {p.kind === 'staff' ? ' (staff)' : ''}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-      </label>
+          </select>
+        </label>
+      )}
       {sheet.contact && !sheet.contact.phone && (
         <p className="warn-line">There's no number for {sheet.contact.name} yet: edit them on the Crew tab to add one, or crew won't know how to reach them.</p>
       )}

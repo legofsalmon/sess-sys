@@ -24,7 +24,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { rateText } from '../format.ts'
-import { useSeesRates } from '../role.ts'
+import { useAccess, useSeesRates } from '../role.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
@@ -47,6 +47,9 @@ export function TimesheetsCard({ view }: { view: View }) {
   const lately = approved.slice(0, 5)
   // Timesheets carry pay, which a role that doesn't see rates isn't sent (ADR 0046): said once, at the top.
   const seesRates = useSeesRates()
+  // Deciding them, and chasing them, is crew's (audit finding 9): a role without it opens them to read.
+  const mayDecide = useAccess().can('crew')
+  const checks = seesRates && mayDecide
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
@@ -63,8 +66,8 @@ export function TimesheetsCard({ view }: { view: View }) {
                   key={r.offer.id}
                   r={r}
                   action={
-                    <a className={seesRates ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
-                      {seesRates ? 'Check' : 'Open'}
+                    <a className={checks ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                      {checks ? 'Check' : 'Open'}
                     </a>
                   }
                 />
@@ -84,12 +87,12 @@ export function TimesheetsCard({ view }: { view: View }) {
                   r={r}
                   action={
                     <>
-                      {r.person && (
+                      {mayDecide && r.person && (
                         <button type="button" onClick={() => setRemind(r)} aria-label={`Ask ${r.person.name} for their timesheet`}>
                           Ask
                         </button>
                       )}
-                      {seesRates && (
+                      {checks && (
                         <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
                           Fill in
                         </a>
@@ -185,6 +188,8 @@ function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow
   const today = useToday()
   // Staff, a booking not confirmed or not started, or a cancelled job: nothing to fill in.
   const why = t ? null : noTimesheetReason(r.offer, r.call, r.person, today)
+  // Checking, approving and reopening are crew's (audit finding 9): a role without it reads it as one without rates does.
+  const mayDecide = useAccess().can('crew')
   return (
     <>
       <section className="card">
@@ -211,7 +216,7 @@ function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow
           </p>
         )}
         {t?.note && <p className="lines">“{t.note}”</p>}
-        {!t && !why && r.person && (
+        {!t && !why && r.person && mayDecide && (
           <div className="actions">
             <button type="button" onClick={() => setAsking(true)}>
               Ask {first} for it
@@ -221,8 +226,8 @@ function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow
       </section>
       {asking && r.person && <Ask r={r} person={r.person} onClose={() => setAsking(false)} />}
       {t?.status === 'approved' ? (
-        <Approved r={r} onTell={onTell} />
-      ) : r.amountsHidden ? (
+        mayDecide ? <Approved r={r} onTell={onTell} /> : <Unpriced r={r} />
+      ) : r.amountsHidden || !mayDecide ? (
         t && <Unpriced r={r} />
       ) : (
         !why && <Check view={view} r={r} onTell={onTell} onRestart={onRestart} />

@@ -1,6 +1,7 @@
 import { mapLink, type JobView, type VenueView, type View } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
@@ -38,6 +39,7 @@ export function VenueScreen({ view, id }: { view: View; id: string }) {
 
 function VenueSummary({ venue }: { venue: VenueView }) {
   const [editing, setEditing] = useState(false)
+  const mayChange = useAccess().can('jobs')
   return (
     <section className="card">
       <header className="title">
@@ -56,7 +58,8 @@ function VenueSummary({ venue }: { venue: VenueView }) {
         </div>
       </dl>
       {venue.notes && <p className="notes">{venue.notes}</p>}
-      {editing ? (
+      {/* Changing it is the jobs' (audit finding 9): a role without them reads it. */}
+      {!mayChange ? null : editing ? (
         <EditVenue venue={venue} onDone={() => setEditing(false)} />
       ) : (
         <button type="button" onClick={() => setEditing(true)}>

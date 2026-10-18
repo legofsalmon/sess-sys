@@ -28,6 +28,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { JobStatusPill, Page } from '../jobs/common.tsx'
 import { forLabel, kitState } from '../jobs/Kit.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
@@ -100,6 +101,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   const [removing, setRemoving] = useState(false)
   const [mistaking, setMistaking] = useState(false)
   const { run, error, refuse } = useAct()
+  const mayChange = useAccess().can('stock')
   const onKit = view.kit.lines.filter((l) => l.modelId === m.id)
   const unusable = view.faults.unusable(m.id)
   // What stops a plain Remove on the server stops it here, so "Added by mistake" is offered instead: any item ever labelled as it,
@@ -183,7 +185,8 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
       </dl>
       {m.notes && <p className="notes">{m.notes}</p>}
       <Refusal error={error} />
-      {editing ? (
+      {/* Changing the stock list is stock's (audit finding 9): a role without it reads it. */}
+      {!mayChange ? null : editing ? (
         <EditProduct m={m} w={w} onDone={() => setEditing(false)} />
       ) : removing ? (
         <Confirm question={`Remove ${m.name} from the stock list? Nothing is counted or labelled as it, so nothing else changes.`} yes="Remove it" onYes={remove} onNo={() => setRemoving(false)} />
@@ -386,6 +389,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
 }
 
 function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; faults: FaultsView; inspections: InspectionsView }) {
+  const mayAdd = useAccess().can('stock')
   return (
     <section className="card" aria-label="Items">
       <h2>Items</h2>
@@ -426,7 +430,7 @@ function Items({ m, w, faults, inspections }: { m: ModelView; w: WarehouseView; 
           </ul>
         </details>
       )}
-      <AddItem m={m} w={w} />
+      {mayAdd && <AddItem m={m} w={w} />}
     </section>
   )
 }
@@ -532,6 +536,7 @@ function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
   const numbered = m.tracking === 'serialised'
   // What a count or a move just did, said here, as a row counted to none or moved away goes.
   const [said, setSaid] = useState('')
+  const mayCount = useAccess().can('stock')
   return (
     <section className="card" aria-label={numbered ? 'Not labelled yet' : 'Counted'}>
       <h2>{numbered ? 'Not labelled yet' : 'Counted'}</h2>
@@ -543,7 +548,7 @@ function Counted({ m, w }: { m: ModelView; w: WarehouseView }) {
         </CountRow>
       ))}
       <SavedLine text={said} />
-      <NewCount m={m} w={w} onSaid={setSaid} />
+      {mayCount && <NewCount m={m} w={w} onSaid={setSaid} />}
       <p className="hint">In all: {amountLabel(m)}.</p>
     </section>
   )

@@ -15,6 +15,7 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 
@@ -288,6 +289,8 @@ export function CountRow({ s, w, children, onSaid }: { s: StockView; w: Warehous
   const [to, setTo] = useState('')
   const { run, error, refuse } = useAct()
   const { ask, question, asking } = useNewPlace(w)
+  // Counting and moving are stock's (audit finding 9): a role without it reads how many are where.
+  const mayCount = useAccess().can('stock')
   const name = s.model?.name ?? 'them'
   const open = (next: 'count' | 'move') => {
     refuse('')
@@ -339,14 +342,18 @@ export function CountRow({ s, w, children, onSaid }: { s: StockView; w: Warehous
       </div>
       <div className="actions">
         <Pending pending={s.pending} />
-        <button type="button" aria-pressed={mode === 'count'} onClick={() => open('count')}>
-          Count again
-        </button>
-        <button type="button" aria-pressed={mode === 'move'} onClick={() => open('move')}>
-          Move some
-        </button>
+        {mayCount && (
+          <>
+            <button type="button" aria-pressed={mode === 'count'} onClick={() => open('count')}>
+              Count again
+            </button>
+            <button type="button" aria-pressed={mode === 'move'} onClick={() => open('move')}>
+              Move some
+            </button>
+          </>
+        )}
       </div>
-      {mode && (
+      {mode && mayCount && (
         <form className="detail grid-form" onSubmit={submit}>
           <label className={mode === 'count' ? 'wide' : undefined}>
             {mode === 'count' ? `How many ${name} are there now` : 'How many'}
@@ -376,6 +383,8 @@ export function CountHere({ w, at, title, onSaid }: { w: WarehouseView; at: Wher
   // A count that would replace one already made waits here until the office says so.
   const [asking, setAsking] = useState<{ m: ModelView; n: number; already: number } | undefined>()
   const { run, error, refuse } = useAct()
+  // Counting is stock's (audit finding 9): not drawn for a role without it.
+  const mayCount = useAccess().can('stock')
   const save = (m: ModelView, n: number) => {
     setAsking(undefined)
     onSaid('')
@@ -396,6 +405,7 @@ export function CountHere({ w, at, title, onSaid }: { w: WarehouseView; at: Wher
     if (already) return setAsking({ m, n, already: already.qty })
     save(m, n)
   }
+  if (!mayCount) return null
   return (
     <form className="grid-form" onSubmit={submit}>
       <h3 className="wide">{title}</h3>
