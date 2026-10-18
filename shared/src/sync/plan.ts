@@ -292,6 +292,9 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ow
       const booked = x.work.filter((w) => w.booked)
       const asked = x.work.filter((w) => !w.booked)
       const why = x.away ? ` (${x.away})` : ''
+      // Staff on several jobs a day is a normal day, and a calendar invite to staff is often "so you know" (audit of 16 October, finding 12): only a freelancer's is a clash.
+      const staffDay = lane.person.kind === 'staff' && x.away === null && unique(x.work.map((w) => w.job)).length === x.work.length
+      if (staffDay) continue
       if (booked.length > 1) {
         const names = unique(booked.map((w) => w.job))
         x.severity = 'clash'

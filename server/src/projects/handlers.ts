@@ -1,10 +1,14 @@
-import { kindOf, kitDaysOf, MAX_PHASE_DAYS, STOPPED, type CommandArgs } from '@sh/shared'
+import { departmentInWords, joinedPhaseName, kindOf, kitDaysOf, MAX_PHASE_DAYS, STOPPED, tailOf, type CommandArgs } from '@sh/shared'
 import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
-import { getCall, getPerson, openCallsFor } from '../crew/store.ts'
-import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
-import { kitOnPhase } from '../stock/kit.ts'
-import { getClient, getPhase, getProject, getVenue, namesForCall } from './store.ts'
-import { vehiclesOnPhase } from '../vehicles/store.ts'
+import { getCall, getCalls, getPerson, openCallsFor } from '../crew/store.ts'
+import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
+import { getKitLine, kitOnPhase } from '../stock/kit.ts'
+import { getFault } from '../stock/faults.ts'
+import { getMovement } from '../stock/moves.ts'
+import { dayEntity, readDaysById } from '../calendar/store.ts'
+import { getQuote } from '../finance/store.ts'
+import { getClient, getPhase, getPhases, getProject, getVenue, namesForCall } from './store.ts'
+import { getBooking, vehiclesOnPhase } from '../vehicles/store.ts'
 
 /**
  * The job rules the server keeps, whichever device a change comes from
@@ -14,10 +18,12 @@ import { vehiclesOnPhase } from '../vehicles/store.ts'
  *   different things both keep theirs;
  * - crew calls carry today's names for their job, phase and venue;
  * - stopping a job (cancelled, lost) cancels its crew calls with it;
- * - a phase with crew or kit still on it can't be removed.
+ * - a phase with crew or kit still on it can't be removed;
+ * - jobs a calendar brought in as several are made one with everything on
+ *   them, and the others go (ADR 0050).
  */
 
-type JobCommand = 'client.upsert' | 'venue.upsert' | 'project.create' | 'project.update' | 'phase.add' | 'phase.update' | 'phase.remove'
+type JobCommand = 'client.upsert' | 'venue.upsert' | 'project.create' | 'project.update' | 'phase.add' | 'phase.update' | 'phase.remove' | 'project.merge'
 type Handler<N extends JobCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 /** The columns each field of a job or phase is kept in. */
@@ -86,6 +92,9 @@ async function renameCalls(ctx: Ctx, by: { projectId: string } | { phaseId: stri
     await emit(ctx, 'crewCall', r.id, await getCall(ctx.tx, r.id))
   }
 }
+
+/** Job notes hold at most this much (ADR 0007). */
+const JOB_NOTES = 4000
 
 const tooLong = (start: string, end: string) => (Date.parse(end) - Date.parse(start)) / 86_400_000 + 1 > MAX_PHASE_DAYS
 
@@ -188,5 +197,74 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     await ctx.tx.query('DELETE FROM phases WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'phase', a.id)
     for (const { id } of kept) await emit(ctx, 'crewCall', id, await getCall(ctx.tx, id))
+  },
+
+  async 'project.merge'(ctx, a) {
+    const into = await getProject(ctx.tx, a.id, true)
+    if (!into) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
+    const from = []
+    for (const id of a.from) {
+      const job = await getProject(ctx.tx, id, true)
+      if (!job) throw new Refused({ code: 'not-found', message: 'One of those jobs no longer exists. Look at the list again.' })
+      from.push(job)
+    }
+    const all = [into, ...from]
+    // A job brought in is left off the jobs calendar and one made in the app is written to it, so the two can't be one job.
+    const made = all.find((j) => !j.sourceCalendar)
+    const brought = all.find((j) => j.sourceCalendar)
+    if (made && brought)
+      throw new Refused({ code: 'conflict', message: `${made.name} was made in the app and ${brought.name} was brought in from Google Calendar, so they stay as separate jobs.` })
+    const ids = from.map((j) => j.id)
+    const { rows: quoted } = await ctx.tx.query<{ project_id: string }>('SELECT DISTINCT project_id FROM quotes WHERE project_id = ANY($1::text[]) ORDER BY project_id', [[a.id, ...ids]])
+    if (quoted.length > 1)
+      throw new Refused({ code: 'conflict', message: `${all.filter((j) => quoted.some((q) => q.project_id === j.id)).map((j) => j.name).join(' and ')} each have a quote. A job has one quote, so make them one by hand.` })
+
+    // Each job's days keep what its name said: EP's "Smirnoff LX" Show is the phase Smirnoff LX, and its calls are for LX.
+    const { rows: phaseRows } = await ctx.tx.query<{ id: string; project_id: string; name: string }>(
+      'SELECT id, project_id, name FROM phases WHERE project_id = ANY($1::text[]) ORDER BY id',
+      [[a.id, ...ids]]
+    )
+    for (const ph of phaseRows) {
+      const job = all.find((j) => j.id === ph.project_id)!
+      const name = joinedPhaseName(ph.name, tailOf(job.name, a.name), job.kind)
+      if (name !== ph.name) await ctx.tx.query('UPDATE phases SET name = $2 WHERE id = $1', [ph.id, name])
+    }
+    for (const job of all) {
+      const department = departmentInWords(tailOf(job.name, a.name))
+      if (department) await ctx.tx.query('UPDATE crew_calls SET department = $2 WHERE project_id = $1 AND department IS NULL', [job.id, department])
+    }
+
+    // Everything on the others becomes this job's, told to devices as it moves.
+    const move = async (table: string) =>
+      (await ctx.tx.query<{ id: string }>(`UPDATE ${table} SET project_id = $1 WHERE project_id = ANY($2::text[]) RETURNING id`, [a.id, ids])).rows.map((r) => r.id).sort()
+    await move('phases')
+    await emitAll(ctx, 'phase', (await getPhases(ctx.tx, phaseRows.map((p) => p.id))).map((p) => ({ id: p.id, data: p })))
+    await move('crew_calls')
+    const kit = await move('kit_lines')
+    for (const id of kit) await emit(ctx, 'kitLine', id, await getKitLine(ctx.tx, id))
+    for (const id of await move('faults')) await emit(ctx, 'fault', id, await getFault(ctx.tx, id))
+    for (const id of await move('movements')) await emit(ctx, 'movement', id, await getMovement(ctx.tx, id))
+    for (const id of await move('vehicle_bookings')) await emit(ctx, 'vehicleBooking', id, await getBooking(ctx.tx, id))
+    for (const id of await move('quotes')) await emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
+    const days = await move('calendar_days')
+    if (days.length) for (const d of await readDaysById(ctx.tx, days)) await emit(ctx, 'calendarDay', d.id, dayEntity(d))
+    await ctx.tx.query('UPDATE calendar_imports SET project_id = $1 WHERE project_id = ANY($2::text[])', [a.id, ids])
+    // Their notes are joined below, so what was read of them for kit is read again.
+    await ctx.tx.query('DELETE FROM kit_notes_read WHERE project_id = ANY($1::text[])', [[a.id, ...ids]])
+
+    const notes = [...new Set(all.map((j) => j.notes.trim()).filter(Boolean))].join('\n\n')
+    const cut = notes.length > JOB_NOTES ? `${notes.slice(0, JOB_NOTES - 1)}…` : notes
+    const first = <T,>(pick: (j: (typeof all)[number]) => T | null | undefined) => all.map(pick).find((v) => v !== null && v !== undefined) ?? null
+    await ctx.tx.query(
+      'UPDATE projects SET name = $2, notes = $3, client_id = $4, venue_id = $5, prep_days = $6, return_days = $7 WHERE id = $1',
+      [a.id, a.name, cut, first((j) => j.clientId), first((j) => j.venueId), Math.max(...all.map((j) => kitDaysOf(j).prep)), Math.max(...all.map((j) => kitDaysOf(j).back))]
+    )
+    await ctx.tx.query('DELETE FROM projects WHERE id = ANY($1::text[])', [ids])
+    await emitRemovedAll(ctx, 'project', ids)
+    await emit(ctx, 'project', a.id, await getProject(ctx.tx, a.id))
+    // The calls carry the job's name and their phases' (renameCalls), and any department just given.
+    await renameCalls(ctx, { projectId: a.id })
+    const { rows: onJob } = await ctx.tx.query<{ id: string }>('SELECT id FROM crew_calls WHERE project_id = $1 ORDER BY id', [a.id])
+    await emitAll(ctx, 'crewCall', (await getCalls(ctx.tx, onJob.map((r) => r.id))).map((c) => ({ id: c.id, data: c })))
   },
 }

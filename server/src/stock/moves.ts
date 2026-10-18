@@ -25,7 +25,7 @@ const toMovement = (r: Row): Movement => ({
   at: r.at,
 })
 
-async function getMovement(q: Queryable, id: string) {
+export async function getMovement(q: Queryable, id: string) {
   const { rows } = await q.query(
     `SELECT id, project_id, direction, asset_id, model_id, qty,
             to_char(at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at

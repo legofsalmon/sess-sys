@@ -65,6 +65,8 @@ export function jobsView(
   const phases = new Map<string, Phase & { pending: boolean }>()
   for (const p of Object.values(entities.phase ?? {})) phases.set(p.id, { ...p, pending: false })
 
+  /** Jobs made part of another, waiting to be sent: their phases and calls show under it. */
+  const joined = new Map<string, string>()
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
@@ -105,15 +107,32 @@ export function jobsView(
       case 'phase.remove':
         phases.delete((m.args as CommandArgs<'phase.remove'>).id)
         break
+      case 'project.merge': {
+        // Shown as one straight away; the server names the phases and moves the rest.
+        const a = m.args as CommandArgs<'project.merge'>
+        const p = projects.get(a.id)
+        if (!p) break
+        projects.set(a.id, { ...p, name: a.name, pending: true })
+        for (const id of a.from) {
+          projects.delete(id)
+          joined.set(id, a.id)
+        }
+        break
+      }
     }
+  }
+  for (const p of phases.values()) {
+    const into = joined.get(p.projectId)
+    if (into) phases.set(p.id, { ...p, projectId: into, pending: true })
   }
 
   const callsByJob = new Map<string, CallView[]>()
   for (const c of calls) {
     if (!c.projectId) continue
-    const list = callsByJob.get(c.projectId) ?? []
+    const job = joined.get(c.projectId) ?? c.projectId
+    const list = callsByJob.get(job) ?? []
     list.push(c)
-    callsByJob.set(c.projectId, list)
+    callsByJob.set(job, list)
   }
   const phasesByJob = new Map<string, (Phase & { pending: boolean })[]>()
   for (const p of phases.values()) {

@@ -284,3 +284,14 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .jobs .notes-kit-add > p:first-child { margin: 0 0 var(--space-8); }
 .jobs .notes-kit-add .actions { margin-top: var(--space-8); }
 .app .notes-kit-nudge p { margin: 0; }
+
+/* Tidy up what came in (ADR 0050): groups of jobs to make one, names to type, venues and clients to put on jobs. */
+.tidy .found .kind { flex-wrap: wrap; }
+.tidy .found .kind .name { flex: 1; min-width: 12rem; font-weight: 700; }
+.tidy .found .people { margin: var(--space-4) 0; }
+.tidy .found .people > li { padding: var(--space-6) 0; }
+.tidy form.tick { align-items: center; }
+.tidy form.tick .name { width: 100%; }
+.tidy .filters { flex-wrap: wrap; }
+/* What the page is for reads across the desk, so the first finding doesn't stand beside an empty column. */
+.tidy > .card.intro { grid-column: 1 / -1; }

@@ -69,6 +69,14 @@ const ROLE_WORDS: readonly [RegExp, (typeof CREW_DEPARTMENTS)[number]][] = [
   [/\b(production|crew chief|producer|production manager|site manager|runner)\b/, 'Production'],
 ]
 
+/**
+ * The department some words name, from the same list: "Smirnoff LX" is LX,
+ * "Audio Main" is Audio. For a job's name or a phase's, where a calendar's
+ * title said which department a day was for. None when they name none.
+ */
+export const departmentInWords = (words: string): (typeof CREW_DEPARTMENTS)[number] | null =>
+  ROLE_WORDS.find(([re]) => re.test(roleKey(words)))?.[1] ?? null
+
 /** What a role is called, as compared: "Sound  No.1" and "sound no.1" are one. */
 const roleKey = (role: string) => role.trim().replace(/\s+/g, ' ').toLowerCase()
 

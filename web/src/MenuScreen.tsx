@@ -88,6 +88,14 @@ export const MENU: PlaceGroup[] = [
         about: 'Jobs already in the calendar',
         needs: ['jobs'],
       },
+      {
+        key: 'tidy',
+        icon: 'edit',
+        href: '#jobs/tidy',
+        label: 'Tidy up what came in',
+        about: 'Jobs brought in as several, names, venues and clients',
+        needs: ['jobs'],
+      },
     ],
   },
   {

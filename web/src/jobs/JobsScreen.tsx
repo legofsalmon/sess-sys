@@ -2,8 +2,10 @@ import {
   crewFill,
   KIND_LABELS,
   kindOf,
+  addDays,
   newId,
   PHASE_NAMES,
+  phaseNames,
   PROJECT_KINDS,
   PROJECT_STATUSES,
   STATUS_LABELS,
@@ -26,6 +28,7 @@ import { client } from '../sync.ts'
 import { useToday, useView, useWide } from '../view.ts'
 import { Beside, Choices, clientNamed, JobStatusPill, Top, useHash, venueNamed } from './common.tsx'
 import { ImportScreen } from './ImportScreen.tsx'
+import { TidyNudge, TidyScreen } from './TidyScreen.tsx'
 import { JobScreen } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
 import { MoneyScreen, PricesScreen } from './Money.tsx'
@@ -48,7 +51,8 @@ import { JOBS } from '../Up.tsx'
  * and venues have a list each (#jobs/clients, #jobs/venues, ADR 0041) and
  * a page each with its documents (#jobs/venues/<id>, ADR 0032), each job's
  * quote is on #jobs/<id>/quote and money on #jobs/money (ADR 0042), jobs
- * already on Google Calendar can be brought in (#jobs/import, ADR 0011), and
+ * already on Google Calendar can be brought in (#jobs/import, ADR 0011) and
+ * what came in tidied up (#jobs/tidy, ADR 0050), and
  * the kit their notes list turned into kit lines, a job at a time
  * (#jobs/<id>/notes-kit) or a season at a time (#jobs/notes-kit, ADR 0043).
  * Everything works with no signal and syncs later, like the rest of the app.
@@ -72,6 +76,7 @@ export function JobsScreen() {
   const wide = useWide()
   if (hash === '#jobs/plan' || hash.startsWith('#jobs/plan/')) return <PlanScreen view={view} hash={hash} />
   if (hash === '#jobs/import') return <ImportScreen view={view} />
+  if (hash === '#jobs/tidy') return <TidyScreen view={view} />
   if (hash === '#jobs/clients') return <ClientsScreen view={view} />
   if (hash === '#jobs/venues') return <VenuesScreen view={view} />
   if (hash === '#jobs/money') return <MoneyScreen view={view} />
@@ -126,6 +131,7 @@ function JobsRest({ view }: { view: View }) {
   const mayAdd = useAccess().can('jobs')
   return (
     <>
+      <TidyNudge view={view} />
       <NotesKitNudge view={view} />
       {mayAdd && (
         <section className="card">
@@ -232,18 +238,24 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
   )
 }
 
+/** A job in the next fortnight with neither is worth a prompt; on every other row the empty line is noise (audit of 16 October, finding 8). */
+const PROMPT_DAYS = 14
+
 export function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitLineView[] | undefined; current: boolean }) {
   const crew = crewFill(job.calls)
   const short = kitShort(kit)
+  const today = useToday()
+  const where = [job.client?.name, job.venue?.name].filter(Boolean).join(' · ')
+  const soon = !!job.span && job.span.end >= today && job.span.start <= addDays(today, PROMPT_DAYS)
   return (
     <a className="job-row" href={`#jobs/${job.id}`} aria-current={current ? 'page' : undefined}>
       <div>
         <b>{job.name}</b>
-        <p>{[job.client?.name, job.venue?.name].filter(Boolean).join(' · ') || 'No client or venue yet'}</p>
+        {(where || soon) && <p>{where || 'No client or venue yet'}</p>}
         <p>
           {kindOf(job) !== 'gig' && `${KIND_LABELS[kindOf(job)]} · `}
           {job.span ? spanLabel(job.span) : 'No dates yet'}
-          {job.phases.length > 0 && ` · ${job.phases.map((p) => p.name).join(', ')}`}
+          {job.phases.length > 0 && ` · ${phaseNames(job.phases)}`}
         </p>
       </div>
       <div className="side">

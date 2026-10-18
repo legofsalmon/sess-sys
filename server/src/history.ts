@@ -33,6 +33,7 @@ import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUM
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
 import { OWN_CALENDAR_ACTIONS } from '@sh/shared'
+import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
@@ -253,6 +254,8 @@ const REFERENCES = [
   // Vans and drivers (ADR 0047).
   'vehicleId',
   'driverId',
+  // Jobs made one (ADR 0050): a list of them.
+  'from',
 ] as const
 
 /**
@@ -279,7 +282,7 @@ async function itemsAsLeft(q: Queryable, rows: Row[]): Promise<Map<string, Data>
 async function lookup(q: Queryable, rows: Row[]): Promise<Look> {
   const known = new Map<string, Data>()
   const ids = (sources: Data[]) =>
-    [...new Set(sources.flatMap((s) => REFERENCES.map((k) => s[k]).filter((v): v is string => typeof v === 'string')))]
+    [...new Set(sources.flatMap((s) => REFERENCES.flatMap((k) => (Array.isArray(s[k]) ? s[k] : [s[k]])).filter((v): v is string => typeof v === 'string')))]
 
   let wanted = ids(rows.map((r) => r.args ?? {}))
   for (let round = 0; round < 2 && wanted.length > 0; round++) {
@@ -523,6 +526,12 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const p = look('phase', a.id)
       return p ? `Removed ${text(p.name, 'a phase')} from ${job(p.projectId)}` : 'Removed a phase'
     }
+    case 'project.merge': {
+      const others = Array.isArray(a.from) ? a.from : []
+      const names = others.slice(0, 5).map(job)
+      if (others.length > 5) names.push(`${others.length - 5} more`)
+      return `Made ${inWords(names.length ? names : ['other jobs'])} part of ${text(a.name, 'a job')}`
+    }
     case 'calendar.connect':
       return `Connected Google Calendar as ${text(a.account, 'a Google account')}`
     case 'calendar.use':
@@ -559,7 +568,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
         count(a.people, 'new person', 'new people'),
         count(a.venues, 'new venue', 'new venues'),
       ])
-      return `Brought in ${what.length ? inWords(what) : 'jobs'} from ${text(a.calendar, 'a calendar')} on Google Calendar${details.length ? `: ${inWords(details)}` : ''}`
+      const from = typeof a.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.from) ? `, from ${new Date(`${a.from}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}` : ''
+      const left = Array.isArray(a.leftOut)
+        ? a.leftOut.flatMap((l: Data) => (typeof l?.count === 'number' && l.count > 0 && !['inApp', 'before'].includes(l.reason as string) && LEFT_OUT_REASONS.includes(l.reason as LeftOutReason) ? [leftOutLabel({ reason: l.reason as LeftOutReason, count: l.count })] : []))
+        : []
+      return `Brought in ${what.length ? inWords(what) : 'jobs'} from ${text(a.calendar, 'a calendar')} on Google Calendar${from}${details.length ? `: ${inWords(details)}` : ''}${left.length ? `. Left out: ${inWords(left)}` : ''}`
     }
     case 'calendar.takeBack': {
       const count = (v: unknown, one: string, many: string) => (typeof v === 'number' && v > 0 ? `${v.toLocaleString('en-IE')} ${v === 1 ? one : many}` : undefined)

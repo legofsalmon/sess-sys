@@ -42,6 +42,7 @@ import {
   type TellContext,
   type TellEvent,
   type View,
+  namedFromAddress,
 } from '@sh/shared'
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
@@ -535,6 +536,7 @@ export function CrewScreen() {
       {page === 'people' && (
         <section className="card" aria-label="People">
           <Heading icon="people">People</Heading>
+          <NamedFromAddress view={view} />
           <Refusal error={roster.error} />
           {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
           <div aria-live="polite">
@@ -740,9 +742,7 @@ export function CallCard({
           ? 'Cancelled'
           : filled
             ? 'Filled'
-            : call.days.length > 1
-              ? `${call.days.filter((d) => call.heldByDay[d]! >= call.needed).length}/${call.days.length} days filled`
-              : `${call.heldByDay[call.days[0]!]}/${call.needed}`}
+            : heldLabel(call)}
       </StatusPill>
       {/* Lines that need acting on stay out at rest (audit finding 16): anyone short of a certificate it needs, and anyone running late (ADR 0028). */}
       {certificateWarnings(call, today).map((w) => (
@@ -1718,4 +1718,32 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
       )}
     </form>
   )
+}
+
+/** A quiet line while anyone brought in from the calendars is still named from their address (audit of 16 October, finding 7). */
+function NamedFromAddress({ view }: { view: View }) {
+  const mayCrew = useAccess().can('crew')
+  const n = view.crew.people.filter(namedFromAddress).length
+  if (!mayCrew || n === 0) return null
+  return (
+    <p className="hint">
+      {n === 1 ? '1 person is' : `${n.toLocaleString('en-IE')} people are`} still named from their email address.{' '}
+      <a href="#jobs/tidy">Give them their names</a>
+    </p>
+  )
+}
+
+/**
+ * How many are held against how many are needed (audit of 18 October,
+ * finding 20): "25 of 40, both days", "3 of 6", or "20 to 25 of 40 a day"
+ * when the days differ, rather than "0/2 days filled" for a call most of the
+ * way there.
+ */
+export function heldLabel(call: Pick<CallView, 'days' | 'heldByDay' | 'needed'>): string {
+  const held = call.days.map((d) => call.heldByDay[d] ?? 0)
+  const least = Math.min(...held)
+  const most = Math.max(...held)
+  if (held.length <= 1) return `${least} of ${call.needed}`
+  if (least !== most) return `${least} to ${most} of ${call.needed} a day`
+  return `${least} of ${call.needed}, ${held.length === 2 ? 'both days' : `all ${held.length} days`}`
 }

@@ -76,6 +76,9 @@ export const KIND_LABELS: Record<ProjectKind, string> = {
   meeting: 'Meeting',
 }
 
+/** The phase a day of each kind of job is when nothing says which (ADR 0037): a gig's is a Show. */
+export const KIND_PHASE: Record<ProjectKind, string> = { gig: 'Show', hire: 'Hire', errand: 'Errand', meeting: 'Meeting' }
+
 /** A job's kind, a gig when it doesn't say. */
 export const kindOf = (p: { kind?: ProjectKind }): ProjectKind => p.kind ?? 'gig'
 
@@ -210,6 +213,17 @@ export const jobCommandSchemas = {
     .refine(...phaseNotTooLong),
   /** Refused while the phase has crew; cancel them first. */
   'phase.remove': z.object({ id }),
+  /**
+   * Several jobs made one (ADR 0050), for a job a calendar brought in as
+   * several ("EP - LX", "EP - Audio"): the others' phases, crew, kit, vans,
+   * faults and movements become this job's, each phase named for what its
+   * job's name said ("LX", "Audio"), and the others are gone. Refused when
+   * jobs made in the app and jobs brought in are mixed, or more than one
+   * has a quote.
+   */
+  'project.merge': z
+    .object({ id, from: z.array(id).min(1, 'Pick at least one job to join it.').max(100, 'Up to 100 jobs at a time, please.'), name: project.shape.name })
+    .refine((m) => !m.from.includes(m.id) && new Set(m.from).size === m.from.length, { message: 'Each job can be joined once.' }),
 } as const
 
 /** "The Heritage, Killenard": the name and the first line of the address, for crew calls and the calendar. */
@@ -246,6 +260,17 @@ export function jobSpan(phases: readonly Pick<Phase, 'start' | 'end'>[]): { star
 /** "Fri 3 Oct", or "Fri 3 Oct to Sun 5 Oct". */
 export function spanLabel(s: { start: string; end: string }): string {
   return s.start === s.end ? dayLabel(s.start) : `${dayLabel(s.start)} to ${dayLabel(s.end)}`
+}
+
+/**
+ * A job's phases by name, a name used more than once said once with how
+ * often (audit of 16 October, finding 9): "Build, Show 3 times, Load out"
+ * for a residency rather than "Show, Show, Show".
+ */
+export function phaseNames(phases: readonly Pick<Phase, 'name'>[]): string {
+  const counts = new Map<string, number>()
+  for (const p of phases) counts.set(p.name, (counts.get(p.name) ?? 0) + 1)
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} ${n} times` : name)).join(', ')
 }
 
 /** Phases in the order they happen; phases starting the same day keep the order they were added in. */
