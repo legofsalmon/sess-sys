@@ -32,7 +32,7 @@ down.
    | **Director** | Everything, and what only a director does: roles, who approves time off, erasing a person on request, made-up data and starting fresh |
    | **Office and production** | Jobs, clients and venues; crew and their bookings; kit on jobs; stock and the warehouse; settings (office details, Google Calendar, bringing lists in, backups now, downloading everything) |
    | **Head of department** | Crew and their bookings, kit on jobs, stock and the warehouse. Not jobs themselves, nor settings |
-   | ~~**Warehouse**~~ | Stock and the warehouse (counts, faults, tests, labels, places, scanning out and in), and kit on jobs. Replaced by **Freelancer** (reporting a fault) in [ADR 0050](0050-freelancer-in-place-of-warehouse.md); holders became heads of department |
+   | ~~**Warehouse**~~ | Stock and the warehouse (counts, faults, tests, labels, places, scanning out and in), and kit on jobs. Replaced by **Freelancer** (reporting a fault) in [ADR 0051](0051-freelancer-in-place-of-warehouse.md); holders became heads of department |
    | **Staff crew** | Their own leave and days in lieu, and reporting a fault |
 
    Everyone can also report a fault and ask for their own leave. Deciding

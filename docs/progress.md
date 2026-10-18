@@ -3,12 +3,12 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
-## 18 October 2026, evening: Freelancer in the list of roles
+## 18 October 2026, late: Freelancer in the list of roles
 
 **Done**
 
 - Warehouse is out of the staff role list and Freelancer is in, on Colly's
-  ask, in [Decision 0050](adr/0050-freelancer-in-place-of-warehouse.md): a
+  ask, in [Decision 0051](adr/0051-freelancer-in-place-of-warehouse.md): a
   freelancer signed in can look and report a fault, reads only their own
   rate and link, and asks for no leave; their offers, timesheets and days
   off still go through their private link. Anyone on the Crew tab as a
@@ -16,6 +16,25 @@ waiting on someone.
   of department, so keeps the stock and kit. The demo's Warehouse persona
   stays, held to a head's role.
 - Checked: typecheck, 802 unit tests, the two role browser tests.
+## 18 October 2026, night: long lists drawn in a window
+
+**Done**
+
+- Jobs' list and Crew's calls draw only the rows near the screen, the rest
+  standing in at their heights, in [Decision 0050](adr/0050-long-lists-drawn-in-a-window.md)
+  (Colly's "faster long lists"). With 900 extra jobs on a slowed phone the
+  Jobs tab went from 254–587 ms to 80–242 ms and Crew from 730–959 ms to
+  132–192 ms. Back still finds the row a job was opened from. Filled calls
+  are built only once unfolded. Find in page now reaches only the rows
+  near the screen; the list's own search covers the rest.
+- Checked: typecheck, the full browser suite (113 tests; the long-list test
+  three times more), scrolling end to end on a phone and in the laptop's
+  column with no blank rows.
+
+**Waiting on**
+
+- Colly: the Railway start command, the backup variables and the Sentry key,
+  as before.
 
 ## 18 October 2026, evening: the audit's P1 fixes
 

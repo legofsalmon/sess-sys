@@ -64,10 +64,10 @@ test('a new screen opens at its top, and Back finds the place the last one was l
   await expect.poll(() => scrollY(page)).toBe(0)
 })
 
-test('a long list draws its rows as they near the screen, and Back finds a place deep in it', async ({ browser, request }) => {
-  // Proves (audit finding 11): Jobs' rows are left undrawn until they near the screen, yet every one is still in the page for a
-  // screen reader, and Back from a job opened deep in the list puts its row back where it was, though the rows above it stand in
-  // at a guessed height when the list is drawn again. Some names wrap onto a second line, so the guess is wrong for those.
+test('a long list draws only the rows near the screen, and Back finds a place deep in it', async ({ browser, request }) => {
+  // Proves (audit finding 11, ADR 0051): Jobs builds only the rows near the screen, each saying where it is in the whole list for a
+  // screen reader, and builds the next ones as the page is scrolled; Back from a job opened deep in the list puts its row back where
+  // it was. Some names wrap onto a second line, so the guessed height is wrong for those until they have been drawn.
   const mutations = Array.from({ length: 160 }, (_, i) => {
     const day = new Date(Date.UTC(2031, 0, 1 + i)).toISOString().slice(0, 10)
     const name = i % 5 === 0 ? `Long list job ${i} with a name long enough to wrap onto a second line on a phone` : `Long list job ${i}`
@@ -83,13 +83,18 @@ test('a long list draws its rows as they near the screen, and Back finds a place
   await page.goto('/#jobs')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   const list = page.getByRole('region', { name: 'Jobs' }).getByRole('list')
-  await expect(list.getByRole('link', { name: /Long list job 159\b/ })).toHaveCount(1)
-  expect(await list.locator('li').first().evaluate((li) => getComputedStyle(li).contentVisibility)).toBe('auto')
+  await expect(list.getByRole('link').first()).toBeVisible()
+  await expect(list.getByRole('link', { name: /Long list job 159\b/ })).toHaveCount(0)
+  const total = Number(await list.locator('li').first().getAttribute('aria-setsize'))
+  expect(total).toBeGreaterThanOrEqual(160)
+  expect(await list.locator('li').count()).toBeLessThan(60)
+  await expect(list.locator('li').first()).toHaveAttribute('aria-posinset', '1')
 
   // Scrolled by hand to a row far down, which is opened from where it is on the screen.
   const row = list.getByRole('link', { name: /Long list job 140\b/ })
   for (let i = 0; i < 100; i++) {
-    const at = await row.evaluate((a) => a.getBoundingClientRect().top)
+    // Not built until the page comes near it.
+    const at = (await row.count()) ? await row.evaluate((a) => a.getBoundingClientRect().top) : Infinity
     if (at < 500) break
     await page.mouse.wheel(0, Math.min(600, at - 400))
     await drawn(page)
@@ -144,7 +149,7 @@ test('staff crew are offered nothing on a job or on Crew they could only be refu
 })
 
 test('the warehouse can add kit to a job, but not change the job itself', async ({ browser }) => {
-  // Proves: the warehouse, held to a head of department's role since ADR 0050, are offered Add kit and the kit lines' Change, and nothing of the job's own.
+  // Proves: the warehouse, held to a head of department's role since ADR 0051, are offered Add kit and the kit lines' Change, and nothing of the job's own.
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await as(page, 'head', /^Warehouse/)
   await openJob(page, 'Harbour Lights Festival')
@@ -168,7 +173,7 @@ test('Crew needed lists only the calls short of people, with the filled ones fol
   await expect(summary).toHaveText(/^Show \d+ filled calls?$/)
   const n = Number((await summary.textContent())!.match(/\d+/)![0])
   // At rest: the calls short of people, and a filled one only with something on it to act on today; the folded ones are all filled.
-  const inView = needed.locator(':scope > .call-group article.call')
+  const inView = needed.locator(':scope > .call-groups > .call-group article.call')
   const onlyShortOrToActOn = async (shortOnes: boolean) => {
     for (const call of await inView.all()) {
       const filled = /^Filled/.test((await call.locator(':scope > .pill').textContent()) ?? '')
@@ -179,10 +184,11 @@ test('Crew needed lists only the calls short of people, with the filled ones fol
   }
   expect(await inView.count()).toBeGreaterThan(0)
   await onlyShortOrToActOn(true)
-  await expect(fold.locator('article.call')).toHaveCount(n)
-  await expect(fold.locator('article.call').first()).toBeHidden()
+  // Folded, the filled calls aren't built at all; opened, they are, in a window like the rest (ADR 0051).
+  await expect(fold.locator('article.call')).toHaveCount(0)
   await summary.click()
   await expect(fold.locator('article.call').first()).toBeVisible()
+  expect(await fold.locator('article.call').count()).toBeLessThanOrEqual(n)
   for (const t of await fold.locator('.pill').allTextContents()) expect(t).toMatch(/^Filled/)
 
   // A department whose calls are all filled says there are none short, and still has them a tap away.

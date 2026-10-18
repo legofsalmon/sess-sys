@@ -106,7 +106,7 @@ async function company() {
 }
 
 describe('roles', () => {
-  it('make whoever was the warehouse a head of department, who keeps all the warehouse could change (ADR 0050)', async () => {
+  it('make whoever was the warehouse a head of department, who keeps all the warehouse could change (ADR 0051)', async () => {
     const db = await pgliteDb()
     cleanup.push(() => db.close())
     await migrateAll(db)
@@ -143,7 +143,7 @@ describe('roles', () => {
       'Only the office, heads of department and directors can change stock and the warehouse. Your role is Staff crew; a director can change it on your person on the Crew tab.'
     )
 
-    // Made a freelancer, he can only report a fault: not stock, not leave (ADR 0050).
+    // Made a freelancer, he can only report a fault: not stock, not leave (ADR 0051).
     expect((await send(app, c, 'person.role', { id: 'sean', role: 'freelancer' })).status).toBe('applied')
     expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'freelancer', rolesOn: true })
     expect((await send(app, s, 'place.upsert', bay('a2'))).reason?.code).toBe('forbidden')
@@ -298,7 +298,7 @@ describe('the demo, seen as someone', () => {
     const none = await see(app, as, null)
     expect(cookie(none, 'sh_preview')!.maxAge).toBe(0)
     expect((await see(app, cookies, 'janitor')).json()).toEqual({ role: null })
-    // Warehouse was a role until ADR 0050: a browser still saying so is held to nothing it chose.
+    // Warehouse was a role until ADR 0051: a browser still saying so is held to nothing it chose.
     expect((await see(app, cookies, 'warehouse')).json()).toEqual({ role: null })
   })
 

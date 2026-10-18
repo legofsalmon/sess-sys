@@ -396,7 +396,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       // An erased person's level went with the rest of their details (ADR 0027).
       return `Moved ${person(a.id)} to ${typeof a.level === 'number' ? levelLabel(a.level) : 'another level'}`
     case 'person.role':
-      // Warehouse was a role until ADR 0050, and the history still says so.
+      // Warehouse was a role until ADR 0051, and the history still says so.
       if (a.role === 'warehouse') return `Gave ${person(a.id)} the role Warehouse`
       return typeof a.role === 'string' && a.role in ROLE_LABELS ? `Gave ${person(a.id)} the role ${ROLE_LABELS[a.role as Role]}` : `Changed ${person(a.id)}'s role`
     case 'person.newLink':

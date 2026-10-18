@@ -1,4 +1,4 @@
-# ADR 0050: Freelancer in place of Warehouse in the list of roles
+# ADR 0051: Freelancer in place of Warehouse in the list of roles
 
 - **Status:** accepted
 - **Date:** 18 October 2026

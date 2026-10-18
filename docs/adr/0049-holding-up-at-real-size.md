@@ -115,6 +115,8 @@ screen and its height there, and Back puts that row back (navigation.md's
 "the same row"). On 900 jobs, CPU slowed four times, phone size: the Jobs
 tab 855 ms to 462 ms, Crew 2.8 s to 1.0 s. iOS Safari before 18 ignores
 the property and draws everything, as before.
+[ADR 0050](0050-long-lists-drawn-in-a-window.md) went on to draw only
+the rows near the screen, on Colly's ask.
 
 ## Consequences
 

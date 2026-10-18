@@ -17,7 +17,7 @@ import type { CommandName } from './commands.ts'
  */
 
 /**
- * The freelancer took the warehouse's place in the list (ADR 0050): the
+ * The freelancer took the warehouse's place in the list (ADR 0051): the
  * warehouse is a department, run by its head, and a freelancer is who the
  * company books most. A freelancer's own offers, bookings, timesheets and
  * days off go through their private link; signed in, they can look and
@@ -230,7 +230,7 @@ export function personForEmail<P extends RolePerson>(people: readonly P[], email
 /**
  * The role a signed-in account acts with. While roles are off, everyone is
  * treated as a director. An account matched to a freelancer is a freelancer
- * (ADR 0050); one matched to nobody is staff crew: it can look, report a
+ * (ADR 0051); one matched to nobody is staff crew: it can look, report a
  * fault, and nothing that needs a person of its own.
  */
 export function roleForEmail(people: readonly RolePerson[], email: string): { role: Role; on: boolean; personId?: string } {

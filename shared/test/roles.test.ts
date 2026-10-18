@@ -14,7 +14,7 @@ describe('roles', () => {
     expect(ROLE_CAN.crew).toEqual(['fault', 'leave'])
     expect(roleMayRun('head', 'move.record')).toBe(true)
     expect(roleMayRun('head', 'project.update')).toBe(false)
-    // A freelancer signed in reports a fault; their own offers, timesheets and days off go through their link (ADR 0050).
+    // A freelancer signed in reports a fault; their own offers, timesheets and days off go through their link (ADR 0051).
     expect(ROLE_CAN.freelancer).toEqual(['fault'])
     expect(roleMayRun('freelancer', 'leave.request')).toBe(false)
     expect(roleMayRun('freelancer', 'move.record')).toBe(false)

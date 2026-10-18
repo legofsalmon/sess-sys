@@ -9,9 +9,10 @@
  * too short to hold it. Kept for the tab's life in session storage, so a
  * reload keeps its place too.
  *
- * A long list's rows (marked `data-place`) are drawn only as they near the
- * screen, and until then stand in at about their height, so the same
- * distance down a newly drawn list may be a different row. A place on such
+ * A long list's rows (marked `data-place`) are drawn only near the screen,
+ * the rest standing in at the height they were last drawn at or a guess
+ * (windowed.ts, ADR 0050), so the same distance down a newly drawn list may
+ * be a different row. A place on such
  * a list is kept by the row in the middle of the screen as well, and Back
  * puts that row back where it was on the screen.
  */
