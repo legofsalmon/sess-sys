@@ -45,7 +45,7 @@ import {
 } from '@sh/shared'
 import { blocks, certificateGaps, certificateRefusal, certificateUnknowns, gapMarks, needsLabel, needsOf, type LateView } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
-import { ROLE_LABELS } from '@sh/shared'
+import { emailInUseRefusal, emailTakenBy, holdsARole, ROLE_LABELS, sameEmail, whoSignsInRefusal } from '@sh/shared'
 import { useId, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -1450,8 +1450,12 @@ function certificatesOf(fields: CertFields): Certificates {
 }
 
 export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial?: PersonView; submitLabel: string; onSubmit: (fields: PersonFields) => Promise<unknown>; onDone?: () => void }) {
+  const access = useAccess()
   // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
-  const mayApprove = useAccess().can('company')
+  const mayApprove = access.can('company')
+  // The email and type of someone who holds a role are how they sign in as it, so only the office and directors change them (audit finding 12).
+  const whoFixed = initial && initial.role && holdsARole(initial) && !access.can('settings') ? initial.role : null
+  const people = useView().crew.people
   // A rate this device isn't sent (ADR 0046) isn't in the form, and the server keeps the one it has.
   const seesRates = useSeesRates() && !initial?.rateHidden
   const blank = {
@@ -1504,12 +1508,16 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     const rate = parseEuro(f.rate)
     if (rate.reason !== undefined) return refuse(rate.reason)
     const company = f.companyName.trim() || f.vatNumber.trim() || f.croNumber.trim()
+    const email = f.email.trim() || null
+    // Each email is one person's, as the server checks it (audit finding 12).
+    const other = sameEmail(email, initial?.email) ? undefined : emailTakenBy(people, initial?.id ?? '', email)
+    if (other) return refuse(emailInUseRefusal(other.name))
     void run(() =>
       onSubmit({
         name: f.name.trim(),
         kind: f.kind,
         phone: f.phone.trim() || null,
-        email: f.email.trim() || null,
+        email,
         skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
         ...(seesRates ? { dayRateCents: rate.cents } : {}),
         notes: f.notes.trim(),
@@ -1536,7 +1544,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
         Mobile <input type="tel" value={f.phone} onChange={set('phone')} placeholder="+353 87…" />
       </label>
       <label>
-        Email <input type="email" value={f.email} onChange={set('email')} />
+        Email <input type="email" value={f.email} onChange={set('email')} readOnly={!!whoFixed} />
       </label>
       <label>
         Skills <input value={f.skills} onChange={set('skills')} placeholder="audio, rigger" />
@@ -1548,11 +1556,12 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
       )}
       <label>
         Type
-        <select value={f.kind} onChange={set('kind')}>
+        <select value={f.kind} onChange={set('kind')} disabled={!!whoFixed}>
           <option value="freelancer">Freelancer</option>
           <option value="staff">Staff</option>
         </select>
       </label>
+      {whoFixed && <p className="hint wide">{whoSignsInRefusal(initial!.name, whoFixed)}</p>}
       {f.kind === 'staff' && mayApprove && (
         <label className="wide tick">
           <input type="checkbox" checked={f.approvesLeave} onChange={(e) => setF({ ...f, approvesLeave: e.target.checked })} />

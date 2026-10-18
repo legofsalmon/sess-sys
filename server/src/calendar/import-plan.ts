@@ -682,15 +682,16 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
   }
   const venueKey = (v: VenueRef | null) => (v === null ? '' : 'id' in v ? `id:${v.id}` : `new:${v.key}`)
 
-  // Guests: people in the app, or people to add. A company's mailbox is never crew.
-  const byEmail = new Map(app.people.filter((p) => p.email).map((p) => [p.email!.toLowerCase(), p]))
+  // Guests: people in the app, or people to add. A company's mailbox is never crew. Matched as an account is, trimmed,
+  // so nobody here is added again with their own email, which the server refuses (audit finding 12).
+  const byEmail = new Map(app.people.filter((p) => p.email?.trim()).map((p) => [p.email!.trim().toLowerCase(), p]))
   const byName = new Map(app.people.filter((p) => !p.email).map((p) => [nameKey(p.name), p]))
   const byId = new Map(app.people.map((p) => [p.id, p]))
   const own = account.toLowerCase()
   const domain = own.split('@')[1] ?? ''
   const newPeople = new Map<string, NewPerson & { jobKeys: Set<string>; gigs: Set<string> }>()
   const personOf = (g: SourceGuest, jobKey: string, gig: boolean): PersonRef | undefined => {
-    const email = g.email.toLowerCase()
+    const email = g.email.trim().toLowerCase()
     if (g.notCrew || email === own || !email.includes('@') || isMailbox(email)) return undefined
     const known = byEmail.get(email) ?? (g.name ? byName.get(nameKey(g.name)) : undefined)
     if (known) return { id: known.id }

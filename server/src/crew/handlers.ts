@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, holdsARole, mayChangeWhoSignsIn, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { stopOwnCalendar } from './own-calendars.ts'
@@ -262,6 +262,29 @@ async function openCall(ctx: Ctx, callId: string) {
   return call
 }
 
+/**
+ * A person's email and kind decide which account is them, and so its role
+ * (audit finding 12). An email someone else here already has is refused, so
+ * no account can find the wrong person; and those of someone who holds a
+ * role are changed only by a role that changes settings, so a head can't
+ * move a director's account, or take one.
+ */
+async function checkWhoSignsIn(ctx: Ctx, was: Person | undefined, next: { id: string; name: string; email: string | null; kind: Person['kind'] }) {
+  const emailChanged = !sameEmail(was?.email, next.email)
+  if (was && (emailChanged || was.kind !== next.kind) && (ctx.via === 'link' || !mayChangeWhoSignsIn(ctx.role))) {
+    // The role as kept, which a freelancer who held one still has, and would have again as staff.
+    const { rows } = await ctx.tx.query<{ role: Role | null }>('SELECT role FROM people WHERE id = $1', [was.id])
+    const held = rows[0]?.role ?? null
+    if (holdsARole({ role: held })) throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(was.name, held!, ctx.role) })
+  }
+  if (!emailChanged || !next.email?.trim()) return
+  const { rows } = await ctx.tx.query<{ name: string }>(
+    'SELECT name FROM people WHERE id <> $1 AND NOT archived AND lower(trim(email)) = lower(trim($2)) ORDER BY id LIMIT 1',
+    [next.id, next.email]
+  )
+  if (rows[0]) throw new Refused({ code: 'conflict', message: emailInUseRefusal(rows[0].name) })
+}
+
 export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'person.upsert'(ctx, a) {
     // Only staff approve time off (ADR 0024); an edit from a version of the app that doesn't know the flag keeps it as it is,
@@ -271,6 +294,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     // Who approves time off is a permission, so once roles are on only a director sets it (ADR 0034).
     if (ctx.role && !roleCan(ctx.role, 'company') && approvesLeave !== (was?.approvesLeave ?? false))
       throw new Refused({ code: 'forbidden', message: `Only directors can say who approves time off. Your role is ${ROLE_LABELS[ctx.role]}.` })
+    await checkWhoSignsIn(ctx, was, a)
     // A freelancer has no role, so someone made a freelancer loses theirs; the last director can't be.
     if (a.kind !== 'staff' && was?.role === 'director') await keepADirector(ctx, a.id)
     const department = a.department !== undefined ? a.department : (was?.department ?? null)
@@ -366,6 +390,11 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'person.contact'(ctx, a) {
     const person = await getPerson(ctx.tx, a.id)
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (a.email !== undefined && a.email !== person.email) {
+      // Their email is how an account finds them (audit finding 12), so a link, which anyone holding it can use, can't change it.
+      if (ctx.via === 'link') throw new Refused({ code: 'forbidden', message: "Your email can't be changed here. Ask the office to change it." })
+      await checkWhoSignsIn(ctx, person, { id: person.id, name: person.name, email: a.email, kind: person.kind })
+    }
     const fields: [string, string | null][] = []
     if (a.email !== undefined) fields.push(['email', a.email])
     if (a.phone !== undefined) fields.push(['phone', a.phone])

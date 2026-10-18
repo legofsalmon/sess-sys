@@ -962,7 +962,7 @@ describe('correcting people (audit finding 7)', () => {
     expect((await entity<Person>(app, 'person', aoife.id)).archived).toBe(true)
   })
 
-  it('lets a freelancer fix their own phone and email on their link, and tells the history which changed, never what', async () => {
+  it('lets a freelancer fix their own phone on their link, not their email, and tells the history which changed, never what', async () => {
     const { app, db } = await signedIn()
     const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
     await colly.send('person.upsert', { id: 'p1', name: 'Aoife Byrne', kind: 'freelancer', email: 'aoife@example.com', phone: '+353871234567', skills: [], dayRateCents: null, notes: '' })
@@ -973,7 +973,9 @@ describe('correcting people (audit finding 7)', () => {
     let page = (await app.inject({ method: 'GET', url: `/f/${aoife.linkToken}` })).body
     expect(page).toContain('<details id="details">')
     expect(page).toContain('value="+353871234567"')
-    expect(page).toContain('value="aoife@example.com"')
+    // Their email is shown, not offered: it's how an account finds a person, so only the office changes it (audit finding 12).
+    expect(page).toContain('with the email <b>aoife@example.com</b>')
+    expect(page).not.toContain('name="email"')
 
     // A new number, the email as it was: only the number is sent, and named.
     const saved = await post(app, details, { phone: '+353 87 999 8888', email: 'aoife@example.com' })
@@ -992,24 +994,27 @@ describe('correcting people (audit finding 7)', () => {
     expect(history.entries[0]).toMatchObject({ who: { kind: 'link', name: 'Aoife Byrne' }, command: 'person.contact', what: 'Aoife Byrne changed their phone number' })
     expect(JSON.stringify(history.entries[0])).not.toContain('999 8888')
 
-    // Both at once; then nothing, which sends nothing.
-    expect(await post(app, details, { phone: '', email: 'aoife.byrne@example.com' })).toMatchObject({ ok: true })
-    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
-    expect((await colly.history()).entries[0]?.what).toBe('Aoife Byrne changed their email address and phone number')
-    expect(await post(app, details, { phone: '', email: 'aoife.byrne@example.com' })).toMatchObject({ ok: true, message: 'Nothing to change: those are the details we have.' })
-    expect((await colly.history()).entries).toHaveLength(3)
+    // An email from a page from before is refused in plain words, with the number typed beside it kept, and nothing changed.
+    const email = await post(app, details, { phone: '', email: 'aoife.byrne@example.com' })
+    expect(email).toMatchObject({ ok: false, message: "Your email can't be changed here. Ask the office to change it." })
+    expect(email.page).toContain('<details id="details" open>')
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353 87 999 8888', email: 'aoife@example.com' })
+    // A number alone; then nothing, which sends nothing.
+    expect(await post(app, details, { phone: '' })).toMatchObject({ ok: true })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife@example.com' })
+    expect(await post(app, details, { phone: '', email: 'aoife@example.com' })).toMatchObject({ ok: true, message: 'Nothing to change: those are the details we have.' })
+    expect((await colly.history()).entries.filter((e) => e.outcome !== 'turned-down')).toHaveLength(3)
     // A post with no fields at all, as a half-formed one would be, clears nothing.
     expect(await post(app, details, {})).toMatchObject({ ok: true, message: 'Nothing to change: those are the details we have.' })
-    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife@example.com' })
 
     // The same checks as the office's form, with the reason in the section.
-    const badPhone = await post(app, details, { phone: 'ring me', email: 'aoife.byrne@example.com' })
+    const badPhone = await post(app, details, { phone: 'ring me' })
     expect(badPhone).toMatchObject({ ok: false, message: 'Phone numbers need digits only, ideally starting with +353.' })
     // Drawn at once in the section, open, with what was typed still in it (rule 11).
     expect(badPhone.page).toContain('<details id="details" open>')
     expect(badPhone.page).toContain('value="ring me"')
-    expect(await post(app, details, { phone: '', email: 'not an address' })).toMatchObject({ ok: false, message: "That email address doesn't look right." })
-    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife.byrne@example.com' })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: null, email: 'aoife@example.com' })
 
     // The office can run it from the app too, in its own words. A change with nothing in it is turned down, not quietly applied.
     expect((await colly.send('person.contact', { id: 'p1', phone: '+353871234567' })).status).toBe('applied')
@@ -1017,7 +1022,7 @@ describe('correcting people (audit finding 7)', () => {
     expect(history.entries[0]).toMatchObject({ who: { kind: 'staff', name: 'Colly Hewson' }, what: "Changed Aoife Byrne's phone number" })
     expect(await colly.send('person.contact', { id: 'p1' })).toMatchObject({ status: 'rejected', reason: { code: 'invalid', message: 'Nothing to change.' } })
     expect((await colly.history()).entries[0]).toMatchObject({ command: 'person.contact', outcome: 'turned-down', reason: 'Nothing to change.' })
-    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353871234567', email: 'aoife.byrne@example.com' })
+    expect(await colly.record<Person>('person', 'p1')).toMatchObject({ phone: '+353871234567', email: 'aoife@example.com' })
   })
 })
 

@@ -324,8 +324,10 @@ function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']
 const rank = (t: Timesheet | undefined) => (!t ? 0 : t.status === 'sent' ? 1 : 2)
 
 /**
- * Their own email and phone, to fix themselves (audit finding 7). Folded
- * away until wanted, and open with the message after they save.
+ * Their own phone, to fix themselves (audit finding 7), and the email the
+ * office has, which only the office changes: it's how an account finds a
+ * person (audit finding 12). Folded away until wanted, and open with the
+ * message after they save.
  */
 function details(d: PageData): string {
   const mine = d.flash?.section === 'details'
@@ -336,11 +338,10 @@ function details(d: PageData): string {
       <summary><h2>Your details</h2></summary>
       ${mine && d.flash ? flash(d.flash) : ''}
       <form method="post" action="${d.base}/details#details">
-        <p class="small">You're down as <b>${h(d.person.name)}</b>. Ask the office to change your name; your number and email you can fix here.</p>
+        <p class="small">You're down as <b>${h(d.person.name)}</b>${d.person.email ? `, with the email <b>${h(d.person.email)}</b>` : ''}. Ask the office to change your name or email; your number you can fix here.</p>
         <label>Mobile <input type="tel" name="phone" value="${h(typed ? typed.get('phone') : (d.person.phone ?? ''))}" maxlength="40" placeholder="+353 87 123 4567" autocomplete="tel"></label>
-        <label>Email <input type="email" name="email" value="${h(typed ? typed.get('email') : (d.person.email ?? ''))}" maxlength="200" autocomplete="email"></label>
         <p class="small">Write your mobile with the country code, +353 for Ireland, so WhatsApp messages and texts reach you.</p>
-        <button>Save my number and email</button>
+        <button>Save my number</button>
       </form>
     </details>
   </section>`
