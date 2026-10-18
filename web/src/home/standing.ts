@@ -1,4 +1,4 @@
-import { answersToCheck, canApproveLeave, runningOut, type Department, type JobView, type PersonView, type View } from '@sh/shared'
+import { answersToCheck, canApproveLeave, departmentOf, runningOut, sameDepartment, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { calendarAnswersToSortOut } from '../crew/CrewScreen.tsx'
 
 /**
@@ -86,7 +86,10 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
     view.documents.toCheck.filter((d) => by.person(d.person)).length
   const late = view.late.toCheck.filter((n) => by.person(n.person)).length
   const fortnight = addDays(today, 14)
-  const crewNeeded = view.crew.calls.filter((c) => c.status === 'open' && c.end >= today && c.start <= fortnight && c.openDays.some((d) => d >= today)).length
+  // A call's own department (ADR 0046), so a head of department sees the calls their department fills.
+  const crewNeeded = view.crew.calls.filter(
+    (c) => c.status === 'open' && c.end >= today && c.start <= fortnight && c.openDays.some((d) => d >= today) && (!department || sameDepartment(departmentOf(c), department)),
+  ).length
   const timesheets = view.timesheets.toApprove.filter((r) => by.person(r.person)).length
   const leave = view.leave.queue.filter((q) => by.person(q.person)).length
   const certificates = runningOut(view.crew.people, view.documents.all, today).filter((r) => by.person(r.person)).length
@@ -98,6 +101,9 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
   const tests = view.inspections.attention.filter((d) => by.kit(d.asset.model?.department))
   const cantGo = tests.filter((d) => d.state !== 'soon').length
   const counts = view.counts.week.due.length
+  // A vehicle's checks run out or running out (ADR 0047); run out on one it needs on the road, it can't be booked.
+  const vehicleChecks = view.vehicles.reminders
+  const vehicleRanOut = vehicleChecks.some((r) => r.ranOut && r.kind !== 'service')
   const approver = canApproveLeave(me)
 
   const all: Tile[] = [
@@ -113,6 +119,7 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
     { key: 'faults', count: faults.length, label: faults.length === 1 ? 'fault open' : 'faults open', href: '#stock/repairs', bad: faults.some((f) => f.stops) },
     { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock/testing', bad: true },
     { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock/testing' },
+    { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut },
     { key: 'counts', count: counts, label: counts === 1 ? 'place to count this week' : 'places to count this week', href: '#stock/count' },
   ]
   return Object.fromEntries(all.map((t) => [t.key, t]))
@@ -120,9 +127,9 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
 
 /** Which counts each view of Home shows, in order: the first is what that person reaches for first. */
 export const TILES_FOR: Record<HomeFor, readonly string[]> = {
-  company: ['late', 'answers', 'crew-needed', 'kit-short', 'still-out', 'to-pick', 'faults', 'cant-go', 'timesheets', 'leave', 'certificates', 'counts'],
-  // Only what can be narrowed to a department: crew calls carry no department yet, and kit still out is the job's, not a department's.
-  department: ['late', 'answers', 'leave', 'timesheets', 'certificates', 'kit-short', 'faults', 'cant-go', 'tests-soon'],
-  warehouse: ['to-pick', 'still-out', 'kit-short', 'faults', 'cant-go', 'counts', 'tests-soon'],
+  company: ['late', 'answers', 'crew-needed', 'kit-short', 'still-out', 'to-pick', 'faults', 'cant-go', 'timesheets', 'leave', 'certificates', 'vehicles', 'counts'],
+  // Only what can be narrowed to a department: crew calls by their own department (ADR 0046); kit still out is the job's, not a department's.
+  department: ['late', 'answers', 'crew-needed', 'leave', 'timesheets', 'certificates', 'kit-short', 'faults', 'cant-go', 'tests-soon'],
+  warehouse: ['to-pick', 'still-out', 'kit-short', 'faults', 'cant-go', 'counts', 'tests-soon', 'vehicles'],
   me: ['leave'],
 }

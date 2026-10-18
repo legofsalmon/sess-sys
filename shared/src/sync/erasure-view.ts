@@ -98,7 +98,11 @@ function undecidedLeave(personId: string, leave: Pick<LeaveView, 'requests' | 'e
  * Why a person can't be erased yet, as the server will say it, or
  * undefined when they can. Only someone archived is offered it at all.
  */
-export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'archived'>, view: Pick<View, 'crew' | 'jobs' | 'timesheets' | 'leave' | 'calendar'>, today: string): string | undefined {
+export function eraseRefusal(
+  person: Pick<Person, 'id' | 'name' | 'email' | 'archived'>,
+  view: Pick<View, 'crew' | 'jobs' | 'timesheets' | 'leave' | 'calendar'> & { vehicles?: Pick<View['vehicles'], 'bookings'> },
+  today: string
+): string | undefined {
   if (!person.archived) return `${person.name} isn't archived. Archive them first, then erase their details.`
   // The earliest of several, as the server picks it, so both say the same job.
   const first = <T extends { start: string; id: string }>(a: T | undefined, b: T) => (!a || b.start < a.start || (b.start === a.start && b.id < a.id) ? b : a)
@@ -116,6 +120,11 @@ export function eraseRefusal(person: Pick<Person, 'id' | 'name' | 'email' | 'arc
   for (const j of view.jobs.jobs)
     for (const p of j.phases) if (p.contactId === person.id && p.end >= today) contact = first(contact, { start: p.start, id: p.id, job: `${j.name} (${p.name})` })
   if (contact) return `${person.name} is the contact on the day for ${contact.job}, which hasn't ended. Choose someone else first.`
+  // Driving a vehicle on a job going ahead or pencilled in (ADR 0047), as the server finds it.
+  let driving: { start: string; id: string; job: string } | undefined
+  for (const b of view.vehicles?.bookings ?? [])
+    if (b.driverId === person.id && b.end >= today && b.hold !== 'none') driving = first(driving, { start: b.start, id: b.id, job: `${b.vehicle?.name ?? 'a vehicle'} for ${b.job?.name ?? 'a job'}` })
+  if (driving) return `${person.name} is driving ${driving.job}, which hasn't ended. Choose another driver first.`
   const waiting = view.timesheets.toApprove.find((r) => r.offer.personId === person.id)
   if (waiting) return `${person.name} has a timesheet waiting on ${waiting.call.project}: approve it first, so their pay is on record.`
   const leave = undecidedLeave(person.id, view.leave)

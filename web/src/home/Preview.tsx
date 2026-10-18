@@ -34,8 +34,15 @@ export const PERSONAS: readonly Persona[] = [
 ]
 
 const KEY = 'sh.preview'
+/** Who the persona stands in for (ADR 0046): a member of staff, or a head's department, so the server sends what they would read. */
+const WHO_KEY = 'sh.preview.who'
+interface Who {
+  personId?: string
+  department?: string
+}
 const listeners = new Set<(key: string) => void>()
 let current = read()
+let who = readWho()
 
 function read(): string {
   try {
@@ -45,23 +52,36 @@ function read(): string {
   }
 }
 
-/** Tell the server which role to hold this browser to; with no signal the device still holds it (web/src/role.ts). */
+function readWho(): Who {
+  try {
+    const w = JSON.parse(localStorage.getItem(WHO_KEY) ?? '{}') as Who
+    return { ...(typeof w.personId === 'string' ? { personId: w.personId } : {}), ...(typeof w.department === 'string' ? { department: w.department } : {}) }
+  } catch {
+    return {}
+  }
+}
+
+const api = `${import.meta.env.VITE_API_BASE ?? ''}/api/auth/preview`
+
+/** Tell the server which role to hold this browser to, and who it stands in for; with no signal the device still holds the role (web/src/role.ts). */
 function tellServer(key: string) {
   const role = key && key !== 'freelancer' ? (key === 'staff' ? 'crew' : key) : null
-  void fetch(`${import.meta.env.VITE_API_BASE ?? ''}/api/auth/preview`, {
+  void fetch(api, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, ...(role ? who : {}) }),
     signal: AbortSignal.timeout(8_000),
   }).catch(() => undefined)
 }
 
-function set(key: string) {
+function set(key: string, as: Who = {}) {
   current = key
+  who = as
   tellServer(key)
   try {
     if (key) localStorage.setItem(KEY, key)
     else localStorage.removeItem(KEY)
+    localStorage.setItem(WHO_KEY, JSON.stringify(as))
   } catch {
     // Private browsing can refuse storage; the choice holds this visit.
   }
@@ -86,30 +106,30 @@ export function usePreview(): Persona | undefined {
 const first = (people: readonly PersonView[], fits: (p: PersonView) => boolean) =>
   people.filter((p) => !p.archived && fits(p)).sort((a, b) => a.name.localeCompare(b.name))[0]
 
-/** Where each persona starts, and as whom. */
-function start(view: View, key: string) {
+/** Where each persona starts, and as whom: who they stand in for goes to the server, so it sends what they'd read (ADR 0046). */
+function start(view: View, key: string): { to: string; as?: Who } {
   const people = view.crew.people
   const home = (s: Saved) => saveHomeFor(s)
   switch (key) {
     case 'director':
       home({ for: 'company' })
-      return '#home'
+      return { to: '#home' }
     case 'office':
       home({ for: 'company' })
-      return '#crew'
+      return { to: '#crew' }
     case 'head': {
       // The department with the most people in it, so there's the most to see.
       const counts = new Map<string, number>()
       for (const p of people) if (!p.archived && p.department) counts.set(p.department, (counts.get(p.department) ?? 0) + 1)
       const department = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0]
       home({ for: 'department', department })
-      return '#home'
+      return { to: '#home', ...(department ? { as: { department } } : {}) }
     }
     case 'warehouse': {
       home({ for: 'warehouse' })
       const hand = first(people, (p) => p.kind === 'staff' && p.skills.some((s) => /warehouse/i.test(s)))
       if (hand) chooseMe(hand.id)
-      return '#home'
+      return { to: '#home', ...(hand ? { as: { personId: hand.id } } : {}) }
     }
     case 'staff': {
       home({ for: 'me' })
@@ -117,38 +137,44 @@ function start(view: View, key: string) {
       const booked = new Set(view.crew.calls.flatMap((c) => c.offers.filter((o) => o.status === 'confirmed').map((o) => o.personId)))
       const me = first(people, (p) => p.kind === 'staff' && !p.approvesLeave && booked.has(p.id)) ?? first(people, (p) => p.kind === 'staff')
       if (me) chooseMe(me.id)
-      return '#home'
+      return { to: '#home', ...(me ? { as: { personId: me.id } } : {}) }
     }
   }
-  return '#home'
+  return { to: '#home' }
 }
 
-/** The freelancer whose page has the most on it: offers and bookings coming up. */
-function freelancerLink(view: View): string | undefined {
-  const busy = new Map<string, number>()
-  for (const c of view.crew.calls) for (const o of c.offers) if (['offered', 'accepted', 'confirmed'].includes(o.status)) busy.set(o.personId, (busy.get(o.personId) ?? 0) + 1)
-  const best = view.crew.people
-    .filter((p) => p.kind === 'freelancer' && !p.archived && p.linkToken)
-    .sort((a, b) => (busy.get(b.id) ?? 0) - (busy.get(a.id) ?? 0) || a.name.localeCompare(b.name))[0]
-  return best && `/f/${best.linkToken}`
+/**
+ * The page of the freelancer with the most on it, which the server finds:
+ * a persona seen before may have left this browser's copy without anyone's
+ * link (ADR 0046).
+ */
+async function freelancerLink(): Promise<string | undefined> {
+  try {
+    const res = await fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: 'freelancer' }), signal: AbortSignal.timeout(8_000) })
+    const { link } = (await res.json()) as { link?: string | null }
+    return typeof link === 'string' && link.startsWith('/f/') ? link : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function PreviewSplash() {
   const view = useView()
+  const [noLink, setNoLink] = useState(false)
   const pick = (p: Persona) => {
     if (p.key === 'freelancer') {
-      const link = freelancerLink(view)
-      if (link) {
+      void freelancerLink().then((link) => {
+        if (!link) return setNoLink(true)
         set('freelancer')
         location.assign(link)
-        return
-      }
+      })
+      return
     }
-    const to = start(view, p.key)
-    set(p.key)
+    const { to, as } = start(view, p.key)
+    set(p.key, as)
     location.hash = to
   }
-  const noFreelancer = !freelancerLink(view)
+  const noFreelancer = noLink || !view.crew.people.some((p) => p.kind === 'freelancer' && !p.archived)
   return (
     <div className="app preview">
       <header className="top">
@@ -177,7 +203,8 @@ export function PreviewSplash() {
         ))}
       </ul>
       <p className="hint">
-        Everyone can look at everything, but changes only what their role covers: the warehouse can't change a job, and staff crew only their own leave.
+        Everyone can look at the work, but changes only what their role covers: the warehouse can't change a job, and staff crew only their own leave.
+        Crew rates and freelancers' private links go only to those who need them, so the others see "hidden for your role" instead.
       </p>
     </div>
   )

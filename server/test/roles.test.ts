@@ -247,3 +247,233 @@ describe('the demo, seen as someone', () => {
     expect((await app.inject({ method: 'POST', url: '/api/auth/preview', payload: { role: 'office' } })).statusCode).toBe(404)
   })
 })
+
+/**
+ * What each role reads (ADR 0046): the records everyone needs are sent to
+ * everyone, with crew rates, timesheet amounts and freelancers' private
+ * links left out where the role doesn't need them, and each person's own
+ * always there.
+ */
+describe('what each role reads', () => {
+  const aine = account('Áine Walsh', 'aine@sessionhire.com')
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
+  const offerTo = (id: string, callId: string, personId: string) => [
+    ['offer.send', { id, callId, personId, override: false }],
+    ['offer.respond', { id, answer: 'accept', days: null, note: '' }],
+    ['offer.confirm', { id }],
+  ] as const
+  const callFor = (id: string, role: string, extra: object = {}) => ({
+    id,
+    projectId: 'gala',
+    phaseId: 'show',
+    project: 'Autumn Gala',
+    phase: 'Show',
+    venue: '',
+    role,
+    start: day(-2),
+    end: day(-1),
+    callTime: null,
+    needed: 2,
+    dayRateCents: 32000,
+    details: '',
+    replyBy: null,
+    ...extra,
+  })
+
+  /** Colly the director, Seán staff crew, Áine head of Audio; Dara (Audio) and Niamh (LX) freelancers booked on the gala, with a timesheet in from Dara. */
+  async function crewed() {
+    const s = await company()
+    const { app, c } = s
+    const ok = async (name: string, args: unknown) => expect(await send(app, c, name, args), name).toMatchObject({ status: 'applied' })
+    await ok('person.upsert', staff('aine', 'Áine Walsh', 'aine@sessionhire.com', { department: 'Audio', dayRateCents: 21000 }))
+    await ok('person.role', { id: 'aine', role: 'head' })
+    await ok('person.upsert', staff('dara', 'Dara Quinn', null, { kind: 'freelancer', department: 'Audio', dayRateCents: 25000 }))
+    await ok('person.upsert', staff('niamh', 'Niamh Byrne', null, { kind: 'freelancer', department: 'LX', dayRateCents: 28000 }))
+    await ok('project.create', { id: 'gala', name: 'Autumn Gala', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+    await ok('phase.add', { id: 'show', projectId: 'gala', name: 'Show', start: day(-3), end: day(-1), venueId: null, notes: '' })
+    // No department sent: the role's words say Audio. One sent stands.
+    await ok('call.create', callFor('sound', 'Sound No.1'))
+    await ok('call.create', callFor('lx', 'Stagehand', { department: 'LX', dayRateCents: 30000 }))
+    for (const [name, args] of [...offerTo('dara-sound', 'sound', 'dara'), ...offerTo('niamh-lx', 'lx', 'niamh'), ...offerTo('aine-sound', 'sound', 'aine')]) await ok(name, args)
+    await ok('timesheet.send', { id: 'dara-sound', days: [day(-2)], extras: [{ what: 'Taxi', cents: 2500 }], note: '' })
+    const pull = async (cookies: Record<string, string>) => {
+      const res = await app.inject({ url: '/api/sync/pull?after=0', cookies })
+      expect(res.statusCode).toBe(200)
+      const body = res.json() as { reading?: unknown; changes: { entity: string; id: string; op: string; data: Record<string, unknown> }[] }
+      const latest = new Map<string, Record<string, unknown>>()
+      for (const ch of body.changes) if (ch.op === 'put') latest.set(`${ch.entity}:${ch.id}`, ch.data)
+      return { reading: body.reading, of: (entity: string, id: string) => latest.get(`${entity}:${id}`)!, all: [...latest.entries()] }
+    }
+    return { ...s, ok, pull }
+  }
+
+  /** Every rate, amount and link token in a feed that isn't this person's own. */
+  function leaks(feed: Awaited<ReturnType<Awaited<ReturnType<typeof crewed>>['pull']>>, own?: string) {
+    const rates: string[] = []
+    const links: string[] = []
+    for (const [key, d] of feed.all) {
+      const [entity] = key.split(':')
+      const mine = own && (d.id === own || d.personId === own || (entity === 'timesheet' && String(d.id).startsWith(`${own}-`)))
+      if (mine) continue
+      if (entity === 'person' && d.linkToken) links.push(String(d.id))
+      if (['person', 'crewCall', 'offer', 'timesheet'].includes(entity!) && (d.dayRateCents != null || (d.counterRateCents ?? null) != null)) rates.push(key)
+      if (entity === 'timesheet') {
+        const t = d as { extras: { cents: number }[]; sent: { dayRateCents: number | null; extras: { cents: number }[] } }
+        if (t.sent.dayRateCents != null || [...t.extras, ...t.sent.extras].some((e) => e.cents !== 0)) rates.push(`${key} amounts`)
+      }
+    }
+    return { rates, links }
+  }
+
+  it('sends the director every rate and link, and the call the department its role suggests', async () => {
+    const { c, pull } = await crewed()
+    const feed = await pull(c)
+    expect(feed.reading).toBeUndefined()
+    expect(feed.of('crewCall', 'sound')).toMatchObject({ department: 'Audio', dayRateCents: 32000 })
+    expect(feed.of('crewCall', 'lx')).toMatchObject({ department: 'LX' })
+    expect(feed.of('person', 'niamh')).toMatchObject({ dayRateCents: 28000 })
+    expect(String(feed.of('person', 'niamh').linkToken)).not.toBe('')
+    expect(feed.of('timesheet', 'dara-sound')).toMatchObject({ dayRateCents: 32000, extras: [{ what: 'Taxi', cents: 2500 }] })
+    expect(feed.of('timesheet', 'dara-sound').amountsHidden).toBeUndefined()
+  })
+
+  it('sends staff crew no rate, amount or link but their own', async () => {
+    const { app, signIn, ok, pull } = await crewed()
+    await ok('offer.send', { id: 'sean-lx', callId: 'lx', personId: 'sean', override: false })
+    const s = { sh_session: await signIn(sean) }
+    const feed = await pull(s)
+    expect(feed.reading).toEqual({ rates: false, links: 'own', personId: 'sean' })
+    expect(leaks(feed, 'sean')).toEqual({ rates: [], links: [] })
+    // The records are all there, so the screens work, and say what's left out.
+    expect(feed.of('crewCall', 'lx')).toMatchObject({ role: 'Stagehand', dayRateCents: null, rateHidden: true })
+    expect(feed.of('person', 'niamh')).toMatchObject({ name: 'Niamh Byrne', dayRateCents: null, rateHidden: true, linkToken: '', linkHidden: true })
+    expect(feed.of('timesheet', 'dara-sound')).toMatchObject({ days: [day(-2)], extras: [{ what: 'Taxi', cents: 0 }], amountsHidden: true })
+    // His own offer is his to read, rate and all.
+    expect(feed.of('offer', 'sean-lx')).toMatchObject({ dayRateCents: 30000 })
+    expect(feed.of('offer', 'sean-lx').rateHidden).toBeUndefined()
+    // Download everything stays the office's and directors'.
+    expect((await app.inject({ url: '/api/export', cookies: s })).statusCode).toBe(403)
+  })
+
+  it('sends the warehouse no rate or link', async () => {
+    const { signIn, ok, pull } = await crewed()
+    await ok('person.role', { id: 'sean', role: 'warehouse' })
+    const feed = await pull({ sh_session: await signIn(sean) })
+    expect(feed.reading).toMatchObject({ rates: false, links: 'own' })
+    expect(leaks(feed, 'sean')).toEqual({ rates: [], links: [] })
+  })
+
+  it("sends a head of department their own department's links, and rates only once a director lets them", async () => {
+    const { app, c, signIn, ok, pull } = await crewed()
+    const h = { sh_session: await signIn(aine) }
+    let feed = await pull(h)
+    expect(feed.reading).toEqual({ rates: false, links: 'department', personId: 'aine', department: 'Audio' })
+    // Dara is in Audio, as she is; Niamh is in LX, and Colly and Seán in none.
+    expect(leaks(feed, 'aine')).toEqual({ rates: [], links: ['dara'] })
+    expect(feed.of('person', 'aine')).toMatchObject({ dayRateCents: 21000 })
+    expect(feed.of('offer', 'aine-sound')).toMatchObject({ dayRateCents: 32000 })
+
+    // She can't set a rate or decide a timesheet, but can make a call without one and edit a person, whose rate is kept.
+    const refusals = [
+      await send(app, h, 'call.create', callFor('foh', 'FOH', { dayRateCents: 35000 })),
+      await send(app, h, 'call.update', { id: 'sound', dayRateCents: 1 }),
+      await send(app, h, 'timesheet.approve', { id: 'dara-sound', days: [day(-2)], dayRateCents: 32000, extras: [], officeNote: '' }),
+    ]
+    for (const r of refusals) expect(r).toMatchObject({ status: 'rejected', reason: { code: 'forbidden', message: expect.stringMatching(/^Only the office and directors see crew rates/) } })
+    expect(await send(app, h, 'call.create', callFor('foh', 'FOH', { dayRateCents: null }))).toMatchObject({ status: 'applied' })
+    expect(await send(app, h, 'person.upsert', { ...staff('dara', 'Dara Quinn', null, { kind: 'freelancer' }), dayRateCents: undefined, notes: 'Has a van' })).toMatchObject({ status: 'applied' })
+    expect((await pull(c)).of('person', 'dara')).toMatchObject({ notes: 'Has a van', dayRateCents: 25000 })
+    expect((await pull(c)).of('crewCall', 'foh')).toMatchObject({ department: 'Audio' })
+
+    // Nor make a new link for someone outside her department, which would stop theirs with none to send; her department's and her own she can.
+    const niamhsLink = (await pull(c)).of('person', 'niamh').linkToken
+    const relink = await send(app, h, 'person.newLink', { id: 'niamh' })
+    expect(relink).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
+    expect(relink.reason!.message).toMatch(/^Only the office and directors see every freelancer's private link, and a head of department those of people in their own department/)
+    expect((await pull(c)).of('person', 'niamh').linkToken).toBe(niamhsLink)
+    const darasLink = (await pull(c)).of('person', 'dara').linkToken
+    expect(await send(app, h, 'person.newLink', { id: 'dara' })).toMatchObject({ status: 'applied' })
+    expect((await pull(h)).of('person', 'dara').linkToken).not.toBe(darasLink)
+    expect(await send(app, h, 'person.newLink', { id: 'aine' })).toMatchObject({ status: 'applied' })
+    // The office makes Niamh's, as ever.
+    expect(await send(app, c, 'person.newLink', { id: 'niamh' })).toMatchObject({ status: 'applied' })
+
+    // Nor agree a rate someone asked for.
+    await ok('call.create', callFor('build', 'Stagehand', { start: day(-3), end: day(-3), department: 'LX' }))
+    await ok('offer.send', { id: 'dara-lx', callId: 'build', personId: 'dara', override: false })
+    await ok('offer.respond', { id: 'dara-lx', answer: 'counter', counterRateCents: 35000, days: null, note: '' })
+    expect(await send(app, h, 'offer.confirm', { id: 'dara-lx' })).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
+    expect((await pull(h)).of('offer', 'dara-lx')).toMatchObject({ status: 'countered', counterRateCents: null, rateHidden: true })
+
+    // Only a director says whether heads see rates.
+    expect((await send(app, h, 'reading.heads', { rates: true })).reason?.code).toBe('forbidden')
+    await ok('reading.heads', { rates: true })
+    feed = await pull(h)
+    expect(feed.reading).toMatchObject({ rates: true, links: 'department' })
+    expect(feed.of('person', 'niamh')).toMatchObject({ dayRateCents: 28000, linkToken: '', linkHidden: true })
+    expect(feed.of('timesheet', 'dara-sound')).toMatchObject({ extras: [{ cents: 2500 }] })
+    expect(await send(app, h, 'call.update', { id: 'sound', dayRateCents: 33000 })).toMatchObject({ status: 'applied' })
+  })
+
+  it('tells the history without figures to a role without rates', async () => {
+    const { app, c, signIn } = await crewed()
+    const say = async (cookies: Record<string, string>) => JSON.stringify((await app.inject({ url: '/api/history', cookies })).json())
+    expect(await say(c)).toMatch(/€/)
+    const his = await say({ sh_session: await signIn(sean) })
+    expect(his).not.toMatch(/€/)
+    expect(his).toContain("Sent Dara Quinn's timesheet for Sound No.1 on Autumn Gala: 1 day, and extras")
+  })
+
+  it('gives many calls one department at once, for those who change crew', async () => {
+    const { app, c, signIn, ok, pull } = await crewed()
+    await ok('call.create', callFor('hands', 'Stagehand', { department: null }))
+    expect((await pull(c)).of('crewCall', 'hands').department).toBeNull()
+    await ok('call.department', { ids: ['hands', 'lx'], department: 'Production' })
+    const feed = await pull(c)
+    expect([feed.of('crewCall', 'hands').department, feed.of('crewCall', 'lx').department]).toEqual(['Production', 'Production'])
+    expect((await send(app, c, 'call.department', { ids: ['nope'], department: 'LX' })).reason?.code).toBe('not-found')
+    expect((await send(app, { sh_session: await signIn(sean) }, 'call.department', { ids: ['hands'], department: 'LX' })).reason?.code).toBe('forbidden')
+    const page = JSON.stringify((await app.inject({ url: '/api/history', cookies: c })).json())
+    expect(page).toContain('Gave 2 crew calls the department Production')
+  })
+
+  it('sends a demo persona what the person it stands in for would read', async () => {
+    const db = await pgliteDb()
+    const app = await buildApp({ db, passcode: 'loud-speakers-42' })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    const ok = await app.inject({ method: 'POST', url: '/api/auth/passcode', payload: { passcode: 'loud-speakers-42' } })
+    const cookies = { sh_passcode: cookie(ok, 'sh_passcode')!.value }
+    for (const [name, args] of [
+      ['person.upsert', staff('dara', 'Dara Quinn', null, { kind: 'freelancer', department: 'Audio', dayRateCents: 25000 })],
+      ['person.upsert', staff('niamh', 'Niamh Byrne', null, { kind: 'freelancer', department: 'LX', dayRateCents: 28000 })],
+      ['person.upsert', staff('sean', 'Seán Ó Briain', null, { dayRateCents: 20000 })],
+    ] as const)
+      expect((await send(app, cookies, name, args)).status).toBe('applied')
+    const as = async (payload: object) => {
+      const chose = await app.inject({ method: 'POST', url: '/api/auth/preview', cookies, payload })
+      const res = await app.inject({ url: '/api/sync/pull?after=0', cookies: { ...cookies, sh_preview: cookie(chose, 'sh_preview')!.value } })
+      const people = new Map<string, Record<string, unknown>>()
+      for (const ch of res.json().changes) if (ch.entity === 'person') people.set(ch.id, ch.data)
+      return { reading: res.json().reading, people }
+    }
+    const everyone = await as({ role: 'office' })
+    expect(everyone.reading).toBeUndefined()
+    expect(everyone.people.get('niamh')).toMatchObject({ dayRateCents: 28000 })
+
+    const head = await as({ role: 'head', department: 'Audio' })
+    expect(head.reading).toMatchObject({ rates: false, links: 'department', department: 'Audio' })
+    expect(head.people.get('dara')!.linkToken).not.toBe('')
+    expect(head.people.get('niamh')).toMatchObject({ linkToken: '', dayRateCents: null })
+
+    const staffCrew = await as({ role: 'crew', personId: 'sean' })
+    expect(staffCrew.people.get('sean')).toMatchObject({ dayRateCents: 20000 })
+    expect(staffCrew.people.get('dara')).toMatchObject({ linkToken: '', dayRateCents: null })
+
+    // The freelancer persona is taken to the busiest freelancer's page by the server, as the device may hold no link.
+    const free = (await app.inject({ method: 'POST', url: '/api/auth/preview', cookies, payload: { role: 'freelancer' } })).json()
+    expect(free).toMatchObject({ role: null, link: expect.stringMatching(/^\/f\/[\w-]+$/) })
+  })
+})

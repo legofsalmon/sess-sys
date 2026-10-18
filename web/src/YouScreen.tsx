@@ -1,4 +1,4 @@
-import { ROLE_LABELS, ROLE_LINES } from '@sh/shared'
+import { ROLE_LABELS, ROLE_LINES, type Reading } from '@sh/shared'
 import { useState } from 'react'
 import { Confirm, Refusal, useAct } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
@@ -128,6 +128,7 @@ export function YouScreen() {
  */
 function RoleCard() {
   const access = useAccess()
+  const { reading } = useView()
   const { run, error } = useAct()
   const [asking, setAsking] = useState(false)
   if (access.rolesOff)
@@ -166,6 +167,7 @@ function RoleCard() {
       <p>
         <b>{ROLE_LABELS[access.role]}</b>. {ROLE_LINES[access.role]}
       </p>
+      <p>{readsLine(reading)}</p>
       <p className="hint">
         {access.role === 'director'
           ? 'You give everyone else their role on their person on the Crew tab.'
@@ -173,6 +175,14 @@ function RoleCard() {
       </p>
     </section>
   )
+}
+
+/** What this device is sent of crew pay and links (ADR 0046), said plainly so a hidden figure isn't taken for a missing one. */
+function readsLine(r: Reading): string {
+  if (r.rates && r.links === 'all') return 'You see crew rates, timesheet amounts and private links.'
+  const rates = r.rates ? 'You see crew rates and timesheet amounts' : "You don't see crew rates or timesheet amounts, other than your own"
+  const links = r.links === 'department' ? "the private links of people in your department" : r.links === 'all' ? 'every private link' : 'no private link but your own'
+  return `${rates}, and ${links}.`
 }
 
 const THEMES: readonly { theme: Theme; name: string; line: string }[] = [

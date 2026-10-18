@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, eachDay, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, type CommandArgs, type CrewCall, type Offer } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
-import { awayOn, getAway, getCall, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
+import { stopOwnCalendar } from './own-calendars.ts'
+import { awayOn, getAway, getCall, getCalls, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
 
 /**
  * The crew rules the server enforces, whatever device or link a request
@@ -29,6 +30,7 @@ type CrewCommand =
   | 'call.create'
   | 'call.update'
   | 'call.cancel'
+  | 'call.department'
   | 'offer.send'
   | 'offer.respond'
   | 'offer.confirm'
@@ -190,8 +192,8 @@ async function changeCall(ctx: Ctx, call: CrewCall, next: CrewCall, shift = 0) {
   }
   await ctx.tx.query(
     `UPDATE crew_calls SET project = $2, phase = $3, venue = $4, role = $5, start_day = $6, end_day = $7, call_time = $8,
-            needed = $9, day_rate_cents = $10, details = $11, reply_by = $12, needs_certificates = $13 WHERE id = $1`,
-    [call.id, next.project, next.phase, next.venue, next.role, next.start, next.end, next.callTime, next.needed, next.dayRateCents, next.details, next.replyBy, JSON.stringify(needsOf(next))]
+            needed = $9, day_rate_cents = $10, details = $11, reply_by = $12, needs_certificates = $13, department = $14 WHERE id = $1`,
+    [call.id, next.project, next.phase, next.venue, next.role, next.start, next.end, next.callTime, next.needed, next.dayRateCents, next.details, next.replyBy, JSON.stringify(needsOf(next)), next.department ?? null]
   )
   await emit(ctx, 'crewCall', call.id, await getCall(ctx.tx, call.id))
   for (const [id, fields] of changes) await setOffer(ctx, id, fields)
@@ -233,6 +235,26 @@ async function callJob(ctx: Ctx, a: CommandArgs<'call.create'>) {
   return { projectId, phaseId: a.phaseId, project: names!.project, phase: names!.phase ?? a.phase, venue: names!.venue ?? a.venue }
 }
 
+/**
+ * The department a new call for this role is given when none is sent (ADR
+ * 0046): from the calls for the same role before it, the people with it as
+ * a skill, or the role's own words, as the device works it out.
+ */
+async function guessDepartment(ctx: Ctx, role: string) {
+  const key = role.trim().replace(/\s+/g, ' ').toLowerCase()
+  const calls = await ctx.tx.query(
+    `SELECT role, department FROM crew_calls WHERE department IS NOT NULL AND lower(regexp_replace(trim(role), '\\s+', ' ', 'g')) = $1`,
+    [key]
+  )
+  const people = await ctx.tx.query(`SELECT skills, department, archived FROM people WHERE department IS NOT NULL AND NOT archived`)
+  return departmentForRole(role, { calls: calls.rows.map((r) => ({ role: r.role as string, department: r.department as string })), people: people.rows.map((r) => ({ skills: r.skills as string[], department: r.department as string, archived: false })) })
+}
+
+/** Turned down when the sender doesn't read crew rates (ADR 0046): setting or agreeing one is for the office and directors. */
+function refuseRates(ctx: Ctx) {
+  if (ctx.seesRates === false) throw new Refused({ code: 'forbidden', message: RATES_REFUSAL })
+}
+
 async function openCall(ctx: Ctx, callId: string) {
   const call = await getCall(ctx.tx, callId, true)
   if (!call) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
@@ -257,6 +279,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     // An edit from a version that knows fewer kinds keeps the newer ones, and can still clear one it knows (ADR 0028).
     const certificates = certificatesAfter(was?.certificates, a.certificates)
     const company = a.company !== undefined ? a.company : (was?.company ?? null)
+    // The usual rate, left out by a role that doesn't read it, or sent by one as it was shown it (none), is kept as it is (ADR 0046).
+    const dayRateCents = a.dayRateCents === undefined || ctx.seesRates === false ? (was?.dayRateCents ?? null) : a.dayRateCents
     await ctx.tx.query(
       `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave,
                            department, level, known_as, certificates, company_name, company_vat_number, company_cro_number)
@@ -273,7 +297,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
         a.email,
         a.phone,
         JSON.stringify(a.skills),
-        a.dayRateCents,
+        dayRateCents,
         a.notes,
         newLinkToken(),
         approvesLeave,
@@ -330,6 +354,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       }
     }
     await ctx.tx.query('UPDATE people SET archived = $2 WHERE id = $1', [person.id, a.archived])
+    // Their link stops, so they couldn't stop sharing their own calendar themselves: it stops with it (ADR 0044).
+    if (a.archived) await stopOwnCalendar(ctx, person.id)
     await emit(ctx, 'person', person.id, await getPerson(ctx.tx, person.id))
   },
 
@@ -370,10 +396,12 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'call.create'(ctx, a) {
     if (await getCall(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This job already exists.' })
     const job = await callJob(ctx, a)
+    // Sent, or else the one its role suggests (ADR 0046), which the office can change.
+    const department = a.department !== undefined ? (a.department ? tidyDepartment(a.department) : null) : await guessDepartment(ctx, a.role)
     await ctx.tx.query(
-      `INSERT INTO crew_calls (id, project_id, phase_id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status, needs_certificates)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open', $15)`,
-      [a.id, job.projectId, job.phaseId, job.project, job.phase, job.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy, JSON.stringify(tidyNeeds(a.needsCertificates))]
+      `INSERT INTO crew_calls (id, project_id, phase_id, project, phase, venue, role, start_day, end_day, call_time, needed, day_rate_cents, details, reply_by, status, needs_certificates, department)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open', $15, $16)`,
+      [a.id, job.projectId, job.phaseId, job.project, job.phase, job.venue, a.role, a.start, a.end, a.callTime, a.needed, a.dayRateCents, a.details, a.replyBy, JSON.stringify(tidyNeeds(a.needsCertificates)), department]
     )
     await emit(ctx, 'crewCall', a.id, await getCall(ctx.tx, a.id))
   },
@@ -387,6 +415,7 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       if (a[k] !== undefined) (next as Record<string, unknown>)[k] = a[k]
     // Needing a certificate refuses nobody already on the call: anyone short of it is warned about on the call's line (ADR 0028).
     if (a.needsCertificates !== undefined) next.needsCertificates = tidyNeeds(a.needsCertificates)
+    if (a.department !== undefined) next.department = (a.department ? tidyDepartment(a.department) : null)
     // One end may have moved on another device, so check the call as it will be.
     if (next.start > next.end) throw new Refused({ code: 'invalid', message: `${next.role} on ${next.project} would end before it starts.` })
     // A reply-by day the change sets is asked for before the job is over, as when a call is made (audit finding 21). One a move of dates leaves behind is left to the office.
@@ -398,6 +427,18 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const call = await getCall(ctx.tx, a.id, true)
     if (!call) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
     await cancelCall(ctx, a.id)
+  },
+
+  /** Many calls given one department (ADR 0046); a cancelled one too, so the record is right. One already gone is left out. */
+  async 'call.department'(ctx, a) {
+    const department = (a.department ? tidyDepartment(a.department) : null)
+    const calls = await getCalls(ctx.tx, [...new Set(a.ids)])
+    if (calls.length === 0) throw new Refused({ code: 'not-found', message: 'Those calls no longer exist.' })
+    for (const c of calls) {
+      if ((c.department ?? null) === department) continue
+      await ctx.tx.query('UPDATE crew_calls SET department = $2 WHERE id = $1', [c.id, department])
+      await emit(ctx, 'crewCall', c.id, await getCall(ctx.tx, c.id))
+    }
   },
 
   async 'offer.send'(ctx, a) {
@@ -483,6 +524,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     }
     if (offer.status !== 'countered')
       throw new Refused({ code: 'conflict', message: `Only an accepted offer or a counter-offer can be confirmed; this one is ${offer.status}.` })
+    // Agreeing a counter agrees a rate, so it's for someone who reads rates (ADR 0046).
+    refuseRates(ctx)
     // Agreeing a counter: the days may have filled while ops were deciding.
     await checkCanHold(ctx, call, offer, offer.days)
     await setOffer(ctx, offer.id, { status: 'confirmed', day_rate_cents: offer.counterRateCents })

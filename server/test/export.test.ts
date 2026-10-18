@@ -118,6 +118,8 @@ describe('download everything', () => {
       'identifiers',
       'inspections',
       'kit_lines',
+      'kit_names',
+      'kit_notes_read',
       'label_runs',
       'leave_allowances',
       'leave_requests',
@@ -127,6 +129,7 @@ describe('download everything', () => {
       'movements',
       'mutations',
       'offers',
+      'own_calendars',
       'people',
       'phases',
       'places',
@@ -140,6 +143,8 @@ describe('download everything', () => {
       'timesheets',
       'unavailability',
       'users',
+      'vehicle_bookings',
+      'vehicles',
       'venues',
     ]
     expect(Object.keys(files).sort()).toEqual(['README.txt', 'everything.json', 'history.csv', ...tables.map((t) => `tables/${t}.csv`)].sort())

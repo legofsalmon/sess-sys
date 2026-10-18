@@ -269,13 +269,14 @@ design system asks (0 to 4; a 3 is fixed or named).
 | No overview of the state of things | D, H, W | 3 | Fixed: Home |
 | Screens look alike; no sense of where you are | All staff | 3 | Fixed: titles, icons, the strip |
 | Long screens with no way to see their parts | O, W | 3 | Fixed: *On this screen* |
-| Nothing narrows to a department | H | 3 | Fixed on Home; crew calls still have no department (open, below) |
-| Crew needed can't be narrowed to a department | H | 2 | Open: calls need a department |
+| Nothing narrows to a department | H | 3 | Fixed: Home, and crew calls by their own department ([Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)) |
+| Crew needed can't be narrowed to a department | H | 2 | Fixed: each call has a department; Home and Crew › Calls narrow to it (Decision 0046) |
 | A freelancer's page doesn't say what's waiting | F | 2 | Fixed: the line at the top |
 | Staff can't see their own bookings in the app | S | 2 | Fixed: Home for me |
 | No money anywhere | D | 2 | Fixed: Jobs › Money and each job's quote, for the office and directors ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)) |
 | Everyone signed in can do everything | D | 2 | Fixed: five roles decide what each person can change ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Home stays a view anyone can switch |
-| Everyone signed in can read everything, rates and links included | D, S | 2 | Open: money is narrowed to the office and directors (Decision 0042); rates and links aren't yet (Decision 0034) |
+| Everyone signed in can read everything, rates and links included | D, S | 2 | Fixed for money (Decision 0042), and for crew rates, timesheet amounts and private links (Decision 0046). Phones and certificates are still read by all staff (Decision 0034, open) |
+| Nothing knows which van is free, or who can drive it | O, W | 3 | Fixed: Stock › Vehicles, booked on the job with a driver; clashes in the planner ([Decision 0047](adr/0047-vans-and-drivers.md)). Licence categories open |
 
 ## Seeing it as each of them
 
@@ -287,12 +288,15 @@ the same bar.
 
 ## Next
 
-- A department on each crew call, so a head of department's Home narrows
-  *crew needed* too.
+- A department on each crew call: built ([Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
+  A head of department's Home counts *crew needed* for their department,
+  and Crew › Calls starts on it.
 - Roles: built ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)).
   Each persona with an account is a role that decides what they can
-  change; on the demo, *See it as…* holds the browser to that role. Next is
-  narrowing what each role can read.
+  change; on the demo, *See it as…* holds the browser to that role and to
+  what it reads. Rates, timesheet amounts and links are narrowed
+  (Decision 0046); next is whether staff crew need every phone number and
+  certificate.
 - Try Home with the office and the warehouse during the office trial, and
   write what they did that this page didn't predict into the design
   system's learnings.

@@ -51,6 +51,8 @@ async function main() {
     errorReporting,
     backupWatch: errorReporting ? backupWatch() : undefined,
     // Writing to Google Calendar stays off until CALENDAR_WRITES is on: Colly's call, 16 October 2026.
+    // Local stand-ins the browser tests read calendars from (ADR 0044): never set where the server runs for real.
+    ownCalendars: process.env.OWN_CALENDAR_TEST_HOSTS ? { testHosts: process.env.OWN_CALENDAR_TEST_HOSTS.split(',').map((h) => h.trim()).filter(Boolean) } : undefined,
     calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, ''), writes: process.env.CALENDAR_WRITES?.trim().toLowerCase() === 'on' } : undefined,
   })
   await assertSignInKept(db, auth)
@@ -69,6 +71,9 @@ async function main() {
   await app.dueErasures.start()
   const port = Number(process.env.PORT ?? 3030)
   await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
+  // Freelancers' own calendars, read again every few hours (ADR 0044).
+  app.ownCalendars.start()
+  if (process.env.OWN_CALENDAR_TEST_HOSTS) app.log.warn('OWN_CALENDAR_TEST_HOSTS is set: calendars may be read over plain http from the hosts it names. It is for the browser tests only.')
   // Documents' files no document has any more, deleted, as each day from now on (ADR 0029). Not waited for: it talks to
   // the bucket, which mustn't hold up the server starting, and it says in the log what it couldn't do.
   void app.documents.start()

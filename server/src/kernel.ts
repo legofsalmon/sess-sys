@@ -60,6 +60,11 @@ export interface Ctx {
    * the person's own link or answer is the permission.
    */
   role?: Role
+  /**
+   * False when the sender doesn't read crew rates (ADR 0046), so setting or
+   * agreeing one, or deciding a timesheet, is turned down; absent otherwise.
+   */
+  seesRates?: boolean
 }
 
 /**

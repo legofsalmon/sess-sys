@@ -1,11 +1,11 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { emptySnapshot, MemoryStorage, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
+import { emptySnapshot, FEED, MemoryStorage, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
-import { pgliteDb, type Db } from '../src/db.ts'
+import { pgliteDb, type Db, type Queryable } from '../src/db.ts'
 
 /**
  * The sync engine's promises (ADR 0001), as tests: devices with a switch for
@@ -352,5 +352,149 @@ describe('one bad change in a batch', () => {
     ])
     const exported = (await app.inject('/api/export')).json()
     expect(exported.phases.map((p: { id: string }) => p.id)).toEqual(['good'])
+  })
+})
+
+/**
+ * A database standing in for one at a distance, or one a test can step in on: `before` runs ahead of every query, in a
+ * transaction too, and may wait, count or slip something in.
+ */
+function steppedDb(db: Db, before: (sql: string) => Promise<void>): Db {
+  const stepped = (q: Queryable): Queryable => ({
+    query: async (sql, params) => {
+      await before(sql)
+      return q.query(sql, params)
+    },
+    exec: (sql) => q.exec(sql),
+  })
+  return { ...db, ...stepped(db), transaction: (fn) => db.transaction((tx) => fn(stepped(tx))) }
+}
+
+describe('a pull answered while another change lands (audit, 18 October 2026)', () => {
+  it('keeps the device where it was when it finds nothing new, so the change that landed comes with the next pull', async () => {
+    // Proves: a change committed after the pull read its page and before it read the head of the feed is not jumped over:
+    // the empty page leaves the device's cursor as it was, and its next pull brings the change.
+    const plain = await pgliteDb()
+    cleanup.push(() => plain.close())
+    let slipIn: (() => Promise<unknown>) | undefined
+    const db = steppedDb(plain, async (sql) => {
+      if (!slipIn || !sql.includes('AS head')) return
+      const go = slipIn
+      slipIn = undefined
+      await go()
+    })
+    const app = await server(db)
+    const office = await seed(app)
+    const laptop = await device(app)
+    await laptop.client.sync()
+    const before = laptop.client.cursor
+
+    // Between the laptop's two reads, the office moves two speakers.
+    slipIn = async () => {
+      await office.client.mutate('stock.move', move(2, 'a3', 'van1'))
+      await office.client.sync()
+    }
+    await laptop.client.sync()
+    expect(slipIn).toBeUndefined()
+    expect(laptop.client.cursor).toBe(before)
+
+    await laptop.client.sync()
+    expect(counts(laptop)).toEqual(['a3 2', 'van1 2'])
+    expect(laptop.client.cursor).toBe(office.client.cursor)
+  })
+
+  it('reads every copy pulled before the fix again from the start, once, keeping what it has waiting', async () => {
+    // Proves: a copy saved before the fix, moved past a change it never got, is told FEED and reads the feed again from the
+    // start, so the change it missed lands; the change it had waiting is kept and goes through; it reads from 0 only once.
+    const app = await server()
+    const office = await seed(app)
+    await office.client.mutate('stock.move', move(1, 'a3', 'van1'))
+    await office.client.mutate('stock.move', move(1, 'a3', 'van2'))
+    await office.client.sync()
+    const head = office.client.cursor
+
+    // The phone's copy holds everything but the move to Van 2, as if a pull had stepped over it, and it isn't marked as read.
+    const storage = new MemoryStorage()
+    const full = (await (office as { storage: MemoryStorage }).storage.load())!
+    const missed: Snapshot = { ...emptySnapshot('phone'), cursor: head, entities: structuredClone(full.entities) }
+    delete (missed.entities as Record<string, Record<string, unknown>>).stock![Object.keys(full.entities.stock).find((k) => k.includes('van2'))!]
+    missed.outbox = [{ id: 'waiting', name: 'stock.move', args: move(1, 'a3', 'van1'), createdAt: new Date().toISOString() }] as Snapshot['outbox']
+    await storage.save(missed)
+    const pulls: number[] = []
+    const phone = await device(app, storage)
+    const pull = phone.link.pull.bind(phone.link)
+    phone.link.pull = (after) => (pulls.push(after), pull(after))
+
+    expect(counts(phone)).toEqual(['a3 1 waiting', 'van1 2 waiting'])
+    await phone.client.sync()
+    expect(pulls).toEqual([head, 0])
+    expect(counts(phone)).toEqual(['a3 1', 'van1 2', 'van2 1'])
+    expect(phone.client.view().pendingCount).toBe(0)
+    expect(await storage.load()).toMatchObject({ feed: FEED, outbox: [] })
+
+    pulls.length = 0
+    await phone.client.sync()
+    expect(pulls).toEqual([phone.client.cursor])
+  })
+})
+
+describe('a phone with a long backlog, far from its database (audit, 18 October 2026)', { timeout: 120_000 }, () => {
+  it(`gets ${PUSH_LIMIT} changes through in pushes that are each answered in time, and a resend of them all is answered from one query`, async () => {
+    // Proves: with every trip to the database slowed, as from Railway to Neon, a phone sends its backlog PUSH_SLICE at a time;
+    // the server answers each push with what it got done inside its time, so no push outlasts the phone's wait; the backlog
+    // drains over several pushes in one sync, every change applied once and in order; and the same changes sent again at once,
+    // as an older phone sends them, are all answered as already made, from a single query.
+    const wait = 1500
+    let queries = 0
+    const plain = await pgliteDb()
+    cleanup.push(() => plain.close())
+    const db = steppedDb(plain, async () => {
+      queries++
+      await new Promise((r) => setTimeout(r, 1))
+    })
+    const app = await buildApp({ db, pushBudgetMs: 400 })
+    cleanup.push(() => app.close())
+    await seed(app)
+
+    const phone = await device(app)
+    await phone.client.sync()
+    const took: number[] = []
+    const push = phone.link.push.bind(phone.link)
+    phone.link.push = async (req) => {
+      const started = Date.now()
+      const timer = new Promise<never>((_, fail) => setTimeout(() => fail(new Error('The phone gave up waiting')), wait))
+      try {
+        return await Promise.race([push(req), timer])
+      } finally {
+        took.push(Date.now() - started)
+      }
+    }
+    phone.link.online = false
+    for (let i = 0; i < PUSH_LIMIT; i++) await phone.client.mutate('place.upsert', { id: `shelf${i}`, name: `Shelf ${i}`, notes: '' })
+    phone.link.online = true
+
+    await phone.client.sync()
+    expect(phone.client.view()).toMatchObject({ connection: 'idle', pendingCount: 0, problems: [] })
+    expect(took.length).toBeGreaterThan(PUSH_LIMIT / PUSH_SLICE)
+    expect(Math.max(...took)).toBeLessThan(wait)
+    const { rows } = await plain.query<{ id: string }>(`SELECT entity_id AS id FROM changes WHERE entity = 'place' AND entity_id LIKE 'shelf%' ORDER BY seq`)
+    expect(rows.map((r) => r.id)).toEqual(Array.from({ length: PUSH_LIMIT }, (_, i) => `shelf${i}`))
+
+    // An older phone, its answer lost, sends all of them again in one push.
+    const { rows: sent } = await plain.query<{ id: string; name: string; args: unknown; created_at: Date }>(
+      `SELECT id, name, args, created_at FROM mutations WHERE name = 'place.upsert' AND args->>'id' LIKE 'shelf%' ORDER BY received_at`
+    )
+    queries = 0
+    const started = Date.now()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/sync/push',
+      payload: { clientId: phone.client.clientId, mutations: sent.map((m) => ({ id: m.id, name: m.name, args: m.args, createdAt: m.created_at.toISOString() })) },
+    })
+    expect(Date.now() - started).toBeLessThan(wait)
+    expect(queries).toBe(1)
+    const results = res.json().results as { status: string; duplicate?: boolean }[]
+    expect(results).toHaveLength(PUSH_LIMIT)
+    expect(results.every((r) => r.status === 'applied' && r.duplicate)).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { MONEY_ENTITY_NAMES, plural, pushRequest, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -19,6 +19,8 @@ import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
+import { OwnCalendars, type OwnCalendarsOptions } from './crew/own-calendars.ts'
+import { registerOwnCalendarRoutes } from './crew/own-calendar-routes.ts'
 import type { Db } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { DocumentFiles } from './documents/files.ts'
@@ -32,12 +34,19 @@ import { CHARACTERS, isCharacterError } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
+import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
 export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000
+/**
+ * How long a push from a device that takes part of an answer runs before it's
+ * answered with what's done: well inside the 30 seconds a phone waits, so a
+ * slow database never leaves it giving up on a push that went through.
+ */
+export const PUSH_BUDGET_MS = 20_000
 
 export interface AppOptions {
   db: Db
@@ -49,6 +58,8 @@ export interface AppOptions {
   webRoot?: string
   /** The longest to wait for a whole request; REQUEST_TIMEOUT_MS unless a test wants it shorter. */
   requestTimeoutMs?: number
+  /** PUSH_BUDGET_MS unless a test wants it shorter. */
+  pushBudgetMs?: number
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
   /** A shared passcode for a demo copy (DEMO_PASSCODE); only used while Google sign-in is off. */
@@ -77,6 +88,8 @@ export interface AppOptions {
   feeds?: FeedsOptions
   /** How much one call bringing in the stock list does (ADR 0026), for tests. */
   stockImport?: StockImportRound
+  /** Reading freelancers' own calendars (ADR 0044): how often, and the local stand-ins tests may read from. */
+  ownCalendars?: OwnCalendarsOptions
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -98,6 +111,8 @@ declare module 'fastify' {
     dueErasures: DueErasures
     /** Documents' files (ADR 0029): where they're kept, and the list of files to delete; the caller starts its daily look. */
     documents: DocumentFiles
+    /** Freelancers' own calendars, read only (ADR 0044); the caller starts reading them on a schedule. */
+    ownCalendars: OwnCalendars
   }
 }
 
@@ -113,7 +128,7 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS } = options
+  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS, pushBudgetMs = PUSH_BUDGET_MS } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
@@ -179,6 +194,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     void erasures?.keep()
     void documents.tidy()
   }
+  // Their own calendars (ADR 0044): read again every few hours, from the time the caller starts it.
+  const ownCalendars = new OwnCalendars(db, { ...options.ownCalendars, onChange: changed, report: (err) => reportError(err, { area: 'own-calendar' }) })
+  app.decorate('ownCalendars', ownCalendars)
   app.decorate('dueErasures', new DueErasures(db, { changed, log: app.log, report: (err) => reportError(err, { area: 'erasure' }) }))
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
@@ -250,20 +268,40 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
-    const { clientId, mutations, sentAt, generation } = parsed.data
+    const { clientId, mutations, sentAt, generation, partial } = parsed.data
+    const started = Date.now()
     // Who is asking, for the history and for the handlers that check it (ADR 0024); nobody while sign-in is off.
     const from = {
       userId: req.user?.id,
       ...(req.user ? { user: { id: req.user.id, email: req.user.email } } : {}),
       // What they may change (ADR 0034); nothing is checked while roles are off.
-      ...(req.role ? { role: req.role } : {}),
+      ...(req.role ? { role: req.role, reader: req.reader ?? {} } : {}),
       sentAt,
       device: describeDevice(req.headers['user-agent']),
     }
     const results: MutationResult[] = []
     let stale = false
+    // What's already applied, in one look, answered as it was the first time: a phone sending again what it sent before
+    // it gave up waiting is answered at once, rather than at a dozen trips to the database a change. Starting fresh
+    // empties this table (ADR 0019), so nothing found here belongs to a copy that's gone.
+    // An id with a character the database can't hold fails the look, so then each is looked up on its own, as before.
+    const seen = await db
+      .query<{ id: string; result: MutationResult }>('SELECT id, result FROM mutations WHERE id = ANY($1::text[])', [mutations.map((m) => m.id)])
+      .then(({ rows }) => rows)
+      .catch((err: unknown) => {
+        if (!isCharacterError(err)) throw err
+        return []
+      })
+    const answered = new Map(seen.map((r) => [r.id, r.result]))
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) {
+      // Out of time for a device that takes part of an answer: the rest go again in its next push, after these.
+      if (partial && results.length > 0 && Date.now() - started > pushBudgetMs) break
+      const before = answered.get(m.id)
+      if (before) {
+        results.push({ ...before, duplicate: true })
+        continue
+      }
       const result = await db
         .transaction(async (tx) => {
           await tx.query('SELECT pg_advisory_xact_lock(7331)')
@@ -300,9 +338,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // Money (ADR 0042) goes only to the roles that see it: for the rest its changes are left out, and the cursor still
     // moves past them, so a phone never holds a price or a quote it couldn't show.
     const money = roleSeesMoney(req.role)
-    const changes: Change[] = page
-      .filter((r) => money || !MONEY_ENTITY_NAMES.includes(r.entity))
-      .map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data }))
+    // Crew rates and private links (ADR 0046) are on records every role needs, so those go to everyone, cut down to what
+    // the role reads: a booking without its rate, a person without their link.
+    const reading = await readingOf(db, req.role, req.reader ?? {})
+    const changes: Change[] = await asRead(
+      db,
+      page.filter((r) => money || !MONEY_ENTITY_NAMES.includes(r.entity)).map((r) => ({ seq: Number(r.seq), entity: r.entity, id: r.entity_id, op: r.op, data: r.data })),
+      reading
+    )
     // Where the feed ends, and which copy of the data this is: a device ahead of the
     // head, or holding another generation, has seen data this server no longer has.
     // Read each time, so a new generation counts at once, without a restart.
@@ -312,10 +355,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     )
     const head = Number(meta[0]?.head ?? 0)
     const generation = meta[0]?.generation ?? undefined
-    const cursor = page.length ? Number(page[page.length - 1]!.seq) : Math.max(after, head)
+    // Nothing new keeps the device where it was. Not the head: a change committed after the page was read and before
+    // the head was would fall between the two, and the device would never be sent it (audit, 18 October 2026).
+    const cursor = page.length ? Number(page[page.length - 1]!.seq) : after
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
-    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, ...(money ? {} : { money: false }) }
+    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, feed: FEED, ...(money ? {} : { money: false }), ...(readsEverything(reading) ? {} : { reading }) }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {
@@ -325,7 +370,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
-  registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode })
+  registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode, ownCalendars })
+  registerOwnCalendarRoutes(app, { ownCalendars })
   registerDocumentRoutes(app, { db, files: documents, onChange: changed })
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, documents, onChange: changed })
@@ -338,7 +384,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
     try {
-      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined })
+      // Read by every member of staff, so in words without crew pay for a role that doesn't see it (ADR 0046).
+      const { rates } = await readingOf(db, req.role, req.reader ?? {})
+      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, rates)
     } catch (err) {
       if (err instanceof BadCursor) return reply.code(400).send({ error: err.message })
       throw err
@@ -405,6 +453,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     app.dueErasures.stop()
     documents.stop()
     calendarSync?.stop()
+    ownCalendars.stop()
     for (const ws of sockets) ws.close()
   })
   return app

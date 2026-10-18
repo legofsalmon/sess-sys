@@ -2,6 +2,7 @@ import {
   calendarTitles,
   crewFill,
   daysLabel,
+  departmentForRole,
   eachDay,
   mapLink,
   movedCallSpan,
@@ -37,12 +38,15 @@ import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../cre
 import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
 import { Pending } from '../StatusPill.tsx'
-import { useAccess } from '../role.ts'
+import { DepartmentField } from '../crew/Department.tsx'
+import { useAccess, useSeesRates } from '../role.ts'
 import { client } from '../sync.ts'
-import { useToday } from '../view.ts'
+import { useToday, useView } from '../view.ts'
 import { Choices, clientNamed, JobStatusPill, Page, venueNamed } from './common.tsx'
 import { KitCard, kitSummary } from './Kit.tsx'
+import { VansCard } from './Vans.tsx'
 import { QuoteCard } from './Quote.tsx'
+import { ShowPackCard } from './ShowPack.tsx'
 import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
@@ -93,6 +97,7 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
 
       {inPhase && offering}
       <KitCard job={job} view={view} />
+      <VansCard job={job} view={view} />
       {!inPhase && offering}
 
       <section className="card" aria-label="Crew">
@@ -111,6 +116,9 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
           </Fold>
         )}
       </section>
+
+      {/* The files for the on-site box (ADR 0045), once there's a phase to have a crew and a running order. */}
+      {job.phases.length > 0 && <ShowPackCard view={view} job={job} />}
 
       {/* Its quote, after the kit and crew it's built from, for the roles that see money (ADR 0042). */}
       {seesMoney && <QuoteCard job={job} view={view} />}
@@ -604,8 +612,23 @@ function AddPhase({ job }: { job: JobView }) {
 /** A role the job needs, for one phase or across several. */
 function AskForCrew({ job }: { job: JobView }) {
   // The reply-by day is suggested from the first day until the office types or clears it (audit finding 21).
-  const blank = { phaseId: undefined as string | undefined, across: '', role: '', needed: 1, callTime: '', rate: '', details: '', replyBy: undefined as string | undefined, needs: [] as CertificateKind[] }
+  const blank = {
+    phaseId: undefined as string | undefined,
+    across: '',
+    role: '',
+    needed: 1,
+    callTime: '',
+    rate: '',
+    details: '',
+    replyBy: undefined as string | undefined,
+    needs: [] as CertificateKind[],
+    // Follows the role until picked (ADR 0046).
+    department: undefined as string | null | undefined,
+  }
   const [f, setF] = useState(blank)
+  const view = useView()
+  const seesRates = useSeesRates()
+  const suggested = departmentForRole(f.role, { calls: view.crew.calls, people: view.crew.people })
   // The phase picked ('' is across several), while the job still has it. Until then, the job's first phase as it is
   // now rather than when the page opened, so a job that had no phases then starts on the first one added.
   const picked = f.phaseId === '' || job.phases.some((p) => p.id === f.phaseId) ? f.phaseId : undefined
@@ -644,10 +667,12 @@ function AskForCrew({ job }: { job: JobView }) {
         end: end < start ? start : end,
         callTime: f.callTime || null,
         needed: Math.max(1, f.needed),
-        dayRateCents: rate.cents,
+        // A role that doesn't read rates leaves it to the office (ADR 0046).
+        dayRateCents: seesRates ? rate.cents : null,
         details: f.details.trim(),
         replyBy: replyBy || null,
         needsCertificates: f.needs,
+        department: f.department === undefined ? suggested : f.department,
       })
     ).then((ok) => {
       // Said where it was asked: the new call lands above, out of sight on a phone, and a second press would make a second call.
@@ -696,9 +721,14 @@ function AskForCrew({ job }: { job: JobView }) {
       <label>
         Call time <input type="time" value={f.callTime} onChange={(e) => setF({ ...f, callTime: e.target.value })} />
       </label>
-      <label>
-        Day rate € <input inputMode="decimal" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} placeholder="250" />
-      </label>
+      {seesRates ? (
+        <label>
+          Day rate € <input inputMode="decimal" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} placeholder="250" />
+        </label>
+      ) : (
+        <p className="hint">The office sets the rate: your role doesn't see crew rates.</p>
+      )}
+      <DepartmentField view={view} value={f.department} suggested={suggested} onChange={(department) => setF({ ...f, department })} className="wide" />
       <label className="wide">
         Reply by <input type="date" value={replyBy} onChange={(e) => setF({ ...f, replyBy: e.target.value })} />
       </label>

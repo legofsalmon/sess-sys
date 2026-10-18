@@ -3,7 +3,7 @@ import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, 
 import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
-import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
+import { FEED, PUSH_SLICE, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
@@ -14,6 +14,7 @@ import { inspectionsView, type InspectionsView } from './inspections-view.ts'
 import { jobsView, type JobsView } from './jobs-view.ts'
 import { kitView, type KitView } from './kit-view.ts'
 import { labelsView, type LabelsView } from './labels-view.ts'
+import { notesKitView, type NotesKitView } from './notes-kit-view.ts'
 import { lateView, type LateView } from './late-view.ts'
 import { leaveView, type LeaveView } from './leave-view.ts'
 import { officeView, type OfficeView } from './office-view.ts'
@@ -21,7 +22,10 @@ import { movesView, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
+import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
+import { vehiclesView, type VehiclesView } from './vehicles-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
+import { READS_EVERYTHING, sameReading, type Reading } from '../reading.ts'
 
 /**
  * The device side of sync: a local copy of what the server has told us, an
@@ -58,6 +62,17 @@ export interface Snapshot {
    * before, which hold everything.
    */
   money?: boolean
+  /**
+   * What the server leaves out of crew rates and private links for this
+   * device's role (ADR 0046); absent when it sends everything, and on
+   * copies saved before, which then read their copy again once.
+   */
+  reading?: Reading
+  /**
+   * How the server read the feed when this copy last pulled (`FEED`); absent
+   * from copies saved before, which then read their copy again once.
+   */
+  feed?: number
 }
 
 export interface Storage {
@@ -103,6 +118,8 @@ export interface View {
   warehouse: WarehouseView
   /** Kit on jobs, and what's short (ADR 0014). */
   kit: KitView
+  /** Kit lists in jobs' notes, matched to the stock list, and the jobs whose notes hold kit not on them yet (ADR 0043). */
+  notesKit: NotesKitView
   /** Numbers set aside for printing labels (ADR 0015). */
   labels: LabelsView
   /** Kit out with jobs and back, and each job's pick list (ADR 0017). */
@@ -129,6 +146,12 @@ export interface View {
   counts: CountsView
   /** Prices, quotes, what's owed and each job's margin (ADR 0042); empty for a role the server sends no money to. */
   money: MoneyView
+  /** When freelancers are busy in their own calendars, read only (ADR 0044). */
+  ownCalendars: OwnCalendarsView
+  /** What this device is sent of crew rates and private links (ADR 0046), as the server last said: a screen says what's hidden. */
+  reading: Reading
+  /** The company's vehicles, their checks, and each booked on jobs with a driver (ADR 0047). */
+  vehicles: VehiclesView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -268,7 +291,7 @@ export class SyncClient {
    * nothing when it can. Set by the app from the person's role (ADR 0034);
    * the server checks the same, so this only saves a change it would turn down.
    */
-  guard?: (name: CommandName) => string | undefined
+  guard?: (name: CommandName, args: unknown) => string | undefined
 
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
@@ -281,10 +304,10 @@ export class SyncClient {
    * shown straight away as pending.
    */
   async mutate<N extends CommandName>(name: N, args: CommandInput<N>): Promise<Mutation<N>> {
-    // A change this person's role can't make is said so here, before it's kept, as the server would (ADR 0034).
-    const refused = this.guard?.(name)
-    if (refused) throw new Error(refused)
     const parsed = commandSchemas[name].safeParse(args)
+    // A change this person's role can't make is said so here, before it's kept, as the server would (ADR 0034, ADR 0046).
+    const refused = this.guard?.(name, parsed.success ? parsed.data : args)
+    if (refused) throw new Error(refused)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
     const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
     this.state.outbox.push(mutation)
@@ -402,6 +425,7 @@ export class SyncClient {
       jobs,
       warehouse,
       kit,
+      notesKit: notesKitView(entities, outbox, this.state.cursor, jobs, warehouse, kit, today),
       labels: labelsView(entities, outbox, this.state.cursor, warehouse),
       moves,
       faults,
@@ -415,6 +439,9 @@ export class SyncClient {
       attachments: attachmentsView(entities, outbox, this.state.cursor),
       counts: countsView(entities, outbox, this.state.cursor, warehouse, crew, today),
       money: moneyView(entities, outbox, this.state.cursor, jobs, crew, kit, timesheets),
+      ownCalendars: ownCalendarsView(entities, outbox, this.state.cursor),
+      reading: this.state.reading ?? READS_EVERYTHING,
+      vehicles: vehiclesView(entities, outbox, this.state.cursor, jobs, crew, today),
       keptFor: (personId, on = today) => nameKept(keptRecordsOf(entities, personId), on),
       // Snapshots saved before the calendar existed have no tables for it.
       calendar: { link: entities.calendarLink?.[CALENDAR_LINK_ID], days: entities.calendarDay ?? {} },
@@ -430,8 +457,20 @@ export class SyncClient {
     // announced as it lands, and the end of the round after that.
     this.connection = 'syncing'
     try {
-      await this.push()
-      await this.pull()
+      // A push that fails or runs out of time still lets the pull go: a phone
+      // that can't get its own changes through keeps hearing everyone else's,
+      // rather than nothing at all until it can (audit, 18 October 2026).
+      let failed: { err: unknown } | undefined
+      try {
+        await this.push()
+      } catch (err) {
+        failed = { err }
+      }
+      // When both fail, the push's failure is the one said, so being signed out still stops the retries.
+      await this.pull().catch((err: unknown) => {
+        throw failed ? failed.err : err
+      })
+      if (failed) throw failed.err
       this.setConnection('idle')
     } catch (err) {
       // No signal, server down, or a response lost on the way back. The
@@ -444,16 +483,18 @@ export class SyncClient {
 
   private async push() {
     const waiting = this.state.outbox.filter((m) => m.appliedSeq === undefined)
-    // The server takes PUSH_LIMIT at a time, so a long day with no signal, or a replay
-    // after a restore, goes up in slices, each answered and saved before the next is sent.
-    for (let from = 0; from < waiting.length; from += PUSH_LIMIT) {
-      const slice = waiting.slice(from, from + PUSH_LIMIT)
+    // A long day with no signal, or a replay after a restore, goes up PUSH_SLICE at a time,
+    // each answered and saved before the next is sent.
+    for (let from = 0; from < waiting.length; from += PUSH_SLICE) {
+      const slice = waiting.slice(from, from + PUSH_SLICE)
       const { results, stale } = await this.transport.push({
         clientId: this.state.clientId,
         mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
         // On the same clock as each createdAt, so the server can tell how long each waited here.
         sentAt: this.now().toISOString(),
         ...(this.state.generation ? { generation: this.state.generation } : {}),
+        // A slow server answers the first of them and leaves the rest, which go again, first, next time.
+        partial: true,
       })
       // The app started fresh after this device's copy: the pull that follows starts it afresh, dropping these.
       if (stale) return
@@ -468,6 +509,12 @@ export class SyncClient {
       this.state.outbox = kept
       this.version++
       await this.persist()
+      // Answered only in part: nothing after the rest may go before them, so this round pulls, and the next one, straight
+      // after, sends them. An answer to none of them, which no server gives, would only end the round.
+      if (results.length < slice.length) {
+        if (results.length > 0) this.again = true
+        return
+      }
     }
   }
 
@@ -481,11 +528,21 @@ export class SyncClient {
       // the records it was never sent; what it has stays, as reading it again only lands it as it is. Without, it lets go of
       // the money it holds.
       const money = res.money !== false
-      const rescoped = money !== (this.state.money !== false)
-      if (rescoped) {
+      const gainedMoney = money && this.state.money === false
+      // What it reads of rates and links changed too (ADR 0046): the copy is read again from the start, which lands every
+      // person, call, offer and timesheet as it's sent now, with what's hidden left out, or what's newly shown put back.
+      const reread = !sameReading(res.reading, this.state.reading)
+      const rescoped = money !== (this.state.money !== false) || reread
+      // The server reads the feed differently now (FEED). A copy read before may have been moved past a change it was
+      // never sent, so it's read again from the start, once: what it has stays, and so does everything waiting to go.
+      const refeed = res.feed !== undefined && res.feed > (this.state.feed ?? 0)
+      if (refeed) this.state.feed = res.feed
+      if (rescoped || refeed) {
         this.state.money = money
+        if (res.reading) this.state.reading = res.reading
+        else delete this.state.reading
         if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
-        else if (this.state.cursor > 0) {
+        if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
           this.state.cursor = 0
           this.version++
           await this.persist()
@@ -493,7 +550,7 @@ export class SyncClient {
         }
       }
       // Nothing new, most of the time: then nothing is saved and nobody is told.
-      let changed = res.changes.length > 0 || rescoped
+      let changed = res.changes.length > 0 || rescoped || refeed
       if (res.generation && res.generation !== this.state.generation) [this.state.generation, changed] = [res.generation, true]
       // Copies saved before made-up data existed have no flag, which means no.
       if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]

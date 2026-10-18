@@ -13,6 +13,7 @@ const DOCS = [
   ['Build progress', 'docs/progress.md'],
   ['Who uses it, and how', 'docs/personas.md'],
   ['Where things live', 'docs/information-architecture.md'],
+  ['Audit, 18 October 2026: from reliability to the screens', 'docs/audit-2026-10-18.md'],
   ['Audit, 16 October 2026: the real data', 'docs/audit-2026-10-16.md'],
   ['Audit, 30 September 2026', 'docs/audit-2026-09-30.md'],
   ['Phone field test', 'docs/field-test.md'],
@@ -27,6 +28,7 @@ const DOCS = [
   ['Competitor audit', 'docs/research/competitor-audit.md'],
   ['How booking works today', 'docs/research/current-process.md'],
   ['Crewbox handoff', 'docs/research/crewbox-handoff.md'],
+  ['The Crewbox show pack', 'docs/crewbox-show-pack.md'],
   // Every decision record, in order, titled from its first heading.
   ...readdirSync(join(root, 'docs/adr'))
     .filter((f) => f.endsWith('.md'))

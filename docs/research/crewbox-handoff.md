@@ -47,6 +47,9 @@ Session Hire generates a **show pack** for each project:
 The crew chief loads it on the box. This works on day one and needs nothing
 from the Crewbox side except the running-order import, which is small.
 
+Built on 17 October 2026 ([Decision 0045](../adr/0045-the-crewbox-show-pack.md)).
+The files and their columns are in [crewbox-show-pack.md](../crewbox-show-pack.md).
+
 ### Step 2: direct push and pull (needs Crewbox work)
 
 New Crewbox work, proposed as its own PRs on that repo:

@@ -120,6 +120,8 @@ describe('a call sheet on a private link', () => {
       'Two stages; the main stage is ours.',
       'Ring <b>Aoife Brennan</b> on <a href="tel:+447700900101">+44 7700 900101</a>',
       '<b>Sound No.1</b>, call <b>10:00</b>',
+      // The call's department (ADR 0046), which its role suggests.
+      ', Audio',
       'Food on site. Blacks, please.',
       'Dara Quinn (you)',
       'Tadhg Brady',

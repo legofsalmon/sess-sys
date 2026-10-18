@@ -56,7 +56,7 @@ List, Week and Month, so nothing is only reachable from the Menu.
 | Area | Row under the title | Pages beneath |
 |---|---|---|
 | Jobs | List · Week · Month · Clients · Venues | a job (pick list, call sheets); a client; a venue; Bring in from Google Calendar |
-| Stock | Catalogue · Places · Labels · Counting · Testing · Repairs | a product, an item, a place; a run of labels; a count; Bring in the stock list |
+| Stock | Catalogue · Places · Labels · Counting · Testing · Repairs · Vehicles | a product, an item, a place; a run of labels; a count; a vehicle ([Decision 0047](adr/0047-vans-and-drivers.md)); Bring in the stock list |
 | Crew | To check · People · Leave · Timesheets | a person (from the other thread); a timesheet; Bring in the crew list |
 | Menu | (every place by name, as now) | Admin (settings only), History, You |
 

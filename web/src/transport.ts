@@ -11,7 +11,8 @@ export class HttpTransport implements Transport {
   constructor(private readonly base = '') {}
 
   async push(req: PushRequest): Promise<PushResponse> {
-    // A push after a day with no signal carries hundreds of changes, so it gets longer than a pull.
+    // A push carries up to fifty changes, each a dozen trips from the server to its database, so it gets longer than a pull;
+    // the server answers what it got done inside 20 seconds (PUSH_BUDGET_MS), well before this runs out.
     return this.call('/api/sync/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) }, 30_000)
   }
 

@@ -3,6 +3,203 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026: a full audit, from reliability to the screens
+
+**Done**
+
+- A full audit of the app with all six new features in
+  ([Audit, 18 October 2026](audit-2026-10-18.md)): sync and data at real
+  size, security and privacy, every screen as each role on a phone and a
+  desk, and speed and running it. Two P0s in the sync (a pull that can
+  skip a change, a phone with a backlog stuck for ever), backups and
+  alerts still off, and an order to fix the rest.
+- Checked: everything was local; nothing live was read or changed.
+- The two sync P0s fixed ([Decision 0001](adr/0001-sync-engine.md),
+  amended): a pull that finds nothing new keeps the device where it was,
+  and every device reads its copy again once, keeping what it has
+  waiting; a phone sends 50 changes at a time, a resend is answered from
+  one look, a slow push is answered in part inside 20 seconds, and a
+  round whose push fails still pulls.
+
+**Waiting on**
+
+- Colly: the backup variables and the Sentry key, and clearing the
+  dashboard start command on both Railway services.
+
+## 17 October 2026: vans and drivers
+
+**Done**
+
+- Stock › Vehicles: the company's vans, Lutons, trucks, cars and trailers,
+  each with its registration, seats, payload and notes, and its checks:
+  NCT or CVRT, motor tax, insurance, service due and, for a truck, the
+  tachograph. Each has its own page, where it's taken off the road (in for
+  repair, until a day or until it's back) and retired
+  ([Decision 0047](adr/0047-vans-and-drivers.md)).
+- A Vehicles card on each job's page books a van on the whole job or one
+  phase, for given days, with a driver from the crew; errands are booked
+  the same way. A road check run out on the booking's days is refused by
+  name, before anything is sent and again on the server; so is a driver
+  with no licence, or one run out. Another job on the same van that day,
+  or a day off the road, asks first and is booked anyway. A licence not
+  recorded, a check not recorded and a service overdue warn.
+- Each booking says what's wrong with it from today on, worst first, and
+  nothing is taken off later: a check that lapses after booking shows on
+  it.
+- The planner has Vans rows: one per vehicle, the jobs it's on and who
+  drives, off the road, and a van on two jobs as a clash in To sort out.
+  A job's day names its vans and drivers.
+- Call sheets, in the app and on a freelancer's link, list the vehicles on
+  that phase and who's driving.
+- Checks running out are listed on the Vehicles page, beside the
+  certificates and documents on Crew › People, and counted on Home for
+  the company and the warehouse. The app asks nobody for anything.
+- The made-up data has Big Van (motor tax running out, service overdue,
+  booked on two jobs on one day) and The Luton (in for a new clutch, its
+  driver's licence not recorded), and an errand to collect stage decks.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- The office: the real vehicles and their check dates, and drivers'
+  licences on their cards.
+- A decision on licence categories (C1 for a heavy Luton, C for a truck),
+  which aren't checked yet.
+
+## 17 October 2026: a department on every call, and what each role reads
+
+**Done**
+
+- Every crew call has a department from the crew profiles' list, or none.
+  Asking for crew starts it on the one its role suggests (from calls for
+  the same role, then people with the role as a skill, then the role's
+  words), with a line saying so; it changes on the call's edit form.
+  Calls brought in from the calendar take the one most of their people
+  are in, or none
+  ([Decision 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
+- Crew › Calls narrows to a department, a head of department starting on
+  their own. Narrowed to "No department", it gives many calls one at once,
+  nothing ticked to start. Home for a department counts the crew its calls
+  still need. Call sheets and the show pack carry the call's department.
+- Crew rates, timesheet amounts and freelancers' private links go only to
+  the roles that need them: all to the office and directors; a head of
+  department their own department's links, and rates if a director
+  allows it in Admin; the warehouse and staff crew none but their own.
+  Records still go to everyone with those fields left out, and every
+  screen says what's hidden for the role. Setting or agreeing a rate, and
+  deciding a timesheet, are refused for a role without rates, with who
+  can. The history leaves the figures out for them; Download everything
+  stays with the office and directors.
+- The demo's personas are sent what the person they stand for would be
+  sent, and You says what each role reads.
+- Checked: typecheck, unit tests (shared and server, with each role's
+  feed checked for rates and links it shouldn't hold), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Colly: whether heads of department should see crew rates (Admin, off
+  to start).
+- The office trial: whether the warehouse and staff crew still need every
+  phone number and certificate, the last of the reading left open.
+
+## 17 October 2026: the Crewbox show pack
+
+**Done**
+
+- Show pack, on each phase's call sheet and on the job's page: one .zip
+  for the Crewbox, made on the device from what it holds, so it works with
+  no signal, and sent nowhere. In it: the crew who said yes (what they go
+  by, role, department, call time, days), the running order as Crewbox
+  acts read from the phase's notes and the run of show as typed, the kit
+  with the Session Hire numbers scanned out, the venue and its access
+  notes, who to ring on the day and the office, a crew list to print, and
+  a manifest with the format's version
+  ([Decision 0045](adr/0045-the-crewbox-show-pack.md)).
+- The join QR: typing the box's address (and the event PIN) when making
+  it puts a QR code of the box's join page on the crew list. Neither is
+  kept in the app.
+- Crew numbers are in it only for the office, heads and directors, as the
+  contact on the day's call sheet has them; anyone else's pack has the
+  contact's number only. No rates or prices in any pack.
+- The patch and lighting sheets are empty, with their columns: the app
+  doesn't plan either yet. Every file's layout is written down in
+  [crewbox-show-pack.md](crewbox-show-pack.md) for the Crewbox side.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- The Crewbox side: a running-order import that reads
+  `running-order.csv`, and a check of the patch and lighting columns
+  against Crewbox's own export layout, which couldn't be read from here.
+
+## 17 October 2026: kit lists from the notes
+
+**Done**
+
+- Jobs brought in from the calendars keep their job sheets in the notes;
+  the kit lists in them (`4 x d&b Y10P`, `2x d20 amp`, `Shure ULXD x 2`)
+  can now become kit lines. A job's Kit card says what its notes list and
+  opens Kit from the notes: each line as written, the product it matched
+  (by name, by its model or code, or a close match), how many, and in
+  words what it will do. Any line can take another product, another
+  number, Not kit, or New product… (for roles that can change stock).
+  Nothing goes on until it's added.
+- A line from a phase's notes goes on that phase; from the job's notes,
+  on the whole job. What the job already has counts, so nothing is
+  doubled, even when the same notes are read twice or by two phones with
+  no signal. The notes stay as written.
+- Names chosen are remembered: "d20 amp" chosen as the D20 once matches
+  it on every job after, and a name said to be not kit stays not kit.
+- Kit in the notes (from the Jobs list, the bring-in and the Menu) lists
+  the jobs whose notes hold kit not on them yet, coming up first: those
+  where everything matched go on together, asked first; the rest each
+  open their own lines. Matching runs on the phone and works with no
+  signal; a season goes in batches of 50 jobs a change
+  ([Decision 0043](adr/0043-kit-lists-from-the-notes.md)).
+- The made-up data has three jobs with kit in their notes: one to check,
+  one with a phase's notes, and one ready to add.
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Adam or the office: a look at a few real job sheets on the made-up
+  data's pattern once the stock list is in, to see how many lines match
+  by name and which names need choosing once.
+
+## 17 October 2026: freelancers' own calendars, read only
+
+**Done**
+
+- A freelancer can share when they're busy from their private link, by
+  pasting their calendar's private address (Google's secret iCal address,
+  Outlook's or iCloud's published link, or a webcal:// one). The page says
+  first that only busy times are kept, never what, where or who with, and
+  that nothing is added to their calendar. One tap stops it.
+- The office can add the address a freelancer sent on their page, in a
+  card "Their own calendar", read it again now, or stop reading it.
+- The server reads each calendar at once, then every three hours: busy
+  times only, four months ahead, repeating events worked out, our own
+  Session Hire bookings left out.
+- Busy days show in the planner as "Busy (own calendar)", on the person's
+  page, and as a warning when offering work; the offer can still go.
+- The address is kept on the server as a secret: not on devices, not in
+  the history, not in Download everything, and blanked in error reports.
+  The server reads only public https addresses, checked again after each
+  redirect, with time and size limits
+  ([Decision 0044](adr/0044-freelancers-own-calendars-read-only.md)).
+- Checked: typecheck, unit tests (shared and server), the web build, the
+  hub build and the browser tests.
+
+**Waiting on**
+
+- Nothing to set up: no keys or accounts are needed. Colly: whether four
+  months ahead and every three hours are right for how far out work is
+  offered.
+
 ## 17 October 2026: quotes and a money view
 
 **Done**

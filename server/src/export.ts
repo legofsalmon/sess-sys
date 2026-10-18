@@ -25,8 +25,11 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * links since replaced. Whoever held the file could otherwise act as them.
  * Likewise the app's key to the connected Google calendar (ADR 0008), even
  * though it is stored locked; devices never see it, so the feed has no copies.
+ * And a freelancer's own calendar's private address (ADR 0044): whoever held
+ * it could read their whole calendar. Devices never see it either; the busy
+ * times stay in.
  */
-const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'] }
+const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'], own_calendars: ['address'] }
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>
@@ -202,7 +205,7 @@ const ABOUT: Record<string, string> = {
   // Counts of places and cases (ADR 0030). The fixes a count led to are in the tables they changed: assets, stock and faults.
   counts:
     'Counts of places and cases: where, when they started and finished on the phone, who counted, what the count said of each item (found, not found, away, or found though kept elsewhere), the numbers no item had, each product counted against what was recorded and how many were out, and a summary in numbers.',
-  crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, and the certificates each needs, such as IPAF.',
+  crew_calls: 'Roles jobs need, such as 2 audio techs for Build and Show, the department each is for, and the certificates each needs, such as IPAF.',
   // People's documents (ADR 0029): the details here, the files in the storage.
   document_files_to_delete: "Files the storage still holds for documents that have gone, or for uploads that didn't finish, waiting to be deleted: the storage's name for each, when, and why one couldn't be deleted yet. Nothing says whose it was.",
   documents:
@@ -212,6 +215,8 @@ const ABOUT: Record<string, string> = {
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
+  kit_names: 'Names that jobs\' notes use for kit, as chosen once in Kit from the notes: the product each means, or blank for not kit.',
+  kit_notes_read: 'Jobs whose notes have been turned into kit lines, with a fingerprint of the notes as they were, so a job comes back to the list only when its notes change.',
   label_runs: 'Numbers set aside for printing labels, a run at a time: the first, how many, what they were for, and when one was cancelled before any of its labels went on an item. A cancelled run is off the list, but its numbers are never given out again.',
   leave_allowances: "Each staff member's annual leave for a year: the days, what was carried over, and a note; 20 days when none is set.",
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
@@ -230,11 +235,15 @@ const ABOUT: Record<string, string> = {
     "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, when it was sent, the client's answer, and the invoice and payment the office recorded for it.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
-  settings: "The office's own details: the name, phone and email shown to freelancers on their pages.",
+  settings: "The office's own details: the name, phone and email shown to freelancers on their pages; and whether heads of department see crew rates.",
   stock: 'Counted stock: how many of a product are at a place or in a case.',
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
+  // Vans and drivers (ADR 0047).
+  vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',
+  vehicles:
+    "The company's vehicles: name, registration, kind, seats, payload in kg, notes, each check (NCT or CVRT, motor tax, insurance, service, tachograph) with whether it's needed and the day it runs out, and when one is off the road and why.",
   venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',
 }
 

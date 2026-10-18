@@ -56,7 +56,19 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  *   and a count short, and one never counted, first on the week's list;
  * - money (ADR 0042): a price list for kit and crew, a client's discount,
  *   and quotes sent, replaced, accepted and invoiced, with the gala's still
- *   owed and a freelancer still to pay.
+ *   owed and a freelancer still to pay;
+ * - a department on each crew call (ADR 0046), the one its role suggests,
+ *   but the Harbour Lights load out's hands, left with none to give them;
+ * - kit lists in jobs' notes (ADR 0043): the wedding's job sheet with lines
+ *   that match by name, by model and not at all, and crew and a van under
+ *   transport; the arts week's Show with a line that's only a guess; and
+ *   the gala's, which all match, ready to add with the others;
+ * - vans and drivers (ADR 0047): a van whose motor tax runs out soon and
+ *   whose service is overdue, booked on the festival's load in, a van run
+ *   to collect stage decks, and both the festival's load out and the
+ *   summit's last day (a clash in the planner, booked anyway); and a Luton
+ *   in for a new clutch until the launch, with a driver whose licence isn't
+ *   known. Their registrations are in a county code no real one has (XX).
  */
 /** Where a store is set up, Róisín has sent her renewed Safe Pass card from her link, waiting for the office to check (ADR 0029). */
 export const MADE_UP_RENEWAL = { name: 'Róisín Farrell', kind: 'safe-pass', days: 377 } as const
@@ -110,15 +122,22 @@ export function madeUpData(today: string): Mutation[] {
   const summitShow = phase(summit, 'Conference', 6, 7, '08:00 Crew call\n08:45 Doors\n09:00 Keynote\n17:30 Close')
   const arts = job('Corrib Arts Week', corrib, granary.id, 'quoted', 'Waiting on their funding.')
   phase(arts, 'Load in', 12, 12)
-  phase(arts, 'Show', 13, 15)
+  phase(arts, 'Show', 13, 15, 'Lighting\n16 x Robe Spiider\n\nStaging\n20 x Stage deck 2x1m\n8 x Stage deck legs 60cm\n\nAccess\nGoods lift 2 m deep, so decks go up in twos.')
   const launch = job('Liffey Brands Launch', liffey, pier3.id, 'confirmed')
   const launchShow = phase(launch, 'Show', 13, 14)
-  const wedding = job('Clonmore Wedding', kilbeg, clonmore.id, 'enquiry', 'Speeches and a band in the marquee.')
+  // Job sheets as the calendar's events have them (ADR 0011), with kit lists to turn into kit lines (ADR 0043).
+  const wedding = job(
+    'Clonmore Wedding',
+    kilbeg,
+    clonmore.id,
+    'enquiry',
+    'Speeches and a band in the marquee.\n\nAudio\n4 x d&b Y10P\n2x d20 amp\n4 x Shure SM58\n1 x Allen & Heath SQ5\n\nLighting\n8 x Spiider\n\nTransport and labour\n1 x Luton van\n2 x Stagehands\n\nRun of show\n5.00pm - Crew call\n7.30pm - Speeches\n9.00pm - Band'
+  )
   phase(wedding, 'Show', 20, 21)
   const showcase = job('Winter Showcase', shannonside, riverside.id, 'confirmed')
   phase(showcase, 'Show', 30, 30)
   add('project.update', { id: showcase, status: 'cancelled' })
-  const gala = job('Autumn Gala', brightwater, northbank.id, 'confirmed')
+  const gala = job('Autumn Gala', brightwater, northbank.id, 'confirmed', 'Audio\n8 x d&b Y10P\n4 x Shure SM58\n4 x XLR 10 m\n\nRun of show\n7.00pm - Doors\n7.30pm - Dinner\n9.00pm - Awards')
   const galaShow = phase(gala, 'Show', -10, -9)
   // On today, so someone can be running late for it (ADR 0028).
   const shoot = job('Liffey Brands Shoot', liffey, pier3.id, 'confirmed', 'Product shots for the launch.')
@@ -211,7 +230,18 @@ export function madeUpData(today: string): Mutation[] {
 
   // Crew asked for from the jobs, and what each person said.
   const venues = new Map([riverside, northbank, granary, pier3, clonmore].map((v) => [v.id, venueLabel(v)]))
-  const call = (p: CommandInput<'phase.add'>, project: string, venueId: string, role: string, needed: number, euroADay: number | null, callTime = '08:00', needsCertificates: CertificateKind[] = []) =>
+  // Each call's department (ADR 0046) is the one its role suggests, as when the office asks for crew, unless it's given.
+  const call = (
+    p: CommandInput<'phase.add'>,
+    project: string,
+    venueId: string,
+    role: string,
+    needed: number,
+    euroADay: number | null,
+    callTime = '08:00',
+    needsCertificates: CertificateKind[] = [],
+    department?: string | null
+  ) =>
     add('call.create', {
       id: newId(),
       projectId: p.projectId,
@@ -228,6 +258,7 @@ export function madeUpData(today: string): Mutation[] {
       details: 'Food on site. Blacks, please.',
       replyBy: null,
       needsCertificates,
+      ...(department !== undefined ? { department } : {}),
     }).id
   const offer = (callId: string, personId: string, override = false) => add('offer.send', { id: newId(), callId, personId, override }).id
   const booked = (callId: string, personId: string) => {
@@ -249,7 +280,8 @@ export function madeUpData(today: string): Mutation[] {
   const lx = call(harbourShow, 'Harbour Lights Festival', riverside.id, 'LX op', 1, 280, '12:00')
   add('offer.respond', { id: offer(lx, fionn), answer: 'counter', counterRateCents: 32000, days: null, note: 'Two long days; can you do 320?' })
   // Tadhg was booked for the load out, then rang to say he can't: the call is short again, for the office to see.
-  add('offer.respond', { id: booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00'), tadhg), answer: 'pullOut', note: 'Away that Monday now, sorry.' })
+  // The load out's hands were asked for with no department, as a call brought in from the calendar comes: one for the office to give one (ADR 0046).
+  add('offer.respond', { id: booked(call(harbourOut, 'Harbour Lights Festival', riverside.id, 'Stagehand', 2, 200, '09:00', [], null), tadhg), answer: 'pullOut', note: 'Away that Monday now, sorry.' })
   booked(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Video', 1, 300), grainne)
   // Dara is booked at Harbour Lights then: offered anyway, so the planner shows it as a check.
   offer(call(summitShow, 'Brightwater Tech Summit', northbank.id, 'Sound No.1', 1, 320), dara, true)
@@ -430,5 +462,40 @@ export function madeUpData(today: string): Mutation[] {
   add('quote.answer', { id: harbourTwo, answer: 'accepted', on: day(-12) })
   const artsQuote = quote(arts, [line('kit', 'Robe Spiider', 'Lighting', 16, 3, 55), line('kit', 'Stage deck 2 × 1 m', 'Staging', 20, 3, 15)])
   add('quote.sent', { id: artsQuote, on: day(-3) })
+
+  // Vans and drivers (ADR 0047).
+  const check = (expires: number | null) => ({ needed: true, expires: expires === null ? null : day(expires) })
+  const not = { needed: false, expires: null }
+  const bigVan = add('vehicle.save', {
+    id: newId(),
+    name: 'Big Van',
+    registration: '241-XX-101',
+    kind: 'van',
+    seats: 3,
+    payloadKg: 1200,
+    notes: 'Roof rack for truss. Fuel card in the glovebox.',
+    checks: { test: check(200), tax: check(9), insurance: check(150), service: check(-3), tacho: not },
+  }).id
+  const luton = add('vehicle.save', {
+    id: newId(),
+    name: 'The Luton',
+    registration: '232-XX-202',
+    kind: 'luton',
+    seats: 3,
+    payloadKg: 1000,
+    notes: 'Tail lift: 500 kg at most.',
+    checks: { test: check(25), tax: check(100), insurance: check(150), service: check(60), tacho: not },
+  }).id
+  add('vehicle.offRoad', { id: luton, out: { since: day(-1), until: day(4), note: 'In for a new clutch' } })
+  const errand = add('project.create', { id: newId(), name: 'Collect stage decks from Murt', clientId: null, venueId: null, status: 'confirmed', kind: 'errand', notes: '20 decks and legs, ready from 10:00.' }).id
+  const errandDay = phase(errand, 'Errand', 1, 1)
+  const book = (vehicleId: string, p: { id: string; projectId: string; start: string; end: string }, driverId: string | null, notes = '', override = false) =>
+    add('vehicleBooking.add', { id: newId(), vehicleId, projectId: p.projectId, phaseId: p.id, start: p.start, end: p.end, driverId, notes, override })
+  book(bigVan, errandDay, cian, 'Ring Murt before leaving.')
+  book(bigVan, harbourIn, cian)
+  book(bigVan, harbourOut, cian)
+  // The summit wants it on its last day too, the same day as the festival's load out: booked anyway, a clash to sort out.
+  book(bigVan, summitShow, null, '', true)
+  book(luton, launchShow, dara, 'Back to the warehouse the same night.')
   return out
 }

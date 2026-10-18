@@ -93,6 +93,13 @@ async function notYet(tx: Queryable, person: Person, today: string): Promise<str
     [person.id, today]
   )
   if (contact[0]) return `${person.name} is the contact on the day for ${job(contact[0])}, which hasn't ended. Choose someone else first.`
+  // Driving a vehicle on a job going ahead or pencilled in (ADR 0047), as the device finds it.
+  const { rows: driving } = await tx.query<{ vehicle: string; project: string }>(
+    `SELECT v.name AS vehicle, p.name AS project FROM vehicle_bookings b JOIN vehicles v ON v.id = b.vehicle_id JOIN projects p ON p.id = b.project_id
+      WHERE b.driver_id = $1 AND b.end_day >= $2::date AND p.status NOT IN ('cancelled', 'lost') ORDER BY b.start_day, b.id LIMIT 1`,
+    [person.id, today]
+  )
+  if (driving[0]) return `${person.name} is driving ${driving[0].vehicle} for ${driving[0].project}, which hasn't ended. Choose another driver first.`
   const { rows: waiting } = await tx.query<{ project: string }>(
     `SELECT c.project FROM timesheets t JOIN offers o ON o.id = t.id JOIN crew_calls c ON c.id = o.call_id
       WHERE o.person_id = $1 AND t.status = 'sent' ORDER BY t.sent_at, t.id LIMIT 1`,

@@ -73,6 +73,14 @@ export const MENU: PlaceGroup[] = [
         needs: ['money'],
       },
       {
+        key: 'notes-kit',
+        icon: 'kit',
+        href: '#jobs/notes-kit',
+        label: 'Kit in the notes',
+        about: "Kit lists in jobs' notes, turned into kit lines",
+        needs: ['kit'],
+      },
+      {
         key: 'import',
         icon: 'download',
         href: '#jobs/import',
@@ -127,6 +135,13 @@ export const MENU: PlaceGroup[] = [
         href: '#stock/repairs',
         label: 'Repairs',
         about: 'Faults and missing kit to sort out',
+      },
+      {
+        key: 'vehicles',
+        icon: 'van',
+        href: '#stock/vehicles',
+        label: 'Vehicles',
+        about: 'The vans, their checks, and the jobs they are on',
       },
       {
         key: 'import-stock',

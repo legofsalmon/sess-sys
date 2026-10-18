@@ -23,6 +23,8 @@ export interface TimesheetRow {
   finished: boolean
   /** From the timesheet, or else the booking: its days at its rate. */
   total: ReturnType<typeof timesheetTotal>
+  /** This device isn't sent the rate or the amounts (ADR 0046), so `total` is no figure to show. */
+  amountsHidden: boolean
 }
 
 export interface TimesheetsView {
@@ -110,6 +112,7 @@ export function timesheetsView(
       state: timesheet ? (timesheet.status === 'approved' ? 'approved' : 'sent') : 'not-in',
       finished: last < today,
       total: timesheetTotal(timesheet ?? { days: offer.days, dayRateCents: offer.dayRateCents, extras: [] }),
+      amountsHidden: timesheet?.amountsHidden === true || offer.rateHidden === true,
     }
     rows.set(offerId, row)
     return row

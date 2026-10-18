@@ -1,6 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { irishToday } from '../calendar.ts'
-import { certificatesAfter, daysBetween, DEFAULT_LEVEL, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, departmentOf, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
 import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
@@ -81,7 +81,7 @@ export function crewView(
   for (const p of Object.values(entities.person ?? {})) people.set(p.id, { ...withDefaults(p), pending: false, worked: [] })
   const calls = new Map<string, CrewCall & { pending: boolean }>()
   // Calls synced before jobs existed have no job or phase.
-  for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, pending: false })
+  for (const c of Object.values(entities.crewCall ?? {})) calls.set(c.id, { ...c, projectId: c.projectId ?? null, phaseId: c.phaseId ?? null, department: departmentOf(c), pending: false })
   const offers = new Map<string, Offer & { pending: boolean }>()
   // Offers synced before "Answers to check" kept declines have no seenAt.
   for (const o of Object.values(entities.offer ?? {})) offers.set(o.id, { ...o, seenAt: o.seenAt ?? null, pending: false })
@@ -132,7 +132,11 @@ export function crewView(
         people.set(a.id, {
           linkToken: was?.linkToken ?? '',
           archived: was?.archived ?? false,
+          // What this device isn't sent (ADR 0046) stays hidden: an edit from a role that doesn't read the rate sends none and keeps it.
+          ...(was?.linkHidden ? { linkHidden: true } : {}),
           ...a,
+          dayRateCents: a.dayRateCents !== undefined ? a.dayRateCents : (was?.dayRateCents ?? null),
+          ...(a.dayRateCents === undefined && was?.rateHidden ? { rateHidden: true } : {}),
           approvesLeave,
           department: a.department !== undefined ? a.department : (was?.department ?? null),
           level: a.level ?? was?.level ?? DEFAULT_LEVEL,
@@ -189,7 +193,17 @@ export function crewView(
       }
       case 'call.create': {
         const a = m.args as CommandArgs<'call.create'>
-        if (!calls.has(a.id)) calls.set(a.id, { ...a, projectId: a.projectId ?? null, phaseId: a.phaseId ?? null, status: 'open', pending: true })
+        // A call sent without a department is given the one its role suggests, as the server will (ADR 0046).
+        const department = a.department !== undefined ? a.department : departmentForRole(a.role, { calls: [...calls.values()], people: [...people.values()] })
+        if (!calls.has(a.id)) calls.set(a.id, { ...a, department, projectId: a.projectId ?? null, phaseId: a.phaseId ?? null, status: 'open', pending: true })
+        break
+      }
+      case 'call.department': {
+        const a = m.args as CommandArgs<'call.department'>
+        for (const id of a.ids) {
+          const c = calls.get(id)
+          if (c && departmentOf(c) !== a.department) calls.set(id, { ...c, department: a.department, pending: true })
+        }
         break
       }
       case 'project.update': {
@@ -248,6 +262,7 @@ export function crewView(
             days: eachDay(c.start, c.end),
             dayRateCents: c.dayRateCents,
             counterRateCents: null,
+            ...(c.rateHidden ? { rateHidden: true } : {}),
             note: '',
             respondedAt: null,
             respondedVia: null,

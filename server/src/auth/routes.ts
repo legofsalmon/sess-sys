@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import { refusalFor, roleCan, ROLES, type Ability, type MeResponse, type Role, type StaffUser } from '@sh/shared'
+import { refusalFor, roleCan, ROLES, type Ability, type MeResponse, type ReaderOf, type Role, type StaffUser } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Db } from '../db.ts'
 import { clearCookie, publicOrigin, readCookie, setCookie } from '../http.ts'
@@ -23,6 +23,12 @@ declare module 'fastify' {
      * checked: roles off, sign-in off, or a public route.
      */
     role: Role | null
+    /**
+     * Who is asking on the Crew tab, and their department, which with the
+     * role decide what they read of crew rates and links (ADR 0046). On a
+     * demo, the persona's stand-in. Empty when nobody is matched.
+     */
+    reader: ReaderOf
   }
 }
 
@@ -35,6 +41,43 @@ const PASSCODE_COOKIE = 'sh_passcode'
 /** On a demo copy, the persona chosen on "See it as…", as the role the server holds it to (ADR 0034). */
 const PREVIEW_COOKIE = 'sh_preview'
 const asRole = (v: unknown): Role | undefined => (ROLES as readonly unknown[]).includes(v) ? (v as Role) : undefined
+
+/**
+ * What the preview cookie holds: the role alone, as it always has, or with
+ * who the persona stands in for, so the demo reads as that person would
+ * (ADR 0046): their own rate and link, a head's department's links.
+ */
+interface Preview {
+  role: Role
+  personId?: string
+  department?: string
+}
+function readPreview(value: string | undefined): Preview | undefined {
+  const role = asRole(value)
+  if (role) return { role }
+  try {
+    const p = JSON.parse(Buffer.from(value ?? '', 'base64url').toString('utf8')) as Record<string, unknown>
+    const known = asRole(p.role)
+    if (!known) return undefined
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : undefined)
+    const personId = text(p.personId, 64)
+    const department = text(p.department, 60)
+    return { role: known, ...(personId ? { personId } : {}), ...(department ? { department } : {}) }
+  } catch {
+    return undefined
+  }
+}
+/** The made-up freelancer whose page has the most on it: offers and bookings coming up. */
+async function busiestLink(db: Db): Promise<string | null> {
+  const { rows } = await db.query<{ link_token: string }>(
+    `SELECT p.link_token FROM people p
+      WHERE p.kind = 'freelancer' AND NOT p.archived AND p.link_token <> ''
+      ORDER BY (SELECT count(*) FROM offers o WHERE o.person_id = p.id AND o.status IN ('offered', 'accepted', 'confirmed')) DESC, p.name, p.id
+      LIMIT 1`
+  )
+  return rows[0] ? `/f/${rows[0].link_token}` : null
+}
+const writePreview = (p: Preview) => (p.personId || p.department ? Buffer.from(JSON.stringify(p)).toString('base64url') : p.role)
 
 /** What the passcode cookie holds: changes whenever the passcode does, so changing it locks every device out. */
 const passcodeProof = (passcode: string) => createHmac('sha256', passcode).update('session-hire demo').digest('base64url')
@@ -58,6 +101,7 @@ const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\
 export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | undefined, passcode?: string) {
   app.decorateRequest('user', null)
   app.decorateRequest('role', null)
+  app.decorateRequest('reader', null as unknown as ReaderOf)
   // Google sign-in wins: a passcode is only for a demo copy before it is set up.
   const proof = !auth && passcode ? passcodeProof(passcode) : undefined
   const hasPasscode = (req: FastifyRequest) => !!proof && same(readCookie(req, PASSCODE_COOKIE) ?? '', proof)
@@ -71,15 +115,19 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
   }
 
   app.addHook('onRequest', async (req, reply) => {
+    req.reader = {}
     if (!req.routeOptions.url?.startsWith('/api/') || req.routeOptions.config.public) return
     if (proof) {
       if (!hasPasscode(req)) return reply.code(401).send({ error: 'Enter the passcode first.' })
-      req.role = asRole(readCookie(req, PREVIEW_COOKIE)) ?? null
+      const preview = readPreview(readCookie(req, PREVIEW_COOKIE))
+      req.role = preview?.role ?? null
+      if (preview) req.reader = { ...(preview.personId ? { personId: preview.personId } : {}), ...(preview.department ? { department: preview.department } : {}) }
     } else if (auth) {
       req.user = await signedIn(req, reply)
       if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
-      const { role, on } = await roleOfAccount(db, req.user.email)
+      const { role, on, personId, department } = await roleOfAccount(db, req.user.email)
       req.role = on ? role : null
+      if (on && personId) req.reader = { personId, department: department ?? null }
     }
     const needs = req.routeOptions.config.needs
     if (needs && req.role && !roleCan(req.role, needs)) return reply.code(403).send({ error: refusalFor(req.role, needs) })
@@ -89,7 +137,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     reply.header('cache-control', 'no-store')
     if (proof) {
       if (!hasPasscode(req)) return reply.code(401).send({ auth: 'passcode', error: 'Enter the passcode first.' })
-      const role = asRole(readCookie(req, PREVIEW_COOKIE))
+      const role = readPreview(readCookie(req, PREVIEW_COOKIE))?.role
       return { auth: 'passcode', ...(role ? { role } : {}) }
     }
     if (!auth) return { auth: 'off' }
@@ -101,12 +149,17 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
 
   // A demo copy's "See it as…" (ADR 0033): the persona chosen is the role the server holds this browser to, so
   // the demo turns down what that person couldn't do, as the live app will. None goes back to everything.
-  app.post<{ Body: { role?: unknown } }>('/api/auth/preview', async (req, reply) => {
+  // With it, who the persona stands in for (a member of staff, a head's department), so the demo reads as they would (ADR 0046).
+  app.post<{ Body: { role?: unknown; personId?: unknown; department?: unknown } }>('/api/auth/preview', async (req, reply) => {
     reply.header('cache-control', 'no-store')
     if (!proof) return reply.code(404).send({ error: 'Only a demo copy can be seen as someone else.' })
     const role = asRole(req.body?.role)
-    if (role) setCookie(req, reply, PREVIEW_COOKIE, role, { maxAge: SESSION_DAYS * 86_400 })
+    const preview = role && readPreview(writePreview({ role, personId: req.body?.personId as string, department: req.body?.department as string }))
+    if (preview) setCookie(req, reply, PREVIEW_COOKIE, writePreview(preview), { maxAge: SESSION_DAYS * 86_400 })
     else clearCookie(req, reply, PREVIEW_COOKIE)
+    // The freelancer is their page, not a role: the one with the most on it, found here, as a persona seen before may
+    // have left this browser's copy without anyone's link (ADR 0046).
+    if (req.body?.role === 'freelancer') return { role: null, link: await busiestLink(db) }
     return { role: role ?? null }
   })
 

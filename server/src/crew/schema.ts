@@ -143,6 +143,26 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE people ADD COLUMN IF NOT EXISTS role text CHECK (role IN ('director', 'office', 'head', 'warehouse', 'crew'));
   `,
+  // Their own calendar, read only (ADR 0044): one each, its id the person's. The address is a secret, like a link: it
+  // never goes to a device, in the history or in Download everything. Only busy times are kept, as JSON, never what
+  // they were. `read_at` is the last good read; `tried_at` the last look, good or not, and `problem` why it wasn't.
+  `
+  CREATE TABLE IF NOT EXISTS own_calendars (
+    id         text PRIMARY KEY,
+    person_id  text NOT NULL UNIQUE REFERENCES people(id),
+    address    text NOT NULL,
+    added_by   text NOT NULL CHECK (added_by IN ('self', 'office')),
+    added_at   timestamptz NOT NULL DEFAULT now(),
+    read_at    timestamptz,
+    tried_at   timestamptz,
+    problem    text,
+    busy       jsonb NOT NULL DEFAULT '[]',
+    until_day  date NOT NULL,
+    CHECK (id = person_id)
+  );
+  `,
+  // A department on every crew call (ADR 0046), from the crew profiles' list; none for a call nobody has given one.
+  `ALTER TABLE crew_calls ADD COLUMN IF NOT EXISTS department text;`,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

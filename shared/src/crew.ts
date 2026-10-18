@@ -47,6 +47,78 @@ export function tidyDepartment(typed: string): string | null {
   return CREW_DEPARTMENTS.find((d) => d.toLowerCase() === s.toLowerCase()) ?? s
 }
 
+/** Whether two departments as typed are the same one: "audio" and "Audio " are. Nothing is never the same as anything. */
+export const sameDepartment = (a: string | null | undefined, b: string | null | undefined) => !!a?.trim() && a.trim().toLowerCase() === b?.trim().toLowerCase()
+
+/**
+ * Words in a role that say its department (ADR 0046), the first that fits:
+ * "Sound No.1" is audio, "LX op" is LX, "Camera" is video. A role that says
+ * nothing about one, such as a stagehand, has none until someone gives it one.
+ */
+const ROLE_WORDS: readonly [RegExp, (typeof CREW_DEPARTMENTS)[number]][] = [
+  [/\blaser/, 'Laser'],
+  [/\bled\b/, 'LED Tech'],
+  [/\b(sound|audio|monitors?|foh|a[12]|pa|rf|mics?)\b/, 'Audio'],
+  [/\b(lx|light(s|ing)?|lamp|follow ?spot|dimmer)\b/, 'LX'],
+  [/\b(video|camera|cam|vision|projection(ist)?|vt)\b/, 'Video'],
+  [/\b(backline|guitar tech|drum tech)\b/, 'Backline'],
+  [/\brigg(er|ers|ing)\b/, 'Rigger'],
+  [/\b(stage manager|asm|dsm|sm)\b/, 'Stage Manager'],
+  [/\b(sfx|pyro|special effects|confetti)\b/, 'SFX'],
+  [/\b(driver|transport|truck|van)\b/, 'Transport'],
+  [/\b(production|crew chief|producer|production manager|site manager|runner)\b/, 'Production'],
+]
+
+/** What a role is called, as compared: "Sound  No.1" and "sound no.1" are one. */
+const roleKey = (role: string) => role.trim().replace(/\s+/g, ' ').toLowerCase()
+
+/** The department named most often, the first by name on a tie; none when nothing is named. */
+function mostNamed(departments: readonly (string | null)[]): string | null {
+  const counts = new Map<string, { name: string; n: number }>()
+  for (const d of departments) {
+    const name = d && tidyDepartment(d)
+    if (!name) continue
+    const was = counts.get(name.toLowerCase())
+    counts.set(name.toLowerCase(), { name: was?.name ?? name, n: (was?.n ?? 0) + 1 })
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name))[0]?.name ?? null
+}
+
+/**
+ * The department a call for this role most likely belongs to (ADR 0046),
+ * offered when a call is made and given to calls brought in from the
+ * calendar: the one calls for the same role were given before, or else the
+ * one most people with the role as a skill are in, or else what the role's
+ * own words say. None when nothing says; the office gives it one. A guess
+ * the office can always change, never a rule.
+ */
+export function departmentForRole(
+  role: string,
+  known: { calls?: readonly Pick<CrewCall, 'role' | 'department'>[]; people?: readonly Pick<Person, 'skills' | 'department' | 'archived'>[] } = {}
+): string | null {
+  const key = roleKey(role)
+  if (!key) return null
+  const fromCalls = mostNamed((known.calls ?? []).filter((c) => roleKey(c.role) === key).map((c) => c.department ?? null))
+  if (fromCalls) return fromCalls
+  const fromPeople = mostNamed((known.people ?? []).filter((p) => !p.archived && p.skills.some((s) => roleKey(s) === key)).map((p) => p.department))
+  if (fromPeople) return fromPeople
+  return ROLE_WORDS.find(([words]) => words.test(key))?.[1] ?? null
+}
+
+/**
+ * The department of a call brought in from the calendar (ADR 0046), whose
+ * role says only "Crew": the one more than half the people on it are in.
+ * None when they're mixed, or nobody on it has one; the office gives those
+ * one, many at a time, on Crew › Calls.
+ */
+export function departmentOfPeople(departments: readonly (string | null | undefined)[]): string | null {
+  if (departments.length === 0) return null
+  const most = mostNamed(departments.map((d) => d ?? null))
+  if (!most) return null
+  const n = departments.filter((d) => sameDepartment(d, most)).length
+  return n * 2 > departments.length ? most : null
+}
+
 /** How much the notes hold; the crew list's notes are added to fit it. */
 export const NOTES_LENGTH = 2000
 const level = whole(0, 5, 'The level')
@@ -155,6 +227,14 @@ export const person = z.object({
    * is staff crew. Set by a director with person.role, never by an edit.
    */
   role: z.enum(ROLES).nullable().default(null),
+  /**
+   * Set by the server on what it sends a role that doesn't read them (ADR
+   * 0046): the rate is left out (null) and so is the link's secret (''),
+   * so a screen can say they're hidden rather than "rate to agree" or "no
+   * link yet". Never stored.
+   */
+  rateHidden: z.boolean().optional(),
+  linkHidden: z.boolean().optional(),
 })
 export type Person = z.infer<typeof person>
 
@@ -226,8 +306,14 @@ export const crewCall = z.object({
   status: z.enum(['open', 'cancelled']),
   /** The certificates everyone on it must hold to the last day (ADR 0028). Missing on calls synced before, which need none. */
   needsCertificates: needs.optional(),
+  /** The department it's for (ADR 0046), from the crew profiles' list; none for a call nobody has given one. Missing on calls synced before. */
+  department: department.optional(),
+  /** Set by the server on what it sends a role that doesn't read rates (ADR 0046): the rate is left out. Never stored. */
+  rateHidden: z.boolean().optional(),
 })
 export type CrewCall = z.infer<typeof crewCall>
+/** A call's department, reading one synced before as having none. */
+export const departmentOf = (c: Pick<CrewCall, 'department'>): string | null => c.department ?? null
 /** What a call needs, reading one synced before as needing nothing. */
 export const needsOf = (c: Pick<CrewCall, 'needsCertificates'>): CertificateKind[] => tidyNeeds(c.needsCertificates)
 
@@ -273,6 +359,8 @@ export const offer = z.object({
    * through Confirm and Withdraw instead. Missing on offers synced before.
    */
   seenAt: z.string().nullable(),
+  /** Set by the server on what it sends a role that doesn't read rates (ADR 0046): both rates are left out. Never stored. */
+  rateHidden: z.boolean().optional(),
 })
 export type Offer = z.infer<typeof offer>
 
@@ -309,7 +397,8 @@ export const crewCommandSchemas = {
     email: contactEmail,
     phone: contactPhone,
     skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),
-    dayRateCents: cents.nullable(),
+    /** Left out by a role that doesn't read rates (ADR 0046), which keeps what the server has. */
+    dayRateCents: cents.nullable().optional(),
     notes: text(NOTES_LENGTH, 'The notes'),
     /** Left out by versions of the app from before leave existed, which then keeps what the server has. */
     approvesLeave: z.boolean().optional(),
@@ -361,6 +450,8 @@ export const crewCommandSchemas = {
       replyBy: day.nullable(),
       /** Optional so versions of the app from before it existed can still send it (ADR 0028). */
       needsCertificates: needs.optional(),
+      /** The department (ADR 0046). Left out, the server gives the one the role suggests; null is none. */
+      department: department.optional(),
     })
     .refine((c) => c.start <= c.end, { message: 'The call ends before it starts.' })
     // A day typed before the dates were changed can be left behind them; an answer asked for after the job is no use (audit finding 21).
@@ -388,10 +479,16 @@ export const crewCommandSchemas = {
       phase: text(100, 'The phase').optional(),
       venue: text(300, 'The venue').optional(),
       needsCertificates: needs.optional(),
+      department: department.optional(),
     })
     .refine(...somethingToChange)
     .refine((c) => !c.start || !c.end || c.start <= c.end, { message: 'The call ends before it starts.' }),
   'call.cancel': z.object({ id }),
+  /**
+   * Give many calls one department at once (ADR 0046), such as the calls
+   * brought in from the calendar with none: "Audio" for every one ticked.
+   */
+  'call.department': z.object({ ids: z.array(id).min(1, 'Tick at least one call.').max(500, 'Up to 500 calls at a time, please.'), department }),
   /**
    * Offer a call to one person. Send several for a shortlist: whoever
    * accepts first gets the place, and the rest are told it has been filled.
@@ -527,7 +624,9 @@ export function euro(c: number | null | undefined): string {
  */
 type Addressee = Pick<Person, 'name' | 'kind'> & Partial<Pick<Person, 'knownAs'>>
 
-const rateLine = (c: Pick<CrewCall, 'dayRateCents'>) => `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
+/** "€320 a day", or "rate to agree"; a rate this device isn't sent (ADR 0046) is on the person's own page instead. */
+const rateLine = (c: Pick<CrewCall, 'dayRateCents'> & Partial<Pick<CrewCall, 'rateHidden'>>) =>
+  c.rateHidden ? 'The rate is on your page' : `${euro(c.dayRateCents)}${c.dayRateCents !== null ? ' a day' : ''}`
 
 /**
  * The message ops paste into WhatsApp, SMS or email. Everything a freelancer
@@ -603,7 +702,7 @@ export type TellEvent =
 
 /** What a message needs besides the person: the call as it stands, and the booking's own figures where they differ. */
 export interface TellContext {
-  call: Pick<CrewCall, 'id' | 'project' | 'phase' | 'role' | 'start' | 'end' | 'callTime' | 'venue' | 'dayRateCents'> & Partial<Pick<CrewCall, 'needsCertificates'>>
+  call: Pick<CrewCall, 'id' | 'project' | 'phase' | 'role' | 'start' | 'end' | 'callTime' | 'venue' | 'dayRateCents'> & Partial<Pick<CrewCall, 'needsCertificates' | 'rateHidden'>>
   /** For a changed call: the certificates it needed before, so the message says what it needs now, or no longer (ADR 0028). */
   neededBefore?: readonly CertificateKind[]
   /** The person's own days, when they took only some. */
@@ -638,7 +737,7 @@ export function tellMessage(event: TellEvent, p: Addressee, ctx: TellContext, li
           `Hi ${first}, you're confirmed for ${job}.`,
           `${c.role}, ${when}`,
           c.venue && `At ${c.venue}`,
-          rated && c.dayRateCents !== null && rateLine(c),
+          rated && (c.dayRateCents !== null || c.rateHidden) && rateLine(c),
           `Your call sheet, with who's on and who to ring on the day, is here: ${link}/sheet/${c.id}`,
           'If anything changes on your side, let us know.',
         ]),
@@ -686,7 +785,7 @@ export function tellMessage(event: TellEvent, p: Addressee, ctx: TellContext, li
       const dropped = was.filter((k) => !now.includes(k))
       return {
         text: lines([
-          `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}${rated ? `, ${rateLine(c)}` : ''}.`,
+          `Hi ${first}, a change to ${job}: ${c.role} is now ${when}${c.venue ? `, at ${c.venue}` : ''}${rated && !c.rateHidden ? `, ${rateLine(c)}` : ''}.`,
           added.length && `This call now needs ${needsLabel(added)}.`,
           dropped.length && `This call no longer needs ${needsLabel(dropped)}.`,
           `The details are on your page: ${link}`,

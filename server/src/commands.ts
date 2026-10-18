@@ -2,8 +2,16 @@ import {
   cleanText,
   COMMAND_NEEDS,
   commandSchemas,
+  RATES_REFUSAL,
+  readingFor,
   refusalFor,
   roleMayRun,
+  setsRates,
+  changesLinkOf,
+  readsLinkOf,
+  LINKS_REFUSAL,
+  type ReaderOf,
+  type Reading,
   type Role,
   type CommandArgs,
   type CommandName,
@@ -21,15 +29,19 @@ import { CHARACTERS, isCharacterError, Refused, type Ctx } from './kernel.ts'
 import { leaveHandlers } from './leave/handlers.ts'
 import { reportError } from './monitoring.ts'
 import { officeHandlers } from './office/handlers.ts'
+import { headsSeeRates } from './office/store.ts'
 import { projectHandlers } from './projects/handlers.ts'
 import { stockHandlers } from './stock/handlers.ts'
 import { kitHandlers } from './stock/kit.ts'
+import { notesKitHandlers } from './stock/notes-kit.ts'
 import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
 import { inspectionHandlers } from './stock/inspections.ts'
 import { moveHandlers } from './stock/moves.ts'
 import { countHandlers } from './stock/counts.ts'
 import { financeHandlers } from './finance/handlers.ts'
+import { ownCalendarHandlers } from './crew/own-calendars.ts'
+import { vehicleHandlers } from './vehicles/handlers.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -46,6 +58,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...projectHandlers,
   ...stockHandlers,
   ...kitHandlers,
+  ...notesKitHandlers,
   ...labelHandlers,
   ...moveHandlers,
   ...faultHandlers,
@@ -59,6 +72,17 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...countHandlers,
   ...attachmentHandlers,
   ...financeHandlers,
+  ...ownCalendarHandlers,
+  ...vehicleHandlers,
+}
+
+/** Whether this reader may make a new link for the person a change names: one whose link they're sent (ADR 0046). */
+async function mayChangeLink(q: Queryable, reading: Reading, name: CommandName, args: unknown): Promise<boolean> {
+  const id = changesLinkOf(name, args)
+  if (!id || reading.links === 'all') return true
+  const { rows } = await q.query<{ department: string | null }>('SELECT department FROM people WHERE id = $1', [id])
+  // Nobody by that id: the handler says so.
+  return !rows[0] || readsLinkOf(reading, { id, department: rows[0].department })
 }
 
 /** Where a command came from, kept on it for the history (ADR 0006). */
@@ -79,6 +103,8 @@ export interface From {
    * and the calendar, so nothing is checked.
    */
   role?: Role
+  /** Who the sender is, for what they read (ADR 0046): their person on the Crew tab and their department. */
+  reader?: ReaderOf
   /** When the device sent it, by the device's own clock. */
   sentAt?: string
   /** The kind of device, such as "Safari on iPhone". */
@@ -106,7 +132,18 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // included: a resend gets the same answer anyway, and the rest of the push carries on.
   if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
 
-  const ctx: Ctx = { tx, mutationId: m.id, seq: 0, via: from.via ?? 'app', ...(from.user ? { user: from.user } : {}), ...(from.role ? { role: from.role } : {}) }
+  // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them.
+  const reading = readingFor(from.role, { ...from.reader, headsSeeRates: from.role === 'head' && (await headsSeeRates(tx)) })
+  const seesRates = reading.rates
+  const ctx: Ctx = {
+    tx,
+    mutationId: m.id,
+    seq: 0,
+    via: from.via ?? 'app',
+    ...(from.user ? { user: from.user } : {}),
+    ...(from.role ? { role: from.role } : {}),
+    ...(seesRates ? {} : { seesRates: false }),
+  }
   let result: MutationResult
   // Record the mutation first so the changes it writes can point at it.
   // Arrival is read after taking the lock, so the history's order is the order changes were made in.
@@ -124,6 +161,12 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
   } else if (!parsed.success) {
     result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
+  } else if (!seesRates && setsRates(m.name, parsed.data)) {
+    // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: RATES_REFUSAL } }
+  } else if (!(await mayChangeLink(tx, reading, m.name, parsed.data))) {
+    // A new link for someone is for a role that reads their link (ADR 0046).
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: LINKS_REFUSAL } }
   } else {
     try {
       await tx.query('SAVEPOINT cmd')

@@ -7,6 +7,7 @@ import { faultCommandSchemas } from './faults.ts'
 import { inspectionCommandSchemas } from './inspections.ts'
 import { jobCommandSchemas } from './jobs.ts'
 import { kitCommandSchemas } from './kit.ts'
+import { notesKitCommandSchemas } from './kit-notes.ts'
 import { labelCommandSchemas } from './labels.ts'
 import { lateCommandSchemas } from './late.ts'
 import { leaveCommandSchemas } from './leave.ts'
@@ -16,6 +17,8 @@ import { stockCommandSchemas } from './stock.ts'
 import { timesheetCommandSchemas } from './timesheets.ts'
 import { attachmentCommandSchemas } from './attachments.ts'
 import { quoteCommandSchemas } from './quotes.ts'
+import { ownCalendarCommandSchemas } from './own-calendar.ts'
+import { vehicleCommandSchemas } from './vehicles.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -31,6 +34,7 @@ export const commandSchemas = {
   ...jobCommandSchemas,
   ...stockCommandSchemas,
   ...kitCommandSchemas,
+  ...notesKitCommandSchemas,
   ...labelCommandSchemas,
   ...moveCommandSchemas,
   ...faultCommandSchemas,
@@ -44,6 +48,8 @@ export const commandSchemas = {
   ...countCommandSchemas,
   ...attachmentCommandSchemas,
   ...quoteCommandSchemas,
+  ...ownCalendarCommandSchemas,
+  ...vehicleCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

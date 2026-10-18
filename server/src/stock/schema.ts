@@ -9,7 +9,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * to jobs and back in (ADR 0017); faults and missing kit (ADR 0018); and
  * inspections (ADR 0020); what was added by mistake (audit finding 19);
  * what the stock list brings in that items didn't hold before (ADR 0026);
- * and counts of places and cases (ADR 0030).
+ * counts of places and cases (ADR 0030); and kit read from jobs' notes
+ * (ADR 0043).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -215,6 +216,24 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS counts_place ON counts (place_id);
   CREATE INDEX IF NOT EXISTS counts_case ON counts (case_id);
+  `,
+  // Kit read from jobs' notes (ADR 0043): names the notes use, remembered
+  // against the product they mean or as not kit (null), by an id made from
+  // the name itself; no foreign key, so a product taken out of the stock
+  // list since only leaves its names unremembered. And each job's notes as
+  // they were when turned into kit, so the list of jobs to work through
+  // leaves it out until they change.
+  `
+  CREATE TABLE IF NOT EXISTS kit_names (
+    id        text PRIMARY KEY,
+    text      text NOT NULL,
+    model_id  text
+  );
+  CREATE TABLE IF NOT EXISTS kit_notes_read (
+    project_id  text PRIMARY KEY REFERENCES projects(id),
+    sum         text NOT NULL,
+    read_at     timestamptz NOT NULL DEFAULT now()
+  );
   `,
 ]
 

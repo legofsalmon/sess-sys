@@ -280,7 +280,9 @@ describe('made-up data', () => {
     expect(starts[0]).toBe('2027-02-17')
     // The shoot is on the day it goes in (ADR 0028), so someone can be running late for it.
     expect(starts[1]).toBe('2027-02-27')
-    expect(starts[2]).toBe('2027-03-02')
+    // The van run to collect stage decks is the next day (ADR 0047).
+    expect(starts[2]).toBe('2027-02-28')
+    expect(starts[3]).toBe('2027-03-02')
     // Fresh ids each time, so it can go in again after starting fresh.
     expect(madeUpData('2027-02-27')[0]!.id).not.toBe(madeUpData('2027-02-27')[0]!.id)
   })
@@ -309,7 +311,7 @@ describe('starting fresh', () => {
     expect(await aoife.send('person.erase', { id: ronan[0]!.id })).toMatchObject({ status: 'applied' })
     const before = await rowsLeft(db)
     // Counts too (ADR 0030).
-    expect(before).toMatchObject({ projects: 8, running_late: 1, erasures: 1, counts: 3 })
+    expect(before).toMatchObject({ projects: 9, running_late: 1, erasures: 1, counts: 3, vehicles: 2, vehicle_bookings: 5 })
     const total = Object.values(before).reduce((a, b) => a + b, 0)
 
     const res = await startFresh(app, START_FRESH_WORDS, aoife)
@@ -437,7 +439,7 @@ describe('starting fresh', () => {
     const res = await startFresh(app)
     expect(res.statusCode).toBe(409)
     expect(res.json().error).toBe("The backup before starting fresh didn't work (The backup storage answered 403: Access denied), so nothing was deleted.")
-    expect((await rowsLeft(db)).projects).toBe(8)
+    expect((await rowsLeft(db)).projects).toBe(9)
     expect(await status(app)).toMatchObject({ empty: false, fresh: null })
   })
 })

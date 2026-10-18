@@ -18,3 +18,13 @@ export function when(iso: string) {
   if (at.toDateString() === dayOffset(1)) return `tomorrow at ${time}`
   return `${at.toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })} at ${time}`
 }
+
+/** What a screen says where a rate this device isn't sent would be (ADR 0046). */
+export const RATE_HIDDEN = 'rate hidden for your role'
+
+/** "€320", "rate to agree", or that it's hidden for this role (ADR 0046), never "€0" or "€NaN". */
+export function rateText(cents: number | null | undefined, hidden: boolean | undefined): string {
+  if (hidden) return RATE_HIDDEN
+  if (cents === null || cents === undefined) return 'rate to agree'
+  return `€${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`
+}

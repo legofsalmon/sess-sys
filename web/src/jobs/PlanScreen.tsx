@@ -15,6 +15,8 @@ import {
   type JobCell,
   type JobLane,
   type PersonCell,
+  type VanCell,
+  type VanLane,
   type Plan,
   type View,
 } from '@sh/shared'
@@ -25,29 +27,31 @@ import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
 import { Views } from '../Views.tsx'
+import { vehicleHref } from '../stock/Vehicles.tsx'
 
 /**
- * The planner (ADR 0010): a week or a month of jobs, or of people, with the
- * crew still to find and the clashes to sort out. It only shows: changes are
+ * The planner (ADR 0010): a week or a month of jobs, of people, or of the
+ * company's vehicles (ADR 0047), with the crew still to find and the
+ * clashes to sort out: a person or a van on two jobs at once. It only shows: changes are
  * made on the job's page or the Crew tab, a tap away.
  */
 
 type Scale = 'week' | 'month'
-type Rows = 'jobs' | 'people'
+type Rows = 'jobs' | 'people' | 'vans'
 interface Place {
   scale: Scale
   day: string
   rows: Rows
 }
 
-/** What the address says is on screen: #jobs/plan/week/2026-10-05, or #jobs/plan/month/2026-10-01/people. */
+/** What the address says is on screen: #jobs/plan/week/2026-10-05, or #jobs/plan/month/2026-10-01/people, or …/vans. */
 function placeOf(hash: string, now: string): Place {
   const [, , scale, day, rows] = hash.split('/')
-  return { scale: scale === 'month' ? 'month' : 'week', day: day && isDay(day) ? day : now, rows: rows === 'people' ? 'people' : 'jobs' }
+  return { scale: scale === 'month' ? 'month' : 'week', day: day && isDay(day) ? day : now, rows: rows === 'people' || rows === 'vans' ? rows : 'jobs' }
 }
 
 function hashOf(p: Place): string {
-  return `#jobs/plan/${p.scale}/${p.scale === 'week' ? mondayOf(p.day) : addMonths(p.day, 0)}${p.rows === 'people' ? '/people' : ''}`
+  return `#jobs/plan/${p.scale}/${p.scale === 'week' ? mondayOf(p.day) : addMonths(p.day, 0)}${p.rows === 'jobs' ? '' : `/${p.rows}`}`
 }
 
 const daysOf = (scale: Scale, day: string) => (scale === 'week' ? weekOf(day) : monthOf(day))
@@ -85,7 +89,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
   const place = placeOf(hash, now)
   const { scale, day, rows } = place
   const days = useMemo(() => daysOf(scale, day), [scale, day])
-  const p = useMemo(() => plan(view, days), [view, days])
+  const p = useMemo(() => plan(view, days, now), [view, days, now])
   const [everyone, setEveryone] = useState(false)
   const at = (changes: Partial<Place>) => hashOf({ ...place, ...changes })
   // Jobs or people is a toggle, not a move, so it keeps focus (audit finding 22). Safari, and Firefox on a Mac, don't focus a button they press, so it takes focus itself: the Shell sees a toggle in focus and leaves it there.
@@ -97,8 +101,9 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
   const title = scale === 'week' ? `${spanLabel({ start: days[0]!, end: days.at(-1)! })} ${days.at(-1)!.slice(0, 4)}` : monthLabel(day)
   const busy = p.people.filter((l) => Object.keys(l.days).length > 0)
   const people = everyone ? p.people : busy
-  const lanes = rows === 'jobs' ? p.jobs.length : people.length
-  const clashes = p.problems.filter((x) => x.severity === 'clash').length
+  const lanes = rows === 'jobs' ? p.jobs.length : rows === 'people' ? people.length : p.vans.length
+  const clashes = [...p.problems, ...p.vanProblems].filter((x) => x.severity === 'clash').length
+  const rowWord = rows === 'jobs' ? 'job' : rows === 'people' ? 'person' : 'vehicle'
 
   // On a phone the days start at today, so the day that matters most is in view: when the days change, and once there is something to show.
   const scroller = useRef<HTMLDivElement>(null)
@@ -125,6 +130,12 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
             <button type="button" aria-pressed={rows === 'people'} onClick={toggle('people')}>
               People
             </button>
+            {/* Only once there are vehicles to plan (ADR 0047). */}
+            {(p.vans.length > 0 || rows === 'vans') && (
+              <button type="button" aria-pressed={rows === 'vans'} onClick={toggle('vans')}>
+                Vans
+              </button>
+            )}
           </div>
         </div>
         <div className="actions">
@@ -141,7 +152,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
         <p className="hint">{summary(p, scale)}</p>
       </section>
 
-      {p.problems.length > 0 && (
+      {p.problems.length + p.vanProblems.length > 0 && (
         <section className={`card ${clashes ? 'attention' : 'checks'}`}>
           <h2>To sort out</h2>
           {p.problems.map((x) => (
@@ -157,6 +168,20 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
               </a>
             </div>
           ))}
+          {/* A van on two jobs, or booked while off the road or with a check run out (ADR 0047). */}
+          {p.vanProblems.map((x) => (
+            <div className="row problem" key={`van ${x.vehicle.id} ${x.day}`}>
+              <div>
+                <b>{x.vehicle.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
+                <p>
+                  {dayLabel(x.day)}: {x.text}
+                </p>
+              </div>
+              <a className="button" href={x.jobId ? `#jobs/${x.jobId}` : vehicleHref(x.vehicle.id)}>
+                {x.jobId ? 'Open job' : 'Open vehicle'}
+              </a>
+            </div>
+          ))}
         </section>
       )}
 
@@ -165,20 +190,22 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
           <p className="empty">
             {rows === 'jobs'
               ? `Nothing on this ${scale}.`
-              : p.people.length
-                ? `No one is booked, offered work or unavailable this ${scale}.`
-                : 'No people yet: add them on the Crew tab.'}
+              : rows === 'vans'
+                ? 'No vehicles yet: add them on Stock › Vehicles.'
+                : p.people.length
+                  ? `No one is booked, offered work, unavailable or busy this ${scale}.`
+                  : 'No people yet: add them on the Crew tab.'}
           </p>
         )}
         {lanes > 0 && (
-          <div className="scroller" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rows === 'jobs' ? 'job' : 'person'}`}>
+          <div className="scroller" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rowWord}`}>
             <table className={`timeline ${scale}`} style={{ '--days': days.length } as CSSProperties}>
               <colgroup>
                 <col className="names" />
               </colgroup>
               <thead>
                 <tr>
-                  <th scope="col">{rows === 'jobs' ? 'Job' : 'Person'}</th>
+                  <th scope="col">{rows === 'jobs' ? 'Job' : rows === 'people' ? 'Person' : 'Vehicle'}</th>
                   {days.map((d) => (
                     <th scope="col" key={d} className={dayClass(d, now, p.holidays)} aria-current={d === now ? 'date' : undefined} title={p.holidays[d]}>
                       {scale === 'week' ? (
@@ -209,7 +236,21 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                         ))}
                       </tr>
                     ))
-                  : people.map((lane) => (
+                  : rows === 'vans'
+                    ? p.vans.map((lane) => (
+                        <tr key={lane.vehicle.id}>
+                          <th scope="row">
+                            <a href={vehicleHref(lane.vehicle.id)}>
+                              <b>{lane.vehicle.name}</b>
+                            </a>
+                            {lane.vehicle.registration && <small>{lane.vehicle.registration}</small>}
+                          </th>
+                          {days.map((d) => (
+                            <VanDay key={d} lane={lane} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} />
+                          ))}
+                        </tr>
+                      ))
+                    : people.map((lane) => (
                       <tr key={lane.person.id}>
                         <th scope="row">
                           <a href={personHref(lane.person.id)}>
@@ -242,8 +283,9 @@ function summary(p: Plan, scale: Scale): string {
   const parts = [p.jobs.length ? `${p.jobs.length} job${p.jobs.length === 1 ? '' : 's'} this ${scale}` : `Nothing on this ${scale}`]
   const crew = p.jobs.some((l) => Object.values(l.days).some((x) => x.needed > 0))
   if (crew) parts.push(p.short ? `crew still needed on ${p.short} day${p.short === 1 ? '' : 's'}` : 'crew found for every day')
-  const clashes = p.problems.filter((x) => x.severity === 'clash').length
-  const checks = p.problems.length - clashes
+  const all = [...p.problems, ...p.vanProblems]
+  const clashes = all.filter((x) => x.severity === 'clash').length
+  const checks = all.length - clashes
   if (clashes) parts.push(`${clashes} clash${clashes === 1 ? '' : 'es'}`)
   if (checks) parts.push(`${checks} to check`)
   return parts.join(' · ')
@@ -271,7 +313,8 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
   const label = phases || (cell.stray ? 'No phase this day' : '')
   const crew = cell.needed > 0 ? `${cell.booked} of ${cell.needed} crew${cell.asked ? `, ${cell.asked} asked` : ''}` : ''
   const moved = phases && cell.stray ? 'Crew here from a phase that moved' : ''
-  const words = [label, crew, moved, ...(cell.late ?? [])].filter(Boolean).join(', ')
+  const vans = cell.vans?.length ? `Vehicles: ${cell.vans.join(', ')}` : ''
+  const words = [label, crew, moved, ...(cell.late ?? []), vans].filter(Boolean).join(', ')
   const tone = cell.needed === 0 ? '' : cell.booked < cell.needed ? 'short' : 'full'
   const className = ['blk', lane.tentative ? 'dashed' : 'solid', tone, cell.stray && 'stray', lane.pending && 'pending'].filter(Boolean).join(' ')
   // The day opens its job, as the name does; a call from the Crew tab has no job to open.
@@ -295,6 +338,8 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
           {l}
         </small>
       ))}
+      {/* The vans going (ADR 0047), with who drives. */}
+      {vans && <small className="vans">{vans}</small>}
     </Block>
   )
 }
@@ -310,13 +355,15 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
       tag && `${tag}: ${cell.problem}`,
       ...cell.work.map((w) => `${w.confirmed ? 'Booked on' : w.booked ? 'To confirm on' : 'Offered'} ${w.job}${w.phase ? `, ${w.phase}` : ''}${w.late ? `, ${w.late}` : ''}`),
       cell.away !== null && `Unavailable${cell.away ? ` (${cell.away})` : ''}`,
+      cell.busy !== null && `Busy in their own calendar (${cell.busy})`,
     ]
       .filter(Boolean)
       .join('. ')
     return (
       <td className={cls}>
-        <div className={`code ${first ? (first.booked ? 'booked' : 'offered') : 'away'}`} title={words}>
-          <span aria-hidden="true">{first ? initials(first.job) : 'Off'}</span>
+        {/* Busy in their own calendar and nothing else: hatched and empty, the words for a screen reader and on hover (ADR 0044). */}
+        <div className={`code ${first ? (first.booked ? 'booked' : 'offered') : cell.away !== null ? 'away' : 'busy'}`} title={words}>
+          <span aria-hidden="true">{first ? initials(first.job) : cell.away !== null ? 'Off' : ''}</span>
           <span className="sr-only">{words}</span>
         </div>
       </td>
@@ -338,13 +385,72 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
           {cell.away && <small>{cell.away}</small>}
         </div>
       )}
+      {/* Read from their own calendar (ADR 0044): shown, never a clash, since it may be something they can move. */}
+      {cell.busy !== null && (
+        <div className="item busy">
+          <b>Busy (own calendar)</b>
+          <small>{cell.busy}</small>
+        </div>
+      )}
+    </td>
+  )
+}
+
+/** A vehicle's day: the jobs it's on, with who drives, and off the road; a clash or a check as for a person. */
+function VanDay({ lane, cell, scale, className }: { lane: VanLane; cell: VanCell | undefined; scale: Scale; className: string | undefined }) {
+  const cls = [className, cell?.severity].filter(Boolean).join(' ') || undefined
+  if (!cell) return <td className={cls} />
+  const tag = cell.severity === 'clash' ? 'Clash' : cell.severity === 'check' ? 'Check' : ''
+  const offRoad = cell.offRoad !== null ? `Off the road${cell.offRoad ? ` (${cell.offRoad})` : ''}` : ''
+  if (scale === 'month') {
+    const first = cell.work.find((w) => w.held) ?? cell.work[0]
+    const words = [
+      tag && `${tag}: ${cell.problem}`,
+      ...cell.work.map((w) => `${w.held ? 'On' : 'Pencilled in for'} ${w.job}${w.phase ? `, ${w.phase}` : ''}${w.driver ? `, ${w.driver} driving` : ', no driver yet'}`),
+      offRoad,
+    ]
+      .filter(Boolean)
+      .join('. ')
+    return (
+      <td className={cls}>
+        <div className={`code ${first ? (first.held ? 'booked' : 'offered') : 'away'}`} title={`${lane.vehicle.name}: ${words}`}>
+          <span aria-hidden="true">{first ? initials(first.job) : 'Off'}</span>
+          <span className="sr-only">{words}</span>
+        </div>
+      </td>
+    )
+  }
+  return (
+    <td className={cls} title={cell.problem ?? undefined}>
+      {tag && <span className="tag">{tag}</span>}
+      {cell.work.map((w) => (
+        <div key={w.bookingId} className={`item ${w.held ? 'booked' : 'offered'}`}>
+          <a href={`#jobs/${w.jobId}`}>{w.job}</a>
+          <small>{[!w.held && 'Pencilled in', w.phase, w.driver ? `${w.driver} driving` : 'No driver yet'].filter(Boolean).join(' · ')}</small>
+        </div>
+      ))}
+      {offRoad && (
+        <div className="item away">
+          <b>Off the road</b>
+          {cell.offRoad && <small>{cell.offRoad}</small>}
+        </div>
+      )}
     </td>
   )
 }
 
 function Legend({ rows }: { rows: Rows }) {
   const keys: [string, string][] =
-    rows === 'jobs'
+    rows === 'vans'
+      ? [
+          ['item booked', 'On a confirmed job'],
+          ['item offered', 'Pencilled in: an enquiry or quote'],
+          ['item away', 'Off the road'],
+          ['swatch clash', 'Clash: on two jobs, or booked while off the road or with a check run out'],
+          ['swatch check', 'Check: would clash if the pencilled job goes ahead'],
+          ['swatch holiday', 'Public holiday'],
+        ]
+      : rows === 'jobs'
       ? [
           ['blk solid', 'Confirmed'],
           ['blk dashed', 'Enquiry or quote'],
@@ -357,6 +463,7 @@ function Legend({ rows }: { rows: Rows }) {
           ['item booked', 'Booked, or to confirm'],
           ['item offered', 'Offered, no answer yet'],
           ['item away', 'Unavailable, or on leave'],
+          ['item busy', 'Busy in their own calendar: they may still say yes'],
           ['swatch clash', 'Clash: booked twice, or while unavailable'],
           ['swatch check', 'Check: would clash if they said yes'],
           ['swatch holiday', 'Public holiday'],

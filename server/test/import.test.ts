@@ -581,6 +581,21 @@ describe('bringing jobs in from Google Calendar', () => {
     expect(everything.calendar_imports).toHaveLength(5)
   })
 
+  it('gives each call the department most of its people are in, or none to give it later (ADR 0046)', async () => {
+    const s = await setup()
+    await s.connect()
+    await s.colly.send('person.upsert', { id: 'aoife', name: 'Aoife Byrne', kind: 'freelancer', email: 'aoife.byrne@gmail.com', phone: null, skills: [], dayRateCents: null, notes: '', department: 'LX' })
+    organisersCalendar(s.google)
+    ok<ImportResult>(await s.bring(choose(ok<ImportPreview>(await s.look(OPS)), { 'Web Summit': false })))
+    const f = await s.feed()
+    const nissan = f.projects.find((p) => p.name === 'Nissan')!
+    // The Show is Aoife's alone, and she's in LX; the Build is hers, Seán's and Ciara's, in no one department.
+    expect(f.calls.filter((c) => c.projectId === nissan.id).map((c) => [c.phase, c.department])).toEqual([
+      ['Build', null],
+      ['Show', 'LX'],
+    ])
+  })
+
   it('shows only what is new when looking again, adds new days to jobs brought in before, and lists events moved or deleted since', async () => {
     const s = await setup()
     await s.connect()

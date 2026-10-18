@@ -23,6 +23,8 @@ import { Top } from '../jobs/common.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
+import { rateText } from '../format.ts'
+import { useSeesRates } from '../role.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
@@ -43,17 +45,30 @@ export function TimesheetsCard({ view }: { view: View }) {
   const { toApprove, notIn, approved } = view.timesheets
   const [remind, setRemind] = useState<TimesheetRow | undefined>()
   const lately = approved.slice(0, 5)
+  // Timesheets carry pay, which a role that doesn't see rates isn't sent (ADR 0046): said once, at the top.
+  const seesRates = useSeesRates()
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
       <Heading icon="timesheet">Timesheets</Heading>
+      {!seesRates && <p className="hint">Your role doesn't see crew rates, so the amounts are hidden, and the office checks and approves timesheets.</p>}
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
         <div className="ts-group" role="group" aria-label="To approve">
           <h3>To approve ({toApprove.length})</h3>
           <ShowAll items={toApprove} limit={3} what="timesheets">
             {(rows) =>
-              rows.map((r) => <Row key={r.offer.id} r={r} action={<a className="button primary" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>Check</a>} />)
+              rows.map((r) => (
+                <Row
+                  key={r.offer.id}
+                  r={r}
+                  action={
+                    <a className={seesRates ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                      {seesRates ? 'Check' : 'Open'}
+                    </a>
+                  }
+                />
+              ))
             }
           </ShowAll>
         </div>
@@ -74,9 +89,11 @@ export function TimesheetsCard({ view }: { view: View }) {
                           Ask
                         </button>
                       )}
-                      <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
-                        Fill in
-                      </a>
+                      {seesRates && (
+                        <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                          Fill in
+                        </a>
+                      )}
                     </>
                   }
                 />
@@ -108,7 +125,8 @@ function Row({ r, action }: { r: TimesheetRow; action: ReactNode }) {
         </p>
       </div>
       <div className="actions">
-        {r.timesheet && <span className="amount">{r.timesheet.dayRateCents === null ? 'Rate to agree' : euro(r.total.total)}</span>}
+        {/* Hidden for a role that doesn't see rates (ADR 0046), which the card says once, rather than a €0 on every line. */}
+        {r.timesheet && !r.amountsHidden && <span className="amount">{r.timesheet.dayRateCents === null ? 'Rate to agree' : euro(r.total.total)}</span>}
         <Pending pending={!!r.timesheet?.pending} />
         {action}
       </div>
@@ -175,8 +193,14 @@ function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow
         <p>
           {job(r)} · {r.call.role}
           <br />
-          Booked {daysLabel(r.offer.days)} at {euro(r.offer.dayRateCents)}
-          {r.offer.dayRateCents !== null && ' a day'}
+          {r.amountsHidden ? (
+            <>Booked {daysLabel(r.offer.days)}, {rateText(null, true)}</>
+          ) : (
+            <>
+              Booked {daysLabel(r.offer.days)} at {euro(r.offer.dayRateCents)}
+              {r.offer.dayRateCents !== null && ' a day'}
+            </>
+          )}
         </p>
         {!t ? (
           <p className="hint">{why ?? `Nothing sent yet. ${first} can send it from their private link, or you can fill it in for them below.`}</p>
@@ -196,12 +220,52 @@ function Timesheet({ view, r, onTell, onRestart }: { view: View; r: TimesheetRow
         )}
       </section>
       {asking && r.person && <Ask r={r} person={r.person} onClose={() => setAsking(false)} />}
-      {t?.status === 'approved' ? <Approved r={r} onTell={onTell} /> : !why && <Check view={view} r={r} onTell={onTell} onRestart={onRestart} />}
+      {t?.status === 'approved' ? (
+        <Approved r={r} onTell={onTell} />
+      ) : r.amountsHidden ? (
+        t && <Unpriced r={r} />
+      ) : (
+        !why && <Check view={view} r={r} onTell={onTell} onRestart={onRestart} />
+      )}
     </>
   )
 }
 
+/**
+ * A timesheet as a role that doesn't see crew rates reads it (ADR 0046):
+ * the days and what each extra was for, without the amounts, and who
+ * decides it.
+ */
+function Unpriced({ r }: { r: TimesheetRow }) {
+  const t = r.timesheet!
+  return (
+    <section className="card" aria-label={t.status === 'approved' ? 'Approved' : 'Sent'}>
+      <h2>{t.status === 'approved' ? 'Approved' : 'Waiting on the office'}</h2>
+      <ul className="ts-lines">
+        <li>
+          <span>
+            {t.days.length} day{t.days.length === 1 ? '' : 's'}, {daysLabel(t.days)}
+          </span>
+        </li>
+        {t.extras.map((e, i) => (
+          <li key={i}>
+            <span>{e.what}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">The amounts are hidden for your role. The office checks and approves timesheets.</p>
+      {t.officeNote && <p className="lines">{t.officeNote}</p>}
+      <Pending pending={t.pending} />
+    </section>
+  )
+}
+
 function Approved({ r, onTell }: { r: TimesheetRow; onTell: OnTell }) {
+  if (r.amountsHidden) return <Unpriced r={r} />
+  return <ApprovedFigures r={r} onTell={onTell} />
+}
+
+function ApprovedFigures({ r, onTell }: { r: TimesheetRow; onTell: OnTell }) {
   const t = r.timesheet!
   const changes = timesheetChanges(t)
   const { fees } = timesheetTotal(t)

@@ -40,6 +40,8 @@ export interface SheetCall {
   offers: readonly { personId: string; status: OfferStatus; days: readonly string[] }[]
   /** The certificates it needs (ADR 0028); missing on a call that needs none. */
   needsCertificates?: readonly CertificateKind[]
+  /** Its department (ADR 0046); missing or null on a call with none. */
+  department?: string | null
 }
 
 export interface SheetKitLine {
@@ -48,6 +50,16 @@ export interface SheetKitLine {
   qty: number
   subhireQty: number
   supplier: string
+}
+
+/** A vehicle booked on the phase or the whole job (ADR 0047), on the days it shares with the sheet. */
+export interface SheetVan {
+  /** "Big Van (221-D-12345)". */
+  name: string
+  start: string
+  end: string
+  driver: string | null
+  notes: string
 }
 
 export interface SheetInput {
@@ -65,6 +77,8 @@ export interface SheetInput {
   readerId?: string
   /** Who said they're running late, with the line to show (ADR 0028), already narrowed to what's still showing. */
   late?: readonly { personId: string; line: string }[]
+  /** The vehicles on it (ADR 0047). */
+  vans?: readonly SheetVan[]
 }
 
 export type CrewStatus = 'booked' | 'to confirm' | 'offered'
@@ -85,6 +99,8 @@ export interface SheetCrew {
 export interface SheetCallView {
   id: string
   role: string
+  /** Its department (ADR 0046), "Audio", for everyone; only when it has one. */
+  department?: string
   callTime: string | null
   /** Only when not the phase's days. */
   days?: string
@@ -112,6 +128,12 @@ export interface CallSheet {
   kit?: { department: string; lines: { name: string; qty: number; note: string }[] }[]
   /** Everyone on it running late, by name; only for the office and the contact on the day, and only when there's someone. */
   late?: { name: string; phone: string | null; line: string }[]
+  /**
+   * The vehicles on it and who drives each (ADR 0047), for everyone: who
+   * is driving is what the crew need to know to get there. Only when there
+   * are some.
+   */
+  vans?: { name: string; days?: string; driver: string | null; notes: string }[]
 }
 
 const SHOWN: Record<SheetReader, readonly OfferStatus[]> = {
@@ -166,6 +188,7 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
       return {
         id: c.id,
         role: c.role,
+        ...(c.department?.trim() ? { department: c.department.trim() } : {}),
         callTime: c.callTime,
         ...(c.start !== start || c.end !== end ? { days: daysLabel(callDays) } : {}),
         details: c.details.trim(),
@@ -190,6 +213,17 @@ export function callSheet(input: SheetInput, reader: SheetReader): CallSheet {
     notes: { job: input.job.notes.trim(), phase: input.phase?.notes.trim() ?? '' },
     calls: views,
   }
+  const vans = (input.vans ?? [])
+    .map((v) => ({ ...v, days: eachDay(v.start, v.end).filter((d) => !days.length || days.includes(d)) }))
+    .filter((v) => v.days.length > 0)
+    .sort((a, b) => a.days[0]!.localeCompare(b.days[0]!) || a.name.localeCompare(b.name, 'en-IE'))
+  if (vans.length)
+    sheet.vans = vans.map((v) => ({
+      name: v.name,
+      ...(v.days.length !== days.length ? { days: daysLabel(v.days) } : {}),
+      driver: v.driver,
+      notes: v.notes.trim(),
+    }))
   const late = new Map(views.flatMap((c) => c.crew.filter((p) => p.late).map((p) => [p.personId, { name: p.name, phone: p.phone ?? null, line: p.late! }])))
   if (late.size) sheet.late = [...late.values()].sort((a, b) => a.name.localeCompare(b.name, 'en-IE'))
   if (reader !== 'crew') {
@@ -226,9 +260,18 @@ export function callSheetText(s: CallSheet): string {
     const booked = c.crew.filter((p) => p.status === 'booked')
     lines.push(`${c.callTime ? `${c.callTime} ` : ''}${c.role}${c.days ? ` (${c.days})` : ''}${c.needs ? `, needs ${c.needs}` : ''}: ${booked.length ? booked.map((p) => p.name).join(', ') : 'to be confirmed'}`)
   }
+  if (s.vans?.length) {
+    lines.push('')
+    for (const v of s.vans) lines.push(vanLine(v))
+  }
   if (s.notes.phase) lines.push('', s.notes.phase)
   if (s.notes.job) lines.push('', s.notes.job)
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** "Big Van (221-D-12345), Sat 3 Oct: Cian Murphy driving", as the sheet and its copy say it. */
+export function vanLine(v: NonNullable<CallSheet['vans']>[number]): string {
+  return `${v.name}${v.days ? `, ${v.days}` : ''}: ${v.driver ? `${v.driver} driving` : 'driver to be confirmed'}${v.notes ? `. ${v.notes}` : ''}`
 }
 
 /** Sending someone the sheet on their private link, by WhatsApp, text or email. */

@@ -1,9 +1,10 @@
-import { callSheet, HOLDING, irishToday, lateDayWord, lateLine, type CallSheet, type OfficeDetails, type SheetKitLine, type SheetPerson } from '@sh/shared'
+import { callSheet, HOLDING, irishToday, lateDayWord, lateLine, vanLine, vehicleName, type CallSheet, type OfficeDetails, type SheetKitLine, type SheetPerson } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { getClient, getPhase, getProject, getVenue } from '../projects/store.ts'
 import { lateOnOffers } from './late.ts'
 import { CSS, officeBlock } from './page.ts'
 import { getCall, getPerson, offersForCall, openCallsFor } from './store.ts'
+import { vehiclesFor } from '../vehicles/store.ts'
 
 /**
  * A call sheet on a person's private link, /f/<token>/sheet/<call> (ADR
@@ -53,6 +54,10 @@ export async function sheetFor(q: Queryable, personId: string, callId: string): 
       readerId: personId,
       // One said the evening before, for tomorrow, says so.
       late: late.map((l) => ({ personId: l.personId, line: l.day === today ? lateLine(l) : `${lateLine(l)} (${lateDayWord(l.day, today)})` })),
+      // Who's driving what (ADR 0047), for everyone on it: how they get there, and who to ask about a lift.
+      vans: project
+        ? (await vehiclesFor(q, project.id, phase?.id ?? null)).map((v) => ({ name: vehicleName(v), start: v.start_day, end: v.end_day, driver: v.driver, notes: v.notes }))
+        : [],
     },
     reader
   )
@@ -102,7 +107,7 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
     .map((c) => {
       const me = c.crew.find((p) => p.me)!
       // What the call needs as it is now (ADR 0028), so a card asked for since the offer isn't missed on the day.
-      return `<section class="you"><h2>You</h2><p><b>${h(c.role)}</b>${c.callTime ? `, call <b>${h(c.callTime)}</b>` : ''}${me.days || c.days ? `, ${h(me.days ?? c.days)}` : ''}${me.status === 'to confirm' ? ' <small>(the office will confirm)</small>' : ''}</p>${c.needs ? `<p>Needs ${h(c.needs)}.</p>` : ''}${c.details ? `<p class="details">${lines(c.details)}</p>` : ''}</section>`
+      return `<section class="you"><h2>You</h2><p><b>${h(c.role)}</b>${c.callTime ? `, call <b>${h(c.callTime)}</b>` : ''}${me.days || c.days ? `, ${h(me.days ?? c.days)}` : ''}${c.department ? `, ${h(c.department)}` : ''}${me.status === 'to confirm' ? ' <small>(the office will confirm)</small>' : ''}</p>${c.needs ? `<p>Needs ${h(c.needs)}.</p>` : ''}${c.details ? `<p class="details">${lines(c.details)}</p>` : ''}</section>`
     })
     .join('')}
 
@@ -132,13 +137,15 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
       : ''
   }
 
+  ${s.vans?.length ? `<section><h2>Vehicles</h2><ul>${s.vans.map((v) => `<li>${h(vanLine(v))}</li>`).join('')}</ul></section>` : ''}
+
   ${s.notes.phase ? `<section><h2>${h(s.phase || 'Running order')}</h2><p class="details">${lines(s.notes.phase)}</p></section>` : ''}
   ${s.notes.job ? `<section><h2>About the job</h2><p class="details">${lines(s.notes.job)}</p></section>` : ''}
 
   <section><h2>Crew</h2>
     ${s.calls
       .map(
-        (c) => `<article class="call"><p><b>${c.callTime ? `${h(c.callTime)} · ` : ''}${h(c.role)}</b>${c.days ? ` <small>${h(c.days)}</small>` : ''}${c.needs ? ` <small>needs ${h(c.needs)}</small>` : ''}</p>
+        (c) => `<article class="call"><p><b>${c.callTime ? `${h(c.callTime)} · ` : ''}${h(c.role)}</b>${c.department ? ` <small>${h(c.department)}</small>` : ''}${c.days ? ` <small>${h(c.days)}</small>` : ''}${c.needs ? ` <small>needs ${h(c.needs)}</small>` : ''}</p>
       ${
         c.crew.length
           ? `<ul>${c.crew

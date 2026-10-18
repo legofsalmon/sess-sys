@@ -65,6 +65,9 @@ export const GONE: readonly Gone[] = [
   // Their documents (ADR 0029): no law asks for them, so they go at once. Their files go on the list of files to delete
   // in the same change, and the server deletes them from the storage straight after, and again each day until they've gone.
   { table: 'documents', entity: 'document', first: queueFilesOf },
+  // Their own calendar's address and their busy times (ADR 0044): about their life, not their work, so they go at once,
+  // and the server stops reading it.
+  { table: 'own_calendars', entity: 'ownCalendar' },
   // Their address on Google Calendar invites, which devices never see. While invites are on, a day still to come keeps
   // theirs until the calendar's next run takes them off its event, and that run removes the row: gone now, it would
   // leave them on the event as a guest added by hand. Past events in Google keep theirs (ADR 0027).
@@ -113,6 +116,9 @@ export const POINTERS: readonly { table: string; column: string }[] = [
   // Who counted a place or a case (ADR 0030): a warehouse record, needed for what was found where, not for who found it,
   // and no law asks for the name, so the count stays and reads "Erased person" once their name goes.
   { table: 'counts', column: 'counted_by' },
+  // Who drove a vehicle on a job (ADR 0047): the job's record, reading "Erased person" once their name goes; erasing is
+  // refused while a booking they drive hasn't ended.
+  { table: 'vehicle_bookings', column: 'driver_id' },
 ]
 
 /** Records of theirs the law asks the business to keep for a time: stripped like STRIPPED while it lasts, then gone like GONE. */
@@ -152,9 +158,10 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
 /**
  * Each field of a person, by its column. Typed against Person, so a field
  * added to a person fails to compile here until it has a column (and
- * `erasedPerson` says whether it goes). The company is three columns.
+ * `erasedPerson` says whether it goes). The company is three columns;
+ * the hidden flags (ADR 0046) are only ever on what's sent, never stored.
  */
-const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company'>]: string } = {
+const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden'>]: string } = {
   name: 'name',
   email: 'email',
   phone: 'phone',

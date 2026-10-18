@@ -4,7 +4,8 @@ import type { Module } from '../migrations.ts'
  * Settings, starting with the office's own details (audit finding 10).
  * Versioned on their own (office_schema_version), so they never fight the
  * crew migrations. One row per setting, by id; "office" is the only one
- * for now.
+ * for now, and
+ * "reading" (ADR 0046) for whether heads of department see crew rates.
  */
 const MIGRATIONS: string[] = [
   `
@@ -16,6 +17,8 @@ const MIGRATIONS: string[] = [
     updated_at  timestamptz NOT NULL DEFAULT now()
   );
   `,
+  // What heads of department read (ADR 0046): on the "reading" row, whether a director lets them see crew rates.
+  `ALTER TABLE settings ADD COLUMN IF NOT EXISTS heads_see_rates boolean;`,
 ]
 
 export const OFFICE: Module = { versionTable: 'office_schema_version', migrations: MIGRATIONS }

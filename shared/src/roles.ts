@@ -5,9 +5,10 @@ import type { CommandName } from './commands.ts'
  * docs/personas.md, less the freelancer, who has a private link and no
  * account: a role says what a signed-in member of staff can change, on the
  * server, where it counts, and on the device, so a button that can't work
- * isn't offered. Everyone signed in still reads everything, but money:
+ * isn't offered. Everyone signed in reads the company's work, but money:
  * prices, quotes and what's owed reach only the roles that can see them
- * (ADR 0042).
+ * (ADR 0042), and crew rates and private links only the roles that need
+ * them (ADR 0046, reading.ts).
  *
  * A role belongs to a staff person on the Crew tab, found by the email
  * their Google account signs in with, as leave already finds "me" (ADR
@@ -85,9 +86,12 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'person.contact': 'crew',
   'unavailability.add': 'crew',
   'unavailability.remove': 'crew',
+  // Their own calendar (ADR 0044): stopping it is the office's, like their days off. Adding one is a server route that needs crew too.
+  'ownCalendar.stop': 'crew',
   'call.create': 'crew',
   'call.update': 'crew',
   'call.cancel': 'crew',
+  'call.department': 'crew',
   'offer.send': 'crew',
   'offer.respond': 'crew',
   'offer.confirm': 'crew',
@@ -106,6 +110,12 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'kit.add': 'kit',
   'kit.update': 'kit',
   'kit.remove': 'kit',
+  // Kit read from jobs' notes (ADR 0043): kit on jobs, with the names it remembers for the next job's notes.
+  'kit.fromNotes': 'kit',
+  // A vehicle on a job, and who drives it (ADR 0047): kit on a job's people, as vans go out with the kit.
+  'vehicleBooking.add': 'kit',
+  'vehicleBooking.update': 'kit',
+  'vehicleBooking.remove': 'kit',
 
   'model.create': 'stock',
   'model.update': 'stock',
@@ -129,6 +139,10 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'fault.close': 'stock',
   'inspection.record': 'stock',
   'count.record': 'stock',
+  // The vehicles themselves and their checks (ADR 0047), kept by whoever keeps the stock.
+  'vehicle.save': 'stock',
+  'vehicle.offRoad': 'stock',
+  'vehicle.archive': 'stock',
 
   'fault.report': 'fault',
 
@@ -153,6 +167,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'cost.paid': 'money',
 
   'office.update': 'settings',
+  // Whether heads of department see crew rates (ADR 0046): what a role reads is a director's to decide, like the role.
+  'reading.heads': 'company',
 
   'person.role': 'company',
   'person.erase': 'company',

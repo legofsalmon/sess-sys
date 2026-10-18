@@ -1,3 +1,4 @@
+import type { Reading } from './reading.ts'
 import { z } from 'zod'
 import type { Role } from './roles.ts'
 import { mutationSchema, type Rejection } from './commands.ts'
@@ -17,8 +18,28 @@ import type { EntityName } from './model.ts'
  *   never loses anything; the next pull covers it.
  */
 
-/** How many changes one push may carry; a device with more waiting sends them in slices. */
+/**
+ * How many changes one push may carry. Phones from before 18 October 2026
+ * still send this many at a time, so the server keeps taking them.
+ */
 export const PUSH_LIMIT = 500
+
+/**
+ * How many changes a device sends at a time. Each takes the server a dozen
+ * or more trips to the database, so 500 at the distance from the server to
+ * the database outlasted the phone's wait, every time, and a phone with a
+ * backlog never got through it (audit, 18 October 2026). Fifty go up in a
+ * few seconds even then.
+ */
+export const PUSH_SLICE = 50
+
+/**
+ * How the feed is read. A device that last read an older one reads its copy
+ * again from the start, once, keeping what it has waiting. 2: a pull that
+ * found nothing new moved a device past any change that landed while it was
+ * being answered, which it then never got (audit, 18 October 2026).
+ */
+export const FEED = 2
 
 export const pushRequest = z.object({
   // "link:…" marks a freelancer's own answers in the history, so no device may call itself that.
@@ -37,6 +58,14 @@ export const pushRequest = z.object({
    * the app, and from a device that hasn't pulled yet.
    */
   generation: z.string().max(100).optional(),
+  /**
+   * The device takes an answer to the first part of the push and sends the
+   * rest again next round, so the server may stop short of a slow push's end
+   * rather than leave the phone waiting past its time. Absent from older
+   * versions of the app, which go on to their next slice whatever the answer
+   * says, so they're answered in full, in order.
+   */
+  partial: z.boolean().optional(),
 })
 export type PushRequest = z.infer<typeof pushRequest>
 
@@ -45,6 +74,7 @@ export type MutationResult =
   | { id: string; status: 'rejected'; reason: Rejection; duplicate?: boolean }
 
 export interface PushResponse {
+  /** In the order sent; when the push asked for `partial`, perhaps only the first of them, the rest left for the next push. */
   results: MutationResult[]
   /** Nothing applied: the app started fresh after the device's copy (see `generation`). Its next pull starts it afresh too. */
   stale?: boolean
@@ -60,6 +90,11 @@ export interface Change {
 
 export interface PullResponse {
   changes: Change[]
+  /**
+   * Where the device is up to: the last change on this page, or, when there's
+   * nothing new, the cursor it asked from. Never the head: a change that
+   * lands while the pull is answered would fall between the two.
+   */
   cursor: number
   more: boolean
   /**
@@ -78,12 +113,21 @@ export interface PullResponse {
   madeUp?: boolean
   /** The server's latest change number. Lower than a device's cursor means the server has lost changes. */
   head?: number
+  /** How the server reads the feed (`FEED`); absent from servers older than 2. */
+  feed?: number
   /**
    * False when this device's role can't see money (ADR 0042), so the
    * changes leave out prices and quotes. A device that's given money later
    * reads its copy again from the start, for what it was never sent.
    */
   money?: boolean
+  /**
+   * What this device's role reads of crew rates and private links (ADR
+   * 0046), when anything is left out; absent when it reads everything. A
+   * device told something different from last time reads its copy again
+   * from the start, so every record it holds is as it would be sent now.
+   */
+  reading?: Reading
 }
 
 /** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0019). */

@@ -87,7 +87,9 @@ also work for other companies, so the system bends to them instead:
 - **Their calendar, not ours.** A freelancer can share free/busy from
   their own calendar (Google, Apple, Outlook, any iCal) so ops see real
   availability without the freelancer filling in a second calendar. Only
-  busy or free is read; never who else they work for.
+  busy or free is read; never who else they work for. Built as their
+  calendar's private iCal address, read only
+  ([ADR 0044](adr/0044-freelancers-own-calendars-read-only.md)).
 - **Enter things once.** Certificates, insurance, bank details and rates
   are uploaded once and kept up to date by expiry reminders, not re-asked
   per job. A freelancer can download everything the company holds on
@@ -479,9 +481,9 @@ of it before anything is saved. Bringing in saves the ticked jobs in one
 change, with a crew call per phase and offers from the guests' answers,
 and remembers each event-day by the id Google gives it on every calendar,
 so looking again shows only what is new and lists what changed in Google.
-Job sheets go into the notes as written; turning kit lists into kit lines
-can come once the stock list has the products to match them against
-([ADR 0014](adr/0014-kit-on-jobs.md)). A job brought in stays
+Job sheets go into the notes as written; their kit lists become kit lines
+on the device, after a look at each, matched against the stock list
+([ADR 0043](adr/0043-kit-lists-from-the-notes.md)). A job brought in stays
 with the calendar it came from, which keeps its events, so the app doesn't
 write it to the jobs calendar.
 
@@ -502,7 +504,9 @@ See [research/crewbox-handoff.md](research/crewbox-handoff.md). In short:
 a **show pack** of files first (no Crewbox changes needed), then a keyed
 push of event, crew and running order into the box and a pull of technical
 incidents back as repair tickets, which needs four small additions to
-Crewbox.
+Crewbox. The show pack is built
+([Decision 0045](adr/0045-the-crewbox-show-pack.md)); what's in it, file by
+file, is [crewbox-show-pack.md](crewbox-show-pack.md).
 
 ## Mobile
 
@@ -568,9 +572,14 @@ Crewbox.
   from the personas; freelancers keep their link. A role decides what a
   member of staff can change, checked by the server on every command and
   request, and the app offers only what it covers. They start off and come
-  on when a director is named from Admin. Not built yet: narrowing what
-  each role can *read* (the sync scopes), and an accountant's role, which
-  waits on finance.
+  on when a director is named from Admin. What each role *reads* is
+  narrowed in the change feed: money's tables go only to the office and
+  directors ([ADR 0042](adr/0042-quotes-prices-and-a-money-view.md)), and
+  crew rates, timesheet amounts and private links are left out of the
+  records sent to roles that don't need them, each person's own always
+  sent ([ADR 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
+  Not built yet: narrowing phones and certificates, and an accountant's
+  role, which waits on finance.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
   details, documents) kept in separate tables with tighter access. Not
   built yet either, for the same reason.

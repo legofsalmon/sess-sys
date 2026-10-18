@@ -159,9 +159,11 @@ work". Money is where that piece starts.
   devices start or drop money at their next sync, with nothing for them
   to do.
 - A timesheet marked paid stays approved until the payment is taken back.
-- Booking rates on offers and timesheets are still read by every role.
-  They're crew's own pay, not the company's prices, and narrowing them is
-  the rest of ADR 0034's reading work.
+- Booking rates on offers and timesheets were still read by every role.
+  They're crew's own pay, not the company's prices, and narrowing them
+  was the rest of ADR 0034's reading work. It came in
+  [ADR 0046](0046-departments-on-calls-and-what-each-role-reads.md),
+  which leaves the fields out of records rather than the tables out.
 - The quote prints the office's phone and email from Admin, and nothing
   else about the company.
 
