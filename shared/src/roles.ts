@@ -169,6 +169,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'office.update': 'settings',
   // Whether heads of department see crew rates (ADR 0046): what a role reads is a director's to decide, like the role.
   'reading.heads': 'company',
+  // Whether the app prompts messages to crew (ADR 0048): a setting, so the office's as much as a director's.
+  'messages.prompt': 'settings',
 
   'person.role': 'company',
   'person.erase': 'company',

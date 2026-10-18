@@ -19,6 +19,8 @@ const MIGRATIONS: string[] = [
   `,
   // What heads of department read (ADR 0046): on the "reading" row, whether a director lets them see crew rates.
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS heads_see_rates boolean;`,
+  // Whether the app prompts messages to crew (ADR 0048): on the "messages" row, off until the office says.
+  `ALTER TABLE settings ADD COLUMN IF NOT EXISTS prompt_messages boolean;`,
 ]
 
 export const OFFICE: Module = { versionTable: 'office_schema_version', migrations: MIGRATIONS }

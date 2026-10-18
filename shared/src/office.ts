@@ -14,6 +14,8 @@ const phone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digit
 export const OFFICE_SETTING_ID = 'office'
 /** What heads of department read (ADR 0046): the second setting, with only `headsSeeRates` to it. */
 export const READING_SETTING_ID = 'reading'
+/** Whether the app prompts messages to crew (ADR 0048): the third setting, with only `promptMessages` to it. */
+export const MESSAGES_SETTING_ID = 'messages'
 
 export const setting = z.object({
   id,
@@ -23,6 +25,13 @@ export const setting = z.object({
   email: z.string().email().max(200).nullable(),
   /** On the "reading" setting (ADR 0046): a director lets heads of department see crew rates. Off unless said. */
   headsSeeRates: z.boolean().optional(),
+  /**
+   * On the "messages" setting (ADR 0048): whether Offer, Send, Tell and Ask
+   * open a WhatsApp, text or email to a real person. Off until the office
+   * says, so a company whose crew came in from a calendar can tidy the
+   * lists without a mis-tap messaging a freelancer about a job in October.
+   */
+  promptMessages: z.boolean().optional(),
 })
 export type Setting = z.infer<typeof setting>
 
@@ -43,6 +52,8 @@ export const officeCommandSchemas = {
   }),
   /** Whether heads of department see crew rates and timesheet amounts (ADR 0046). A director's to decide. */
   'reading.heads': z.object({ rates: z.boolean() }),
+  /** Whether the app prompts messages to crew (ADR 0048). The office's to decide, under Admin. */
+  'messages.prompt': z.object({ on: z.boolean() }),
 } as const
 
 /** The details when there is a way back in them: a phone or an email. A name alone is nothing to show. */
