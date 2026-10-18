@@ -3,6 +3,23 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026: a full audit, from reliability to the screens
+
+**Done**
+
+- A full audit of the app with all six new features in
+  ([Audit, 18 October 2026](audit-2026-10-18.md)): sync and data at real
+  size, security and privacy, every screen as each role on a phone and a
+  desk, and speed and running it. Two P0s in the sync (a pull that can
+  skip a change, a phone with a backlog stuck for ever), backups and
+  alerts still off, and an order to fix the rest.
+- Checked: everything was local; nothing live was read or changed.
+
+**Waiting on**
+
+- Colly: the backup variables and the Sentry key, and clearing the
+  dashboard start command on both Railway services.
+
 ## 17 October 2026: vans and drivers
 
 **Done**
