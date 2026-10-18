@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 18 October 2026, night: long lists drawn in a window
+
+**Done**
+
+- Jobs' list and Crew's calls draw only the rows near the screen, the rest
+  standing in at their heights, in [Decision 0050](adr/0050-long-lists-drawn-in-a-window.md)
+  (Colly's "faster long lists"). With 900 extra jobs on a slowed phone the
+  Jobs tab went from 254–587 ms to 80–242 ms and Crew from 730–959 ms to
+  132–192 ms. Back still finds the row a job was opened from. Filled calls
+  are built only once unfolded. Find in page now reaches only the rows
+  near the screen; the list's own search covers the rest.
+- Checked: typecheck, the full browser suite (113 tests; the long-list test
+  three times more), scrolling end to end on a phone and in the laptop's
+  column with no blank rows.
+
+**Waiting on**
+
+- Colly: the Railway start command, the backup variables and the Sentry key,
+  as before.
+
 ## 18 October 2026, evening: the audit's P1 fixes
 
 **Done**

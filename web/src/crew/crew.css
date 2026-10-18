@@ -130,7 +130,9 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 
 /* A crew call at rest is one line (audit finding 16): a button with the role and who's on it that opens the rest of the call under it, and on the right its state as a pill, with "Offer…" under that while there are places to fill. On the Crew tab the calls are grouped by job and then by days. */
 .crew .call-group { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
-.crew .card > h2 + .call-group { padding-top: 0; border-top: 0; }
+.crew .call-groups { display: grid; gap: var(--space-10); }
+.crew .filled-calls .call-groups { gap: 0; }
+.crew .card > h2 + .call-groups > [data-first] { padding-top: 0; border-top: 0; }
 .crew .call-group > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .crew .call-group > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .crew .call-date { display: grid; gap: var(--space-6); }

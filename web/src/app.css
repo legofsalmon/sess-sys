@@ -235,13 +235,12 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .menu .place-icon .icon { width: 22px; height: 22px; }
 .menu .job-row .side { align-content: center; color: var(--muted); }
 .app .job-list { list-style: none; margin: 0; padding: 0; display: grid; }
-/* A row of a long list (audit finding 11): laid out and painted only as it nears the screen, standing in at about its height until then,
-   and at its own once it has been drawn. Still in the page, so find in page, the keyboard and a screen reader reach every row. Its focus
-   ring is drawn just outside it, so what it paints may go that far. Back finds the place by these rows (places.ts). */
-.app [data-place] { content-visibility: auto; contain-intrinsic-size: auto 110px; overflow-clip-margin: var(--space-6); }
-.crew .call-group[data-place] { contain-intrinsic-size: auto 300px; }
+/* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, the rest standing in as padding at their heights
+   (windowed.ts), which moves the page itself when a row above the screen changes height, so the browser's own anchoring is off. Back
+   finds the place by its rows (data-place, places.ts). The first row has no line above it, wherever the window starts. */
+.app .windowed { overflow-anchor: none; }
 .app .job-row { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
-.app .job-list li:first-child .job-row { border-top: 0; padding-top: 0; }
+.app .job-list li:first-child:not([aria-posinset]) .job-row, .app .job-list li[aria-posinset='1'] .job-row { border-top: 0; padding-top: 0; }
 .app .job-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .app .job-row .side { display: grid; justify-items: end; align-content: start; gap: var(--space-4); text-align: right; }
 .app .job-row small { color: var(--muted); font-size: var(--text-hint); white-space: nowrap; }
