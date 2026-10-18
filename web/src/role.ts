@@ -13,8 +13,8 @@ import { useView } from './view.ts'
  * none and everything is offered, as before.
  */
 
-/** The demo's personas, as the roles they stand for. A freelancer has their link, not the app. */
-const PERSONA_ROLES: Record<string, Role> = { director: 'director', office: 'office', head: 'head', warehouse: 'warehouse', staff: 'crew' }
+/** The demo's personas, as the roles they stand for. The warehouse is a department, run as a head runs one (ADR 0051); a freelancer has their link. */
+const PERSONA_ROLES: Record<string, Role> = { director: 'director', office: 'office', head: 'head', warehouse: 'head', staff: 'crew' }
 
 export interface Access {
   /** The role being held to; none while nothing is checked. */
