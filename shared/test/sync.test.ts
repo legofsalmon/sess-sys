@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { commandSchemas, type Rejection } from '../src/commands.ts'
 import type { EntityName } from '../src/model.ts'
-import { PUSH_LIMIT, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
+import { FEED, PUSH_LIMIT, PUSH_SLICE, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
 import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { keepSyncing } from '../src/sync/retry.ts'
 
@@ -19,8 +19,11 @@ import { keepSyncing } from '../src/sync/retry.ts'
  * asked, backing off to every 30 seconds; a long feed is pulled a page at a
  * time; after the server is restored from a backup the device starts its
  * copy afresh and sends again what it did lately, unless the server was
- * cleared on purpose, when it drops it; and a push the server calls stale
- * is followed by just such a fresh start.
+ * cleared on purpose, when it drops it; a push the server calls stale
+ * is followed by just such a fresh start; a push answered only in part
+ * sends the rest first, next round; a push that fails still lets the round
+ * pull; and a copy read before the feed's fix reads it again, once,
+ * keeping what it has waiting.
  */
 
 /** A server that applies everything it's sent, in order, and remembers each push. */
@@ -49,15 +52,22 @@ class PretendServer implements Transport {
   down = false
   /** Hold every answer until this settles, so a test can look in mid-round. */
   wait?: Promise<void>
+  /** Answer only this many of each push, as a slow server out of time does, leaving the rest for the next. */
+  answerAtMost?: number
+  /** Pushes fail, as when the server takes longer than the phone waits; pulls still answer. */
+  pushFails = false
+  /** How it reads the feed (`FEED`); undefined plays a server from before. */
+  feed?: number
 
   async push(req: PushRequest): Promise<PushResponse> {
     await this.wait
     if (this.down) throw new Error('No signal')
+    if (this.pushFails) throw new Error('The server took too long')
     this.pushes.push(req)
     if (this.pushes.length === this.staleAt) return { results: [], stale: true }
     if (this.staleFor !== undefined && req.generation === this.staleFor) return { results: [], stale: true }
     return {
-      results: req.mutations.map((m): MutationResult => {
+      results: req.mutations.slice(0, this.answerAtMost).map((m): MutationResult => {
         const before = this.answered.get(m.id)
         if (before) return { ...before, duplicate: true }
         const reason = this.refuse?.(m)
@@ -81,6 +91,7 @@ class PretendServer implements Transport {
       cursor: more ? changes[changes.length - 1]!.seq : Math.max(after, this.seq, ...changes.map((c) => c.seq)),
       more,
       head: this.seq,
+      ...(this.feed !== undefined ? { feed: this.feed } : {}),
       ...(this.generation !== undefined ? { generation: this.generation } : {}),
       ...(this.cleared ? { cleared: true } : {}),
     }
@@ -101,7 +112,7 @@ const place = (id: string, name = `Bay ${id}`) => ({ id, name, notes: '' })
 describe('a big outbox', { timeout: 30_000 }, () => {
   const many = PUSH_LIMIT * 2 + 1
 
-  it(`sends more than ${PUSH_LIMIT} waiting changes in slices, in order, and all of them leave the outbox`, async () => {
+  it(`sends ${many} waiting changes ${PUSH_SLICE} at a time, in order, and all of them leave the outbox`, async () => {
     const server = new PretendServer()
     const storage = new MemoryStorage()
     const phone = await device(server, storage)
@@ -109,7 +120,8 @@ describe('a big outbox', { timeout: 30_000 }, () => {
     expect(phone.view().pendingCount).toBe(many)
 
     await phone.sync()
-    expect(server.pushes.map((p) => p.mutations.length)).toEqual([PUSH_LIMIT, PUSH_LIMIT, 1])
+    expect(server.pushes.map((p) => p.mutations.length)).toEqual([...Array<number>(Math.floor(many / PUSH_SLICE)).fill(PUSH_SLICE), many % PUSH_SLICE])
+    expect(server.pushes.every((p) => p.partial === true)).toBe(true)
     expect(server.pushes.flatMap((p) => p.mutations.map((m) => (m.args as { id: string }).id))).toEqual(Array.from({ length: many }, (_, i) => `p${i}`))
     expect(phone.view().pendingCount).toBe(0)
     expect((await storage.load())?.outbox).toEqual([])
@@ -122,9 +134,9 @@ describe('a big outbox', { timeout: 30_000 }, () => {
     for (let i = 0; i < many; i++) await phone.mutate('place.upsert', place(`p${i}`))
 
     await phone.sync()
-    expect(server.pushes.map((p) => p.mutations.length)).toEqual([PUSH_LIMIT, PUSH_LIMIT])
-    // The first slice went through; the second was stale, so the third stayed waiting.
-    expect(phone.view().pendingCount).toBe(PUSH_LIMIT + 1)
+    expect(server.pushes.map((p) => p.mutations.length)).toEqual([PUSH_SLICE, PUSH_SLICE])
+    // The first slice went through; the second was stale, so the rest stayed waiting.
+    expect(phone.view().pendingCount).toBe(many - PUSH_SLICE)
   })
 })
 
@@ -585,5 +597,88 @@ describe('a push the server calls stale', () => {
     expect(server.pushes[0]!.generation).toBe('g1')
     expect(phone.pendingCount).toBe(0)
     expect(phone.view().warehouse.places).toEqual([])
+  })
+})
+
+describe('a push answered only in part', () => {
+  it('sends the rest again first, straight after, so the server takes them in the order they were made', async () => {
+    // Proves: a server out of time answers the first of a slice; the phone sends nothing after the rest until they're
+    // answered, pulls in between, and the same sync goes round again until all of it is through, each change sent once more
+    // at most, and every one applied in the order it was made.
+    const server = new PretendServer()
+    server.answerAtMost = 20
+    const phone = await device(server)
+    const n = PUSH_SLICE * 2 + 10
+    for (let i = 0; i < n; i++) await phone.mutate('place.upsert', place(`p${i}`))
+    await phone.sync()
+    expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 0 })
+    const firsts = server.pushes.map((p) => (p.mutations[0]!.args as { id: string }).id)
+    expect(firsts).toEqual(Array.from({ length: Math.ceil(n / 20) }, (_, i) => `p${i * 20}`))
+    expect([...server.answered.values()].map((r) => (r.status === 'applied' ? r.seq : 0))).toEqual(Array.from({ length: n }, (_, i) => i + 1))
+    // A pull between each push, so a phone working through a backlog still hears from the server.
+    expect(server.pulls).toBe(server.pushes.length)
+  })
+})
+
+describe('a push that fails', () => {
+  it('still lets the round pull, so a phone that cannot get its own changes through keeps hearing everyone else’s', async () => {
+    // Proves: with every push failing (as when the server takes longer than the phone waits), the round still pulls and lands
+    // what others did, keeps its own change waiting, and says the round failed so it's tried again.
+    const server = new PretendServer()
+    server.seq = 1
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 1 }]
+    server.pushFails = true
+    const phone = await device(server)
+    await phone.mutate('place.upsert', place('van1', 'Van 1'))
+    await expect(phone.sync()).rejects.toThrow('The server took too long')
+    expect(server.pulls).toBe(1)
+    expect(phone.cursor).toBe(1)
+    expect(phone.view()).toMatchObject({ connection: 'offline', pendingCount: 1 })
+    expect(phone.view().warehouse.places.map((p) => p.id).sort()).toEqual(['a3', 'van1'])
+
+    server.pushFails = false
+    await phone.sync()
+    expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 0 })
+  })
+})
+
+describe('a copy read before the feed was fixed', () => {
+  it('reads it again from the start, once, keeping everything waiting to go', async () => {
+    // Proves: a server on FEED tells a copy saved before it to read the feed again from 0, which lands a change it was moved
+    // past; its waiting change stays and is sent; the next sync reads on from where it is, not from the start again; a new
+    // copy, starting from 0 anyway, reads it once.
+    const server = new PretendServer()
+    server.seq = 3
+    server.changes = [1, 2, 3].map((seq) => ({ ...placed(`b${seq}`, `Bay ${seq}`), seq }))
+    const storage = new MemoryStorage()
+    // A copy at cursor 3 that was moved past change 2 without being sent it, as an empty pull could.
+    const old = emptySnapshot('phone')
+    old.cursor = 3
+    for (const seq of [1, 3]) applyChange(old, server.changes[seq - 1]!)
+    await storage.save(old)
+    const phone = await device(server, storage)
+    await phone.mutate('place.upsert', place('van1', 'Van 1'))
+    expect(phone.view().warehouse.places.map((p) => p.id).sort()).toEqual(['b1', 'b3', 'van1'])
+
+    // A server from before says nothing, and nothing is read again.
+    server.down = true
+    await expect(phone.sync()).rejects.toThrow()
+    server.down = false
+    server.feed = FEED
+    await phone.sync()
+    expect(server.pulledAfter).toEqual([3, 0])
+    // This pretend server sends no change back for Van 1, so only the bays are in the copy, the missed one among them.
+    expect(phone.view().warehouse.places.map((p) => p.id).sort()).toEqual(['b1', 'b2', 'b3'])
+    expect(phone.view().pendingCount).toBe(0)
+    expect(server.pushes.flatMap((p) => p.mutations.map((m) => (m.args as { id: string }).id))).toEqual(['van1'])
+    expect(await storage.load()).toMatchObject({ feed: FEED, cursor: 4 })
+
+    server.pulledAfter = []
+    await phone.sync()
+    expect(server.pulledAfter).toEqual([4])
+
+    const fresh = await device(server)
+    await fresh.sync()
+    expect(fresh.view().warehouse.places.map((p) => p.id).sort()).toEqual(['b1', 'b2', 'b3'])
   })
 })

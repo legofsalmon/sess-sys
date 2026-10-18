@@ -1,6 +1,6 @@
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import type { WebSocket } from 'ws'
@@ -41,6 +41,12 @@ import { registerItemLogRoutes } from './stock/log.ts'
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
 export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000
+/**
+ * How long a push from a device that takes part of an answer runs before it's
+ * answered with what's done: well inside the 30 seconds a phone waits, so a
+ * slow database never leaves it giving up on a push that went through.
+ */
+export const PUSH_BUDGET_MS = 20_000
 
 export interface AppOptions {
   db: Db
@@ -52,6 +58,8 @@ export interface AppOptions {
   webRoot?: string
   /** The longest to wait for a whole request; REQUEST_TIMEOUT_MS unless a test wants it shorter. */
   requestTimeoutMs?: number
+  /** PUSH_BUDGET_MS unless a test wants it shorter. */
+  pushBudgetMs?: number
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
   /** A shared passcode for a demo copy (DEMO_PASSCODE); only used while Google sign-in is off. */
@@ -120,7 +128,7 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS } = options
+  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS, pushBudgetMs = PUSH_BUDGET_MS } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
@@ -260,7 +268,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.post('/api/sync/push', async (req, reply): Promise<PushResponse | void> => {
     const parsed = pushRequest.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message })
-    const { clientId, mutations, sentAt, generation } = parsed.data
+    const { clientId, mutations, sentAt, generation, partial } = parsed.data
+    const started = Date.now()
     // Who is asking, for the history and for the handlers that check it (ADR 0024); nobody while sign-in is off.
     const from = {
       userId: req.user?.id,
@@ -272,8 +281,27 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     const results: MutationResult[] = []
     let stale = false
+    // What's already applied, in one look, answered as it was the first time: a phone sending again what it sent before
+    // it gave up waiting is answered at once, rather than at a dozen trips to the database a change. Starting fresh
+    // empties this table (ADR 0019), so nothing found here belongs to a copy that's gone.
+    // An id with a character the database can't hold fails the look, so then each is looked up on its own, as before.
+    const seen = await db
+      .query<{ id: string; result: MutationResult }>('SELECT id, result FROM mutations WHERE id = ANY($1::text[])', [mutations.map((m) => m.id)])
+      .then(({ rows }) => rows)
+      .catch((err: unknown) => {
+        if (!isCharacterError(err)) throw err
+        return []
+      })
+    const answered = new Map(seen.map((r) => [r.id, r.result]))
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) {
+      // Out of time for a device that takes part of an answer: the rest go again in its next push, after these.
+      if (partial && results.length > 0 && Date.now() - started > pushBudgetMs) break
+      const before = answered.get(m.id)
+      if (before) {
+        results.push({ ...before, duplicate: true })
+        continue
+      }
       const result = await db
         .transaction(async (tx) => {
           await tx.query('SELECT pg_advisory_xact_lock(7331)')
@@ -327,10 +355,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     )
     const head = Number(meta[0]?.head ?? 0)
     const generation = meta[0]?.generation ?? undefined
-    const cursor = page.length ? Number(page[page.length - 1]!.seq) : Math.max(after, head)
+    // Nothing new keeps the device where it was. Not the head: a change committed after the page was read and before
+    // the head was would fall between the two, and the device would never be sent it (audit, 18 October 2026).
+    const cursor = page.length ? Number(page[page.length - 1]!.seq) : after
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
-    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, ...(money ? {} : { money: false }), ...(readsEverything(reading) ? {} : { reading }) }
+    return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, feed: FEED, ...(money ? {} : { money: false }), ...(readsEverything(reading) ? {} : { reading }) }
   })
 
   app.get('/api/sync/live', { websocket: true }, async (socket) => {

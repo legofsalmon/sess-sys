@@ -14,6 +14,12 @@ waiting on someone.
   skip a change, a phone with a backlog stuck for ever), backups and
   alerts still off, and an order to fix the rest.
 - Checked: everything was local; nothing live was read or changed.
+- The two sync P0s fixed ([Decision 0001](adr/0001-sync-engine.md),
+  amended): a pull that finds nothing new keeps the device where it was,
+  and every device reads its copy again once, keeping what it has
+  waiting; a phone sends 50 changes at a time, a resend is answered from
+  one look, a slow push is answered in part inside 20 seconds, and a
+  round whose push fails still pulls.
 
 **Waiting on**
 

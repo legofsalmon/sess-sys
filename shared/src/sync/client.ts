@@ -3,7 +3,7 @@ import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, 
 import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
-import { PUSH_LIMIT, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
+import { FEED, PUSH_SLICE, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
@@ -68,6 +68,11 @@ export interface Snapshot {
    * copies saved before, which then read their copy again once.
    */
   reading?: Reading
+  /**
+   * How the server read the feed when this copy last pulled (`FEED`); absent
+   * from copies saved before, which then read their copy again once.
+   */
+  feed?: number
 }
 
 export interface Storage {
@@ -452,8 +457,20 @@ export class SyncClient {
     // announced as it lands, and the end of the round after that.
     this.connection = 'syncing'
     try {
-      await this.push()
-      await this.pull()
+      // A push that fails or runs out of time still lets the pull go: a phone
+      // that can't get its own changes through keeps hearing everyone else's,
+      // rather than nothing at all until it can (audit, 18 October 2026).
+      let failed: { err: unknown } | undefined
+      try {
+        await this.push()
+      } catch (err) {
+        failed = { err }
+      }
+      // When both fail, the push's failure is the one said, so being signed out still stops the retries.
+      await this.pull().catch((err: unknown) => {
+        throw failed ? failed.err : err
+      })
+      if (failed) throw failed.err
       this.setConnection('idle')
     } catch (err) {
       // No signal, server down, or a response lost on the way back. The
@@ -466,16 +483,18 @@ export class SyncClient {
 
   private async push() {
     const waiting = this.state.outbox.filter((m) => m.appliedSeq === undefined)
-    // The server takes PUSH_LIMIT at a time, so a long day with no signal, or a replay
-    // after a restore, goes up in slices, each answered and saved before the next is sent.
-    for (let from = 0; from < waiting.length; from += PUSH_LIMIT) {
-      const slice = waiting.slice(from, from + PUSH_LIMIT)
+    // A long day with no signal, or a replay after a restore, goes up PUSH_SLICE at a time,
+    // each answered and saved before the next is sent.
+    for (let from = 0; from < waiting.length; from += PUSH_SLICE) {
+      const slice = waiting.slice(from, from + PUSH_SLICE)
       const { results, stale } = await this.transport.push({
         clientId: this.state.clientId,
         mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
         // On the same clock as each createdAt, so the server can tell how long each waited here.
         sentAt: this.now().toISOString(),
         ...(this.state.generation ? { generation: this.state.generation } : {}),
+        // A slow server answers the first of them and leaves the rest, which go again, first, next time.
+        partial: true,
       })
       // The app started fresh after this device's copy: the pull that follows starts it afresh, dropping these.
       if (stale) return
@@ -490,6 +509,12 @@ export class SyncClient {
       this.state.outbox = kept
       this.version++
       await this.persist()
+      // Answered only in part: nothing after the rest may go before them, so this round pulls, and the next one, straight
+      // after, sends them. An answer to none of them, which no server gives, would only end the round.
+      if (results.length < slice.length) {
+        if (results.length > 0) this.again = true
+        return
+      }
     }
   }
 
@@ -508,12 +533,16 @@ export class SyncClient {
       // person, call, offer and timesheet as it's sent now, with what's hidden left out, or what's newly shown put back.
       const reread = !sameReading(res.reading, this.state.reading)
       const rescoped = money !== (this.state.money !== false) || reread
-      if (rescoped) {
+      // The server reads the feed differently now (FEED). A copy read before may have been moved past a change it was
+      // never sent, so it's read again from the start, once: what it has stays, and so does everything waiting to go.
+      const refeed = res.feed !== undefined && res.feed > (this.state.feed ?? 0)
+      if (refeed) this.state.feed = res.feed
+      if (rescoped || refeed) {
         this.state.money = money
         if (res.reading) this.state.reading = res.reading
         else delete this.state.reading
         if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
-        if ((gainedMoney || reread) && this.state.cursor > 0) {
+        if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
           this.state.cursor = 0
           this.version++
           await this.persist()
@@ -521,7 +550,7 @@ export class SyncClient {
         }
       }
       // Nothing new, most of the time: then nothing is saved and nobody is told.
-      let changed = res.changes.length > 0 || rescoped
+      let changed = res.changes.length > 0 || rescoped || refeed
       if (res.generation && res.generation !== this.state.generation) [this.state.generation, changed] = [res.generation, true]
       // Copies saved before made-up data existed have no flag, which means no.
       if ((this.state.madeUp === true) !== (res.madeUp === true)) [this.state.madeUp, changed] = [res.madeUp === true, true]

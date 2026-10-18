@@ -48,6 +48,29 @@
   seconds: a retry each stacked up, so a few asks while a slow round
   failed kept a phone on a poor signal trying every few seconds for
   ten minutes.
+- **Amended:** 18 October 2026, from the
+  [audit](../audit-2026-10-18.md)'s two P0s in the sync. *A pull that
+  finds nothing new keeps the device where it was.* It used to move the
+  device to the head of the feed, read in a second query, so a change
+  committed between the two was never sent; the lock keeps numbers in
+  order, but only for what a pull reads. The head is still sent, only
+  to tell a server that has gone back in time. The fix comes with
+  `FEED` 2 in each pull: a device whose copy was read before it reads
+  the feed again from the start, once, as it does when its role's
+  reading changes, keeping everything it has waiting. *A backlog goes
+  up 50 at a time* (`PUSH_SLICE`), not 500: at a dozen or more trips
+  to the database a change, 500 from Railway to Neon outlasted the
+  phone's 30-second wait every time. The server still takes up to 500,
+  for phones on the older version. It looks up every change in a push
+  that's already applied in one query and answers those as the first
+  time, so a resend is answered at once. A device that says it takes
+  part of an answer (`partial`) is answered after 20 seconds with what's
+  done, in order; it sends nothing after the rest until they're
+  answered, and goes again straight after the pull. An older device,
+  which would go on to its next slice, is answered in full. And a round
+  whose push fails still pulls, so a phone that can't get its own
+  changes through still hears everyone else's. Every change is still
+  applied under the one lock, once, with its answer kept by its id.
 
 ## Context
 
