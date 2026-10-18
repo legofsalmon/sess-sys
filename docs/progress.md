@@ -39,6 +39,7 @@ waiting on someone.
   of department, so keeps the stock and kit. The demo's Warehouse persona
   stays, held to a head's role.
 - Checked: typecheck, 802 unit tests, the two role browser tests.
+
 ## 18 October 2026, night: long lists drawn in a window
 
 **Done**
