@@ -73,6 +73,13 @@ export interface Snapshot {
    * from copies saved before, which then read their copy again once.
    */
   feed?: number
+  /**
+   * How far the copy had read when it began reading the feed again from the
+   * start (`FEED`, money, what its role reads), keeping what it held; gone
+   * once it's read that far again. What the person sees meanwhile is as of
+   * this, so a change made then says it was made against this.
+   */
+  held?: number
 }
 
 export interface Storage {
@@ -321,7 +328,9 @@ export class SyncClient {
     const refused = this.guard?.(name, parsed.success ? parsed.data : args)
     if (refused) throw new Error(refused)
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid request')
-    const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString() }
+    // What the person was looking at, so the server can tell an edit to something changed elsewhere since (audit, 18 October 2026).
+    const seen = Math.max(this.state.cursor, this.state.held ?? 0)
+    const mutation: Mutation<N> = { id: newId(), name, args: parsed.data as CommandArgs<N>, createdAt: this.now().toISOString(), seen }
     this.state.outbox.push(mutation)
     this.version++
     const takeBack = () => {
@@ -503,7 +512,7 @@ export class SyncClient {
       const slice = waiting.slice(from, from + PUSH_SLICE)
       const { results, stale, busy } = await this.transport.push({
         clientId: this.state.clientId,
-        mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
+        mutations: slice.map(({ id, name, args, createdAt, seen }) => ({ id, name, args, createdAt, ...(seen !== undefined ? { seen } : {}) })),
         // On the same clock as each createdAt, so the server can tell how long each waited here.
         sentAt: this.now().toISOString(),
         ...(this.state.generation ? { generation: this.state.generation } : {}),
@@ -559,6 +568,7 @@ export class SyncClient {
         else delete this.state.reading
         if (!money) for (const name of MONEY_ENTITY_NAMES) (this.state.entities as Record<string, unknown>)[name] = {}
         if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
+          this.state.held = Math.max(this.state.held ?? 0, this.state.cursor)
           this.state.cursor = 0
           this.version++
           await this.persist()
@@ -576,6 +586,7 @@ export class SyncClient {
         applyChange(this.state, change)
       }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
+      if (this.state.held !== undefined && this.state.cursor >= this.state.held) delete this.state.held
       // Applied mutations leave the outbox once their result has arrived.
       const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)
       if (done.length) {
@@ -662,6 +673,11 @@ export class SyncClient {
   }
 }
 
+/**
+ * Without `seen` too: a change sent again after the server's data is put
+ * back (`restart`) was made against change numbers from the copy that was
+ * lost, so it applies in the order it arrives, as from an older version.
+ */
 function strip(m: PendingMutation): Mutation {
   return { id: m.id, name: m.name, args: m.args, createdAt: m.createdAt }
 }

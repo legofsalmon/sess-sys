@@ -117,6 +117,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .not-done-list { grid-column: 1 / -1; max-height: 60vh; overflow: auto; }
 .not-done-list .row > div { flex: 1; min-width: 60%; }
 .not-done-list .meta { font-size: var(--text-hint); }
+/* What was typed into a change turned down, folded under its reason, to copy (problems.tsx). */
+.not-done-list .typed { display: grid; gap: var(--space-8); margin-top: var(--space-6); }
+.not-done-list .typed summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.not-done-list .typed button { justify-self: start; }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
 .warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
 .confirm { display: grid; gap: var(--space-8); }

@@ -1,6 +1,6 @@
 import { dayLabel, levelLabel, normaliseNumber, spanLabel, type Mutation, type View } from '@sh/shared'
 import { attachmentTitleInSentence, titleInSentence } from '@sh/shared'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { reasonOf } from './act.tsx'
 import { when } from './format.ts'
 import { client } from './sync.ts'
@@ -15,6 +15,11 @@ import { client } from './sync.ts'
  * in plain words, until each is dismissed. A change this device turns down
  * before keeping it isn't here: that's said where it was asked for
  * (act.tsx).
+ *
+ * Text the person typed into a change that was turned down is kept with
+ * it, to copy, until it's dismissed (audit, 18 October 2026, finding 5): a
+ * job sheet typed with no signal that met a newer one from the office is
+ * turned down rather than saved over it, and the words aren't lost.
  */
 
 /** The count for the top bar and the list for under it, wired together: the count opens and closes the list. */
@@ -47,7 +52,7 @@ function NotDoneList({ view }: { view: View }) {
   return (
     <section className="card attention not-done-list" aria-label="Not done" aria-live="polite">
       <h2>Not done</h2>
-      <p className="hint">The server turned these down, so they weren't made. Sort out what each says and ask again, or dismiss it.</p>
+      <p className="hint">The server turned these down, so they weren't made. Sort out what each says and ask again, or dismiss it. Anything you typed stays here to copy until you do.</p>
       {problems.map((p) => {
         const what = say(p.mutation)
         return (
@@ -55,6 +60,7 @@ function NotDoneList({ view }: { view: View }) {
             <div>
               <b>{what}</b>
               <p>{reasonOf(p.reason.message)}</p>
+              <Typed m={p.mutation} />
               <p className="meta">
                 Asked {when(p.mutation.createdAt)}
                 {p.at.slice(0, 16) !== p.mutation.createdAt.slice(0, 16) && `, turned down ${when(p.at)}`}
@@ -67,6 +73,46 @@ function NotDoneList({ view }: { view: View }) {
         )
       })}
     </section>
+  )
+}
+
+/** Text a person types into a change, by what the form calls it. */
+const TYPED: Record<string, string> = {
+  name: 'Name',
+  knownAs: 'Goes by',
+  role: 'Role',
+  address: 'Address',
+  notes: 'Notes',
+  details: 'Details for crew',
+  note: 'Note',
+}
+
+/** What was typed, ready to paste: the text alone when there's one piece, each under its name when there are more. */
+function typedOf(m: Mutation): string {
+  const a = (m.args ?? {}) as Record<string, unknown>
+  const typed = Object.entries(TYPED).flatMap(([k, label]) => (typeof a[k] === 'string' && a[k].trim() ? [[label, a[k]] as const] : []))
+  return typed.length === 1 ? typed[0]![1] : typed.map(([label, text]) => `${label}:\n${text}`).join('\n\n')
+}
+
+/** What was typed into a change that wasn't made, folded away, to copy. Where the browser won't copy, the text is selected for the person to. */
+function Typed({ m }: { m: Mutation }) {
+  const text = typedOf(m)
+  const [copied, setCopied] = useState(false)
+  const box = useRef<HTMLTextAreaElement>(null)
+  if (!text) return null
+  const select = () => box.current?.select()
+  const copy = () => {
+    if (!navigator.clipboard) return select()
+    void navigator.clipboard.writeText(text).then(() => setCopied(true), select)
+  }
+  return (
+    <details className="typed">
+      <summary>What you typed</summary>
+      <textarea ref={box} readOnly value={text} rows={Math.min(8, text.split('\n').length + 1)} aria-label="What you typed" onFocus={select} />
+      <button type="button" onClick={copy}>
+        {copied ? 'Copied' : 'Copy what you typed'}
+      </button>
+    </details>
   )
 }
 
