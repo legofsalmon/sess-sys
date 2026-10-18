@@ -563,6 +563,35 @@ export function renderGone(office?: OfficeDetails | null): string {
 <p class="flash bad">This link doesn't work any more. Ask the office to send you a new one.</p>${officeBlock(office)}</main></body></html>`
 }
 
+/** Why a member of staff's page didn't open, and what to do (ADR 0052). */
+export type StaffSignIn =
+  | { why: 'sign-in' | 'cancelled' | 'failed' | 'denied' }
+  | { why: 'not-theirs'; as: string }
+
+/**
+ * A member of staff's own page asks for their Google account before it
+ * opens (ADR 0052): the link alone is no longer enough, as Google is the
+ * only way in for staff. One button, which comes back to the page.
+ */
+export function renderStaffSignIn(name: string, start: string, said: StaffSignIn, office?: OfficeDetails | null): string {
+  const first = h(firstName({ name }))
+  const line =
+    said.why === 'not-theirs'
+      ? `<p class="flash warn">You're signed in as ${h(said.as)}, which isn't ${first}'s account. Sign in as ${first}, or ask the office to check the email they have for you.</p>`
+      : said.why === 'denied'
+        ? `<p class="flash bad">That account can't open Session Hire. Use your Session Hire Google account.</p>`
+        : said.why === 'failed'
+          ? `<p class="flash bad">Signing in didn't work. Please try again.</p>`
+          : said.why === 'cancelled'
+            ? `<p class="flash warn">Signing in was stopped before it finished.</p>`
+            : ''
+  return `<!doctype html><html lang="en-IE"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Session Hire</title><style>${CSS}</style></head>
+<body><main><header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>${first}'s page</small></div></header>
+${line}<p>Sign in with your Session Hire Google account to see your calls, days off and timesheets. You'll stay signed in on this device.</p>
+<a class="button yes" href="${h(start)}">Sign in with Google</a>${officeBlock(office)}</main></body></html>`
+}
+
 /**
  * The page's colour names pointed at the shared design system's roles, as
  * web/src/app.css does for the app, written out as values: the page has no
@@ -631,6 +660,7 @@ fieldset.days input{width:20px}
 .glance a{color:inherit}
 .feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}
 .feed-buttons{display:flex;gap:8px}.feed-buttons>*{flex:1}.feed-buttons .copy[hidden]{display:none}
+a.button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 a.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;text-decoration:none}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}

@@ -40,6 +40,8 @@ const ATTEMPT_PATH = '/api/auth'
 const PASSCODE_COOKIE = 'sh_passcode'
 /** On a demo copy, the persona chosen on "See it as…", as the role the server holds it to (ADR 0034). */
 const PREVIEW_COOKIE = 'sh_preview'
+/** How long a demo copy remembers a browser's passcode and persona: the 60 days staff sessions had before ADR 0052. */
+const DEMO_DAYS = 60
 const asRole = (v: unknown): Role | undefined => (ROLES as readonly unknown[]).includes(v) ? (v as Role) : undefined
 
 /**
@@ -83,11 +85,29 @@ const writePreview = (p: Preview) => (p.personId || p.department ? Buffer.from(J
 const passcodeProof = (passcode: string) => createHmac('sha256', passcode).update('session-hire demo').digest('base64url')
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 
+/** A member of staff's own page, /f/<token>, which asks for Google before it opens (ADR 0052). */
+const STAFF_PAGE = /^\/f\/[A-Za-z0-9_-]{16,64}$/
 /**
  * Where to land after signing in: one of the app's own areas, or a place in
- * one (#jobs/<id>, #stock/item/<id>, #jobs/plan/week/<day>/people), never another site.
+ * one (#jobs/<id>, #stock/item/<id>, #jobs/plan/week/<day>/people),
+ * or a member of staff's own page, never another site.
  */
-const landing = (next: unknown) => (typeof next === 'string' && /^#[a-z]{1,20}(\/[a-z0-9-]{1,64}){0,4}$/.test(next) ? next : '')
+const landing = (next: unknown) =>
+  typeof next === 'string' && (/^#[a-z]{1,20}(\/[a-z0-9-]{1,64}){0,4}$/.test(next) || STAFF_PAGE.test(next)) ? next : ''
+
+/**
+ * The member of staff a request is signed in as, or null, keeping the
+ * cookie's lifetime in step when the session has just been renewed. For
+ * the API and for staff's own pages alike (ADR 0052).
+ */
+export async function signedInStaff(db: Db, req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
+  const token = readCookie(req, SESSION_COOKIE)
+  // Asked on every request, so on the reads' own connections: never queued behind writes waiting for the write lock.
+  const found = token ? await sessionUser(db.reads, token) : undefined
+  if (!found) return null
+  if (found.renewed) setCookie(req, reply, SESSION_COOKIE, token!, { maxAge: SESSION_DAYS * 86_400 })
+  return found.user
+}
 
 /**
  * Staff sign-in. When it is on, every /api route needs a signed-in person
@@ -106,14 +126,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
   const proof = !auth && passcode ? passcodeProof(passcode) : undefined
   const hasPasscode = (req: FastifyRequest) => !!proof && same(readCookie(req, PASSCODE_COOKIE) ?? '', proof)
 
-  async function signedIn(req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
-    const token = readCookie(req, SESSION_COOKIE)
-    // Asked on every request, so on the reads' own connections: never queued behind writes waiting for the write lock.
-    const found = token ? await sessionUser(db.reads, token) : undefined
-    if (!found) return null
-    if (found.renewed) setCookie(req, reply, SESSION_COOKIE, token!, { maxAge: SESSION_DAYS * 86_400 })
-    return found.user
-  }
+  const signedIn = (req: FastifyRequest, reply: FastifyReply) => signedInStaff(db, req, reply)
 
   app.addHook('onRequest', async (req, reply) => {
     req.reader = {}
@@ -156,7 +169,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     if (!proof) return reply.code(404).send({ error: 'Only a demo copy can be seen as someone else.' })
     const role = asRole(req.body?.role)
     const preview = role && readPreview(writePreview({ role, personId: req.body?.personId as string, department: req.body?.department as string }))
-    if (preview) setCookie(req, reply, PREVIEW_COOKIE, writePreview(preview), { maxAge: SESSION_DAYS * 86_400 })
+    if (preview) setCookie(req, reply, PREVIEW_COOKIE, writePreview(preview), { maxAge: DEMO_DAYS * 86_400 })
     else clearCookie(req, reply, PREVIEW_COOKIE)
     // The freelancer is their page, not a role: the one with the most on it, found here, as a persona seen before may
     // have left this browser's copy without anyone's link (ADR 0046).
@@ -185,7 +198,9 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
       const [state, verifier, next] = (readCookie(req, ATTEMPT_COOKIE) ?? '').split('.')
       clearCookie(req, reply, ATTEMPT_COOKIE, ATTEMPT_PATH)
       const back = landing(next)
-      const fail = (why: 'cancelled' | 'failed' | 'denied') => reply.redirect(`/?signin=${why}${back}`, 303)
+      // A staff page is gone back to with what happened; anywhere in the app, the sign-in screen says it.
+      const page = back.startsWith('/')
+      const fail = (why: 'cancelled' | 'failed' | 'denied') => reply.redirect(page ? `${back}?signin=${why}` : `/?signin=${why}${back}`, 303)
 
       if (req.query.error) return fail(req.query.error === 'access_denied' ? 'cancelled' : 'failed')
       // The state must match the one this browser left with, or someone is
@@ -207,7 +222,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
       if (user.disabled) return fail('denied')
       const token = await createSession(db, user.id, String(req.headers['user-agent'] ?? '').slice(0, 300))
       setCookie(req, reply, SESSION_COOKIE, token, { maxAge: SESSION_DAYS * 86_400 })
-      return reply.redirect(`/${back}`, 303)
+      return reply.redirect(page ? back : `/${back}`, 303)
     }
   )
 
@@ -220,7 +235,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
       await new Promise((r) => setTimeout(r, 1_000))
       return reply.code(403).send({ error: "That passcode isn't right." })
     }
-    setCookie(req, reply, PASSCODE_COOKIE, proof, { maxAge: SESSION_DAYS * 86_400 })
+    setCookie(req, reply, PASSCODE_COOKIE, proof, { maxAge: DEMO_DAYS * 86_400 })
     return { ok: true }
   })
 

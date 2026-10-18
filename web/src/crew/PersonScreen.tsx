@@ -369,7 +369,11 @@ function TheirLink({ person }: { person: PersonView }) {
     <section className="card" aria-label="Their link">
       <Heading icon="link">Their link</Heading>
       <p className="hint">
-        Where they answer offers, mark days off and send documents, with no app or login. Their bookings go to their own calendar from there too.
+        {person.kind === 'staff'
+          ? // Staff sign in with Google only (ADR 0052): their page asks for it, so the link alone opens nothing.
+            'Where they answer calls, mark days off and send documents. It asks for their Google sign-in first, so it only opens for them, the office or a director.'
+          : 'Where they answer offers, mark days off and send documents, with no app or login.'}{' '}
+        Their bookings go to their own calendar from there too.
       </p>
       {/* Not sent to this role (ADR 0046): said plainly, so it isn't taken for a link not made yet. */}
       {person.linkHidden && <p className="hint">Your role doesn't see {person.name}'s link. The office or a director can open it or send it.</p>}

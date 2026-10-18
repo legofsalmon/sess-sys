@@ -82,7 +82,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await db.query("UPDATE sessions SET last_seen_at = now() - interval '2 days', expires_at = now() + interval '1 day'")
       expect((await sessionUser(db, token))?.renewed).toBe(true)
       const { rows } = await db.query<{ days: number }>('SELECT round(extract(epoch FROM expires_at - now()) / 86400)::int AS days FROM sessions')
-      expect(rows[0]!.days).toBe(60)
+      expect(rows[0]!.days).toBe(400)
 
       await endSession(db, token)
       expect(await sessionUser(db, token)).toBeUndefined()

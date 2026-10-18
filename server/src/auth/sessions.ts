@@ -4,11 +4,13 @@ import type { Queryable } from '../db.ts'
 import type { Identity } from './google.ts'
 
 /**
- * A session lasts this long after the device was last used, so a phone
- * that is picked up every week or two never has to sign in again, while
- * one left in a drawer drops out on its own.
+ * A session lasts this long after the device was last used: 400 days, the
+ * longest a browser will keep a cookie (Chrome caps every cookie there),
+ * renewed on each day of use. So staff stay signed in until they sign out,
+ * their account is switched off, or a device goes unused for over a year
+ * (ADR 0052). It used to be 60 days.
  */
-export const SESSION_DAYS = 60
+export const SESSION_DAYS = 400
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex')
 

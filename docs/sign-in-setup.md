@@ -233,8 +233,13 @@ step 7, before the rest of the office signs in.
 
 ## Good to know
 
-- A session lasts 60 days after the device was last used. Signing out (on
-  You) also clears that device's copy of the data.
+- Google is the only way in for staff (ADR 0052). A member of staff's own
+  page (their link) asks for their Google sign-in too; freelancers' links
+  still open on their own, and so does every calendar feed.
+- A session lasts 400 days after the device was last used, renewed each
+  day it is used, so staff stay signed in until they sign out or are
+  switched off. Signing out (on You) also clears that device's copy of the
+  data.
 - Once anyone has signed in, the server won't start without the two Google
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
