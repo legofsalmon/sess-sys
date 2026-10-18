@@ -95,7 +95,7 @@ describe('running late from a link', () => {
     expect(entry).toMatchObject({ command: 'late.say', who: { kind: 'link', name: 'Gráinne Power' }, device: 'Chrome on Android' })
     expect(entry.what).toBe(`Gráinne Power said they'll be about 30 minutes late for Liffey Brands Shoot (Shoot), ${dayLabel(today)}: Traffic on the M50`)
 
-    const aoife = (await app.inject({ url: `/f/${await token('aoife')}/sheet/chief` })).body
+    const aoife = (await app.inject({ cookies: colly.cookies, url: `/f/${await token('aoife')}/sheet/chief` })).body
     expect(aoife).toContain('<h2>Running late</h2>')
     expect(aoife).toContain('<b>Gráinne Power</b>: about 30 minutes late, “Traffic on the M50”')
     const dara = (await app.inject({ url: `/f/${await token('dara')}/sheet/sound` })).body
@@ -118,7 +118,7 @@ describe('running late from a link', () => {
     await onLink(app, `/f/${gráinne}/late`, { offer: 'o-grainne', day: today, at: '09:15', note: 'Puncture <i>again</i>' })
     // What they typed is drawn as text, on their page and on the contact's sheet.
     expect((await app.inject({ url: `/f/${gráinne}` })).body).toContain('Puncture &lt;i&gt;again&lt;/i&gt;')
-    expect((await app.inject({ url: `/f/${await token('aoife')}/sheet/chief` })).body).toContain('there at about 09:15, “Puncture &lt;i&gt;again&lt;/i&gt;”')
+    expect((await app.inject({ cookies: colly.cookies, url: `/f/${await token('aoife')}/sheet/chief` })).body).toContain('there at about 09:15, “Puncture &lt;i&gt;again&lt;/i&gt;”')
     const { rows } = await db.query<{ id: string; arrive_at: string; seen_at: string | null }>('SELECT id, arrive_at, seen_at FROM running_late')
     expect(rows).toEqual([{ id: said!.id, arrive_at: '09:15', seen_at: null }])
     await office.sync()
@@ -203,7 +203,7 @@ describe('running late noted by the office, for someone who rang', () => {
     await office.sync()
     expect(office.view().late.toCheck.map((l) => [l.person?.name, l.call?.role, lateLine(l)])).toEqual([['Dara Quinn', 'Sound No.1', 'about 30 minutes late, “Rang from the M50”']])
     expect(office.view().late.forOffer('o-dara').map((l) => l.id)).toEqual(['l-dara'])
-    const sheet = async () => (await app.inject({ url: `/f/${await token('aoife')}/sheet/chief` })).body
+    const sheet = async () => (await app.inject({ cookies: colly.cookies, url: `/f/${await token('aoife')}/sheet/chief` })).body
     expect(await sheet()).toContain('<b>Dara Quinn</b>: about 30 minutes late, “Rang from the M50”')
     expect((await app.inject({ url: `/f/${await token('dara')}` })).body).toContain("You've told us: about 30 minutes late, “Rang from the M50”.")
     const [noted] = (await colly.history()).entries

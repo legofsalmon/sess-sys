@@ -213,13 +213,14 @@ describe('deciding', () => {
     expect(ics.body).toContain('DTSTART;VALUE=DATE:20310303')
     expect(ics.body).toContain('DTEND;VALUE=DATE:20310308')
     // Nor from her own link: the page says it's approved leave with no Remove, and the form, if posted anyway, answers with the refusal and leaves the days off.
-    const page = (await app.inject({ url: `/f/${token}` })).body
+    // Hers is a member of staff's page, so it opens for her Google sign-in (ADR 0052).
+    const page = (await app.inject({ url: `/f/${token}`, cookies: aoife.cookies })).body
     expect(page).toContain('Approved leave')
     expect(page).not.toContain('/away/r1/remove')
-    const posted = await app.inject({ method: 'POST', url: `/f/${token}/away/r1/remove`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: '' })
+    const posted = await app.inject({ method: 'POST', url: `/f/${token}/away/r1/remove`, cookies: aoife.cookies, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: '' })
     expect(posted.statusCode).toBe(303)
     const to = new URL(posted.headers.location as string, 'http://x')
-    expect(flashOf((await app.inject({ url: to.pathname + to.search })).body)).toEqual({
+    expect(flashOf((await app.inject({ url: to.pathname + to.search, cookies: aoife.cookies })).body)).toEqual({
       ok: false,
       message: 'These days off are approved leave: cancel the leave on the Leave screen instead.',
     })
