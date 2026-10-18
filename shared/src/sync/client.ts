@@ -110,6 +110,18 @@ export interface Problem {
 
 export type Connection = 'idle' | 'syncing' | 'offline'
 
+/**
+ * The server answered, but was in the middle of a long change and couldn't take
+ * this device's changes in time (audit finding 7). Not a problem to show: the
+ * connection is fine and they wait to go again, which `keepSyncing` does shortly,
+ * as does the poke the server sends when the long change is done.
+ */
+export class ServerBusy extends Error {
+  constructor() {
+    super('The server is busy with a long change; sending again shortly.')
+  }
+}
+
 export interface View {
   problems: Problem[]
   crew: CrewView
@@ -466,17 +478,19 @@ export class SyncClient {
       } catch (err) {
         failed = { err }
       }
-      // When both fail, the push's failure is the one said, so being signed out still stops the retries.
+      // When both fail, the push's failure is the one said, so being signed out still stops the retries; unless the
+      // push was only told the server was busy, which says nothing of the signal, so then it's the pull's.
       await this.pull().catch((err: unknown) => {
-        throw failed ? failed.err : err
+        throw failed && !(failed.err instanceof ServerBusy) ? failed.err : err
       })
       if (failed) throw failed.err
       this.setConnection('idle')
     } catch (err) {
       // No signal, server down, or a response lost on the way back. The
       // outbox is untouched, and every mutation carries its own id, so
-      // sending it all again later is safe.
-      this.setConnection('offline')
+      // sending it all again later is safe. A busy server answered, and the
+      // pull came through: nothing is wrong to show, and the changes wait.
+      this.setConnection(err instanceof ServerBusy ? 'idle' : 'offline')
       throw err
     }
   }
@@ -487,7 +501,7 @@ export class SyncClient {
     // each answered and saved before the next is sent.
     for (let from = 0; from < waiting.length; from += PUSH_SLICE) {
       const slice = waiting.slice(from, from + PUSH_SLICE)
-      const { results, stale } = await this.transport.push({
+      const { results, stale, busy } = await this.transport.push({
         clientId: this.state.clientId,
         mutations: slice.map(({ id, name, args, createdAt }) => ({ id, name, args, createdAt })),
         // On the same clock as each createdAt, so the server can tell how long each waited here.
@@ -509,6 +523,8 @@ export class SyncClient {
       this.state.outbox = kept
       this.version++
       await this.persist()
+      // In the middle of a long change, the server answered what it could: the rest go again shortly, in order.
+      if (busy) throw new ServerBusy()
       // Answered only in part: nothing after the rest may go before them, so this round pulls, and the next one, straight
       // after, sends them. An answer to none of them, which no server gives, would only end the round.
       if (results.length < slice.length) {

@@ -1,8 +1,10 @@
+import compress from '@fastify/compress'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
+import { constants as zlib } from 'node:zlib'
 import type { WebSocket } from 'ws'
 import type { AuthConfig } from './auth/config.ts'
 import { registerAuth } from './auth/routes.ts'
@@ -30,7 +32,7 @@ import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
-import { CHARACTERS, isCharacterError } from './kernel.ts'
+import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
@@ -47,6 +49,12 @@ export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000
  * slow database never leaves it giving up on a push that went through.
  */
 export const PUSH_BUDGET_MS = 20_000
+/**
+ * How long a push waits for the write lock while a long change holds it (a bring-in, a restore) before it answers
+ * "busy" for the rest, which the device sends again shortly without showing a problem (audit finding 7). Waiting
+ * longer held a connection each, until pulls and the health check queued behind them and every phone said "No signal".
+ */
+export const PUSH_LOCK_WAIT_MS = 3_000
 
 export interface AppOptions {
   db: Db
@@ -60,6 +68,8 @@ export interface AppOptions {
   requestTimeoutMs?: number
   /** PUSH_BUDGET_MS unless a test wants it shorter. */
   pushBudgetMs?: number
+  /** PUSH_LOCK_WAIT_MS unless a test wants it shorter. */
+  pushLockWaitMs?: number
   /** Staff sign-in. Without it the API is open to anyone who can reach it, which is only for tests and trials. */
   auth?: AuthConfig
   /** A shared passcode for a demo copy (DEMO_PASSCODE); only used while Google sign-in is off. */
@@ -128,7 +138,7 @@ const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCo
  * "your data, always reachable" (ADR 0006).
  */
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
-  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS, pushBudgetMs = PUSH_BUDGET_MS } = options
+  const { db, logger = false, logTo, webRoot, auth, passcode, backupStore, backupKey, commit, errorReporting, backupWatch, calendar, requestTimeoutMs = REQUEST_TIMEOUT_MS, pushBudgetMs = PUSH_BUDGET_MS, pushLockWaitMs = PUSH_LOCK_WAIT_MS } = options
   await migrateAll(db)
   const app = Fastify({
     // Railway keeps the log, so a request is logged by its method and path only, with private links masked.
@@ -147,6 +157,23 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const backups = await new Backups(db, backupStore, { log: app.log, commit, watch: backupWatch, key: backupKey }).load()
   app.decorate('backups', backups)
   await app.register(websocket)
+  // The API's answers go compressed to a device that takes it (audit finding 6): a phone's first pull is a few megabytes
+  // of JSON, a tenth of that compressed, and on a weak signal that's the difference between finishing and not. Only the
+  // API: the app's own files are compressed once, when it's built (scripts/compress-web.mjs), and served as they are.
+  // Only what compresses: the export's zip, documents' files and photos are compressed already, and are left alone by
+  // their type; so is an answer under a kilobyte. The live connection is a WebSocket, which this never touches.
+  // Set before the plugin, so its own look at each route sees it.
+  app.addHook('onRoute', (route) => {
+    if (!route.url.startsWith('/api/') || route.websocket) route.compress = false
+  })
+  // Brotli at a middling quality: nearly as small as its best, at a fraction of the time on the server's one thread.
+  await app.register(compress, {
+    encodings: ['br', 'gzip'],
+    threshold: 1024,
+    brotliOptions: { params: { [zlib.BROTLI_PARAM_QUALITY]: 5 } },
+    // What devices send stays as it is: nothing sends it compressed.
+    globalDecompression: false,
+  })
 
   const sockets = new Set<WebSocket>()
   const feeds = new Feeds(db, options.feeds)
@@ -158,7 +185,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // the server's own trouble: the change is already made, and devices
     // pull on their own clock anyway. Left to throw, it would stop the server.
     try {
-      const msg: Poke = { type: 'poke', cursor: await currentSeq(db) }
+      const msg: Poke = { type: 'poke', cursor: await currentSeq(db.reads) }
       const text = JSON.stringify(msg)
       for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
     } catch (err) {
@@ -249,7 +276,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       calendar: calendarSync ? (calendarSync.writes ? 'writing' : 'read-only') : 'off',
       // "fresh" false means the nightly backup has stopped working.
       backups: backup.configured ? { last: backup.lastOk?.finishedAt ?? null, fresh: backup.fresh } : 'off',
-      cursor: await currentSeq(db),
+      // On the reads' own connections, so the health check answers while a long change holds the write lock.
+      cursor: await currentSeq(db.reads),
     }
   })
 
@@ -281,6 +309,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     const results: MutationResult[] = []
     let stale = false
+    let busy = false
     // What's already applied, in one look, answered as it was the first time: a phone sending again what it sent before
     // it gave up waiting is answered at once, rather than at a dozen trips to the database a change. Starting fresh
     // empties this table (ADR 0019), so nothing found here belongs to a copy that's gone.
@@ -304,12 +333,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
       const result = await db
         .transaction(async (tx) => {
-          await tx.query('SELECT pg_advisory_xact_lock(7331)')
+          await takeWriteLock(tx, pushLockWaitMs)
           // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
-          if (generation && (await clearedSince(tx, generation))) return undefined
+          if (generation && (await clearedSince(tx, generation))) return 'stale' as const
           return applyMutationIn(tx, clientId, m as never, from, req.log)
         })
-        .catch((err: unknown): MutationResult => {
+        .catch((err: unknown): MutationResult | 'busy' => {
+          // A long change holds the write lock: this one and the rest go again shortly, and what's done is answered now.
+          if (isLockBusy(err)) return 'busy'
           // A character the database can't hold where it can't be cleaned, such as in the change's own id or the
           // device's: nothing of it can be recorded, so it's answered here, as a refusal, and the rest of the push
           // carries on rather than failing with it and stranding the phone. A resend gets the same answer.
@@ -317,18 +348,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
           req.log.info({ command: m.name }, 'Turned down a change with a character the database cannot hold')
           return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: CHARACTERS } }
         })
-      if (!result) {
+      if (result === 'stale') {
         stale = true
+        break
+      }
+      if (result === 'busy') {
+        req.log.info({ answered: results.length, waiting: mutations.length - results.length }, 'Push answered busy: the write lock is held by a long change')
+        busy = true
         break
       }
       results.push(result)
     }
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
-    return stale ? { results: [], stale } : { results }
+    return stale ? { results: [], stale } : busy ? { results, busy } : { results }
   })
 
   app.get<{ Querystring: { after?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
     const after = Math.max(0, Number(req.query.after ?? 0) || 0)
+    // Pulls never take the write lock, and read on connections of their own, so a phone keeps hearing everyone else's
+    // changes while a long one is written, rather than waiting behind the pushes queued for it (audit finding 7).
+    const db = options.db.reads
     const { rows } = await db.query<{ seq: string; entity: EntityName; entity_id: string; op: 'put' | 'delete'; data: unknown }>(
       'SELECT seq, entity, entity_id, op, data FROM changes WHERE seq > $1 ORDER BY seq LIMIT $2',
       [after, PULL_LIMIT + 1]
@@ -366,7 +405,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get('/api/sync/live', { websocket: true }, async (socket) => {
     sockets.add(socket)
     socket.on('close', () => sockets.delete(socket))
-    socket.send(JSON.stringify({ type: 'poke', cursor: await currentSeq(db) } satisfies Poke))
+    socket.send(JSON.stringify({ type: 'poke', cursor: await currentSeq(db.reads) } satisfies Poke))
   })
 
   // Freelancers' private links: no app or login needed to answer an offer.
@@ -436,6 +475,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const assets = join(webRoot, 'assets') + sep
     await app.register(fastifyStatic, {
       root: webRoot,
+      // The .br and .gz beside each file, made when the app is built, go to a browser that takes them (audit finding 6).
+      preCompressed: true,
       cacheControl: false,
       setHeaders: (reply, path) => reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache'),
     })

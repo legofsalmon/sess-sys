@@ -581,6 +581,22 @@ describe('bringing jobs in from Google Calendar', () => {
     expect(everything.calendar_imports).toHaveLength(5)
   })
 
+  it('brings each event in once when two people bring the same calendar in at once', async () => {
+    // Proves (audit finding 7): planning outside the write lock doesn't let two bring-ins both save the same jobs; the one
+    // that finds the app changed by the other once it has the lock plans again, and has nothing left to bring.
+    const s = await setup()
+    await s.connect()
+    organisersCalendar(s.google)
+    const choices = choose(ok<ImportPreview>(await s.look(OPS)), { 'Web Summit': false })
+    const both = (await Promise.all([s.bring(choices), s.bring(choices)])).map((r) => ok<ImportResult>(r))
+    expect(both.map((r) => r.jobs).sort()).toEqual([0, 2])
+    const f = await s.feed()
+    expect(f.projects.map((p) => p.name).sort()).toEqual(['Christmas party', 'Nissan'])
+    const phases = f.phases.map((p) => `${p.projectId} ${p.name} ${p.start}`)
+    expect(new Set(phases).size).toBe(phases.length)
+    expect(f.calls.filter((c) => c.phase === 'Build')).toHaveLength(1)
+  })
+
   it('gives each call the department most of its people are in, or none to give it later (ADR 0046)', async () => {
     const s = await setup()
     await s.connect()

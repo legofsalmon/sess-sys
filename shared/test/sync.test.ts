@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { commandSchemas, type Rejection } from '../src/commands.ts'
 import type { EntityName } from '../src/model.ts'
 import { FEED, PUSH_LIMIT, PUSH_SLICE, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../src/protocol.ts'
-import { applyChange, emptySnapshot, MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
+import { applyChange, emptySnapshot, MemoryStorage, ServerBusy, SyncClient, type Transport } from '../src/sync/client.ts'
 import { keepSyncing } from '../src/sync/retry.ts'
 
 /**
@@ -22,7 +22,8 @@ import { keepSyncing } from '../src/sync/retry.ts'
  * cleared on purpose, when it drops it; a push the server calls stale
  * is followed by just such a fresh start; a push answered only in part
  * sends the rest first, next round; a push that fails still lets the round
- * pull; and a copy read before the feed's fix reads it again, once,
+ * pull; a push the server is too busy to take waits quietly and goes again;
+ * and a copy read before the feed’s fix reads it again, once,
  * keeping what it has waiting.
  */
 
@@ -56,6 +57,8 @@ class PretendServer implements Transport {
   answerAtMost?: number
   /** Pushes fail, as when the server takes longer than the phone waits; pulls still answer. */
   pushFails = false
+  /** Busy with a long change: answer only this many of each push, and say busy, as the server does when the write lock is held. */
+  busyAfter?: number
   /** How it reads the feed (`FEED`); undefined plays a server from before. */
   feed?: number
 
@@ -67,7 +70,8 @@ class PretendServer implements Transport {
     if (this.pushes.length === this.staleAt) return { results: [], stale: true }
     if (this.staleFor !== undefined && req.generation === this.staleFor) return { results: [], stale: true }
     return {
-      results: req.mutations.slice(0, this.answerAtMost).map((m): MutationResult => {
+      ...(this.busyAfter !== undefined && this.busyAfter < req.mutations.length ? { busy: true } : {}),
+      results: req.mutations.slice(0, this.busyAfter ?? this.answerAtMost).map((m): MutationResult => {
         const before = this.answered.get(m.id)
         if (before) return { ...before, duplicate: true }
         const reason = this.refuse?.(m)
@@ -639,6 +643,59 @@ describe('a push that fails', () => {
     server.pushFails = false
     await phone.sync()
     expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 0 })
+  })
+})
+
+describe('a push the server is too busy to take', () => {
+  it('keeps what is waiting without showing a problem, still pulls, and sends it again shortly', async () => {
+    // Proves (audit finding 7): while a long change holds the server's write lock, a push answered "busy" keeps the rest
+    // waiting in order, the round still pulls everyone else's changes, the connection isn't shown as lost, and the round
+    // fails quietly so `keepSyncing` tries again; once the server is free, everything goes.
+    const server = new PretendServer()
+    server.seq = 1
+    server.changes = [{ ...placed('a3', 'Bay A3'), seq: 1 }]
+    server.busyAfter = 1
+    const phone = await device(server)
+    await phone.mutate('place.upsert', place('van1', 'Van 1'))
+    await phone.mutate('place.upsert', place('van2', 'Van 2'))
+    await expect(phone.sync()).rejects.toBeInstanceOf(ServerBusy)
+    expect(server.pulls).toBe(1)
+    expect(phone.cursor).toBe(2)
+    expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 1 })
+    expect(phone.view().warehouse.places.map((p) => p.id)).toEqual(expect.arrayContaining(['a3', 'van2']))
+
+    // Busy and no signal for the pull: that's no signal.
+    server.busyAfter = 0
+    server.pushFails = false
+    const pull = server.pull.bind(server)
+    server.pull = () => Promise.reject(new Error('No signal'))
+    await expect(phone.sync()).rejects.toThrow('No signal')
+    expect(phone.view().connection).toBe('offline')
+    server.pull = pull
+
+    server.busyAfter = undefined
+    await phone.sync()
+    expect(phone.view()).toMatchObject({ connection: 'idle', pendingCount: 0 })
+    expect(server.pushes.map((p) => p.mutations.map((m) => (m.args as { id: string }).id))).toEqual([['van1', 'van2'], ['van2'], ['van2']])
+  })
+
+  it('is tried again by keepSyncing, like any round that did not finish', async () => {
+    vi.useFakeTimers()
+    try {
+      let rounds = 0
+      const retry = keepSyncing(
+        async () => {
+          rounds++
+          if (rounds === 1) throw new ServerBusy()
+        },
+        { may: () => true, stop: () => false }
+      )
+      retry.soon()
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(rounds).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

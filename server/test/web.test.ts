@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp, REQUEST_TIMEOUT_MS } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
@@ -22,7 +23,7 @@ afterEach(async () => {
 })
 
 /** The app, with a stand-in for web/dist that holds the page and whatever else a test needs. */
-async function serving(files: Record<string, string> = {}) {
+async function serving(files: Record<string, string | Buffer> = {}) {
   const webRoot = mkdtempSync(join(tmpdir(), 'sh-web-'))
   writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>Session Hire</title>')
   for (const [name, text] of Object.entries(files)) {
@@ -111,5 +112,85 @@ describe('every answer', () => {
     const asked = await app.inject({ method: 'OPTIONS', url: '/api/sync/push', headers: { origin: 'https://another.example', 'access-control-request-method': 'POST' } })
     expect(asked.headers['access-control-allow-origin']).toBeUndefined()
     expect(asked.headers['access-control-allow-methods']).toBeUndefined()
+  })
+})
+
+describe('what goes compressed (audit finding 6)', () => {
+  it('serves the .br or .gz made when the app was built to a browser that takes it, and the file itself to one that does not', async () => {
+    // Proves: the built app's files go pre-compressed, chosen by what the browser says it takes, with the same cache rules
+    // as the file itself and a Vary so no cache hands one to a browser that asked for the other; a file with no
+    // compressed copy, and the page served for the app's own addresses, still go.
+    const script = 'console.log("Session Hire");'.repeat(100)
+    const page = '<!doctype html><title>Session Hire</title>'
+    const app = await serving({
+      'assets/index-BkQx1zL2.js': script,
+      'assets/index-BkQx1zL2.js.br': brotliCompressSync(script),
+      'assets/index-BkQx1zL2.js.gz': gzipSync(script),
+      'sw.js': 'self.skipWaiting()',
+      'index.html.br': brotliCompressSync(page),
+    })
+    const get = (url: string, encoding?: string) => app.inject({ method: 'GET', url, headers: encoding ? { 'accept-encoding': encoding } : {} })
+
+    const br = await get('/assets/index-BkQx1zL2.js', 'gzip, deflate, br')
+    expect(br.headers['content-encoding']).toBe('br')
+    expect(br.headers['content-type']).toContain('javascript')
+    expect(br.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+    expect(br.headers.vary).toContain('accept-encoding')
+    expect(brotliDecompressSync(br.rawPayload).toString()).toBe(script)
+
+    const gz = await get('/assets/index-BkQx1zL2.js', 'gzip')
+    expect(gz.headers['content-encoding']).toBe('gzip')
+    expect(gunzipSync(gz.rawPayload).toString()).toBe(script)
+
+    const plain = await get('/assets/index-BkQx1zL2.js')
+    expect(plain.headers['content-encoding']).toBeUndefined()
+    expect(plain.body).toBe(script)
+
+    // No compressed copy: the file as it is, still checked every time.
+    const sw = await get('/sw.js', 'br')
+    expect(sw.headers['content-encoding']).toBeUndefined()
+    expect(sw.headers['cache-control']).toBe('no-cache')
+    expect(sw.body).toBe('self.skipWaiting()')
+
+    // The page, for an address the app routes, compressed too and checked every time.
+    const routed = await get('/jobs/j1', 'br')
+    expect(routed.headers['content-encoding']).toBe('br')
+    expect(routed.headers['content-type']).toContain('text/html')
+    expect(routed.headers['cache-control']).toBe('no-cache')
+    expect(brotliDecompressSync(routed.rawPayload).toString()).toBe(page)
+
+    // A missing file under /assets/ is still a plain 404.
+    expect((await get('/assets/missing.js', 'br')).statusCode).toBe(404)
+  })
+
+  it('compresses the API’s JSON, the pull above all, but not the export’s zip or a small answer', async () => {
+    // Proves: a JSON answer over a kilobyte goes compressed to a device that takes it, and reads back the same; one that
+    // doesn't say so gets it plain; the zip, compressed already, and a small answer go as they are.
+    const app = await serving()
+    const mutations = Array.from({ length: 40 }, (_, i) => ({ id: `m${i}`, name: 'place.upsert', args: { id: `p${i}`, name: `Bay ${i}`, notes: '' }, createdAt: new Date().toISOString() }))
+    await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'phone', mutations } })
+
+    const plain = await app.inject({ method: 'GET', url: '/api/sync/pull?after=0' })
+    expect(plain.headers['content-encoding']).toBeUndefined()
+    expect(plain.json().changes).toHaveLength(40)
+
+    const br = await app.inject({ method: 'GET', url: '/api/sync/pull?after=0', headers: { 'accept-encoding': 'gzip, deflate, br' } })
+    expect(br.headers['content-encoding']).toBe('br')
+    expect(br.headers.vary).toContain('accept-encoding')
+    expect(br.rawPayload.length).toBeLessThan(plain.rawPayload.length / 3)
+    expect(JSON.parse(brotliDecompressSync(br.rawPayload).toString())).toEqual(plain.json())
+
+    const gz = await app.inject({ method: 'GET', url: '/api/sync/pull?after=0', headers: { 'accept-encoding': 'gzip' } })
+    expect(gz.headers['content-encoding']).toBe('gzip')
+    expect(JSON.parse(gunzipSync(gz.rawPayload).toString())).toEqual(plain.json())
+
+    const zip = await app.inject({ method: 'GET', url: '/api/export.zip', headers: { 'accept-encoding': 'br, gzip' } })
+    expect(zip.statusCode).toBe(200)
+    expect(zip.headers['content-type']).toBe('application/zip')
+    expect(zip.headers['content-encoding']).toBeUndefined()
+
+    const small = await app.inject({ method: 'GET', url: '/api/up', headers: { 'accept-encoding': 'br' } })
+    expect(small.headers['content-encoding']).toBeUndefined()
+    expect(small.json()).toEqual({ ok: true })
   })
 })

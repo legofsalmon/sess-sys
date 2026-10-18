@@ -1,8 +1,9 @@
-import { irishToday, itemLogWords, newId, type CrewListPreview, type ItemLogPage, type Mutation, type Person, type StockListReading, type StockListResult } from '@sh/shared'
+import { irishToday, itemLogWords, newId, type CrewListPreview, type ItemLogPage, type Mutation, type MutationResult, type Person, type StockListReading, type StockListResult } from '@sh/shared'
 import { strFromU8, unzipSync } from 'fflate'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import pg from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
@@ -644,6 +645,116 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       await app.close()
       await db.close()
       rmSync(files, { recursive: true, force: true })
+    }
+  })
+})
+
+describe.skipIf(!url)('real Postgres, a long change holding the write lock (audit finding 7)', () => {
+  /** Hold the write lock from another connection, as a bring-in or a restore does, until `release` is called. */
+  async function holdWriteLock() {
+    const holder = new pg.Client({ connectionString: url })
+    await holder.connect()
+    await holder.query('BEGIN')
+    await holder.query('SELECT pg_advisory_xact_lock(7331)')
+    return async () => {
+      await holder.query('COMMIT')
+      await holder.end()
+    }
+  }
+  const m = (name: Mutation['name'], args: object): Mutation => ({ id: newId(), name, args: args as never, createdAt: new Date().toISOString() })
+  const place = (id: string) => m('place.upsert', { id, name: `Bay ${id}`, notes: '' })
+
+  it('answers a push that waits too long "busy", and pulls and the health check at once, even with every write connection waiting', async () => {
+    // Proves: pushes give up waiting for the lock after their limit and answer busy, sending back what was done; the pull,
+    // the health check and the sign-in check have connections of their own, so they answer while the writes queue; and
+    // once the lock is let go, the same changes go through.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, pushLockWaitMs: 2_500 })
+    const push = (clientId: string, mutations: Mutation[]) =>
+      app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId, mutations, partial: true } }).then((r) => [r.statusCode, r.json()] as const)
+    try {
+      const release = await holdWriteLock()
+      let released = false
+      try {
+        // Twelve phones push at once: more than the ten connections writes have, all waiting for the lock.
+        const started = Date.now()
+        const pushes = Promise.all(Array.from({ length: 12 }, (_, i) => push(`phone-${i}`, [place(`p${i}`), place(`q${i}`)])))
+        await new Promise((r) => setTimeout(r, 200))
+        const reads = Date.now()
+        const pull = await app.inject({ url: '/api/sync/pull?after=0' })
+        const health = await app.inject({ url: '/api/health' })
+        expect(pull.statusCode).toBe(200)
+        expect(health.statusCode).toBe(200)
+        expect(Date.now() - reads).toBeLessThan(1_000)
+
+        const answers = await pushes
+        // Every push answered busy with nothing done, within its wait (the last two waited for a connection first).
+        for (const [status, body] of answers) expect([status, body]).toEqual([200, { results: [], busy: true }])
+        expect(Date.now() - started).toBeLessThan(8_000)
+        await release()
+        released = true
+      } finally {
+        if (!released) await release()
+      }
+
+      const [status, again] = await push('phone-0', [place('p0'), place('q0')])
+      expect(status).toBe(200)
+      expect(again.results.map((r: MutationResult) => r.status)).toEqual(['applied', 'applied'])
+      expect(again.busy).toBeUndefined()
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('answers what got done before the lock was taken, and busy for the rest', async () => {
+    // Proves: a push whose first change went through before a long change took the lock answers that one applied and the
+    // rest busy, so the phone keeps only those waiting, in order.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, pushLockWaitMs: 500 })
+    try {
+      // A long change takes the lock just after the first of the three is written.
+      let release: (() => Promise<void>) | undefined
+      const transaction = db.transaction.bind(db)
+      let calls = 0
+      db.transaction = async (fn) => {
+        const result = await transaction(fn)
+        if (++calls === 1) release = await holdWriteLock()
+        return result
+      }
+      const answer = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'phone', mutations: [place('a'), place('b'), place('c')], partial: true } })
+      await release?.()
+      const body = answer.json()
+      expect(body.busy).toBe(true)
+      expect(body.results.map((r: MutationResult) => [r.id, r.status])).toEqual([[expect.any(String), 'applied']])
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('ends a transaction left idle, or a statement that runs too long, letting go of the lock', async () => {
+    // Proves: a transaction stuck between statements is ended by Postgres after its limit, so the write lock it held is free
+    // again rather than holding every device until a restart; a statement over its limit fails the same way.
+    const db = postgresDb(url!, { limits: { idleInTransactionMs: 300, statementMs: 300 } })
+    try {
+      const stuck = db.transaction(async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(7331)')
+        await new Promise((r) => setTimeout(r, 1_000))
+        await tx.query('SELECT 1')
+      })
+      await expect(stuck).rejects.toThrow()
+      const started = Date.now()
+      await db.transaction((tx) => tx.query('SELECT pg_advisory_xact_lock(7331)'))
+      expect(Date.now() - started).toBeLessThan(1_000)
+
+      await expect(db.transaction((tx) => tx.query('SELECT pg_sleep(2)'))).rejects.toMatchObject({ code: '57014' })
+      // Reads outside a transaction, and the reads' own connections, still work after.
+      expect((await db.reads.query<{ n: number }>('SELECT 1 AS n')).rows).toEqual([{ n: 1 }])
+    } finally {
+      await db.close()
     }
   })
 })

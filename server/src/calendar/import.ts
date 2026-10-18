@@ -509,6 +509,24 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     const personNames = new Map(choices.people.flatMap((p) => (p.name?.trim() ? [[p.email.toLowerCase(), p.name.trim()] as const] : [])))
     const client = typeof req.query.client === 'string' && /^[a-z0-9]{1,64}$/.test(req.query.client) ? req.query.client : undefined
     const options = { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today }
+    /** The plan for what's ticked, and every job the calendar holds that isn't in the app yet. */
+    const plans = (app: AppData) => ({
+      plan: planImport(read.events, app, options, { names, kinds, include, people: personNames }),
+      found: new Set(planImport(read.events, app, options).jobs.map((j) => j.key)),
+    })
+    // Planned first outside the write lock, which every device's change waits for (audit finding 7): a season is
+    // thousands of events. Inside the lock the app is read again, and only when it has changed since is the plan made
+    // again, so two people bringing in at once still can't bring the same events in twice.
+    //
+    // The lock is still held for the whole save, not taken a batch at a time. Each change in the feed takes the next
+    // number as it's written, and a device's pull moves past every number it has read; were the lock let go between
+    // batches, another change could be read past a batch not yet saved, and devices would never be sent it. Saving in
+    // separate transactions instead would leave half a bring-in in the app when one failed, as several entries in the
+    // history, which is what "Take it all back" and the all-or-nothing promise rule out. The save writes a few hundred
+    // rows per statement, so it's short; a push that meets it answers "busy" and goes again shortly, and pulls don't
+    // wait for it at all.
+    const before = await readApp(db.reads, read.from, read.to)
+    const planned = plans(before)
     let missing: string[] = []
     let result: Omit<ImportResult, 'missing'>
     try {
@@ -518,8 +536,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
         async (ctx) => {
           // Planned again inside the lock, so two people bringing in at once can't bring the same events in twice.
           const app = await readApp(ctx.tx, read.from, read.to)
-          const plan = planImport(read.events, app, options, { names, kinds, include, people: personNames })
-          const found = new Set(planImport(read.events, app, options).jobs.map((j) => j.key))
+          const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : plans(app)
           missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
           const done = await bring(ctx, plan, people, read.calendar, app)
