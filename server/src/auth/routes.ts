@@ -139,7 +139,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     } else if (auth) {
       req.user = await signedIn(req, reply)
       if (!req.user) return reply.code(401).send({ error: 'Sign in first.' })
-      const { role, on, personId, department } = await roleOfAccount(db.reads, req.user.email)
+      const { role, on, personId, department } = await roleOfAccount(db.reads, req.user.email, auth.admins)
       req.role = on ? role : null
       if (on && personId) req.reader = { personId, department: department ?? null }
     }
@@ -157,8 +157,8 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
     if (!auth) return { auth: 'off' }
     const user = await signedIn(req, reply)
     if (!user) return reply.code(401).send({ auth: 'google', error: 'Sign in first.' })
-    const { role, on } = await roleOfAccount(db, user.email)
-    return { auth: 'google', user, role, rolesOn: on }
+    const { role, on, admin } = await roleOfAccount(db, user.email, auth.admins)
+    return { auth: 'google', user, role, rolesOn: on, ...(admin ? { admin: true as const } : {}) }
   })
 
   // A demo copy's "See it as…" (ADR 0033): the persona chosen is the role the server holds this browser to, so

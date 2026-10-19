@@ -16,12 +16,12 @@ const SAID = ['cancelled', 'failed', 'denied'] as const
  * still their whole credential (ADR 0002), but a member of staff's link
  * (/f/<token>, and everything under it but the calendar feed) opens only
  * for a Google sign-in: their own, matched by email as roles are, or the
- * office's or a director's once roles are on, or anyone's while they are
- * off, as the app itself is then open to every member of staff. Only
- * when Google sign-in is on: a demo copy and a local server keep links as
+ * office's, a director's or a system admin's (ADR 0059) once roles are
+ * on, or anyone's while they are off, as the app itself is then open to
+ * every member of staff. Only when Google sign-in is on: a demo copy and a local server keep links as
  * they were.
  */
-export function guardStaffPages(app: FastifyInstance, db: Db) {
+export function guardStaffPages(app: FastifyInstance, db: Db, admins?: readonly string[]) {
   app.addHook('onRequest', async (req, reply) => {
     const url = req.routeOptions.url
     if (!url?.startsWith('/f/:token') || url === FEED) return
@@ -32,7 +32,7 @@ export function guardStaffPages(app: FastifyInstance, db: Db) {
     if (user) {
       const email = user.email.trim().toLowerCase()
       if (hasEmail(person, email)) return
-      const { role, on } = await roleOfAccount(db.reads, email)
+      const { role, on } = await roleOfAccount(db.reads, email, admins)
       if (!on || role === 'director' || role === 'office') return
     }
     const asked = (req.query as { signin?: string } | undefined)?.signin

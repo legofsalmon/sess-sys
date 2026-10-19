@@ -11,7 +11,8 @@ export type Auth =
   | { status: 'unknown' }
   /** The server hasn't got sign-in switched on, or (passcode) is a demo copy locked with a shared passcode. */
   | { status: 'open'; passcode?: true }
-  | { status: 'signed-in'; user: StaffUser }
+  /** `admin`: the server's settings name them a system admin (ADR 0059), who can change everything whatever their role. */
+  | { status: 'signed-in'; user: StaffUser; admin?: true }
   | { status: 'signed-out'; passcode?: true }
 
 const KEY = 'sh.auth'
@@ -62,7 +63,7 @@ export async function checkAuth() {
     }
     if (!res.ok) return
     const me = (await res.json()) as MeResponse
-    set(me.auth === 'off' ? { status: 'open' } : me.auth === 'passcode' ? { status: 'open', passcode: true } : { status: 'signed-in', user: me.user })
+    set(me.auth === 'off' ? { status: 'open' } : me.auth === 'passcode' ? { status: 'open', passcode: true } : { status: 'signed-in', user: me.user, ...(me.admin ? { admin: true as const } : {}) })
   } catch {
     // No signal or server down: carry on as before.
   }

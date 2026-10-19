@@ -1,4 +1,4 @@
-import { changesLinkOf, COMMAND_NEEDS, LINKS_REFUSAL, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
+import { changesLinkOf, COMMAND_NEEDS, LINKS_REFUSAL, personForEmail, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
 import { currentAuth, useAuth, type Auth } from './auth.ts'
 import { previewKey, usePreview } from './home/Preview.tsx'
 import { client } from './sync.ts'
@@ -23,6 +23,8 @@ export interface Access {
   rolesOff?: true
   /** The Crew tab's person this account is, when found. */
   personId?: string
+  /** A system admin, named in the server's settings (ADR 0059): held to a director's role whatever their own says. */
+  admin?: true
 }
 
 function accessOf(auth: Auth, view: View, persona: string): Access {
@@ -31,8 +33,12 @@ function accessOf(auth: Auth, view: View, persona: string): Access {
     return role ? { role } : {}
   }
   if (auth.status !== 'signed-in') return {}
-  const { role, on, personId } = roleForEmail(view.crew.people, auth.user.email)
-  return on ? { role, ...(personId ? { personId } : {}) } : { rolesOff: true }
+  const admin = auth.admin ? { admin: true as const } : {}
+  const { role, on, personId } = roleForEmail(view.crew.people, auth.user.email, !!auth.admin)
+  if (on) return { role, ...(personId ? { personId } : {}), ...admin }
+  // Roles off: who they are still matters, as the way to switch roles on is making yourself the first director.
+  const me = personForEmail(view.crew.people, auth.user.email)
+  return { rolesOff: true, ...(me ? { personId: me.id } : {}), ...admin }
 }
 
 /** Whether this device's person can make a kind of change. */

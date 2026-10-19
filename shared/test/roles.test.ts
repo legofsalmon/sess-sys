@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ABILITIES, COMMAND_NAMES, COMMAND_NEEDS, emailTakenBy, holdsARole, mayChangeWhoSignsIn, refusalFor, ROLES, ROLE_CAN, roleForEmail, roleMayRun, whoSignsInRefusal, type RolePerson } from '../src/index.ts'
+import { ABILITIES, COMMAND_NAMES, COMMAND_NEEDS, emailTakenBy, holdsARole, isSystemAdmin, mayChangeWhoSignsIn, refusalFor, ROLES, ROLE_CAN, roleForEmail, roleMayRun, whoSignsInRefusal, type RolePerson } from '../src/index.ts'
 
 const p = (id: string, email: string | null, extra: Partial<RolePerson> = {}): RolePerson => ({ id, kind: 'staff', email, archived: false, role: null, ...extra })
 
@@ -36,6 +36,11 @@ describe('roles', () => {
     expect(roleForEmail(people, 's@x.ie').role).toBe('crew')
     expect(roleForEmail(people, 'o@x.ie').role).toBe('crew')
     expect(roleForEmail(people, 'stranger@x.ie')).toEqual({ role: 'crew', on: true })
+    // A system admin (ADR 0059) acts as a director, whoever they are on the Crew tab; it doesn't switch roles on.
+    expect(roleForEmail(people, 's@x.ie', true)).toEqual({ role: 'director', on: true, personId: 's' })
+    expect(roleForEmail(people, 'stranger@x.ie', true)).toEqual({ role: 'director', on: true })
+    expect(roleForEmail([p('s', 's@x.ie')], 's@x.ie', true).on).toBe(false)
+    expect([isSystemAdmin(['a@x.ie'], ' A@X.ie '), isSystemAdmin(['a@x.ie'], 'b@x.ie'), isSystemAdmin(undefined, 'a@x.ie'), isSystemAdmin([''], '')]).toEqual([true, false, false, false])
   })
 
   it('say who can, and who to ask', () => {

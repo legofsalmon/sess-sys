@@ -245,11 +245,23 @@ export function personForEmail<P extends RolePerson>(people: readonly P[], email
  * (ADR 0051); one matched to nobody is staff crew: it can look, report a
  * fault, and nothing that needs a person of its own.
  */
-export function roleForEmail(people: readonly RolePerson[], email: string): { role: Role; on: boolean; personId?: string } {
+export function roleForEmail(people: readonly RolePerson[], email: string, admin = false): { role: Role; on: boolean; personId?: string } {
   if (!rolesOn(people)) return { role: 'director', on: false }
   const me = personForEmail(people, email)
-  const role: Role = !me ? 'crew' : me.kind === 'freelancer' ? 'freelancer' : (roleOfPerson(me) ?? 'crew')
+  const role: Role = admin ? 'director' : !me ? 'crew' : me.kind === 'freelancer' ? 'freelancer' : (roleOfPerson(me) ?? 'crew')
   return { role, on: true, ...(me ? { personId: me.id } : {}) }
+}
+
+/**
+ * A system admin (ADR 0059) is an account the
+ * server's settings name, not anyone on the Crew tab: whoever builds and
+ * sets the app up. They act as a director whatever their person's role says,
+ * but aren't one: they don't switch roles on, and don't count as the
+ * director who must always be left.
+ */
+export const isSystemAdmin = (admins: readonly string[] | undefined, email: string | null | undefined) => {
+  const wanted = (email ?? '').trim().toLowerCase()
+  return !!wanted && (admins ?? []).includes(wanted)
 }
 
 /** Two emails as an account is matched to a person: trimmed, in any case. */

@@ -10,6 +10,8 @@ export interface AuthConfig {
   provider: IdentityProvider
   domains: string[]
   emails: string[]
+  /** SYSTEM_ADMINS (ADR 0059): accounts that can do everything whatever their role, set here so nobody in the app can take it away. */
+  admins?: string[]
 }
 
 const list = (s: string | undefined) =>
@@ -22,6 +24,9 @@ const list = (s: string | undefined) =>
  * Sign-in is on when the Google client id and secret are set (Railway
  * variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET), and off otherwise.
  * STAFF_DOMAINS and STAFF_EMAILS, comma-separated, say who counts as staff.
+ * SYSTEM_ADMINS, comma-separated emails, are staff who can change
+ * everything once roles are on, as a director can (ADR 0059). It lets
+ * nobody in who isn't already staff.
  */
 export function authFromEnv(env: NodeJS.ProcessEnv = process.env): AuthConfig | undefined {
   const clientId = env.GOOGLE_CLIENT_ID?.trim()
@@ -34,7 +39,7 @@ export function authFromEnv(env: NodeJS.ProcessEnv = process.env): AuthConfig | 
   // Google's account picker can be narrowed to one company's accounts, but
   // only when nobody from outside it is allowed in.
   const hostedDomain = domains.length === 1 && emails.length === 0 ? domains[0] : undefined
-  return { provider: googleProvider({ clientId, clientSecret, hostedDomain }), domains, emails }
+  return { provider: googleProvider({ clientId, clientSecret, hostedDomain }), domains, emails, admins: list(env.SYSTEM_ADMINS) }
 }
 
 /**
