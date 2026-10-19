@@ -246,7 +246,7 @@ const ABOUT: Record<string, string> = {
   vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',
   vehicles:
     "The company's vehicles: name, registration, kind, seats, payload in kg, notes, each check (NCT or CVRT, motor tax, insurance, service, tachograph) with whether it's needed and the day it runs out, and when one is off the road and why.",
-  venues: 'Where jobs happen: addresses, and notes on access, load-in, power and parking.',
+  venues: 'Where jobs happen: addresses, notes on access, load-in, power and parking, and where each is on the map (lat and lng, in degrees) once someone has put it there.',
 }
 
 function readme(e: Everything, by?: { name: string; email: string }): string {

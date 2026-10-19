@@ -39,6 +39,7 @@ import { SheetScreen } from './SheetScreen.tsx'
 import { JobViews, PlanScreen } from './PlanScreen.tsx'
 import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
+import { VenuesMapCard } from './VenueMaps.tsx'
 import { Heading, Icon } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 import { useWindowed } from '../windowed.ts'
@@ -174,13 +175,14 @@ function ClientsScreen({ view }: { view: View }) {
   )
 }
 
-/** Every venue, on a page along Jobs' row (ADR 0041). */
+/** Every venue, on a page along Jobs' row (ADR 0041), with a map of them all above the list (ADR 0057). */
 function VenuesScreen({ view }: { view: View }) {
   const { jobs, venues } = view.jobs
   return (
     <div className="app crew jobs">
       <Top view={view} />
       <JobViews current="venues" />
+      <VenuesMapCard venues={venues} jobsAt={(id) => jobsAt(jobs, id).length} />
       <section className="card">
         <h1 className="with-icon">
           <Icon name="venue" />
@@ -423,6 +425,7 @@ function VenueRow({ v, jobs, docs }: { v: VenueView; jobs: number; docs: number 
           {jobs} job{jobs === 1 ? '' : 's'}
           {docs > 0 && ` · ${docs} document${docs === 1 ? '' : 's'}`}
           {v.address && ` · ${v.address.split('\n')[0]}`}
+          {!v.pin && ' · not on the map yet'}
         </p>
       </div>
       <div className="side">
