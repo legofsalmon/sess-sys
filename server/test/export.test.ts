@@ -128,6 +128,7 @@ describe('download everything', () => {
       'models',
       'movements',
       'mutations',
+      'notices_read',
       'offers',
       'own_calendars',
       'people',

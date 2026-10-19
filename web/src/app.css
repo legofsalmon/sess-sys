@@ -371,3 +371,39 @@ button.primary:not(:disabled):active, a.button.primary:active, button.danger:not
 .tabs a:not([aria-current='page']):active { background: var(--ds-wash-pressed); }
 /* Work under way (aria-busy, useLate.ts): no second press, without the faded look of a button that can't be used. */
 button[aria-busy='true'] { cursor: progress; opacity: 1; }
+
+/*
+ * Notifications (ADR 0058). The bell sits top right before dark and light, its count the accent: things waiting for
+ * you. The pop-ups are the design system's toast in the toaster: the overlay surface, its line, edge and shadow,
+ * arriving from the bottom edge, above the phone's bar and never over a control in the page's flow.
+ */
+.notices-button { position: relative; flex: none; display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--radius-control); color: var(--muted); }
+.notices-button .icon { width: 22px; height: 22px; }
+.notices-button[aria-current='page'] { color: var(--ink); }
+.notices-button .badge { position: absolute; top: 2px; right: 0; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-6); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg); }
+@media (hover: hover) {
+  .notices-button:hover { background: var(--ds-wash-hover); color: var(--ink); }
+}
+.notices-button:active { background: var(--ds-wash-pressed); }
+.toaster { position: fixed; inset-inline-end: var(--space-16); inset-block-end: calc(76px + env(safe-area-inset-bottom)); z-index: var(--ds-layer-toast); width: min(26rem, calc(100% - 2 * var(--space-16))); pointer-events: none; }
+.toaster .toasts { display: grid; justify-items: end; gap: var(--space-8); }
+@media (min-width: 900px) {
+  .toaster { inset-block-end: var(--space-16); }
+}
+.toast { pointer-events: auto; display: flex; align-items: center; gap: var(--space-8); width: 100%; padding: var(--space-10) var(--space-8) var(--space-10) var(--space-12); border: 1px solid var(--ds-line-strong); border-inline-start-width: var(--space-4); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); color: var(--ink); box-shadow: var(--ds-elevation-menu);
+  transition: opacity var(--ds-duration-slow) var(--ds-ease-emphasized-enter), translate var(--ds-duration-slow) var(--ds-ease-emphasized-enter); }
+@starting-style {
+  .toast { opacity: 0; translate: 0 var(--ds-motion-offset-medium); }
+}
+.toast[data-leaving='true'] { opacity: 0; translate: 0 var(--ds-motion-offset-medium); transition-duration: var(--ds-duration-base); transition-timing-function: var(--ds-ease-exit); }
+.toast-body { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+.toast-body b { overflow-wrap: anywhere; }
+.toast-body small { color: var(--muted); font-size: var(--text-hint); }
+.toast-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
+.toast-dismiss { display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
+.toast-dismiss .icon { width: 20px; height: 20px; }
+/* The list: the History tab's rows, a new one marked in words beside a dot of the accent. */
+.notices .card > button { justify-self: start; }
+.notice .new-mark { display: inline-flex; align-items: center; gap: var(--space-4); margin-right: var(--space-6); color: var(--accent-ink); font-size: var(--text-hint); font-weight: 700; }
+.notice .new-mark .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent-fill); }
+.notice.new p { font-weight: 600; }

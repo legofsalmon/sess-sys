@@ -2,6 +2,7 @@ import { newId, STATUS_LABELS, type ClientView, type ProjectStatus, type VenueVi
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSeenAs } from '../home/Preview.tsx'
 import { useNotDone } from '../problems.tsx'
+import { NoticesButton } from '../NoticesButton.tsx'
 import { OnThisScreen } from '../OnThisScreen.tsx'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
@@ -70,6 +71,7 @@ export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: V
           <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
             {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}
           </span>
+          <NoticesButton />
           <ThemeButton />
         </div>
         {up && <Up {...up} />}
