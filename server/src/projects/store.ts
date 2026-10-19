@@ -4,14 +4,20 @@ import type { Queryable } from '../db.ts'
 /** Reading job rows back as the records devices see. */
 
 const CLIENT = `id, name, contacts, notes`
-const VENUE = `id, name, address, notes`
+const VENUE = `id, name, address, notes, lat, lng`
 const PROJECT = `id, name, client_id, venue_id, status, kind, notes, source_calendar, prep_days, return_days`
 const PHASE = `id, project_id, name, start_day::text, end_day::text, venue_id, notes, contact_id`
 
 type Row = Record<string, any>
 
 export const toClient = (r: Row): Client => ({ id: r.id, name: r.name, contacts: r.contacts, notes: r.notes })
-export const toVenue = (r: Row): Venue => ({ id: r.id, name: r.name, address: r.address, notes: r.notes })
+export const toVenue = (r: Row): Venue => ({
+  id: r.id,
+  name: r.name,
+  address: r.address,
+  notes: r.notes,
+  pin: r.lat === null || r.lat === undefined ? null : { lat: Number(r.lat), lng: Number(r.lng) },
+})
 export const toProject = (r: Row): Project => ({
   id: r.id,
   name: r.name,

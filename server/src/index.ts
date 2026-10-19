@@ -7,6 +7,7 @@ import { restoreFrom } from './backup/service.ts'
 import { dirStore, storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
+import { nominatim } from './projects/places.ts'
 import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting } from './monitoring.ts'
 
 // Error reporting first, so a start-up that goes wrong is reported too (ADR 0005).
@@ -52,6 +53,7 @@ async function main() {
     backupWatch: errorReporting ? backupWatch() : undefined,
     // Writing to Google Calendar stays off until CALENDAR_WRITES is on: Colly's call, 16 October 2026.
     // Local stand-ins the browser tests read calendars from (ADR 0044): never set where the server runs for real.
+    places: nominatim({ base: process.env.NOMINATIM_URL || undefined }),
     ownCalendars: process.env.OWN_CALENDAR_TEST_HOSTS ? { testHosts: process.env.OWN_CALENDAR_TEST_HOSTS.split(',').map((h) => h.trim()).filter(Boolean) } : undefined,
     calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, ''), writes: process.env.CALENDAR_WRITES?.trim().toLowerCase() === 'on' } : undefined,
   })

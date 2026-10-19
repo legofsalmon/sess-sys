@@ -52,6 +52,8 @@ import { addDays, newId, venueLabel, type CertificateKind, type CommandInput, ty
  * - documents on venues and clients (ADR 0032): links on Northbank,
  *   Riverside Park and Brightwater Conferences, to example.com, so their
  *   pages have something to open;
+ * - venues on the map (ADR 0057): all but Clonmore House, so the map has
+ *   one still to place;
  * - counts (ADR 0030): three places counted, one with a speaker not found
  *   and a count short, and one never counted, first on the week's list;
  * - money (ADR 0042): a price list for kit and crew, a client's discount,
@@ -108,6 +110,11 @@ export function madeUpData(today: string): Mutation[] {
   const granary = venue('The Granary Hall', 'Quay Street\nGalway', 'Goods lift 2 m deep. Parking for one van.')
   const pier3 = venue('Pier 3 Studio', 'Alexandra Road\nDublin 1', 'Blackout drapes on all walls.')
   const clonmore = venue('Clonmore House', 'Clonmore\nCo. Wicklow', 'Marquee on the lawn; the venue supplies a generator.')
+  // On the map (ADR 0057), all but Clonmore, so the map shows one still to place.
+  add('venue.pin', { id: riverside.id, pin: { lat: 52.665, lng: -8.63 } })
+  add('venue.pin', { id: northbank.id, pin: { lat: 53.3478, lng: -6.237 } })
+  add('venue.pin', { id: granary.id, pin: { lat: 53.2715, lng: -9.0533 } })
+  add('venue.pin', { id: pier3.id, pin: { lat: 53.347, lng: -6.215 } })
 
   // Jobs and their phases.
   const job = (name: string, clientId: string, venueId: string, status: CommandInput<'project.create'>['status'], notes = '') =>

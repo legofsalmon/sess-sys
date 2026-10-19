@@ -39,6 +39,15 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//],
         // Once Reload lets the new version in, it takes the open page straight away, so the reload lands on it.
         clientsClaim: true,
+        // The map's pictures (ADR 0057), kept as they're seen, so a venue's map opened before still shows with no signal.
+        // Asked for openly (Map.tsx), so each is kept at its own size; the newest 500, for a month.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'map-pictures', expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 }, cacheableResponse: { statuses: [200] } },
+          },
+        ],
       },
     }),
   ],

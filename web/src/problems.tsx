@@ -224,6 +224,8 @@ function describer(view: View): (m: Mutation) => string {
         return `Save the client ${str(a.name, 'a client')}`
       case 'venue.upsert':
         return `Save the venue ${str(a.name, 'a venue')}`
+      case 'venue.pin':
+        return a.pin ? 'Put a venue on the map' : 'Take a venue off the map'
       case 'project.create':
         return `Add the job ${str(a.name, 'a job')}`
       case 'project.update':

@@ -512,6 +512,10 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Saved the client ${text(a.name, 'a client')}`
     case 'venue.upsert':
       return `Saved the venue ${text(a.name, 'a venue')}`
+    case 'venue.pin': {
+      const name = text(look('venue', a.id)?.name, 'a venue')
+      return a.pin ? `Put ${name} on the map` : `Took ${name} off the map`
+    }
     case 'project.create':
       return `Added the job ${text(a.name, 'a job')}${a.clientId ? ` for ${client(a.clientId)}` : ''}, ${status(a.status)}`
     case 'project.update': {

@@ -23,7 +23,7 @@ import { getBooking, vehiclesOnPhase } from '../vehicles/store.ts'
  *   them, and the others go (ADR 0050).
  */
 
-type JobCommand = 'client.upsert' | 'venue.upsert' | 'project.create' | 'project.update' | 'phase.add' | 'phase.update' | 'phase.remove' | 'project.merge'
+type JobCommand = 'client.upsert' | 'venue.upsert' | 'venue.pin' | 'project.create' | 'project.update' | 'phase.add' | 'phase.update' | 'phase.remove' | 'project.merge'
 type Handler<N extends JobCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 /** The columns each field of a job or phase is kept in. */
@@ -116,6 +116,13 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     )
     await emit(ctx, 'venue', a.id, await getVenue(ctx.tx, a.id))
     await renameCalls(ctx, { venueId: a.id })
+  },
+
+  /** On its own, so saving a venue's details from an older device leaves its pin where it is (ADR 0057). */
+  async 'venue.pin'(ctx, a) {
+    await checkVenue(ctx, a.id)
+    await ctx.tx.query('UPDATE venues SET lat = $2, lng = $3 WHERE id = $1', [a.id, a.pin?.lat ?? null, a.pin?.lng ?? null])
+    await emit(ctx, 'venue', a.id, await getVenue(ctx.tx, a.id))
   },
 
   async 'project.create'(ctx, a) {

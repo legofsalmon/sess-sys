@@ -40,6 +40,7 @@ import { keptSyncTestTables } from './schema.ts'
 import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
+import { nominatim, registerPlaceRoutes, type PlaceSearch } from './projects/places.ts'
 
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
@@ -101,6 +102,8 @@ export interface AppOptions {
   stockImport?: StockImportRound
   /** Reading freelancers' own calendars (ADR 0044): how often, and the local stand-ins tests may read from. */
   ownCalendars?: OwnCalendarsOptions
+  /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
+  places?: PlaceSearch
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -420,6 +423,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerPeopleImportRoutes(app, { db, onChange: changed })
   registerStockImportRoutes(app, { db, onChange: changed, round: options.stockImport })
   registerItemLogRoutes(app, { db })
+  registerPlaceRoutes(app, { search: options.places ?? nominatim() })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 
