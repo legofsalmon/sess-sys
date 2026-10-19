@@ -74,7 +74,11 @@ async function knownStock(q: Queryable): Promise<KnownStock> {
     pat_months: number | null
     notes: string
     mistake: boolean
-  }>('SELECT id, name, tracking, is_case, value_cents, pat_months, notes, mistake FROM models ORDER BY id')
+    day_cents: number | null
+  }>(
+    `SELECT m.id, m.name, m.tracking, m.is_case, m.value_cents, m.pat_months, m.notes, m.mistake, pp.day_cents
+       FROM models m LEFT JOIN product_prices pp ON pp.model_id = m.id ORDER BY m.id`
+  )
   const { rows: places } = await q.query<{ id: string; name: string }>('SELECT id, name FROM places ORDER BY id')
   const { rows: counts } = await q.query<{ model_id: string; place_id: string | null; case_id: string | null; qty: number }>(
     'SELECT model_id, place_id, case_id, qty FROM stock ORDER BY id'
@@ -89,6 +93,7 @@ async function knownStock(q: Queryable): Promise<KnownStock> {
       patMonths: m.pat_months,
       notes: m.notes,
       mistake: m.mistake,
+      dayCents: m.day_cents,
     })),
     items: (await everyAsset(q)).map((a) => ({
       id: a.id,
@@ -125,8 +130,8 @@ interface Step {
 }
 
 /**
- * The plan as the commands a device would send, in order: places, products
- * and what changes on products already here; items keeping their own
+ * The plan as the commands a device would send, in order: places, products,
+ * what changes on products already here and their day prices; items keeping their own
  * numbers, so the next free numbers come after them; cases, each after the
  * case it goes in, so what goes in them has somewhere to go; the rest of the
  * items; moves and changes to items already here; then counts. An item
@@ -145,6 +150,7 @@ function stepsOf(plan: StockPlan): Step[] {
   for (const p of plan.places) steps.push({ name: 'place.upsert', args: { id: idOf(p), name: p.name, notes: '' }, row: p.row, tally: 'places' })
   for (const { key, row, ...p } of plan.products) steps.push({ name: 'model.create', args: { ...p, id: idOf({ key }), liftingMonths: null }, row, tally: 'products' })
   for (const { id, name: _name, row, ...changes } of plan.productChanges) steps.push({ name: 'model.update', args: { id, ...changes }, row })
+  for (const p of plan.prices) steps.push({ name: 'price.product', args: { modelId: idOf(p.model), dayCents: p.dayCents }, row: p.row })
 
   const added = new Set<string>()
   const later: PlannedItem[] = []

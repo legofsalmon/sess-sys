@@ -1,0 +1,7 @@
+Id,Product,Store,Transaction Type,Rate Definition,Price,Valid From Date,Valid To Date
+1,Corvo K12,"",Rental,Daily Rate,60.0,,
+2,10m XLR cable,"",Rental,Weekly Rate,2.0,,
+3,Lumo Par 7,"",Rental,3 Day Week Rate,0.0,,
+4,Lumo Par 7,"",Sale,,0.0,,
+5,Stage deck 2x1,"",Rental,3 Day Week Rate,0.0,,
+6,Stage deck 2x1,Default,Rental,3 Day Week Rate,15.0,,

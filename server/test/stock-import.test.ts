@@ -1,4 +1,5 @@
 import {
+  currentRmsList,
   itemLogWords,
   newId,
   previewStockList,
@@ -349,6 +350,42 @@ describe('bringing the list in', () => {
     expect(somewhere.places).toEqual(['Warehouse', 'Bay D'])
     expect((await bringIn(app, colly.cookies, choices(somewhere), { make: true, defaultPlace: 'Warehouse' })).statusCode).toBe(200)
     expect((await db.query('SELECT name FROM places ORDER BY name')).rows).toEqual([{ name: 'Bay D' }, { name: 'Warehouse' }])
+  })
+})
+
+describe('bringing the stock in from Current RMS (ADR 0056)', () => {
+  const rms = (name: string) => readFileSync(new URL(`../../docs/samples/current-rms/${name}.csv`, import.meta.url), 'utf8')
+  const WAREHOUSE: StockListOptions = { make: true, defaultPlace: 'Warehouse' }
+
+  it('counts every product, puts its day price on the price list unless one is set, and changes nothing the second time', async () => {
+    const { app, db, colly } = await office()
+    // A price set by hand before stays as it is.
+    expect(await colly.send('model.create', { id: 'deck', name: 'Stage deck 2x1', department: 'staging', category: '', tracking: 'bulk', isCase: false, valueCents: null, patMonths: null, liftingMonths: null, notes: '' })).toMatchObject({ status: 'applied' })
+    expect(await colly.send('price.product', { modelId: 'deck', dayCents: 1200 })).toMatchObject({ status: 'applied' })
+    const { text } = currentRmsList([rms('products'), rms('stock-levels'), rms('rates')]).list!
+    const p = await preview(app, colly.cookies, text, WAREHOUSE)
+    expect(p.notRead).toEqual([])
+    expect(p.counts).toMatchObject({ rows: 4, products: 3, items: 0, counted: 3, problems: 0 })
+    expect(p.rows[3]!.does).toEqual(['Updates Stage deck 2x1: value €300'])
+    expect((await bringIn(app, colly.cookies, choices(p), WAREHOUSE)).json()).toEqual({ rows: 4, skipped: 0, products: 3, items: 0, counted: 3, places: 1, changed: 0 })
+    const { rows: priced } = await db.query('SELECT m.name, pp.day_cents FROM product_prices pp JOIN models m ON m.id = pp.model_id ORDER BY m.name')
+    expect(priced).toEqual([
+      { name: '10m XLR cable', day_cents: 200 },
+      { name: 'Corvo K12', day_cents: 6000 },
+      { name: 'Stage deck 2x1', day_cents: 1200 },
+    ])
+    const { rows: counted } = await db.query('SELECT m.name, s.qty FROM stock s JOIN models m ON m.id = s.model_id ORDER BY m.name')
+    expect(counted).toEqual([
+      { name: '10m XLR cable', qty: 3 },
+      { name: 'Corvo K12', qty: 2 },
+      { name: 'Lumo Par 7', qty: 6 },
+    ])
+
+    const before = await everything(db)
+    const again = await preview(app, colly.cookies, text, WAREHOUSE)
+    expect(again.rows.map((r) => r.does)).toEqual(again.rows.map(() => [UNCHANGED]))
+    expect((await bringIn(app, colly.cookies, choices(again), WAREHOUSE)).statusCode).toBe(200)
+    expect(await everything(db)).toEqual(before)
   })
 })
 

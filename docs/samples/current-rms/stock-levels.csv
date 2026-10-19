@@ -1,0 +1,9 @@
+Id,Product,Store,Stock Type,Asset Number,Serial Number,Location,Effective Date,Opening Balance,Quantity Held,Current Balance,Image Link Url
+1,Corvo K12,Default,Rental,0000000001,"","",01/04/2021,1.0,,1.0,
+2,Corvo K12,Default,Rental,0000000002,"","",01/04/2021,1.0,,1.0,
+3,10m XLR cable,Default,Rental,0000000003,"","",01/04/2021,1.0,,1.0,
+4,10m XLR cable,Default,Rental,0000000004,"","",01/04/2021,1.0,,1.0,
+5,10m XLR cable,Default,Rental,0000000005,"","",01/04/2021,1.0,,1.0,
+6,Lumo Par 7,Default,Rental,Bulk Stock,"","",01/04/2021,6.0,,6.0,
+7,Lumo Par 7,Default,Sale,Bulk Stock,"","",,,-2.0,,
+8,Smoke fluid 5L,Default,Sale,Bulk Stock,"","",,,4.0,,

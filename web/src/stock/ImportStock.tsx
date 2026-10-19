@@ -1,6 +1,8 @@
 import {
   bringInStockLabel,
   columnLetter,
+  currentRmsList,
+  currentRmsTable,
   knownStockOf,
   needsColumnStep,
   plural,
@@ -44,6 +46,8 @@ interface Row extends StockListPreviewRow {
 
 interface Previewing {
   at: 'preview'
+  /** What was read from Current RMS's files, when they were. */
+  from?: string
   text: string
   file: StockFile
   columns: (StockField | null)[]
@@ -85,12 +89,13 @@ export function ImportStockScreen({ view }: { view: View }) {
   useEffect(() => heading.current?.focus(), [step.at])
 
   /** The server's reading of the file with these columns. */
-  const preview = async (text: string, file: StockFile, columns: (StockField | null)[]) => {
+  const preview = async (text: string, file: StockFile, columns: (StockField | null)[], from?: string) => {
     setStep({ at: 'reading' })
     try {
       const read = await post<StockListReading>('/api/stock/import/preview', { text, columns, options: NO_OPTIONS })
       setStep({
         at: 'preview',
+        from,
         text,
         file,
         columns,
@@ -107,20 +112,28 @@ export function ImportStockScreen({ view }: { view: View }) {
   }
 
   const choose = async (e: ChangeEvent<HTMLInputElement>) => {
-    const chosen = e.target.files?.[0]
-    if (!chosen) return
-    if (chosen.size > MOST_BYTES) return setStep({ at: 'choose', problem: 'The file is bigger than 5 MB.' })
+    const chosen = [...(e.target.files ?? [])]
+    if (chosen.length === 0) return
+    if (chosen.some((f) => f.size > MOST_BYTES)) return setStep({ at: 'choose', problem: `${chosen.length > 1 ? 'A' : 'The'} file is bigger than 5 MB.` })
     setStep({ at: 'reading' })
-    let text: string
+    let texts: string[]
     try {
-      text = await readFile(chosen)
+      texts = await Promise.all(chosen.map(readFile))
     } catch (err) {
       return setStep({ at: 'choose', problem: (err as Error).message })
+    }
+    // Current RMS's exports, read together into one list (ADR 0056); any other list is one file.
+    let text = texts[0]!
+    let from: string | undefined
+    if (texts.length > 1 || currentRmsTable(text)) {
+      const rms = currentRmsList(texts)
+      if (!rms.list) return setStep({ at: 'choose', problem: texts.length > 1 && !texts.some((t) => currentRmsTable(t)) ? 'Choose one stock list file.' : rms.problem })
+      ;({ text, said: from } = rms.list)
     }
     const read = readStockFile(text)
     if (!read.file) return setStep({ at: 'choose', problem: read.problem })
     if (needsColumnStep(read.file)) setStep({ at: 'columns', text, file: read.file, columns: read.file.columns })
-    else await preview(text, read.file, read.file.columns)
+    else await preview(text, read.file, read.file.columns, from)
   }
 
   return (
@@ -166,9 +179,10 @@ function Choose(p: { reading: boolean; offline: boolean; problem: string | undef
         Serial, Asset number, Location, Case, Value and PAT due, in any order; a title above it is fine. Nothing is saved until you've seen every
         row.
       </p>
+      <p>From Current RMS, choose its products and stock levels exports together, and its rates if you have them.</p>
       <label className="field">
         Stock list file
-        <input type="file" accept=".csv,text/csv" onChange={p.onChoose} disabled={p.reading || p.offline} />
+        <input type="file" accept=".csv,text/csv" multiple onChange={p.onChoose} disabled={p.reading || p.offline} />
       </label>
       {p.reading && <p className="hint">Reading the file…</p>}
       {p.problem && (
@@ -257,7 +271,7 @@ function Preview(p: {
   const recheck = (next: Row[], nextOptions: StockListOptions) => {
     const read = previewStockList(
       next.map((r) => ({ row: r.row, cells: r.cells, skip: r.skip })),
-      knownStockOf(p.view.warehouse),
+      knownStockOf(p.view.warehouse, p.view.money.productPrice),
       nextOptions
     )
     p.onStep({ ...step, options: nextOptions, rows: read.rows.map((r, i) => ({ ...r, fix: next[i]!.fix })), counts: read.counts, places: read.places, cases: read.cases })
@@ -317,6 +331,7 @@ function Preview(p: {
         <p role="status">
           <b>{first}</b> read{rest.join(' read')}
         </p>
+        {step.from && <p className="hint">{step.from}</p>}
         {step.notRead.length > 0 && <p className="hint">Not read: {step.notRead.join(', ')}.</p>}
         <div className="links">
           <button type="button" className="link" onClick={p.onColumns} disabled={bringing}>

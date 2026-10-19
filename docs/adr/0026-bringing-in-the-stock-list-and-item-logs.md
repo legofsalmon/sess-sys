@@ -68,6 +68,7 @@ field has its names; the first column found for a field is read:
 | Value of one | value, replacement value, cost, price, unit price, replacement cost, unit value |
 | PAT due | pat due, pat due date, next test, next test due, next pat, next pat due, inspection due |
 | Notes | notes, note, comments, comment, remarks |
+| Day price | day price, day rate, daily rate, price a day, hire price, rental price (added by [ADR 0056](0056-bringing-the-stock-in-from-current-rms.md)) |
 
 A column headed "No." is asked about: it's a line's number or an asset
 number as often as a count, and a line's number read as a count would
