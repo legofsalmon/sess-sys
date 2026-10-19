@@ -247,7 +247,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
         <h2>{mode === 'out' ? 'Kit to go out' : 'Kit coming back'}</h2>
         {rows.length === 0 && (
           <Empty>
-            Add the job's kit on <a href={`#jobs/${job.id}`}>its page</a>.
+            Add the job's kit on <a href={`#jobs/${job.id}/kit`}>its page</a>.
           </Empty>
         )}
         {mode === 'in' && rows.length > 0 && shown.length === 0 && <Empty>Kit shows here once it has gone out with this job.</Empty>}

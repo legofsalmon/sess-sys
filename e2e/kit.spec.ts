@@ -59,6 +59,8 @@ async function newJob(page: Page, name: string, status: 'Confirmed' | 'Quoted' |
   }
   await form.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+  // The kit is a part of the job's page of its own (ADR 0059); the page opens on it from then on.
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
 }
 
 async function addKit(page: Page, product: string, qty: number, days = 'Whole job') {

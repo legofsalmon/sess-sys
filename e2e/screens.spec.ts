@@ -133,7 +133,14 @@ test('staff crew are offered nothing on a job or on Crew they could only be refu
   await openJob(page, 'Harbour Lights Festival')
   const main = page.getByRole('main')
   await expect(main.getByRole('region', { name: 'Phases' })).toBeVisible()
-  for (const name of ['Change', 'Change details', 'Add phase', 'Add kit', 'Ask for crew', 'Offer…', 'Running late…', 'Book a vehicle']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
+  // Each part of the job in turn (ADR 0059), and no Quote for a role that doesn't see money.
+  await expect(main.getByRole('tab')).toHaveText(['Phases 3', /^Crew/, 'Kit and vans', 'Show pack'])
+  for (const part of ['Phases', 'Crew', 'Kit and vans', 'Show pack']) {
+    await main.getByRole('tab', { name: new RegExp(`^${part}`) }).click()
+    for (const name of ['Change', 'Change details', 'Add phase', 'Add kit', 'Ask for crew', 'Offer…', 'Running late…', 'Book a vehicle'])
+      await expect(main.getByRole('button', { name, exact: true }), `${name} on ${part}`).toHaveCount(0)
+  }
+  await main.getByRole('tab', { name: /^Crew/ }).click()
   // A call opened still says who's on it, without Withdraw, Send, Change or Cancel.
   await main.getByRole('button', { name: /× Rigger/ }).first().click()
   await expect(main.getByRole('link', { name: 'Pádraig Kenny' })).toBeVisible()
@@ -154,9 +161,11 @@ test('the warehouse can add kit to a job, but not change the job itself', async 
   await as(page, 'head', /^Warehouse/)
   await openJob(page, 'Harbour Lights Festival')
   const main = page.getByRole('main')
+  await main.getByRole('tab', { name: 'Kit and vans' }).click()
   await expect(main.getByRole('button', { name: 'Add kit' })).toBeVisible()
   const kit = main.getByRole('region', { name: 'Kit' })
   await expect(kit.getByRole('button', { name: 'Change', exact: true }).first()).toBeVisible()
+  await main.getByRole('tab', { name: /^Phases/ }).click()
   const phases = main.getByRole('region', { name: 'Phases' })
   for (const name of ['Change', 'Add phase']) await expect(phases.getByRole('button', { name, exact: true })).toHaveCount(0)
   await expect(main.getByRole('button', { name: 'Change details', exact: true })).toHaveCount(0)

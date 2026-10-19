@@ -63,7 +63,8 @@ test("a person's name opens their page, with what's ahead for them and the way b
   expect(await office.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneSize.width)
 
   await ahead.getByRole('link', { name: new RegExp(`^${job}`) }).click()
-  await expect(office).toHaveURL(new RegExp(`#jobs/${k('job')}$`))
+  // To the job's Crew, where the offer is (ADR 0059).
+  await expect(office).toHaveURL(new RegExp(`#jobs/${k('job')}/crew$`))
   await office.goBack()
   await expect(office.getByRole('heading', { level: 1 })).toHaveText(name)
 

@@ -306,6 +306,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   await form.getByLabel('Phase 1 to').fill('2030-10-15')
   await form.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { name: job })).toBeVisible()
+  await page.getByRole('tab', { name: /^Crew/ }).click()
   await page.getByRole('button', { name: 'Ask for crew' }).click()
   const ask = page.getByRole('form', { name: 'Ask for crew' })
   await ask.getByLabel('Role').fill('Audio tech')

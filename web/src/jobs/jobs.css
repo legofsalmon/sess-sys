@@ -330,3 +330,21 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .jobs .map a.leaflet-popup-close-button { color: var(--muted); }
 .jobs .paste-pin { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: end; }
 .jobs .find-rest { display: grid; gap: var(--space-8); }
+
+/*
+ * A job's page (JobScreen): the whole width, with no list beside it, its
+ * parts one at a time under tabs (the design system's tabs: the open one
+ * underlined in the accent, the rest muted). One column, as its forms and
+ * calls read down; from 1200px a little wider than other pages.
+ */
+.part-tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.part-tabs::-webkit-scrollbar { display: none; }
+.app .part-tabs [role='tab'] { flex: none; display: inline-flex; align-items: center; gap: var(--space-6); min-height: 44px; margin-bottom: -1px; padding: var(--space-8) var(--space-12); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.app .part-tabs [role='tab']:hover { color: var(--ink); }
+.app .part-tabs [role='tab'][aria-selected='true'] { color: var(--ink); border-bottom-color: var(--accent); }
+.part-count { font-weight: 600; font-variant-numeric: tabular-nums; opacity: .8; }
+.job-part { display: grid; gap: var(--space-14); min-width: 0; }
+.jobs .phase-crew { margin: 0; }
+@media (min-width: 1200px) {
+  .app.job-page { max-width: 960px; }
+}
