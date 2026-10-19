@@ -324,6 +324,8 @@ function Preview(p: {
     counts.updates > 0 && `${plural(counts.updates, 'row')} changing what's here`,
   ].filter(Boolean)
   const [first, ...rest] = stockListSaid(counts).split(' read')
+  /** Whether any row says where its kit is, so "all of it there" is a choice worth offering. */
+  const namesPlaces = rows.some((r) => !r.skip && !!r.cells.place?.trim())
 
   return (
     <>
@@ -344,7 +346,32 @@ function Preview(p: {
       </section>
 
       <section className="card" aria-label="Places and cases">
-        <h2>Places and cases</h2>
+        <h2>Where it's kept</h2>
+        {/* One place for the lot (ADR 0061): typed once here rather than on every row. */}
+        <label className="field">
+          {namesPlaces ? "Kit the list doesn't place is at" : 'All this kit is kept at'}
+          <input
+            list="import-places"
+            value={options.defaultPlace}
+            onChange={(e) => recheck(rows, { ...options, defaultPlace: e.target.value })}
+            placeholder="e.g. Warehouse; empty to leave it unplaced"
+            disabled={bringing}
+          />
+        </label>
+        <datalist id="import-places">
+          {p.view.warehouse.places.map((x) => (
+            <option key={x.id} value={x.name} />
+          ))}
+        </datalist>
+        {namesPlaces && (
+          <label className="tick">
+            <input type="checkbox" checked={options.allAt === true} onChange={(e) => recheck(rows, { ...options, allAt: e.target.checked })} disabled={bringing} />
+            <span>
+              <b>Put all of it there</b>
+              <small>Every row goes to this one place, whatever the list says. Kit in a case stays in its case.</small>
+            </span>
+          </label>
+        )}
         {step.places.length === 0 && step.cases.length === 0 ? (
           <p className="hint">Every place and case the list names is here already.</p>
         ) : (
@@ -368,21 +395,6 @@ function Preview(p: {
             </label>
           </>
         )}
-        <label className="field">
-          Kit the list doesn't place is at
-          <input
-            list="import-places"
-            value={options.defaultPlace}
-            onChange={(e) => recheck(rows, { ...options, defaultPlace: e.target.value })}
-            placeholder="e.g. Warehouse; empty to leave it unplaced"
-            disabled={bringing}
-          />
-        </label>
-        <datalist id="import-places">
-          {p.view.warehouse.places.map((x) => (
-            <option key={x.id} value={x.name} />
-          ))}
-        </datalist>
       </section>
 
       <section className="card" aria-label="Rows">

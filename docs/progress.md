@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026, night: one place for a whole stock list
+
+**Done**
+
+- One place for a whole stock list, in [Decision 0061](adr/0061-one-place-for-a-whole-stock-list.md)
+  (Colly's "set the stock location all to the same"): the bring-in's
+  "Where it's kept" card now asks first where all the kit is kept, and a
+  list that places its kit can be put all in one place with "Put all of it
+  there".
+- Checked: typecheck, all tests (1 new unit, end-to-end extended).
+
+**Waiting on**
+
+- Colly: bring the Current RMS files in on the live app (Claude can't sign
+  in there).
+
 ## 19 October 2026: system admins
 
 **Done**
