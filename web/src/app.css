@@ -386,7 +386,7 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 }
 .notices-button:active { background: var(--ds-wash-pressed); }
 .toaster { position: fixed; inset-inline-end: var(--space-16); inset-block-end: calc(76px + env(safe-area-inset-bottom)); z-index: var(--ds-layer-toast); width: min(26rem, calc(100% - 2 * var(--space-16))); pointer-events: none; }
-.toaster [role='status'] { display: grid; justify-items: end; gap: var(--space-8); }
+.toaster .toasts { display: grid; justify-items: end; gap: var(--space-8); }
 @media (min-width: 900px) {
   .toaster { inset-block-end: var(--space-16); }
 }

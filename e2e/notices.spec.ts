@@ -43,7 +43,7 @@ test('pops up a change someone else made to a job you made, counts it on the bel
   await expect(toast).toBeVisible()
   await expect(toast).toContainText('A job you made')
   await expect(bell).toHaveAccessibleName('Notifications, 1 new')
-  await expect(page.locator('.toaster [role="status"]')).toHaveCount(1)
+  await expect(page.locator('.toaster .toasts[aria-live="polite"]')).toHaveCount(1)
 
   // Its one action goes to the job.
   await toast.getByRole('link', { name: 'Open' }).click()

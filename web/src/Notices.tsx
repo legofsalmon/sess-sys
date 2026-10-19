@@ -40,7 +40,8 @@ export function Toaster() {
   const toasts = useToasts()
   return (
     <section className="toaster" aria-label="Notifications">
-      <div role="status">
+      {/* Polite, as role="status" is, without being a second status on the page beside the sync state. */}
+      <div className="toasts" aria-live="polite" aria-relevant="additions">
         {toasts.map((t) => (
           <div
             key={t.id}
