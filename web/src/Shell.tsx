@@ -11,6 +11,7 @@ import { PreviewSplash, useHoldPersona, usePreview } from './home/Preview.tsx'
 import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
 import { MenuScreen } from './MenuScreen.tsx'
+import { NoticesScreen, Toaster } from './Notices.tsx'
 import { settlePlace } from './places.ts'
 import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
@@ -31,7 +32,8 @@ import { YouScreen } from './YouScreen.tsx'
  * three areas the work is done in, and the Menu (ADR 0035), which names
  * every place in the app and holds what's used now and then: Admin (the
  * company's settings, at #admin; the old #account lands there, ADR 0041),
- * History and You (a person's own settings). Those keep the Menu's tab.
+ * History and You (a person's own settings), and Notifications, which the
+ * bell in the top bar opens (ADR 0058). Those keep the Menu's tab.
  */
 const AREAS = [
   { hash: '#home', label: 'Home', Screen: HomeScreen },
@@ -46,6 +48,7 @@ const UNDER_MENU = [
   { hash: '#admin', Screen: AccountScreen },
   { hash: '#history', Screen: HistoryScreen },
   { hash: '#me', Screen: YouScreen },
+  { hash: '#notifications', Screen: NoticesScreen },
 ] as const
 
 /**
@@ -165,6 +168,7 @@ export function Shell() {
       <main ref={main}>
         <Screen />
       </main>
+      <Toaster />
       <nav className="tabs" aria-label="Areas" hidden={barAway}>
         {AREAS.map((a) => (
           <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>

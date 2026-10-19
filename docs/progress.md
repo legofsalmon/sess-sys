@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: notifications
+
+**Done**
+
+- Notifications, in [Decision 0058](adr/0058-notifications.md) (Colly's
+  "a notification centre … that fires toast messages when something
+  updates for something the person is associated with"): a bell top right
+  on every screen counts what's new, and opens a list of what others
+  changed in the last 30 days on what's yours (the jobs you're on or made,
+  the offers you sent, your own details, bookings, leave and timesheets),
+  in the History tab's words, each linking to its page. Changes that arrive
+  while the app is open pop up at the bottom of the screen, more than two
+  at once as one; a switch on the list turns the pop-ups off on that
+  device. In the app only: nobody is emailed, texted or pushed to.
+- The bell icon is new in the design system (0.5.1, its PR #15).
+- Checked: typecheck, all tests (3 new server, 1 new end-to-end), and the
+  pop-up and the list looked at on a phone and a desk.
+
+**Waiting on**
+
+- Colly: merge the design system's PR #15 (the icon is already in the app,
+  taken from it).
+
 ## 19 October 2026: the stock from Current RMS
 
 **Done**

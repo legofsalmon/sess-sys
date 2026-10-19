@@ -35,6 +35,7 @@ import { BadCursor, readHistory, recordExport } from './history.ts'
 import { publicOrigin, requestForLog } from './http.ts'
 import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
 import { migrateAll } from './modules.ts'
+import { registerNoticeRoutes } from './notices.ts'
 import { reportError, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
 import { asRead, readingOf } from './reading.ts'
@@ -420,6 +421,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerPeopleImportRoutes(app, { db, onChange: changed })
   registerStockImportRoutes(app, { db, onChange: changed, round: options.stockImport })
   registerItemLogRoutes(app, { db })
+  registerNoticeRoutes(app, { db })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
 

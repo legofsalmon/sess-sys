@@ -76,7 +76,7 @@ export interface HistoryQuery {
 /** A `before` that this server didn't hand out. */
 export class BadCursor extends Error {}
 
-interface Row {
+export interface Row {
   id: string
   client_id: string
   user_id: string | null
@@ -98,7 +98,7 @@ interface Row {
 // still gives the right wait. When it was made is placed on the server's
 // clock: when it arrived, less the wait. Times come back as UTC text to the
 // microsecond, which is also what the paging cursor needs to be exact.
-const SELECT = `
+export const SELECT = `
   SELECT m.id, m.client_id, m.user_id, m.name, m.args, m.status, m.result, m.device,
          to_char(m.received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS received,
          to_char((m.received_at - coalesce(w.waited, interval '0')) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS made,
@@ -203,7 +203,7 @@ function readCursor(text: string): { at: string; id: string } {
   throw new BadCursor('That page of the history no longer exists; start again from the newest.')
 }
 
-async function toEntries(q: Queryable, rows: Row[], rates = true): Promise<HistoryEntry[]> {
+export async function toEntries(q: Queryable, rows: Row[], rates = true): Promise<HistoryEntry[]> {
   const look = await lookup(q, rows)
   const left = await itemsAsLeft(q, rows)
   return rows.map((r) => {

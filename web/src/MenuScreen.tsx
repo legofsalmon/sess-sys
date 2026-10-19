@@ -235,6 +235,13 @@ export const MENU: PlaceGroup[] = [
         label: 'You',
         about: 'Signing out, your own calendar feed and this device',
       },
+      {
+        key: 'notifications',
+        icon: 'notifications',
+        href: '#notifications',
+        label: 'Notifications',
+        about: "What others changed on the jobs you're on or made, and on your own things",
+      },
     ],
   },
 ]

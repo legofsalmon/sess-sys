@@ -260,3 +260,34 @@ export interface HistoryPage {
   /** Everyone the history can be narrowed to, on the first page only. */
   people?: { key: string; name: string }[]
 }
+
+/**
+ * Why a change is news to someone (ADR 0058), most their own first: it's
+ * about them (their details, bookings, leave, timesheets, documents, the
+ * van they drive), an offer they sent, a job they're on (as crew, the
+ * contact on the day or a driver), or a job they made in the app.
+ */
+export const NOTICE_WHY = ['you', 'sent', 'on', 'made'] as const
+export type NoticeWhy = (typeof NOTICE_WHY)[number]
+export const NOTICE_WHY_WORDS: Record<NoticeWhy, string> = {
+  you: 'About you',
+  sent: 'An offer you sent',
+  on: "A job you're on",
+  made: 'A job you made',
+}
+
+/** A change someone else made to something of theirs: a history entry, with why it's theirs. */
+export interface Notice extends HistoryEntry {
+  why: NoticeWhy
+  /** The record of theirs it changed: the one nearest them, when it changed several. */
+  about: { entity: string; id: string }
+}
+
+/** GET /api/notices: the last 30 days, newest first. */
+export interface NoticesPage {
+  notices: Notice[]
+  /** When they last opened the list, by when a change reached the server: anything after is new. Null before they ever have. */
+  readUpTo: string | null
+  /** Whether the account was found on the Crew tab; without, only jobs they made and offers they sent are theirs. */
+  found: boolean
+}

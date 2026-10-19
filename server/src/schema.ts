@@ -126,6 +126,14 @@ const MIGRATIONS: string[] = [
     END LOOP;
   END $$;
   `,
+  // How far each person has read their notifications (ADR 0058): by account, or by device while nobody is signed in.
+  // The notifications themselves are read from the history, so nothing else is kept.
+  `
+  CREATE TABLE IF NOT EXISTS notices_read (
+    reader text PRIMARY KEY,
+    up_to  timestamptz NOT NULL
+  );
+  `,
 ]
 
 export const CORE: Module = { versionTable: 'schema_version', migrations: MIGRATIONS }
