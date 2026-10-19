@@ -37,7 +37,7 @@ import { everyAsset } from './store.ts'
  */
 
 const field = z.enum(STOCK_FIELDS)
-const options = z.object({ make: z.boolean(), defaultPlace: z.string().max(200) })
+const options = z.object({ make: z.boolean(), defaultPlace: z.string().max(200), allAt: z.boolean().optional() })
 const previewBody = z.object({
   text: z.string().max(5_000_000, 'The file is too big: up to 5 MB.'),
   /** Which field each column is, as the office said; the headers' own reading when left out. */

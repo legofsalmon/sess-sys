@@ -415,6 +415,8 @@ export interface StockListOptions {
   make: boolean
   /** Where kit is kept when its row says neither a place nor a case; empty for nowhere. */
   defaultPlace: string
+  /** Everything goes to that one place, whatever the list's place column says (ADR 0061); kit in a case stays in it. Left out by an older app. */
+  allAt?: boolean
 }
 
 export interface StockProblem {
@@ -699,8 +701,8 @@ function readRow(input: StockListRow & { skip?: boolean }, options: StockListOpt
     dayCents: day.reason === undefined && (day.cents ?? 0) <= MOST_DAY_CENTS ? day.cents : null,
     patDue: due.day ?? null,
     notes: (c.notes ?? '').slice(0, 2000),
-    // Kit the row doesn't place goes where the office said, if it said.
-    placeCell: c.place ?? (caseCell ? '' : options.defaultPlace.trim()),
+    // Kit the row doesn't place goes where the office said, if it said; all of it, when the office said all of it.
+    placeCell: caseCell ? (c.place ?? '') : options.allAt && options.defaultPlace.trim() ? options.defaultPlace.trim() : (c.place ?? options.defaultPlace.trim()),
     caseCell,
     monthFirst: writtenMonthFirst(c.patDue ?? ''),
     eitherWay: readsEitherWay(c.patDue ?? ''),
