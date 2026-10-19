@@ -245,7 +245,7 @@ describe('a count', () => {
          FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
         WHERE c.contype = 'f' AND c.confrelid = 'people'::regclass`
     )
-    const theirs = new Set([...GONE, ...STRIPPED, ...LEAVE].map((p) => `${p.table}.person_id`))
+    const theirs = new Set([...GONE, ...STRIPPED, ...LEAVE].map((p) => `${p.table}.${('column' in p && p.column) || 'person_id'}`))
     const pointers = new Set(POINTERS.map((p) => `${p.table}.${p.column}`))
     for (const r of rows) expect(theirs.has(`${r.table}.${r.column}`) || pointers.has(`${r.table}.${r.column}`), `${r.table}.${r.column}`).toBe(true)
     expect(pointers).toContain('counts.counted_by')

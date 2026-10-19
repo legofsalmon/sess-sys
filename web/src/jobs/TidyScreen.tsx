@@ -1,5 +1,6 @@
 import {
   clientWords,
+  samePeople,
   joinedPhaseName,
   jobsNaming,
   namedFromAddress,
@@ -19,6 +20,7 @@ import {
 } from '@sh/shared'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
+import { SamePeople } from '../crew/Combine.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
@@ -47,6 +49,8 @@ export function useTidy(view: View) {
     const jobs = view.jobs.jobs.map(tidyJob)
     return {
       same: sameJobs(jobs),
+      // The same person brought in twice (ADR 0055), before naming anyone: combining may give them their name.
+      twice: samePeople(view.crew.people),
       people: view.crew.people.filter(namedFromAddress),
       venues: venueGuesses(jobs, view.jobs.venues),
       words: clientWords(jobs, { clients: view.jobs.clients, venues: view.jobs.venues }).slice(0, 12),
@@ -57,7 +61,7 @@ export function useTidy(view: View) {
 
 /** How much there is to tidy, for the line on Jobs and Crew. */
 export function tidyCount(t: ReturnType<typeof useTidy>) {
-  return t.same.length + t.people.length + t.venues.length + t.small.length
+  return t.same.length + t.twice.length + t.people.length + t.venues.length + t.small.length
 }
 
 /** On Jobs, once a calendar has been brought in and there's something to tidy. */
@@ -67,6 +71,7 @@ export function TidyNudge({ view }: { view: View }) {
   if (!mayJobs || !view.jobs.jobs.some((j) => j.sourceCalendar)) return null
   const parts = [
     t.same.length && plural(t.same.length, 'job', 'jobs') + ' brought in as several',
+    t.twice.length && plural(t.twice.length, 'person', 'people') + ' brought in twice',
     t.people.length && plural(t.people.length, 'person', 'people') + ' named from their address',
     t.venues.length && plural(t.venues.length, 'venue', 'venues') + ' to put on jobs',
   ].filter(Boolean)
@@ -96,9 +101,13 @@ export function TidyScreen({ view }: { view: View }) {
           What the calendars couldn't say, found in the jobs and people already in the app. Nothing changes until you choose, and each change is in the history like any
           other.
         </p>
-        {nothing && <Empty>Nothing to tidy: no job looks brought in twice, everyone has a name, and no venue or client is waiting to be put on a job.</Empty>}
+        {nothing && (
+          <Empty>Nothing to tidy: no job or person looks brought in twice, everyone has a name, and no venue or client is waiting to be put on a job.</Empty>
+        )}
       </section>
       {access.can('jobs') && t.same.length > 0 && <SameJobs view={view} groups={t.same} />}
+      {/* Always there for crew, so what it combined stays said once the last pair has gone. */}
+      {access.can('crew') && <SamePeople view={view} groups={t.twice} />}
       {access.can('crew') && t.people.length > 0 && <Names people={t.people} />}
       {access.can('jobs') && t.venues.length > 0 && <Venues guesses={t.venues} />}
       {access.can('jobs') && <Clients view={view} words={t.words} />}

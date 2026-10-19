@@ -33,6 +33,8 @@ export interface KnownPerson {
   id: string
   name: string
   email: string | null
+  /** The addresses they had as someone they were combined with (ADR 0055), which find them too. */
+  otherEmails?: readonly string[]
   phone: string | null
   archived: boolean
 }
@@ -332,8 +334,7 @@ export function matchRows<R extends CrewListRow & { skip?: boolean }>(rows: read
   const byEmail = new Map<string, KnownPerson>()
   const byPhone = new Map<string, KnownPerson>()
   for (const k of known) {
-    const email = k.email?.trim().toLowerCase()
-    if (email && !byEmail.has(email)) byEmail.set(email, k)
+    for (const email of [k.email?.trim().toLowerCase(), ...(k.otherEmails ?? [])]) if (email && !byEmail.has(email)) byEmail.set(email, k)
     const digits = phoneDigits(k.phone)
     if (digits && !byPhone.has(digits)) byPhone.set(digits, k)
   }

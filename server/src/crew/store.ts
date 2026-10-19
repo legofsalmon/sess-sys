@@ -4,7 +4,7 @@ import { sortByIds } from '../projects/store.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role`
+const PERSON = `id, name, kind, email, other_emails, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status, needs_certificates, department`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
@@ -16,6 +16,8 @@ export const toPerson = (r: Row): Person => ({
   name: r.name,
   kind: r.kind,
   email: r.email,
+  // Only once combined with someone (ADR 0055), so a person never combined is sent as before.
+  ...(r.other_emails?.length ? { otherEmails: r.other_emails } : {}),
   phone: r.phone,
   skills: r.skills,
   dayRateCents: r.day_rate_cents,
@@ -77,17 +79,26 @@ export async function getPerson(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE id = $1`, [id])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
-/** The person a private link belongs to. An archived person's link is gone with them. */
+/**
+ * The person a private link belongs to: theirs, or the link of someone
+ * they were combined with (ADR 0055), which opens the one person. An
+ * archived person's link is gone with them.
+ */
 export async function personByToken(q: Queryable, token: string) {
   if (!token || token.length < 16) return undefined
-  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE link_token = $1 AND NOT archived`, [token])
+  const { rows } = await q.query(
+    `SELECT ${PERSON} FROM people WHERE NOT archived AND (link_token = $1 OR id = (SELECT into_id FROM person_merges WHERE link_token = $1)) ORDER BY link_token = $1 DESC LIMIT 1`,
+    [token]
+  )
   return rows[0] ? toPerson(rows[0]) : undefined
 }
+/** Whether an address is a person's, as SQL on `people`: their own, or one they had as someone they were combined with (ADR 0055). `$n` is the address, trimmed and in small letters. */
+export const HAS_EMAIL = (param: string) => `(lower(trim(email)) = ${param} OR other_emails ? ${param})`
 /** The person a signed-in account is, by email, case aside (ADR 0024): the match the Account tab's feed card makes. */
 export async function personByEmail(q: Queryable, email: string) {
   const wanted = email.trim().toLowerCase()
   if (!wanted) return undefined
-  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE lower(trim(email)) = $1 AND NOT archived ORDER BY id LIMIT 1`, [wanted])
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE ${HAS_EMAIL('$1')} AND NOT archived ORDER BY id LIMIT 1`, [wanted])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
 export async function getCall(q: Queryable, id: string, lock = false) {

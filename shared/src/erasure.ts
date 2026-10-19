@@ -168,6 +168,7 @@ export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'>, keepName: 
     kind: p.kind,
     name: keepName ? p.name : ERASED_NAME,
     email: null,
+    otherEmails: [],
     phone: null,
     skills: [],
     dayRateCents: null,
@@ -225,6 +226,8 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnC
   'person.newLink': { names: { field: 'id' }, refused: true, keep: as },
   'person.role': { names: { field: 'id' }, refused: true, keep: as },
   'person.archive': { names: { field: 'id' }, refused: true, keep: as },
+  // Combining (ADR 0055) carries ids only: who was kept, and who was made part of them.
+  'person.merge': { names: { field: 'id' }, refused: true, keep: as },
   'unavailability.add': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId') },
   'offer.send': { names: { field: 'personId' }, refused: true, keep: as },
   // Their answer stays as a record of work; what they wrote with it goes.

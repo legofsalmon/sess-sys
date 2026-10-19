@@ -3,6 +3,25 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: combining people brought in twice
+
+**Done**
+
+- Combining people, in [Decision 0055](adr/0055-combining-people-brought-in-twice.md)
+  (Colly's "combine users created to the same one"): on a person's page,
+  "Combine with…", and on Jobs › Tidy up, "The same person, brought in
+  twice". The one person keeps every booking, offer, timesheet, day off,
+  leave, document and history entry, and every address, so the next
+  bring-in and their Google sign-in find them. Old private links and feeds
+  open the one person. Two offers for one call become one.
+- Checked: typecheck, all tests (11 new unit, 6 new server, 1 new
+  end-to-end), and the page on a phone.
+
+**Waiting on**
+
+- Colly: combine the doubles on the live app (Jobs › Tidy up lists them);
+  the Railway start command, backup variables and Sentry key, as before.
+
 ## 18 October 2026, late: charts on Home
 
 **Done**

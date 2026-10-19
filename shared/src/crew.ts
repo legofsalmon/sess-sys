@@ -200,6 +200,14 @@ export const person = z.object({
   name: needed(200, 'The name', 'A name'),
   kind: z.enum(['staff', 'freelancer']),
   email: z.string().max(200).nullable(),
+  /**
+   * The addresses they had as someone they were combined with (ADR 0055),
+   * trimmed and in small letters: a bring-in matches them, and so does
+   * their Google sign-in, as it does `email`. Set by the server, never by
+   * an edit. Missing on records synced before it existed, and on anyone
+   * never combined: none.
+   */
+  otherEmails: z.array(z.string().max(200)).max(20).optional(),
   /** International format, e.g. +353871234567, so WhatsApp links work. */
   phone: z.string().max(40).nullable(),
   skills: z.array(needed(60, 'A skill', 'A skill')).max(30, 'Up to 30 skills, please.'),

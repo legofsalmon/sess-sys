@@ -194,3 +194,9 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .person-page .card > p, .person-page .documents p { font-size: var(--text-small); }
 .crew a.who { color: inherit; text-decoration: none; }
 .person-page .who-card a.button { gap: var(--space-6); }
+
+/* Combining people brought in twice (ADR 0055): the ticks are Tidy up's; the search sits above them. */
+.person-page .combine { display: grid; gap: var(--space-10); }
+.person-page .combine .field { display: grid; gap: var(--space-4); }
+.person-page .combine .field input { width: 100%; }
+.person-page .combine .actions { margin: 0; }

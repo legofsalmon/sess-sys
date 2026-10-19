@@ -65,7 +65,7 @@ const importBody = z.object({ rows: z.array(choice).max(10_000) })
 
 /** Everyone on the Crew tab, archived or not: a row for a leaver is marked, never applied. */
 async function knownPeople(q: Queryable): Promise<KnownPerson[]> {
-  const { rows } = await q.query<KnownPerson>('SELECT id, name, email, phone, archived FROM people ORDER BY id')
+  const { rows } = await q.query<KnownPerson>('SELECT id, name, email, other_emails AS "otherEmails", phone, archived FROM people ORDER BY id')
   return rows
 }
 

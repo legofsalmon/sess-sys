@@ -131,6 +131,7 @@ describe('download everything', () => {
       'offers',
       'own_calendars',
       'people',
+      'person_merges',
       'phases',
       'places',
       'product_prices',
@@ -210,6 +211,7 @@ describe('download everything', () => {
       'company_vat_number',
       'company_cro_number',
       'role',
+      'other_emails',
     ])
     expect(people[0]).toMatchObject({
       name: 'Seán Ó Briain',

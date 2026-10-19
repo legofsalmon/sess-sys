@@ -171,6 +171,20 @@ const MIGRATIONS: string[] = [
   UPDATE people SET role = 'head' WHERE role = 'warehouse';
   ALTER TABLE people ADD CONSTRAINT people_role_check CHECK (role IN ('director', 'office', 'head', 'crew', 'freelancer'));
   `,
+  // Combining people brought in twice (ADR 0055): the addresses they had as the others, in small letters, which a
+  // bring-in and a Google sign-in match as they match `email`; and each person made part of another, with the secret of
+  // the link they had, so a freelancer's old link and calendar feed open the one person's. No row says anything else
+  // about them. A second combining moves the rows on to whoever is kept then.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS other_emails jsonb NOT NULL DEFAULT '[]';
+  CREATE TABLE IF NOT EXISTS person_merges (
+    from_id     text PRIMARY KEY,
+    into_id     text NOT NULL REFERENCES people(id),
+    link_token  text NOT NULL UNIQUE,
+    merged_at   timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS person_merges_into ON person_merges (into_id);
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

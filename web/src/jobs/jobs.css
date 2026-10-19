@@ -124,25 +124,25 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .import .field input { width: 100%; }
 .import .card > p { margin: 0; }
 .import .card > button.link { justify-self: start; }
-.import .found { list-style: none; margin: 0; padding: 0; display: grid; }
-.import .found > li { display: grid; gap: var(--space-4); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
-.import .found > li:first-child { border-top: 0; padding-top: 0; }
-.import .found p { margin: 0; color: var(--muted); font-size: .9rem; }
-.import .found a { color: var(--accent-ink); font-weight: 700; }
-.import .found .head { display: flex; gap: var(--space-8); align-items: center; }
-.import .found .head b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.import .found .head .name { flex: 1; width: 0; min-width: 0; font-weight: 700; }
-.import .found .head input[type='checkbox'], .import .tick input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
-.import .found li.is-off > :not(.head) { opacity: .5; }
-.import .found .guess { color: var(--warn); }
-.import .tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; cursor: pointer; }
-.import .tick input { margin-top: var(--space-2); }
-.import .tick b, .import .tick small { display: block; overflow-wrap: anywhere; }
-.import .tick small { color: var(--muted); font-size: .8rem; }
-.import .tick > span { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
-.import .tick .name { width: 100%; font-weight: 700; }
-.import .found .kind { display: flex; gap: var(--space-8); align-items: center; font-size: .9rem; color: var(--muted); }
-.import .found .kind select { flex: none; width: auto; }
+:is(.import, .combine) .found { list-style: none; margin: 0; padding: 0; display: grid; }
+:is(.import, .combine) .found > li { display: grid; gap: var(--space-4); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
+:is(.import, .combine) .found > li:first-child { border-top: 0; padding-top: 0; }
+:is(.import, .combine) .found p { margin: 0; color: var(--muted); font-size: .9rem; }
+:is(.import, .combine) .found a { color: var(--accent-ink); font-weight: 700; }
+:is(.import, .combine) .found .head { display: flex; gap: var(--space-8); align-items: center; }
+:is(.import, .combine) .found .head b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+:is(.import, .combine) .found .head .name { flex: 1; width: 0; min-width: 0; font-weight: 700; }
+:is(.import, .combine) .found .head input[type='checkbox'], :is(.import, .combine) .tick input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+:is(.import, .combine) .found li.is-off > :not(.head) { opacity: .5; }
+:is(.import, .combine) .found .guess { color: var(--warn); }
+:is(.import, .combine) .tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; cursor: pointer; }
+:is(.import, .combine) .tick input { margin-top: var(--space-2); }
+:is(.import, .combine) .tick b, :is(.import, .combine) .tick small { display: block; overflow-wrap: anywhere; }
+:is(.import, .combine) .tick small { color: var(--muted); font-size: .8rem; }
+:is(.import, .combine) .tick > span { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+:is(.import, .combine) .tick .name { width: 100%; font-weight: 700; }
+:is(.import, .combine) .found .kind { display: flex; gap: var(--space-8); align-items: center; font-size: .9rem; color: var(--muted); }
+:is(.import, .combine) .found .kind select { flex: none; width: auto; }
 .import details summary { display: flex; align-items: center; min-height: 44px; font-weight: 700; cursor: pointer; }
 .import .left-out { margin: var(--space-4) 0 0; padding-left: var(--space-20); display: grid; gap: var(--space-6); font-size: .9rem; }
 .import .left-out small { display: block; color: var(--muted); overflow-wrap: anywhere; }

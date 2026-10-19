@@ -4,6 +4,7 @@ import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, depar
 import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
+import { mergedPerson } from '../merge-people.ts'
 
 /**
  * The crew screen's view of a device's data: what the server has said, with
@@ -182,6 +183,20 @@ export function crewView(
         const a = m.args as CommandArgs<'person.archive'>
         const p = people.get(a.id)
         if (p) people.set(p.id, { ...p, archived: a.archived, pending: true })
+        break
+      }
+      case 'person.merge': {
+        // As the server combines them (ADR 0055): one person, with the others' offers and days off. Two offers for one call
+        // are shown as they are until the server says which it kept.
+        const a = m.args as CommandArgs<'person.merge'>
+        const into = people.get(a.id)
+        const from = a.from.map((id) => people.get(id)).filter((p): p is PersonView => !!p)
+        if (!into || !from.length) break
+        people.set(into.id, { ...into, ...mergedPerson(into, from), pending: true })
+        for (const p of from) people.delete(p.id)
+        const gone = new Set(from.map((p) => p.id))
+        for (const o of offers.values()) if (gone.has(o.personId)) offers.set(o.id, { ...o, personId: into.id, pending: true })
+        for (const u of away.values()) if (gone.has(u.personId)) away.set(u.id, { ...u, personId: into.id, pending: true })
         break
       }
       case 'person.contact': {
