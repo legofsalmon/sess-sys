@@ -60,6 +60,7 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.getByText(`Goes on the calendar as “${job} - Show” once one is connected in Admin.`)).toBeVisible()
 
   // Crew for the build.
+  await office.getByRole('tab', { name: /^Crew/ }).click()
   await office.getByRole('button', { name: 'Ask for crew' }).click()
   const ask = office.getByRole('form', { name: 'Ask for crew' })
   await ask.getByLabel('For which phase').selectOption({ label: 'Build, Mon 7 Oct to Tue 8 Oct' })

@@ -26,6 +26,7 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   })
   await office.goto('/#jobs')
   await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
   await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
 
   // Built from the job: its 12 Spiiders for the two days, and its LX op at the price list's €360 rather than the €280 they were booked at.

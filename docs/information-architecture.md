@@ -15,7 +15,7 @@ Menu. Under each, its pages:
 |---|---|---|
 | Home | Company, department, warehouse or me | `#home` |
 | Jobs | List, Week, Month (the planner) | `#jobs`, `#plan/…` |
-| | A job; its pick list; a phase's call sheet | `#jobs/<id>`, `…/pick`, `…/sheet/<phase>` |
+| | A job, and its parts (Phases, Crew, Kit and vans, Show pack, Quote: ADR 0059); its pick list; a phase's call sheet | `#jobs/<id>`, `…/phases`, `…/crew`, `…/kit`, `…/pack`, `…/money`, `…/pick`, `…/sheet/<phase>` |
 | | A venue; a client (listed at the foot of the Jobs list) | `#venues/<id>`, `#clients/<id>` |
 | | Bring in from Google Calendar | `#import` |
 | Stock | Catalogue, kit short, pick lists, places, repairs, tests due, labels, counts (one long screen) | `#stock` |

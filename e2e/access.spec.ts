@@ -101,6 +101,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // A job's page, with Ask for crew and its reply-by day, behind its button (audit finding 16).
     await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
     await page.getByRole('link', { name: /Harbour Lights Festival/ }).first().click()
+    await page.getByRole('tab', { name: /^Crew/ }).click()
     await page.getByRole('button', { name: 'Ask for crew' }).click()
     await expect(page.getByRole('form', { name: 'Ask for crew' }).getByLabel('Reply by')).toBeVisible()
     for (const f of await fieldBorders(page)) expect(contrast(f.border, f.behind), `a job: ${f.field} border ${f.border} on ${f.behind}`).toBeGreaterThanOrEqual(3)

@@ -213,7 +213,7 @@ export function NotesKitScreen({ view, jobId }: { view: View; jobId: string }) {
             {next ? (
               <a href={`#jobs/${encodeURIComponent(next.job.id)}/notes-kit`}>Next: {next.job.name} ›</a>
             ) : (
-              <a href={`#jobs/${encodeURIComponent(job.id)}`}>Back to the job</a>
+              <a href={`#jobs/${encodeURIComponent(job.id)}/kit`}>Back to the job</a>
             )}
           </p>
         )}

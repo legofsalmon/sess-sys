@@ -29,7 +29,7 @@ import { useToday, useView, useWide } from '../view.ts'
 import { Beside, Choices, clientNamed, JobStatusPill, Top, useHash, venueNamed } from './common.tsx'
 import { ImportScreen } from './ImportScreen.tsx'
 import { TidyNudge, TidyScreen } from './TidyScreen.tsx'
-import { JobScreen } from './JobScreen.tsx'
+import { JOB_PARTS, JobScreen, type JobPart } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
 import { MoneyScreen, PricesScreen } from './Money.tsx'
 import { NotesKitListScreen, NotesKitNudge, NotesKitScreen } from './NotesKit.tsx'
@@ -94,23 +94,18 @@ export function JobsScreen() {
   if (pick) return <PickScreen view={view} id={decodeURIComponent(pick)} />
   const [, sheetJob, sheetPhase] = /^#jobs\/([^/]+)\/sheet\/([^/]+)$/.exec(hash) ?? []
   if (sheetJob && sheetPhase) return <SheetScreen view={view} jobId={decodeURIComponent(sheetJob)} phaseId={decodeURIComponent(sheetPhase)} />
-  const open = hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
-  // On a laptop the list keeps a column of its own (audit finding 25), with its search and filter, beside the open job or the rest of the tab; on a phone the job is a page of its own.
+  // A job's page, at a part of it when the address names one.
+  const [, partOf, part] = /^#jobs\/([^/]+)\/([a-z]+)$/.exec(hash) ?? []
+  const open = partOf && JOB_PARTS.includes(part as JobPart) ? decodeURIComponent(partOf) : hash.startsWith('#jobs/') ? decodeURIComponent(hash.slice('#jobs/'.length)) : undefined
+  // A job has the whole width, on a laptop too: the list beside it took a third of the desk from it. The way up goes back to the list.
+  if (open) return <JobScreen key={open} view={view} id={open} part={partOf ? (part as JobPart) : undefined} />
+  // On a laptop the list keeps a column of its own (audit finding 25), with its search and filter, beside the rest of the tab; on a phone it's above it.
   if (wide)
     return (
-      <Beside
-        view={view}
-        className="crew jobs"
-        head={<JobViews />}
-        list={<JobsCard view={view} current={open} />}
-        open={open}
-        up={{ steps: [JOBS], here: view.jobs.jobs.find((j) => j.id === open)?.name }}
-      >
-        {/* Keyed by the job, so a form left open on one isn't still open on the next picked from the list. */}
-        {open ? <JobScreen key={open} view={view} id={open} bare /> : <JobsRest view={view} />}
+      <Beside view={view} className="crew jobs" head={<JobViews />} list={<JobsCard view={view} />}>
+        <JobsRest view={view} />
       </Beside>
     )
-  if (open) return <JobScreen view={view} id={open} />
   return <JobList view={view} />
 }
 
@@ -203,8 +198,8 @@ function VenuesScreen({ view }: { view: View }) {
 
 const jobKey = (j: JobView) => j.id
 
-/** Every job, searched and filtered; `current` marks the one open beside the list. */
-function JobsCard({ view, current }: { view: View; current?: string }) {
+/** Every job, searched and filtered. */
+function JobsCard({ view }: { view: View }) {
   const { jobs } = view.jobs
   const [filter, setFilter] = useState<Filter>('coming')
   const [search, setSearch] = useState('')
@@ -236,7 +231,7 @@ function JobsCard({ view, current }: { view: View; current?: string }) {
       <ul className="job-list windowed" ref={win.list} style={win.style}>
         {win.rows.map((j, i) => (
           <li key={j.id} ref={win.row(j.id)} data-place={j.id} aria-setsize={shown.length} aria-posinset={win.start + i + 1}>
-            <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={j.id === current} />
+            <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={false} />
           </li>
         ))}
       </ul>

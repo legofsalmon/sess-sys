@@ -146,6 +146,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await form.getByLabel('Phase 1 to').fill(fromToday(3))
   await form.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { level: 1, name: job })).toBeVisible()
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
   await page.getByRole('button', { name: 'Add kit' }).click()
   for (const [product, qty] of [
     [speaker, 2],

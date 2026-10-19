@@ -94,6 +94,7 @@ test('on a job, a van whose tax runs out is refused by name, and one off the roa
   // Proves: the refusal names the van and the fix, and sends nothing; off the road asks first, then books with the problem said; an unrecorded licence warns; Remove takes it off.
   const phone = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await openJob(phone, 'Liffey Brands Launch')
+  await phone.getByRole('tab', { name: 'Kit and vans' }).click()
   const vans = phone.getByRole('region', { name: 'Vehicles' })
   const luton = vans.locator('.van-line', { hasText: 'The Luton' })
   await expect(luton).toContainText('Dara Quinn driving')

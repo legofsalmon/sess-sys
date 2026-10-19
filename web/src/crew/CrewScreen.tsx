@@ -351,7 +351,7 @@ export function CrewScreen() {
               {g.venue && <p>{g.venue}</p>}
             </div>
             {g.projectId && (
-              <a className="link" href={`#jobs/${g.projectId}`}>
+              <a className="link" href={`#jobs/${g.projectId}/crew`}>
                 Open job
               </a>
             )}
@@ -406,7 +406,7 @@ export function CrewScreen() {
                   </div>
                   {c.projectId && (
                     <div className="actions">
-                      <a className="link" href={`#jobs/${c.projectId}`}>
+                      <a className="link" href={`#jobs/${c.projectId}/crew`}>
                         Open job
                       </a>
                     </div>
