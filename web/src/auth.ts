@@ -11,7 +11,7 @@ export type Auth =
   | { status: 'unknown' }
   /** The server hasn't got sign-in switched on, or (passcode) is a demo copy locked with a shared passcode. */
   | { status: 'open'; passcode?: true }
-  /** `admin`: the server's settings name them a system admin (ADR 0059), who can change everything whatever their role. */
+  /** `admin`: the server's settings name them a system admin (ADR 0060), who can change everything whatever their role. */
   | { status: 'signed-in'; user: StaffUser; admin?: true }
   | { status: 'signed-out'; passcode?: true }
 

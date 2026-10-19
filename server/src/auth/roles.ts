@@ -20,7 +20,7 @@ export async function roleOfAccount(
      WHERE (role = 'director' AND kind = 'staff' AND NOT archived) OR ${HAS_EMAIL('$1')}`,
     [email.trim().toLowerCase()]
   )
-  // A system admin (ADR 0059) acts as a director, as the server's settings say, whatever the Crew tab says.
+  // A system admin (ADR 0060) acts as a director, as the server's settings say, whatever the Crew tab says.
   const admin = isSystemAdmin(admins, email)
   const { role, on, personId } = roleForEmail(rows, email, admin)
   const me = personId ? rows.find((r) => r.id === personId) : undefined

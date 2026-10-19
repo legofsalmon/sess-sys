@@ -36,7 +36,7 @@ describe('roles', () => {
     expect(roleForEmail(people, 's@x.ie').role).toBe('crew')
     expect(roleForEmail(people, 'o@x.ie').role).toBe('crew')
     expect(roleForEmail(people, 'stranger@x.ie')).toEqual({ role: 'crew', on: true })
-    // A system admin (ADR 0059) acts as a director, whoever they are on the Crew tab; it doesn't switch roles on.
+    // A system admin (ADR 0060) acts as a director, whoever they are on the Crew tab; it doesn't switch roles on.
     expect(roleForEmail(people, 's@x.ie', true)).toEqual({ role: 'director', on: true, personId: 's' })
     expect(roleForEmail(people, 'stranger@x.ie', true)).toEqual({ role: 'director', on: true })
     expect(roleForEmail([p('s', 's@x.ie')], 's@x.ie', true).on).toBe(false)

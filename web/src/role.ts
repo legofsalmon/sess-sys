@@ -23,7 +23,7 @@ export interface Access {
   rolesOff?: true
   /** The Crew tab's person this account is, when found. */
   personId?: string
-  /** A system admin, named in the server's settings (ADR 0059): held to a director's role whatever their own says. */
+  /** A system admin, named in the server's settings (ADR 0060): held to a director's role whatever their own says. */
   admin?: true
 }
 

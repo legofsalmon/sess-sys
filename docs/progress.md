@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- System admins, in [Decision 0059](adr/0059-system-admins.md) (Colly's
+- System admins, in [Decision 0060](adr/0060-system-admins.md) (Colly's
   "I need to retain admin access to continue building this out"): the
   Railway variable `SYSTEM_ADMINS` names accounts that can change
   everything whatever their role on the Crew tab. Set on the server only,

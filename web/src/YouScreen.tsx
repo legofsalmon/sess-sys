@@ -131,7 +131,7 @@ function RoleCard() {
   const { reading, crew } = useView()
   const { run, error } = useAct()
   const [asking, setAsking] = useState(false)
-  // A system admin (ADR 0059): said first, as it is what decides what they can change once roles are on.
+  // A system admin (ADR 0060): said first, as it is what decides what they can change once roles are on.
   const me = access.personId ? crew.people.find((p) => p.id === access.personId) : undefined
   const own = me && roleOfPerson(me)
   const adminLine = access.admin && (

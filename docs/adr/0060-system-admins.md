@@ -1,4 +1,4 @@
-# ADR 0059: System admins, on top of roles
+# ADR 0060: System admins, on top of roles
 
 - **Status:** accepted
 - **Date:** 19 October 2026

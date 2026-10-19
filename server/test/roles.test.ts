@@ -166,7 +166,7 @@ describe('roles', () => {
     expect((await send(app, s, 'person.role', { id: 'sean', role: 'director' })).reason?.code).toBe('forbidden')
   })
 
-  it("let a system admin named in the server's settings change everything, whatever their own role (ADR 0059)", async () => {
+  it("let a system admin named in the server's settings change everything, whatever their own role (ADR 0060)", async () => {
     const { app, signIn, c } = await company(['sean@sessionhire.com'])
     const s = { sh_session: await signIn(sean) }
     // Seán is staff crew on the Crew tab, but the server's settings make him a system admin.

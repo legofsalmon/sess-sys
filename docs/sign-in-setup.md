@@ -64,7 +64,7 @@ In Railway, open the **shserver** service, then **Variables**, and add:
 | `GOOGLE_CLIENT_SECRET` | The Client secret from step 1 |
 | `STAFF_DOMAINS` | Only if the Workspace's address isn't sessionhire.com: the domain your company accounts end in. Leave it out otherwise |
 | `STAFF_EMAILS` | Only if people outside sessionhire.com should sign in (for example a tester): their Google addresses, separated by commas |
-| `SYSTEM_ADMINS` | Whoever builds and sets the app up: their Google addresses, separated by commas. They can change everything whatever their role on the Crew tab ([Decision 0059](adr/0059-system-admins.md)). It lets nobody in who isn't already staff |
+| `SYSTEM_ADMINS` | Whoever builds and sets the app up: their Google addresses, separated by commas. They can change everything whatever their role on the Crew tab ([Decision 0060](adr/0060-system-admins.md)). It lets nobody in who isn't already staff |
 
 Railway then asks to deploy the change; let it.
 

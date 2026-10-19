@@ -10,7 +10,7 @@ export interface AuthConfig {
   provider: IdentityProvider
   domains: string[]
   emails: string[]
-  /** SYSTEM_ADMINS (ADR 0059): accounts that can do everything whatever their role, set here so nobody in the app can take it away. */
+  /** SYSTEM_ADMINS (ADR 0060): accounts that can do everything whatever their role, set here so nobody in the app can take it away. */
   admins?: string[]
 }
 
@@ -25,7 +25,7 @@ const list = (s: string | undefined) =>
  * variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET), and off otherwise.
  * STAFF_DOMAINS and STAFF_EMAILS, comma-separated, say who counts as staff.
  * SYSTEM_ADMINS, comma-separated emails, are staff who can change
- * everything once roles are on, as a director can (ADR 0059). It lets
+ * everything once roles are on, as a director can (ADR 0060). It lets
  * nobody in who isn't already staff.
  */
 export function authFromEnv(env: NodeJS.ProcessEnv = process.env): AuthConfig | undefined {

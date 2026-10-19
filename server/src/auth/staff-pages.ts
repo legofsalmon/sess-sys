@@ -16,7 +16,7 @@ const SAID = ['cancelled', 'failed', 'denied'] as const
  * still their whole credential (ADR 0002), but a member of staff's link
  * (/f/<token>, and everything under it but the calendar feed) opens only
  * for a Google sign-in: their own, matched by email as roles are, or the
- * office's, a director's or a system admin's (ADR 0059) once roles are
+ * office's, a director's or a system admin's (ADR 0060) once roles are
  * on, or anyone's while they are off, as the app itself is then open to
  * every member of staff. Only when Google sign-in is on: a demo copy and a local server keep links as
  * they were.

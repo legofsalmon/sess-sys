@@ -253,7 +253,7 @@ export function roleForEmail(people: readonly RolePerson[], email: string, admin
 }
 
 /**
- * A system admin (ADR 0059) is an account the
+ * A system admin (ADR 0060) is an account the
  * server's settings name, not anyone on the Crew tab: whoever builds and
  * sets the app up. They act as a director whatever their person's role says,
  * but aren't one: they don't switch roles on, and don't count as the

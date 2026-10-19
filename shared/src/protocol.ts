@@ -176,7 +176,7 @@ export type MeResponse =
   | { auth: 'passcode'; role?: Role }
   /**
    * `role` is what they can change; `rolesOn` false while nobody is a director, when everyone can (ADR 0034).
-   * `admin` when the server's SYSTEM_ADMINS names them (ADR 0059): a director's every ability, whatever their role.
+   * `admin` when the server's SYSTEM_ADMINS names them (ADR 0060): a director's every ability, whatever their role.
    */
   | { auth: 'google'; user: StaffUser; role: Role; rolesOn: boolean; admin?: true }
 
