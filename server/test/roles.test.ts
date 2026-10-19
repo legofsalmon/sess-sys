@@ -54,10 +54,10 @@ afterEach(async () => {
 
 const cookie = (res: LightMyRequestResponse, name: string) => res.cookies.find((c) => c.name === name)
 
-async function server() {
+async function server(admins: string[] = []) {
   const db = await pgliteDb()
   const google = fakeGoogle()
-  const auth: AuthConfig = { provider: google.provider, domains: ['sessionhire.com'], emails: [] }
+  const auth: AuthConfig = { provider: google.provider, domains: ['sessionhire.com'], emails: [], admins }
   const app = await buildApp({ db, auth })
   cleanup.push(async () => {
     await app.close()
@@ -96,8 +96,8 @@ const staff = (id: string, name: string, email: string | null, extra: object = {
 const bay = (id: string) => ({ id, name: `Bay ${id}`, notes: '' })
 
 /** Colly signs in, puts herself and Seán on the Crew tab, and makes herself the director: roles are on. */
-async function company() {
-  const s = await server()
+async function company(admins: string[] = []) {
+  const s = await server(admins)
   const c = { sh_session: await s.signIn(colly) }
   expect((await send(s.app, c, 'person.upsert', staff('colly', 'Colly', 'colly@sessionhire.com'))).status).toBe('applied')
   expect((await send(s.app, c, 'person.upsert', staff('sean', 'Seán Ó Briain', 'Sean@SessionHire.com'))).status).toBe('applied')
@@ -164,6 +164,31 @@ describe('roles', () => {
     expect((await app.inject({ url: '/api/export', cookies: s })).statusCode).toBe(200)
     expect((await app.inject({ method: 'POST', url: '/api/data/start-fresh', cookies: s, payload: { confirm: 'x' } })).statusCode).toBe(403)
     expect((await send(app, s, 'person.role', { id: 'sean', role: 'director' })).reason?.code).toBe('forbidden')
+  })
+
+  it("let a system admin named in the server's settings change everything, whatever their own role (ADR 0060)", async () => {
+    const { app, signIn, c } = await company(['sean@sessionhire.com'])
+    const s = { sh_session: await signIn(sean) }
+    // Seán is staff crew on the Crew tab, but the server's settings make him a system admin.
+    expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'director', rolesOn: true, admin: true })
+    expect((await app.inject({ url: '/api/me', cookies: c })).json()).not.toHaveProperty('admin')
+    expect((await send(app, s, 'place.upsert', bay('a1'))).status).toBe('applied')
+    expect((await send(app, s, 'project.create', { id: 'j1', name: 'Culture Night', clientId: null, venueId: null, status: 'confirmed', notes: '' })).status).toBe('applied')
+    expect((await app.inject({ url: '/api/export', cookies: s })).statusCode).toBe(200)
+    expect((await send(app, s, 'person.upsert', staff('adam', 'Adam', 'adam@sessionhire.com'))).status).toBe('applied')
+    expect((await send(app, s, 'person.role', { id: 'adam', role: 'director' })).status).toBe('applied')
+    // A director taking his role away changes nothing for him: it isn't one in the app to take.
+    expect((await send(app, c, 'person.role', { id: 'sean', role: 'freelancer' })).status).toBe('applied')
+    expect((await send(app, s, 'place.upsert', bay('a2'))).status).toBe('applied')
+    // He isn't a director either: the last of those still can't step down.
+    expect((await send(app, s, 'person.role', { id: 'colly', role: 'crew' })).status).toBe('applied')
+    expect((await send(app, s, 'person.role', { id: 'adam', role: 'crew' })).reason?.message).toBe('There has to be at least one director. Make someone else a director first.')
+  })
+
+  it("don't come on because of a system admin: only a director switches them on", async () => {
+    const { app, signIn } = await server(['sean@sessionhire.com'])
+    const s = { sh_session: await signIn(sean) }
+    expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'director', rolesOn: false, admin: true })
   })
 
   it('treat an account that matches nobody on the Crew tab as staff crew', async () => {

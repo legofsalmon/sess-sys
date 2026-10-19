@@ -270,7 +270,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   registerAuth(app, db, auth, passcode)
   // Staff's own pages need Google too, once it is on (ADR 0052).
-  if (auth) guardStaffPages(app, db)
+  if (auth) guardStaffPages(app, db, auth.admins)
 
   app.get('/api/health', { config: { public: true } }, async () => {
     const backup = backups.status()
