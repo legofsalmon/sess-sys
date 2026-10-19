@@ -252,7 +252,9 @@ test('a call says where it stands at rest, the picker only searches on Enter, an
   // On the job's page the cancelled call says so, and each phase's details open on a tap.
   await office.goto(`/#jobs/j-${id}`)
   await expect(office.getByRole('status')).toHaveText('Up to date')
+  await office.getByRole('tab', { name: /^Crew/ }).click()
   await expect(office.getByRole('article', { name: '1 × Runner' }).locator('.pill')).toHaveText('Cancelled')
+  await office.getByRole('tab', { name: /^Phases/ }).click()
   const show = office.getByRole('article', { name: 'Show' })
   await expect(show.getByRole('link', { name: 'Call sheet' })).toBeHidden()
   await expect(show.getByText('18:00 Doors')).toBeHidden()
@@ -262,7 +264,7 @@ test('a call says where it stands at rest, the picker only searches on Enter, an
   await expect(show.locator('.cal')).toContainText('Goes on the calendar as')
 })
 
-test('on a laptop the Jobs list sits beside the open job and the catalogue beside the open product; a phone gets each on its own', async ({ browser }) => {
+test('on a laptop a job has the whole width and the catalogue sits beside the open product; a phone gets each on its own', async ({ browser }) => {
   const id = tag()
   const laptop = await (await browser.newContext({ viewport: laptopSize })).newPage()
   await laptop.goto('/#jobs')
@@ -274,31 +276,27 @@ test('on a laptop the Jobs list sits beside the open job and the catalogue besid
   await form.getByLabel('Phase 1 to').fill('2031-06-12')
   await form.getByRole('button', { name: 'Add job' }).click()
 
-  // The job opens beside the list, under one top bar: the list on the left with the job's row marked, the job on the right.
+  // The job opens with the whole width (ADR 0059): no list beside it, its breadcrumbs the way back to the list.
   const title = laptop.getByRole('heading', { level: 1, name: job })
   await expect(title).toBeVisible()
   const list = laptop.getByRole('region', { name: 'Jobs' })
-  await expect(list.locator('.job-row', { hasText: job })).toHaveAttribute('aria-current', 'page')
-  const [listBox, titleBox] = [(await list.boundingBox())!, (await title.boundingBox())!]
-  expect(listBox.x + listBox.width).toBeLessThanOrEqual(titleBox.x)
+  await expect(list).toHaveCount(0)
   await expect(laptop.locator('.top')).toHaveCount(1)
-  await expect(laptop.getByRole('link', { name: '‹ All jobs' })).toHaveCount(0)
+  const crumbs = laptop.getByRole('navigation', { name: 'Breadcrumb' })
+  await expect(crumbs.getByRole('listitem')).toHaveText(['Jobs', job])
+  const [titleBox, tabsBox] = [(await title.boundingBox())!, (await laptop.getByRole('tablist', { name: 'Parts of the job' }).boundingBox())!]
+  expect(tabsBox.width).toBeGreaterThan(laptopSize.width / 2)
+  expect(tabsBox.y).toBeGreaterThan(titleBox.y)
 
-  // Found in the list and opened from it, the job opens beside a list that still holds what was typed.
-  await laptop.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
+  // Back to the list by the breadcrumbs, which sits beside the rest of the tab; found there and opened, the job starts at its top.
+  await crumbs.getByRole('link', { name: 'Jobs' }).click()
   await expect(title).toHaveCount(0)
+  await expect(list).toBeVisible()
+  await laptop.setViewportSize({ width: laptopSize.width, height: 500 })
+  await laptop.evaluate(() => scrollTo(0, document.body.scrollHeight))
   await list.getByLabel('Find').fill(job)
   await list.locator('.job-row', { hasText: job }).click()
   await expect(title).toBeVisible()
-  await expect(list.getByLabel('Find')).toHaveValue(job)
-
-  // Another job opened from the list starts at its top, however far down the last one the window was.
-  await list.getByLabel('Find').fill('')
-  await laptop.setViewportSize({ width: laptopSize.width, height: 500 })
-  await laptop.evaluate(() => scrollTo(0, document.body.scrollHeight))
-  expect(await laptop.evaluate(() => scrollY)).toBeGreaterThan(0)
-  await list.locator('.job-row', { hasNotText: job }).first().click()
-  await expect(title).toHaveCount(0)
   await expect.poll(() => laptop.evaluate(() => scrollY)).toBe(0)
   await laptop.setViewportSize(laptopSize)
 

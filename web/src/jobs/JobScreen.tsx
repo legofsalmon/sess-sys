@@ -31,7 +31,7 @@ import {
   type ProjectStatus,
   type View,
 } from '@sh/shared'
-import { useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { NeedsField } from '../crew/Certificates.tsx'
 import { CallCard, peopleOn, promptFor, SharePanelFor, type Share } from '../crew/CrewScreen.tsx'
@@ -51,13 +51,32 @@ import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
- * One job: what it is, its phases and how each will read on the calendar,
- * its kit (ADR 0014) and its crew. Crew calls made here belong to the job
- * and its phase, so freelancers always see the job's current name, dates
- * and venue.
+ * One job: what it is, then its parts one at a time (a tab each): its
+ * phases and how each will read on the calendar, its crew, its kit and
+ * vans (ADR 0014, 0047), its show pack and its quote. Crew calls made here
+ * belong to the job and its phase, so freelancers always see the job's
+ * current name, dates and venue. The page has the whole width, with no
+ * list beside it: the way up goes back to the list.
  */
 
-export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
+export type JobPart = 'phases' | 'crew' | 'kit' | 'pack' | 'money'
+export const JOB_PARTS: readonly JobPart[] = ['phases', 'crew', 'kit', 'pack', 'money']
+
+const PART_LABELS: Record<JobPart, string> = { phases: 'Phases', crew: 'Crew', kit: 'Kit and vans', pack: 'Show pack', money: 'Quote' }
+
+/** The part last looked at, so the office moving from job to job to book crew lands on Crew each time ("a fold remembers"). */
+const LAST_PART = 'sh.jobPart'
+
+function lastPart(): JobPart | undefined {
+  try {
+    const p = localStorage.getItem(LAST_PART)
+    return JOB_PARTS.includes(p as JobPart) ? (p as JobPart) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function JobScreen({ view, id, part: asked }: { view: View; id: string; part?: JobPart }) {
   const job = view.jobs.jobs.find((j) => j.id === id)
   // An offer to send, or the people to tell after a withdrawal or a stopped job (audit finding 9): one panel at a time.
   const [share, setShare] = useState<Share | undefined>()
@@ -66,71 +85,235 @@ export function JobScreen({ view, id, bare }: { view: View; id: string; bare?: b
   // A button the role can't use isn't drawn (audit finding 9): phases are the job's, asking for crew is crew's.
   const mayJobs = access.can('jobs')
   const mayCrew = access.can('crew')
+  const parts = JOB_PARTS.filter((p) => p !== 'money' || seesMoney)
+  // The part the address names, else the one picked here, else the last one looked at; a link to another part starts there.
+  const [picked, setPicked] = useState<JobPart | undefined>()
+  useEffect(() => setPicked(undefined), [asked])
+  const wanted = picked ?? asked ?? lastPart() ?? 'phases'
+  const part = parts.includes(wanted) ? wanted : 'phases'
+  const pick = (p: JobPart) => {
+    setPicked(p)
+    try {
+      localStorage.setItem(LAST_PART, p)
+    } catch {
+      // Storage that's off just doesn't remember.
+    }
+    // In the address, so a reload or a link keeps the part, without a step in the history: Back still goes up to the list.
+    history.replaceState(history.state, '', `#jobs/${encodeURIComponent(id)}/${p}`)
+  }
   const up = { steps: [JOBS], here: job?.name }
   if (!job)
     return (
-      <Page view={view} className="crew jobs" up={up} bare={bare}>
+      <Page view={view} className="crew jobs job-page" up={up}>
         <section className="card">
           <p className="empty">This job isn't on this device. It may still be on its way: check again once it says “Up to date”.</p>
         </section>
       </Page>
     )
   const onShare = (call: CallView) => (person: PersonView) => setShare({ kind: 'offer', person, call })
-  const stopped = STOPPED.includes(job.status)
-  // Sending an offer opens beside the call it's for: under the phases, or over the crew across phases. People to tell open under the job's details.
+  // Sending an offer opens under the calls it's for. People to tell open under the job's details, whichever part is open.
   const panel = share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />
-  const offering = share?.kind === 'offer' && panel
+  const offerFor = (calls: readonly CallView[]) => share?.kind === 'offer' && calls.some((c) => c.id === share.call.id) && panel
   const telling = share?.kind === 'tell' && panel
-  const inPhase = share?.kind === 'offer' && job.phases.some((p) => p.id === share.call.phaseId)
+  const fill = crewFill(job.calls)
+  const counts: Partial<Record<JobPart, string>> = {
+    phases: job.phases.length ? String(job.phases.length) : undefined,
+    crew: fill.needed ? `${fill.booked}/${fill.needed}` : undefined,
+  }
 
   return (
-    <Page view={view} className="crew jobs" up={up} bare={bare}>
+    <Page view={view} className="crew jobs job-page" up={up}>
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
 
-      <section className="card" aria-label="Phases">
-        <Heading icon="time">Phases</Heading>
-        {job.phases.length === 0 && <Empty>{mayJobs && 'Add the first phase below, so the job has dates.'}</Empty>}
-        {job.phases.map((p) => (
-          <Phase key={p.id} job={job} phase={p} view={view} onShare={onShare} onTell={setShare} mayChange={mayJobs} />
-        ))}
-        {mayJobs && (
-          <Fold label="Add phase">
-            <AddPhase job={job} />
-          </Fold>
+      <PartTabs parts={parts} current={part} counts={counts} onPick={pick} />
+      <div className="job-part" role="tabpanel" id="job-part" aria-labelledby={`job-tab-${part}`}>
+        {part === 'phases' && (
+          <section className="card" aria-label="Phases">
+            <Heading icon="time">Phases</Heading>
+            {job.phases.length === 0 && <Empty>{mayJobs && 'Add the first phase below, so the job has dates.'}</Empty>}
+            {job.phases.map((p) => (
+              <Phase key={p.id} job={job} phase={p} view={view} onTell={setShare} onCrew={() => pick('crew')} mayChange={mayJobs} />
+            ))}
+            {mayJobs && (
+              <Fold label="Add phase">
+                <AddPhase job={job} />
+              </Fold>
+            )}
+          </section>
         )}
-      </section>
 
-      {inPhase && offering}
-      <KitCard job={job} view={view} />
-      <VansCard job={job} view={view} />
-      {!inPhase && offering}
+        {part === 'crew' && <CrewPart job={job} view={view} onShare={onShare} onTell={setShare} offerFor={offerFor} mayCrew={mayCrew} />}
 
-      <section className="card" aria-label="Crew">
-        <Heading icon="people">Crew</Heading>
-        {job.otherCalls.length > 0 && <p className="hint">Across phases:</p>}
-        {job.otherCalls.map((c) => (
-          <CallCard key={c.id} call={c} crew={view.crew} calendar={view.calendar} late={view.late} onShare={onShare(c)} onTell={setShare} inJob />
-        ))}
-        {stopped ? (
-          <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p>
-        ) : !mayCrew ? (
-          job.calls.length === 0 && <p className="empty">No crew asked for yet.</p>
-        ) : !job.span ? (
-          <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
-        ) : (
-          <Fold label="Ask for crew">
-            <AskForCrew job={job} />
-          </Fold>
+        {part === 'kit' && (
+          <>
+            <KitCard job={job} view={view} />
+            <VansCard job={job} view={view} />
+          </>
         )}
-      </section>
 
-      {/* The files for the on-site box (ADR 0045), once there's a phase to have a crew and a running order. */}
-      {job.phases.length > 0 && <ShowPackCard view={view} job={job} />}
+        {/* The files for the on-site box (ADR 0045), once there's a phase to have a crew and a running order. */}
+        {part === 'pack' &&
+          (job.phases.length > 0 ? (
+            <ShowPackCard view={view} job={job} />
+          ) : (
+            <section className="card" aria-label="Show pack">
+              <Heading icon="download">Show pack</Heading>
+              <Empty>Add a phase first: the pack is the crew and running order of a phase.</Empty>
+            </section>
+          ))}
 
-      {/* Its quote, after the kit and crew it's built from, for the roles that see money (ADR 0042). */}
-      {seesMoney && <QuoteCard job={job} view={view} />}
+        {/* Its quote, built from the kit and crew, for the roles that see money (ADR 0042). */}
+        {part === 'money' && seesMoney && <QuoteCard job={job} view={view} />}
+      </div>
     </Page>
+  )
+}
+
+/**
+ * The job's parts as tabs (the design system's tabs): one Tab stop, Left
+ * and Right move and open, Home and End go to the ends. A count after a
+ * part's name: its phases, its crew booked of those needed.
+ */
+function PartTabs({
+  parts,
+  current,
+  counts,
+  onPick,
+}: {
+  parts: readonly JobPart[]
+  current: JobPart
+  counts: Partial<Record<JobPart, string>>
+  onPick: (p: JobPart) => void
+}) {
+  const row = useRef<HTMLDivElement>(null)
+  // The current part in view, where the row is wider than the phone.
+  useEffect(() => {
+    row.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [current])
+  const key = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const at = parts.indexOf(current)
+    const to =
+      e.key === 'ArrowRight' ? (at + 1) % parts.length : e.key === 'ArrowLeft' ? (at - 1 + parts.length) % parts.length : e.key === 'Home' ? 0 : e.key === 'End' ? parts.length - 1 : -1
+    if (to < 0) return
+    e.preventDefault()
+    onPick(parts[to]!)
+    row.current?.querySelector<HTMLElement>(`#job-tab-${parts[to]}`)?.focus()
+  }
+  return (
+    <div className="part-tabs" role="tablist" aria-label="Parts of the job" ref={row}>
+      {parts.map((p) => (
+        <button
+          key={p}
+          type="button"
+          role="tab"
+          id={`job-tab-${p}`}
+          aria-selected={p === current}
+          aria-controls="job-part"
+          tabIndex={p === current ? 0 : -1}
+          onClick={() => onPick(p)}
+          onKeyDown={key}
+        >
+          {PART_LABELS[p]}
+          {counts[p] && (
+            <>
+              {' '}
+              <span className="part-count">{counts[p]}</span>
+            </>
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The job's crew: the calls of each phase under its name, then those
+ * across phases, then asking for more. An offer being sent opens under
+ * the calls it's for.
+ */
+function CrewPart({
+  job,
+  view,
+  onShare,
+  onTell,
+  offerFor,
+  mayCrew,
+}: {
+  job: JobView
+  view: View
+  onShare: (c: CallView) => (p: PersonView) => void
+  onTell: (share: Share | undefined) => void
+  offerFor: (calls: readonly CallView[]) => ReactNode
+  mayCrew: boolean
+}) {
+  const stopped = STOPPED.includes(job.status)
+  const card = (c: CallView, phase?: PhaseView) => (
+    <CallCard
+      key={c.id}
+      call={c}
+      crew={view.crew}
+      calendar={view.calendar}
+      late={view.late}
+      onShare={onShare(c)}
+      onTell={onTell}
+      inJob
+      phaseDays={phase ? c.start === phase.start && c.end === phase.end : undefined}
+    />
+  )
+  return (
+    <>
+      {job.phases
+        .filter((p) => p.calls.length > 0)
+        .map((phase) => {
+          const outside = phase.calls.filter((c) => c.status === 'open' && (c.start < phase.start || c.end > phase.end))
+          return (
+            <Fragment key={phase.id}>
+              {/* Named for its phase, as the phase is on Phases: one part is open at a time. */}
+              <article className="card" aria-label={phase.name}>
+                <Heading icon="people">{phase.name}</Heading>
+                <p className="hint">{spanLabel(phase)}</p>
+                {outside.map((c) => (
+                  <p className="warn-line" key={c.id}>
+                    The {c.role} crew are asked for {daysLabel(c.days)}, outside {phase.name}.
+                  </p>
+                ))}
+                {phase.calls.map((c) => card(c, phase))}
+              </article>
+              {offerFor(phase.calls)}
+            </Fragment>
+          )
+        })}
+      {job.otherCalls.length > 0 && (
+        <>
+          <section className="card" aria-label="Crew across phases">
+            <Heading icon="people">Across phases</Heading>
+            {job.otherCalls.map((c) => card(c))}
+          </section>
+          {offerFor(job.otherCalls)}
+        </>
+      )}
+      {/* Asking for more: last, under the calls it adds to; nothing for a role that can't ask, once there are calls to see. */}
+      {(mayCrew || job.calls.length === 0) && (
+        <section className="card" aria-label={job.calls.length ? 'More crew' : 'Crew'}>
+          <Heading icon="add">{job.calls.length ? 'More crew' : 'Crew'}</Heading>
+          {stopped ? (
+            <p className="empty">This job is {job.status === 'lost' ? 'lost' : 'cancelled'}, so it needs no crew.</p>
+          ) : job.calls.length === 0 && !mayCrew ? (
+            <p className="empty">No crew asked for yet.</p>
+          ) : !job.span ? (
+            <p className="empty">Add a phase first: crew are asked for by phase and day.</p>
+          ) : (
+            <>
+              {job.calls.length === 0 && <p className="hint">No crew asked for yet.</p>}
+              <Fold label="Ask for crew">
+                <AskForCrew job={job} />
+              </Fold>
+            </>
+          )}
+        </section>
+      )}
+    </>
   )
 }
 
@@ -365,20 +548,21 @@ function Phase({
   job,
   phase,
   view,
-  onShare,
   onTell,
+  onCrew,
   mayChange,
 }: {
   job: JobView
   phase: PhaseView
   view: View
-  onShare: (c: CallView) => (p: PersonView) => void
   onTell: (share: Share | undefined) => void
+  /** Opens the job's Crew, where this phase's calls are. */
+  onCrew: () => void
   mayChange: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const today = useToday()
-  const outside = phase.calls.filter((c) => c.status === 'open' && (c.start < phase.start || c.end > phase.end))
+  const fill = crewFill(phase.calls)
   const ownVenue = phase.venueId && phase.venueId !== job.venueId ? phase.venue : undefined
   const contact = phase.contactId ? view.crew.people.find((p) => p.id === phase.contactId) : undefined
   const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
@@ -416,24 +600,14 @@ function Phase({
         </div>
       </details>
       {editing && mayChange && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
-      {outside.map((c) => (
-        <p className="warn-line" key={c.id}>
-          The {c.role} crew are asked for {daysLabel(c.days)}, outside {phase.name}.
+      {/* Its calls are under Crew; here, how they stand, a tap from them. */}
+      {fill.needed > 0 && (
+        <p className="phase-crew">
+          <button type="button" className="link" onClick={onCrew}>
+            Crew: {fill.booked} of {fill.needed} booked{fill.toConfirm > 0 && `, ${fill.toConfirm} to confirm`}
+          </button>
         </p>
-      ))}
-      {phase.calls.map((c) => (
-        <CallCard
-          key={c.id}
-          call={c}
-          crew={view.crew}
-          calendar={view.calendar}
-          late={view.late}
-          onShare={onShare(c)}
-          onTell={onTell}
-          inJob
-          phaseDays={c.start === phase.start && c.end === phase.end}
-        />
-      ))}
+      )}
     </article>
   )
 }

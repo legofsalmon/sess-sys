@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: a job's page in parts
+
+**Done**
+
+- A job's page tidied, in [Decision 0059](adr/0059-a-job-page-in-parts.md)
+  (Colly's "tidy up and segment the job page", and "the coming up jobs
+  shouldn't be there when you click into a job"): on a desk a job now has
+  the whole width, with no list beside it; Jobs › the job in the bar goes
+  back to the list. Its details stay on top, and under them its parts are
+  tabs, one at a time: Phases, Crew (booked of needed), Kit and vans, Show
+  pack, and Quote for the roles that see money. Crew calls moved out of the
+  phases into Crew, a card per phase; each phase says how its crew stand,
+  a tap from them. The page opens on the part last looked at.
+- Checked: typecheck, all tests, and the page on a phone and a desk.
+
 ## 19 October 2026: venues on the map
 
 **Done**
