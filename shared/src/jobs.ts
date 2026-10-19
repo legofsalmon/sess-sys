@@ -40,7 +40,20 @@ export const venue = z.object({
   /** Access, load-in, power, parking. */
   notes: text(4000, 'The notes'),
 })
-export type Venue = z.infer<typeof venue>
+/** Where a venue is on the map (ADR 0057), in degrees as GPS gives them. */
+export const pin = z.object({
+  lat: z.number().min(-90, "That isn't a place on the map.").max(90, "That isn't a place on the map."),
+  lng: z.number().min(-180, "That isn't a place on the map.").max(180, "That isn't a place on the map."),
+})
+export type Pin = z.infer<typeof pin>
+
+/**
+ * A venue as the server holds it. Its pin is set on its own (`venue.pin`),
+ * never by saving the venue's details, so an older device saving a venue
+ * leaves it where it is. Null until someone puts it on the map; missing
+ * from copies made before maps.
+ */
+export type Venue = z.infer<typeof venue> & { pin?: Pin | null }
 
 /**
  * What people decide about a job. What the system can see for itself (on
@@ -170,6 +183,8 @@ export const jobCommandSchemas = {
   /** Saved whole, like a person: clients are edited rarely. */
   'client.upsert': client,
   'venue.upsert': venue,
+  /** Put a venue on the map, move its pin, or (null) take it off (ADR 0057). */
+  'venue.pin': z.object({ id, pin: pin.nullable() }),
   'project.create': project,
   /**
    * Only the fields the person changed, so two people changing different
@@ -234,9 +249,77 @@ export function venueLabel(v: Pick<Venue, 'name' | 'address'>): string {
   return label.length > 300 ? `${label.slice(0, 299)}…` : label
 }
 
-/** A map search for the venue; an Eircode in the address makes it exact. */
-export function mapLink(v: Pick<Venue, 'name' | 'address'>): string {
+/** A map search for the venue; an Eircode in the address makes it exact, and its pin more so. */
+export function mapLink(v: Pick<Venue, 'name' | 'address' | 'pin'>): string {
+  if (v.pin) return `https://www.google.com/maps/search/?api=1&query=${v.pin.lat},${v.pin.lng}`
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([v.name, v.address.replace(/\s*\r?\n\s*/g, ', ')].filter(Boolean).join(', '))}`
+}
+
+/** Directions to a pin, in whatever maps app the phone opens Google's links with. */
+export const directionsLink = (p: Pin) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`
+
+/** An Eircode ("R32 PW10"), which the open map data mostly doesn't know: searches drop it and try again. */
+const EIRCODE = /\b(?:[AC-FHKNPRTV-Y]\d{2}|D6W)\s?[0-9AC-FHKNPRTV-Y]{4}\b/gi
+
+/**
+ * What to search the map for to find a venue (ADR 0057), best first: its
+ * name and address together, the address alone, then the address without
+ * its Eircode, then the name alone. Many venues came in from calendar
+ * titles with a name and no address, so the name on its own is the last
+ * try. Each is said once.
+ */
+export function pinSearches(v: Pick<Venue, 'name' | 'address'>): string[] {
+  const lines = v.address
+    .split(/\r?\n|,/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const name = v.name.trim()
+  // An address that starts with the venue's name says it once.
+  const rest = lines.length && lines[0]!.toLowerCase() === name.toLowerCase() ? lines.slice(1) : lines
+  const address = rest.join(', ')
+  const bare = rest
+    .map((l) => l.replace(EIRCODE, '').trim())
+    .filter(Boolean)
+    .join(', ')
+  const all = [[name, address].filter(Boolean).join(', '), address, bare, name].filter((q) => q.length >= 3)
+  return [...new Set(all)]
+}
+
+/**
+ * A pin typed or pasted rather than searched for: "53.1336, -7.1512", or a
+ * Google Maps or OpenStreetMap link to a place ("…/@53.1336,-7.1512,17z",
+ * "…?q=53.1336,-7.1512", "#map=17/53.1336/-7.1512"). Undefined for
+ * anything else, which is then searched for as words.
+ */
+export function pinFromText(text: string): Pin | undefined {
+  const t = text.trim()
+  const pairs = [
+    /^(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)$/,
+    /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
+    /[?&](?:q|query|destination|ll|mlat)=(-?\d{1,2}\.\d+)(?:,|%2C|&mlon=)(-?\d{1,3}\.\d+)/i,
+    /#map=\d+\/(-?\d{1,2}\.\d+)\/(-?\d{1,3}\.\d+)/,
+    /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+  ]
+  for (const re of pairs) {
+    const m = t.match(re)
+    if (!m) continue
+    const found = pin.safeParse({ lat: Number(m[1]), lng: Number(m[2]) })
+    if (found.success) return found.data
+  }
+  return undefined
+}
+
+/** One place a search found, for someone to pick: what the map calls it, and where. */
+export interface FoundPlace extends Pin {
+  label: string
+}
+
+/** What looking for a venue on the map found (GET /api/places). */
+export interface PlacesFound {
+  /** Up to five places, best first. */
+  found: FoundPlace[]
+  /** What was searched for to find them; undefined when nothing was. */
+  searched?: string
 }
 
 /** The title each day of a phase has on the calendar, as crew know it: "Nissan - Build 1/2". */

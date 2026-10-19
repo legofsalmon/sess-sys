@@ -57,6 +57,7 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
     what: named('phase'),
   },
   'venue.upsert': { entity: 'venue', fields: { name: 'name', address: 'address', notes: 'notes' }, what: named('venue') },
+  'venue.pin': { entity: 'venue', fields: { pin: 'place on the map' }, what: named('venue') },
   'client.upsert': { entity: 'client', fields: { name: 'name', contacts: 'contacts', notes: 'notes' }, what: named('client') },
   'person.upsert': {
     entity: 'person',

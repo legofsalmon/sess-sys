@@ -77,7 +77,14 @@ export function jobsView(
       }
       case 'venue.upsert': {
         const a = m.args as CommandArgs<'venue.upsert'>
-        venues.set(a.id, { ...a, pending: true })
+        // Saving the details leaves the pin where it is (ADR 0057).
+        venues.set(a.id, { ...a, pin: venues.get(a.id)?.pin ?? null, pending: true })
+        break
+      }
+      case 'venue.pin': {
+        const a = m.args as CommandArgs<'venue.pin'>
+        const v = venues.get(a.id)
+        if (v) venues.set(a.id, { ...v, pin: a.pin, pending: true })
         break
       }
       case 'project.create': {

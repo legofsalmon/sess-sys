@@ -7,11 +7,13 @@ import { client } from '../sync.ts'
 import { Attachments, JobsCard } from './Attachments.tsx'
 import { Page } from './common.tsx'
 import { JOBS, VENUES } from '../Up.tsx'
+import { VenueMapCard } from './VenueMaps.tsx'
 
 /**
  * One venue on a page of its own (ADR 0032, #jobs/venues/<id>): where it is,
  * what to know getting in, the documents kept for it (its tech spec, floor
- * plan, health and safety pack…), and the jobs there.
+ * plan, health and safety pack…), and the jobs there. Its map (ADR 0057)
+ * sits under its address.
  */
 
 /** The jobs at a venue: the job's own, or one of its phases'. */
@@ -31,6 +33,7 @@ export function VenueScreen({ view, id }: { view: View; id: string }) {
   return (
     <Page view={view} title="Venue" className="crew jobs" up={up}>
       <VenueSummary venue={venue} />
+      <VenueMapCard venue={venue} />
       <Attachments owner={{ owner: 'venue', id: venue.id, name: venue.name }} />
       <JobsCard jobs={jobsAt(view.jobs.jobs, venue.id)} title="Jobs here" client />
     </Page>
@@ -51,9 +54,12 @@ function VenueSummary({ venue }: { venue: VenueView }) {
           <dt>Address</dt>
           <dd>
             {venue.address ? <span className="lines">{venue.address}</span> : 'None yet'}{' '}
-            <a href={mapLink(venue)} target="_blank" rel="noreferrer">
-              Map
-            </a>
+            {/* Once it's on the map, the map under says where, with directions. */}
+            {!venue.pin && (
+              <a href={mapLink(venue)} target="_blank" rel="noreferrer">
+                Map
+              </a>
+            )}
           </dd>
         </div>
       </dl>

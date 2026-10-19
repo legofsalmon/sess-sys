@@ -3,6 +3,28 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: venues on the map
+
+**Done**
+
+- Venues on the map, in [Decision 0057](adr/0057-venues-on-the-map.md)
+  (Colly's "a map interface for the individual venue pages and an overall
+  map for the venues page"): each venue's page has its map with
+  Directions, and Jobs › Venues has one map of them all. OpenStreetMap,
+  drawn with Leaflet: open, free, no key. A venue's pin is kept on the
+  venue, so the map needs no look-up once it's placed and works with poor
+  signal. It is placed by looking the venue up by name and address,
+  pasting a map link or coordinates, or tapping the map. **Find the rest**
+  looks up every venue not yet on the map for the office to check, then
+  puts the ticked ones on in one press.
+- Checked: typecheck, all tests (6 new unit, 9 new server, 2 new
+  end-to-end), and the pages on a phone and a desk in both themes.
+
+**Waiting on**
+
+- The office: Jobs › Venues › Find the rest on the live app, then a look
+  at any venue it couldn't find.
+
 ## 19 October 2026: the stock from Current RMS
 
 **Done**

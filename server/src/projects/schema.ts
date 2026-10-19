@@ -62,6 +62,12 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'gig' CHECK (kind IN ('gig', 'hire', 'errand', 'meeting'));
   `,
+  // Where each venue is on the map (ADR 0057): both or neither, until someone puts it there.
+  `
+  ALTER TABLE venues ADD COLUMN IF NOT EXISTS lat double precision CHECK (lat BETWEEN -90 AND 90);
+  ALTER TABLE venues ADD COLUMN IF NOT EXISTS lng double precision CHECK (lng BETWEEN -180 AND 180);
+  ALTER TABLE venues ADD CONSTRAINT venues_pin_whole CHECK ((lat IS NULL) = (lng IS NULL));
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }
