@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: the stock from Current RMS
+
+**Done**
+
+- Bringing the stock in from Current RMS, in [Decision 0056](adr/0056-bringing-the-stock-in-from-current-rms.md)
+  (Colly's "can this be imported?"): Stock › Bring in the stock list takes
+  Current RMS's products, stock levels and rates exports chosen together,
+  and reads them into one list of a row a product, everything counted to
+  be labelled later. Colly's export: 309 products and 3,491 pieces of kit,
+  228 day prices. Any stock list can now have a Day price column, which
+  fills the price list where a product has no price.
+- Checked: typecheck, all tests (5 new unit, 1 new server, 1 new
+  end-to-end), and Colly's three files read through the preview with
+  nothing to fix.
+
+**Waiting on**
+
+- Colly: bring the three files in on the live app, with the place the kit
+  is kept typed once above the rows.
+
 ## 19 October 2026: combining people brought in twice
 
 **Done**

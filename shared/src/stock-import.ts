@@ -31,7 +31,7 @@ import type { WarehouseView } from './sync/stock-view.ts'
 
 // The columns.
 
-export const STOCK_FIELDS = ['product', 'make', 'model', 'department', 'category', 'quantity', 'serial', 'number', 'place', 'case', 'value', 'patDue', 'notes'] as const
+export const STOCK_FIELDS = ['product', 'make', 'model', 'department', 'category', 'quantity', 'serial', 'number', 'place', 'case', 'value', 'patDue', 'notes', 'dayPrice'] as const
 export type StockField = (typeof STOCK_FIELDS)[number]
 
 export const STOCK_FIELD_LABELS: Record<StockField, string> = {
@@ -48,6 +48,7 @@ export const STOCK_FIELD_LABELS: Record<StockField, string> = {
   value: 'Value of one',
   patDue: 'PAT due',
   notes: 'Notes',
+  dayPrice: 'Day price',
 }
 
 /** What each field is headed in a file, as `tidyHeader` leaves it; the first column found for a field is read. */
@@ -66,6 +67,8 @@ const HEADERS: Record<StockField, readonly string[]> = {
   value: ['value', 'replacement value', 'cost', 'price', 'unit price', 'replacement cost', 'unit value'],
   patDue: ['pat due', 'pat due date', 'next test', 'next test due', 'next pat', 'next pat due', 'inspection due'],
   notes: ['notes', 'note', 'comments', 'comment', 'remarks'],
+  // A hire price for one day, for quotes (ADR 0042); a "price" alone is the value of one, as it always was.
+  dayPrice: ['day price', 'day rate', 'daily rate', 'price a day', 'hire price', 'rental price'],
 }
 
 /** A header as it's compared: capitals, anything in brackets ("Value (€)"), and marks other than letters, digits, "/" and "&" left out. */
@@ -347,6 +350,8 @@ export interface KnownProduct {
   patMonths: number | null
   notes: string
   mistake: boolean
+  /** Its day price on the price list (ADR 0042); null for none, undefined where this device isn't sent prices. */
+  dayCents?: number | null
 }
 export interface KnownItem {
   id: string
@@ -370,8 +375,8 @@ export interface KnownStock {
   counts: { modelId: string; placeId: string | null; caseId: string | null; qty: number }[]
 }
 
-/** What a device holds, as the rows are checked again while the office fixes them. */
-export function knownStockOf(w: WarehouseView): KnownStock {
+/** What a device holds, as the rows are checked again while the office fixes them, with its day prices where it's sent them. */
+export function knownStockOf(w: WarehouseView, priceOf?: (modelId: string) => number | undefined): KnownStock {
   return {
     products: [...w.models, ...w.mistakes.values()].map((m) => ({
       id: m.id,
@@ -382,6 +387,7 @@ export function knownStockOf(w: WarehouseView): KnownStock {
       patMonths: m.patMonths,
       notes: m.notes,
       mistake: m.mistake,
+      dayCents: priceOf ? (priceOf(m.id) ?? null) : undefined,
     })),
     items: [...w.assets.values()].map((a) => ({
       id: a.id,
@@ -546,6 +552,12 @@ export interface PlannedChange {
   patDue?: string
   notes?: string
 }
+/** A day price for the price list (ADR 0042), for a new product or one with none. */
+export interface PlannedPrice {
+  row: number
+  model: StockRef
+  dayCents: number
+}
 export interface PlannedCount {
   row: number
   model: StockRef
@@ -560,6 +572,7 @@ export interface StockPlan {
   items: PlannedItem[]
   changes: PlannedChange[]
   counts: PlannedCount[]
+  prices: PlannedPrice[]
 }
 
 /** "Bring in 212 rows", or why not yet. */
@@ -590,6 +603,9 @@ const LIST_PAT_MONTHS = INSPECTION_MONTHS.pat
 /** ADR 0013's line between numbered and counted: anything worth more than about €150. */
 const NUMBERED_FROM_CENTS = 150_00
 const MOST_CENTS = 1_000_000_00
+/** As the price list takes (quotes.ts). */
+const MOST_DAY_CENTS = 100_000_00
+const dayLabel = (cents: number) => `${valueLabel(cents)} a day`
 
 const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
 const refKey = (r: StockRef | null) => (r ? (r.id ?? `new ${r.key}`) : '')
@@ -615,6 +631,7 @@ interface Read {
   serials: string[]
   numbered: boolean
   valueCents: number | null
+  dayCents: number | null
   patDue: string | null
   notes: string
   placeCell: string
@@ -661,6 +678,9 @@ function readRow(input: StockListRow & { skip?: boolean }, options: StockListOpt
   const value = parseEuro(c.value ?? '')
   if (value.reason !== undefined) problems.push({ field: 'value', text: `Couldn't read the value "${c.value}". ${value.reason}` })
   else if (value.cents !== null && value.cents > MOST_CENTS) problems.push({ field: 'value', text: 'A value can be up to €1,000,000.' })
+  const day = parseEuro(c.dayPrice ?? '')
+  if (day.reason !== undefined) problems.push({ field: 'dayPrice', text: `Couldn't read the day price "${c.dayPrice}". ${day.reason}` })
+  else if (day.cents !== null && day.cents > MOST_DAY_CENTS) problems.push({ field: 'dayPrice', text: 'A day price can be up to €100,000.' })
   const due = readStockDay(c.patDue ?? '')
   if (due.problem) problems.push({ field: 'patDue', text: due.problem })
   const caseCell = c.case ?? ''
@@ -676,6 +696,7 @@ function readRow(input: StockListRow & { skip?: boolean }, options: StockListOpt
     serials,
     numbered,
     valueCents: value.reason === undefined ? value.cents : null,
+    dayCents: day.reason === undefined && (day.cents ?? 0) <= MOST_DAY_CENTS ? day.cents : null,
     patDue: due.day ?? null,
     notes: (c.notes ?? '').slice(0, 2000),
     // Kit the row doesn't place goes where the office said, if it said.
@@ -702,6 +723,7 @@ interface Group {
   department: Department
   category: string
   valueCents: number | null
+  dayCents: number | null
   /** New items of it the list adds, in row order, and its items here in stock. */
   added: string[]
 }
@@ -754,13 +776,22 @@ export function previewStockList(
     if (!r.name) continue
     const k = norm(r.name)
     let g = groups.get(k)
-    if (!g) groups.set(k, (g = { key: k, name: r.name, known: productByName.get(k), rows: [], isCase: false, department: 'other', category: '', valueCents: null, added: [] }))
+    if (!g) groups.set(k, (g = { key: k, name: r.name, known: productByName.get(k), rows: [], isCase: false, department: 'other', category: '', valueCents: null, dayCents: null, added: [] }))
     g.rows.push(r)
   }
   for (const g of groups.values()) {
     let value: { cents: number; row: number } | undefined
     let department: { is: Department; row: number } | undefined
+    let day: { cents: number; row: number } | undefined
     for (const r of g.rows) {
+      if (r.dayCents !== null) {
+        if (!day) day = { cents: r.dayCents, row: r.input.row }
+        else if (day.cents !== r.dayCents)
+          r.problems.push({
+            field: 'dayPrice',
+            text: `Row ${day.row} gives ${g.name} a day price of ${valueLabel(day.cents)}; this row says ${valueLabel(r.dayCents)}. Make them the same, or clear one.`,
+          })
+      }
       if (r.valueCents !== null) {
         if (!value) value = { cents: r.valueCents, row: r.input.row }
         else if (value.cents !== r.valueCents)
@@ -780,6 +811,7 @@ export function previewStockList(
       if (!g.category && r.category) g.category = r.category
     }
     g.valueCents = value?.cents ?? null
+    g.dayCents = day?.cents ?? null
     g.department = department?.is ?? 'other'
   }
   const groupOf = (r: Read) => (r.name ? groups.get(norm(r.name)) : undefined)
@@ -973,7 +1005,7 @@ export function previewStockList(
   }
 
   // The plan, and each row's words.
-  const plan: StockPlan = { places: [...newPlaces].map(([k, p]) => ({ key: `place:${k}`, ...p })), products: [], productChanges: [], items: [], changes: [], counts: [] }
+  const plan: StockPlan = { places: [...newPlaces].map(([k, p]) => ({ key: `place:${k}`, ...p })), products: [], productChanges: [], items: [], changes: [], counts: [], prices: [] }
   const modelRef = (g: Group): StockRef => (g.known ? { id: g.known.id } : { key: `product:${g.key}` })
   // Counted rows by product and where, so two rows counting one thing in one place are marked, and labelling takes from a count only the list leaves alone.
   const countedRows = new Map<string, Read>()
@@ -1006,7 +1038,8 @@ export function previewStockList(
       const patMonths = patDays ? LIST_PAT_MONTHS : null
       plan.products.push({ key: `product:${g.key}`, row: first.input.row, name: g.name, department: g.department, category: g.category, tracking, isCase: g.isCase, valueCents: g.valueCents, patMonths, notes: notes.slice(0, 2000) })
       const how = !numbered ? 'counted' : g.isCase ? 'numbered, holds other kit' : g.rows.some(makesItems) ? 'numbered' : 'numbered, counted until labelled'
-      doing(first).does.push(`New product, ${how}${patMonths ? `, a PAT every ${patMonths} months` : ''}`)
+      if (g.dayCents !== null) plan.prices.push({ row: first.input.row, model: { key: `product:${g.key}` }, dayCents: g.dayCents })
+      doing(first).does.push(`New product, ${how}${patMonths ? `, a PAT every ${patMonths} months` : ''}${g.dayCents !== null ? `, ${dayLabel(g.dayCents)}` : ''}`)
     } else {
       const k = g.known
       const change: PlannedProductChange = { id: k.id, name: k.name, row: first.input.row }
@@ -1032,8 +1065,12 @@ export function previewStockList(
         change.notes = withList
         parts.push('notes added to')
       }
+      // The list fills a price list that has none for it, as it fills a blank value; a price set here stays.
+      const prices = k.dayCents === null && g.dayCents !== null
+      if (prices) plan.prices.push({ row: first.input.row, model: { id: k.id }, dayCents: g.dayCents! })
+      if (parts.length) plan.productChanges.push(change)
+      if (prices) parts.push(`day price ${valueLabel(g.dayCents!)}`)
       if (parts.length) {
-        plan.productChanges.push(change)
         const s = doing(first)
         s.does.push(`Updates ${k.name}: ${inWords(parts)}`)
         s.updates = true
@@ -1160,6 +1197,7 @@ export function previewStockList(
       g?.known ? '' : DEPARTMENT_LABELS[r.department ?? g?.department ?? 'other'],
       r.category,
       r.valueCents !== null ? valueLabel(r.valueCents) : '',
+      r.dayCents !== null ? dayLabel(r.dayCents) : '',
       r.patDue ? `PAT due ${fullDayLabel(r.patDue)}` : '',
     ].filter(Boolean)
     return {

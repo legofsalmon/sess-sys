@@ -190,3 +190,20 @@ test('keeps an item’s long log whole when a change arrives after older entries
   const serials = (await entries.allTextContents()).map((t) => /S(\d+)$/.exec(t)?.[1]).filter(Boolean).map(Number)
   expect(serials).toEqual(Array.from({ length: serials.length }, (_, i) => 106 - i))
 })
+
+test('reads Current RMS’s exports chosen together into one counted list, and says which one is missing', async ({ browser }) => {
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await ready(office, '#stock/import')
+  const file = office.getByLabel('Stock list file')
+  await file.setInputFiles('docs/samples/current-rms/products.csv')
+  await expect(office.getByRole('alert')).toHaveText(
+    'From Current RMS, choose the products and the stock levels together, and the rates if you have them. Missing: the stock levels.'
+  )
+  await file.setInputFiles(['docs/samples/current-rms/products.csv', 'docs/samples/current-rms/stock-levels.csv', 'docs/samples/current-rms/rates.csv'])
+  // No column step: the list has the headers the bring-in knows. Corvo K12 is here from the made-up list, so it's filled, not made.
+  const read = office.getByRole('region', { name: 'What was read' })
+  await expect(read).toContainText('4 products and 11 pieces of kit from Current RMS, with the rates. Everything comes in counted, to be labelled later.')
+  const k12 = office.getByRole('region', { name: 'Rows' }).getByRole('listitem', { name: 'Row 2' })
+  await expect(k12).toContainText('2 counted · €1,250 · €60 a day')
+  await expect(k12).toContainText('Updates Corvo K12: day price €60')
+})
