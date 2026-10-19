@@ -66,6 +66,7 @@ test("a job's notes become kit lines, checked first, and reading them again adds
   await newProduct(page, amp, 4)
   await jobWithNotes(page, job, `Load in from the north gate.\n\nAudio\n4 x ${speaker}\n2x D20 ${id}\n1 x Wedding arch ${id}\n\nTransport and labour\n1 x Luton van\n\n5.00pm - Crew call`)
 
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
   const kit = page.getByRole('region', { name: 'Kit' })
   await expect(kit.locator('.notes-kit-link')).toContainText("The notes list 3 lines of kit; 2 aren't on the job yet, 1 with no product found.")
   await kit.getByRole('link', { name: 'Kit from the notes' }).click()
@@ -149,5 +150,6 @@ test('Kit in the notes adds every job with nothing to check in one go, with no s
   await ready(laptop, '#jobs')
   await laptop.getByLabel('Find').fill(sure)
   await laptop.locator('.job-row', { hasText: sure }).click()
+  await laptop.getByRole('tab', { name: 'Kit and vans' }).click()
   await expect(laptop.getByRole('region', { name: 'Kit' }).getByRole('article', { name: `6 × ${speaker}` })).toBeVisible()
 })

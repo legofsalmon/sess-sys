@@ -30,6 +30,7 @@ test('the crew chief’s show pack, for a phase and, with no signal, for the who
   await page.locator('.job-row', { hasText: 'Harbour Lights Festival' }).click()
 
   // One of the speakers goes out with the job, so its number is on the pack's kit.
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
   await page.getByRole('link', { name: 'Pick list' }).click()
   const where = await page.getByRole('article', { name: 'd&b Y10P' }).getByRole('list', { name: 'Where to find them' }).textContent()
   const number = /SH-\d{6}/.exec(where ?? '')![0]
@@ -38,6 +39,7 @@ test('the crew chief’s show pack, for a phase and, with no signal, for the who
   await expect(page.getByRole('status', { name: 'Last scan' })).toContainText(`${number} d&b Y10P`)
   await page.goBack()
 
+  await page.getByRole('tab', { name: /^Phases/ }).click()
   const show = page.getByRole('article', { name: 'Show' })
   await show.locator('summary').click()
   await show.getByRole('link', { name: 'Call sheet' }).click()
@@ -86,6 +88,7 @@ test('the crew chief’s show pack, for a phase and, with no signal, for the who
   // No signal: the whole job's, from its page, from what the phone holds.
   await page.goBack()
   await context.setOffline(true)
+  await page.getByRole('tab', { name: 'Show pack' }).click()
   const job = page.getByRole('region', { name: 'Show pack' })
   await expect(job).toContainText('for the whole job')
   const [jobDownload] = await Promise.all([page.waitForEvent('download'), job.getByRole('button', { name: 'Download show pack' }).click()])

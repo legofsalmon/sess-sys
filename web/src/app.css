@@ -334,8 +334,8 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
   .app { max-width: 760px; }
 }
 @media (min-width: 1200px) {
-  .app:not(.beside, .plan, .history, .signin, .preview) { max-width: 1200px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .app:not(.beside, .plan, .history, .signin, .preview) > :not(.card) { grid-column: 1 / -1; }
+  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) { max-width: 1200px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) > :not(.card) { grid-column: 1 / -1; }
   .menu .places { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
 

@@ -298,7 +298,7 @@ function ComingUp({ person, view, onArchived }: { person: PersonView; view: View
             return (
               <li key={o.id}>
                 {c.projectId ? (
-                  <a className="job-row" href={`#jobs/${c.projectId}`}>
+                  <a className="job-row" href={`#jobs/${c.projectId}/crew`}>
                     {inner}
                   </a>
                 ) : (
@@ -526,7 +526,7 @@ function Worked({ person }: { person: PersonView }) {
               return (
                 <li key={w.callId}>
                   {w.projectId ? (
-                    <a className="job-row" href={`#jobs/${w.projectId}`}>
+                    <a className="job-row" href={`#jobs/${w.projectId}/crew`}>
                       {inner}
                     </a>
                   ) : (

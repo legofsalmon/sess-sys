@@ -140,6 +140,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await newJob.getByLabel('Phase 1 to').fill(fromToday(3))
   await newJob.getByRole('button', { name: 'Add job' }).click()
   await expect(page.getByRole('heading', { level: 1, name: job })).toBeVisible()
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
   await page.getByRole('button', { name: 'Add kit' }).click()
   const kit = page.getByRole('form', { name: 'Add kit' })
   await kit.getByLabel('Product').fill(speaker)
