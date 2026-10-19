@@ -275,7 +275,7 @@ design system asks (0 to 4; a 3 is fixed or named).
 | Staff can't see their own bookings in the app | S | 2 | Fixed: Home for me |
 | No money anywhere | D | 2 | Fixed: Jobs › Money and each job's quote, for the office and directors ([Decision 0042](adr/0042-quotes-prices-and-a-money-view.md)) |
 | Everyone signed in can do everything | D | 2 | Fixed: five roles decide what each person can change ([Decision 0034](adr/0034-roles-and-what-each-can-change.md)). Home stays a view anyone can switch |
-| Everyone signed in can read everything, rates and links included | D, S | 2 | Fixed for money (Decision 0042), and for crew rates, timesheet amounts and private links (Decision 0046). Phones and certificates are still read by all staff (Decision 0034, open) |
+| Everyone signed in can read everything, rates and links included | D, S | 2 | Fixed for money (Decision 0042), for crew rates, timesheet amounts and private links (Decision 0046), and for other people's emails, notes, documents and what they wrote about time off ([Decision 0062](adr/0062-what-crew-and-freelancers-read-of-other-people.md)). Staff crew keep phone numbers |
 | Nothing knows which van is free, or who can drive it | O, W | 3 | Fixed: Stock › Vehicles, booked on the job with a driver; clashes in the planner ([Decision 0047](adr/0047-vans-and-drivers.md)). Licence categories open |
 
 ## Seeing it as each of them
@@ -295,8 +295,8 @@ the same bar.
   Each persona with an account is a role that decides what they can
   change; on the demo, *See it as…* holds the browser to that role and to
   what it reads. Rates, timesheet amounts and links are narrowed
-  (Decision 0046); next is whether staff crew need every phone number and
-  certificate.
+  (Decision 0046), and so are other people's details and documents
+  (Decision 0062); staff crew keep phone numbers.
 - Try Home with the office and the warehouse during the office trial, and
   write what they did that this page didn't predict into the design
   system's learnings.

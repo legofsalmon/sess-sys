@@ -142,12 +142,18 @@ export function Documents({ person }: { person: PersonView }) {
   const [changing, setChanging] = useState<string | undefined>()
   // Adding, changing and removing them is crew's (audit finding 9); anyone can open one.
   const mayChange = useAccess().can('crew')
+  const hidden = (view.reading.documents ?? 'all') !== 'all' && person.id !== view.reading.personId
   return (
     <div className="documents" role="group" aria-label={`Documents: ${person.name}`}>
       <p className="muted">
         <b>Documents</b>
       </p>
-      {docs.length === 0 && <p className="hint">None yet: their insurance, and a photo of each certificate's card.</p>}
+      {/* Other people's documents aren't sent to staff crew or freelancers (ADR 0062): said, so they aren't taken for none. */}
+      {hidden ? (
+        <p className="hint">Your role doesn't see {person.name}'s documents. The office, directors and heads of department do.</p>
+      ) : (
+        docs.length === 0 && <p className="hint">None yet: their insurance, and a photo of each certificate's card.</p>
+      )}
       {docs.map((d) =>
         changing === d.id && mayChange ? (
           <DocumentForm key={d.id} person={person} doc={d} onDone={() => setChanging(undefined)} />

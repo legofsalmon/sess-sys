@@ -2,7 +2,24 @@ import { describe, expect, it } from 'vitest'
 import type { Mutation } from '../src/commands.ts'
 import { departmentForRole, departmentOf, departmentOfPeople, type CrewCall, type Offer, type Person } from '../src/crew.ts'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { callAsRead, changesLinkOf, offerAsRead, readsLinkOf, personAsRead, READS_EVERYTHING, readingFor, readsEverything, sameReading, setsRates, timesheetAsRead, type Reading } from '../src/reading.ts'
+import {
+  callAsRead,
+  changesLinkOf,
+  notesAsRead,
+  offerAsRead,
+  readsDocumentOf,
+  readsEveryRate,
+  readsLinkOf,
+  readsRatesIn,
+  personAsRead,
+  READS_EVERYTHING,
+  readingFor,
+  readsEverything,
+  sameReading,
+  setsRates,
+  timesheetAsRead,
+  type Reading,
+} from '../src/reading.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import type { Timesheet } from '../src/timesheets.ts'
@@ -120,9 +137,9 @@ describe('what each role reads', () => {
   it('is everything for the office, directors and with roles off; for others, rates and links are narrowed', () => {
     for (const role of ['director', 'office', null] as const) expect(readsEverything(readingFor(role))).toBe(true)
     expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio' })
-    expect(readingFor('head', { department: 'Audio', headsSeeRates: true }).rates).toBe(true)
-    expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own' })
-    expect(crew).toEqual({ rates: false, links: 'own', personId: own })
+    expect(readingFor('head', { department: 'Audio', headsSeeRates: true })).toMatchObject({ rates: true, ratesBy: 'department' })
+    expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own', details: 'own', documents: 'own' })
+    expect(crew).toEqual({ rates: false, links: 'own', personId: own, details: 'phones', documents: 'own' })
   })
 
   it('leaves a rate and link out of a person, saying so, and never out of their own', () => {
@@ -177,6 +194,73 @@ describe('what each role reads', () => {
     expect(sameReading(head, { ...head, department: 'LX' })).toBe(false)
     expect(sameReading(crew, readingFor('crew', { personId: 'someone else' }))).toBe(false)
     expect(sameReading(crew, undefined)).toBe(false)
+    // What's read of other people (ADR 0062) counts too, so a device reads its copy again when it changes.
+    expect(sameReading(crew, { ...crew, details: 'own' })).toBe(false)
+    expect(sameReading(crew, { ...crew, documents: undefined, details: undefined })).toBe(false)
+    const ratedHead = readingFor('head', { personId: own, department: 'Audio', headsSeeRates: true })
+    expect(sameReading(ratedHead, { ...ratedHead, ratesBy: undefined })).toBe(false)
+    expect(sameReading(ratedHead, { ...ratedHead, department: 'LX' })).toBe(false)
+  })
+})
+
+/** What staff crew and freelancers read of other people, and a head their own department's rates (ADR 0062). */
+describe('what staff crew and freelancers read of other people', () => {
+  const own = 'me'
+  const crew = readingFor('crew', { personId: own })
+  const freelancer = readingFor('freelancer', { personId: own })
+  const head = readingFor('head', { personId: own, department: 'Audio', headsSeeRates: true })
+  const someone = person('s', {
+    email: 'sean@example.com',
+    otherEmails: ['sean@old.ie'],
+    phone: '+353871234567',
+    notes: 'Bad back',
+    company: { name: 'Seán Sound Ltd', vatNumber: 'IE1', croNumber: null },
+    department: 'Audio',
+  })
+
+  it('gives staff crew a phone number but not the email, notes or company', () => {
+    const read = personAsRead(someone, crew)
+    expect(read).toMatchObject({ phone: '+353871234567', email: null, notes: '', company: null, detailsHidden: true })
+    expect(read.otherEmails).toBeUndefined()
+    // The name, skills, department and certificates stay, so the crew screens work.
+    expect(read).toMatchObject({ name: someone.name, department: 'Audio', certificates: {} })
+  })
+
+  it('gives a freelancer none of it, and everyone their own', () => {
+    expect(personAsRead(someone, freelancer)).toMatchObject({ phone: null, email: null, detailsHidden: true })
+    expect(personAsRead(person(own, { email: 'me@example.com' }), freelancer)).toMatchObject({ email: 'me@example.com' })
+    expect(personAsRead(someone, head)).toMatchObject({ email: 'sean@example.com', notes: 'Bad back' })
+    expect(personAsRead(someone, head).detailsHidden).toBeUndefined()
+  })
+
+  it("sends only their own documents to staff crew and freelancers", () => {
+    expect(readsDocumentOf(crew, { personId: 's' })).toBe(false)
+    expect(readsDocumentOf(freelancer, { personId: own })).toBe(true)
+    expect(readsDocumentOf(head, { personId: 's' })).toBe(true)
+    expect(readsDocumentOf(READS_EVERYTHING, { personId: 's' })).toBe(true)
+  })
+
+  it('keeps the days of time off and the answers, without what was written', () => {
+    const away = { id: 'u', personId: 's', start: '2026-10-20', end: '2026-10-21', note: 'Hospital', source: 'ops' as const }
+    expect(notesAsRead(away, crew)).toEqual({ ...away, note: '' })
+    const leave = { id: 'l', personId: 's', note: 'Wedding', reason: 'Too busy that week' }
+    expect(notesAsRead(leave, freelancer)).toEqual({ ...leave, note: '', reason: '' })
+    expect(notesAsRead({ ...leave, personId: own }, crew)).toEqual({ ...leave, personId: own })
+    expect(notesAsRead(leave, head)).toBe(leave)
+    expect(offerAsRead(offer('o', 'other', { note: 'Can do half days' }), crew)).toMatchObject({ note: '', rateHidden: true })
+  })
+
+  it("gives a head who reads rates their own department's, and not everyone's", () => {
+    expect(readsRatesIn(head, 'audio')).toBe(true)
+    expect(readsRatesIn(head, 'LX')).toBe(false)
+    expect(readsRatesIn(head, null)).toBe(false)
+    expect(readsEveryRate(head)).toBe(false)
+    expect(readsEveryRate(READS_EVERYTHING)).toBe(true)
+    expect(callAsRead(call('c', { department: 'Audio' }), head).rateHidden).toBeUndefined()
+    expect(callAsRead(call('c', { department: 'LX' }), head)).toMatchObject({ dayRateCents: null, rateHidden: true })
+    expect(personAsRead(person('l', { department: 'LX' }), head)).toMatchObject({ dayRateCents: null, rateHidden: true })
+    expect(offerAsRead(offer('o', 'other'), head, 'Audio').rateHidden).toBeUndefined()
+    expect(offerAsRead(offer('o', 'other'), head, 'LX')).toMatchObject({ rateHidden: true })
   })
 })
 

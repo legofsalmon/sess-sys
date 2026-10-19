@@ -432,7 +432,7 @@ describe('what each role reads', () => {
     await ok('offer.send', { id: 'sean-lx', callId: 'lx', personId: 'sean', override: false })
     const s = { sh_session: await signIn(sean) }
     const feed = await pull(s)
-    expect(feed.reading).toEqual({ rates: false, links: 'own', personId: 'sean' })
+    expect(feed.reading).toEqual({ rates: false, links: 'own', personId: 'sean', details: 'phones', documents: 'own' })
     expect(leaks(feed, 'sean')).toEqual({ rates: [], links: [] })
     // The records are all there, so the screens work, and say what's left out.
     expect(feed.of('crewCall', 'lx')).toMatchObject({ role: 'Stagehand', dayRateCents: null, rateHidden: true })
@@ -500,10 +500,52 @@ describe('what each role reads', () => {
     expect((await send(app, h, 'messages.prompt', { on: true })).reason?.code).toBe('forbidden')
     await ok('reading.heads', { rates: true })
     feed = await pull(h)
-    expect(feed.reading).toMatchObject({ rates: true, links: 'department' })
-    expect(feed.of('person', 'niamh')).toMatchObject({ dayRateCents: 28000, linkToken: '', linkHidden: true })
+    expect(feed.reading).toMatchObject({ rates: true, ratesBy: 'department', links: 'department' })
+    // Her own department's rates (ADR 0062): Dara's and the Audio call's, and not Niamh's or the LX call's.
+    expect(feed.of('person', 'dara')).toMatchObject({ dayRateCents: 25000 })
+    expect(feed.of('person', 'niamh')).toMatchObject({ dayRateCents: null, rateHidden: true, linkToken: '', linkHidden: true })
+    expect(feed.of('crewCall', 'lx')).toMatchObject({ dayRateCents: null, rateHidden: true })
+    expect(feed.of('offer', 'niamh-lx')).toMatchObject({ dayRateCents: null, rateHidden: true })
     expect(feed.of('timesheet', 'dara-sound')).toMatchObject({ extras: [{ cents: 2500 }] })
     expect(await send(app, h, 'call.update', { id: 'sound', dayRateCents: 33000 })).toMatchObject({ status: 'applied' })
+    // Another department's rate is the office's, and so is one on a call she makes for it.
+    for (const r of [
+      await send(app, h, 'call.update', { id: 'lx', dayRateCents: 1 }),
+      await send(app, h, 'call.create', callFor('rig', 'Rigger', { department: 'LX', dayRateCents: 30000 })),
+    ])
+      expect(r).toMatchObject({ status: 'rejected', reason: { code: 'forbidden', message: expect.stringMatching(/^You see the rates of your own department's/) } })
+    expect(await send(app, h, 'call.create', callFor('mon', 'Monitors', { department: 'Audio', dayRateCents: 30000 }))).toMatchObject({ status: 'applied' })
+    // An edit to Niamh keeps the rate she can't see.
+    expect(await send(app, h, 'person.upsert', { ...staff('niamh', 'Niamh Byrne', null, { kind: 'freelancer', department: 'LX' }), dayRateCents: 1 })).toMatchObject({ status: 'applied' })
+    expect((await pull(c)).of('person', 'niamh')).toMatchObject({ dayRateCents: 28000 })
+    // The history names everyone's, so it tells her none of the figures.
+    expect(JSON.stringify((await app.inject({ url: '/api/history', cookies: h })).json())).not.toMatch(/€/)
+  })
+
+  it("sends staff crew a colleague's phone but not their email, notes, documents or what they wrote about time off", async () => {
+    const { app, c, signIn, ok, pull } = await crewed()
+    await ok('person.upsert', staff('dara', 'Dara Quinn', 'dara@example.com', { kind: 'freelancer', department: 'Audio', dayRateCents: 25000, phone: '+353871234567', notes: 'Bad back' }))
+    await ok('document.save', { id: 'd-dara', personId: 'dara', kind: 'insurance', title: 'Public liability insurance', expires: null })
+    await ok('document.save', { id: 'd-sean', personId: 'sean', kind: 'insurance', title: 'Public liability insurance', expires: null })
+    await ok('unavailability.add', { id: 'away', personId: 'dara', start: day(5), end: day(6), note: 'Hospital' })
+    const s = { sh_session: await signIn(sean) }
+    const feed = await pull(s)
+    expect(feed.of('person', 'dara')).toMatchObject({ name: 'Dara Quinn', phone: '+353871234567', email: null, notes: '', detailsHidden: true })
+    expect(feed.of('document', 'd-dara')).toBeUndefined()
+    expect(feed.of('document', 'd-sean')).toMatchObject({ personId: 'sean' })
+    expect(feed.of('unavailability', 'away')).toMatchObject({ start: day(5), note: '' })
+    // Nor its file, nor the note in the history.
+    const file = await app.inject({ url: '/api/documents/d-dara/file', cookies: s })
+    expect(file.statusCode).toBe(403)
+    expect(file.json().error).toMatch(/^Only the office, directors and heads of department/)
+    expect(JSON.stringify((await app.inject({ url: '/api/history', cookies: s })).json())).not.toContain('Hospital')
+    expect(JSON.stringify((await app.inject({ url: '/api/history', cookies: c })).json())).toContain('Hospital')
+
+    // A freelancer signed in reads no one's phone either; the office reads everything.
+    await ok('person.role', { id: 'sean', role: 'freelancer' })
+    expect((await pull(s)).of('person', 'dara')).toMatchObject({ phone: null, email: null })
+    expect((await pull(c)).of('person', 'dara')).toMatchObject({ email: 'dara@example.com', notes: 'Bad back' })
+    expect((await pull(c)).of('document', 'd-dara')).toBeDefined()
   })
 
   it('tells the history without figures to a role without rates', async () => {

@@ -657,6 +657,9 @@ export class SyncClient {
         if (res.reading) this.state.reading = res.reading
         else delete this.state.reading
         if (!money) for (const name of MONEY_ENTITY_NAMES) this.replaceTable(name)
+        // Other people's documents are left out of the feed, not cut down (ADR 0062), so reading again wouldn't take back
+        // the ones it holds: it lets go of them all, and its own come back as it reads.
+        if (reread && (res.reading?.documents ?? 'all') !== 'all') this.replaceTable('document')
         if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
           this.state.held = Math.max(this.state.held ?? 0, this.state.cursor)
           this.state.cursor = 0

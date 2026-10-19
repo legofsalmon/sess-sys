@@ -132,6 +132,12 @@ function Who({ person, view }: { person: PersonView; view: View }) {
           )}
         </div>
       )}
+      {/* Not sent to staff crew or freelancers (ADR 0062): said, so it isn't taken for none. */}
+      {person.detailsHidden && (
+        <p className="hint">
+          Your role doesn't see {person.name}'s {person.phone ? 'email, notes or company' : 'phone, email, notes or company'}. The office has them.
+        </p>
+      )}
       {editing ? (
         <PersonForm
           initial={person}
