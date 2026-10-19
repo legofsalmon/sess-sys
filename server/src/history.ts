@@ -112,8 +112,10 @@ const SELECT = `
       SELECT CASE WHEN m.sent_at IS NULL THEN NULL ELSE greatest(m.sent_at - m.created_at, interval '0') END AS waited
     ) w
     LEFT JOIN users u ON u.id = m.user_id
-    LEFT JOIN people p ON (m.client_id LIKE 'link:%' AND p.id = substr(m.client_id, 6))
-                       OR (m.client_id LIKE 'calendar:%' AND p.id = substr(m.client_id, 10))`
+    -- Someone combined with another (ADR 0055) answered as the one person, whose name it now is.
+    LEFT JOIN person_merges pm ON pm.from_id = CASE WHEN m.client_id LIKE 'link:%' THEN substr(m.client_id, 6) WHEN m.client_id LIKE 'calendar:%' THEN substr(m.client_id, 10) END
+    LEFT JOIN people p ON (m.client_id LIKE 'link:%' AND p.id = coalesce(pm.into_id, substr(m.client_id, 6)))
+                       OR (m.client_id LIKE 'calendar:%' AND p.id = coalesce(pm.into_id, substr(m.client_id, 10)))`
 
 /** One page of the history, newest first. */
 export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true): Promise<HistoryPage> {
@@ -128,7 +130,11 @@ export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates 
   }
   if (query.who?.startsWith('user:')) where.push(`m.user_id = ${param(query.who.slice(5))}`)
   // A freelancer answers on their link or in Google Calendar (ADR 0009): both are theirs.
-  else if (query.who?.startsWith('link:')) where.push(`m.client_id IN (${param(query.who)}, ${param(`calendar:${query.who.slice(5)}`)})`)
+  else if (query.who?.startsWith('link:')) {
+    // With the answers of anyone combined with them (ADR 0055): they were the same person.
+    const id = param(query.who.slice(5))
+    where.push(`m.client_id IN (SELECT k || i FROM (SELECT ${id}::text AS i UNION SELECT from_id FROM person_merges WHERE into_id = ${id}) ids, (VALUES ('link:'), ('calendar:')) v(k))`)
+  }
   else if (query.who) where.push('false')
   if (query.id) {
     const id = param(query.id)
@@ -406,6 +412,13 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':
       return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
+    // The others' names as they were: their last copies stay in the feed (ADR 0055).
+    case 'person.merge': {
+      const others = Array.isArray(a.from) ? a.from : []
+      const names = others.slice(0, 5).map(person)
+      if (others.length > 5) names.push(`${others.length - 5} more`)
+      return `Made ${inWords(names.length ? names : ['others'])} part of ${person(a.id)}, as one person`
+    }
     // No name: the history is read by every member of staff, and keeps this for good (ADR 0027).
     case 'person.erase':
       return "Erased a person's details on request"

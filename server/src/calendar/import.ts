@@ -108,7 +108,9 @@ export function sourceEvent(ev: GoogleEvent): SourceEvent {
 export async function readApp(q: Queryable, from: string, to: string): Promise<AppData> {
   // One after another: inside a transaction they share one connection.
   // Someone who has left isn't matched by email, so an old calendar can't book them again.
-  const people = await q.query<{ id: string; name: string; email: string | null }>('SELECT id, name, email FROM people WHERE NOT archived ORDER BY id')
+  const people = await q.query<{ id: string; name: string; email: string | null; otherEmails: string[] }>(
+    'SELECT id, name, email, other_emails AS "otherEmails" FROM people WHERE NOT archived ORDER BY id'
+  )
   const venues = await q.query<{ id: string; name: string; address: string }>('SELECT id, name, address FROM venues ORDER BY id')
   const jobs = await q.query<AppData['jobs'][number]>(
     `SELECT p.id, p.name, p.status, p.kind, p.venue_id AS "venueId", p.source_calendar AS "sourceCalendar",
@@ -385,6 +387,7 @@ async function importedPeopleToGo(q: Queryable): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM phases ph WHERE ph.contact_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM vehicle_bookings b WHERE b.driver_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM erasures e WHERE e.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM person_merges pm WHERE pm.into_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM calendar_link cl WHERE cl.state <> 'off' AND lower(trim(cl.account_email)) = lower(trim(coalesce(p.email, ''))))
       ORDER BY p.id`,
     [PERSON_NOTE]

@@ -3,7 +3,7 @@ import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { stopOwnCalendar } from './own-calendars.ts'
-import { awayOn, getAway, getCall, getCalls, getOffer, getPerson, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
+import { awayOn, getAway, getCall, getCalls, getOffer, getPerson, HAS_EMAIL, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
 
 /**
  * The crew rules the server enforces, whatever device or link a request
@@ -279,8 +279,8 @@ async function checkWhoSignsIn(ctx: Ctx, was: Person | undefined, next: { id: st
   }
   if (!emailChanged || !next.email?.trim()) return
   const { rows } = await ctx.tx.query<{ name: string }>(
-    'SELECT name FROM people WHERE id <> $1 AND NOT archived AND lower(trim(email)) = lower(trim($2)) ORDER BY id LIMIT 1',
-    [next.id, next.email]
+    `SELECT name FROM people WHERE id <> $1 AND NOT archived AND ${HAS_EMAIL('$2')} ORDER BY id LIMIT 1`,
+    [next.id, next.email.trim().toLowerCase()]
   )
   if (rows[0]) throw new Refused({ code: 'conflict', message: emailInUseRefusal(rows[0].name) })
 }
@@ -359,6 +359,9 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'person.newLink'(ctx, a) {
     const { rows } = await ctx.tx.query('UPDATE people SET link_token = $2 WHERE id = $1 RETURNING id', [a.id, newLinkToken()])
     if (!rows.length) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    // The links of anyone they were combined with (ADR 0055) stop with theirs: a new link is asked for when one has leaked.
+    // The rows stay, saying who was made part of them, for the history.
+    await ctx.tx.query(`UPDATE person_merges SET link_token = 'stopped:' || from_id WHERE into_id = $1`, [a.id])
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))
   },
 
@@ -379,8 +382,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     } else if (person.email?.trim()) {
       // Back from the archive, their email must still be theirs alone, or an account could find either of them (ADR 0049).
       const { rows } = await ctx.tx.query<{ name: string }>(
-        'SELECT name FROM people WHERE id <> $1 AND NOT archived AND lower(trim(email)) = lower(trim($2)) ORDER BY id LIMIT 1',
-        [person.id, person.email]
+        `SELECT name FROM people WHERE id <> $1 AND NOT archived AND ${HAS_EMAIL('$2')} ORDER BY id LIMIT 1`,
+        [person.id, person.email.trim().toLowerCase()]
       )
       if (rows[0]) throw new Refused({ code: 'conflict', message: emailBackRefusal(person.name, rows[0].name) })
     }

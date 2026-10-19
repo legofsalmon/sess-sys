@@ -46,6 +46,8 @@ interface Gone {
   entity?: EntityName
   /** Which rows are theirs; `person_id = $1` when not said. A table devices see needs an `id`. */
   theirs?: string
+  /** The column that names them, when it isn't `person_id` (and `theirs` says it is them). */
+  column?: string
   /** What goes with the rows outside the database, done first in the same change: a document's file in the storage. */
   first?: (tx: Queryable, personId: string) => Promise<void>
 }
@@ -76,6 +78,9 @@ export const GONE: readonly Gone[] = [
     theirs: `person_id = $1 AND NOT (EXISTS (SELECT 1 FROM calendar_link WHERE state <> 'off' AND invites)
       AND day_id IN (SELECT id FROM calendar_days WHERE day >= ${TODAY} AND state <> 'removed'))`,
   },
+  // The links of anyone they were combined with (ADR 0055), which opened them: secrets of theirs, so they go, and the
+  // old links stop with their own.
+  { table: 'person_merges', column: 'into_id', theirs: 'into_id = $1' },
 ]
 
 /** Records of their work that stay, without what they wrote themselves. */
@@ -164,6 +169,7 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
 const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden'>]: string } = {
   name: 'name',
   email: 'email',
+  otherEmails: 'other_emails',
   phone: 'phone',
   skills: 'skills',
   dayRateCents: 'day_rate_cents',
@@ -233,8 +239,10 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
     [personId, erasure.erasedAt, kept]
   )
   if (!before) return erasure
+  // Anyone they were combined with (ADR 0055) was them: what the history and the feed hold under those ids is theirs too.
+  const merged = await mergedInto(tx, personId)
   // Read before the copies that hold them are rewritten.
-  const details = await detailsOf(tx, personId)
+  const details = await detailsOf(tx, personId, merged)
   // First in the feed, so a device still holds their offers and leave when it hears, and can tell which of its changes were theirs.
   await emit(ctx, 'erasure', personId, erasure)
 
@@ -272,6 +280,7 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
   const values: Record<string, unknown> = {}
   for (const [field, column] of Object.entries(PERSON_COLUMNS)) values[column] = after[field as keyof typeof PERSON_COLUMNS]
   values.skills = JSON.stringify(after.skills)
+  values.other_emails = JSON.stringify(after.otherEmails ?? [])
   values.certificates = JSON.stringify(after.certificates)
   values.link_token = `erased-${randomBytes(18).toString('base64url')}`
   Object.assign(values, { company_name: null, company_vat_number: null, company_cro_number: null })
@@ -279,10 +288,27 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
   await tx.query(`UPDATE people SET ${columns.map((c, i) => `${c} = $${i + 2}`).join(', ')} WHERE id = $1`, [personId, ...columns.map((c) => values[c])])
   await tx.query(`UPDATE changes SET data = $2 WHERE entity = 'person' AND entity_id = $1 AND op = 'put'`, [personId, JSON.stringify(after)])
   await emit(ctx, 'person', personId, after)
+  // The copies of those they were combined with held the same details, and nothing reads them now but the history, which reads the name as it is.
+  if (merged.length)
+    await tx.query(`UPDATE changes SET data = jsonb_set($2::jsonb, '{id}', to_jsonb(entity_id)) WHERE entity = 'person' AND entity_id = ANY($1::text[]) AND op = 'put'`, [merged, JSON.stringify(after)])
 
   for (const userId of await accountsOf(tx, details.emails)) await eraseAccount(ctx, userId)
-  await stripHistory(tx, personId, records, nameNow, { name: kept === null && before.name !== ERASED_NAME ? before.name : undefined, ...details })
+  const name = kept === null && before.name !== ERASED_NAME ? before.name : undefined
+  for (const id of [personId, ...merged]) await stripHistory(tx, id, records, nameNow, { name: id === personId ? name : undefined, ...details })
   return erasure
+}
+
+/**
+ * Everyone made part of them (ADR 0055), by the links kept for them, and
+ * by the history, which still says so after a new link stopped the old ones.
+ */
+async function mergedInto(tx: Queryable, personId: string): Promise<string[]> {
+  const { rows } = await tx.query<{ id: string }>(
+    `SELECT from_id AS id FROM person_merges WHERE into_id = $1
+     UNION SELECT jsonb_array_elements_text(args->'from') FROM mutations WHERE name = 'person.merge' AND status = 'applied' AND args->>'id' = $1`,
+    [personId]
+  )
+  return rows.map((r) => r.id).filter((id) => id !== personId).sort()
 }
 
 /** Ids from a query on the person's id, and, given an entity, every id of theirs in the change feed, including records since removed. */
@@ -329,15 +355,17 @@ async function strip(ctx: Ctx, s: Stripped, ids: string[]) {
  * theirs as well (a shared number, or a second record for the same
  * person), so their history and their sign-in keep it.
  */
-async function detailsOf(tx: Queryable, personId: string): Promise<{ emails: string[]; phones: string[] }> {
+async function detailsOf(tx: Queryable, personId: string, merged: readonly string[] = []): Promise<{ emails: string[]; phones: string[] }> {
   const { rows } = await tx.query<{ email: string | null; phone: string | null }>(
-    `SELECT data->>'email' AS email, data->>'phone' AS phone FROM changes WHERE entity = 'person' AND entity_id = $1 AND op = 'put'
-     UNION SELECT email, phone FROM people WHERE id = $1`,
-    [personId]
+    `SELECT data->>'email' AS email, data->>'phone' AS phone FROM changes WHERE entity = 'person' AND entity_id = ANY($2::text[]) AND op = 'put'
+     UNION SELECT jsonb_array_elements_text(data->'otherEmails'), NULL FROM changes WHERE entity = 'person' AND entity_id = ANY($2::text[]) AND op = 'put' AND jsonb_typeof(data->'otherEmails') = 'array'
+     UNION SELECT email, phone FROM people WHERE id = $1
+     UNION SELECT jsonb_array_elements_text(other_emails), NULL FROM people WHERE id = $1`,
+    [personId, [personId, ...merged]]
   )
-  const { rows: others } = await tx.query<{ email: string | null; phone: string | null }>(`SELECT email, phone FROM people WHERE id <> $1`, [personId])
+  const { rows: others } = await tx.query<{ email: string | null; phone: string | null; other_emails: string[] }>(`SELECT email, phone, other_emails FROM people WHERE id <> $1`, [personId])
   const address = (e: string | null) => e?.trim().toLowerCase() ?? ''
-  const shared = { emails: new Set(others.map((o) => address(o.email))), phones: new Set(others.map((o) => phoneDigits(o.phone))) }
+  const shared = { emails: new Set(others.flatMap((o) => [address(o.email), ...(o.other_emails ?? [])])), phones: new Set(others.map((o) => phoneDigits(o.phone))) }
   const emails = rows.map((r) => address(r.email)).filter((e) => e && !shared.emails.has(e))
   const phones = rows.map((r) => r.phone?.trim() ?? '').filter((p) => p && !shared.phones.has(phoneDigits(p)))
   return { emails: [...new Set(emails)], phones: [...new Set(phones)] }

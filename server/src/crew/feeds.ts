@@ -97,6 +97,7 @@ export class Feeds {
     const before = new Map([...(this.built?.byLink.values() ?? [])].map((f) => [f.personId, f]))
     const codes = new Map<string, string>()
     const built: Built = { version, at: now.getTime(), byCode: new Map(), byLink: new Map() }
+    const mine = new Map<string, Feed>()
     for (const person of people) {
       // An archived person's feed stops with their link.
       if (person.archived) continue
@@ -110,6 +111,17 @@ export class Feeds {
       codes.set(person.linkToken, code)
       built.byCode.set(code, feed)
       built.byLink.set(person.linkToken, feed)
+      mine.set(person.id, feed)
+    }
+    // The links of anyone combined with them (ADR 0055), and those links' feed addresses, give the one person's feed.
+    const { rows: merged } = await this.db.query<{ into_id: string; link_token: string }>(`SELECT into_id, link_token FROM person_merges WHERE link_token NOT LIKE 'stopped:%' ORDER BY from_id`)
+    for (const m of merged) {
+      const feed = mine.get(m.into_id)
+      if (!feed) continue
+      const code = this.codes.get(m.link_token) ?? (await feedCodeFor(m.link_token))
+      codes.set(m.link_token, code)
+      built.byCode.set(code, feed)
+      built.byLink.set(m.link_token, feed)
     }
     this.codes = codes
     if (!this.built || this.built.version <= version) this.built = built

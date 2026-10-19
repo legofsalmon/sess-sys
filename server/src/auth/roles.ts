@@ -1,4 +1,5 @@
 import { roleForEmail, type Role, type RolePerson } from '@sh/shared'
+import { HAS_EMAIL } from '../crew/store.ts'
 import type { Queryable } from '../db.ts'
 
 /**
@@ -11,8 +12,8 @@ import type { Queryable } from '../db.ts'
  */
 export async function roleOfAccount(q: Queryable, email: string): Promise<{ role: Role; on: boolean; personId?: string; department?: string | null }> {
   const { rows } = await q.query<RolePerson & { department: string | null }>(
-    `SELECT id, kind, email, archived, role, department FROM people
-     WHERE (role = 'director' AND kind = 'staff' AND NOT archived) OR lower(trim(email)) = $1`,
+    `SELECT id, kind, email, other_emails AS "otherEmails", archived, role, department FROM people
+     WHERE (role = 'director' AND kind = 'staff' AND NOT archived) OR ${HAS_EMAIL('$1')}`,
     [email.trim().toLowerCase()]
   )
   const { role, on, personId } = roleForEmail(rows, email)

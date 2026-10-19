@@ -11,6 +11,7 @@ import { notesKitCommandSchemas } from './kit-notes.ts'
 import { labelCommandSchemas } from './labels.ts'
 import { lateCommandSchemas } from './late.ts'
 import { leaveCommandSchemas } from './leave.ts'
+import { mergeCommandSchemas } from './merge-people.ts'
 import { moveCommandSchemas } from './moves.ts'
 import { officeCommandSchemas } from './office.ts'
 import { stockCommandSchemas } from './stock.ts'
@@ -31,6 +32,7 @@ const id = z.string().min(1).max(64)
 
 export const commandSchemas = {
   ...crewCommandSchemas,
+  ...mergeCommandSchemas,
   ...jobCommandSchemas,
   ...stockCommandSchemas,
   ...kitCommandSchemas,

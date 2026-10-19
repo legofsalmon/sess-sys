@@ -69,6 +69,7 @@ import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 import { CrewViews } from './CrewViews.tsx'
 import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
+import { useSamePeople } from './Combine.tsx'
 import { Avatar, Avatars } from '../Picture.tsx'
 
 /**
@@ -1748,11 +1749,16 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
 function NamedFromAddress({ view }: { view: View }) {
   const mayCrew = useAccess().can('crew')
   const n = view.crew.people.filter(namedFromAddress).length
-  if (!mayCrew || n === 0) return null
+  // And anyone who looks brought in twice, under two addresses (ADR 0055).
+  const twice = useSamePeople(view).length
+  if (!mayCrew || (n === 0 && twice === 0)) return null
+  const said = [
+    twice > 0 && `${twice === 1 ? '1 person looks' : `${twice.toLocaleString('en-IE')} people look`} brought in twice`,
+    n > 0 && `${n === 1 ? '1 person is' : `${n.toLocaleString('en-IE')} people are`} still named from their email address`,
+  ].filter(Boolean)
   return (
     <p className="hint">
-      {n === 1 ? '1 person is' : `${n.toLocaleString('en-IE')} people are`} still named from their email address.{' '}
-      <a href="#jobs/tidy">Give them their names</a>
+      {said.join(', and ')}. <a href="#jobs/tidy">{twice > 0 ? 'Tidy them up' : 'Give them their names'}</a>
     </p>
   )
 }

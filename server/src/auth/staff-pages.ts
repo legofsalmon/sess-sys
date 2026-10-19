@@ -1,3 +1,4 @@
+import { hasEmail } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db.ts'
 import { renderStaffSignIn, type StaffSignIn } from '../crew/page.ts'
@@ -30,7 +31,7 @@ export function guardStaffPages(app: FastifyInstance, db: Db) {
     const user = await signedInStaff(db, req, reply)
     if (user) {
       const email = user.email.trim().toLowerCase()
-      if ((person.email ?? '').trim().toLowerCase() === email) return
+      if (hasEmail(person, email)) return
       const { role, on } = await roleOfAccount(db.reads, email)
       if (!on || role === 'director' || role === 'office') return
     }

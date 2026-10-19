@@ -91,6 +91,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'person.newLink': 'crew',
   'person.archive': 'crew',
   'person.contact': 'crew',
+  // Combining people brought in twice (ADR 0055): the crew's records, like an edit. One who signs in with a role needs settings too, on the server.
+  'person.merge': 'crew',
   'unavailability.add': 'crew',
   'unavailability.remove': 'crew',
   // Their own calendar (ADR 0044): stopping it is the office's, like their days off. Adding one is a server route that needs crew too.
@@ -210,8 +212,16 @@ export interface RolePerson {
   id: string
   kind: 'staff' | 'freelancer'
   email: string | null
+  /** The addresses they had as someone they were combined with (ADR 0055), which find them too. Missing on older copies. */
+  otherEmails?: readonly string[]
   archived: boolean
   role: Role | null
+}
+
+/** Whether an account's address is one of this person's: their own, or one they had as someone they were combined with. */
+export const hasEmail = (p: Pick<RolePerson, 'email' | 'otherEmails'>, email: string | null | undefined) => {
+  const wanted = (email ?? '').trim().toLowerCase()
+  return !!wanted && ((p.email ?? '').trim().toLowerCase() === wanted || (p.otherEmails ?? []).includes(wanted))
 }
 
 /** A staff person's role as it stands, as picked on their page: none set is staff crew. A freelancer has none to pick. */
@@ -225,7 +235,7 @@ export const rolesOn = (people: readonly Pick<RolePerson, 'kind' | 'archived' | 
 export function personForEmail<P extends RolePerson>(people: readonly P[], email: string): P | undefined {
   const wanted = email.trim().toLowerCase()
   if (!wanted) return undefined
-  return people.filter((p) => !p.archived && (p.email ?? '').trim().toLowerCase() === wanted).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0]
+  return people.filter((p) => !p.archived && hasEmail(p, wanted)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0]
 }
 
 /**
@@ -265,7 +275,7 @@ export const emailBackRefusal = (name: string, other: string) =>
   `${other} now has ${name}'s email, so ${name} can't be brought back until one of them has another. Each person needs their own, as it's how the app knows who signs in.`
 
 /** Someone else, not archived, with this email, as the server checks it before keeping one. */
-export function emailTakenBy<P extends Pick<RolePerson, 'id' | 'email' | 'archived'>>(people: readonly P[], id: string, email: string | null | undefined): P | undefined {
+export function emailTakenBy<P extends Pick<RolePerson, 'id' | 'email' | 'otherEmails' | 'archived'>>(people: readonly P[], id: string, email: string | null | undefined): P | undefined {
   if (!email?.trim()) return undefined
-  return people.find((p) => p.id !== id && !p.archived && sameEmail(p.email, email))
+  return people.find((p) => p.id !== id && !p.archived && hasEmail(p, email))
 }

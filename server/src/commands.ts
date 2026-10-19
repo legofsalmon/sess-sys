@@ -20,6 +20,7 @@ import {
 } from '@sh/shared'
 import { crewHandlers } from './crew/handlers.ts'
 import { lateHandlers } from './crew/late.ts'
+import { mergeHandlers } from './crew/merge.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
 import type { Db, Queryable } from './db.ts'
 import { documentHandlers } from './documents/handlers.ts'
@@ -56,6 +57,7 @@ export type Handler<N extends CommandName> = (ctx: Ctx, args: CommandArgs<N>) =>
 
 const handlers: { [N in CommandName]: Handler<N> } = {
   ...crewHandlers,
+  ...mergeHandlers,
   ...projectHandlers,
   ...stockHandlers,
   ...kitHandlers,

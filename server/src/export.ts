@@ -29,7 +29,7 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * it could read their whole calendar. Devices never see it either; the busy
  * times stay in.
  */
-const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], calendar_link: ['refresh_token'], own_calendars: ['address'] }
+const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], person_merges: ['link_token'], calendar_link: ['refresh_token'], own_calendars: ['address'] }
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>
@@ -226,7 +226,9 @@ const ABOUT: Record<string, string> = {
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
-  people: 'Staff and freelancers on the crew list: contact details, department, level, the name they go by, certificates, the company and VAT and CRO numbers they trade through, skills and rates, whether they have been archived, and which staff can approve time off.',
+  people: 'Staff and freelancers on the crew list: contact details, department, level, the name they go by, certificates, the company and VAT and CRO numbers they trade through, skills and rates, whether they have been archived, which staff can approve time off, and the other addresses of anyone combined with them.',
+  // Combining people brought in twice (ADR 0055).
+  person_merges: 'People made part of another, as one person: who, whom, and when. Their old private links open the one person; the links themselves are left out.',
   phases: "The parts of each job, such as Build and Show, their days, and who crew ring on the day.",
   places: 'Where stock is kept: the warehouse, its bays and shelves, vans.',
   product_prices: "The price list: each product's price for a day, in cents.",

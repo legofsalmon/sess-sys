@@ -112,7 +112,7 @@ describe('roles', () => {
     await migrateAll(db)
     // As the database was the day before: warehouse still a role.
     await db.query('ALTER TABLE people DROP CONSTRAINT people_role_check')
-    await db.query(`UPDATE crew_schema_version SET version = $1`, [CREW.migrations.length - 1])
+    await db.query(`UPDATE crew_schema_version SET version = $1`, [CREW.migrations.findIndex((m) => m.includes("SET role = 'head' WHERE role = 'warehouse'"))])
     await db.query(`INSERT INTO people (id, name, kind, link_token, role) VALUES ('w', 'Wes', 'staff', 'tw', 'warehouse'), ('h', 'Áine', 'staff', 'th', 'head')`)
     await migrateCrew(db)
     expect((await db.query(`SELECT id, role FROM people ORDER BY id`)).rows).toEqual([{ id: 'h', role: 'head' }, { id: 'w', role: 'head' }])
