@@ -461,7 +461,8 @@ describe('sign-in settings', () => {
     expect(authFromEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' })).toMatchObject({ domains: ['sessionhire.com'], emails: [] })
     expect(
       authFromEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', STAFF_DOMAINS: 'sessionhire.com, Example.ie', STAFF_EMAILS: ' Colly@Gmail.com ' })
-    ).toMatchObject({ domains: ['sessionhire.com', 'example.ie'], emails: ['colly@gmail.com'] })
+    ).toMatchObject({ domains: ['sessionhire.com', 'example.ie'], emails: ['colly@gmail.com'], admins: [] })
+    expect(authFromEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', SYSTEM_ADMINS: ' Colly@SessionHire.com , ' })).toMatchObject({ admins: ['colly@sessionhire.com'] })
     expect(() => authFromEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', STAFF_DOMAINS: '' })).toThrow('nobody')
   })
 

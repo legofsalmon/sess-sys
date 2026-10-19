@@ -3,6 +3,24 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: system admins
+
+**Done**
+
+- System admins, in [Decision 0060](adr/0060-system-admins.md) (Colly's
+  "I need to retain admin access to continue building this out"): the
+  Railway variable `SYSTEM_ADMINS` names accounts that can change
+  everything whatever their role on the Crew tab. Set on the server only,
+  so no director's change can take it away, and it isn't a director: it
+  doesn't switch roles on or count as the last one. **You** says so.
+  **Switch roles on** on You now shows when it should.
+- Checked: typecheck, all tests (new unit and server tests).
+
+**Waiting on**
+
+- Colly: add `SYSTEM_ADMINS` with their sign-in address on the
+  **shserver** service in Railway.
+
 ## 19 October 2026: a job's page in parts
 
 **Done**

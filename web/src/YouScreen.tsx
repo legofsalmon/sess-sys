@@ -1,4 +1,4 @@
-import { ROLE_LABELS, ROLE_LINES, type Reading } from '@sh/shared'
+import { ROLE_LABELS, ROLE_LINES, roleOfPerson, type Reading } from '@sh/shared'
 import { useState } from 'react'
 import { Confirm, Refusal, useAct } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
@@ -128,13 +128,23 @@ export function YouScreen() {
  */
 function RoleCard() {
   const access = useAccess()
-  const { reading } = useView()
+  const { reading, crew } = useView()
   const { run, error } = useAct()
   const [asking, setAsking] = useState(false)
+  // A system admin (ADR 0060): said first, as it is what decides what they can change once roles are on.
+  const me = access.personId ? crew.people.find((p) => p.id === access.personId) : undefined
+  const own = me && roleOfPerson(me)
+  const adminLine = access.admin && (
+    <p>
+      <b>System admin.</b> You can change everything, as a director can, whatever your role on the Crew tab{own ? ` (${ROLE_LABELS[own]})` : ''} says. It's
+      set in the server's settings, so nobody can take it away in the app, and it doesn't count as a director.
+    </p>
+  )
   if (access.rolesOff)
     return (
       <section className="card">
         <h2>Roles</h2>
+        {adminLine}
         <p>
           Roles are off, so everyone signed in can change everything. They come on when someone is made a director, who then gives each member of
           staff theirs on the Crew tab.
@@ -164,12 +174,16 @@ function RoleCard() {
   return (
     <section className="card">
       <h2>Your role</h2>
-      <p>
-        <b>{ROLE_LABELS[access.role]}</b>. {ROLE_LINES[access.role]}
-      </p>
+      {adminLine || (
+        <p>
+          <b>{ROLE_LABELS[access.role]}</b>. {ROLE_LINES[access.role]}
+        </p>
+      )}
       <p>{readsLine(reading)}</p>
       <p className="hint">
-        {access.role === 'director'
+        {access.admin
+          ? 'You and the directors give everyone else their role on their person on the Crew tab.'
+          : access.role === 'director'
           ? 'You give everyone else their role on their person on the Crew tab.'
           : 'A director can change your role on your person on the Crew tab.'}
       </p>
