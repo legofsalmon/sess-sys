@@ -64,9 +64,9 @@ export function narrower(department: string | undefined) {
   }
 }
 
-/** The jobs on a day, by a phase on it: going ahead or not yet decided, never the cancelled or lost. */
+/** The jobs on a day, by a phase on it: going ahead or quoted, never an enquiry (audit finding 22), the cancelled or the lost. */
 export function jobsOn(view: View, day: string): JobView[] {
-  return view.jobs.jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.phases.some((p) => p.start <= day && p.end >= day))
+  return view.jobs.jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.status !== 'enquiry' && j.phases.some((p) => p.start <= day && p.end >= day))
 }
 
 /** Jobs from tomorrow to a week on, by when they start: the week ahead. */

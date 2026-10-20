@@ -58,10 +58,8 @@ export function ShowPackCard({ view, job, phase }: { view: View; job: JobView; p
   return (
     <section className="card show-pack" aria-label="Show pack">
       <Heading icon="download">Show pack</Heading>
-      <p className="hint">
-        The crew, running order, kit, venue and who to ring for {what}, as files to load on the Crewbox on site, in one .zip. It's made on this device from what it
-        holds, so it works with no signal, and nothing is sent anywhere.
-      </p>
+      {/* A line and the button (audit, P3): what goes in it, and how, wait behind "What's in it". */}
+      <p className="hint">Files for the Crewbox on site, for {what}, in one .zip. Made on this device, so it works with no signal.</p>
       <details className="phase-details">
         <summary>Join QR on the crew list</summary>
         <div>
@@ -101,12 +99,18 @@ export function ShowPackCard({ view, job, phase }: { view: View; job: JobView; p
           {done && `Downloaded ${done}`}
         </span>
       </div>
-      <p className="hint">
-        {phones
-          ? 'It has the numbers of crew who have said yes, as the crew chief needs.'
-          : "Your role can't change crew, so it lists those confirmed, with no number but the contact on the day's."}{' '}
-        No rates or prices are in it. Session Hire holds no patch or lighting rig yet, so those two files are empty, with their columns to fill in.
-      </p>
+      <details className="phase-details">
+        <summary>What's in it</summary>
+        <div>
+          <p className="hint">
+            The crew, running order, kit, venue and who to ring, as files to load on the box. Nothing is sent anywhere.{' '}
+            {phones
+              ? 'It has the numbers of crew who have said yes, as the crew chief needs.'
+              : "Your role can't change crew, so it lists those confirmed, with no number but the contact on the day's."}{' '}
+            No rates or prices are in it. Session Hire holds no patch or lighting rig yet, so those two files are empty, with their columns to fill in.
+          </p>
+        </div>
+      </details>
     </section>
   )
 }

@@ -1,8 +1,10 @@
 import {
   crewFill,
+  dayLabel,
   KIND_LABELS,
   kindOf,
   addDays,
+  mondayOf,
   newId,
   PHASE_NAMES,
   phaseNames,
@@ -19,9 +21,10 @@ import {
   type VenueView,
   type View,
 } from '@sh/shared'
-import { useState, type FormEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
+import { Fold } from '../Fold.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
@@ -115,30 +118,36 @@ function JobList({ view }: { view: View }) {
       <Top view={view} root />
       <JobViews />
 
-      <JobsCard view={view} />
+      <JobsCard view={view} phone />
 
-      <JobsRest view={view} />
+      <JobsRest view={view} phone />
     </div>
   )
 }
 
-/** A new job: under the list on a phone, beside it on a laptop. */
-function JobsRest({ view }: { view: View }) {
+/** The way to bring in jobs already on a calendar, rather than typing them as new ones; in view beside New job, open or not. */
+function BringInHint({ view }: { view: View }) {
+  if (view.calendar.link?.state !== 'on' && view.calendar.link?.state !== 'choosing') return null
+  return (
+    <p className="hint">
+      Jobs already on a Google calendar? <a href="#jobs/import">Bring them in</a> rather than typing them again.
+    </p>
+  )
+}
+
+/** Beside the list on a laptop: the nudges, and a new job. On a phone New job is at the top of the list, behind its button (audit finding 22). */
+function JobsRest({ view, phone = false }: { view: View; phone?: boolean }) {
   // Taking a job in is the office's, so a role without jobs has no New job (ADR 0034).
   const mayAdd = useAccess().can('jobs')
   return (
     <>
       <TidyNudge view={view} />
       <NotesKitNudge view={view} />
-      {mayAdd && (
+      {mayAdd && !phone && (
         <section className="card">
           <Heading icon="add">New job</Heading>
           <NewJob view={view} />
-          {(view.calendar.link?.state === 'on' || view.calendar.link?.state === 'choosing') && (
-            <p className="hint">
-              Jobs already on a Google calendar? <a href="#jobs/import">Bring them in</a> rather than typing them again.
-            </p>
-          )}
+          <BringInHint view={view} />
         </section>
       )}
     </>
@@ -196,13 +205,65 @@ function VenuesScreen({ view }: { view: View }) {
   )
 }
 
-const jobKey = (j: JobView) => j.id
+/** A row of the list: the heading of a week, or a job with its place among the jobs. */
+type Row = { week: string; label: string } | { job: JobView; n: number }
+const rowKey = (r: Row) => ('job' in r ? r.job.id : `week:${r.week}`)
 
-/** Every job, searched and filtered. */
-function JobsCard({ view }: { view: View }) {
+/** Coming up shows the next fortnight until Show all (audit finding 22). */
+const SOON_DAYS = 14
+/** Show all, kept for the tab's life, so Back from a job finds the same list and its place on it (places.ts). */
+let showingAll = false
+
+/** "This week", "Next week", "Last week", or "Week of Mon 3 Nov". */
+function weekLabel(monday: string, today: string): string {
+  const now = mondayOf(today)
+  if (monday === now) return 'This week'
+  if (monday === addDays(now, 7)) return 'Next week'
+  if (monday === addDays(now, -7)) return 'Last week'
+  return `Week of ${dayLabel(monday)}`
+}
+
+/** Jobs under the heading of their week: a job already going is in this week's; one with no dates under "No dates yet". */
+function byWeek(jobs: readonly JobView[], today: string): Row[] {
+  const rows: Row[] = []
+  let last: string | undefined
+  jobs.forEach((job, n) => {
+    const week = job.span ? mondayOf(job.span.start < today && job.span.end >= today ? today : job.span.start) : ''
+    if (week !== last) rows.push({ week, label: week ? weekLabel(week, today) : 'No dates yet' })
+    last = week
+    rows.push({ job, n })
+  })
+  return rows
+}
+
+/**
+ * The week headings stay at the top while their jobs scroll under them: on
+ * a phone just under the top bar, whatever its height; in a column of its
+ * own on a laptop, at the column's top.
+ */
+function useUnderTop(phone: boolean) {
+  const card = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const el = card.current
+    const top = document.querySelector<HTMLElement>('.top')
+    if (!phone || !el || !top || typeof ResizeObserver === 'undefined') return
+    const set = () => el.style.setProperty('--under-top', `${(parseFloat(getComputedStyle(top).top) || 0) + top.offsetHeight}px`)
+    const watch = new ResizeObserver(set)
+    watch.observe(top)
+    set()
+    return () => watch.disconnect()
+  }, [phone])
+  return card
+}
+
+/** Every job, searched and filtered, by week. */
+function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
   const { jobs } = view.jobs
   const [filter, setFilter] = useState<Filter>('coming')
   const [search, setSearch] = useState('')
+  const [all, setAll] = useState(showingAll)
+  const mayAdd = useAccess().can('jobs')
+  const card = useUnderTop(phone)
   const day = useToday()
   const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const matches = (j: JobView) => {
@@ -213,11 +274,24 @@ function JobsCard({ view }: { view: View }) {
   // Past jobs newest first; everything else soonest first.
   if (filter === 'past') shown.reverse()
   const count = (f: Filter) => jobs.filter((j) => filterOf(j, day) === f).length
-  const win = useWindowed('jobs', shown, jobKey, 110)
+  // The next fortnight, and the ones with no dates yet, until Show all; a search looks through them all.
+  const soonOnly = filter === 'coming' && !all && words.length === 0
+  const soonEnd = addDays(day, SOON_DAYS)
+  const listed = soonOnly ? shown.filter((j) => !j.span || j.span.start < soonEnd) : shown
+  const rows = byWeek(listed, day)
+  const win = useWindowed('jobs', rows, rowKey, 110)
 
   return (
-    <section className="card" aria-label="Jobs">
+    <section className="card jobs-card" aria-label="Jobs" ref={card}>
       <Heading icon="calendar">Jobs</Heading>
+      {phone && mayAdd && (
+        <>
+          <Fold label="New job" className="new-job">
+            <NewJob view={view} />
+          </Fold>
+          <BringInHint view={view} />
+        </>
+      )}
       <input className="search" type="search" placeholder="Find a job, client or venue" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find" />
       <div className="filters" role="group" aria-label="Show">
         {FILTERS.map(([f, label]) => (
@@ -227,14 +301,33 @@ function JobsCard({ view }: { view: View }) {
         ))}
       </div>
       {shown.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
+      {shown.length > 0 && listed.length === 0 && <p className="hint">Nothing in the next fortnight.</p>}
       {/* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, and Back finds its place by them (places.ts). */}
       <ul className="job-list windowed" ref={win.list} style={win.style}>
-        {win.rows.map((j, i) => (
-          <li key={j.id} ref={win.row(j.id)} data-place={j.id} aria-setsize={shown.length} aria-posinset={win.start + i + 1}>
-            <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={false} />
-          </li>
-        ))}
+        {win.rows.map((r) =>
+          'job' in r ? (
+            <li key={r.job.id} ref={win.row(r.job.id)} data-place={r.job.id} aria-setsize={listed.length} aria-posinset={r.n + 1}>
+              <JobRow job={r.job} kit={view.kit.byJob.get(r.job.id)} current={false} />
+            </li>
+          ) : (
+            <li key={rowKey(r)} ref={win.row(rowKey(r))} data-place={rowKey(r)} className="week-head">
+              <h3>{r.label}</h3>
+            </li>
+          )
+        )}
       </ul>
+      {listed.length < shown.length && (
+        <button
+          type="button"
+          className="link show-all"
+          onClick={() => {
+            showingAll = true
+            setAll(true)
+          }}
+        >
+          Show all {shown.length.toLocaleString('en-IE')} coming up
+        </button>
+      )}
     </section>
   )
 }

@@ -201,7 +201,7 @@ export function NotesKitScreen({ view, jobId }: { view: View; jobId: string }) {
         )
       })}
 
-      <section className="card notes-kit-add" aria-label="Add to the kit">
+      <section className="bring notes-kit-add" aria-label="Add to the kit">
         <p>
           {plan.adding ? `Adds ${plural(plan.adding, 'line')} to the kit${toAdd > plan.adding ? `, from ${toAdd} lines of the notes` : ''}.` : 'Nothing to add: what the notes list is on the job, or left out.'}
           {plan.choosing ? ` ${plan.choosing === 1 ? '1 line is' : `${plan.choosing} lines are`} left out until a product is chosen for ${plan.choosing === 1 ? 'it' : 'them'}.` : ''}
