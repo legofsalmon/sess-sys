@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crewView, emailTakenBy, keptOf, mergedPerson, mergeRefusal, offerKept, personForEmail, samePeople, type Mutation, type Person } from '../src/index.ts'
+import { crewView, emailTakenBy, keptOf, mergedPerson, mergeRefusal, offerKept, personForEmail, samePeople, withMainEmail, type Mutation, type Person } from '../src/index.ts'
 
 /**
  * Combining people brought in twice (ADR 0055): who looks like one person,
@@ -147,5 +147,23 @@ describe('on a device, before the server answers', () => {
     )
     expect(view.people.map((p) => [p.name, p.otherEmails, p.pending])).toEqual([['Aoife Byrne', ['aoifebyrne@gmail.com'], true]])
     expect(view.unavailability.map((u) => u.personId)).toEqual([a.id])
+  })
+})
+
+describe('making another address the main one (ADR 0064)', () => {
+  it('swaps them, keeping every address, and refuses one they are not found by', () => {
+    const a = person('Adam Byrne', { email: 'Adam@SessionHire.com', otherEmails: ['adam@gmail.com', 'adambyrne@yahoo.ie'] })
+    expect(withMainEmail(a, ' ADAM@gmail.com')).toEqual({ email: 'adam@gmail.com', otherEmails: ['adam@sessionhire.com', 'adambyrne@yahoo.ie'] })
+    expect(withMainEmail(a, 'adam@sessionhire.com')).toBeUndefined()
+    expect(withMainEmail(a, 'someone@else.ie')).toBeUndefined()
+    expect(withMainEmail({ email: null, otherEmails: ['adam@gmail.com'] }, 'adam@gmail.com')).toEqual({ email: 'adam@gmail.com', otherEmails: [] })
+  })
+
+  it('shows the swap on a device before the server answers, and the same person found by each address', () => {
+    const a = person('Adam Byrne', { kind: 'staff', email: 'adam@sessionhire.com', otherEmails: ['adam@gmail.com'], role: 'office' })
+    const swap: Mutation<'person.mainEmail'> = { id: 'm1', name: 'person.mainEmail', args: { id: a.id, email: 'adam@gmail.com' }, createdAt: '2026-10-20T10:00:00Z' }
+    const [p] = crewView({ person: { [a.id]: a } }, [swap], 0, '2026-10-20').people
+    expect([p!.email, p!.otherEmails, p!.pending]).toEqual(['adam@gmail.com', ['adam@sessionhire.com'], true])
+    for (const e of ['adam@gmail.com', 'adam@sessionhire.com']) expect(personForEmail([p!], e)?.id).toBe(a.id)
   })
 })
