@@ -7,6 +7,7 @@ import { describeDevice } from '../devices.ts'
 import { documentsSection } from '../documents/page.ts'
 import { documentsOf } from '../documents/store.ts'
 import { publicOrigin } from '../http.ts'
+import { reportError } from '../monitoring.ts'
 import { officeFor } from '../office/store.ts'
 import { getPhase } from '../projects/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
@@ -71,6 +72,9 @@ const SAID = {
   'days-off-removed': { ok: true, text: 'Removed. You can be offered work on those days again.' },
   'days-off-gone': { ok: true, text: 'Already removed.' },
   'check-the-dates': { ok: false, text: 'Check the dates and try again.' },
+  'days-off-first': { ok: false, text: 'Put in the first day off.' },
+  'days-off-first-real': { ok: false, text: "The first day off isn't a real date. Pick it again." },
+  'days-off-last-real': { ok: false, text: "The last day off isn't a real date. Pick it again, or leave it empty for one day." },
   // A timesheet.
   'timesheet-sent': { ok: true, text: "Thanks, it's gone to the office. You can change it until they approve it." },
   'not-your-booking': { ok: false, text: "That booking isn't one of yours." },
@@ -96,6 +100,8 @@ const SAID = {
   'calendar-stopped': { ok: true, text: "Stopped. We've deleted your calendar's address and the times we read from it." },
 } satisfies Record<string, { ok: boolean; text: string }>
 type Said = keyof typeof SAID
+/** The id the page gives a days-off form: one of the app's own (newId). */
+const AWAY_ID = /^[a-z0-9]{8,32}$/
 type Refusal = Extract<MutationResult, { status: 'rejected' }>
 
 /** The address's part for a message: its code, or the id of the change that was refused. */
@@ -396,15 +402,25 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const form = (req.body ?? new URLSearchParams()) as Form
     const start = form.get('start') ?? ''
     const end = form.get('end') || start
+    // A refusal keeps the dates and the note as they were typed, beside the form (rule 11), and says which date is wrong.
+    const turnedDown = (what: Said | Refusal) => refused(req, reply, person, what, { form: 'away', values: form }, { section: 'away' })
+    if (!start) return turnedDown('days-off-first')
+    if (!isDay(start)) return turnedDown('days-off-first-real')
+    if (!isDay(end)) return turnedDown('days-off-last-real')
+    // The page gives each form an id of its own, so the same form sent again (a double tap, or the browser resending it)
+    // adds the days once (audit, P3: words). Sent from anywhere else, a new one.
+    const given = form.get('id') ?? ''
     const result = await run(req, person.id, 'unavailability.add', {
-      id: newId(),
+      id: AWAY_ID.test(given) ? given : newId(),
       personId: person.id,
       start,
       end,
       note: (form.get('note') ?? '').slice(0, 500),
-    }).catch(() => undefined)
-    // A refusal keeps the dates and the note as they were typed, beside the form (rule 11).
-    if (!result || result.status === 'rejected') return refused(req, reply, person, result ?? 'check-the-dates', { form: 'away', values: form }, { section: 'away' })
+    }).catch((err: unknown) => {
+      reportError(err, { route: '/f/:token/away', method: 'POST' })
+      return undefined
+    })
+    if (!result || result.status === 'rejected') return turnedDown(result ?? 'try-again')
     return back(reply, person.linkToken, 'days-off-added')
   })
 

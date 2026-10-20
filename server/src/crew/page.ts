@@ -1,6 +1,6 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
-import { dsColor, ownColours } from '@sh/shared'
+import { dsColor, newId, ownColours } from '@sh/shared'
 import { busyByDay, type OwnCalendar } from '@sh/shared'
 
 /**
@@ -535,6 +535,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
         : ''
     }
     <form method="post" action="${d.base}/away#away" class="add-away">
+      <input type="hidden" name="id" value="${newId()}">
       <label>From <input type="date" name="start" required min="${d.today}" value="${h(away?.get('start'))}"></label>
       <label>To <input type="date" name="end" min="${d.today}" value="${h(away?.get('end'))}"></label>
       <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour" value="${h(away?.get('note'))}"></label>
