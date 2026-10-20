@@ -5,6 +5,10 @@
 - **Asked for by:** Colly, 20 October 2026 ("Could the staff skills input be
   an autocomplete free type field, that can populate with multiple
   selections.")
+- **Amended:** 20 October 2026, after a review against the design system
+  ("give it a full review to align with the style and design guide"): the
+  highlight Enter takes, Backspace held down, what is said aloud, and the
+  highlighted row's look.
 
 ## Context
 
@@ -29,10 +33,23 @@ already reads skills as tags.
 - Something not on the list is still taken as typed, and the last option
   says so in words: **Add "Pyro" as a new skill**. A typed skill that
   matches one on the list in another case takes the list's spelling.
-- Enter or a comma adds what's typed (Up and Down then Enter choose an
-  offer), a pasted list with commas becomes chips at once, Backspace on an
-  empty box takes the last chip off, Escape closes the offers. With the
-  box empty, Enter sends the form as in any other field.
+- While something is typed, one offer is always highlighted: the one
+  Enter (or a typed comma) takes. It is the skill spelt as typed, else the
+  first starting with it, else the new one (`firstPick`), so "aud" and
+  Enter is Audio, not a new skill called "aud"; Down reaches the new one.
+  Up and Down move the highlight and the list scrolls to keep it in sight.
+  A pasted list with commas becomes chips at once, each part as written.
+  Backspace on an empty box takes the last chip off, but only on a fresh
+  press, so holding it down to clear what's typed stops at the empty box.
+  Escape closes the offers, and Enter then adds what's typed as it is.
+  With the box empty, Enter sends the form as in any other field.
+- Each chip added or taken off is said in a polite live line under the
+  field ("Added Audio. 2 skills."), and typing one already chosen says so,
+  so a screen reader hears what a sighted person sees happen.
+- The highlighted offer is drawn as a current row is in sess-sys (the
+  accent bar) on the pressed wash; a row the pointer rests on takes only
+  the hover wash, where a pointer hovers. The new-skill row is in the
+  secondary ink, not the tertiary, which fell to 3.8:1 under a highlight.
 - What's still typed when the form is sent goes with it. It is not added
   on leaving the box, because turning it into a chip there moves the Add
   person button under a press that has already started, and the press is
@@ -51,5 +68,6 @@ already reads skills as tags.
 - Skills already spelt two ways stay so until someone edits them; the
   offers show the more common spelling, so the list converges as people are
   edited.
-- The design system has no multi-pick field yet; this one is sess-sys's
-  own, listed as a learning for the system.
+- The design system had no multi-pick field; this one became its
+  `ds-combobox` (design-system 0.7.0). sess-sys keeps its own look, as a
+  colour-only adopter, and follows the part's keys and states.

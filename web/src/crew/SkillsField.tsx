@@ -1,5 +1,5 @@
-import { addSkills, MOST_SKILLS, skillsInUse, suggestSkills } from '@sh/shared'
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { addSkills, firstPick, MOST_SKILLS, skillsInUse, suggestSkills } from '@sh/shared'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Icon } from '../Icon.tsx'
 import { useView } from '../view.ts'
 
@@ -7,10 +7,14 @@ import { useView } from '../view.ts'
  * Skills as a list of picks (ADR 0063): those chosen sit in the field as
  * chips, and typing offers the skills the crew list already uses, the most
  * used first, so the same skill keeps one spelling. Something new is added
- * as typed. Enter or a comma adds it, Backspace on an empty field takes the
- * last one off, and what's still typed when the form is sent goes with it.
+ * as typed. Enter or a comma takes the highlighted offer, Backspace on an
+ * empty field takes the last one off, and what's still typed when the form
+ * is sent goes with it.
  * The suggestions follow the combobox pattern (a listbox under the field,
- * Up and Down to move, Enter to choose, Escape to close).
+ * Up and Down to move, Enter to choose, Escape to close). While something is
+ * typed one offer is always highlighted, the one Enter will take (firstPick):
+ * the spelling in use before a new one. Each chip added or taken off is said
+ * in a status line, so it isn't only seen.
  */
 export function SkillsField({
   value,
@@ -28,38 +32,60 @@ export function SkillsField({
   const people = useView().crew.people
   const known = useMemo(() => skillsInUse(people), [people])
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState(-1)
+  // Where Up or Down moved the highlight; null until they do, when it's the one Enter would take anyway.
+  const [moved, setMoved] = useState<number | null>(null)
+  const [said, setSaid] = useState('')
   const input = useRef<HTMLInputElement>(null)
+  const list = useRef<HTMLUListElement>(null)
   const id = useId()
   const full = value.length >= MOST_SKILLS
   const typed = text.trim()
   const offered = suggestSkills(known, text, value)
+  const chosen = (s: string) => value.find((v) => v.toLowerCase() === s.toLowerCase())
   // Something typed that isn't on the list yet is offered too, last, in words, so it's plain that it will be a new one.
-  const isNew = !!typed && !known.some((s) => s.toLowerCase() === typed.toLowerCase()) && !value.some((s) => s.toLowerCase() === typed.toLowerCase())
+  const isNew = !!typed && !known.some((s) => s.toLowerCase() === typed.toLowerCase()) && !chosen(typed)
   const options = [...offered.map((s) => ({ skill: s, label: s })), ...(isNew ? [{ skill: typed, label: `Add “${typed}” as a new skill` }] : [])]
   const shown = open && !full && options.length > 0
+  const active = shown ? (moved ?? firstPick(offered, text, value, isNew)) : -1
+
+  // A highlight moved past the bottom of the list's scroll is brought into view, so what Enter will take can be seen.
+  useEffect(() => {
+    if (active >= 0) list.current?.children[active]?.scrollIntoView({ block: 'nearest' })
+  }, [active])
 
   const add = (more: string) => {
     const next = addSkills(value, more, known)
-    if (next.length !== value.length) onChange(next)
+    const added = next.slice(value.length)
+    if (added.length) {
+      onChange(next)
+      setSaid(`Added ${added.join(', ')}. ${count(next.length)}.`)
+    } else if (chosen(more.trim())) setSaid(`${chosen(more.trim())} is already on.`)
     onText('')
-    setActive(-1)
+    setMoved(null)
   }
   const remove = (skill: string) => {
-    onChange(value.filter((s) => s !== skill))
+    const next = value.filter((s) => s !== skill)
+    onChange(next)
+    setSaid(`Removed ${skill}. ${count(next.length)}.`)
     input.current?.focus()
   }
-  // A list pasted or typed with commas becomes chips as it goes, the last part left to finish.
+  // A list pasted or typed with commas becomes chips as it goes, the last part left to finish. A comma typed after a part
+  // takes the highlighted offer, as Enter does; one in a paste keeps each part as it was written.
   const type = (next: string) => {
+    if (shown && active >= 0 && typed && (next === `${text},` || next === `${text};`)) return add(options[active]!.skill)
     const parts = next.split(/[,;]/)
     if (parts.length > 1) {
       const last = parts.pop()!
-      const chosen = addSkills(value, parts.join(','), known)
-      if (chosen.length !== value.length) onChange(chosen)
+      const more = parts.join(',')
+      const chose = addSkills(value, more, known)
+      if (chose.length !== value.length) {
+        onChange(chose)
+        setSaid(`Added ${chose.slice(value.length).join(', ')}. ${count(chose.length)}.`)
+      }
       next = last.trimStart()
     }
     onText(next)
-    setActive(-1)
+    setMoved(null)
     setOpen(true)
   }
   const key = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -67,11 +93,11 @@ export function SkillsField({
       e.preventDefault()
       if (!shown) return setOpen(true)
       const last = options.length - 1
-      setActive((i) => (e.key === 'ArrowDown' ? (i >= last ? 0 : i + 1) : i <= 0 ? last : i - 1))
+      setMoved(e.key === 'ArrowDown' ? (active >= last ? 0 : active + 1) : active <= 0 ? last : active - 1)
       return
     }
     if (e.key === 'Enter') {
-      const pick = shown && active >= 0 ? options[active] : undefined
+      const pick = active >= 0 ? options[active] : undefined
       if (!pick && !typed) return // An empty field lets Enter send the form, as any other field does.
       e.preventDefault()
       add(pick ? pick.skill : typed)
@@ -81,12 +107,13 @@ export function SkillsField({
       e.preventDefault()
       e.stopPropagation()
       setOpen(false)
-      setActive(-1)
+      setMoved(null)
       return
     }
+    // Only a fresh press takes a chip off: Backspace held down to clear what's typed stops at the empty field.
     if (e.key === 'Backspace' && !text && value.length > 0) {
       e.preventDefault()
-      onChange(value.slice(0, -1))
+      if (!e.repeat) remove(value[value.length - 1]!)
     }
   }
 
@@ -115,7 +142,7 @@ export function SkillsField({
             aria-autocomplete="list"
             aria-expanded={shown}
             aria-controls={`${id}-list`}
-            aria-activedescendant={shown && active >= 0 ? `${id}-${active}` : undefined}
+            aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
             value={text}
             onChange={(e) => type(e.target.value)}
             onKeyDown={key}
@@ -124,14 +151,14 @@ export function SkillsField({
             // the button under a press that has already begun.
             onBlur={() => {
               setOpen(false)
-              setActive(-1)
+              setMoved(null)
             }}
             placeholder={value.length ? '' : 'Audio, rigger'}
             readOnly={full}
             autoComplete="off"
           />
         </div>
-        <ul className="skill-options" id={`${id}-list`} role="listbox" aria-label="In use" hidden={!shown}>
+        <ul ref={list} className="skill-options" id={`${id}-list`} role="listbox" aria-label="In use" hidden={!shown}>
           {options.map((o, i) => (
             <li
               key={`${o.skill}-${i}`}
@@ -151,9 +178,15 @@ export function SkillsField({
         </ul>
       </div>
       <small id={`${id}-hint`}>{full ? `Up to ${MOST_SKILLS} skills. Remove one to add another.` : 'Pick from those in use, or type a new one. Enter or a comma adds it.'}</small>
+      {/* Polite, and there from the start so the first change is heard; not a status role, which the sync state already is. */}
+      <span className="sr-only" aria-live="polite">
+        {said}
+      </span>
     </div>
   )
 }
+
+const count = (n: number) => (n === 1 ? '1 skill' : `${n} skills`)
 
 /** The skills chosen with whatever is still typed in the field, as the form sends them, in the crew list's own spelling. */
 export function withTyped(skills: string[], typed: string, people: readonly { skills: readonly string[] }[]): string[] {
