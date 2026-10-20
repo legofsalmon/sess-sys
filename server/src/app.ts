@@ -26,7 +26,7 @@ import { registerCrewLinks } from './crew/links.ts'
 import { COPY_SCRIPT } from './crew/page.ts'
 import { OwnCalendars, type OwnCalendarsOptions } from './crew/own-calendars.ts'
 import { registerOwnCalendarRoutes } from './crew/own-calendar-routes.ts'
-import type { Db } from './db.ts'
+import { faultForLog, type Db } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { DocumentFiles } from './documents/files.ts'
 import { registerDocumentRoutes } from './documents/routes.ts'
@@ -259,7 +259,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       reply.send(err)
       return
     }
-    req.log.error({ req, res: reply, err }, err.message)
+    // A database error's detail holds the row it was about: the log gets the fault without it.
+    const logged = faultForLog(err)
+    req.log.error({ req, res: reply, err: logged }, logged === err ? err.message : (logged as { message: string }).message)
     reply.code(status).send({ error: 'Something went wrong on the server.' })
   })
 
