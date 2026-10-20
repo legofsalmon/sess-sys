@@ -17,6 +17,9 @@ export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, email = EXCLUDED.email, updated_at = now()`,
       [OFFICE_SETTING_ID, a.name, a.phone, a.email]
     )
+    // Left as they were by a change that doesn't say them, as one from an app older than them doesn't.
+    if (a.vatNumber !== undefined) await ctx.tx.query(`UPDATE settings SET vat_number = $2 WHERE id = $1`, [OFFICE_SETTING_ID, a.vatNumber || null])
+    if (a.address !== undefined) await ctx.tx.query(`UPDATE settings SET address = $2 WHERE id = $1`, [OFFICE_SETTING_ID, a.address || null])
     await emit(ctx, 'setting', OFFICE_SETTING_ID, await getSetting(ctx.tx, OFFICE_SETTING_ID))
   },
 

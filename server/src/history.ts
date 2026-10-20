@@ -499,7 +499,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Noted ${o.who}'s answer on ${o.what}`
     }
     case 'office.update':
-      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
+      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email'), ...(a.vatNumber ? [`VAT number ${text(a.vatNumber, '').trim()}`] : []), ...(a.address ? ['an address'] : [])])}`
     case 'reading.heads':
       return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
     case 'messages.prompt':

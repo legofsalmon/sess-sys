@@ -1,18 +1,25 @@
-import { officeLine, type OfficeView } from '@sh/shared'
+import { ADDRESS_LENGTH, officeLine, type OfficeView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
 import { Refusal, useAct } from './act.tsx'
 import { Pending } from './StatusPill.tsx'
 import { client } from './sync.ts'
 
-type Fields = { name: string; phone: string; email: string }
-const fieldsOf = (details: OfficeView['details']): Fields => ({ name: details?.name ?? 'Session Hire office', phone: details?.phone ?? '', email: details?.email ?? '' })
-const same = (a: Fields, b: Fields) => a.name === b.name && a.phone === b.phone && a.email === b.email
+type Fields = { name: string; phone: string; email: string; vatNumber: string; address: string }
+const fieldsOf = (details: OfficeView['details']): Fields => ({
+  name: details?.name ?? 'Session Hire office',
+  phone: details?.phone ?? '',
+  email: details?.email ?? '',
+  vatNumber: details?.vatNumber ?? '',
+  address: details?.address ?? '',
+})
+const same = (a: Fields, b: Fields) => a.name === b.name && a.phone === b.phone && a.email === b.email && a.vatNumber === b.vatNumber && a.address === b.address
 
 /**
  * The office's own details (audit finding 10): shown on every freelancer
  * page as a way back to the office, so someone booked can ring or email
- * without the app. Saved like any other change, so it works with no signal
- * and syncs later.
+ * without the app. The company's VAT number and address go on the printed
+ * quote only. Saved like any other change, so it works with no signal and
+ * syncs later.
  */
 export function OfficeCard({ office }: { office: OfficeView }) {
   const { details, pending } = office
@@ -29,7 +36,15 @@ export function OfficeCard({ office }: { office: OfficeView }) {
   const shown = officeLine(details)
   const save = (e: FormEvent) => {
     e.preventDefault()
-    void run(() => client.mutate('office.update', { name: f.name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null }))
+    void run(() =>
+      client.mutate('office.update', {
+        name: f.name.trim(),
+        phone: f.phone.trim() || null,
+        email: f.email.trim() || null,
+        vatNumber: f.vatNumber.trim() || null,
+        address: f.address.trim() || null,
+      })
+    )
   }
   return (
     <section className="card office" aria-labelledby="office-title">
@@ -42,7 +57,8 @@ export function OfficeCard({ office }: { office: OfficeView }) {
           </>
         ) : (
           'Nothing is shown until a phone or an email is saved here.'
-        )}
+        )}{' '}
+        The VAT number and address go on printed quotes, and nowhere else.
       </p>
       <form className="office-form" onSubmit={save}>
         <label className="wide">
@@ -53,6 +69,13 @@ export function OfficeCard({ office }: { office: OfficeView }) {
         </label>
         <label>
           Email <input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} placeholder="office@…" />
+        </label>
+        <label>
+          VAT number <input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} placeholder="IE 1234567T" autoCapitalize="characters" />
+        </label>
+        <label className="wide">
+          Address{' '}
+          <textarea rows={3} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} maxLength={ADDRESS_LENGTH} placeholder="A line each, as on a letter" />
         </label>
         <div className="actions wide">
           <button type="submit" className="primary">
