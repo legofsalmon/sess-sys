@@ -90,6 +90,8 @@ export interface OwnCalendarsOptions extends FetchOptions {
 
 const THREE_HOURS = 3 * 60 * 60 * 1000
 const FIFTEEN_MINUTES = 15 * 60 * 1000
+/** The longest the schedule goes without looking, though nothing it knows of is due: a restore can bring calendars back. */
+const A_DAY = 24 * 60 * 60 * 1000
 
 export interface Sharing {
   personId: string
@@ -103,6 +105,12 @@ export interface Sharing {
 export class OwnCalendars {
   private timer?: ReturnType<typeof setInterval>
   private running?: Promise<void>
+  /**
+   * When the schedule next needs to look, by this server's clock: when the next calendar it knows of is due, or a day on
+   * when none is shared. Until then it asks the database nothing, which with nobody sharing was a query every quarter of
+   * an hour, all night, for nothing (audit finding 15).
+   */
+  private nextLook = 0
 
   constructor(
     private readonly db: Db,
@@ -148,6 +156,8 @@ export class OwnCalendars {
       await emit(ctx, 'ownCalendar', cal.id, cal)
       return cal
     })
+    // Read just now, so due again in three hours, if nothing else is sooner.
+    this.nextLook = Math.min(this.nextLook, Date.now() + (this.options.everyMs ?? THREE_HOURS))
     this.options.onChange()
     return saved
   }
@@ -186,13 +196,19 @@ export class OwnCalendars {
     if (this.running) return this.running
     this.running = (async () => {
       const every = this.options.everyMs ?? THREE_HOURS
-      const { rows } = await this.db.query<{ person_id: string }>(
-        `SELECT c.person_id FROM own_calendars c JOIN people p ON p.id = c.person_id
-          WHERE NOT p.archived AND (c.tried_at IS NULL OR c.tried_at < now() - ($1::double precision * interval '1 millisecond'))
+      // Every calendar shared, with how long until each is due (none or less: due now).
+      const { rows } = await this.db.query<{ person_id: string; wait_ms: number | null }>(
+        `SELECT c.person_id, extract(epoch FROM c.tried_at + ($1::double precision * interval '1 millisecond') - now()) * 1000 AS wait_ms
+           FROM own_calendars c JOIN people p ON p.id = c.person_id
+          WHERE NOT p.archived
           ORDER BY c.tried_at NULLS FIRST`,
         [every]
       )
-      for (const { person_id } of rows) {
+      const waits = rows.map((r) => (r.wait_ms === null ? 0 : Number(r.wait_ms)))
+      const due = rows.filter((_, i) => waits[i]! <= 0)
+      // Each one read now is due again in `every`; the rest when they say.
+      this.nextLook = Date.now() + Math.min(A_DAY, ...waits.map((w) => (w <= 0 ? every : w)))
+      for (const { person_id } of due) {
         try {
           await this.readNow(person_id)
         } catch (err) {
@@ -203,10 +219,13 @@ export class OwnCalendars {
     return this.running
   }
 
-  /** Look for calendars due a read now and every quarter of an hour. */
+  /** Look for calendars due a read now, and every quarter of an hour once one may be. */
   start() {
     void this.readDue().catch((err) => this.options.report?.(err))
-    this.timer = setInterval(() => void this.readDue().catch((err) => this.options.report?.(err)), this.options.lookMs ?? FIFTEEN_MINUTES)
+    this.timer = setInterval(() => {
+      if (Date.now() < this.nextLook) return
+      void this.readDue().catch((err) => this.options.report?.(err))
+    }, this.options.lookMs ?? FIFTEEN_MINUTES)
     this.timer.unref?.()
   }
 
