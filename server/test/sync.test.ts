@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { emptySnapshot, FEED, MemoryStorage, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
+import { emptySnapshot, FEED, MemoryStorage, type LatestOnly, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildApp } from '../src/app.ts'
+import { buildApp, type AppOptions } from '../src/app.ts'
 import { pgliteDb, type Db, type Queryable } from '../src/db.ts'
 
 /**
@@ -47,9 +47,9 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function server(db?: Db) {
+async function server(db?: Db, options: Partial<AppOptions> = {}) {
   const database = db ?? (await pgliteDb())
-  const app = await buildApp({ db: database })
+  const app = await buildApp({ db: database, ...options })
   cleanup.push(async () => {
     await app.close()
     if (!db) await database.close()
@@ -496,5 +496,203 @@ describe('a phone with a long backlog, far from its database (audit, 18 October 
     const results = res.json().results as { status: string; duplicate?: boolean }[]
     expect(results).toHaveLength(PUSH_LIMIT)
     expect(results.every((r) => r.status === 'applied' && r.duplicate)).toBe(true)
+  })
+})
+
+/** A transport that asks for only the latest of each record when the device does (unless told to read every change, as before), counting what it's sent. */
+class LatestLink extends TestLink {
+  sent = 0
+  asked: (LatestOnly | undefined)[] = []
+  constructor(app: FastifyInstance, private readonly everyChange = false) {
+    super(app)
+  }
+  override async pull(after: number, latest?: LatestOnly): Promise<PullResponse> {
+    if (!this.online) throw new Error('offline')
+    this.asked.push(latest)
+    const asking = latest !== undefined && !this.everyChange
+    const res = (await this.app.inject({ method: 'GET', url: `/api/sync/pull?after=${after}${asking ? `&latest=${latest}` : ''}` })).json() as PullResponse
+    this.sent += res.changes.length
+    return res
+  }
+}
+
+/** A device beginning empty: one that asks for the latest only, or one that reads every change, as before. */
+async function newDevice(app: FastifyInstance, latest: boolean) {
+  const link = new LatestLink(app, !latest)
+  const storage = new MemoryStorage()
+  const client = await new SyncClient({ storage, transport: link }).open()
+  return { link, client, storage }
+}
+
+/** What a copy holds, without the tables it holds nothing in, to compare one copy with another. */
+async function held(d: { storage: MemoryStorage; client: SyncClient }) {
+  const saved = (await d.storage.load())!
+  const entities = Object.fromEntries(Object.entries(saved.entities).filter(([, t]) => Object.keys(t).length > 0))
+  return { entities, cursor: saved.cursor, latest: saved.latest }
+}
+
+describe('a new device reads the records as they are, not every change ever made (audit finding 17)', () => {
+  /** Speakers moved back and forth, and shelves made and taken away again: far more changes than records. */
+  async function busy(app: FastifyInstance) {
+    const office = await seed(app)
+    for (let i = 0; i < 6; i++) {
+      await office.client.mutate('stock.move', move(2, 'a3', 'van1'))
+      await office.client.mutate('stock.move', move(2, 'van1', 'a3'))
+    }
+    for (let i = 0; i < 5; i++) await office.client.mutate('place.upsert', { id: `shelf${i}`, name: `Shelf ${i}`, notes: '' })
+    for (let i = 0; i < 3; i++) await office.client.mutate('place.remove', { id: `shelf${i}` })
+    await office.client.mutate('place.upsert', { id: 'shelf4', name: 'Shelf 4, top', notes: '' })
+    await office.client.sync()
+    return office
+  }
+
+  it('ends with the same copy as a device that read every change, sent far fewer, in pages, and reads on from there', async () => {
+    // Proves: a device that begins empty asks for the latest of each record, a few at a time, and ends holding exactly what a
+    // device that read the whole feed holds, at the same cursor; it was sent fewer changes, none of them deletes from before
+    // it began; and once it's read to the end it asks for the feed as it is, for what's new.
+    const app = await server(undefined, { pullLimit: 4 })
+    const office = await busy(app)
+    const replayed = await newDevice(app, false)
+    const fresh = await newDevice(app, true)
+    await replayed.client.sync()
+    await fresh.client.sync()
+
+    expect(await held(fresh)).toEqual(await held(replayed))
+    expect(fresh.client.cursor).toBe(office.client.cursor)
+    expect(counts(fresh)).toEqual(['a3 4'])
+    expect(fresh.link.sent).toBeLessThan(replayed.link.sent / 2)
+    expect(fresh.link.asked[0]).toBe('new')
+    expect(fresh.link.asked.length).toBeGreaterThanOrEqual(2)
+    expect(fresh.link.asked.slice(1).every((a) => typeof a === 'number' && a > 0)).toBe(true)
+    expect((await held(fresh)).latest).toBeUndefined()
+
+    // What's new after comes as the feed has it, deletes and all.
+    await office.client.mutate('place.remove', { id: 'shelf3' })
+    await office.client.mutate('stock.move', move(1, 'a3', 'van2'))
+    await office.client.sync()
+    fresh.link.asked.length = 0
+    await fresh.client.sync()
+    await replayed.client.sync()
+    expect(fresh.link.asked).toEqual([undefined])
+    expect(await held(fresh)).toEqual(await held(replayed))
+    expect(counts(fresh)).toEqual(['a3 3', 'van2 1'])
+  })
+
+  it('loses nothing changed or deleted while it reads', async () => {
+    // Proves: a record sent on the first page and changed again before the read ends comes again as it is then; one deleted
+    // after the read began is deleted, its delete sent, though deletes from before it began are not.
+    const app = await server(undefined, { pullLimit: 3 })
+    const office = await busy(app)
+    const fresh = await newDevice(app, true)
+    const replayed = await newDevice(app, false)
+
+    // After the first page: Bay A3 and Shelf 4 change, and Shelf 3 goes.
+    let pages = 0
+    const pull = fresh.link.pull.bind(fresh.link)
+    fresh.link.pull = async (after, latest) => {
+      const res = await pull(after, latest)
+      if (++pages === 1) {
+        expect(res.more).toBe(true)
+        expect(res.changes.map((c) => c.id)).toContain('a3')
+        await office.client.mutate('place.upsert', { id: 'a3', name: 'Bay A3 (back wall)', notes: '' })
+        await office.client.mutate('place.upsert', { id: 'shelf4', name: 'Shelf 4, bottom', notes: '' })
+        await office.client.mutate('place.remove', { id: 'shelf3' })
+        await office.client.mutate('stock.move', move(1, 'a3', 'van1'))
+        await office.client.sync()
+      }
+      return res
+    }
+    await fresh.client.sync()
+    await replayed.client.sync()
+
+    expect(await held(fresh)).toEqual(await held(replayed))
+    expect(fresh.client.cursor).toBe(office.client.cursor)
+    expect(counts(fresh)).toEqual(['a3 3', 'van1 1'])
+    const places = Object.values((await held(fresh)).entities.place as Record<string, { name: string }>).map((p) => p.name).sort()
+    expect(places).toEqual(['Bay A3 (back wall)', 'Shelf 4, bottom', 'Van 1', 'Van 2'])
+  })
+
+  it('jumps over no change that lands as its last page is answered (P0 finding 1)', async () => {
+    // Proves: a page of the latest that isn't full moves the cursor only as far as the feed went as that page was read, in
+    // the same statement, so a change committed after it and before the rest of the answer comes with the next pull.
+    const plain = await pgliteDb()
+    cleanup.push(() => plain.close())
+    let slipIn: (() => Promise<unknown>) | undefined
+    const db = steppedDb(plain, async (sql) => {
+      if (!slipIn || !sql.includes('AS head')) return
+      const go = slipIn
+      slipIn = undefined
+      await go()
+    })
+    const app = await server(db)
+    const office = await busy(app)
+    const fresh = await newDevice(app, true)
+    slipIn = async () => {
+      await office.client.mutate('stock.move', move(1, 'a3', 'van2'))
+      await office.client.sync()
+    }
+    await fresh.client.sync()
+    expect(slipIn).toBeUndefined()
+    expect(fresh.link.asked).toEqual(['new'])
+    expect(fresh.client.cursor).toBeLessThan(office.client.cursor)
+    await fresh.client.sync()
+    expect(counts(fresh)).toEqual(['a3 3', 'van2 1'])
+    expect(fresh.client.cursor).toBe(office.client.cursor)
+    const replayed = await newDevice(app, false)
+    await replayed.client.sync()
+    expect(await held(fresh)).toEqual(await held(replayed))
+  })
+
+  it("reads the feed as it is while a change of its own is on its way back, and from a server that doesn't know latest", async () => {
+    // Proves: a device with a change of its own applied but not yet read back never asks for the latest only, so the change
+    // can't vanish from its screen while the record waits on a later page; and an answer without `latest`, from a server
+    // older than it, leaves the device reading every change, as before. Either way it ends where the feed does.
+    const app = await server(undefined, { pullLimit: 3 })
+    const office = await busy(app)
+    const phone = await newDevice(app, true)
+    phone.link.online = false
+    await phone.client.mutate('place.upsert', { id: 'van3', name: 'Van 3', notes: '' }).catch(() => {})
+    phone.link.online = true
+    await phone.client.sync()
+    expect(phone.link.asked.every((a) => a === undefined)).toBe(true)
+    expect(phone.client.cursor).toBe(office.client.cursor + 1)
+
+    // An older server: nothing says latest, so the phone reads every change.
+    const older = await newDevice(app, true)
+    const pull = older.link.pull.bind(older.link)
+    older.link.pull = async (after, latest) => {
+      const { latest: _, ...res } = await pull(after, latest)
+      return res
+    }
+    await older.client.sync()
+    expect(older.link.asked[0]).toBe('new')
+    expect(older.link.asked.slice(1).every((a) => a === undefined)).toBe(true)
+    const replayed = await newDevice(app, false)
+    await replayed.client.sync()
+    expect(await held(older)).toEqual(await held(replayed))
+  })
+
+  it('reads again from the start with only the latest, deletes and all, when the copy already holds records', async () => {
+    // Proves: a copy read again from the start (FEED, money, what its role reads) holds records already, so it asks with 0,
+    // which sends the deletes too: a record it holds that has gone since is taken away, as reading every change would.
+    const app = await server(undefined, { pullLimit: 4 })
+    const office = await busy(app)
+    const head = office.client.cursor
+    const storage = new MemoryStorage()
+    const full = (await (office as { storage: MemoryStorage }).storage.load())!
+    // A copy saved before FEED 2, holding Shelf 0 still, which has gone, and missing the latest name of Shelf 4.
+    const old: Snapshot = { ...emptySnapshot('phone'), cursor: head, entities: structuredClone(full.entities) }
+    ;(old.entities.place as Record<string, unknown>).shelf0 = { id: 'shelf0', name: 'Shelf 0', notes: '' }
+    ;(old.entities.place as Record<string, { name: string }>).shelf4!.name = 'Shelf 4'
+    await storage.save(old)
+    const link = new LatestLink(app)
+    const phone = { link, storage, client: await new SyncClient({ storage, transport: link }).open() }
+    await phone.client.sync()
+    expect(link.asked[0]).toBeUndefined()
+    expect(link.asked[1]).toBe(0)
+    const replayed = await newDevice(app, false)
+    await replayed.client.sync()
+    expect((await held(phone)).entities).toEqual((await held(replayed)).entities)
+    expect(phone.client.cursor).toBe(head)
   })
 })

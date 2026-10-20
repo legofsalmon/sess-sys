@@ -3,7 +3,7 @@ import { commandSchemas, type CommandArgs, type CommandInput, type CommandName, 
 import { nameKept, type Erasure, type NameKept } from '../erasure.ts'
 import { newId } from '../ids.ts'
 import { ENTITY_NAMES, type Entities, type EntityName } from '../model.ts'
-import { FEED, PUSH_SLICE, type Change, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
+import { FEED, PUSH_SLICE, type Change, type LatestOnly, type MutationResult, type PullResponse, type PushRequest, type PushResponse } from '../protocol.ts'
 import { countsView, type CountsView } from './counts-view.ts'
 import { crewView, type CrewView } from './crew-view.ts'
 import { documentsView, type DocumentsView } from './documents-view.ts'
@@ -41,7 +41,8 @@ import { READS_EVERYTHING, sameReading, type Reading } from '../reading.ts'
 
 export interface Transport {
   push(req: PushRequest): Promise<PushResponse>
-  pull(after: number): Promise<PullResponse>
+  /** With `latest`, asks for only the latest change of each record (see `LatestOnly`); a transport may leave it out. */
+  pull(after: number, latest?: LatestOnly): Promise<PullResponse>
 }
 
 /** Everything a device keeps between reloads. */
@@ -81,6 +82,12 @@ export interface Snapshot {
    * this, so a change made then says it was made against this.
    */
   held?: number
+  /**
+   * The copy is being read from the start with only the latest change of
+   * each record (audit finding 17), and the server said to ask with this
+   * for the next page (`PullResponse.latest`); gone once it's read to the end.
+   */
+  latest?: number
 }
 
 export interface Storage {
@@ -633,9 +640,26 @@ export class SyncClient {
     }
   }
 
+  /**
+   * Whether this pull asks for only the latest change of each record, and how: from the start, a copy that holds nothing
+   * asks "new", one that holds records 0, for the deletes too; the pages after, what the server answered. Never while a
+   * change of this device's own is applied and not yet read back: the cursor could pass it while the record it changed
+   * waits for a later page, and the change would vanish from the screen until then. The rest of that read is the feed as
+   * it is, which is always right, only longer.
+   */
+  private latestOnly(): LatestOnly | undefined {
+    if (this.state.outbox.some((m) => m.appliedSeq !== undefined && m.appliedSeq > this.state.cursor)) {
+      delete this.state.latest
+      return undefined
+    }
+    if (this.state.latest !== undefined) return this.state.latest
+    if (this.state.cursor !== 0) return undefined
+    return Object.values(this.state.entities).every((table) => Object.keys(table ?? {}).length === 0) ? 'new' : 0
+  }
+
   private async pull() {
     for (;;) {
-      const res = await this.transport.pull(this.state.cursor)
+      const res = await this.transport.pull(this.state.cursor, this.latestOnly())
       const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
       const behind = res.head !== undefined && res.head < this.state.cursor
       if (restored || behind) return this.restart(res.generation, restored && res.cleared === true)
@@ -663,6 +687,8 @@ export class SyncClient {
         if ((gainedMoney || reread || refeed) && this.state.cursor > 0) {
           this.state.held = Math.max(this.state.held ?? 0, this.state.cursor)
           this.state.cursor = 0
+          // It holds records now, so it reads again with the deletes.
+          delete this.state.latest
           this.version++
           await this.persist()
           continue
@@ -684,6 +710,13 @@ export class SyncClient {
         this.touched(change.entity)
       }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
+      // Reading only the latest of each record, there's more to come; read to the end, or from a server that sent every change, it's done.
+      const latest = res.more ? res.latest : undefined
+      if (latest !== this.state.latest) {
+        if (latest === undefined) delete this.state.latest
+        else this.state.latest = latest
+        changed = true
+      }
       if (this.state.held !== undefined && this.state.cursor >= this.state.held) delete this.state.held
       // Applied mutations leave the outbox once their result has arrived.
       const done = this.state.outbox.filter((m) => m.appliedSeq !== undefined && m.appliedSeq <= this.state.cursor)

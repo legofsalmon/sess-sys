@@ -12,7 +12,9 @@ import type { EntityName } from './model.ts'
  *   original answer is repeated.
  * - pull: fetch every change after the cursor the device already has. The
  *   cursor is the server's change sequence number, so a device that has been
- *   offline for a week gets exactly the gap.
+ *   offline for a week gets exactly the gap. A device reading its copy from
+ *   the start asks for only the latest change of each record (`latest`), so
+ *   it's sent the records as they are, not every change ever made to them.
  * - live: a WebSocket that only says "there is something new up to N". The
  *   device then pulls. Keeping data off the socket means a dropped socket
  *   never loses anything; the next pull covers it.
@@ -133,7 +135,24 @@ export interface PullResponse {
    * from the start, so every record it holds is as it would be sent now.
    */
   reading?: Reading
+  /**
+   * The pull asked for only the latest change of each record (audit
+   * finding 17), and this page is that: deletes up to this change number
+   * are left out, for a copy that began empty by then, and the device asks
+   * with it for the next page. Absent when the pull didn't ask, and from
+   * servers older than it, which send every change.
+   */
+  latest?: number
 }
+
+/**
+ * How a device asks for only the latest change of each record: "new" for
+ * the first page of a copy that holds nothing, which leaves out every delete
+ * the feed holds by then; the number the server answered with (`latest`) on
+ * the pages after; 0 for a copy that holds records, which is sent the
+ * deletes too.
+ */
+export type LatestOnly = number | 'new'
 
 /** GET /api/data: whether the app holds made-up data, and when it last started fresh (ADR 0019). */
 export interface DataStatus {
@@ -155,6 +174,15 @@ export const START_FRESH_WORDS = 'delete everything'
 export interface Poke {
   type: 'poke'
   cursor: number
+}
+
+/**
+ * The live connection is still there, said every 25 seconds (`LIVE_BEAT_MS`
+ * on the server). A device that hears nothing for longer takes it as gone,
+ * polls, and connects again. Devices from before it ignore it.
+ */
+export interface Beat {
+  type: 'beat'
 }
 
 /** A member of staff, signed in to the app with their Google account. */
