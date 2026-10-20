@@ -1,3 +1,4 @@
+import { photoPath, type Person } from '@sh/shared'
 import { useState } from 'react'
 import { Icon, type IconName } from './Icon.tsx'
 
@@ -6,9 +7,9 @@ import { Icon, type IconName } from './Icon.tsx'
  * system's imagery.md): a thing's photo or, until it has one, a quiet tile
  * with the icon for what kind of thing it is; a person's photo or, until
  * they give one, their initials. The name is always beside it, so the
- * picture is hidden from screen readers. There is nowhere to keep photos
- * yet (files wait on the bucket), so every picture is a placeholder for now
- * and `src` is for when there is.
+ * picture is hidden from screen readers. A person's photo comes from the
+ * server once they have one (ADR 0065); things have only placeholders yet,
+ * and `src` is for when they have photos too.
  */
 
 type Size = 'small' | 'large'
@@ -16,10 +17,16 @@ const cls = (base: string, size?: Size) => (size ? `${base} ${base}-${size}` : b
 
 /** A photo that falls back to its placeholder if it can't be loaded, never a broken image. */
 function Photo({ src, fallback }: { src?: string; fallback: React.ReactNode }) {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) return <>{fallback}</>
-  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
+  // Which address failed, so a new photo is tried afresh: with no signal, a photo not yet kept by the browser is the placeholder.
+  const [failed, setFailed] = useState<string>()
+  if (!src || failed === src) return <>{fallback}</>
+  return <img src={src} alt="" loading="lazy" onError={() => setFailed(src)} />
 }
+
+const base = import.meta.env.VITE_API_BASE ?? ''
+
+/** Where a person's photo is, once they have one (ADR 0065). */
+export const photoOf = (p: Pick<Person, 'id' | 'photo'> | undefined) => (p?.photo ? `${base}${photoPath(p.id, p.photo.at)}` : undefined)
 
 /** A thing: a product, an item, a case. */
 export function Thumb({ icon, src, size }: { icon: IconName; src?: string; size?: Size }) {

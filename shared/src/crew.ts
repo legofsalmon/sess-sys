@@ -322,6 +322,12 @@ export const person = z.object({
    * freelancer their phone too. Never stored.
    */
   detailsHidden: z.boolean().optional(),
+  /**
+   * Their photo (ADR 0065): when it was put up, which makes its address
+   * (photoPath). Set by the server, never by an edit; none is their
+   * initials. Not sent to a reader who doesn't read their details.
+   */
+  photo: z.object({ at: z.string() }).nullable().optional(),
 })
 export type Person = z.infer<typeof person>
 

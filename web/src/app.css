@@ -306,7 +306,7 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .fold > button.link, .app button.show-all { justify-self: start; }
 
 /* Sign-in and account. */
-a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
+a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* 44px touch targets: easier with gloves on or in a dark venue. */
@@ -376,17 +376,17 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
  * leave a button looking held. The washes and timings are the shared ones; what is selected or current doesn't hover, and nothing
  * disabled answers. Only colour changes, so reduced motion leaves it as it is.
  */
-button, a.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.link {
+button, a.button, label.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.link {
   transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard), filter var(--ds-duration-fast) var(--ds-ease-standard);
 }
 @media (hover: hover) {
-  button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
+  button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover, label.button:not([aria-busy='true']):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
   button.primary:not(:disabled):hover, a.button.primary:hover, button.danger:not(:disabled):hover { filter: brightness(.92); }
   .app button.link:not(:disabled):hover, .app a.link:hover, .app .back:hover, .top .up-link:hover, .crumbs a:hover, .account button.link:not(:disabled):hover { color: var(--ink); }
   .tabs a:not([aria-current='page']):hover { background: var(--ds-wash-hover); color: var(--ink); }
   .app .job-row:not([aria-current='page']):hover b, .app .who:not(:disabled):hover b, .history .run-line:hover .what { text-decoration: underline; text-underline-offset: 3px; }
 }
-button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):active, a.button:not(.primary):active { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); transition-duration: var(--ds-duration-instant); }
+button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):active, a.button:not(.primary):active, label.button:not([aria-busy='true']):active { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); transition-duration: var(--ds-duration-instant); }
 button.primary:not(:disabled):active, a.button.primary:active, button.danger:not(:disabled):active { filter: brightness(.84); transition-duration: var(--ds-duration-instant); }
 .tabs a:not([aria-current='page']):active { background: var(--ds-wash-pressed); }
 /* Work under way (aria-busy, useLate.ts): no second press, without the faded look of a button that can't be used. */
