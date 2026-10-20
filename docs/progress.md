@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - A person's main email can be swapped for another of theirs, in
-  [Decision 0063](adr/0063-making-another-email-the-main-one.md) (Colly's
+  [Decision 0064](adr/0064-making-another-email-the-main-one.md) (Colly's
   "change the primary email address for users that have been combined"):
   on their page, each address under "Also found by" has **Make main**, and
   the one it replaces joins the others. They answer to the same addresses,

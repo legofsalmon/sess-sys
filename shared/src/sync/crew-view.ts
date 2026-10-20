@@ -200,7 +200,7 @@ export function crewView(
         break
       }
       case 'person.mainEmail': {
-        // The same addresses, one of the others first (ADR 0063).
+        // The same addresses, one of the others first (ADR 0064).
         const a = m.args as CommandArgs<'person.mainEmail'>
         const p = people.get(a.id)
         const next = p && withMainEmail(p, a.email)

@@ -34,7 +34,7 @@ export const mergeCommandSchemas = {
    * Make one of the addresses `id` also answers to their main one, the one
    * shown and written to; the main one they had joins the others. They
    * answer to the same addresses as before, so whoever signs in as them
-   * still does, with the same role (ADR 0063).
+   * still does, with the same role (ADR 0064).
    */
   'person.mainEmail': z.object({ id, email: z.string().min(1).max(200) }),
 }
@@ -52,7 +52,7 @@ export function emailsOf(p: Pick<Person, 'email'> & { otherEmails?: readonly str
 
 /**
  * A person's addresses with one of their others made the main one (ADR
- * 0063): the same addresses, so a bring-in and their sign-in find them as
+ * 0064): the same addresses, so a bring-in and their sign-in find them as
  * before, with the main one they had first among the others. Nothing when
  * it isn't one of their others.
  */

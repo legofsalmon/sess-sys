@@ -157,7 +157,7 @@ function Who({ person, view }: { person: PersonView; view: View }) {
               </div>
             )}
             {/* The addresses they had as someone combined with them (ADR 0055): a bring-in and their sign-in find them by these too.
-                Any can be made the main one (ADR 0063); the one it replaces joins these, so it's undone the same way. */}
+                Any can be made the main one (ADR 0064); the one it replaces joins these, so it's undone the same way. */}
             {(person.otherEmails ?? []).length > 0 && (
               <div>
                 <dt>Also found by</dt>

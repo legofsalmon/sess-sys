@@ -145,7 +145,7 @@ describe('combining people brought in twice', () => {
     expect((await latest<Person>(app, 'person', colly.id))!.name).toBe('Colly Hewson')
   })
 
-  it('makes another of their addresses the main one, and they still sign in with the same role by either (ADR 0063)', async () => {
+  it('makes another of their addresses the main one, and they still sign in with the same role by either (ADR 0064)', async () => {
     const { app, db } = await server()
     const colly = await person(app, 'Colly', { kind: 'staff', email: 'colly@sessionhire.com' })
     const again = await person(app, 'Colly Hewson', { kind: 'staff', email: 'colly@gmail.com' })

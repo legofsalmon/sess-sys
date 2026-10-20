@@ -95,7 +95,7 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'person.contact': 'crew',
   // Combining people brought in twice (ADR 0055): the crew's records, like an edit. One who signs in with a role needs settings too, on the server.
   'person.merge': 'crew',
-  // Which of their addresses is the main one (ADR 0063): an edit of their details. For someone with a role, settings too, on the server.
+  // Which of their addresses is the main one (ADR 0064): an edit of their details. For someone with a role, settings too, on the server.
   'person.mainEmail': 'crew',
   'unavailability.add': 'crew',
   'unavailability.remove': 'crew',

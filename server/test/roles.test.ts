@@ -287,7 +287,7 @@ describe('roles', () => {
     expect((await send(app, c, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com', { kind: 'freelancer' }))).status).toBe('applied')
     expect((await send(app, s, 'person.upsert', staff('dara2', 'Dara Kelly', 'dara.kelly@sessionhire.com'))).reason?.code).toBe('forbidden')
 
-    // Which of the director's addresses is the main one is the office's too (ADR 0063), though she signs in by either.
+    // Which of the director's addresses is the main one is the office's too (ADR 0064), though she signs in by either.
     expect((await send(app, c, 'person.upsert', staff('colly2', 'Colly Hewson', 'colly.hewson@sessionhire.com'))).status).toBe('applied')
     expect((await send(app, c, 'person.merge', { id: 'colly', from: ['colly2'] })).status).toBe('applied')
     expect((await send(app, s, 'person.mainEmail', { id: 'colly', email: 'colly.hewson@sessionhire.com' })).reason?.code).toBe('forbidden')

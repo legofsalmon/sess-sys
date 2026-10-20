@@ -112,7 +112,7 @@ export const mergeHandlers = {
   },
 
   /**
-   * One of the addresses someone answers to made their main one (ADR 0063).
+   * One of the addresses someone answers to made their main one (ADR 0064).
    * They answer to the same addresses after, so nobody's sign-in or role
    * changes, and no address can come to belong to two people; who may
    * change a role holder's email is still who may change this.

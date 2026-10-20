@@ -1,4 +1,4 @@
-# ADR 0063: Making another email the main one
+# ADR 0064: Making another email the main one
 
 - **Status:** accepted
 - **Date:** 20 October 2026

@@ -150,7 +150,7 @@ describe('on a device, before the server answers', () => {
   })
 })
 
-describe('making another address the main one (ADR 0063)', () => {
+describe('making another address the main one (ADR 0064)', () => {
   it('swaps them, keeping every address, and refuses one they are not found by', () => {
     const a = person('Adam Byrne', { email: 'Adam@SessionHire.com', otherEmails: ['adam@gmail.com', 'adambyrne@yahoo.ie'] })
     expect(withMainEmail(a, ' ADAM@gmail.com')).toEqual({ email: 'adam@gmail.com', otherEmails: ['adam@sessionhire.com', 'adambyrne@yahoo.ie'] })
