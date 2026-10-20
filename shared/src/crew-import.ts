@@ -174,8 +174,8 @@ const HEADERS = {
 } as const
 type Field = keyof typeof HEADERS
 
-const MOST_SKILLS = 30
-const SKILL_LENGTH = 60
+export const MOST_SKILLS = 30
+export const SKILL_LENGTH = 60
 
 const tidy = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
 
