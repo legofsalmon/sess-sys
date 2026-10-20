@@ -4,7 +4,7 @@ import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, depar
 import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
-import { mergedPerson } from '../merge-people.ts'
+import { mergedPerson, withMainEmail } from '../merge-people.ts'
 
 /**
  * The crew screen's view of a device's data: what the server has said, with
@@ -197,6 +197,14 @@ export function crewView(
         const gone = new Set(from.map((p) => p.id))
         for (const o of offers.values()) if (gone.has(o.personId)) offers.set(o.id, { ...o, personId: into.id, pending: true })
         for (const u of away.values()) if (gone.has(u.personId)) away.set(u.id, { ...u, personId: into.id, pending: true })
+        break
+      }
+      case 'person.mainEmail': {
+        // The same addresses, one of the others first (ADR 0063).
+        const a = m.args as CommandArgs<'person.mainEmail'>
+        const p = people.get(a.id)
+        const next = p && withMainEmail(p, a.email)
+        if (p && next) people.set(p.id, { ...p, ...next, pending: true })
         break
       }
       case 'person.contact': {

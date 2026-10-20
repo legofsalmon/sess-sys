@@ -30,6 +30,13 @@ export const mergeCommandSchemas = {
   'person.merge': z
     .object({ id, from: z.array(id).min(1, 'Pick someone to combine them with.').max(MERGE_AT_ONCE, `Up to ${MERGE_AT_ONCE} people at a time, please.`) })
     .refine((m) => !m.from.includes(m.id) && new Set(m.from).size === m.from.length, { message: 'Pick each person once.' }),
+  /**
+   * Make one of the addresses `id` also answers to their main one, the one
+   * shown and written to; the main one they had joins the others. They
+   * answer to the same addresses as before, so whoever signs in as them
+   * still does, with the same role (ADR 0063).
+   */
+  'person.mainEmail': z.object({ id, email: z.string().min(1).max(200) }),
 }
 
 /** A name the bring-in made from their address, archived or not ("Craicaudio" from craicaudio@gmail.com), as Tidy up finds them. */
@@ -41,6 +48,18 @@ export const emailKey = (e: string | null | undefined) => (e ?? '').trim().toLow
 /** Every address a person answers to: their own first, then those they had as someone they were combined with. */
 export function emailsOf(p: Pick<Person, 'email'> & { otherEmails?: readonly string[] }): string[] {
   return [...new Set([p.email, ...(p.otherEmails ?? [])].map(emailKey).filter(Boolean))]
+}
+
+/**
+ * A person's addresses with one of their others made the main one (ADR
+ * 0063): the same addresses, so a bring-in and their sign-in find them as
+ * before, with the main one they had first among the others. Nothing when
+ * it isn't one of their others.
+ */
+export function withMainEmail(p: Pick<Person, 'email'> & { otherEmails?: readonly string[] }, email: string): { email: string; otherEmails: string[] } | undefined {
+  const wanted = emailKey(email)
+  if (!wanted || !(p.otherEmails ?? []).map(emailKey).includes(wanted)) return undefined
+  return { email: wanted, otherEmails: emailsOf(p).filter((e) => e !== wanted) }
 }
 
 /** A certificate's entry worth keeping of two: one held over one not, then the later expiry, then the one with a note. */

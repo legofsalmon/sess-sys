@@ -3,6 +3,19 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: making another email the main one
+
+**Done**
+
+- A person's main email can be swapped for another of theirs, in
+  [Decision 0063](adr/0063-making-another-email-the-main-one.md) (Colly's
+  "change the primary email address for users that have been combined"):
+  on their page, each address under "Also found by" has **Make main**, and
+  the one it replaces joins the others. They answer to the same addresses,
+  so sign-in and roles don't change; for someone with a role only the
+  office and directors can do it.
+- Checked: typecheck, all tests (new unit and server tests).
+
 ## 19 October 2026: what crew and freelancers read of other people
 
 **Done**
