@@ -25,7 +25,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { rateText } from '../format.ts'
 import { useAccess, useSeesRates } from '../role.ts'
-import { promptFor, SharePanel, SharePanelFor, type Share } from './CrewScreen.tsx'
+import { promptFor, SharePanel, SharePanelFor, type Share } from './Messages.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
 
