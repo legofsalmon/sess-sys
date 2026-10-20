@@ -15,6 +15,30 @@ waiting on someone.
   initials on their page, the People list and Home. Erasing and combining
   people handle it.
 - Checked: typecheck, all tests (new server tests for photos).
+## 20 October 2026: making another email the main one
+
+**Done**
+
+- A person's main email can be swapped for another of theirs, in
+  [Decision 0064](adr/0064-making-another-email-the-main-one.md) (Colly's
+  "change the primary email address for users that have been combined"):
+  on their page, each address under "Also found by" has **Make main**, and
+  the one it replaces joins the others. They answer to the same addresses,
+  so sign-in and roles don't change; for someone with a role only the
+  office and directors can do it.
+- Checked: typecheck, all tests (new unit and server tests).
+## 20 October 2026: skills as picks
+
+**Done**
+
+- Skills as picks, in [Decision 0063](adr/0063-skills-as-picks.md)
+  (Colly's "an autocomplete free type field, that can populate with
+  multiple selections"): the person form's Skills field holds chips, offers
+  the skills already on the crew list as you type (most used first, in the
+  spelling most people have), and still takes a new one as typed. Enter or
+  a comma adds, Backspace or a chip's own button takes one off.
+- Checked: typecheck, all unit and server tests, the browser suite (new
+  skills test).
 
 ## 19 October 2026: what crew and freelancers read of other people
 

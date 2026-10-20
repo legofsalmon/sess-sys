@@ -428,6 +428,9 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (others.length > 5) names.push(`${others.length - 5} more`)
       return `Made ${inWords(names.length ? names : ['others'])} part of ${person(a.id)}, as one person`
     }
+    // Not which address: the history is read by every member of staff.
+    case 'person.mainEmail':
+      return `Made another of ${person(a.id)}'s email addresses their main one`
     // No name: the history is read by every member of staff, and keeps this for good (ADR 0027).
     case 'person.erase':
       return "Erased a person's details on request"

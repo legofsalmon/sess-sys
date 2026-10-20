@@ -229,6 +229,8 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnC
   'person.archive': { names: { field: 'id' }, refused: true, keep: as },
   // Combining (ADR 0055) carries ids only: who was kept, and who was made part of them.
   'person.merge': { names: { field: 'id' }, refused: true, keep: as },
+  // That their main address changed, never to what.
+  'person.mainEmail': { names: { field: 'id' }, refused: true, keep: only('id') },
   'unavailability.add': { names: { field: 'personId' }, refused: true, keep: only('id', 'personId') },
   'offer.send': { names: { field: 'personId' }, refused: true, keep: as },
   // Their answer stays as a record of work; what they wrote with it goes.

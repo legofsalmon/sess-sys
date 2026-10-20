@@ -194,6 +194,8 @@ function describer(view: View): (m: Mutation) => string {
         return a.archived ? `Archive ${person(a.id)}` : `Bring ${person(a.id)} back`
       case 'person.contact':
         return `Change ${person(a.id)}'s contact details`
+      case 'person.mainEmail':
+        return `Change ${person(a.id)}'s main email`
       case 'person.erase':
         return `Erase ${person(a.id)}'s details`
       case 'unavailability.add':
