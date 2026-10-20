@@ -1,9 +1,10 @@
-import { historyDays, historyTime, NOTICE_WHY_WORDS, type Notice } from '@sh/shared'
+import { historyDays, historyTime, NOTICE_WHY_WORDS, plan, sortOutDays, type Notice } from '@sh/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth.ts'
 import { Empty } from './Empty.tsx'
 import { Icon } from './Icon.tsx'
 import { Top } from './jobs/common.tsx'
+import { SortOut } from './jobs/PlanScreen.tsx'
 import {
   dismissToast,
   isNew,
@@ -18,9 +19,10 @@ import {
   useNotices,
   useToasts,
 } from './notices.ts'
+import { useAccess } from './role.ts'
 import { MENU } from './Up.tsx'
 import { useLate } from './useLate.ts'
-import { useView } from './view.ts'
+import { useToday, useView } from './view.ts'
 
 /**
  * Notifications (ADR 0058): the bell in the top bar with how many are new,
@@ -89,6 +91,11 @@ export function NoticesScreen() {
     if (notices.status === 'ready') void markAllRead()
   }, [notices.status, notices.notices[0]?.id])
 
+  // Clashes and checks from today to four weeks out (ADR 0069), for whoever books crew: worked out on this device, so they show without signal too.
+  const today = useToday()
+  const booksCrew = useAccess().can('crew')
+  const ahead = useMemo(() => (booksCrew ? plan(view, sortOutDays(today), today) : null), [booksCrew, view, today])
+
   const byId = useMemo(() => new Map(notices.notices.map((n) => [n.id, n])), [notices.notices])
   const days = useMemo(() => historyDays(notices.notices), [notices.notices])
 
@@ -137,6 +144,8 @@ export function NoticesScreen() {
           <Empty>When someone changes a job you're on, your leave or an offer you sent, it shows here.</Empty>
         )}
       </section>
+
+      {ahead && <SortOut problems={ahead.problems} vanProblems={ahead.vanProblems} hint="Clashes and checks from today to four weeks out. Each goes once it's sorted." />}
 
       {days.map((d) => (
         <section className="card day" key={d.day} aria-labelledby={`notices-${d.day}`}>

@@ -306,7 +306,8 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ow
         x.severity = 'check'
         x.problem = `Offered ${list(unique(asked.map((w) => w.job)))} ${booked.length ? `while booked on ${booked[0]!.job}` : `but marked unavailable${why}`}`
       }
-      if (x.problem && x.severity)
+      // A day gone is history, not something to sort out (ADR 0069): the day still shows it, the list doesn't.
+      if (x.problem && x.severity && !(today && day < today))
         problems.push({
           person: lane.person,
           day,
@@ -330,6 +331,14 @@ export function plan(view: { jobs: JobsView; crew: CrewView; late?: LateView; ow
   const { vans, vanProblems } = vansOn(view.vehicles, days, lanes, today)
 
   return { days: [...days], jobs, people, problems, short, holidays: publicHolidaysAmong(days), vans, vanProblems }
+}
+
+/** How far ahead clashes and checks are called out away from the planner, in the notifications (ADR 0069): four weeks. */
+export const SORT_OUT_DAYS = 28
+
+/** Today and the four weeks after it: the near future crew and vans are still being sorted for. */
+export function sortOutDays(today: string): string[] {
+  return Array.from({ length: SORT_OUT_DAYS }, (_, i) => addDays(today, i))
 }
 
 /**
@@ -381,7 +390,7 @@ function vansOn(vehicles: VehiclesView | undefined, days: readonly string[], job
         x.severity = 'check'
         x.problem = `Pencilled in for ${list(unique(pencilled.map((w) => w.job)))} ${held.length ? `while on ${held[0]!.job}` : x.offRoad !== null ? `but off the road${why}` : `but ${lapsed}`}`
       }
-      if (x.problem && x.severity)
+      if (x.problem && x.severity && !(today && day < today))
         vanProblems.push({ vehicle: v, day, text: x.problem, severity: x.severity, jobId: (x.severity === 'check' ? pencilled[0] : held[0])?.jobId ?? null })
     }
   }
