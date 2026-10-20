@@ -206,4 +206,11 @@ test('reads Current RMS’s exports chosen together into one counted list, and s
   const k12 = office.getByRole('region', { name: 'Rows' }).getByRole('listitem', { name: 'Row 2' })
   await expect(k12).toContainText('2 counted · €1,250 · €60 a day')
   await expect(k12).toContainText('Updates Corvo K12: day price €60')
+  // The list places nothing, so one place is asked for once, for all of it (ADR 0061), rather than on every row.
+  const where = office.getByRole('region', { name: 'Places and cases' })
+  await expect(where.getByRole('checkbox', { name: /Put all of it there/ })).toHaveCount(0)
+  await expect(k12).toContainText('Say where these are kept')
+  await where.getByLabel('All this kit is kept at').fill('Bay A1')
+  await expect(k12).not.toContainText('Say where these are kept')
+  await expect(k12).toContainText('At Bay A1')
 })

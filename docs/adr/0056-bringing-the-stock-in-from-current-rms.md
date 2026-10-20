@@ -57,7 +57,7 @@ and checked one by one. Products worth €150 or more come in numbered and
 counted until labelled (ADR 0013's line), so labelling them later with the
 app's own QR labels takes one off the count each, as ever. Current RMS has
 one store, "Default", and no locations, so where it's all kept is typed
-once above the rows ("Kit the list doesn't place is at").
+once above the rows ("All this kit is kept at", [ADR 0061](0061-one-place-for-a-whole-stock-list.md)).
 
 **Product groups become departments.** A group that names one (Audio,
 Lighting, Power, Rigging, Staging) is that; the others are matched by

@@ -81,3 +81,19 @@ describe('a day price in any stock list', () => {
     expect(previewStockList(rows({ dayPrice: 'lots' }), known(null), opts).rows[0]!.problems[0]).toMatchObject({ field: 'dayPrice' })
   })
 })
+
+describe('one place for all of it (ADR 0061)', () => {
+  const none = { products: [], items: [], places: [{ id: 'p1', name: 'Warehouse' }], counts: [] }
+  const rows = [
+    { row: 2, cells: { product: 'Gaffer tape', quantity: '40' } },
+    { row: 3, cells: { product: 'IEC lead', quantity: '12', place: 'Bay D' } },
+    { row: 4, cells: { product: 'XLR 10m', quantity: '20', case: 'Cable trunk' } },
+  ]
+  const where = (allAt: boolean) =>
+    previewStockList(rows, none, { make: true, defaultPlace: 'Warehouse', allAt }).rows.map((r) => r.where)
+
+  it('puts only unplaced kit there unless told to put all of it there; kit in a case stays in its case', () => {
+    expect(where(false)).toEqual(['At Warehouse', 'At Bay D (new place)', 'In Cable trunk (new case)'])
+    expect(where(true)).toEqual(['At Warehouse', 'At Warehouse', 'In Cable trunk (new case)'])
+  })
+})
