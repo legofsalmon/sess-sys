@@ -133,6 +133,7 @@ const CASES: Case[] = [
   c('offer.cancel', { id: 'eimear-sound' }),
   c('offer.seen', { id: 'eimear-sound' }, { before: [m('offer.respond', { id: 'eimear-sound', answer: 'decline', note: '' })] }),
   c('person.merge', { id: 'dara', from: ['niamh'] }, { before: [person('niamh', 'Dara Q', 'freelancer', { email: 'dq@example.com' })] }),
+  c('person.mainEmail', { id: 'dara', email: 'dq@example.com' }, { before: [person('niamh', 'Dara Q', 'freelancer', { email: 'dq@example.com' }), m('person.merge', { id: 'dara', from: ['niamh'] })] }),
 
   // Jobs.
   c('client.upsert', { id: 'bw', name: 'Brightwater Events Ltd', contacts: [{ name: 'Orla Byrne', role: 'Producer', email: 'orla@example.com', phone: '+35315550000' }], notes: 'Pays in 30 days' }),
