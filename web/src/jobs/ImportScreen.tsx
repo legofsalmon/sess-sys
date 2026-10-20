@@ -1,6 +1,7 @@
 import {
   addMonths,
   dayLabel,
+  fullName,
   importFromDefault,
   isDay,
   jobsAfterNaming,
@@ -8,6 +9,7 @@ import {
   leftOutLabel,
   PROJECT_KINDS,
   spanLabel,
+  splitName,
   type ImportBrought,
   type ImportCalendar,
   type ImportChanged,
@@ -15,6 +17,7 @@ import {
   type ImportJob,
   type ImportPreview,
   type ImportResult,
+  type NameParts,
   type ProjectKind,
   type View,
 } from '@sh/shared'
@@ -44,7 +47,7 @@ type Step =
   | { at: 'done'; preview: ImportPreview; result: ImportResult }
 
 /** What was unticked, renamed, re-kinded and chosen on a calendar's list, kept while someone goes back to look at another and returns. */
-type Picks = { names: Record<string, string>; kinds: Record<string, ProjectKind>; skip: ReadonlySet<string>; people: ReadonlySet<string>; personNames: Record<string, string> }
+type Picks = { names: Record<string, string>; kinds: Record<string, ProjectKind>; skip: ReadonlySet<string>; people: ReadonlySet<string>; personNames: Record<string, NameParts> }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-IE')} ${n === 1 ? one : many}`
 
@@ -246,7 +249,10 @@ function Look(p: {
   const [kinds, setKinds] = useState<Record<string, ProjectKind>>(() => ({ ...Object.fromEntries(preview.jobs.map((j) => [j.key, j.kind])), ...p.kept?.kinds }))
   const [skip, setSkip] = useState<ReadonlySet<string>>(() => p.kept?.skip ?? new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => p.kept?.people ?? new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
-  const [personNames, setPersonNames] = useState<Record<string, string>>(() => ({ ...Object.fromEntries(preview.people.map((x) => [x.email, x.name])), ...p.kept?.personNames }))
+  // Each person's name in two, split from what Google had, to correct (ADR 0063).
+  const [personNames, setPersonNames] = useState<Record<string, NameParts>>(() => ({ ...Object.fromEntries(preview.people.map((x) => [x.email, splitName(x.name)])), ...p.kept?.personNames }))
+  const partsOf = (x: { email: string; name: string }) => personNames[x.email] ?? splitName(x.name)
+  const setPart = (email: string, part: keyof NameParts, value: string) => setPersonNames({ ...personNames, [email]: { ...(personNames[email] ?? { firstName: '', lastName: '' }), [part]: value } })
   const { onKeep } = p
   useEffect(() => {
     onKeep({ names, kinds, skip, people, personNames })
@@ -267,13 +273,16 @@ function Look(p: {
   const more = ticked.length - newJobs.length
   const what = [count && plural(count, 'job', 'jobs'), more && `more days for ${plural(more, 'job', 'jobs')}`].filter(Boolean).join(' and ')
   const blank = newJobs.find((j) => !(names[j.key] ?? '').trim())
-  const unnamed = adding.find((e) => !(personNames[e] ?? '').trim())
+  const unnamed = adding.find((e) => !(personNames[e]?.firstName ?? '').trim())
 
   const choices: ImportChoices = {
     calendarId: preview.calendar.id,
     from: preview.from,
     jobs: preview.jobs.map((j) => ({ key: j.key, name: (names[j.key] ?? j.name).trim() || j.name, kind: kinds[j.key] ?? j.kind, include: !skip.has(j.key) })),
-    people: preview.people.map((x) => ({ email: x.email, name: (personNames[x.email] ?? x.name).trim() || x.name, include: people.has(x.email) })),
+    people: preview.people.map((x) => {
+      const parts = { firstName: partsOf(x).firstName.trim(), lastName: partsOf(x).lastName.trim() }
+      return parts.firstName ? { email: x.email, name: fullName(parts), ...parts, include: people.has(x.email) } : { email: x.email, name: x.name, include: people.has(x.email) }
+    }),
   }
   const told = `Bring in ${what}${adding.length ? `, adding ${plural(adding.length, 'person', 'people')} to the crew list` : ''}?`
 
@@ -332,14 +341,26 @@ function Look(p: {
                 <div className="tick">
                   <input type="checkbox" checked={people.has(x.email)} onChange={() => setPeople(toggle(people, x.email))} aria-label={`Add ${x.name}`} />
                   <span>
-                    <input
-                      className="name"
-                      value={personNames[x.email] ?? x.name}
-                      onChange={(e) => setPersonNames({ ...personNames, [x.email]: e.target.value })}
-                      aria-label={`Name for ${x.email}`}
-                      maxLength={200}
-                      disabled={!people.has(x.email)}
-                    />
+                    <span className="names">
+                      <input
+                        className="name"
+                        value={partsOf(x).firstName}
+                        onChange={(e) => setPart(x.email, 'firstName', e.target.value)}
+                        aria-label={`First name for ${x.email}`}
+                        placeholder="First name"
+                        maxLength={100}
+                        disabled={!people.has(x.email)}
+                      />
+                      <input
+                        className="name"
+                        value={partsOf(x).lastName}
+                        onChange={(e) => setPart(x.email, 'lastName', e.target.value)}
+                        aria-label={`Last name for ${x.email}`}
+                        placeholder="Last name"
+                        maxLength={100}
+                        disabled={!people.has(x.email)}
+                      />
+                    </span>
                     <small>
                       {x.email} · {x.kind === 'staff' ? 'staff' : 'freelancer'} · on {plural(x.jobs, 'job', 'jobs')}
                     </small>

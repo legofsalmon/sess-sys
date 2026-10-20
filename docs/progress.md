@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: first and last names
+
+**Done**
+
+- A person's name is asked for in two, first and last, in
+  [Decision 0063](adr/0063-first-and-last-names.md) (Colly's "first name and
+  last name fields whenever name is asked for"): the person form, Tidy up's
+  people named from their address, and the people on a calendar bring-in.
+  The whole name stays as the two joined, so everything else reads as
+  before. Everyone already in the app is split on deploy, Irish surnames
+  kept whole ("Seán Ó Briain"), and the form shows the split to correct.
+  Download everything has the two as columns.
+- Checked: typecheck, all unit and server tests (the deploy's split checked
+  against the app's own), the browser tests.
+
 ## 19 October 2026: what crew and freelancers read of other people
 
 **Done**

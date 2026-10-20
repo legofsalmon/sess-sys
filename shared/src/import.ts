@@ -107,8 +107,8 @@ export interface ImportChoices {
   calendarId: string
   from: string
   jobs: { key: string; name: string; kind?: ProjectKind; include: boolean }[]
-  /** The name as it will show, when the office changed it. */
-  people: { email: string; name?: string; include: boolean }[]
+  /** The name as it will show, when the office changed it, and the first and last name that make it (ADR 0063). */
+  people: { email: string; name?: string; firstName?: string; lastName?: string; include: boolean }[]
 }
 
 /** GET /api/calendar/import/brought: everything brought in from Google Calendar so far, to take back and bring in again (ADR 0037). */

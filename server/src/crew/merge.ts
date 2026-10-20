@@ -1,4 +1,4 @@
-import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, offerKept, ROLE_LABELS, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
+import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, nameParts, offerKept, ROLE_LABELS, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
 import { getDocument } from '../documents/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
@@ -83,7 +83,8 @@ export const mergeHandlers = {
     await tx.query('DELETE FROM people WHERE id = ANY($1::text[])', [ids])
     await tx.query(
       `UPDATE people SET name = $2, email = $3, other_emails = $4, phone = $5, skills = $6, day_rate_cents = $7, notes = $8, archived = $9, approves_leave = $10,
-         department = $11, level = $12, known_as = $13, certificates = $14, company_name = $15, company_vat_number = $16, company_cro_number = $17, role = $18
+         department = $11, level = $12, known_as = $13, certificates = $14, company_name = $15, company_vat_number = $16, company_cro_number = $17, role = $18,
+         first_name = $19, last_name = $20
        WHERE id = $1`,
       [
         one.id,
@@ -104,6 +105,8 @@ export const mergeHandlers = {
         one.company?.vatNumber ?? null,
         one.company?.croNumber ?? null,
         one.role,
+        nameParts(one).firstName,
+        nameParts(one).lastName,
       ]
     )
     // The others' earlier copies stay in the feed, so the history still reads their names as they were.

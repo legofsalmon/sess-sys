@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CERTIFICATE_KINDS, HOLDING, NOTES_LENGTH, type Certificate, type Certificates, type Offer, type OfferStatus, type Person } from './crew.ts'
+import { CERTIFICATE_KINDS, HOLDING, nameParts, NOTES_LENGTH, type Certificate, type Certificates, type Offer, type OfferStatus, type Person } from './crew.ts'
 import { phoneDigits } from './crew-import.ts'
 import { nameFromEmail, nameKey } from './import.ts'
 
@@ -79,6 +79,7 @@ export function mergedPerson(into: Person, from: readonly Person[]): Person {
   return {
     id: into.id,
     name: realName?.name ?? into.name,
+    ...nameParts(realName ?? into),
     kind: into.kind,
     email,
     otherEmails: [...new Set(emails)].filter((e) => e !== emailKey(email)).slice(0, OTHER_EMAILS_MAX),

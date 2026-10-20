@@ -1,4 +1,4 @@
-import type { CommandName, EntityName, Mutation } from '@sh/shared'
+import { nameParts, type CommandName, type EntityName, type Mutation } from '@sh/shared'
 import type { Queryable } from './db.ts'
 import { Refused } from './kernel.ts'
 
@@ -32,6 +32,8 @@ interface Checked {
   fields: Record<string, string>
   /** The record, in a few words, from what it holds now: "the job Electric Picnic". */
   what: (data: Record<string, unknown> | undefined) => string
+  /** A copy as it reads now, for a field a copy from before it existed lacks. */
+  read?: (data: Record<string, unknown>) => Record<string, unknown>
 }
 
 const named = (kind: string) => (d: Record<string, unknown> | undefined) => (typeof d?.name === 'string' && d.name ? `the ${kind} ${d.name}` : `this ${kind}`)
@@ -63,6 +65,8 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
     entity: 'person',
     fields: {
       name: 'name',
+      firstName: 'first name',
+      lastName: 'last name',
       kind: 'staff or freelance',
       email: 'email address',
       phone: 'phone number',
@@ -76,6 +80,8 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
       company: 'company details',
     },
     what: (d) => (typeof d?.name === 'string' && d.name ? d.name : 'this person'),
+    // A copy from before the name was asked for in two (ADR 0063) reads as split, as the server reads the row.
+    read: (d) => (typeof d.name === 'string' ? { ...d, ...nameParts(d as { name: string; firstName?: string; lastName?: string }) } : d),
   },
   'call.update': {
     entity: 'crewCall',
@@ -146,11 +152,12 @@ export async function notOverwriting<A extends Record<string, unknown>>(
   )
 
   // What the person was looking at (the copy, with this device's own changes over it), and what others have changed since.
-  let prev = before[0]?.data ?? undefined
+  const read = (d: Record<string, unknown> | null | undefined) => (d ? (checked.read?.(d) ?? d) : undefined)
+  let prev = read(before[0]?.data)
   const saw: Record<string, unknown> = Object.fromEntries(fields.map((f) => [f, prev?.[f]]))
   const theirs = new Set<string>()
   for (const r of since) {
-    const next = r.data ?? undefined
+    const next = read(r.data)
     for (const f of fields) {
       if (same(prev?.[f], next?.[f])) continue
       if (r.own) saw[f] = next?.[f]

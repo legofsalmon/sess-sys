@@ -1,3 +1,4 @@
+import { NAME_PARTICLES } from '@sh/shared'
 import type { Db } from '../db.ts'
 import { runMigrations, type Module } from '../migrations.ts'
 
@@ -184,6 +185,35 @@ const MIGRATIONS: string[] = [
     merged_at   timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS person_merges_into ON person_merges (into_id);
+  `,
+  // A first and a last name, asked for in place of one name (ADR 0063). The whole name stays, always the two joined, so
+  // everything that reads it reads as before. Everyone already here is split as splitName in shared/src/crew.ts splits
+  // a name, word for word: the last word is the last name, with any words before it that start one ("Ó", "Mac", "van").
+  // One word is a first name alone. The office corrects any it gets wrong.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS first_name text NOT NULL DEFAULT '';
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS last_name text NOT NULL DEFAULT '';
+  CREATE FUNCTION sh_split_name(whole text, particles text[], OUT first_name text, OUT last_name text) LANGUAGE plpgsql AS $$
+  DECLARE
+    words text[] := string_to_array(regexp_replace(btrim(whole), '[[:space:]]+', ' ', 'g'), ' ');
+    n integer := coalesce(array_length(words, 1), 0);
+    i integer := n;
+  BEGIN
+    IF n < 2 THEN
+      first_name := coalesce(words[1], '');
+      last_name := '';
+      RETURN;
+    END IF;
+    WHILE i > 2 AND words[i - 1] = ANY(particles) LOOP
+      i := i - 1;
+    END LOOP;
+    first_name := array_to_string(words[1:i - 1], ' ');
+    last_name := array_to_string(words[i:n], ' ');
+  END
+  $$;
+  UPDATE people SET (first_name, last_name) = (SELECT s.first_name, s.last_name FROM sh_split_name(name, ARRAY[${NAME_PARTICLES.map((w) => `'${w}'`).join(', ')}]::text[]) s)
+   WHERE first_name = '';
+  DROP FUNCTION sh_split_name(text, text[]);
   `,
 ]
 
