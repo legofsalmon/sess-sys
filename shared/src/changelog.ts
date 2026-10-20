@@ -39,7 +39,7 @@ export const CHANGELOG: readonly Release[] = [
     version: '1.24.0',
     date: '2026-10-20',
     title: 'To sort out, from today on',
-    what: 'Jobs\' "To sort out" no longer lists clashes and checks on days already gone. Anyone who books crew sees the clashes and checks for the next four weeks at the top of Notifications.',
+    what: 'Jobs\' "To sort out" no longer lists clashes and checks on days already gone. The day itself still shows its mark. Anyone who books crew sees the clashes and checks from today to four weeks ahead at the top of Notifications; it stays in the app and contacts no one.',
     prs: [111],
     adrs: [69],
   },
