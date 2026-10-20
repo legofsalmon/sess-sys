@@ -241,7 +241,8 @@ describe('personal calendar feeds', () => {
 describe('the request log', () => {
   it('keeps private links, feed codes and sign-in codes out of it', async () => {
     const lines: string[] = []
-    const { app } = await server({ logger: true, logTo: { write: (line) => void lines.push(line) } })
+    // Every request logged, as if each were slow, so every address is seen to be masked.
+    const { app } = await server({ logger: true, slowRequestMs: 0, logTo: { write: (line) => void lines.push(line) } })
     const aoife = await person(app, 'Aoife Byrne')
     const feed = await feedOf(aoife)
     const urls = [`/f/${aoife.linkToken}`, `/f/${aoife.linkToken}/calendar.ics`, feed, '/api/auth/google/callback?code=4/0AVGzR1Bsecretcode&state=abc']
@@ -256,6 +257,20 @@ describe('the request log', () => {
     expect(log).not.toContain(feed.slice(5, -4))
     expect(log).not.toContain('secretcode')
     expect(log).not.toContain('remoteAddress')
+  })
+
+  it('says only the requests that failed or were slow, once each, with how long they took (audit finding 15)', async () => {
+    const lines: string[] = []
+    const { app } = await server({ logger: true, logTo: { write: (line) => void lines.push(line) } })
+    for (const url of ['/api/up', '/api/sync/pull?after=0', '/api/health']) expect((await app.inject({ url })).statusCode).toBe(200)
+    expect(lines).toEqual([])
+    expect((await app.inject({ url: '/api/nothing-here' })).statusCode).toBe(404)
+    expect(lines.map((l) => JSON.parse(l))).toEqual([expect.objectContaining({ msg: 'Request failed', req: { method: 'GET', url: '/api/nothing-here' }, res: { statusCode: 404 }, responseTime: expect.any(Number) })])
+
+    lines.length = 0
+    const slow = await server({ logger: true, slowRequestMs: 0, logTo: { write: (line) => void lines.push(line) } })
+    await slow.app.inject({ url: '/api/up' })
+    expect(lines.map((l) => JSON.parse(l))).toEqual([expect.objectContaining({ msg: 'Slow request', req: { method: 'GET', url: '/api/up' } })])
   })
 
   it('masks the addresses however they are written', () => {

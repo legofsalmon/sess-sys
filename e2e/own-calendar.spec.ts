@@ -98,7 +98,7 @@ test('a freelancer shares when they are busy from their link, the office sees it
   const phone = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()
   await phone.goto(`/f/${token}`)
   const section = phone.locator('section#calendar')
-  await expect(section.getByRole('heading', { name: 'Your own calendar' })).toBeVisible()
+  await expect(section.getByRole('heading', { name: "Let us see when you're busy" })).toBeVisible()
   await expect(section).toContainText("We keep only the times you're busy: never what, where or who with. Nothing is ever added to your calendar")
   await section.getByLabel("Your calendar's private address").fill(`http://127.0.0.1:${standInPort}${secretPath}`)
   await section.getByRole('button', { name: "Share when I'm busy" }).click()

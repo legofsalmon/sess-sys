@@ -41,7 +41,11 @@ export function officeView(entities: Partial<Tables>, outbox: readonly (Mutation
       messagesPending = true
     }
     if (m.name !== 'office.update') continue
-    details = { id: OFFICE_SETTING_ID, ...(m.args as CommandArgs<'office.update'>) }
+    // Laid over what's known, so a change that doesn't say the VAT number or address keeps them, as the server does.
+    const args = m.args as CommandArgs<'office.update'>
+    details = { ...details, id: OFFICE_SETTING_ID, ...args }
+    if (args.vatNumber === null || args.vatNumber === '') delete details.vatNumber
+    if (args.address === null || args.address === '') delete details.address
     pending = true
   }
   return { details, pending, headsSeeRates, headsPending, promptMessages, messagesPending }

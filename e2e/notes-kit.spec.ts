@@ -41,6 +41,8 @@ async function newProduct(page: Page, name: string, count: number) {
 /** A confirmed job with one show day in 2030, and these notes, as the calendar's bring-in leaves them. */
 async function jobWithNotes(page: Page, name: string, notes: string) {
   await page.goto('/#jobs')
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await form.getByLabel('Job').fill(name)
   await form.getByLabel('Status').selectOption({ label: 'Confirmed' })

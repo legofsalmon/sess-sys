@@ -32,7 +32,7 @@ import {
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
-import { OWN_CALENDAR_ACTIONS } from '@sh/shared'
+import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
@@ -416,6 +416,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':
       return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
+    // Their photo (ADR 0065): that it changed, never the picture.
+    case PHOTO_ACTIONS.put:
+      return `${a.replaced ? 'Put a new photo' : 'Put a photo'} on ${person(a.id)}'s page`
+    case PHOTO_ACTIONS.remove:
+      return `Took the photo off ${person(a.id)}'s page`
     // The others' names as they were: their last copies stay in the feed (ADR 0055).
     case 'person.merge': {
       const others = Array.isArray(a.from) ? a.from : []
@@ -502,7 +507,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Noted ${o.who}'s answer on ${o.what}`
     }
     case 'office.update':
-      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email')])}`
+      return `Set the office details: ${inWords([text(a.name, 'no name'), text(a.phone, 'no phone'), text(a.email, 'no email'), ...(a.vatNumber ? [`VAT number ${text(a.vatNumber, '').trim()}`] : []), ...(a.address ? ['an address'] : [])])}`
     case 'reading.heads':
       return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
     case 'messages.prompt':

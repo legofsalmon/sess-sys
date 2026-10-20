@@ -106,7 +106,7 @@ function Booking({ b, job, view, mayBook }: { b: BookingView; job: JobView; view
       )}
       {mayBook && !doing && (
         <div className="actions">
-          <button type="button" onClick={() => setDoing('edit')}>
+          <button type="button" className="link" onClick={() => setDoing('edit')}>
             Change
           </button>
           <button type="button" className="link" onClick={() => setDoing('remove')}>

@@ -46,7 +46,7 @@ test('Stock › Vehicles lists the vans and their checks, and a van off the road
   await expect(phone.getByRole('heading', { name: 'Vehicles', level: 1 })).toBeVisible()
 
   const reminders = phone.getByRole('region', { name: 'Vehicle checks running out' })
-  await expect(reminders.getByRole('heading')).toHaveText('Running out (3)')
+  await expect(reminders.getByRole('heading')).toHaveText('Vehicle checks running out (3)')
   const due = reminders.locator('.reminder')
   await expect(due.nth(0)).toHaveClass(/ran-out/)
   await expect(due.nth(0)).toContainText('Big Van (241-XX-101)')

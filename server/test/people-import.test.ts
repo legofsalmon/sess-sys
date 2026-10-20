@@ -284,7 +284,7 @@ describe('the profile', () => {
     const dara = await colly.record<Person>('person', 'p1')
     expect(dara).toMatchObject({ department: 'Audio', level: 3, knownAs: 'Dar', certificates: { 'manual-handling': { held: true, expires: '2027-03-01', note: 'Card in the office' } }, company: { name: 'Quinn Audio Ltd' }, skills: ['Audio'] })
     // The greeting on their link uses the name they go by.
-    expect((await app.inject({ url: `/f/${dara.linkToken}` })).body).toContain('Hi Dar.')
+    expect((await app.inject({ url: `/f/${dara.linkToken}` })).body).toContain('<h1>Hi Dar</h1>')
 
     expect(await colly.send('person.level', { id: 'p1', level: 5 })).toMatchObject({ status: 'applied' })
     expect((await colly.record<Person>('person', 'p1')).level).toBe(5)

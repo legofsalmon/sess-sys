@@ -1,6 +1,6 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
-import { dsColor, ownColours } from '@sh/shared'
+import { dsColor, newId, ownColours } from '@sh/shared'
 import { busyByDay, type OwnCalendar } from '@sh/shared'
 
 /**
@@ -375,20 +375,10 @@ function earlierLine(j: PageData['jobs'][number], how: string): string {
 }
 
 /**
- * The calendar feed address (ADR 0012), in a field that can be copied by
- * hand on any phone, with Subscribe for the calendar apps that take a
- * webcal: link and Copy where the browser can copy. The Copy button is the
- * page's one piece of script: it stays hidden until the script has run
- * and found a clipboard to write to.
+ * The Copy button's script, the one script on any of these pages. The pages' content security policy lets in this
+ * script by its hash and no other (audit finding 24), so it is kept exactly as it is here.
  */
-function feedBlock(feed: string): string {
-  return `<div class="feed">
-      <p class="small">Your bookings in your own calendar, kept up to date. It only shows your bookings, so it's fine in a calendar you share. If our Google Calendar invites already reach you, you don't need it as well.</p>
-      <label>Calendar address <input id="feed" readonly value="${h(feed)}"></label>
-      <div class="feed-buttons"><a class="button" href="${h(feed.replace(/^https?:/, 'webcal:'))}">Subscribe</a><button type="button" class="copy" hidden>Copy address</button></div>
-      <p class="small">On a phone, Subscribe adds it to your calendar app. Google Calendar can't take it on a phone: copy the address and add it on a laptop, under Other calendars, From URL.</p>
-    </div>
-    <script>
+export const COPY_SCRIPT = `
     (function () {
       var field = document.getElementById('feed'), copy = document.querySelector('.copy')
       field.addEventListener('focus', function () { field.select() })
@@ -399,7 +389,23 @@ function feedBlock(feed: string): string {
         navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
       })
     })()
-    </script>`
+    `
+
+/**
+ * The calendar feed address (ADR 0012), in a field that can be copied by
+ * hand on any phone, with Subscribe for the calendar apps that take a
+ * webcal: link and Copy where the browser can copy. The Copy button is the
+ * page's one piece of script: it stays hidden until the script has run
+ * and found a clipboard to write to.
+ */
+function feedBlock(feed: string): string {
+  return `<div class="feed">
+      <p class="small">Put your bookings in your calendar, kept up to date. It only shows your bookings, so it's fine in a calendar you share. If our Google Calendar invites already reach you, you don't need it as well.</p>
+      <label>Calendar address <input id="feed" readonly value="${h(feed)}"></label>
+      <div class="feed-buttons"><a class="button" href="${h(feed.replace(/^https?:/, 'webcal:'))}">Subscribe</a><button type="button" class="copy" hidden>Copy address</button></div>
+      <p class="small">On a phone, Subscribe adds it to your calendar app. Google Calendar can't take it on a phone: copy the address and add it on a laptop, under Other calendars, From URL.</p>
+    </div>
+    <script>${COPY_SCRIPT}</script>`
 }
 
 /** How long a list of busy days the page shows: the next few are what someone checks. */
@@ -433,7 +439,7 @@ function ownCalendarBlock(d: PageData): string {
   const promise = 'We keep only the times you\'re busy: never what, where or who with. Nothing is ever added to your calendar, and Session Hire bookings in it aren\'t counted.'
   if (!cal)
     return `<section id="calendar">
-    <h2>Your own calendar</h2>
+    <h2>Let us see when you're busy</h2>
     ${mine ? flash(mine) : ''}
     <p class="small">Rather than marking days here, you can let us see when you're busy in the calendar you already use, so the office knows before it asks. ${promise} You can stop at any time.</p>
     ${field("Your calendar's private address", "Share when I'm busy")}
@@ -441,7 +447,7 @@ function ownCalendarBlock(d: PageData): string {
   const busy = [...busyByDay(cal)].filter(([day]) => day >= d.today)
   const read = cal.readAt ? (new Date(cal.readAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }) === d.today ? 'today' : `on ${onDay(cal.readAt)}`) : ''
   return `<section id="calendar">
-    <h2>Your own calendar</h2>
+    <h2>Let us see when you're busy</h2>
     ${mine ? flash(mine) : ''}
     <p class="small">You're sharing when you're busy${cal.addedBy === 'office' ? ', from the address you sent the office' : ''}. We read it every few hours${read ? `, last ${read}` : ''}. ${promise} The office sees "busy" on those days: you can still be offered work, and still say yes.</p>
     ${cal.problem ? `<p class="flash warn" role="status">We couldn't read it last time: ${h(cal.problem)} What we read before still shows.</p>` : ''}
@@ -490,7 +496,7 @@ export function renderPage(d: PageData): string {
 <body>
 ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</b>: ${h(d.person.name)}'s own page</span><a href="/#preview">Choose someone else</a></p>` : ''}
 <main>
-  <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Hi ${h(first)}. This page is just for you.</small></div></header>
+  <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><h1>Hi ${h(first)}</h1><small>This page is just for you.</small></div></header>
   ${officeBlock(d.office)}
   ${d.flash && !inCard ? flash(d.flash) : ''}
 
@@ -529,6 +535,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
         : ''
     }
     <form method="post" action="${d.base}/away#away" class="add-away">
+      <input type="hidden" name="id" value="${newId()}">
       <label>From <input type="date" name="start" required min="${d.today}" value="${h(away?.get('start'))}"></label>
       <label>To <input type="date" name="end" min="${d.today}" value="${h(away?.get('end'))}"></label>
       <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour" value="${h(away?.get('note'))}"></label>
@@ -623,7 +630,7 @@ export const CSS = `
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 48px;display:grid;gap:18px}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
-.top{display:flex;gap:12px;align-items:center}.top b{display:block;text-transform:uppercase;letter-spacing:.03em}.top small{color:var(--muted)}
+.top{display:flex;gap:12px;align-items:center}.top b{display:block;text-transform:uppercase;letter-spacing:.03em}.top small{display:block;color:var(--muted)}.top h1{margin:0;font-size:1.25rem;line-height:1.2}
 .mark{width:40px;height:40px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
 h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
 section{display:grid;gap:10px}

@@ -127,7 +127,9 @@ async function loadOnce() {
     // Only what reached the server since the last look: a job they've just been put on brings its past with it, which isn't news.
     arrived(page.notices.filter((n) => !before.has(n.id) && n.arrivedAt > newest && isNew(n, page.readUpTo)))
   }
-  state = { status: 'ready', notices: page.notices, readUpTo: page.readUpTo, found: page.found }
+  // A look that set off before the list was opened doesn't bring back what opening it read.
+  const readUpTo = state.readUpTo !== null && (page.readUpTo === null || state.readUpTo > page.readUpTo) ? state.readUpTo : page.readUpTo
+  state = { status: 'ready', notices: page.notices, readUpTo, found: page.found }
   tell()
 }
 

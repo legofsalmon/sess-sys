@@ -7,7 +7,7 @@ import { encode } from 'uqr'
  * code in the middle, as a camera held over a label would see it. An item's
  * label shows it under the camera, which stays on for the next (audit
  * finding 18); a label on nothing yet asks what it's on, likewise; a label
- * held still is read once; a maker's serial in a QR code finds its item;
+ * held still is read once, even past a stall; a maker's serial in a QR code finds its item;
  * and a blocked camera says what to do.
  * The test server is shared with the other browser tests, so numbers are
  * read off the screen rather than assumed. To refresh the blueprint
@@ -173,10 +173,17 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   await expect(added).toHaveText(`Added ${one} (${speaker}) at ${bay}. Scan the next label.`)
   await expect(camera).toBeVisible()
 
-  // Still in front of the camera, the same label isn't read again.
+  // Still in front of the camera, the same label isn't read again: not after a while, and not after a slow phone stalls between two looks.
   await page.waitForTimeout(1500)
   await expect(page).toHaveURL(/#stock$/)
   await expect(added).toBeVisible()
+  await page.evaluate(() => {
+    const until = performance.now() + 1800
+    while (performance.now() < until);
+  })
+  await page.waitForTimeout(600)
+  await expect(added).toBeVisible()
+  await expect(lastScan).toHaveCount(0)
 
   // The next label: the product and place are still there, so it's one tap.
   await hold(page, null)

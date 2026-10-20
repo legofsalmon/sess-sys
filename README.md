@@ -7,8 +7,9 @@ during the move and handing off to [Crewbox](https://github.com/legofsalmon/crew
 on site.
 
 Phase 0 is built, with the phone field test left: the offline sync
-engine, crew booking, staff sign-in, nightly backups, error alerts, and a
-history of every change with a download of everything. Everything on
+engine, crew booking, staff sign-in, nightly backups and error alerts
+(both switched on 19 October 2026), and a history of every change with a
+download of everything. Everything on
 the Phase 1 list is built too: clients, venues and each job's phases,
 with crew asked for from the job, confirmed jobs written to Google
 Calendar, crew invited to their days there, with their answers read back
@@ -52,7 +53,8 @@ turn on Deployment Protection in the Vercel project settings.
 
 The source documents:
 
-- [docs/architecture.md](docs/architecture.md): the proposed design
+- [docs/architecture.md](docs/architecture.md): the design, what's built
+  of it and what isn't, and what each role's device holds
 - [docs/roadmap.md](docs/roadmap.md): the phased plan
 - [docs/research/](docs/research/): competitor audit, today's booking process,
   and the Crewbox handoff

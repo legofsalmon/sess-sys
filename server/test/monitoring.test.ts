@@ -11,7 +11,7 @@ import { buildApp } from '../src/app.ts'
 import { Backups } from '../src/backup/service.ts'
 import { dirStore, type BackupStore } from '../src/backup/store.ts'
 import { pgliteDb, type Db } from '../src/db.ts'
-import { BACKUP_MONITOR, backupWatch, errorReportingFromEnv, startErrorReporting } from '../src/monitoring.ts'
+import { BACKUP_MONITOR, backupWatch, errorReportingFromEnv, startErrorReporting, watchEventLoop } from '../src/monitoring.ts'
 
 /**
  * Error alerts and uptime checks (ADR 0005). Sentry is stood in for by a
@@ -96,6 +96,35 @@ describe('uptime checks', () => {
     expect(up.statusCode).toBe(200)
     expect(up.json()).toEqual({ ok: true })
     expect(up.headers['cache-control']).toBe('no-store')
+  })
+})
+
+describe('a server held up', () => {
+  it('is reported when nobody was answered for over a second, and not again straight away', async () => {
+    // Proves: something holding the server's one thread, which fails nothing, still reaches the error reports (audit finding 19).
+    const reports: { message: string; tags: Record<string, string | undefined> | undefined }[] = []
+    const warnings: object[] = []
+    const stop = watchEventLoop({ warn: (obj) => void warnings.push(obj) }, { everyMs: 50, report: (err, tags) => void reports.push({ message: (err as Error).message, tags }) })
+    cleanup.push(stop)
+    const hold = (ms: number) => {
+      const until = Date.now() + ms
+      while (Date.now() < until);
+    }
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 120))
+    await tick()
+    hold(300)
+    await tick()
+    expect(reports).toEqual([])
+    hold(1_300)
+    await tick()
+    expect(reports).toHaveLength(1)
+    expect(reports[0]!.message).toMatch(/^The server answered nobody for 1\.\d s$/)
+    expect(reports[0]!.tags).toEqual({ area: 'event-loop' })
+    hold(1_300)
+    await tick()
+    // Said in the log each time, reported once in a quarter of an hour.
+    expect(reports).toHaveLength(1)
+    expect(warnings).toHaveLength(2)
   })
 })
 

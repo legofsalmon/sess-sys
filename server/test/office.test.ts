@@ -105,6 +105,28 @@ describe('the office’s details', () => {
     expect(exported.settings).toEqual([expect.objectContaining({ id: 'office', name: 'Session Hire', phone: null, email: 'office@sessionhire.com' })])
   })
 
+  it('carry the VAT number and address for the quote, kept by a change that doesn’t say them', async () => {
+    const { app, pages } = await company()
+    const office = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'setting').at(-1).data
+    const [bad] = await send(app, m('office.update', { name: 'Session Hire', phone: null, email: 'office@sessionhire.com', vatNumber: 'IE-123/4' }))
+    expect(bad).toMatchObject({ status: 'rejected', reason: { message: 'A VAT number is letters and digits, such as IE 1234567T.' } })
+
+    const [ok] = await send(app, m('office.update', { name: 'Session Hire', phone: null, email: 'office@sessionhire.com', vatNumber: ' IE 1234567T ', address: 'Unit 4\nDublin 3' }))
+    expect(ok).toMatchObject({ status: 'applied' })
+    expect(await office()).toEqual({ id: 'office', name: 'Session Hire', phone: null, email: 'office@sessionhire.com', vatNumber: 'IE 1234567T', address: 'Unit 4\nDublin 3' })
+    // Only the quote shows them: no freelancer page does.
+    for (const [name, html] of Object.entries(await pages())) expect(html, name).not.toContain('1234567T')
+
+    // A change from an app older than them leaves them; cleared, they're gone.
+    await send(app, m('office.update', { name: 'Session Hire office', phone: null, email: 'office@sessionhire.com' }))
+    expect(await office()).toMatchObject({ name: 'Session Hire office', vatNumber: 'IE 1234567T', address: 'Unit 4\nDublin 3' })
+    await send(app, m('office.update', { name: 'Session Hire office', phone: null, email: 'office@sessionhire.com', vatNumber: null, address: null }))
+    expect(await office()).toEqual({ id: 'office', name: 'Session Hire office', phone: null, email: 'office@sessionhire.com' })
+
+    const history: HistoryPage = (await app.inject({ url: '/api/history' })).json()
+    expect(history.entries.map((e) => e.what)).toContain('Set the office details: Session Hire, no phone, office@sessionhire.com, VAT number IE 1234567T and an address')
+  })
+
   it('prompt no messages to crew until the office says so (ADR 0048)', async () => {
     const { app } = await company()
     const settings = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'setting')

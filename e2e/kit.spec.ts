@@ -48,6 +48,8 @@ async function newProduct(page: Page, name: string, how: 'numbered' | 'counted',
 /** A job and its phases, as [name, first day, last day]; it opens on its own page. */
 async function newJob(page: Page, name: string, status: 'Confirmed' | 'Quoted' | 'Enquiry', phases: [string, string, string][]) {
   await page.goto('/#jobs')
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await form.getByLabel('Job').fill(name)
   await form.getByLabel('Status').selectOption({ label: status })
@@ -61,6 +63,18 @@ async function newJob(page: Page, name: string, status: 'Confirmed' | 'Quoted' |
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
   // The kit is a part of the job's page of its own (ADR 0059); the page opens on it from then on.
   await page.getByRole('tab', { name: 'Kit and vans' }).click()
+}
+
+/** A product on the stock list with nothing counted yet, as most are while the list comes in. */
+async function uncounted(page: Page, name: string) {
+  await page.goto('/#stock')
+  await page.getByRole('button', { name: 'Add product' }).click()
+  const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
+  await form.getByLabel('Name').fill(name)
+  await form.getByLabel('Department').selectOption({ label: 'Lighting' })
+  await form.getByRole('radio', { name: /^Counted/ }).check()
+  await form.getByRole('button', { name: 'Add product' }).click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
 async function addKit(page: Page, product: string, qty: number, days = 'Whole job') {
@@ -142,19 +156,24 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   await toCard(kit)
   await page.screenshot(shot('kit-short'))
 
-  // Both are flagged on the jobs list.
+  // Both are flagged on the jobs list: in 2030, past the next fortnight it starts with (audit finding 22), so under Show all.
   await page.getByRole('link', { name: '‹ All jobs' }).click()
+  await expect(page.locator('.job-row', { hasText: festival })).toHaveCount(0)
+  await page.getByRole('button', { name: /^Show all [\d,]+ coming up$/ }).click()
   await expect(page.locator('.job-row', { hasText: festival }).locator('.flag')).toHaveText('Kit short')
   await expect(page.locator('.job-row', { hasText: launch }).locator('.flag')).toHaveText('Kit short')
 
   // Two subhired for the launch sorts both.
   await page.locator('.job-row', { hasText: launch }).click()
-  await monitors.getByRole('button', { name: 'Subhire the 2 short' }).click()
-  const change = monitors.getByRole('form', { name: `Change ${speaker}` })
-  await expect(change.getByLabel('Subhired')).toHaveValue('2')
-  await expect(change.getByLabel('From')).toBeFocused()
-  await change.getByLabel('From').fill('PRG')
-  await change.getByRole('button', { name: 'Save line' }).click()
+  // What's short is said once, above the lines, with one way to subhire it (audit finding 21).
+  await expect(kit.locator('.short-kit .kit-state')).toHaveText('1 line short: not enough.')
+  await kit.getByRole('button', { name: "Subhire what's short…" }).click()
+  const subhire = kit.getByRole('form', { name: `Subhire what's short on ${launch}` })
+  await expect(subhire.getByRole('checkbox', { name: new RegExp(`^2 × ${speaker}`) })).toBeChecked()
+  await expect(subhire.getByRole('checkbox', { name: new RegExp(`^2 × ${speaker}`) })).toBeFocused()
+  await subhire.getByLabel('From').fill('PRG')
+  await subhire.getByRole('button', { name: 'Subhire 1 line' }).click()
+  await expect(kit.locator('.short-kit')).toHaveCount(0)
   await expect(state(monitors)).toHaveText('2 subhired from PRG. Enough, with none to spare.')
   await expect(page.locator('.facts')).toContainText('1 product')
   await expect(page.locator('.facts')).not.toContainText('short')
@@ -207,6 +226,39 @@ test('short where two jobs share the days, sorted by subhire, with a quote penci
   await expect(kit.locator('.empty')).toBeVisible()
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Stock' }).click()
   await expect(page.locator('.kit-short .job-row', { hasText: speaker })).toHaveCount(0)
+})
+
+test('a job with many lines short says so once, and subhires what is ticked', async ({ browser }) => {
+  const id = tag()
+  const names = ['Hazer', 'Fan', 'Strobe', 'Blinder'].map((n) => named(n, id))
+  const wash = named('Robe Spiider', id)
+  const job = named('Forbidden Fruit', id)
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await ready(page, '#stock')
+  for (const n of names) await uncounted(page, n)
+  await newProduct(page, wash, 'numbered', 1, 'Lighting')
+  await newJob(page, job, 'Confirmed', [['Show', '2030-06-01', '2030-06-01']])
+  for (const n of names) await addKit(page, n, 2)
+  await addKit(page, wash, 3)
+  const kit = page.getByRole('region', { name: 'Kit' })
+  await expect(kit.locator('.short-kit .kit-state')).toHaveText('5 lines short: 4 none counted yet, 1 not enough.')
+  // Many short: each line says its own in a few words, and they fold like any other lines.
+  await expect(kit.locator('.kit-line')).toHaveCount(3)
+  await expect(state(kit.getByRole('article', { name: `2 × ${names[0]}` }))).toHaveText('Short 2: none counted yet.')
+  await kit.getByRole('button', { name: 'Show all 5 lines' }).click()
+  await expect(state(kit.getByRole('article', { name: `3 × ${wash}` }))).toHaveText('Short 2 on Fri 31 May, getting it ready.')
+
+  // The list to tick starts with what's really short; none counted yet may be a count not finished.
+  await kit.getByRole('button', { name: "Subhire what's short…" }).click()
+  const subhire = kit.getByRole('form', { name: `Subhire what's short on ${job}` })
+  await expect(subhire.getByRole('checkbox')).toHaveCount(5)
+  await expect(subhire.getByRole('checkbox', { checked: true })).toHaveCount(1)
+  await subhire.getByRole('checkbox', { name: new RegExp(`^2 × ${names[0]}`) }).check()
+  await subhire.getByLabel('From').fill('Lightcom')
+  await subhire.getByRole('button', { name: 'Subhire 2 lines' }).click()
+  await expect(kit.locator('.short-kit .added')).toHaveText("Subhired what's short on 2 lines from Lightcom.")
+  await expect(kit.locator('.short-kit .kit-state')).toHaveText('3 lines short: none counted yet.')
+  await expect(state(kit.getByRole('article', { name: `3 × ${wash}` }))).toHaveText('2 subhired from Lightcom. Enough, with none to spare.')
 })
 
 test('kit added with no signal counts at once, then goes through', async ({ browser }) => {

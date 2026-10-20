@@ -276,9 +276,22 @@ describe('freelancer link', () => {
       payload: 'start=someday&note=At+a+wedding',
     })
     expect(bad.statusCode).toBe(422)
-    expect(flashOf(bad.body)).toMatchObject({ ok: false, message: "That isn't a real date." })
+    expect(flashOf(bad.body)).toMatchObject({ ok: false, message: "The first day off isn't a real date. Pick it again." })
     expect(bad.body.indexOf('<p class="flash bad"')).toBeGreaterThan(bad.body.indexOf('<section id="away">'))
     expect(bad.body).toContain('value="At a wedding"')
+
+    // Each error says which date (audit, P3: words).
+    const away = (payload: string) =>
+      app.inject({ method: 'POST', url: `/f/${aoife.linkToken}/away`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload })
+    expect(flashOf((await away('note=Gig')).body)).toMatchObject({ ok: false, message: 'Put in the first day off.' })
+    expect(flashOf((await away('start=2026-10-03&end=2026-02-30')).body)).toMatchObject({ ok: false, message: expect.stringContaining("The last day off isn't a real date.") })
+    expect(flashOf((await away('start=2026-10-05&end=2026-10-03')).body)).toMatchObject({ ok: false, message: 'The days off end before they start.' })
+
+    // The same form sent twice (a double tap, or the browser sending it again) adds the days once.
+    const formId = (await app.inject({ url: `/f/${aoife.linkToken}` })).body.match(/name="id" value="([a-z0-9]+)"/)![1]!
+    for (let i = 0; i < 2; i++) expect((await away(`id=${formId}&start=2026-11-10&end=2026-11-12&note=Holiday`)).statusCode).toBe(303)
+    const { rows } = await lastDb.query("SELECT 1 FROM unavailability WHERE start_day = '2026-11-10'")
+    expect(rows).toHaveLength(1)
 
     const c = await call(app)
     const refused = await offer(app, c, aoife.id)

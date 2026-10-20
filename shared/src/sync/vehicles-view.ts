@@ -101,7 +101,8 @@ export function vehiclesView(
       case 'vehicle.save': {
         const a = m.args as CommandArgs<'vehicle.save'>
         const was = vehicles.get(a.id)
-        vehicles.set(a.id, { ...a, outOfService: was?.outOfService ?? null, archived: was?.archived ?? false, pending: true })
+        // As the server keeps it: the registration in capitals.
+        vehicles.set(a.id, { ...a, name: a.name.trim(), registration: a.registration.trim().toUpperCase(), notes: a.notes.trim(), outOfService: was?.outOfService ?? null, archived: was?.archived ?? false, pending: true })
         break
       }
       case 'vehicle.offRoad': {

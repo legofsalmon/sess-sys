@@ -1,5 +1,6 @@
 import { PGlite } from '@electric-sql/pglite'
 import pg from 'pg'
+import { redact } from '@sh/shared'
 import { reportError } from './monitoring.ts'
 
 /**
@@ -159,4 +160,31 @@ export function dbFromEnv(env: NodeJS.ProcessEnv = process.env, postgres: Postgr
 
 function isHosted(env: NodeJS.ProcessEnv) {
   return env.NODE_ENV === 'production' || env.RAILWAY_ENVIRONMENT_NAME !== undefined || env.RAILWAY_ENVIRONMENT !== undefined
+}
+
+/**
+ * A fault as the server's log writes it. Postgres's errors (by pg and PGlite alike) carry the row they were about in
+ * their detail ("Key (email)=(…) already exists"), and PGlite's the query's values too: the log, which Railway keeps,
+ * gets only which kind of fault, on which table, and where in the code, with the message cleaned as a report's is.
+ * Any other error goes as it is.
+ */
+export function faultForLog(err: unknown): unknown {
+  if (!isDatabaseError(err)) return err
+  const message = redact(err.message)
+  return {
+    type: err.constructor.name,
+    message,
+    code: err.code,
+    ...(err.table ? { table: err.table } : {}),
+    ...(err.constraint ? { constraint: err.constraint } : {}),
+    ...(err.stack ? { stack: err.stack.replace(/^.*$/m, `${err.name}: ${message}`) } : {}),
+  }
+}
+
+type DatabaseError = Error & { code: string; severity: string; table?: string; constraint?: string }
+
+/** An error Postgres sent: it has a severity and a five-character SQLSTATE code. */
+export function isDatabaseError(err: unknown): err is DatabaseError {
+  const e = err as Partial<DatabaseError> | null
+  return err instanceof Error && typeof e?.severity === 'string' && typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code)
 }

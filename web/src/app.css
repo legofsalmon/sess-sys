@@ -92,7 +92,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .brand small, label small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .brand .made-up { color: var(--warn); font-weight: 600; }
 /* On the demo, whose eyes it's seen through, under the company's name (ADR 0036): the name in the accent, which means "you", and pressing it chooses again. */
-.brand .seen-as a { color: var(--accent-ink); font-weight: 700; text-underline-offset: 2px; padding-block: var(--space-12); margin-block: calc(-1 * var(--space-12)); }
+.brand .seen-as a { color: var(--accent-ink); font-weight: 700; text-underline-offset: 2px; }
+/* The whole of the company's name and the line under it is the target, 44px and more tall: the line itself is cut short by its … and too thin for a thumb. */
+.brand:has(.seen-as) { position: relative; }
+.brand .seen-as a::after { content: ''; position: absolute; inset: 0; }
 /* Dark or light, top right (ThemeButton.tsx): a picture, its words for a screen reader and a pointer's hover. */
 .theme-button { flex: none; display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
 .theme-button .icon { width: 22px; height: 22px; }
@@ -185,10 +188,10 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
 .app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
-/* An area's pages in one row (Views.tsx): the current one filled. Each takes an equal share where they fit; on a phone a longer row scrolls sideways rather than squeezing a name. */
-.views { display: flex; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; }
-.views::-webkit-scrollbar { display: none; }
-.views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
+/* An area's pages in one row (Views.tsx): the current one filled. Each takes an equal share where they fit; where they don't, as on a phone, the row
+   wraps rather than squeezing a name or hiding a page off the edge with nothing to say it's there (audit P2 23): Stock's seven and Jobs' Money all show. */
+.views { display: flex; flex-wrap: wrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); }
+.views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; gap: var(--space-6); min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
 .views a:not([aria-current]):hover { color: var(--ink); }
 .views-count { font-weight: 600; opacity: .8; }
@@ -210,17 +213,21 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
 /* An area's own screen says its name, large, so Home, Jobs, Stock, Crew and Admin read as different places (ADR 0033). */
 .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; margin-top: calc(-1 * var(--space-6)); }
-/* On this screen: the parts of a long screen by name, under the bar, scrolling sideways on a phone (ADR 0033). */
+/* On this screen: the parts of a long screen by name, under the bar, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
+   row of pages, so it doesn't read as the area's row (Views.tsx): plain words on the bar, no box round them, the part in view underlined in ink. */
 .top .on-screen { grid-column: 1 / -1; margin: 0 calc(-1 * var(--space-16)); }
 .top .on-screen ul { list-style: none; margin: 0; padding: var(--space-2) var(--space-16) var(--space-4); display: flex; gap: var(--space-6); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: var(--space-16); }
 .top .on-screen ul::-webkit-scrollbar { display: none; }
-.top .on-screen button { min-height: 40px; padding: var(--space-4) var(--space-12); border-radius: var(--radius-full); white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--space-6); }
-.top .on-screen button[aria-current] { color: var(--ink); border-color: var(--ink); }
+.top .on-screen ul { gap: var(--space-2); border-bottom: 1px solid var(--line); padding-bottom: 0; }
+.top .on-screen button { min-height: 44px; padding: var(--space-4) var(--space-10); border: 0; border-bottom: 2px solid transparent; border-radius: 0; white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--space-6); }
+.top .on-screen button[aria-current] { color: var(--ink); border-bottom-color: var(--ink); }
+@media (hover: hover) {
+  .top .on-screen button:hover { color: var(--ink); background-image: none; }
+}
 .top .on-screen .count { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink); }
 .app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
 .app .facts dt { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .app .facts dd { margin: 0; }
-.app .facts a { color: var(--accent-ink); font-weight: 600; }
 .app .also-emails { list-style: none; margin: 0; padding: 0; }
 .app .also-emails li { overflow-wrap: anywhere; }
 .app .notes { margin: 0; white-space: pre-line; color: var(--muted); font-size: var(--text-small); }
@@ -256,8 +263,8 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app .kit-short h2 { color: var(--warn); }
 .app .pick-lists h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 /* Something just added: kit on a job, items and counts on Stock. */
-.app .added { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); background: var(--good-soft); color: var(--good); font-size: var(--text-small); }
-.app .added a { color: inherit; font-weight: 700; }
+/* It worked, so it's quiet (the design system's "healthy is quiet", green never for "saved"): ink on the inset surface, the words saying what was done. */
+.app .added { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); background: var(--ds-surface-inset); color: var(--ink); font-size: var(--text-small); }
 .app fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .app legend { padding: 0; font-size: var(--text-hint); color: var(--muted); margin-bottom: var(--space-4); }
 .app textarea { font: inherit; font-size: var(--text-body); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
@@ -288,9 +295,9 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 }
 .skill-options li[aria-selected='true'] { background: var(--ds-wash-pressed); box-shadow: inset 3px 0 0 var(--accent); }
 .skill-options li.new { color: var(--ds-ink-secondary); }
-/* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. */
-.app button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) 0; color: var(--muted); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
+/* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. It looks like every other link (Links, below). */
+.app button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) 0; color: var(--accent-ink); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
 .app .end { justify-content: flex-end; }
 /* A row that opens on a tap: the name as the button, its detail under it. */
 .app .person { align-items: center; }
@@ -312,7 +319,7 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .fold > button.link, .app button.show-all { justify-self: start; }
 
 /* Sign-in and account. */
-a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
+a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* 44px touch targets: easier with gloves on or in a dark venue. */
@@ -327,7 +334,7 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .account .who b, .account .who span { display: block; }
 .account .who span { color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
 .account .card button { justify-self: start; }
-.account button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.account button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
 .account .invites { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
 .account .feed input { font-size: var(--text-hint); color: var(--muted); }
 .account .invites h3 { margin: 0; font-size: var(--text-subheading); }
@@ -382,17 +389,18 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
  * leave a button looking held. The washes and timings are the shared ones; what is selected or current doesn't hover, and nothing
  * disabled answers. Only colour changes, so reduced motion leaves it as it is.
  */
-button, a.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.link {
+button, a.button, label.button, .tabs a, .app .job-row, .app .who, .app a.link, .app button.link {
   transition: background-color var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) var(--ds-ease-standard), color var(--ds-duration-fast) var(--ds-ease-standard), filter var(--ds-duration-fast) var(--ds-ease-standard);
 }
 @media (hover: hover) {
-  button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
+  button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):hover, a.button:not(.primary):hover, label.button:not([aria-busy='true']):hover { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); border-color: var(--field-line); }
   button.primary:not(:disabled):hover, a.button.primary:hover, button.danger:not(:disabled):hover { filter: brightness(.92); }
-  .app button.link:not(:disabled):hover, .app a.link:hover, .app .back:hover, .top .up-link:hover, .crumbs a:hover, .account button.link:not(:disabled):hover { color: var(--ink); }
+  .app .back:hover, .top .up-link:hover, .crumbs a:hover { color: var(--ink); }
+  .app button.link:not(:disabled):hover, .app a.link:hover, .account button.link:not(:disabled):hover, :where(a:not([class])):hover { text-decoration-thickness: 2px; }
   .tabs a:not([aria-current='page']):hover { background: var(--ds-wash-hover); color: var(--ink); }
   .app .job-row:not([aria-current='page']):hover b, .app .who:not(:disabled):hover b, .history .run-line:hover .what { text-decoration: underline; text-underline-offset: 3px; }
 }
-button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):active, a.button:not(.primary):active { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); transition-duration: var(--ds-duration-instant); }
+button:not(:disabled, .primary, .danger, .link, .who, .run-line, [aria-pressed='true']):active, a.button:not(.primary):active, label.button:not([aria-busy='true']):active { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); transition-duration: var(--ds-duration-instant); }
 button.primary:not(:disabled):active, a.button.primary:active, button.danger:not(:disabled):active { filter: brightness(.84); transition-duration: var(--ds-duration-instant); }
 .tabs a:not([aria-current='page']):active { background: var(--ds-wash-pressed); }
 /* Work under way (aria-busy, useLate.ts): no second press, without the faded look of a button that can't be used. */
@@ -433,3 +441,34 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .notice .new-mark { display: inline-flex; align-items: center; gap: var(--space-4); margin-right: var(--space-6); color: var(--accent-ink); font-size: var(--text-hint); font-weight: 700; }
 .notice .new-mark .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent-fill); }
 .notice.new p { font-weight: 600; }
+
+/*
+ * Links (audit, P3): one look everywhere, a link in words and a button drawn as one alike: the accent's ink, semibold and underlined,
+ * as Session Hire's links have been since it kept its red for "you" (the design system's adoption.md). Set at the lowest weight, so
+ * a part that draws its links its own way, a row that opens or a planner's block, still does; this only stops the browser's own
+ * blue and lavender showing where nothing else was said.
+ */
+:where(a:not([class])) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
+/* As tall as a thumb on a touch screen, a fact's Map or a line's "All jobs" alike, the words where they were: padding on a link in a line moves no line. */
+@media (pointer: coarse) {
+  :where(a:not([class])) { padding-block: var(--space-14); }
+}
+
+/* The way past the places to the screen (Shell.tsx, the design system's skip link): out of sight until a keyboard reaches it, first thing in the page. */
+.skip-to-content { position: fixed; top: var(--space-8); left: var(--space-8); z-index: 10; padding: var(--space-10) var(--space-14); border-radius: var(--radius-control); background: var(--accent-fill); color: var(--on-accent); font-weight: 700; text-decoration: none; translate: 0 calc(-100% - var(--space-16)); }
+.skip-to-content:focus { translate: 0 0; }
+
+/* Offline on a narrow phone (audit, P3): "No signal" and what's waiting take a line of their own under the bell rather than squeezing the company's name to "S…". */
+@media (max-width: 479px) {
+  /* The name sets the column's least width whatever the phone's font; the line under it never widens it. */
+  .top:has(.conn.offline) { grid-template-columns: minmax(min-content, 1fr) auto; }
+  .top:has(.conn.offline) .brand small { contain: inline-size; }
+  .top .state:has(.conn.offline) { flex-wrap: wrap; row-gap: var(--space-4); }
+  /* What's waiting can wrap under "No signal" rather than push the page wider. */
+  .top .state > .conn.offline { order: 1; white-space: normal; }
+}
+
+/* On paper (audit, P3): white round every sheet, whatever the screen's theme, so a dark page doesn't print round it with backgrounds on. */
+@media print {
+  html, body { background: #fff; }
+}

@@ -215,6 +215,39 @@ describe('telling devices about a change', () => {
   })
 })
 
+describe('the live connection', () => {
+  it('beats while it lasts, without asking the database, and is let go when the device stops answering (audit, P3)', async () => {
+    // Proves: every connected device hears a beat on a schedule, so one that hears none knows its connection is gone; a
+    // device that answers the server's pings (every browser does, by itself) is kept, and one that doesn't is closed.
+    const db = await pgliteDb()
+    let queries = 0
+    const counted: Db = { ...db, query: (sql, params) => (queries++, db.query(sql, params)), reads: { ...db.reads, query: (sql, params) => (queries++, db.reads.query(sql, params)) } }
+    const app = await buildApp({ db: counted, liveBeatMs: 40 })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    await app.ready()
+    const told = { answering: [] as string[], silent: [] as string[] }
+    const answering = await app.injectWS('/api/sync/live', {}, { onInit: (s) => (s.on('message', (d) => told.answering.push(String(d))), s.on('ping', () => s.pong())) })
+    const silent = await app.injectWS('/api/sync/live', {}, { onInit: (s) => s.on('message', (d) => told.silent.push(String(d))) })
+    const closed = new Promise((resolve) => silent.on('close', resolve))
+    try {
+      await vi.waitFor(() => expect(told.answering.length).toBeGreaterThanOrEqual(2))
+      const before = queries
+      await vi.waitFor(() => expect(told.answering.length).toBeGreaterThanOrEqual(6))
+      expect(told.answering[0]).toMatch(/^\{"type":"poke","cursor":\d+\}$/)
+      expect(new Set(told.answering.slice(1))).toEqual(new Set(['{"type":"beat"}']))
+      expect(queries).toBe(before)
+      await closed
+      expect(answering.readyState).toBe(answering.OPEN)
+    } finally {
+      answering.terminate()
+      silent.terminate()
+    }
+  })
+})
+
 describe('a character the database cannot hold', () => {
   it("is cleaned from a person's name sent through the sync push, so the phone and the server hold the same words", async () => {
     // Proves: a NUL, which neither Postgres's text nor its JSON can hold, with other control characters and half an emoji,

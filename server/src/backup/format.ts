@@ -202,14 +202,32 @@ function parse(data: Buffer): Parsed {
  * client).
  */
 export async function restoreBackup(db: Db, data: Buffer, key?: Buffer): Promise<RestoreReport> {
-  const { header, sections, summary } = readBackup(data, key)
+  return restoreChecked(db, checkBackupFile(data, key))
+}
+
+/**
+ * Everything about a file that can be known without a database: it unlocks,
+ * unzips and is whole, and this version of the app can read it. The test
+ * restore asks this before it boots a scratch database, so a bad file is
+ * turned down at once.
+ */
+export function checkBackupFile(data: Buffer, key?: Buffer): CheckedBackup {
+  const parsed = readBackup(data, key)
   const known = new Map(MODULES.map((m) => [m.versionTable, m]))
-  for (const [versionTable, version] of Object.entries(header.schemas)) {
+  for (const [versionTable, version] of Object.entries(parsed.header.schemas)) {
     const mod = known.get(versionTable)
     if (!mod || version > mod.migrations.length) {
       throw new BackupError('This backup was made by a newer version of the app. Restore it with that version or a later one.')
     }
   }
+  return parsed as CheckedBackup
+}
+
+/** A file checkBackupFile has passed. */
+export type CheckedBackup = Parsed & { readonly checked: unique symbol }
+
+/** restoreBackup, for a file already checked. */
+export async function restoreChecked(db: Db, { header, sections, summary }: CheckedBackup): Promise<RestoreReport> {
   if ((await tablesInOrder(db)).length > 0) {
     throw new BackupError('The database to restore into already has tables in it. Restore into a new, empty database.')
   }

@@ -23,7 +23,7 @@ import { useState } from 'react'
 import { ShowAll } from '../Fold.tsx'
 import { useAccess } from '../role.ts'
 import { useToday } from '../view.ts'
-import { linkFor, QuietPanel, SendButtons, usePromptsMessages } from './CrewScreen.tsx'
+import { linkFor, QuietPanel, SendButtons, usePromptsMessages } from './Messages.tsx'
 import { useDocumentStorage } from './Documents.tsx'
 import { Heading } from '../Icon.tsx'
 

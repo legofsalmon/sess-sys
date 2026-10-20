@@ -18,6 +18,50 @@ waiting on someone.
   pointer; and the "Add as a new skill" row is readable when highlighted.
 - Checked: typecheck, all unit tests, the browser tests, contrast of each
   row in both themes.
+## 20 October 2026: the audit's P2s and P3s
+
+**Done**
+
+- All of the 18 October audit's P2s (findings 13 to 26) and its P3 polish,
+  in [Decision 0067](adr/0067-the-audits-p2-and-p3s.md) (Colly's "proceed
+  with all the P2s and P3s"). A new phone reads the latest of each record
+  rather than the whole feed; a deploy without screen changes costs a phone
+  2 KB, not 1.2 MB; devices poll only while the live connection is down,
+  with a heartbeat; phones ask to keep their storage; the backup's test
+  restore no longer holds the server up; more failures reach the error
+  reports; demo passcode guesses are limited and every page has a content
+  security policy.
+- On the screens: a big call reads "25 of 40, both days" with its names
+  across the card; a job's short kit is one line by reason and one
+  "Subhire what's short…"; Jobs shows the next fortnight under week
+  headings with New job at the top; Home puts what needs attention first;
+  every page in an area row shows on a phone; one link style; the quote
+  carries the company's VAT number and address (Admin › Office details).
+- The architecture page now says what's built, including which role's
+  device holds whose contact details. New tests on the money, kit from
+  the notes and vans views, and a parity test that runs 90 commands on a
+  phone offline and compares its copy with the server's.
+- Checked: typecheck (now including the browser tests), all unit, server
+  and browser tests.
+
+**Waiting on**
+
+- Colly: clear the start command in Railway's dashboard on both services
+  (audit finding 25), and say when a demo passcode under 12 characters
+  should be refused rather than warned about.
+
+## 20 October 2026: a photo on a person's page
+
+**Done**
+
+- A photo on a person's page, in [Decision 0065](adr/0065-a-photo-on-a-persons-page.md)
+  (Colly's "upload of peoples images on their staff page"). Add a photo,
+  Change photo and Remove photo under their picture, for the person and
+  whoever can change crew. The device squares and shrinks it before sending;
+  it's kept in the bucket the documents use, and shown in place of the
+  initials on their page, the People list and Home. Erasing and combining
+  people handle it.
+- Checked: typecheck, all tests (new server tests for photos).
 
 ## 20 October 2026: first and last names
 

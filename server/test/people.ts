@@ -4,7 +4,8 @@ import { afterEach, expect } from 'vitest'
 import { buildApp, type AppOptions } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
 import { createSession, upsertUser } from '../src/auth/sessions.ts'
-import { pgliteDb, type Db } from '../src/db.ts'
+import type { Db } from '../src/db.ts'
+import { scratchDb } from './scratch-db.ts'
 
 /** Staff signed in on their own devices, and freelancers on their private links, for the history and export tests. */
 
@@ -22,7 +23,7 @@ afterEach(async () => {
 
 /** The app with sign-in on. Nobody signs in through Google here; staff are given sessions directly. */
 export async function server(more: Partial<AppOptions> = {}) {
-  const db = await pgliteDb()
+  const db = await scratchDb()
   const app = await buildApp({ db, auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] }, ...more })
   cleanup.push(async () => {
     await app.close()

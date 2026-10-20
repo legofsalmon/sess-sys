@@ -14,24 +14,37 @@ export interface Module {
 
 /** Bring a module up to `upTo` (all of its migrations by default), one transaction per migration. Never goes back. */
 export function runMigrations(db: Db, mod: Module, upTo = mod.migrations.length) {
-  return migrate(db, mod, upTo, (step) => db.transaction(step))
+  return migrate(mod, upTo, (step) => db.transaction(step))
 }
 
 /** The same, inside a transaction the caller already has open, so it all happens or none of it does. */
 export function runMigrationsIn(tx: Queryable, mod: Module, upTo = mod.migrations.length) {
-  return migrate(tx, mod, upTo, (step) => step(tx))
+  return migrate(mod, upTo, (step) => step(tx))
 }
 
-async function migrate(q: Queryable, mod: Module, upTo: number, inStep: (step: (tx: Queryable) => Promise<void>) => Promise<void>) {
-  await q.query(`CREATE TABLE IF NOT EXISTS ${mod.versionTable} (version integer NOT NULL)`)
-  const { rows } = await q.query<{ version: number }>(`SELECT version FROM ${mod.versionTable}`)
-  let version = rows[0]?.version ?? 0
-  if (rows.length === 0) await q.query(`INSERT INTO ${mod.versionTable} (version) VALUES (0)`)
-  for (; version < Math.min(upTo, mod.migrations.length); version++) {
-    const next = version + 1
+/**
+ * Each step is one transaction holding a lock of its own, and reads the version again under it, so two servers starting
+ * at once (a deploy overlapping the one it replaces, say) take turns: the second finds the step done and goes on, rather
+ * than running it twice or making two version rows. A transaction's lock, not the connection's: Neon's pooled address
+ * hands a connection to whoever's transaction is next (db.ts).
+ */
+const MIGRATION_LOCK = 7333
+
+async function migrate(mod: Module, upTo: number, inStep: (step: (tx: Queryable) => Promise<void>) => Promise<void>) {
+  const want = Math.min(upTo, mod.migrations.length)
+  for (let done = false; !done; ) {
     await inStep(async (tx) => {
-      await tx.exec(mod.migrations[next - 1]!)
-      await tx.query(`UPDATE ${mod.versionTable} SET version = $1`, [next])
+      await tx.query(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK})`)
+      await tx.query(`CREATE TABLE IF NOT EXISTS ${mod.versionTable} (version integer NOT NULL)`)
+      const { rows } = await tx.query<{ version: number }>(`SELECT version FROM ${mod.versionTable}`)
+      if (rows.length === 0) await tx.query(`INSERT INTO ${mod.versionTable} (version) VALUES (0)`)
+      const version = rows[0]?.version ?? 0
+      if (version >= want) {
+        done = true
+        return
+      }
+      await tx.exec(mod.migrations[version]!)
+      await tx.query(`UPDATE ${mod.versionTable} SET version = $1`, [version + 1])
     })
   }
 }

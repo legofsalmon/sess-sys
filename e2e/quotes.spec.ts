@@ -24,6 +24,12 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
     ;(window as unknown as { printed: number }).printed = 0
     window.print = () => void (window as unknown as { printed: number }).printed++
   })
+  // The company's VAT number and address, from Admin's office details, go on the printed quote.
+  await office.goto('/#admin')
+  await office.getByLabel('VAT number').fill('IE 1234567T')
+  await office.getByLabel('Address').fill('Unit 4, Docklands Business Park\nDublin 3')
+  await office.getByRole('button', { name: 'Save office details' }).click()
+  await expect(office.locator('.conn')).toHaveText('Up to date')
   await office.goto('/#jobs')
   await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
   await office.getByRole('tab', { name: 'Quote' }).click()
@@ -57,6 +63,7 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(printed).toContainText('For Liffey Brands')
   await expect(printed).toContainText('Delivery')
   await expect(printed).toContainText('€1,867.65')
+  await expect(printed.locator('.from')).toHaveText('Unit 4, Docklands Business Park\nDublin 3VAT number IE 1234567T')
   await expect.poll(() => office.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1)
   await office.emulateMedia({ media: 'print' })
   await expect(printed).toBeVisible()

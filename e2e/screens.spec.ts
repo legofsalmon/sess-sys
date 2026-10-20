@@ -83,12 +83,17 @@ test('a long list draws only the rows near the screen, and Back finds a place de
   await page.goto('/#jobs')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   const list = page.getByRole('region', { name: 'Jobs' }).getByRole('list')
+  // Coming up starts at the next fortnight (audit finding 22); these are in 2031, under Show all, which Back keeps.
+  await page.getByRole('button', { name: /^Show all [\d,]+ coming up$/ }).click()
   await expect(list.getByRole('link').first()).toBeVisible()
   await expect(list.getByRole('link', { name: /Long list job 159\b/ })).toHaveCount(0)
-  const total = Number(await list.locator('li').first().getAttribute('aria-setsize'))
+  // The week headings are rows of the list too, but not counted among the jobs.
+  const jobs = list.locator('li[aria-posinset]')
+  const total = Number(await jobs.first().getAttribute('aria-setsize'))
   expect(total).toBeGreaterThanOrEqual(160)
   expect(await list.locator('li').count()).toBeLessThan(60)
-  await expect(list.locator('li').first()).toHaveAttribute('aria-posinset', '1')
+  await expect(jobs.first()).toHaveAttribute('aria-posinset', '1')
+  await expect(list.locator('li.week-head').first()).toBeVisible()
 
   // Scrolled by hand to a row far down, which is opened from where it is on the screen.
   const row = list.getByRole('link', { name: /Long list job 140\b/ })

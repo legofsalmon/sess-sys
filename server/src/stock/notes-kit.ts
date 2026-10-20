@@ -32,14 +32,32 @@ async function insertMany(ctx: Ctx, table: string, columns: string[], rows: unkn
   }
 }
 
+/**
+ * Which jobs have gone, by name, from the last the change feed said of each: combined into another, say, while the
+ * notes waited on a phone with no signal (audit, P3: words). Unnamed only when the feed no longer has it.
+ */
+async function goneJobs(ctx: Ctx, projectIds: string[], found: { id: string }[]): Promise<string> {
+  const here = new Set(found.map((p) => p.id))
+  const gone = projectIds.filter((id) => !here.has(id))
+  const { rows } = await ctx.tx.query<{ name: string | null }>(
+    `SELECT DISTINCT ON (entity_id) data->>'name' AS name FROM changes
+      WHERE entity = 'project' AND entity_id = ANY($1::text[]) AND op = 'put' ORDER BY entity_id, seq DESC`,
+    [gone]
+  )
+  const names = rows.map((r) => r.name).filter((n): n is string => !!n)
+  const all = projectIds.length === 1 ? 'nothing was added' : 'nothing was added for any of these jobs'
+  if (names.length === 0) return `${projectIds.length === 1 ? 'That job no longer exists' : 'One of these jobs no longer exists'}, so ${all}. Look again at what's left.`
+  const named = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+  return `${named} ${names.length === 1 ? 'is' : 'are'} no longer on the jobs list (combined into another job, or deleted), so ${all}. Look again at what's left.`
+}
+
 export const notesKitHandlers = {
   async 'kit.fromNotes'(ctx: Ctx, a: CommandArgs<'kit.fromNotes'>) {
     const projectIds = a.jobs.map((j) => j.projectId)
     const lines = a.jobs.flatMap((j) => j.lines.map((l) => ({ ...l, projectId: j.projectId })))
 
     const { rows: projects } = await ctx.tx.query<{ id: string; name: string }>(`SELECT id, name FROM projects WHERE id = ANY($1::text[])`, [projectIds])
-    if (projects.length < projectIds.length)
-      throw new Refused({ code: 'not-found', message: `${projectIds.length === 1 ? 'That job no longer exists' : 'One of these jobs no longer exists'}, so nothing was added. Look again at what's left.` })
+    if (projects.length < projectIds.length) throw new Refused({ code: 'not-found', message: await goneJobs(ctx, projectIds, projects) })
 
     const phaseIds = [...new Set(lines.map((l) => l.phaseId).filter((p): p is string => p !== null))]
     const { rows: phases } = await ctx.tx.query<{ id: string; project_id: string; name: string }>(`SELECT id, project_id, name FROM phases WHERE id = ANY($1::text[])`, [phaseIds])

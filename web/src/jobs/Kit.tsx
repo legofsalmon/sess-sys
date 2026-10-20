@@ -113,6 +113,39 @@ export function kitState(l: KitLineView, today: string): { tone: Tone; text: str
   return say('ok', l.spare ? `Enough, with ${l.spare} to spare.` : 'Enough, with none to spare.')
 }
 
+/**
+ * Why a line is short, for the Kit card's summary (audit finding 21): none
+ * counted in stock yet, which while the stock list comes in is the first
+ * state of most jobs and may only mean the count isn't finished; none fit
+ * to go out; or not enough once the other jobs have theirs.
+ */
+export type ShortWhy = 'uncounted' | 'unfit' | 'notEnough'
+const SHORT_WHY: [ShortWhy, string][] = [
+  ['uncounted', 'none counted yet'],
+  ['unfit', 'none fit to go out'],
+  ['notEnough', 'not enough'],
+]
+export const shortWhy = (l: KitLineView): ShortWhy => (l.owned > 0 ? 'notEnough' : l.unusable + l.late > 0 ? 'unfit' : 'uncounted')
+const whyWords = (w: ShortWhy) => SHORT_WHY.find(([x]) => x === w)![1]
+
+/** The short lines in a line, bad news first: "12 lines short: 9 none counted yet, 3 not enough." */
+export function shortSummary(short: readonly KitLineView[]): string {
+  const held = short.some((l) => l.hold === 'held')
+  const head = `${plural(short.length, 'line')} ${held ? 'short' : 'would be short if the job goes ahead'}`
+  const by = SHORT_WHY.map(([w, words]) => [short.filter((l) => shortWhy(l) === w).length, words] as const).filter(([n]) => n > 0)
+  return by.length === 1 ? `${head}: ${by[0]![1]}.` : `${head}: ${by.map(([n, words]) => `${n} ${words}`).join(', ')}.`
+}
+
+/** A short line said in a few words, once the summary has said the rest: "Short 9: none counted yet." */
+function shortBrief(l: KitLineView): string {
+  const would = l.hold === 'pencilled' ? 'Would be short' : 'Short'
+  const why = shortWhy(l)
+  return why === 'notEnough' ? `${would} ${l.short} on ${dayLabel(l.shortDay!)}${whichDay(l, l.shortDay!)}.` : `${would} ${l.short}: ${whyWords(why)}.`
+}
+
+/** More short lines than this and each says its own in a few words, folded under the summary like any other line. */
+const BRIEF_FROM = 3
+
 /** "5 products, 2 short", for the job's summary; undefined with no kit. */
 export function kitSummary(job: JobView, lines: readonly KitLineView[]): string | undefined {
   if (lines.length === 0) return undefined
@@ -142,6 +175,10 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
     const tone = kitState(l, today)?.tone
     return tone === 'bad' || tone === 'warn'
   }
+  // Short now, as the lines say it: not on a stopped job or days gone by.
+  const short = byDepartment.filter((l) => l.short > 0 && toAct(l))
+  // A few short lines each say why in full and stay in view; many are said once, by the summary, and fold with the rest (audit finding 21).
+  const brief = short.length > BRIEF_FROM
   return (
     <section className="card kit" aria-label="Kit">
       <Heading icon="kit">Kit</Heading>
@@ -150,7 +187,8 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
       {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} mayChange={access.can('jobs')} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
       {lines.length === 0 && <Empty>{mayKit && 'Add what the job needs from the stock list, for the whole job or one phase.'}</Empty>}
-      <ShowAll items={byDepartment} limit={3} what="lines" keep={toAct}>
+      {short.length > 0 && <ShortKit job={job} short={short} mayChange={mayKit} />}
+      <ShowAll items={byDepartment} limit={3} what="lines" keep={brief ? undefined : toAct}>
         {(shown) =>
           DEPARTMENTS.filter((d) => shown.some((l) => department(l) === d)).map((d) => (
             <div className="kit-group" key={d}>
@@ -161,7 +199,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
               {shown
                 .filter((l) => department(l) === d)
                 .map((l) => (
-                  <KitLine key={l.id} line={l} job={job} today={today} mayChange={mayKit} />
+                  <KitLine key={l.id} line={l} job={job} today={today} mayChange={mayKit} brief={brief} />
                 ))}
             </div>
           ))
@@ -282,10 +320,113 @@ function KitDays({ job, mayChange }: { job: JobView; mayChange: boolean }) {
   )
 }
 
-function KitLine({ line, job, today, mayChange }: { line: KitLineView; job: JobView; today: string; mayChange: boolean }) {
-  // Open with how many to subhire already filled in, from "Subhire the 2 short".
-  const [editing, setEditing] = useState<{ subhire?: number } | undefined>()
-  const state = kitState(line, today)
+/**
+ * What's short on the job, said once at the top of the card (audit finding
+ * 21), and one way to subhire it: a list of the short lines to tick, each
+ * subhiring its shortfall from the one supplier, as a line's own Subhired
+ * and From do. Lines with none counted yet start unticked, as the count may
+ * just not be finished.
+ */
+function ShortKit({ job, short, mayChange }: { job: JobView; short: readonly KitLineView[]; mayChange: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
+  const [supplier, setSupplier] = useState('')
+  const [done, setDone] = useState('')
+  const { run, error } = useAct()
+  const opener = useRef<HTMLButtonElement>(null)
+  const first = useRef<HTMLInputElement>(null)
+  const closed = useRef(false)
+  useEffect(() => {
+    if (open) first.current?.focus()
+    else if (closed.current) opener.current?.focus()
+  }, [open])
+  const held = short.some((l) => l.hold === 'held')
+  const chosen = short.filter((l) => ticked.has(l.id))
+  const start = () => {
+    setTicked(new Set(short.filter((l) => shortWhy(l) !== 'uncounted').map((l) => l.id)))
+    setDone('')
+    setOpen(true)
+  }
+  const close = () => {
+    closed.current = true
+    setOpen(false)
+  }
+  const tick = (id: string, on: boolean) => {
+    const next = new Set(ticked)
+    if (on) next.add(id)
+    else next.delete(id)
+    setTicked(next)
+  }
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    if (chosen.length === 0) return
+    const from = supplier.trim()
+    const said = `Subhired what's short on ${plural(chosen.length, 'line')}${from ? ` from ${from}` : ''}.`
+    void run(async () => {
+      for (const l of chosen) {
+        const changes: CommandInput<'kit.update'> = { id: l.id, subhireQty: Math.min(l.qty, l.subhireQty + l.short) }
+        if (from && from !== l.supplier) changes.supplier = from
+        await client.mutate('kit.update', changes)
+      }
+    }).then((ok) => {
+      if (!ok) return
+      setDone(said)
+      close()
+    })
+  }
+  return (
+    <div className="short-kit">
+      <p className={`kit-state ${held ? 'bad' : 'warn'}`}>{shortSummary(short)}</p>
+      {done && !open && (
+        <p className="added" role="status">
+          {done}
+        </p>
+      )}
+      {mayChange && !open && (
+        <button type="button" ref={opener} onClick={start}>
+          Subhire what's short…
+        </button>
+      )}
+      {mayChange && open && (
+        <form className="grid-form" onSubmit={save} aria-label={`Subhire what's short on ${job.name}`}>
+          <fieldset className="wide short-list">
+            <legend>Tick what to subhire</legend>
+            {short.some((l) => shortWhy(l) === 'uncounted') && <p className="hint">Lines with none counted yet are left unticked: their count may not be finished.</p>}
+            {short.map((l, i) => (
+              <label className="tick" key={l.id}>
+                <input type="checkbox" ref={i === 0 ? first : undefined} checked={ticked.has(l.id)} onChange={(e) => tick(l.id, e.target.checked)} />
+                <span>
+                  {l.short} × {productName(l)}
+                  <small>
+                    {forLabel(l)} · {whyWords(shortWhy(l))}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <label className="wide">
+            From <input list="supplier-names" value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Who they're hired from" />
+          </label>
+          <Refusal error={error} className="wide" />
+          <div className="actions wide">
+            <button type="submit" className="primary" disabled={chosen.length === 0}>
+              {chosen.length === 0 ? 'Nothing ticked' : `Subhire ${plural(chosen.length, 'line')}`}
+            </button>
+            <button type="button" onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
+function KitLine({ line, job, today, mayChange, brief }: { line: KitLineView; job: JobView; today: string; mayChange: boolean; brief: boolean }) {
+  const [editing, setEditing] = useState(false)
+  const full = kitState(line, today)
+  // Many short lines: each says its own in a few words, the summary at the top having said the rest.
+  const state = full && brief && line.short > 0 && (full.tone === 'bad' || full.tone === 'warn') ? { tone: full.tone, text: shortBrief(line) } : full
   return (
     <article className="kit-line" aria-label={`${line.qty} × ${productName(line)}`}>
       <header>
@@ -299,18 +440,13 @@ function KitLine({ line, job, today, mayChange }: { line: KitLineView; job: JobV
           {line.notes && <p>{line.notes}</p>}
         </div>
         {mayChange && (
-          <button type="button" className="link" onClick={() => setEditing(editing ? undefined : {})} aria-expanded={!!editing}>
+          <button type="button" className="link" onClick={() => setEditing(!editing)} aria-expanded={editing}>
             Change
           </button>
         )}
       </header>
-      {state && <p className={`kit-state ${state.tone}`}>{state.text}</p>}
-      {line.short > 0 && !editing && mayChange && (
-        <button type="button" onClick={() => setEditing({ subhire: Math.min(line.qty, line.subhireQty + line.short) })}>
-          Subhire the {line.short} short
-        </button>
-      )}
-      {editing && <EditKit line={line} job={job} subhire={editing.subhire} onDone={() => setEditing(undefined)} />}
+      {state && <p className={`kit-state ${state.tone}${brief ? ' brief' : ''}`}>{state.text}</p>}
+      {editing && <EditKit line={line} job={job} onDone={() => setEditing(false)} />}
     </article>
   )
 }
@@ -330,20 +466,16 @@ function ForChoice({ job, value, onChange }: { job: JobView; value: string; onCh
 }
 
 /** Only what was changed is sent, so someone else's change to another field stands. */
-function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobView; subhire?: number; onDone: () => void }) {
+function EditKit({ line, job, onDone }: { line: KitLineView; job: JobView; onDone: () => void }) {
   const [f, setF] = useState({
     qty: String(line.qty),
     phaseId: line.phaseId ?? '',
-    subhired: String(subhire ?? line.subhireQty),
+    subhired: String(line.subhireQty),
     supplier: line.supplier,
     notes: line.notes,
   })
   const [removing, setRemoving] = useState(false)
   const { run, error, refuse } = useAct()
-  const supplierField = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (subhire !== undefined) supplierField.current?.focus()
-  }, [subhire])
   const name = productName(line)
 
   const save = (e: FormEvent) => {
@@ -381,7 +513,6 @@ function EditKit({ line, job, subhire, onDone }: { line: KitLineView; job: JobVi
       <label>
         From{' '}
         <input
-          ref={supplierField}
           list="supplier-names"
           value={f.supplier}
           onChange={(e) => setF({ ...f, supplier: e.target.value })}

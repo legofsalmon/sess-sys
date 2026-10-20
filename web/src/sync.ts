@@ -1,5 +1,6 @@
 import { keepSyncing, SyncClient } from '@sh/shared'
 import { markSignedOut } from './auth.ts'
+import { watchSync } from './errors.ts'
 import { openStorage } from './storage.ts'
 import { claimTab, onTabMessage, onTabRole, tabRole } from './tabs.ts'
 import { HttpTransport, SignedOutError } from './transport.ts'
@@ -16,6 +17,8 @@ export const transport = new HttpTransport(import.meta.env.VITE_API_BASE ?? '')
 await claimTab()
 export const storage = await openStorage()
 export const client = await new SyncClient({ storage, transport }).open()
+// Pushes that keep failing, and changes waiting over a day, are reported (audit finding 19).
+watchSync(client, transport, { isSignedOut: (err) => err instanceof SignedOutError, writing: () => tabRole() === 'writer' })
 
 /** Try now, and keep trying while offline, backing off to once every 30 s. */
 const retry = keepSyncing(() => client.sync(), {
@@ -38,13 +41,19 @@ onTabMessage('wipe', () => {
 
 // Behind this device too: the server started fresh or was restored, which a pull finds out.
 try {
-  transport.listen((cursor) => {
-    if (cursor !== client.cursor) syncSoon()
-  })
+  transport.listen(
+    (cursor) => {
+      if (cursor !== client.cursor) syncSoon()
+    },
+    // Gone: whatever changed meanwhile wasn't said, so a pull now, and the tick below until it's back.
+    (live) => live || syncSoon()
+  )
 } catch {
   // A browser that won't open a WebSocket here: the 30-second tick still syncs.
 }
 addEventListener('online', syncSoon)
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncSoon())
-setInterval(syncSoon, 30_000)
+// Only while the live connection is down: while it's up, every change is said on it, and a poll every 30 seconds from
+// every device only kept the database awake (audit finding 15). Changes made here go at once, and a failed sync retries.
+setInterval(() => transport.live || syncSoon(), 30_000)
 syncSoon()
