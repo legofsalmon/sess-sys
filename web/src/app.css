@@ -472,3 +472,11 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 @media print {
   html, body { background: #fff; }
 }
+
+/* Admin › What's changed (ADR 0071): one entry per version, newest first. */
+.release { display: grid; gap: var(--space-4); }
+.release + .release { padding-top: var(--space-14); border-top: 1px solid var(--line); }
+.release h2, .release h3 { margin: 0; font-size: var(--text-subheading); text-transform: none; letter-spacing: 0; }
+.release-version { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: var(--space-4); }
+.release-refs { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-12); }
+.card > a[href="#admin/changes"] { justify-self: start; }

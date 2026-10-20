@@ -74,3 +74,4 @@ export { ownColours } from './own-colours.ts'
 // The shared design system's icons, by meaning (vendored in ds/; drawn by web/src/Icon.tsx).
 export { icons, iconFrame } from './ds/icons.js'
 export type { IconName, IconNode } from './ds/icons.js'
+export * from './changelog.ts'
