@@ -1,4 +1,5 @@
 import {
+  aliasesOf,
   inShForm,
   MAX_CASE_DEPTH,
   MAX_NUMBER,
@@ -77,6 +78,7 @@ const MODEL_COLUMNS = {
   notes: 'notes',
   patMonths: 'pat_months',
   liftingMonths: 'lifting_months',
+  aliases: 'aliases',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -227,9 +229,21 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const taken = await nameTaken(ctx.tx, 'models', a.name.trim(), a.id)
     if (taken) throw new Refused({ code: 'conflict', message: `There's already a product called ${taken}.` })
     await ctx.tx.query(
-      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [a.id, a.name.trim(), a.department, a.category.trim(), a.tracking, a.isCase, a.valueCents, a.notes, a.patMonths, a.liftingMonths]
+      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        a.id,
+        a.name.trim(),
+        a.department,
+        a.category.trim(),
+        a.tracking,
+        a.isCase,
+        a.valueCents,
+        a.notes,
+        a.patMonths,
+        a.liftingMonths,
+        JSON.stringify(aliasesOf((a.aliases ?? []).join(','), a.name)),
+      ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },
@@ -259,7 +273,9 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const fields = (Object.keys(MODEL_COLUMNS) as (keyof typeof MODEL_COLUMNS)[]).filter((k) => a[k] !== undefined)
     await ctx.tx.query(`UPDATE models SET ${fields.map((k, i) => `${MODEL_COLUMNS[k]} = $${i + 2}`).join(', ')} WHERE id = $1`, [
       a.id,
-      ...fields.map((k) => (k === 'name' || k === 'category' ? String(a[k]).trim() : a[k])),
+      ...fields.map((k) =>
+        k === 'name' || k === 'category' ? String(a[k]).trim() : k === 'aliases' ? JSON.stringify(aliasesOf(a.aliases!.join(','), next.name)) : a[k]
+      ),
     ])
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },

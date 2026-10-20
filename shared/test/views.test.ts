@@ -36,6 +36,7 @@ const day = (n: number) => `2026-10-${String(n).padStart(2, '0')}`
 const NAMES = ['Aoife', 'áine', 'Brian', 'Ciarán', 'ciara', 'Dónal', 'Éabha', 'eoin', 'Niamh', 'Órla', 'oisín', 'Pádraig', 'Róisín', 'Séan', 'sinéad', 'Tadhg']
 
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
+  aliases: [],
   id,
   name,
   department: 'audio',

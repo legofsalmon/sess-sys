@@ -55,6 +55,19 @@ export const CATEGORY_IDEAS = [
  * more than about €150, needing its own test or inspection history, or
  * likely to go missing. Counted (bulk): quantities only.
  */
+/** The most other names a product can have. */
+export const MOST_ALIASES = 20
+
+/** Other names as typed, split at commas: trimmed, each once whatever its case, and none that is the name itself. */
+export function aliasesOf(typed: string, name = ''): string[] {
+  const out: string[] = []
+  for (const part of typed.split(/[,;\n]/)) {
+    const a = part.trim().replace(/\s+/g, ' ')
+    if (a && a.toLowerCase() !== name.trim().toLowerCase() && !out.some((x) => x.toLowerCase() === a.toLowerCase())) out.push(a)
+  }
+  return out
+}
+
 export const TRACKING = ['serialised', 'bulk'] as const
 export type Tracking = (typeof TRACKING)[number]
 
@@ -73,6 +86,12 @@ export const model = z.object({
   /** How often its items need an electrical test (PAT), and a thorough examination, in months; null for never (ADR 0020). */
   patMonths: months.default(null),
   liftingMonths: months.default(null),
+  /**
+   * Other names it goes by (ADR 0070): what crew and the notes call it, such
+   * as "58" or "Beta 58" for a Shure SM58. Found by the product picker and by
+   * Kit from the notes as the name is. Left out by an older app, so a default.
+   */
+  aliases: z.array(needed(100, 'Another name', 'Another name')).max(MOST_ALIASES, `Up to ${MOST_ALIASES} other names, please.`).default([]),
 })
 export type Model = z.infer<typeof model> & {
   /**
@@ -206,6 +225,7 @@ export const stockCommandSchemas = {
       notes: model.shape.notes.optional(),
       patMonths: months.optional(),
       liftingMonths: months.optional(),
+      aliases: model.shape.aliases.removeDefault().optional(),
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered),
