@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { AccountScreen } from './AccountScreen.tsx'
 import { useAuth } from './auth.ts'
 import { CrewBadge } from './crew/CrewBadge.tsx'
@@ -161,14 +161,24 @@ export function Shell() {
         </main>
       </>
     )
+  // The way past the places to the screen itself, first in the page (the design system's skip link). The address is the app's, so
+  // it doesn't go by an id in it: it lands on the screen's heading, as a move does.
+  const skip = (e: MouseEvent) => {
+    e.preventDefault()
+    const heading = headingIn(main.current)
+    if (!heading) return
+    heading.el.tabIndex = -1
+    heading.el.focus()
+  }
+  // The places come before the screen, so a keyboard meets them first on a desk too, where they're the sidebar; the bar sits at
+  // the foot of a phone's screen wherever it is in the page.
   return (
     <>
       <UpdateBar unkept={unkept} />
+      <a className="skip" href={hash || '#home'} onClick={skip}>
+        Skip to content
+      </a>
       <StorageBanner />
-      <main ref={main}>
-        <Screen />
-      </main>
-      <Toaster />
       <nav className="tabs" aria-label="Areas" hidden={barAway}>
         {AREAS.map((a) => (
           <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>
@@ -178,6 +188,10 @@ export function Shell() {
           </a>
         ))}
       </nav>
+      <main ref={main}>
+        <Screen />
+      </main>
+      <Toaster />
     </>
   )
 }
