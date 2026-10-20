@@ -21,6 +21,7 @@ const never: Transport = {
   pull: () => Promise.reject(new Error('No signal')),
 }
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
+  aliases: [],
   id,
   name,
   department: 'audio',

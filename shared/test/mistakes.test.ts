@@ -17,6 +17,7 @@ import { warehouseView } from '../src/sync/stock-view.ts'
  */
 
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
+  aliases: [],
   id,
   name,
   department: 'audio',

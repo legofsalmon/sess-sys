@@ -9,12 +9,26 @@ waiting on someone.
 
 - Admin ends with the app's version and its latest change, and "See every
   change" opens Admin › What's changed: every version from 0.1.0 (29
-  September) to 1.25.0, newest first, in plain words, each with its pull
+  September) to 1.26.0, newest first, in plain words, each with its pull
   requests and decisions
   ([Decision 0071](adr/0071-whats-changed-and-version-numbers.md), Colly's
   ask). From now on every change to the app adds an entry and a version.
 - Checked: typecheck, and a test that the list runs newest first, each
   number one step up, and every decision it names exists.
+
+## 20 October 2026: finding a product by typing
+
+**Done**
+
+- Kit from the notes and Add kit choose a product by typing, not from a
+  long dropdown: any part of the name, an other name it goes by, or its
+  category or department, in any order ("shure 58", "beta", "wedge"), the
+  best first and Enter takes it. Products can have other names, set on
+  their page, and Kit from the notes matches lines written that way
+  ([Decision 0070](adr/0070-finding-a-product-by-typing.md), Colly's ask).
+  The design system's combobox gained the pattern for picking one record.
+- Checked: typecheck, all unit and server tests, the kit, notes, pick list,
+  faults and inspections browser tests, one new test typing part of a name.
 
 ## 20 October 2026: To sort out, from today on
 

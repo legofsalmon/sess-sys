@@ -84,7 +84,16 @@ test("a job's notes become kit lines, checked first, and reading them again adds
   const add = page.getByRole('region', { name: 'Add to the kit' })
   await expect(add).toContainText('Adds 2 lines to the kit. 1 line is left out until a product is chosen for it.')
 
-  await row(`1 x Wedding arch ${id}`).getByLabel('Product').selectOption({ label: 'Not kit' })
+  // The product is found by typing any part of its name, in any order, and Enter takes the one highlighted.
+  const ampPick = row(`2x D20 ${id}`).getByRole('combobox', { name: 'Product' })
+  await ampPick.fill(`${id} 20`)
+  await expect(row(`2x D20 ${id}`).getByRole('option', { name: amp })).toHaveAttribute('aria-selected', 'true')
+  if (process.env.SHOTS) await page.screenshot({ path: 'docs/hub/img/product-picker.png' })
+  await ampPick.press('Enter')
+  await expect(ampPick).toHaveValue(amp)
+  await expect(row(`2x D20 ${id}`).locator('.kit-state')).toHaveText('Adds 2.')
+  await row(`1 x Wedding arch ${id}`).getByRole('combobox', { name: 'Product' }).click()
+  await row(`1 x Wedding arch ${id}`).getByRole('option', { name: 'Not kit' }).click()
   await expect(row(`1 x Wedding arch ${id}`).locator('.kit-state')).toHaveText('Not kit, so left out.')
   await expect(add).toContainText('Adds 2 lines to the kit.')
   await add.getByRole('button', { name: 'Add 2 lines to the kit' }).click()

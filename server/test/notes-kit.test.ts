@@ -244,7 +244,7 @@ describe('kit from the notes', () => {
   it('arrives on a database already in use, leaving its kit as it was', async () => {
     // A database from before this change, with a job and a kit line, takes the two new tables on the next start.
     const db = await pgliteDb()
-    for (const mod of MODULES) await runMigrations(db, mod, mod === STOCK ? STOCK.migrations.length - 1 : undefined)
+    for (const mod of MODULES) await runMigrations(db, mod, mod === STOCK ? STOCK.migrations.findIndex((m) => m.includes('kit_names')) : undefined)
     expect((await db.query(`SELECT to_regclass('kit_names')::text AS found`)).rows).toEqual([{ found: null }])
     await db.query(`INSERT INTO models (id, name, department, tracking) VALUES ('y10p', 'd&b Y10P', 'audio', 'serialised')`)
     await db.query(`INSERT INTO projects (id, name, status, notes) VALUES ('p1', 'Fairview Build', 'confirmed', 'Audio

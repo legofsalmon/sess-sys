@@ -295,6 +295,16 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 }
 .skill-options li[aria-selected='true'] { background: var(--ds-wash-pressed); box-shadow: inset 3px 0 0 var(--accent); }
 .skill-options li.new { color: var(--ds-ink-secondary); }
+/* The product picker (ADR 0070): a field like the others in a form, its offers two lines, the name then why it's offered
+   and where it belongs; notes in the list ("Most like it", "40 more") aren't offers, so they're quiet and never highlight. */
+.picker-field { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.picker-field input { width: 100%; }
+.picker-options li[role='option'] { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-2); padding-block: var(--space-4); }
+.picker-options li small { color: var(--ds-ink-secondary); font-size: var(--text-hint); }
+.picker-options li.note { min-height: 0; padding-block: var(--space-6) var(--space-2); color: var(--ds-ink-secondary); font-size: var(--text-hint); cursor: default; }
+@media (hover: hover) {
+  .picker-options li.note:hover { background: none; }
+}
 /* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. It looks like every other link (Links, below). */
 .app button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
 .app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) 0; color: var(--accent-ink); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }

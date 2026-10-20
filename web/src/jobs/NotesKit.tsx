@@ -24,6 +24,7 @@ import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
+import { ProductPicker } from '../ProductPicker.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { JOBS, type Step } from '../Up.tsx'
@@ -260,7 +261,6 @@ function NoteLine({
 }) {
   const models = view.warehouse.models
   const says = rowSays(p, chosen)
-  const value = making ? 'new' : p.state === 'not-kit' ? 'not-kit' : (p.modelId ?? '')
   const likely = p.row.match.likely.map((id) => models.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => !!m)
   const [qty, setQty] = useState(String(p.qty))
   return (
@@ -272,44 +272,24 @@ function NoteLine({
         </div>
       </header>
       <div className="grid-form">
-        <label>
-          Product
-          <select
-            value={value}
-            disabled={!mayKit}
-            onChange={(e) => {
-              const v = e.target.value
-              if (v === 'new') return onMake(true)
-              onMake(false)
-              if (v) onChoose({ pick: v })
-            }}
-          >
-            {value === '' && <option value="">Choose a product…</option>}
-            {likely.length > 0 && (
-              <optgroup label="Most like it">
-                {likely.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {DEPARTMENTS.map((d) => {
-              const of = models.filter((m) => m.department === d && !likely.includes(m))
-              return of.length ? (
-                <optgroup key={d} label={DEPARTMENT_LABELS[d]}>
-                  {of.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null
-            })}
-            <option value="not-kit">Not kit</option>
-            {mayStock && <option value="new">New product…</option>}
-          </select>
-        </label>
+        <ProductPicker
+          label="Product"
+          products={models}
+          value={making || p.state === 'not-kit' ? '' : (p.modelId ?? '')}
+          shownAs={making ? 'New product' : p.state === 'not-kit' ? 'Not kit' : undefined}
+          first={likely}
+          actions={[{ key: 'not-kit', label: 'Not kit' }, ...(mayStock ? [{ key: 'new', label: 'New product…' }] : [])]}
+          disabled={!mayKit}
+          onPick={(id) => {
+            onMake(false)
+            onChoose({ pick: id })
+          }}
+          onAction={(key) => {
+            if (key === 'new') return onMake(true)
+            onMake(false)
+            onChoose({ pick: key })
+          }}
+        />
         <label>
           How many
           <input

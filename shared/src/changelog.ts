@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.25.0',
+    version: '1.26.0',
     date: '2026-10-20',
     title: "What's changed, and a version number",
     what: "Admin now has this page: every version of the app, newest first, with what changed in plain words and the pull requests and decisions behind it. The version you're on is shown at the top. From now on every update adds a line here.",
     prs: [113],
     adrs: [71],
+  },
+  {
+    version: '1.25.0',
+    date: '2026-10-20',
+    title: 'Choose kit by typing',
+    what: 'Find a product by any part of its name, another name it goes by, or its category. Products can have other names, and Kit from the notes matches them.',
+    prs: [112],
+    adrs: [70],
   },
   {
     version: '1.24.0',

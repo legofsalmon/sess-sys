@@ -23,6 +23,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
+import { ProductPicker } from '../ProductPicker.tsx'
 import { ProductChoices } from '../stock/common.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
@@ -558,10 +559,8 @@ function AddKit({ job, view, lines }: { job: JobView; view: View; lines: readonl
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setAdded('')
-    const typed = f.product.trim()
-    if (!typed) return
-    const m = w.models.find((x) => x.name.trim().toLowerCase() === typed.toLowerCase())
-    if (!m) return refuse(`No product is called ${typed}. Add it to the stock list on the Stock tab first.`)
+    const m = w.models.find((x) => x.id === f.product)
+    if (!m) return refuse('Which product? Type part of its name, or another name it goes by, and choose it from the list.')
     const n = Number(f.qty)
     if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many? A whole number, please.')
     const phaseId = f.phaseId || null
@@ -585,17 +584,7 @@ function AddKit({ job, view, lines }: { job: JobView; view: View; lines: readonl
     <form className="grid-form add-kit" onSubmit={submit} aria-label="Add kit">
       <h3 className="wide">Add kit</h3>
       {w.models.length === 0 && <p className="hint wide">Kit comes from the stock list, which is empty so far. Add products on the Stock tab.</p>}
-      <label className="wide">
-        Product{' '}
-        <input
-          list="product-names"
-          value={f.product}
-          onChange={(e) => setF({ ...f, product: e.target.value })}
-          placeholder="From the stock list"
-          autoComplete="off"
-          required
-        />
-      </label>
+      <ProductPicker label="Product" className="wide" products={w.models} value={f.product} onPick={(product) => setF((now) => ({ ...now, product }))} />
       <label>
         How many <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} required />
       </label>
