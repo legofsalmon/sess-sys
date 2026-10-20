@@ -6,6 +6,7 @@ import {
   domainOf,
   importCounts,
   matchRows,
+  namesOfRow,
   newId,
   NOTES_LENGTH,
   OFFICE_SETTING_ID,
@@ -45,6 +46,8 @@ const previewBody = z.object({ text: z.string().max(5_000_000, 'The file is too 
 const choice = z.object({
   row: z.number().int().min(1).max(1_000_000),
   name: z.string().max(1000),
+  firstName: z.string().max(1000).optional(),
+  lastName: z.string().max(1000).optional(),
   kind: z.enum(['staff', 'freelancer']),
   email: z.string().max(1000).nullable(),
   phone: z.string().max(1000).nullable(),
@@ -97,6 +100,7 @@ function updated(r: CrewListRow, was: Person): CommandInput<'person.upsert'> {
   return {
     id: was.id,
     name: r.name,
+    ...namesOfRow(r),
     // The office set the kind and the level; the file's flags don't override them.
     kind: was.kind,
     email: r.email ?? was.email,
@@ -116,6 +120,7 @@ function added(r: CrewListRow): CommandInput<'person.upsert'> {
   return {
     id: newId(),
     name: r.name,
+    ...namesOfRow(r),
     kind: r.kind,
     email: r.email,
     phone: r.phone,

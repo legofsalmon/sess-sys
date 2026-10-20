@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Getting about the app and reading it, with a screen reader or in daylight
@@ -255,7 +256,7 @@ test('every field on every screen has a name, and the not-done list is a live re
   })
   await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
-  await person.getByLabel('Name').fill(`Nora Walsh ${id}`)
+  await fillName(person, `Nora Walsh ${id}`)
   await person.getByRole('button', { name: 'Add person' }).click()
   const count = page.getByRole('button', { name: /not done$/ })
   await expect(count).toHaveText('1 not done')

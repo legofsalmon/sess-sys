@@ -12,6 +12,8 @@ import {
   euro,
   euroText,
   firstName,
+  fullName,
+  nameParts,
   HOLDING,
   levelLabel,
   levelLine,
@@ -1549,7 +1551,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   // A rate this device isn't sent (ADR 0046) isn't in the form, and the server keeps the one it has.
   const seesRates = useSeesRates() && !initial?.rateHidden
   const blank = {
-    name: '',
+    firstName: '',
+    lastName: '',
     phone: '',
     email: '',
     skills: [] as string[],
@@ -1567,7 +1570,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     croNumber: '',
   }
   const from = (p: PersonView) => ({
-    name: p.name,
+    // Someone from before the two were asked for comes split from their whole name, to correct if it's wrong.
+    ...nameParts(p),
     phone: p.phone ?? '',
     email: p.email ?? '',
     skills: p.skills,
@@ -1596,7 +1600,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   const setCert = (kind: CertificateKind, field: Partial<CertField>) => setF({ ...f, certs: { ...f.certs, [kind]: { ...f.certs[kind], ...field } } })
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!f.name.trim()) return
+    const names = { firstName: f.firstName.trim(), lastName: f.lastName.trim() }
+    if (!names.firstName) return
     const rate = parseEuro(f.rate)
     if (rate.reason !== undefined) return refuse(rate.reason)
     const company = f.companyName.trim() || f.vatNumber.trim() || f.croNumber.trim()
@@ -1606,7 +1611,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     if (other) return refuse(emailInUseRefusal(other.name))
     void run(() =>
       onSubmit({
-        name: f.name.trim(),
+        name: fullName(names),
+        ...names,
         kind: f.kind,
         phone: f.phone.trim() || null,
         email,
@@ -1629,8 +1635,11 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   }
   return (
     <form className="grid-form" onSubmit={submit} aria-label={initial ? `Edit ${initial.name}` : 'Add person'}>
-      <label className="wide">
-        Name <input value={f.name} onChange={set('name')} placeholder="Full name" required />
+      <label>
+        First name <input value={f.firstName} onChange={set('firstName')} autoComplete="off" maxLength={100} required />
+      </label>
+      <label>
+        Last name <input value={f.lastName} onChange={set('lastName')} autoComplete="off" maxLength={100} />
       </label>
       <label>
         Mobile <input type="tel" value={f.phone} onChange={set('phone')} placeholder="+353 87…" />

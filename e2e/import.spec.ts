@@ -258,11 +258,14 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(people.getByRole('checkbox', { name: 'Add Aoife Byrne' })).toBeChecked()
   await expect(people.getByRole('checkbox', { name: 'Add Seán Murphy' })).toBeChecked()
   await expect(people.getByRole('checkbox', { name: 'Add Client' })).not.toBeChecked()
-  const handle = people.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }) })
+  // Each name in two (ADR 0066), split from what Google had: a first name is needed.
+  const handle = people.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'First name for craicaudio@gmail.com' }) })
   await expect(handle).toContainText('Named from their address: give them their name.')
-  await handle.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }).fill('')
+  await expect(people.getByRole('textbox', { name: 'Last name for aoife.byrne@gmail.com' })).toHaveValue('Byrne')
+  await handle.getByRole('textbox', { name: 'First name for craicaudio@gmail.com' }).fill('')
   await expect(page.getByText('Give craicaudio@gmail.com a name, or untick them.')).toBeVisible()
-  await handle.getByRole('textbox', { name: 'Name for craicaudio@gmail.com' }).fill('Cathal Craic')
+  await handle.getByRole('textbox', { name: 'First name for craicaudio@gmail.com' }).fill('Cathal')
+  await handle.getByRole('textbox', { name: 'Last name for craicaudio@gmail.com' }).fill('Craic')
 
   // What was left out, and why.
   const leftOut = page.getByRole('region', { name: 'Left out' })
@@ -311,10 +314,10 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
         { key: `christmas party|${day(70)}`, name: 'EY Christmas party', kind: 'gig', include: true },
       ],
       people: [
-        { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', include: true },
-        { email: 'craicaudio@gmail.com', name: 'Cathal Craic', include: true },
-        { email: 'sean@sessionhire.com', name: 'Seán Murphy', include: true },
-        { email: 'client@example.ie', name: 'Client', include: false },
+        { email: 'aoife.byrne@gmail.com', name: 'Aoife Byrne', firstName: 'Aoife', lastName: 'Byrne', include: true },
+        { email: 'craicaudio@gmail.com', name: 'Cathal Craic', firstName: 'Cathal', lastName: 'Craic', include: true },
+        { email: 'sean@sessionhire.com', name: 'Seán Murphy', firstName: 'Seán', lastName: 'Murphy', include: true },
+        { email: 'client@example.ie', name: 'Client', firstName: 'Client', lastName: '', include: false },
       ],
     },
   ])

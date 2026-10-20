@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Google Calendar in the browser (ADR 0008, 0009). The test server runs
@@ -292,7 +293,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
   await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
   for (const [name, email] of [[niamh, 'niamh@example.com'], [conor, 'conor@example.ie'], [sean, '']] as const) {
-    await person.getByLabel('Name').fill(name)
+    await fillName(person, name)
     await person.getByLabel('Email').fill(email)
     await person.getByRole('button', { name: 'Add person' }).click()
     await expect(page.getByRole('region', { name: 'People' }).getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible()

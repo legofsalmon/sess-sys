@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Erasing a person's details on request (ADR 0027) end to end: the office
@@ -23,7 +24,7 @@ test('archived, then erased through the question in place: the card says so and 
 
   await people.getByRole('button', { name: 'Add person' }).click()
   const form = people.getByRole('form', { name: 'Add person' })
-  await form.getByLabel('Name').fill(name)
+  await fillName(form, name)
   await form.getByLabel('Mobile').fill('+353 85 555 0199')
   await form.getByLabel('Skills').fill('stage management')
   await form.getByRole('button', { name: 'Add person' }).click()

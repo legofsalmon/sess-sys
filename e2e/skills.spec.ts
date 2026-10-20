@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Skills as picks (ADR 0063): the Skills field offers what the crew list
@@ -25,7 +26,7 @@ test('the Skills field offers the skills in use and takes new ones as chips', as
   await page.getByRole('button', { name: 'Add person' }).click()
   const form = page.getByRole('form', { name: 'Add person' })
   const name = `Dara Spark ${id}`
-  await form.getByLabel('Name').fill(name)
+  await fillName(form, name)
 
   // Typing part of it offers the one in use, once, in the spelling most people have; Down and Enter choose it.
   const skills = form.getByRole('combobox', { name: 'Skills' })
@@ -53,7 +54,7 @@ test('the Skills field offers the skills in use and takes new ones as chips', as
   // What's still typed when the form goes is kept, not lost.
   await skills.fill('rigger')
   await form.getByRole('button', { name: 'Add person' }).click()
-  await expect(form.getByLabel('Name')).toHaveValue('')
+  await expect(form.getByLabel('First name')).toHaveValue('')
 
   const people = page.getByRole('region', { name: 'People' })
   await people.getByLabel('Find a person').fill(`dara spark ${id}`)

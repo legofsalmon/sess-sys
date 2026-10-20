@@ -1,4 +1,4 @@
-import { APPLICANT_LEVEL, DEFAULT_LEVEL, NOTES_LENGTH, tidyDepartment, type Certificates, type Company, type Person } from './crew.ts'
+import { APPLICANT_LEVEL, DEFAULT_LEVEL, fullName, NOTES_LENGTH, tidyDepartment, type Certificates, type Company, type Person } from './crew.ts'
 import { blankRecord, parseCsv } from './csv.ts'
 import { parseEuro } from './money.ts'
 
@@ -19,6 +19,13 @@ export interface CrewListPerson extends Pick<Person, 'name' | 'kind' | 'email' |
   company: Company | null
   /** The day rate as the file has it, read into cents when the person goes in; kept as text so a cell that can't be read is shown as it is. */
   dayRate: string
+  /**
+   * The first and last name, when the file has them in columns of their own
+   * (ADR 0066). They go in only while they still make the name: a name the
+   * office retyped is split as any other is.
+   */
+  firstName?: string
+  lastName?: string
 }
 
 export interface CrewListRow extends CrewListPerson {
@@ -223,6 +230,13 @@ export function readSkills(cell: string): string[] {
   return out
 }
 
+/** A row's first and last name as the person's change takes them: the file's own, while they still make the row's name; none otherwise, and the name is split. */
+export function namesOfRow(r: Pick<CrewListPerson, 'name' | 'firstName' | 'lastName'>): { firstName: string; lastName: string } | Record<string, never> {
+  if (!r.firstName?.trim()) return {}
+  const parts = { firstName: r.firstName.trim(), lastName: r.lastName?.trim() ?? '' }
+  return fullName(parts) === r.name.trim().replace(/\s+/g, ' ') ? parts : {}
+}
+
 /**
  * The rows of the file as people, with each row's problems, or why the file
  * can't be read at all. `officeDomain` is the office email's domain, which
@@ -264,6 +278,7 @@ export function readCrewList(text: string, officeDomain: string | null): { rows:
       // The line in the file, so "row 4" is line 4 of the spreadsheet even after a blank line.
       row: i + 1,
       name: [cell('firstName'), cell('lastName')].filter(Boolean).join(' ') || cell('name'),
+      ...(cell('firstName') ? { firstName: cell('firstName').slice(0, 100), lastName: cell('lastName').slice(0, 100) } : {}),
       kind: 'freelancer',
       email: cell('email') || null,
       phone: cell('phone') || null,
