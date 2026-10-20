@@ -1,5 +1,6 @@
 import { keepSyncing, SyncClient } from '@sh/shared'
 import { markSignedOut } from './auth.ts'
+import { watchSync } from './errors.ts'
 import { openStorage } from './storage.ts'
 import { claimTab, onTabMessage, onTabRole, tabRole } from './tabs.ts'
 import { HttpTransport, SignedOutError } from './transport.ts'
@@ -16,6 +17,8 @@ export const transport = new HttpTransport(import.meta.env.VITE_API_BASE ?? '')
 await claimTab()
 export const storage = await openStorage()
 export const client = await new SyncClient({ storage, transport }).open()
+// Pushes that keep failing, and changes waiting over a day, are reported (audit finding 19).
+watchSync(client, transport, { isSignedOut: (err) => err instanceof SignedOutError, writing: () => tabRole() === 'writer' })
 
 /** Try now, and keep trying while offline, backing off to once every 30 s. */
 const retry = keepSyncing(() => client.sync(), {

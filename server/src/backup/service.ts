@@ -1,6 +1,6 @@
 import { newId, type BackupRun, type BackupStatus } from '@sh/shared'
+import { Worker } from 'node:worker_threads'
 import type { Db } from '../db.ts'
-import { pgliteDb } from '../db.ts'
 import { eraseAgainFromStore } from '../erasure/list.ts'
 import { encryptBackup } from './crypto.ts'
 import { BackupError, isEmptyDatabase, restoreBackup, writeBackup, type RestoreReport } from './format.ts'
@@ -235,16 +235,31 @@ export class Backups {
   }
 }
 
-/** Prove a backup file restores: load it into a throwaway database in memory and check every table. */
-export async function checkRestores(data: Buffer, key?: Buffer): Promise<RestoreReport> {
-  const scratch = await pgliteDb()
-  try {
-    return await restoreBackup(scratch, data, key)
-  } catch (err) {
-    throw new BackupError(`The test restore failed: ${err instanceof Error ? err.message : String(err)}`)
-  } finally {
-    await scratch.close()
-  }
+/** The longest a test restore may take before its worker is stopped and the backup counted as failed. */
+const RESTORE_CHECK_MS = 10 * 60_000
+
+/**
+ * Prove a backup file restores: load it into a throwaway database in memory and check every table. It runs in a
+ * worker thread (restore-worker.ts), so the seconds it takes don't stall the server for everyone else: "Back up now"
+ * and starting fresh run it in the day (audit finding 13). The file is checked there before any database is booted.
+ */
+export function checkRestores(data: Buffer, key?: Buffer, { timeoutMs = RESTORE_CHECK_MS } = {}): Promise<RestoreReport> {
+  return new Promise<RestoreReport>((resolve, reject) => {
+    const worker = new Worker(new URL('./restore-worker.mjs', import.meta.url), { workerData: { data, key } })
+    let settled = false
+    const settle = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn()
+      void worker.terminate()
+    }
+    const failed = (why: string) => settle(() => reject(new BackupError(`The test restore failed: ${why}`)))
+    const timer = setTimeout(() => failed('it took too long.'), timeoutMs)
+    worker.once('message', (m: { report?: RestoreReport; failed?: string }) => (m.report ? settle(() => resolve(m.report!)) : failed(m.failed ?? 'no reason given.')))
+    worker.once('error', (err) => failed(err instanceof Error ? err.message : String(err)))
+    worker.once('exit', () => failed('its worker stopped without answering.'))
+  })
 }
 
 /**

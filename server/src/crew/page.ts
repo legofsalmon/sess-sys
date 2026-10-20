@@ -1,6 +1,6 @@
 import { dayLabel, daysLabel, eachDay, euro, firstName, HOLDING, noTimesheetReason, timesheetTotal, type CrewCall, type Offer, type Person, type Timesheet, type Unavailability } from '@sh/shared'
 import { LATE_BY, LATE_BY_LABELS, LATE_NOTE_LENGTH, lateDayWord, lateLine, needsLabel, needsOf, officeContact, telHref, type OfficeDetails, type RunningLate } from '@sh/shared'
-import { dsColor, ownColours } from '@sh/shared'
+import { dsColor, newId, ownColours } from '@sh/shared'
 import { busyByDay, type OwnCalendar } from '@sh/shared'
 
 /**
@@ -375,6 +375,23 @@ function earlierLine(j: PageData['jobs'][number], how: string): string {
 }
 
 /**
+ * The Copy button's script, the one script on any of these pages. The pages' content security policy lets in this
+ * script by its hash and no other (audit finding 24), so it is kept exactly as it is here.
+ */
+export const COPY_SCRIPT = `
+    (function () {
+      var field = document.getElementById('feed'), copy = document.querySelector('.copy')
+      field.addEventListener('focus', function () { field.select() })
+      if (!navigator.clipboard) return
+      copy.hidden = false
+      copy.addEventListener('click', function () {
+        // Where the browser won't copy after all, the address is selected for copying by hand.
+        navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
+      })
+    })()
+    `
+
+/**
  * The calendar feed address (ADR 0012), in a field that can be copied by
  * hand on any phone, with Subscribe for the calendar apps that take a
  * webcal: link and Copy where the browser can copy. The Copy button is the
@@ -388,18 +405,7 @@ function feedBlock(feed: string): string {
       <div class="feed-buttons"><a class="button" href="${h(feed.replace(/^https?:/, 'webcal:'))}">Subscribe</a><button type="button" class="copy" hidden>Copy address</button></div>
       <p class="small">On a phone, Subscribe adds it to your calendar app. Google Calendar can't take it on a phone: copy the address and add it on a laptop, under Other calendars, From URL.</p>
     </div>
-    <script>
-    (function () {
-      var field = document.getElementById('feed'), copy = document.querySelector('.copy')
-      field.addEventListener('focus', function () { field.select() })
-      if (!navigator.clipboard) return
-      copy.hidden = false
-      copy.addEventListener('click', function () {
-        // Where the browser won't copy after all, the address is selected for copying by hand.
-        navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
-      })
-    })()
-    </script>`
+    <script>${COPY_SCRIPT}</script>`
 }
 
 /** How long a list of busy days the page shows: the next few are what someone checks. */
@@ -529,6 +535,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
         : ''
     }
     <form method="post" action="${d.base}/away#away" class="add-away">
+      <input type="hidden" name="id" value="${newId()}">
       <label>From <input type="date" name="start" required min="${d.today}" value="${h(away?.get('start'))}"></label>
       <label>To <input type="date" name="end" min="${d.today}" value="${h(away?.get('end'))}"></label>
       <label class="wide">Note (optional) <input name="note" maxlength="500" placeholder="e.g. on tour" value="${h(away?.get('note'))}"></label>

@@ -1,14 +1,14 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
-import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv } from './auth/config.ts'
+import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv, passcodeWarning } from './auth/config.ts'
 import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
 import { dirStore, storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
 import { nominatim } from './projects/places.ts'
-import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting } from './monitoring.ts'
+import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting, watchEventLoop } from './monitoring.ts'
 
 // Error reporting first, so a start-up that goes wrong is reported too (ADR 0005).
 const errorReporting = errorReportingFromEnv()
@@ -73,6 +73,8 @@ async function main() {
   await app.dueErasures.start()
   const port = Number(process.env.PORT ?? 3030)
   await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
+  // Held up for over a second, answering nobody: logged, and reported (audit finding 19).
+  watchEventLoop(app.log)
   // Freelancers' own calendars, read again every few hours (ADR 0044).
   app.ownCalendars.start()
   if (process.env.OWN_CALENDAR_TEST_HOSTS) app.log.warn('OWN_CALENDAR_TEST_HOSTS is set: calendars may be read over plain http from the hosts it names. It is for the browser tests only.')
@@ -81,7 +83,11 @@ async function main() {
   void app.documents.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
-  else if (passcode) app.log.info('Sign-in: a shared passcode (DEMO_PASSCODE), for made-up data only')
+  else if (passcode) {
+    app.log.info('Sign-in: a shared passcode (DEMO_PASSCODE), for made-up data only')
+    const short = passcodeWarning(passcode)
+    if (short) app.log.warn(short)
+  }
   else app.log.warn('Sign-in is off: anyone who can reach the app can use it. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to switch it on.')
   if (restored)
     app.log.warn(

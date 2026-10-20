@@ -225,6 +225,22 @@ describe('kit from the notes', () => {
     expect(r).toMatchObject({ status: 'rejected', reason: { message: expect.stringContaining('added by mistake') } })
   })
 
+  it('names a job that has gone since its notes were read, combined into another', async () => {
+    // Proves: kit from the notes turned down for a job that's gone says which job, by its last name (audit, P3: words).
+    const { app, job, y10p } = await setUp()
+    const other = newId()
+    await ok(app, 'project.create', { id: other, name: 'Fairview Get-out', clientId: null, venueId: null, status: 'confirmed', notes: '' })
+    await ok(app, 'project.merge', { id: job, from: [other], name: 'Fairview' })
+    const line = () => [{ id: newId(), phaseId: null, modelId: y10p.id, qty: 1, notes: '' }]
+    const alone = await send(app, 'kit.fromNotes', { jobs: [{ projectId: other, sum: 'x', lines: line() }], names: [] })
+    expect(alone).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'not-found', message: "Fairview Get-out is no longer on the jobs list (combined into another job, or deleted), so nothing was added. Look again at what's left." },
+    })
+    const both = await send(app, 'kit.fromNotes', { jobs: [{ projectId: job, sum: 'x', lines: line() }, { projectId: other, sum: 'x', lines: line() }], names: [] })
+    expect(both.status === 'rejected' && both.reason.message).toContain('Fairview Get-out is no longer on the jobs list (combined into another job, or deleted), so nothing was added for any of these jobs.')
+  })
+
   it('arrives on a database already in use, leaving its kit as it was', async () => {
     // A database from before this change, with a job and a kit line, takes the two new tables on the next start.
     const db = await pgliteDb()

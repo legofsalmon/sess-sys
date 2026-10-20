@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -22,10 +23,13 @@ afterEach(async () => {
   cleanup = []
 })
 
+/** A stand-in for the page's inline theme script, which its content security policy lets in by its hash. */
+const THEME = "document.documentElement.dataset.theme = 'dark'"
+
 /** The app, with a stand-in for web/dist that holds the page and whatever else a test needs. */
 async function serving(files: Record<string, string | Buffer> = {}) {
   const webRoot = mkdtempSync(join(tmpdir(), 'sh-web-'))
-  writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>Session Hire</title>')
+  writeFileSync(join(webRoot, 'index.html'), `<!doctype html><title>Session Hire</title><script>${THEME}</script>`)
   for (const [name, text] of Object.entries(files)) {
     mkdirSync(dirname(join(webRoot, name)), { recursive: true })
     writeFileSync(join(webRoot, name), text)
@@ -78,13 +82,35 @@ describe('every answer', () => {
     for (const url of ['/', '/api/health', '/sw.js', '/assets/missing.js', '/nothing-here', '/f/a-link-nobody-was-given', '/cal/aaaaaaaaaaaaaaaaaaaaaaaa.ics']) {
       const res = await app.inject({ method: 'GET', url })
       expect(res.headers['x-content-type-options'], url).toBe('nosniff')
-      expect(res.headers['content-security-policy'], url).toBe("frame-ancestors 'none'")
+      expect(res.headers['content-security-policy'], url).toContain("frame-ancestors 'none'")
       expect(res.headers['referrer-policy'], url).toBe('strict-origin-when-cross-origin')
       expect(res.headers['strict-transport-security'], url).toBeUndefined()
     }
     // Railway says which protocol the request came in on.
     const https = await app.inject({ method: 'GET', url: '/api/health', headers: { 'x-forwarded-proto': 'https' } })
     expect(https.headers['strict-transport-security']).toBe('max-age=31536000; includeSubDomains')
+  })
+
+  it('has a strict content security policy on the app and on the server’s own pages, and frames kept out of the rest', async () => {
+    // Proves: the app shell lets in its own files, its theme script by hash, the map's tiles and Sentry, and nothing else
+    // inline but style; a freelancer's page lets in nothing but itself, its style and its one script (audit finding 24).
+    const app = await serving({ 'sw.js': 'self.skipWaiting()' })
+    const policy = async (url: string) => String((await app.inject({ method: 'GET', url })).headers['content-security-policy'])
+    const theme = `'sha256-${createHash('sha256').update(THEME).digest('base64')}'`
+    for (const url of ['/', '/index.html', '/jobs/j1']) {
+      const shell = await policy(url)
+      expect(shell, url).toContain("default-src 'self'")
+      expect(shell, url).toContain(`script-src 'self' ${theme};`)
+      expect(shell, url).toContain("style-src 'self' 'unsafe-inline'")
+      expect(shell, url).toContain('img-src \'self\' data: blob: https://tile.openstreetmap.org')
+      expect(shell, url).toContain('https://*.ingest.de.sentry.io')
+      expect(shell, url).toContain("object-src 'none'")
+    }
+    const page = await policy('/f/a-link-nobody-was-given')
+    expect(page).toContain("default-src 'none'")
+    expect(page).toMatch(/script-src 'sha256-[A-Za-z0-9+/=]+';/)
+    expect(page).toContain("form-action 'self'")
+    for (const url of ['/api/health', '/sw.js', '/assets/missing.js', '/cal/aaaaaaaaaaaaaaaaaaaaaaaa.ics']) expect(await policy(url), url).toBe("frame-ancestors 'none'")
   })
 
   it('is not waited for for ever: the server has a time limit for a whole request to arrive', async () => {

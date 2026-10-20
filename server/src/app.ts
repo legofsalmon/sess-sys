@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { LogController, type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
+import { readFileSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { constants as zlib } from 'node:zlib'
 import type { WebSocket } from 'ws'
@@ -22,9 +23,10 @@ import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
+import { COPY_SCRIPT } from './crew/page.ts'
 import { OwnCalendars, type OwnCalendarsOptions } from './crew/own-calendars.ts'
 import { registerOwnCalendarRoutes } from './crew/own-calendar-routes.ts'
-import type { Db, Queryable } from './db.ts'
+import { faultForLog, type Db, type Queryable } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { DocumentFiles } from './documents/files.ts'
 import { registerDocumentRoutes } from './documents/routes.ts'
@@ -32,11 +34,11 @@ import { DueErasures } from './erasure/due.ts'
 import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
-import { publicOrigin, requestForLog } from './http.ts'
+import { appShellPolicy, inlineScripts, pagePolicy, publicOrigin, requestForLog } from './http.ts'
 import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { registerNoticeRoutes } from './notices.ts'
-import { reportError, type ErrorReporting } from './monitoring.ts'
+import { reportError, reportNowAndThen, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
 import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
@@ -123,6 +125,8 @@ export interface AppOptions {
   ownCalendars?: OwnCalendarsOptions
   /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
   places?: PlaceSearch
+  /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
+  report?: typeof reportError
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -208,6 +212,10 @@ class QuietRequests extends LogController {
  * turning down a character it can't hold (a NUL in a query string, say), which is the request's, so a refusal.
  */
 const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCode ?? err.status ?? (isCharacterError(err) ? 400 : 500)
+
+class EmptyPullBehindHead extends Error {
+  override name = 'EmptyPullBehindHead'
+}
 
 /**
  * The sync API. Three routes do the work (push, pull, live); `history` and
@@ -324,7 +332,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       reply.send(err)
       return
     }
-    req.log.error({ req, res: reply, err }, err.message)
+    // A database error's detail holds the row it was about: the log gets the fault without it.
+    const logged = faultForLog(err)
+    req.log.error({ req, res: reply, err: logged }, logged === err ? err.message : (logged as { message: string }).message)
     reply.code(status).send({ error: 'Something went wrong on the server.' })
   })
 
@@ -333,10 +343,16 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // only where a link came from, not which page. Browsers remember the https
   // rule for a year, so it goes out only on https (Railway says so in the
   // forwarded protocol), never from a local server on http.
+  // The server's own pages get a strict content security policy (audit finding 24); the app shell sets its own as it's
+  // served, below, and a document's file a stricter one of its own (ADR 0029). Anything else isn't a page, and needs only
+  // to stay out of other sites' frames.
+  const pages = pagePolicy([COPY_SCRIPT])
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff')
-    // A document's file sets a stricter one of its own (ADR 0029), which already holds this.
-    if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', "frame-ancestors 'none'")
+    if (!reply.hasHeader('content-security-policy')) {
+      const html = String(reply.getHeader('content-type') ?? '').startsWith('text/html')
+      reply.header('content-security-policy', html ? pages : "frame-ancestors 'none'")
+    }
     reply.header('referrer-policy', 'strict-origin-when-cross-origin')
     if (publicOrigin(req).startsWith('https:')) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains')
   })
@@ -443,6 +459,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return stale ? { results: [], stale } : busy ? { results, busy } : { results }
   })
 
+  // A pull that found nothing new while the feed's head is past the device (audit finding 19). One change landing between
+  // the page and the head is enough, and is harmless now: the device keeps its cursor and the next pull brings it. Often,
+  // though, it says writes are slow to commit, and it is how finding 1 lost changes before it was fixed.
+  const reportBehind = reportNowAndThen(10 * 60_000, options.report)
   app.get<{ Querystring: { after?: string; latest?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
     const after = Math.max(0, Number(req.query.after ?? 0) || 0)
     // Pulls never take the write lock, and read on connections of their own, so a phone keeps hearing everyone else's
@@ -478,6 +498,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // the latest that isn't full goes as far as the feed did when that page was read, in the same statement, so past
     // whatever it left out (deletes, changes made again since), and nothing committed after can fall behind it.
     const cursor = more ? Number(page[page.length - 1]!.seq) : Math.max(after, page.length ? Number(page[page.length - 1]!.seq) : after, upTo ?? 0)
+    if (page.length === 0 && cursor === after && head > after) {
+      req.log.warn({ after, head }, 'A pull found nothing after the device, with the head of the feed past it')
+      reportBehind(new EmptyPullBehindHead(`A pull found nothing after ${after}, with the head of the feed at ${head}`), { area: 'pull' })
+    }
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
     return {
@@ -592,12 +616,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // service worker and the manifest keep their names, so they are checked every time.
     // Judged from the web root, so a checkout in a folder that happens to be called assets changes nothing.
     const assets = join(webRoot, 'assets') + sep
+    const page = join(webRoot, 'index.html')
+    // Its inline theme script is let in by its hash, read from the page as built (audit finding 24).
+    const shell = appShellPolicy(inlineScripts(readFileSync(page, 'utf8')), errorReporting?.dsn)
     await app.register(fastifyStatic, {
       root: webRoot,
       // The .br and .gz beside each file, made when the app is built, go to a browser that takes them (audit finding 6).
       preCompressed: true,
       cacheControl: false,
-      setHeaders: (reply, path) => reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+      setHeaders: (reply, path) => {
+        reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache')
+        if (path === page) reply.header('content-security-policy', shell)
+      },
     })
     // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.
     // A missing file under /assets/ is a plain 404, never the page: a page from before a deploy

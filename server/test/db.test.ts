@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import pg from 'pg'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
-import { dbFromEnv, postgresDb, type Db } from '../src/db.ts'
+import { dbFromEnv, faultForLog, pgliteDb, postgresDb, type Db } from '../src/db.ts'
 
 /**
  * A deploy must never look healthy while quietly keeping its data in
@@ -170,3 +170,21 @@ async function pretendPostgres() {
   opened.push({ close } as Db)
   return { url: `postgresql://nobody:x@127.0.0.1:${(server.address() as AddressInfo).port}/none`, queries }
 }
+
+describe('a database error in the log', () => {
+  it('says which kind, on which table, and where in the code, but not the row it was about', async () => {
+    // Proves: Postgres's detail ("Key (email)=(…)") and PGlite's query values never reach the log Railway keeps (audit, P3).
+    const db = await pgliteDb()
+    opened.push(db)
+    await db.exec('CREATE TABLE crew (email text PRIMARY KEY)')
+    await db.query('INSERT INTO crew VALUES ($1)', ['aoife.byrne@example.ie'])
+    const err = await db.query('INSERT INTO crew VALUES ($1)', ['aoife.byrne@example.ie']).catch((e: unknown) => e)
+    expect((err as { detail?: string }).detail).toContain('aoife.byrne@example.ie')
+    const logged = faultForLog(err) as Record<string, unknown>
+    expect(logged).toMatchObject({ code: '23505', table: 'crew', constraint: 'crew_pkey', message: 'duplicate key value violates unique constraint "crew_pkey"' })
+    expect(JSON.stringify(logged)).not.toContain('aoife')
+    // Any other error is left as it is.
+    const plain = new Error('Nothing to do with the database')
+    expect(faultForLog(plain)).toBe(plain)
+  })
+})
