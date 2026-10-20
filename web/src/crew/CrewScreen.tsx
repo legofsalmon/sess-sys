@@ -73,6 +73,7 @@ import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
 import { useSamePeople } from './Combine.tsx'
 import { Avatar, Avatars } from '../Picture.tsx'
+import { SkillsField, withTyped } from './SkillsField.tsx'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
@@ -1554,7 +1555,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     lastName: '',
     phone: '',
     email: '',
-    skills: '',
+    skills: [] as string[],
+    skillsTyped: '',
     rate: '',
     kind: 'freelancer' as 'freelancer' | 'staff',
     notes: '',
@@ -1572,7 +1574,8 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
     ...nameParts(p),
     phone: p.phone ?? '',
     email: p.email ?? '',
-    skills: p.skills.join(', '),
+    skills: p.skills,
+    skillsTyped: '',
     rate: p.dayRateCents === null ? '' : euroText(p.dayRateCents),
     kind: p.kind,
     notes: p.notes,
@@ -1590,7 +1593,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   const [moreOpen] = useState(() => !!initial && (!!initial.department || !!initial.knownAs || initial.level !== DEFAULT_LEVEL || !!initial.company || Object.values(initial.certificates).some((c) => c && (c.held !== null || !!c.expires || !!c.note))))
   const listId = useId()
   const { run, error, refuse } = useAct()
-  const set = (k: Exclude<keyof typeof blank, 'approvesLeave' | 'certs'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const set = (k: Exclude<keyof typeof blank, 'approvesLeave' | 'certs' | 'skills' | 'skillsTyped'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   // Only freelancers trade through a company (ADR 0025); one a member of staff already has (from the crew list, say)
   // stays in view so it can be seen and cleared, never dropped without a word.
   const showCompany = f.kind === 'freelancer' || !!initial?.company
@@ -1613,7 +1616,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
         kind: f.kind,
         phone: f.phone.trim() || null,
         email,
-        skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        skills: withTyped(f.skills, f.skillsTyped, people),
         ...(seesRates ? { dayRateCents: rate.cents } : {}),
         notes: f.notes.trim(),
         // Only staff approve time off (ADR 0024).
@@ -1644,9 +1647,13 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
       <label>
         Email <input type="email" value={f.email} onChange={set('email')} readOnly={!!whoFixed} />
       </label>
-      <label>
-        Skills <input value={f.skills} onChange={set('skills')} placeholder="audio, rigger" />
-      </label>
+      <SkillsField
+        className="wide"
+        value={f.skills}
+        onChange={(skills) => setF((was) => ({ ...was, skills }))}
+        text={f.skillsTyped}
+        onText={(skillsTyped) => setF((was) => ({ ...was, skillsTyped }))}
+      />
       {seesRates && (
         <label>
           Usual day rate € <input inputMode="decimal" value={f.rate} onChange={set('rate')} />
