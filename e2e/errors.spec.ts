@@ -122,3 +122,56 @@ test('sends a report still waiting when the app was closed, the next time it ope
   await again.goto('/')
   await expect.poll(() => messages(sentry), { timeout: 20_000 }).toEqual(['Could not save the count'])
 })
+
+/** Four speakers in a bay, on a product's page of their own, and a way to move them: a change for the phone to send. */
+async function speakers(page: Page) {
+  const id = Math.random().toString(36).slice(2, 8)
+  const createdAt = new Date().toISOString()
+  const setUp = [
+    { name: 'model.create', args: { id: `m${id}`, name: `Speaker ${id}`, department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: null, notes: '' } },
+    { name: 'place.upsert', args: { id: `a${id}`, name: `Bay ${id}`, notes: '' } },
+    { name: 'place.upsert', args: { id: `v${id}`, name: `Van ${id}`, notes: '' } },
+    { name: 'stock.set', args: { modelId: `m${id}`, placeId: `a${id}`, caseId: null, qty: 4 } },
+  ].map((m, i) => ({ ...m, id: `errs${id}${i}`, createdAt }))
+  await page.request.post('/api/sync/push', { data: { clientId: `office${id}`, mutations: setUp } })
+  await page.goto(`/#stock/product/m${id}`)
+  const row = page.getByRole('region', { name: 'Counted' }).locator('.count', { hasText: `Bay ${id}` })
+  await expect(row).toContainText('4')
+  return async () => {
+    await row.getByRole('button', { name: 'Move some' }).click()
+    await row.getByLabel('How many').fill('1')
+    await row.getByLabel('To', { exact: true }).fill(`Van ${id}`)
+    await row.getByRole('button', { name: `Move Speaker ${id}` }).click()
+  }
+}
+
+test("reports a phone whose changes keep failing to send while it has a signal, once", async ({ context, page }) => {
+  // Proves: a push the server keeps failing, which the phone only retries, reaches the error reports (audit finding 19).
+  const sentry = await standIn(context)
+  const move = await speakers(page)
+  await reporting(page)
+  let pushes = 0
+  await context.route('**/api/sync/push', (route) => {
+    pushes++
+    return route.fulfill({ status: 500, json: { error: 'Something went wrong on the server.' } })
+  })
+  await move()
+  await expect.poll(() => messages(sentry), { timeout: 40_000 }).toEqual(['Sending a change has failed 4 times in a row: Server answered 500'])
+  expect(sentry.reports[0]!.body.exception.values.at(-1)?.type).toBe('PushFailing')
+  // Still failing, and still said once.
+  const after = pushes
+  await expect.poll(() => pushes, { timeout: 40_000 }).toBeGreaterThan(after)
+  expect(sentry.reports).toHaveLength(1)
+})
+
+test('reports a change that has waited on the phone for over a day', async ({ context, page }) => {
+  const sentry = await standIn(context)
+  await page.clock.install()
+  const move = await speakers(page)
+  await reporting(page)
+  await context.route('**/api/sync/push', (route) => route.abort('internetdisconnected'))
+  await move()
+  await page.clock.fastForward('25:00:00')
+  await page.clock.runFor(11 * 60_000)
+  await expect.poll(() => messages(sentry), { timeout: 20_000 }).toContainEqual(expect.stringMatching(/^A change \(stock\.move\) has waited 2[45] hours on this device to be sent, with 1 waiting in all$/))
+})

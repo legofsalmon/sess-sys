@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { emptySnapshot, FEED, MemoryStorage, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildApp } from '../src/app.ts'
+import { buildApp, type AppOptions } from '../src/app.ts'
 import { pgliteDb, type Db, type Queryable } from '../src/db.ts'
 
 /**
@@ -47,9 +47,9 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function server(db?: Db) {
+async function server(db?: Db, more: Omit<AppOptions, 'db'> = {}) {
   const database = db ?? (await pgliteDb())
-  const app = await buildApp({ db: database })
+  const app = await buildApp({ db: database, ...more })
   cleanup.push(async () => {
     await app.close()
     if (!db) await database.close()
@@ -383,7 +383,9 @@ describe('a pull answered while another change lands (audit, 18 October 2026)', 
       slipIn = undefined
       await go()
     })
-    const app = await server(db)
+    // And it's reported, as what usually means writes are slow to commit (audit finding 19).
+    const reported: Error[] = []
+    const app = await server(db, { report: (err) => void reported.push(err as Error) })
     const office = await seed(app)
     const laptop = await device(app)
     await laptop.client.sync()
@@ -397,9 +399,11 @@ describe('a pull answered while another change lands (audit, 18 October 2026)', 
     await laptop.client.sync()
     expect(slipIn).toBeUndefined()
     expect(laptop.client.cursor).toBe(before)
+    expect(reported.map((e) => e.message)).toEqual([`A pull found nothing after ${before}, with the head of the feed at ${office.client.cursor}`])
 
     await laptop.client.sync()
     expect(counts(laptop)).toEqual(['a3 2', 'van1 2'])
+    expect(reported).toHaveLength(1)
     expect(laptop.client.cursor).toBe(office.client.cursor)
   })
 

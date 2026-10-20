@@ -1,5 +1,6 @@
 import {
   browserApiErrorsIntegration,
+  captureException,
   dedupeIntegration,
   eventFiltersIntegration,
   globalHandlersIntegration,
@@ -43,6 +44,11 @@ export function start({ dsn, environment }: NonNullable<ClientConfig['errors']>)
     maxBreadcrumbs: 0,
     beforeSend: scrub,
   })
+}
+
+/** One the app noticed itself (errors.ts, watchSync). */
+export function report(err: Error) {
+  captureException(err)
 }
 
 const NOTHING: BrowserOptions['dataCollection'] = {

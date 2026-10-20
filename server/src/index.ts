@@ -8,7 +8,7 @@ import { dirStore, storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
 import { nominatim } from './projects/places.ts'
-import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting } from './monitoring.ts'
+import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting, watchEventLoop } from './monitoring.ts'
 
 // Error reporting first, so a start-up that goes wrong is reported too (ADR 0005).
 const errorReporting = errorReportingFromEnv()
@@ -73,6 +73,8 @@ async function main() {
   await app.dueErasures.start()
   const port = Number(process.env.PORT ?? 3030)
   await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
+  // Held up for over a second, answering nobody: logged, and reported (audit finding 19).
+  watchEventLoop(app.log)
   // Freelancers' own calendars, read again every few hours (ADR 0044).
   app.ownCalendars.start()
   if (process.env.OWN_CALENDAR_TEST_HOSTS) app.log.warn('OWN_CALENDAR_TEST_HOSTS is set: calendars may be read over plain http from the hosts it names. It is for the browser tests only.')

@@ -88,6 +88,13 @@ Addresses**. The app already asks Sentry not to work them out.
   minutes, and Sentry closes the issue itself when it answers again.
 - An email when a night's backup fails, runs for more than 30 minutes, or
   hasn't started by 03:00 UTC.
+- An issue for what fails nothing but still matters: the server held up
+  for over a second, answering nobody (`ServerHeldUp`); a phone's pull
+  finding nothing new while the feed is past it, which usually means
+  writes are slow to commit (`EmptyPullBehindHead`); a phone whose changes
+  have failed to send four times in a row while it has a signal
+  (`PushFailing`); and a change that has waited on a phone for over a day
+  (`OutboxStale`).
 - Each issue in Sentry shows where in the code it happened, how often, on
   which version of the app, and on what kinds of device.
 

@@ -36,7 +36,7 @@ import { publicOrigin, requestForLog } from './http.ts'
 import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { registerNoticeRoutes } from './notices.ts'
-import { reportError, type ErrorReporting } from './monitoring.ts'
+import { reportError, reportNowAndThen, type ErrorReporting } from './monitoring.ts'
 import { keptSyncTestTables } from './schema.ts'
 import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
@@ -105,6 +105,8 @@ export interface AppOptions {
   ownCalendars?: OwnCalendarsOptions
   /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
   places?: PlaceSearch
+  /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
+  report?: typeof reportError
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -136,6 +138,10 @@ declare module 'fastify' {
  * turning down a character it can't hold (a NUL in a query string, say), which is the request's, so a refusal.
  */
 const statusOf = (err: { statusCode?: number; status?: number }) => err.statusCode ?? err.status ?? (isCharacterError(err) ? 400 : 500)
+
+class EmptyPullBehindHead extends Error {
+  override name = 'EmptyPullBehindHead'
+}
 
 /**
  * The sync API. Three routes do the work (push, pull, live); `history` and
@@ -370,6 +376,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return stale ? { results: [], stale } : busy ? { results, busy } : { results }
   })
 
+  // A pull that found nothing new while the feed's head is past the device (audit finding 19). One change landing between
+  // the page and the head is enough, and is harmless now: the device keeps its cursor and the next pull brings it. Often,
+  // though, it says writes are slow to commit, and it is how finding 1 lost changes before it was fixed.
+  const reportBehind = reportNowAndThen(10 * 60_000, options.report)
   app.get<{ Querystring: { after?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
     const after = Math.max(0, Number(req.query.after ?? 0) || 0)
     // Pulls never take the write lock, and read on connections of their own, so a phone keeps hearing everyone else's
@@ -404,6 +414,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // Nothing new keeps the device where it was. Not the head: a change committed after the page was read and before
     // the head was would fall between the two, and the device would never be sent it (audit, 18 October 2026).
     const cursor = page.length ? Number(page[page.length - 1]!.seq) : after
+    if (page.length === 0 && head > after) {
+      req.log.warn({ after, head }, 'A pull found nothing after the device, with the head of the feed past it')
+      reportBehind(new EmptyPullBehindHead(`A pull found nothing after ${after}, with the head of the feed at ${head}`), { area: 'pull' })
+    }
     // Began with someone starting fresh: a device starting its copy afresh drops what it had waiting (ADR 0019).
     const cleared = generation !== undefined && (await startedFresh(db, generation))
     return { changes, cursor, more, generation, ...(cleared ? { cleared } : {}), ...(meta[0]?.made_up ? { madeUp: true } : {}), head, feed: FEED, ...(money ? {} : { money: false }), ...(readsEverything(reading) ? {} : { reading }) }

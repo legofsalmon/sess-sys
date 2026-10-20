@@ -111,6 +111,54 @@ export async function flushReports(timeoutMs = 2000) {
   if (Sentry.getClient()) await Sentry.flush(timeoutMs)
 }
 
+/** The longest the server's one thread may be held up before it's reported (audit finding 19). */
+export const STALL_MS = 1_000
+
+/**
+ * The server stopped answering everyone for a while: something held its one
+ * thread (a big file read on it, say, as the backups' test restore once did).
+ * Nothing fails when that happens, so nothing else would say. Checked by a
+ * timer that should fire every half second; reported at most once in a
+ * quarter of an hour, and logged each time. Returns the way to stop it.
+ */
+export function watchEventLoop(
+  log: { warn(obj: object, msg: string): void },
+  { overMs = STALL_MS, everyMs = 500, quietMs = 15 * 60_000, report = reportError }: { overMs?: number; everyMs?: number; quietMs?: number; report?: typeof reportError } = {}
+): () => void {
+  let last = performance.now()
+  let reported = -Infinity
+  const timer = setInterval(() => {
+    const now = performance.now()
+    const heldMs = Math.round(now - last - everyMs)
+    last = now
+    if (heldMs <= overMs) return
+    log.warn({ heldMs }, 'The server was held up and answered nobody meanwhile')
+    if (now - reported < quietMs) return
+    reported = now
+    report(new ServerHeldUp(`The server answered nobody for ${(heldMs / 1000).toFixed(1)} s`), { area: 'event-loop' })
+  }, everyMs)
+  timer.unref()
+  return () => clearInterval(timer)
+}
+
+class ServerHeldUp extends Error {
+  override name = 'ServerHeldUp'
+}
+
+/**
+ * Once in so long at most, for something that could happen many times in a
+ * row: a report each time would only bury the others.
+ */
+export function reportNowAndThen(everyMs: number, report = reportError): typeof reportError {
+  let last = -Infinity
+  return (err, tags) => {
+    const now = performance.now()
+    if (now - last < everyMs) return
+    last = now
+    report(err, tags)
+  }
+}
+
 /** The Sentry monitor watching the nightly backup, set up by the first check-in. */
 export const BACKUP_MONITOR = 'nightly-backup'
 
