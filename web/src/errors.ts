@@ -1,4 +1,5 @@
 import type { ClientConfig } from '@sh/shared'
+import { versionRead } from './version.ts'
 
 /**
  * Reports of the app's own errors, from every phone and laptop (ADR 0005).
@@ -39,7 +40,7 @@ export async function startErrorReporting() {
   if (!settings) return
   try {
     const { start } = await import('./errorsSdk.ts')
-    start(settings)
+    start(settings, await versionRead)
   } catch {
     // Its code isn't on this device yet (a new version arriving, say): next time.
   }

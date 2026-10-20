@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Confirm, Refusal, useAct } from './act.tsx'
 import { signOut, useAuth } from './auth.ts'
 import { FeedCard } from './FeedCard.tsx'
+import { askToKeep, useKept } from './kept.ts'
 import { Top } from './jobs/common.tsx'
 import { useAccess } from './role.ts'
 import { forgetCountDraft } from './stock/Counts.tsx'
@@ -113,11 +114,44 @@ export function YouScreen() {
 
       <section className="card">
         <h2>This device</h2>
+        <KeptLine />
         <p className="hint">
           Device {client.clientId.slice(-6)} · change #{view.cursor} · {waiting === 0 ? 'nothing waiting to sync' : `${waiting} waiting to sync`}
         </p>
       </section>
     </div>
+  )
+}
+
+/**
+ * Whether this browser keeps the copy (kept.ts, audit finding 16), in plain words, with what would go if it doesn't
+ * and a way to ask again. Nothing while it isn't known; and while the copy is only in memory, the bar at the top says so.
+ */
+function KeptLine() {
+  const kept = useKept()
+  const [asking, setAsking] = useState(false)
+  const [refused, setRefused] = useState(false)
+  if (kept === undefined || storage.state().mode === 'memory') return null
+  if (kept) return <p>This browser keeps the app's copy of the data, and changes waiting to sync, until you sign out.</p>
+  const ask = async () => {
+    setAsking(true)
+    setRefused((await askToKeep(true)) === false)
+    setAsking(false)
+  }
+  return (
+    <>
+      <p>
+        This browser may clear the app's copy of the data to make room, or after a week unused, and changes waiting to sync would go with it. Adding
+        the app to your Home Screen usually stops that.
+      </p>
+      {refused ? (
+        <p className="hint">Asked again, and it still won't say it will keep it.</p>
+      ) : (
+        <button type="button" onClick={() => void ask()} disabled={asking} aria-busy={asking}>
+          Ask it to keep the copy
+        </button>
+      )}
+    </>
   )
 }
 

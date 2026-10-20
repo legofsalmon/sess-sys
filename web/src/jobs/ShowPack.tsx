@@ -14,9 +14,8 @@ import { strToU8, zipSync } from 'fflate'
 import { useId, useState } from 'react'
 import { Heading } from '../Icon.tsx'
 import { useAccess } from '../role.ts'
+import { appVersion } from '../version.ts'
 import { sheetInput } from './SheetScreen.tsx'
-
-declare const __APP_VERSION__: string
 
 /**
  * The Crewbox show pack (ADR 0045): one .zip of files for the on-site box,
@@ -136,7 +135,7 @@ export function packInput(view: View, job: JobView, phase: PhaseView | undefined
     office: view.office.details ?? null,
     phones: o.phones,
     made: o.made ?? new Date().toISOString(),
-    appVersion: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev',
+    appVersion: appVersion(),
     box: o.box,
   }
 }
