@@ -1,6 +1,11 @@
 # Session Hire system: proposed architecture
 
-Status: proposal for review, 2026-09-29. Nothing is built yet.
+Status: proposed 29 September 2026, and most of it built since. Where a
+part is built this page names its ADR; where the code does something else,
+or a part isn't built yet, it says so. Checked against the code on 20
+October 2026 (audit of 18 October, finding 18): what each device holds,
+the local store, the jobs, free text and the backups and alerts were
+corrected then.
 
 Read with [research/competitor-audit.md](research/competitor-audit.md),
 [research/current-process.md](research/current-process.md) and
@@ -49,7 +54,12 @@ core stock handling. Matching them is enough.
 
 Session Hire's main complaint about Rentman and TeamTrack is that they are
 closed and rigid: the product decides how the business works. So these
-rules hold everywhere in the design:
+rules hold everywhere in the design. They are aims: built so far are
+Download everything, overrides kept with a note (prices, shortages,
+clashes), configurable departments and crew roles, and Google Calendar,
+Crewbox's show pack and file exports. A documented public API, webhooks,
+rules on status changes, custom fields and settings for phase types and
+statuses are not built yet.
 
 - **Your data, always reachable.** A documented API over everything the UI
   can do, webhooks on every change, and a full export (CSV, JSON, Excel)
@@ -83,7 +93,11 @@ also work for other companies, so the system bends to them instead:
   where they already look: SMS or WhatsApp, email, and a Google or Apple
   calendar invite. Each message has a one-tap link (accept, decline, view
   the call sheet) that works without signing in. The app is there for
-  those who want it, never a condition of getting work.
+  those who want it, never a condition of getting work. Built as the
+  private link ([ADR 0002](adr/0002-crew-booking-links.md)), calendar
+  invites ([ADR 0009](adr/0009-crew-invites.md)) and messages the office
+  sends from its own WhatsApp, texts or email; the server sends none
+  itself.
 - **Their calendar, not ours.** A freelancer can share free/busy from
   their own calendar (Google, Apple, Outlook, any iCal) so ops see real
   availability without the freelancer filling in a second calendar. Only
@@ -115,25 +129,36 @@ also work for other companies, so the system bends to them instead:
 ## The shape of the system
 
 ```
- Phones / laptops (PWA, optional Capacitor shell for scanning)
+ Phones / laptops (PWA)
  ┌───────────────────────────────────────────────────────────┐
  │ React UI                                                  │
- │  ├─ local replica (SQLite-in-browser or IndexedDB)        │
- │  ├─ outbox of commands (client ids, retried until acked)  │
- │  └─ Yjs docs for free text (job notes, run of show)       │
+ │  ├─ local copy of the feed, in IndexedDB                  │
+ │  └─ outbox of commands (client ids, retried until acked)  │
  └──────────────┬────────────────────────────────────────────┘
-                │ HTTPS + WebSocket (changes streamed by sequence number)
+                │ HTTPS: push commands, pull the feed by sequence number
+                │ WebSocket: a poke when the feed moves on
  ┌──────────────┴────────────────────────────────────────────┐
- │ API server (TypeScript, Fastify)                          │
- │  ├─ command handlers: validate, check availability, write │
- │  ├─ change feed: per-scope sequence numbers               │
- │  ├─ jobs: calendar sync, emails, PDF quotes, exports      │
- │  └─ integrations: Google Calendar, Crewbox, exports       │
+ │ API server (TypeScript, Fastify), one process on Railway  │
+ │  ├─ command handlers: validate, check, write              │
+ │  ├─ change feed: one sequence for everything, cut down    │
+ │  │   per role as it goes out                              │
+ │  ├─ timers in the process: calendar sync, freelancers'    │
+ │  │   calendars, the nightly backup, erasures due, files   │
+ │  └─ integrations: Google Calendar, Crewbox show pack,     │
+ │      Download everything                                  │
  └──────────────┬────────────────────────────────────────────┘
                 │
-       Postgres (EU region, point-in-time recovery)
-       Object storage (PDFs, photos, documents)
+       Postgres on Neon, Frankfurt (Neon's own history of hours to days)
+       S3-compatible bucket: the nightly backups and documents' files
 ```
+
+What the first sketch had and the code doesn't, yet: SQLite on the device
+(IndexedDB holds the copy; `web/src/storage.ts`), a sequence number per
+scope (there is one feed, and every device reads all of it but what its
+role is cut off from), a queue for jobs (they run on timers in the server
+process, each taking its turn), Yjs for free text, a Capacitor shell, and
+email sent by the server (the office sends messages from its own WhatsApp,
+texts or email, and quotes are printed to PDF in the browser).
 
 ### Why commands, not a free-for-all merge
 
@@ -163,8 +188,13 @@ ever lying about stock.
 
 This is the same pattern Crewbox uses for chat (client id, outbox, server
 sequence numbers) extended with server-side validation. Free text that many
-people edit at once (job notes, run of show) uses Yjs, as Crewbox does for
-patch sheets.
+people edit at once (job notes, run of show) was to use Yjs, as Crewbox does
+for patch sheets. **Not built:** notes are plain text on their record. A
+change carries how far its device had read (`seen`), and a field someone
+else changed since, that this person changed too, refuses the whole change
+as a conflict, keeping what they typed to copy
+([ADR 0049](adr/0049-holding-up-at-real-size.md)); nothing merges two
+people's words.
 
 ### Build or buy the sync layer
 
@@ -181,22 +211,45 @@ spike that decided it, and its test results, are in the ADR.
 
 ### What lives on the device
 
-Nobody's phone holds the whole company. Each device syncs **scopes**:
+The plan was that nobody's phone holds the whole company, each device
+syncing only its **scope** (a job, a fortnight's pick lists, a freelancer's
+own bookings). **That isn't built.** Every device signed in reads the whole
+change feed from the start, every job past and future, all the stock and
+every person, and the server cuts each record down to what the role reads
+as it goes out (`server/src/reading.ts`, rules in `shared/src/reading.ts`).
+What's left out never reaches the phone:
 
-| Who                    | What syncs to their device                                                    |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| Ops / office           | All live projects from 30 days back to 12 months ahead, full catalogue, crew  |
-| Warehouse              | Catalogue, assets, cases, stock locations, pick lists for the next 14 days     |
-| Crew chief on a job    | That job: phases, crew list and phone numbers, kit list, run of show, venue   |
-| Freelancer             | Their own offers and bookings, call times, venue details, their documents     |
+| Signed in as                   | Money: prices, quotes, discounts, costs paid | Crew rates                              | Private links      | Other people's phone | Their email, notes and company | Their documents | Their notes on time off and answers |
+| ------------------------------ | -------------------------------------------- | --------------------------------------- | ------------------ | -------------------- | ------------------------------ | --------------- | ----------------------------------- |
+| Office, director, system admin | Yes                                          | All                                     | All                | All                  | All                            | All             | All                                 |
+| Head of department             | No                                           | Their department's, if a director allows | Their department's | All                  | All                            | All             | All                                 |
+| Staff crew                     | No                                           | Own                                     | Own                | All                  | Own                            | Own             | Own                                 |
+| Freelancer                     | No                                           | Own                                     | Own                | Own                  | Own                            | Own             | Own                                 |
 
-Scopes also enforce privacy: a freelancer's device never receives rates or
-personal details of other crew.
+([ADR 0042](adr/0042-quotes-prices-and-a-money-view.md),
+[ADR 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md),
+[ADR 0062](adr/0062-what-crew-and-freelancers-read-of-other-people.md).)
+With roles off, or sign-in off as in the demo, every device reads
+everything.
 
-Call sheets follow the same scopes ([ADR 0021](adr/0021-call-sheets.md)):
-the office's shows everything; the contact on the day, the crew chief of
-the table above, sees everyone booked with their numbers and the kit on
-their private link; the rest of the crew see who else is on by name and
+So, plainly: **every crew member's phone number** is on the device of
+everyone signed in as office, director, system admin, head of department
+or staff crew, and **their email** on the office's, directors', system
+admins' and heads'. A freelancer signed in holds only their own. Clients'
+contacts (names, phones, emails) and venues are not cut down at all: they
+are on every device signed in, a freelancer's included. Everyone holds
+every job, phase, kit line, item and booking (who's on which days, without
+the rate), and the planner and the crew screens show who's away. An
+emergency contact isn't a field yet.
+
+A freelancer on their private link, not signed in, holds no copy: the
+server builds their page from their own offers, bookings, timesheets and
+days off, with the call sheet of each booking.
+
+Call sheets are cut down the same way ([ADR 0021](adr/0021-call-sheets.md)):
+the office's shows everything; the contact on the day, the crew chief,
+sees everyone booked with their numbers and the kit on their private
+link; the rest of the crew see who else is on by name and
 role, and only the contact's number.
 
 ## Domain model (first cut)
@@ -530,21 +583,23 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
 | -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | Language       | TypeScript everywhere, npm workspaces                             | Same as Crewbox; shared types and schemas         |
 | Web            | React, Vite, vite-plugin-pwa                                      | Same as Crewbox                                   |
-| Local store    | SQLite in the browser (wa-sqlite on OPFS), IndexedDB fallback     | Real queries for availability offline             |
+| Local store    | IndexedDB, a record per table (`web/src/storage.ts`); SQLite in the browser (wa-sqlite on OPFS) planned once the data outgrows it | Availability is worked out in memory from the copy for now |
 | API            | Fastify, zod schemas shared with the client                       | Same as Crewbox                                   |
-| Database       | Postgres in an EU region, managed, with point-in-time recovery    | Relational data, range queries for availability   |
-| Jobs           | Postgres-backed queue (pg-boss or graphile-worker)                | No extra service                                  |
-| Files          | S3-compatible storage in the EU                                   | Quotes, photos of damage, documents               |
+| Database       | Postgres on Neon, Frankfurt, with Neon's own short history        | Relational data, range queries for availability   |
+| Jobs           | Timers in the server process; a Postgres-backed queue (pg-boss or graphile-worker) not built | No extra service; one server runs them           |
+| Files          | S3-compatible bucket in the EU, the backups' own                   | Backups and documents' files; quotes are printed from the browser, and photos of damage aren't built |
 | Auth           | Google Workspace sign-in for staff ([ADR 0003](adr/0003-staff-sign-in.md)); a private link per freelancer ([ADR 0002](adr/0002-crew-booking-links.md)) | Staff already have Workspace; freelancers do not |
-| Hosting        | One EU region to start (Dublin or Frankfurt)                      | GDPR, latency                                     |
+| Hosting        | Railway, one server; the database in Frankfurt                    | GDPR, latency                                     |
 | Tests          | Vitest, Playwright including offline scenarios                    | Same as Crewbox                                   |
 
 ## Resilience
 
-- Postgres with point-in-time recovery, plus a nightly logical backup to
+- Neon's own history (hours to days), plus a nightly logical backup to
   separate storage, each one restored into a scratch database to prove it
-  works before it counts ([ADR 0004](adr/0004-backups.md)). After a
-  restore, devices reload their copy and send again what the backup missed.
+  works before it counts ([ADR 0004](adr/0004-backups.md)). Built in
+  Phase 0 and **switched on 19 October 2026**, when the bucket and key
+  were set; before then there were none. After a restore, devices reload
+  their copy and send again what the backup missed.
 - Start fresh on the Account tab deletes everything but the staff
   accounts, after a backup, to clear made-up data before the real data
   goes in ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)).
@@ -554,10 +609,13 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
 - The outbox means no scan or change is lost if the server is down; devices
   keep working from their replica.
 - Every command is idempotent by its client id, so retries are safe.
-- Health checks, error alerts and an uptime check from day one, with
-  Sentry, which also emails when a night's backup fails or doesn't happen.
-  Reports are built to leave out anyone's details
-  ([ADR 0005](adr/0005-error-alerts.md)).
+- Health checks, error alerts and an uptime check, with Sentry, which also
+  emails when a night's backup fails or doesn't happen. Reports are built
+  to leave out anyone's details ([ADR 0005](adr/0005-error-alerts.md)).
+  Planned from day one and built in Phase 0, but error alerts were only
+  **switched on 19 October 2026**, with the Sentry key
+  ([monitoring.md](monitoring.md)). The health check (`/api/health`) and
+  the uptime address (`/api/up`) answered throughout.
 - An export of everything (CSV and JSON) that the company can run any time,
   so it is never locked in, which is a common complaint about the incumbents.
   Built as **Download everything**: one file with a spreadsheet for each
@@ -578,8 +636,13 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
   crew rates, timesheet amounts and private links are left out of the
   records sent to roles that don't need them, each person's own always
   sent ([ADR 0046](adr/0046-departments-on-calls-and-what-each-role-reads.md)).
-  Not built yet: narrowing phones and certificates, and an accountant's
-  role, which waits on finance.
+  Since 19 October staff crew and freelancers don't read other people's
+  email, notes, company, documents or notes on their time off, and a
+  freelancer not their phone either; a head who reads rates reads their
+  own department's ([ADR 0062](adr/0062-what-crew-and-freelancers-read-of-other-people.md)).
+  The table under [What lives on the device](#what-lives-on-the-device)
+  sets it out. Not built yet: narrowing what anyone reads by job or date,
+  and an accountant's role, which waits on finance.
 - Personal data of freelancers (PPS number if ever needed for payments, bank
   details, documents) kept in separate tables with tighter access. Not
   built yet either, for the same reason.
