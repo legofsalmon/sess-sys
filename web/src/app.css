@@ -447,13 +447,13 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 }
 
 /* The way past the places to the screen (Shell.tsx, the design system's skip link): out of sight until a keyboard reaches it, first thing in the page. */
-.skip { position: fixed; top: var(--space-8); left: var(--space-8); z-index: 10; padding: var(--space-10) var(--space-14); border-radius: var(--radius-control); background: var(--accent-fill); color: var(--on-accent); font-weight: 700; text-decoration: none; translate: 0 calc(-100% - var(--space-16)); }
-.skip:focus { translate: 0 0; }
+.skip-to-content { position: fixed; top: var(--space-8); left: var(--space-8); z-index: 10; padding: var(--space-10) var(--space-14); border-radius: var(--radius-control); background: var(--accent-fill); color: var(--on-accent); font-weight: 700; text-decoration: none; translate: 0 calc(-100% - var(--space-16)); }
+.skip-to-content:focus { translate: 0 0; }
 
 /* Offline on a narrow phone (audit, P3): "No signal" and what's waiting take a line of their own under the bell rather than squeezing the company's name to "S…". */
 @media (max-width: 479px) {
-  .top { grid-template-columns: minmax(min(10.5rem, 50%), 1fr) auto; }
-  .top .state { flex-wrap: wrap; row-gap: var(--space-4); }
+  .top:has(.conn.offline) { grid-template-columns: minmax(min(10.5rem, 50%), 1fr) auto; }
+  .top .state:has(.conn.offline) { flex-wrap: wrap; row-gap: var(--space-4); }
   .top .state > .conn.offline { order: 1; }
 }
 

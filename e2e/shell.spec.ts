@@ -53,7 +53,8 @@ test('on a phone every page in an area row shows, counts stand apart, and the st
   })
   expect(gap).toBeGreaterThanOrEqual(4)
 
-  await ready(page, '#jobs')
+  // Home has parts enough for the strip on a phone (Jobs folds New job into its one card now).
+  await ready(page, '#home')
   const strip = page.getByRole('navigation', { name: 'On this screen' })
   await expect(strip.getByRole('button').first()).toBeVisible()
   for (const part of await strip.getByRole('button').all()) {

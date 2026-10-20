@@ -626,7 +626,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       cacheControl: false,
       setHeaders: (reply, path) => {
         reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache')
-        if (path === page) reply.header('content-security-policy', shell)
+        // The page may go as its .br or .gz, which is still the page.
+        if (path === page || path === `${page}.br` || path === `${page}.gz`) reply.header('content-security-policy', shell)
       },
     })
     // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.

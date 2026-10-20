@@ -175,7 +175,7 @@ export function Shell() {
   return (
     <>
       <UpdateBar unkept={unkept} />
-      <a className="skip" href={hash || '#home'} onClick={skip}>
+      <a className="skip-to-content" href={hash || '#home'} onClick={skip}>
         Skip to content
       </a>
       <StorageBanner />

@@ -71,6 +71,8 @@ test("staff crew aren't shown counts of what only the office can act on", async 
   await page.route('**/api/auth/preview', (route) => route.fulfill({ json: { role: 'crew' } }))
   await page.goto('/')
   await page.getByRole('button', { name: /^Staff crew/ }).click()
+  // Choosing a persona waits for the server and a fresh read before it opens Home (audit finding 23).
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
   await page.goto('/#crew/people')
   await expect(page.getByRole('heading', { level: 1, name: 'People' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: /^Crew/ }).locator('.badge')).toHaveCount(0)
