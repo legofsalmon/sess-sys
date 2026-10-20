@@ -36,7 +36,7 @@ import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { personHref } from './PersonScreen.tsx'
 import { useSamePeople } from './Combine.tsx'
-import { Avatar } from '../Picture.tsx'
+import { Avatar, photoOf } from '../Picture.tsx'
 import { SkillsField, withTyped } from './SkillsField.tsx'
 
 /**
@@ -81,7 +81,7 @@ export function PersonRow({ person, crew }: { person: PersonView; crew: CrewView
   return (
     <div className="row person">
       <a className="who pictured" href={personHref(person.id)}>
-        <Avatar name={person.name} />
+        <Avatar name={person.name} src={photoOf(person)} />
         <span>
           <b>{person.name}</b>
           <small>

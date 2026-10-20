@@ -8,7 +8,7 @@ import { kitShort } from '../jobs/Kit.tsx'
 import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
-import { Avatar } from '../Picture.tsx'
+import { Avatar, photoOf } from '../Picture.tsx'
 import { useAccess } from '../role.ts'
 import { Chart, type Series } from './Chart.tsx'
 
@@ -366,7 +366,7 @@ function ForDepartment({
             {working.map(({ c, o }) => (
               <li key={o.id}>
                 <a className="job-row" href={c.projectId ? `#jobs/${c.projectId}` : '#crew'}>
-                  <Avatar name={o.person!.name} />
+                  <Avatar name={o.person!.name} src={photoOf(o.person)} />
                   <div>
                     <b>{o.person!.name}</b>
                     <p>
@@ -390,7 +390,7 @@ function ForDepartment({
             {away.map((u) => (
               <li key={u.id}>
                 <div className="job-row">
-                  <Avatar name={people.get(u.personId)?.name ?? ''} />
+                  <Avatar name={people.get(u.personId)?.name ?? ''} src={photoOf(people.get(u.personId))} />
                   <div>
                     <b>{people.get(u.personId)?.name ?? 'Someone'}</b>
                     <p>{u.source === 'leave' ? 'Approved leave' : u.note || 'Away'}</p>

@@ -35,6 +35,19 @@ waiting on someone.
   (audit finding 25), and say when a demo passcode under 12 characters
   should be refused rather than warned about.
 
+## 20 October 2026: a photo on a person's page
+
+**Done**
+
+- A photo on a person's page, in [Decision 0065](adr/0065-a-photo-on-a-persons-page.md)
+  (Colly's "upload of peoples images on their staff page"). Add a photo,
+  Change photo and Remove photo under their picture, for the person and
+  whoever can change crew. The device squares and shrinks it before sending;
+  it's kept in the bucket the documents use, and shown in place of the
+  initials on their page, the People list and Home. Erasing and combining
+  people handle it.
+- Checked: typecheck, all tests (new server tests for photos).
+
 ## 20 October 2026: first and last names
 
 **Done**

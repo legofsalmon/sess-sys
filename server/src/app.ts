@@ -30,6 +30,7 @@ import { faultForLog, type Db, type Queryable } from './db.ts'
 import { describeDevice } from './devices.ts'
 import { DocumentFiles } from './documents/files.ts'
 import { registerDocumentRoutes } from './documents/routes.ts'
+import { registerPhotoRoutes } from './documents/photos.ts'
 import { DueErasures } from './erasure/due.ts'
 import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
@@ -552,6 +553,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerCrewLinks(app, db, changed, feeds, { demo: !auth && !!passcode, ownCalendars })
   registerOwnCalendarRoutes(app, { ownCalendars })
   registerDocumentRoutes(app, { db, files: documents, onChange: changed })
+  registerPhotoRoutes(app, { db, files: documents, onChange: changed })
   registerBackupRoutes(app, backups)
   registerDataRoutes(app, { db, backups, documents, onChange: changed })
   registerPeopleImportRoutes(app, { db, onChange: changed })

@@ -137,6 +137,8 @@ export function crewView(
           archived: was?.archived ?? false,
           // What this device isn't sent (ADR 0046) stays hidden: an edit from a role that doesn't read the rate sends none and keeps it.
           ...(was?.linkHidden ? { linkHidden: true } : {}),
+          // Their photo is the server's to set (ADR 0065).
+          ...(was?.photo ? { photo: was.photo } : {}),
           ...a,
           ...namesAfter(a, was),
           dayRateCents: a.dayRateCents !== undefined ? a.dayRateCents : (was?.dayRateCents ?? null),

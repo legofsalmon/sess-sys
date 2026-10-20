@@ -20,7 +20,7 @@ import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { Heading, Icon } from '../Icon.tsx'
 import { Page } from '../jobs/common.tsx'
-import { Avatar } from '../Picture.tsx'
+import { Avatar, photoOf } from '../Picture.tsx'
 import { Pending, StatusPill } from '../StatusPill.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
@@ -33,6 +33,7 @@ import { PersonForm } from './People.tsx'
 import { Documents } from './Documents.tsx'
 import { useFeedAddress } from './feed.ts'
 import { OwnCalendarCard } from './OwnCalendar.tsx'
+import { PersonPhoto } from './PersonPhoto.tsx'
 
 /**
  * One person on a page of their own (#crew/person/<id>): who they are and
@@ -95,9 +96,9 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   return (
     <section className="card who-card" aria-label={person.name}>
       <header className="title">
-        {/* Their picture before their name (ADR 0038): their initials until there's somewhere to keep photos. */}
+        {/* Their picture before their name (ADR 0038): their photo once there is one (ADR 0065), their initials until then. */}
         <div className="pictured">
-          <Avatar name={person.name} size="large" />
+          <Avatar name={person.name} src={photoOf(person)} size="large" />
           <div className="who-name">
             <h1>{person.name}</h1>
             <p className="muted">{[kind, person.department, levelLine(person.level)].filter(Boolean).join(' · ')}</p>
@@ -106,6 +107,7 @@ function Who({ person, view }: { person: PersonView; view: View }) {
         </div>
         <Pending pending={person.pending} />
       </header>
+      <PersonPhoto person={person} />
       {person.archived && (
         <p className="warn-line">Archived: kept for the record, and offered no work. Bring them back from the Archived list on Crew.</p>
       )}

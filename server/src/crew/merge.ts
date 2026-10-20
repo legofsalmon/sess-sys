@@ -1,5 +1,5 @@
 import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, nameParts, offerKept, ROLE_LABELS, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
-import { getDocument } from '../documents/store.ts'
+import { getDocument, queueFile } from '../documents/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
 import { getPhases } from '../projects/store.ts'
@@ -79,6 +79,7 @@ export const mergeHandlers = {
     const { rows: links } = await tx.query<{ id: string; link_token: string }>('SELECT id, link_token FROM people WHERE id = ANY($1::text[]) ORDER BY id', [ids])
     for (const l of links) await tx.query('INSERT INTO person_merges (from_id, into_id, link_token) VALUES ($1, $2, $3) ON CONFLICT (from_id) DO NOTHING', [l.id, into.id, l.link_token])
 
+    await movePhoto(ctx, into.id, ids)
     const one = mergedPerson(into, from)
     await tx.query('DELETE FROM people WHERE id = ANY($1::text[])', [ids])
     await tx.query(
@@ -132,6 +133,26 @@ export const mergeHandlers = {
     await tx.query('UPDATE people SET email = $2, other_emails = $3 WHERE id = $1', [person.id, next.email, JSON.stringify(next.otherEmails)])
     await emit(ctx, 'person', person.id, await getPerson(tx, person.id))
   },
+}
+
+/**
+ * Their photo (ADR 0065): the one kept keeps theirs; with none, they take
+ * the newest of the others'. Every other photo goes on the list of files to
+ * delete, in the same change.
+ */
+async function movePhoto(ctx: Ctx, intoId: string, ids: string[]) {
+  const { tx } = ctx
+  const { rows } = await tx.query<{ id: string; photo_key: string; photo_type: string; photo_bytes: number; photo_at: Date }>(
+    'SELECT id, photo_key, photo_type, photo_bytes, photo_at FROM people WHERE id = ANY($1::text[]) AND photo_key IS NOT NULL ORDER BY id = $2 DESC, photo_at DESC, id',
+    [[intoId, ...ids], intoId]
+  )
+  const [kept, ...gone] = rows
+  if (!kept) return
+  for (const g of gone) await queueFile(tx, g.photo_key, true)
+  if (kept.id === intoId) return
+  // Off the one it came from first: a key is kept by one person only.
+  await tx.query('UPDATE people SET photo_key = NULL, photo_type = NULL, photo_bytes = NULL, photo_at = NULL WHERE id = $1', [kept.id])
+  await tx.query('UPDATE people SET photo_key = $2, photo_type = $3, photo_bytes = $4, photo_at = $5 WHERE id = $1', [intoId, kept.photo_key, kept.photo_type, kept.photo_bytes, kept.photo_at])
 }
 
 /**
