@@ -458,7 +458,8 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
   .top:has(.conn.offline) { grid-template-columns: minmax(min-content, 1fr) auto; }
   .top:has(.conn.offline) .brand small { contain: inline-size; }
   .top .state:has(.conn.offline) { flex-wrap: wrap; row-gap: var(--space-4); }
-  .top .state > .conn.offline { order: 1; }
+  /* What's waiting can wrap under "No signal" rather than push the page wider. */
+  .top .state > .conn.offline { order: 1; white-space: normal; }
 }
 
 /* On paper (audit, P3): white round every sheet, whatever the screen's theme, so a dark page doesn't print round it with backgrounds on. */
