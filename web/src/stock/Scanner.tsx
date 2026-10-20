@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 /**
  * Scanning with the phone's camera in the app (ADR 0016). The camera stays
  * on until it's stopped, reading one label after another: each new code is
- * read once, and the same code isn't read again until it has been out of
- * sight for a moment, so a label held still isn't read twice. Only a code
+ * read once, and the same code isn't read again until it has left the
+ * picture, so a label held still isn't read twice, however slow the phone. Only a code
  * wholly inside the frame on screen counts, whichever reader found it, so
  * a neighbouring label is never read early (audit finding 18). Pictures
  * never leave the phone and aren't kept: each frame is looked at and dropped.
@@ -15,8 +15,14 @@ type Decode = (video: HTMLVideoElement) => Promise<string | undefined>
 
 /** Codes read by the phone's own barcode reader, where it has one; ours are QR codes, the rest are makers' barcodes on gear. */
 const FORMATS = ['qr_code', 'code_128', 'code_39', 'data_matrix', 'ean_13']
-/** How long a code must be out of sight before it's read again. */
-const AGAIN_AFTER = 1200
+/**
+ * A code has left the picture once that many looks in a row, over at least
+ * that long, have not found it. Both, so neither a blurred frame or two nor a
+ * slow phone stalling between two looks at a label held still counts as
+ * leaving (audit finding P3): only looks that saw something else do.
+ */
+const GONE_LOOKS = 4
+const GONE_AFTER = 600
 /** How often the picture is looked at: often enough to feel instant, not so often it drains the battery. */
 const EVERY = 120
 /** How far in from each edge of the square picture the frame on screen sits (stock.css draws it the same). */
@@ -188,7 +194,8 @@ export function CameraScanner({ onRead, onStop, small = false }: { onRead: (code
     let alive = true
     let stream: MediaStream | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
-    let last = { code: '', seen: 0 }
+    // The code in the picture, and since when and for how many looks it hasn't been found.
+    let last = { code: '', missed: 0, since: 0 }
     setProblem('')
     setStarting(true)
     void (async () => {
@@ -218,13 +225,17 @@ export function CameraScanner({ onRead, onStop, small = false }: { onRead: (code
             const code = (await decode(v).catch(() => undefined))?.trim()
             const now = performance.now()
             if (code && alive) {
-              if (code !== last.code || now - last.seen > AGAIN_AFTER) {
+              if (code !== last.code) {
                 setRead({ code, at: now })
                 navigator.vibrate?.(60)
                 if (soundRef.current) beep()
                 latest.current(code)
               }
-              last = { code, seen: now }
+              last = { code, missed: 0, since: 0 }
+            } else if (last.code) {
+              const since = last.missed ? last.since : now
+              const missed = last.missed + 1
+              last = missed >= GONE_LOOKS && now - since >= GONE_AFTER ? { code: '', missed: 0, since: 0 } : { code: last.code, missed, since }
             }
           }
           timer = setTimeout(tick, EVERY)

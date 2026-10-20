@@ -5,12 +5,11 @@
  * Crew's Calls, People, Leave and Timesheets
  * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the
- * current one is marked. On a phone a row longer than the screen scrolls
- * sideways, keeping the current one in view.
+ * current one is marked. A row longer than the screen, as on a phone, wraps
+ * onto a second line, so no page is hidden off the edge (audit P2 23).
  */
 
 import type { View } from '@sh/shared'
-import { useEffect, useRef } from 'react'
 
 export interface AreaPage {
   key: string
@@ -21,13 +20,8 @@ export interface AreaPage {
 }
 
 export function Views({ label, pages, current }: { label: string; pages: readonly AreaPage[]; current: string }) {
-  const row = useRef<HTMLElement>(null)
-  // The current page in view, where the row is wider than the phone.
-  useEffect(() => {
-    row.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-  }, [current])
   return (
-    <nav className="views" aria-label={label} ref={row}>
+    <nav className="views" aria-label={label}>
       {pages.map((p) => (
         <a key={p.key} href={p.href} aria-current={p.key === current ? 'page' : undefined}>
           {p.label}

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../auth.ts'
 import { chooseMe } from '../crew/Leave.tsx'
 import { ThemeButton } from '../ThemeButton.tsx'
+import { client } from '../sync.ts'
+import { useLate } from '../useLate.ts'
 import { useView } from '../view.ts'
 import { saveHomeFor, type Saved } from './HomeScreen.tsx'
 
@@ -64,20 +66,29 @@ function readWho(): Who {
 const api = `${import.meta.env.VITE_API_BASE ?? ''}/api/auth/preview`
 
 /** Tell the server which role to hold this browser to, and who it stands in for; with no signal the device still holds the role (web/src/role.ts). */
-function tellServer(key: string) {
+function tellServer(key: string, as: Who = who): Promise<unknown> {
   const role = key && key !== 'freelancer' ? (key === 'staff' ? 'crew' : key === 'warehouse' ? 'head' : key) : null
-  void fetch(api, {
+  return fetch(api, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ role, ...(role ? who : {}) }),
+    body: JSON.stringify({ role, ...(role ? as : {}) }),
     signal: AbortSignal.timeout(8_000),
   }).catch(() => undefined)
 }
 
-function set(key: string, as: Who = {}) {
+/**
+ * Once the server holds this browser to a new persona, the copy is read
+ * again before the app opens as them, so a narrower one never sees what the
+ * last was sent: the pull finds that what it's sent has changed and lets go
+ * of money, rates and others' documents (shared/src/sync/client.ts). With no
+ * signal it opens anyway, after a few seconds, on the copy it has.
+ */
+const readAgain = () => Promise.race([client.sync().catch(() => undefined), new Promise((done) => setTimeout(done, 8_000))])
+
+function set(key: string, as: Who = {}, told = false) {
   current = key
   who = as
-  tellServer(key)
+  if (!told) void tellServer(key)
   try {
     if (key) localStorage.setItem(KEY, key)
     else localStorage.removeItem(KEY)
@@ -161,6 +172,9 @@ async function freelancerLink(): Promise<string | undefined> {
 export function PreviewSplash() {
   const view = useView()
   const [noLink, setNoLink] = useState(false)
+  // The persona being opened, while the copy is read again for them.
+  const [choosing, setChoosing] = useState<string>()
+  const late = useLate(!!choosing)
   const pick = (p: Persona) => {
     if (p.key === 'freelancer') {
       void freelancerLink().then((link) => {
@@ -171,8 +185,14 @@ export function PreviewSplash() {
       return
     }
     const { to, as } = start(view, p.key)
-    set(p.key, as)
-    location.hash = to
+    setChoosing(p.key)
+    void tellServer(p.key, as)
+      .then(readAgain)
+      .finally(() => {
+        set(p.key, as, true)
+        location.hash = to
+        setChoosing(undefined)
+      })
   }
   const noFreelancer = noLink || !view.crew.people.some((p) => p.kind === 'freelancer' && !p.archived)
   return (
@@ -194,10 +214,15 @@ export function PreviewSplash() {
       <ul className="personas">
         {PERSONAS.map((p) => (
           <li key={p.key}>
-            <button type="button" onClick={() => pick(p)} disabled={p.key === 'freelancer' && noFreelancer}>
+            <button
+              type="button"
+              onClick={() => !choosing && pick(p)}
+              disabled={p.key === 'freelancer' && noFreelancer}
+              aria-busy={choosing === p.key || undefined}
+            >
               <b>{p.name}</b>
               <small>{p.who}</small>
-              <span>{p.sees}</span>
+              <span>{late && choosing === p.key ? "Opening it as they'd see it…" : p.sees}</span>
             </button>
           </li>
         ))}
@@ -224,6 +249,6 @@ export function useSeenAs(): Persona | undefined {
 export function useHoldPersona(persona: Persona | undefined) {
   const key = persona?.key
   useEffect(() => {
-    if (key) tellServer(key)
+    if (key) void tellServer(key)
   }, [key])
 }
