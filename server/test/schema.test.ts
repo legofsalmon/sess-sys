@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { pgliteDb, type Db } from '../src/db.ts'
+import { migrateAll, MODULES } from '../src/modules.ts'
 import { keptSyncTestTables, migrate, SYNC_TEST_GONE } from '../src/schema.ts'
 
 /**
@@ -74,5 +75,19 @@ describe('the sync test going', () => {
     // Started again: still there, said again once, and nothing else changes.
     expect((await start(db)).said).toHaveLength(1)
     expect((await db.query(`SELECT 1 FROM bookings`)).rows).toHaveLength(1)
+  })
+})
+
+describe('two servers starting at once', () => {
+  it('take turns at the migrations: each runs once, and each module keeps one version row', async () => {
+    // Proves: migrations hold a lock and read the version again under it (audit, P3), so a deploy overlapping the
+    // server it replaces neither runs a step twice nor makes a second version row.
+    const db = await pgliteDb()
+    cleanup.push(() => db.close())
+    await Promise.all([migrateAll(db), migrateAll(db)])
+    for (const mod of MODULES) {
+      const { rows } = await db.query<{ version: number }>(`SELECT version FROM ${mod.versionTable}`)
+      expect(rows, mod.versionTable).toEqual([{ version: mod.migrations.length }])
+    }
   })
 })
