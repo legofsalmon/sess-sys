@@ -197,7 +197,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   if (from.role && !roleMayRun(from.role, m.name)) {
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
   } else if (!parsed.success) {
-    result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
+    result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: invalidMessage(parsed.error.issues[0]) } }
   } else if (!seesRates && setsRates(m.name, parsed.data)) {
     // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: reading.rates ? RATES_REFUSAL_DEPARTMENT : RATES_REFUSAL } }
@@ -264,6 +264,19 @@ function cleanArgs(v: unknown): unknown {
 
 const DROPPED = "The server couldn't apply this change, so it was dropped. Check it and send it again."
 const UNKNOWN = "The app doesn't do this any more, so it wasn't made."
+
+/** A change from an older version of the app, which leaves out something this version needs (audit, P3: words). */
+export const OLDER_APP = 'This was made on an older version of the app, which left out something it now needs, so it wasn\'t made. Close the app and open it again to update it, then make the change again.'
+
+/**
+ * Why a change's contents are turned down, in words. A field missing altogether, which zod says only as "Required", is
+ * what an older version of the app sends when a command has gained one, so it says that.
+ */
+function invalidMessage(issue: { code: string; message: string; received?: unknown } | undefined): string {
+  if (!issue) return 'Invalid request.'
+  if (issue.code === 'invalid_type' && issue.received === 'undefined') return OLDER_APP
+  return issue.message
+}
 
 /** Where a dropped change is noted, besides the error report, and a refused one: the request's log. */
 export interface Log {

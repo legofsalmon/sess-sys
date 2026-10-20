@@ -132,6 +132,8 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
 
   // Scanning it out for a job warns.
   await page.goto('/#jobs')
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const newJob = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await newJob.getByLabel('Job').fill(job)
   await newJob.getByLabel('Status').selectOption({ label: 'Confirmed' })

@@ -5,9 +5,10 @@ import { registerSW } from 'virtual:pwa-register'
  * A deploy while the app is open. The new version is fetched in the
  * background and then waits: the page that's open keeps the files it was
  * built with until someone taps Reload, so a screen opened later (the
- * camera's QR reader, say) still loads. A laptop tab left open asks once
- * an hour whether there's anything new. Should a file still be missing,
- * the page starts again on the new version rather than sitting broken.
+ * camera's QR reader, say) still loads. A tab left open asks whether
+ * there's anything new once an hour, and whenever it comes back to the
+ * front. Should a file still be missing, the page starts again on the new
+ * version rather than sitting broken.
  */
 
 const RELOADED = 'sh.reloadedAt'
@@ -32,8 +33,18 @@ export function watchForUpdates() {
       for (const fn of listeners) fn(true)
     },
     onRegisteredSW(_url, registration) {
-      // Browsers look for a new version on a page load, which a tab left open never does.
-      if (registration) setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000)
+      if (!registration) return
+      // Browsers look for a new version on a page load, which a tab left open never does: so once an hour, and each time
+      // the page comes back to the front (a phone picked up, a laptop tab clicked), not more than once a minute.
+      let looked = 0
+      const look = () => {
+        if (Date.now() - looked < 60_000) return
+        looked = Date.now()
+        registration.update().catch(() => {})
+      }
+      setInterval(look, 60 * 60 * 1000)
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && look())
+      addEventListener('focus', look)
     },
   })
   reload = () => update(true)

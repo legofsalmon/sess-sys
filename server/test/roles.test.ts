@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { newId } from '@sh/shared'
+import { MemoryStorage, newId, SyncClient, type LatestOnly, type PullResponse, type Transport } from '@sh/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildApp } from '../src/app.ts'
+import { buildApp, type AppOptions } from '../src/app.ts'
 import type { AuthConfig } from '../src/auth/config.ts'
 import type { Identity, IdentityProvider } from '../src/auth/google.ts'
 import { CREW, migrateCrew } from '../src/crew/schema.ts'
@@ -54,11 +54,11 @@ afterEach(async () => {
 
 const cookie = (res: LightMyRequestResponse, name: string) => res.cookies.find((c) => c.name === name)
 
-async function server(admins: string[] = []) {
+async function server(admins: string[] = [], options: Partial<AppOptions> = {}) {
   const db = await pgliteDb()
   const google = fakeGoogle()
   const auth: AuthConfig = { provider: google.provider, domains: ['sessionhire.com'], emails: [], admins }
-  const app = await buildApp({ db, auth })
+  const app = await buildApp({ db, auth, ...options })
   cleanup.push(async () => {
     await app.close()
     await db.close()
@@ -96,8 +96,8 @@ const staff = (id: string, name: string, email: string | null, extra: object = {
 const bay = (id: string) => ({ id, name: `Bay ${id}`, notes: '' })
 
 /** Colly signs in, puts herself and Seán on the Crew tab, and makes herself the director: roles are on. */
-async function company(admins: string[] = []) {
-  const s = await server(admins)
+async function company(admins: string[] = [], options: Partial<AppOptions> = {}) {
+  const s = await server(admins, options)
   const c = { sh_session: await s.signIn(colly) }
   expect((await send(s.app, c, 'person.upsert', staff('colly', 'Colly', 'colly@sessionhire.com'))).status).toBe('applied')
   expect((await send(s.app, c, 'person.upsert', staff('sean', 'Seán Ó Briain', 'Sean@SessionHire.com'))).status).toBe('applied')
@@ -378,8 +378,8 @@ describe('what each role reads', () => {
   })
 
   /** Colly the director, Seán staff crew, Áine head of Audio; Dara (Audio) and Niamh (LX) freelancers booked on the gala, with a timesheet in from Dara. */
-  async function crewed() {
-    const s = await company()
+  async function crewed(options: Partial<AppOptions> = {}) {
+    const s = await company([], options)
     const { app, c } = s
     const ok = async (name: string, args: unknown) => expect(await send(app, c, name, args), name).toMatchObject({ status: 'applied' })
     await ok('person.upsert', staff('aine', 'Áine Walsh', 'aine@sessionhire.com', { department: 'Audio', dayRateCents: 21000 }))
@@ -553,6 +553,71 @@ describe('what each role reads', () => {
     expect((await pull(s)).of('person', 'dara')).toMatchObject({ phone: null, email: null })
     expect((await pull(c)).of('person', 'dara')).toMatchObject({ email: 'dara@example.com', notes: 'Bad back' })
     expect((await pull(c)).of('document', 'd-dara')).toBeDefined()
+  })
+
+  it('gives a new device of each role the same copy reading only the latest of each record as reading every change (audit finding 17)', async () => {
+    // Proves: for every role, a device that begins empty and asks for only the latest change of each record, a few at a
+    // time, ends holding exactly what one reading every change holds: rates, links, money, other people's details and
+    // documents cut down or left out just the same, records changed and deleted along the way as they are now.
+    const { app, c, signIn, ok } = await crewed({ pullLimit: 4 })
+    // More changes than records: rates changed, a document and time off taken away, a quote saved twice, a price set.
+    await ok('call.update', { id: 'sound', dayRateCents: 33000 })
+    await ok('call.update', { id: 'sound', dayRateCents: 34000 })
+    await ok('person.upsert', staff('dara', 'Dara Quinn', 'dara@example.com', { kind: 'freelancer', department: 'Audio', dayRateCents: 26000, notes: 'Has a van' }))
+    await ok('document.save', { id: 'd-dara', personId: 'dara', kind: 'insurance', title: 'Public liability insurance', expires: null })
+    await ok('document.save', { id: 'd-sean', personId: 'sean', kind: 'insurance', title: 'Public liability insurance', expires: null })
+    await ok('document.save', { id: 'd-old', personId: 'sean', kind: 'insurance', title: 'Old insurance', expires: null })
+    await ok('document.remove', { id: 'd-old' })
+    await ok('unavailability.add', { id: 'away', personId: 'dara', start: day(5), end: day(6), note: 'Hospital' })
+    await ok('unavailability.add', { id: 'gone', personId: 'sean', start: day(8), end: day(8), note: '' })
+    await ok('unavailability.remove', { id: 'gone' })
+    const lines = [{ id: 'l1', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '23' }]
+    await ok('quote.save', { id: 'q1', projectId: 'gala', lines, discountPct: 0, notes: '' })
+    await ok('quote.save', { id: 'q1', projectId: 'gala', lines, discountPct: 10, notes: 'Agreed on the phone' })
+    await ok('price.role', { role: 'Rigger', dayCents: 38000 })
+
+    const transport = (cookies: Record<string, string>, latestOnly: boolean): Transport & { sent: number } => ({
+      sent: 0,
+      push: async (req) => (await app.inject({ method: 'POST', url: '/api/sync/push', cookies, payload: req })).json(),
+      async pull(after: number, latest?: LatestOnly) {
+        const asking = latestOnly && latest !== undefined
+        const res = (await app.inject({ url: `/api/sync/pull?after=${after}${asking ? `&latest=${latest}` : ''}`, cookies })).json() as PullResponse
+        this.sent += res.changes.length
+        return res
+      },
+    })
+    const copyOf = async (cookies: Record<string, string>, latestOnly: boolean) => {
+      const storage = new MemoryStorage()
+      const link = transport(cookies, latestOnly)
+      const client = await new SyncClient({ storage, transport: link }).open()
+      await client.sync()
+      const saved = (await storage.load())!
+      return { entities: Object.fromEntries(Object.entries(saved.entities).filter(([, t]) => Object.keys(t).length > 0)), cursor: saved.cursor, sent: link.sent }
+    }
+    const same = async (who: string, cookies: Record<string, string>) => {
+      const replayed = await copyOf(cookies, false)
+      const latest = await copyOf(cookies, true)
+      expect(latest.entities, who).toEqual(replayed.entities)
+      expect(latest.cursor, who).toBe(replayed.cursor)
+      expect(latest.sent, who).toBeLessThan(replayed.sent)
+      return latest
+    }
+
+    const director = await same('director', c)
+    expect(director.entities.quote).toBeDefined()
+    expect(director.entities.document?.['d-old']).toBeUndefined()
+    const head = await same('head', { sh_session: await signIn(aine) })
+    expect(head.entities.document?.['d-dara']).toBeDefined()
+    const s = { sh_session: await signIn(sean) }
+    const crew = await same('staff crew', s)
+    expect(crew.entities.quote).toBeUndefined()
+    expect(Object.keys(crew.entities.document ?? {})).toEqual(['d-sean'])
+    expect(crew.entities.person?.dara).toMatchObject({ notes: '', detailsHidden: true })
+    await ok('person.role', { id: 'sean', role: 'office' })
+    expect((await same('office', s)).entities.quote).toBeDefined()
+    await ok('person.role', { id: 'sean', role: 'freelancer' })
+    const freelancer = await same('freelancer', s)
+    expect(freelancer.entities.person?.dara).toMatchObject({ phone: null, email: null })
   })
 
   it('tells the history without figures to a role without rates', async () => {

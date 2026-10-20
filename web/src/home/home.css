@@ -16,6 +16,10 @@
 .home .tile:active { background: var(--ds-wash-pressed); }
 .home .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .home .all-clear { margin: 0; color: var(--muted); }
+/* Today, a line a job (audit finding 22): the name takes what room there is, cut short with an ellipsis, and the crew and kit stay whole beside it. */
+.home .today-row { align-items: baseline; }
+.home .today-row > b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home .today-row > .side { display: flex; flex-wrap: nowrap; align-items: baseline; gap: var(--space-8); }
 
 /* The demo's choice of whose eyes to see it through (ADR 0033). */
 .preview .personas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-10); }

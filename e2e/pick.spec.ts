@@ -138,6 +138,8 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
 
   // A confirmed job two days out, needing two speakers and 12 cables.
   await page.goto('/#jobs')
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await form.getByLabel('Job').fill(job)
   await form.getByLabel('Status').selectOption({ label: 'Confirmed' })

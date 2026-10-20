@@ -632,10 +632,19 @@ function Totals({ totals, discountPct }: { totals: QuoteTotals; discountPct: num
 function QuoteSheet({ q, job, office }: { q: QuoteView; job: JobView; office: View['office'] }) {
   const made = q.sentOn ?? irishToday(new Date(q.savedAt))
   const reach = [office.details?.phone, office.details?.email].filter(Boolean).join(' · ')
+  // Who it's from, once Admin's office details have them: the company's address, a line each as typed, and its VAT number.
+  const address = office.details?.address?.trim()
+  const vat = office.details?.vatNumber?.trim()
   return (
     <>
       <header>
         <p className="kicker">Session Hire · quote</p>
+        {(address || vat) && (
+          <p className="from muted">
+            {address && <span className="lines">{address}</span>}
+            {vat && <span>VAT number {vat}</span>}
+          </p>
+        )}
         <h1>{job.name}</h1>
         <p>
           {[job.client && `For ${job.client.name}`, job.span && spanLabel(job.span), job.venue && venueLabel(job.venue)].filter(Boolean).join(' · ')}

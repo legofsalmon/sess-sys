@@ -28,7 +28,8 @@ import { newGeneration, readGeneration, restoreBackup, writeBackup } from '../sr
 import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toThin } from '../src/backup/service.ts'
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
 import { CREW, migrateCrew } from '../src/crew/schema.ts'
-import { pgliteDb, type Db } from '../src/db.ts'
+import type { Db } from '../src/db.ts'
+import { scratchDb } from './scratch-db.ts'
 import { moduleVersion, runMigrations } from '../src/migrations.ts'
 import { PROJECTS } from '../src/projects/schema.ts'
 import { CORE, keptSyncTestTables, migrate, SYNC_TEST_GONE } from '../src/schema.ts'
@@ -48,7 +49,7 @@ afterEach(async () => {
 const DAY = 86_400_000
 
 async function database() {
-  const db = await pgliteDb()
+  const db = await scratchDb()
   cleanup.push(() => db.close())
   return db
 }

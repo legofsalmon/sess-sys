@@ -137,7 +137,7 @@ export function VehicleReminders({ view }: { view: View }) {
   if (!reminders.length) return null
   return (
     <section className="card reminders" aria-label="Vehicle checks running out">
-      <Heading icon="certificate">Running out ({reminders.length})</Heading>
+      <Heading icon="certificate">Vehicle checks running out ({reminders.length})</Heading>
       <ShowAll items={reminders} limit={3} what="checks">
         {(rows) =>
           rows.map((r) => (

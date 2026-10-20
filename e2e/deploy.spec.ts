@@ -76,3 +76,20 @@ test('a new version waits for Load the new version, which brings it in with an u
   await expect(row).not.toContainText('Waiting to sync')
   await context.close()
 })
+
+test('a tab brought back to the front looks for a new version, without waiting for the hour', async ({ browser }) => {
+  // Proves: coming back to the app (a phone picked up, a tab clicked) asks for a new version (audit, P3), so a deploy shows.
+  const context = await browser.newContext()
+  const tab = await context.newPage()
+  await tab.goto('/#stock/places')
+  await expect(tab.locator('.conn')).toHaveText('Up to date')
+  await tab.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 }).catch(() => tab.reload())
+  await tab.waitForFunction(() => navigator.serviceWorker?.controller != null)
+
+  put(files.page, before.page.replace('</head>', '<meta name="build" content="three"></head>'))
+  put(files.sw, before.sw.replace(/(\{url:"index\.html",revision:")[^"]*(")/, '$1deploy-three$2'))
+  // Nothing asks the service worker to look: only the page coming to the front again.
+  await tab.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(tab.getByText('A new version is ready.')).toBeVisible({ timeout: 20_000 })
+  await context.close()
+})

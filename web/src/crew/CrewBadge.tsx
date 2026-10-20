@@ -1,6 +1,7 @@
-import { answersToCheck, canApproveLeave } from '@sh/shared'
+import { canApproveLeave } from '@sh/shared'
+import { useAccess } from '../role.ts'
 import { useToday, useView } from '../view.ts'
-import { calendarAnswersToSortOut } from './CrewScreen.tsx'
+import { crewToCheck } from './CrewViews.tsx'
 import { useMe } from './Leave.tsx'
 
 /**
@@ -12,7 +13,9 @@ import { useMe } from './Leave.tsx'
  * (ADR 0029); and, for someone who can approve time
  * off, the leave waiting on them (ADR 0024). Certificates running out
  * aren't counted: they're known weeks ahead, and a badge always lit stops
- * being read.
+ * being read. The office's part only for a role that can act on it
+ * (audit of 18 October): staff crew and the warehouse see their own leave
+ * to approve, if any, and nothing else.
  * Nothing while there's nothing waiting. Not a status, so the top bar's
  * stays the one.
  */
@@ -20,7 +23,8 @@ export function CrewBadge() {
   const view = useView()
   const today = useToday()
   const { me } = useMe(view)
-  const n = answersToCheck(view.crew, today).length + calendarAnswersToSortOut(view, today).length + view.late.toCheck.length + view.documents.toCheck.length + (canApproveLeave(me) ? view.leave.queue.length : 0)
+  const mayCrew = useAccess().can('crew')
+  const n = (mayCrew ? crewToCheck(view, today) : 0) + (canApproveLeave(me) ? view.leave.queue.length : 0)
   if (n === 0) return null
   return (
     <span className="badge">

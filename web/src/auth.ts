@@ -1,5 +1,6 @@
 import type { MeResponse, StaffUser } from '@sh/shared'
 import { useEffect, useState } from 'react'
+import { askToKeep } from './kept.ts'
 
 /**
  * Who is using this device, as far as it knows. The app never waits on
@@ -19,6 +20,7 @@ const KEY = 'sh.auth'
 const base = import.meta.env.VITE_API_BASE ?? ''
 const listeners = new Set<(auth: Auth) => void>()
 let current = load()
+if (current.status === 'signed-in' || current.status === 'open') void askToKeep()
 
 function load(): Auth {
   try {
@@ -38,6 +40,8 @@ function set(next: Auth) {
     // Private browsing can refuse storage; the app still works this session.
   }
   for (const fn of listeners) fn(next)
+  // In, so the company's data and changes waiting to sync are on this device: the browser is asked to keep them (kept.ts).
+  if (next.status === 'signed-in' || next.status === 'open') void askToKeep()
 }
 
 /** The same, outside a screen: the change guard reads it (ADR 0034). */
@@ -87,6 +91,8 @@ export async function enterPasscode(passcode: string): Promise<string | undefine
       signal: AbortSignal.timeout(8_000),
     })
     if (res.status === 403) return "That passcode isn't right."
+    // Too many wrong ones from here: the server says how long to wait.
+    if (res.status === 429) return ((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Too many wrong passcodes from here. Try again in a few minutes.'
     if (!res.ok) return `The server answered ${res.status}. Please try again.`
   } catch {
     return "Couldn't reach the server. Check the signal and try again."

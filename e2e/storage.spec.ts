@@ -69,3 +69,31 @@ test('a copy kept the old way, as one record, opens with its change waiting, and
   await page.reload()
   await expect(page.getByText(bay)).toBeVisible()
 })
+
+test('asks the browser to keep the copy once in, and says on You whether it does (audit finding 16)', async ({ page }) => {
+  // Proves: the app asks to keep its storage without being told to, says plainly on You when the browser won't promise,
+  // and asking again from there, when the browser agrees, says it's kept.
+  await page.addInitScript(() => {
+    const w = window as unknown as { persistAsked: number; persistAnswer: boolean }
+    w.persistAsked = 0
+    w.persistAnswer = false
+    let kept = false
+    Object.defineProperty(navigator.storage, 'persisted', { value: async () => kept })
+    Object.defineProperty(navigator.storage, 'persist', {
+      value: async () => {
+        w.persistAsked++
+        kept = w.persistAnswer
+        return kept
+      },
+    })
+  })
+  await page.goto('/#me')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { persistAsked: number }).persistAsked)).toBe(1)
+  const card = page.locator('.card', { has: page.getByRole('heading', { name: 'This device' }) })
+  await expect(card).toContainText("This browser may clear the app's copy of the data to make room")
+  await page.evaluate(() => ((window as unknown as { persistAnswer: boolean }).persistAnswer = true))
+  await card.getByRole('button', { name: 'Ask it to keep the copy' }).click()
+  await expect(card).toContainText("This browser keeps the app's copy of the data, and changes waiting to sync, until you sign out.")
+  await expect(card.getByRole('button', { name: 'Ask it to keep the copy' })).toHaveCount(0)
+})

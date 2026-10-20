@@ -60,8 +60,21 @@ export function googleClientFromEnv(env: NodeJS.ProcessEnv = process.env): { cli
 export function passcodeFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const passcode = env.DEMO_PASSCODE?.trim()
   if (!passcode) return undefined
-  if (passcode.length < 8) throw new Error('DEMO_PASSCODE is too short: use at least 8 characters.')
+  if (passcode.length < 8) throw new Error(`DEMO_PASSCODE is too short: use at least ${PASSCODE_LENGTH} characters.`)
   return passcode
+}
+
+/**
+ * How long a passcode should be (audit finding 24). Shorter, down to the
+ * 8 that's refused, still starts, with a warning in the log: the demo copy
+ * that's running may have one, and it shouldn't stop at its next deploy.
+ */
+export const PASSCODE_LENGTH = 12
+
+/** Said in the log at start-up for a passcode shorter than it should be; nothing for one long enough. */
+export function passcodeWarning(passcode: string | undefined): string | undefined {
+  if (!passcode || passcode.length >= PASSCODE_LENGTH) return undefined
+  return `DEMO_PASSCODE is ${passcode.length} characters: change it to one of at least ${PASSCODE_LENGTH}, such as three words joined by hyphens.`
 }
 
 /**

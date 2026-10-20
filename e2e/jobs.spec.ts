@@ -21,7 +21,9 @@ async function ready(page: Page, hash = '#jobs') {
   await expect(page.getByRole('status')).toHaveText('Up to date')
 }
 
-function newJobForm(page: Page) {
+/** New job waits behind its button at the top of the list on a phone (audit finding 22). */
+async function newJobForm(page: Page) {
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   return page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
 }
 
@@ -32,7 +34,7 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await ready(office)
 
-  const form = newJobForm(office)
+  const form = await newJobForm(office)
   await form.getByLabel('Job').fill(job)
   await expect(form.getByLabel('Status')).toHaveValue('enquiry')
   await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
@@ -109,7 +111,7 @@ test('a job added with no signal waits on the phone, then goes through', async (
   await ready(phone)
   await context.setOffline(true)
 
-  const form = newJobForm(phone)
+  const form = await newJobForm(phone)
   await form.getByLabel('Job').fill(job)
   await form.getByLabel('Client').fill('Fuel Events')
   await form.getByLabel('Phase 1 from').fill('2030-11-02')

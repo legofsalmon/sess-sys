@@ -102,7 +102,7 @@ test('on a phone a call is one line that opens on a tap, the picker narrows as y
   await office.locator('details.filled-calls > summary').click()
   await expect(line).toHaveAttribute('aria-expanded', 'false')
   await expect(call).toContainText('Filled')
-  await expect(line).toContainText(`Maeve Doyle ${id}`)
+  await expect(call.locator('.who-line')).toContainText(`Maeve Doyle ${id}`)
   await expect(call.locator('.offers')).toHaveCount(0)
   await expect(call.getByRole('button', { name: 'Offer…' })).toHaveCount(0)
 

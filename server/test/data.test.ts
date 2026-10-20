@@ -22,7 +22,8 @@ import { buildApp } from '../src/app.ts'
 import { checkRestores } from '../src/backup/service.ts'
 import { dirStore, type BackupStore } from '../src/backup/store.ts'
 import { madeUpData } from '../src/data/madeup.ts'
-import { pgliteDb, type Db } from '../src/db.ts'
+import type { Db } from '../src/db.ts'
+import { scratchDb } from './scratch-db.ts'
 import { tablesInOrder } from '../src/tables.ts'
 import { IPHONE, server as signedInServer, staff } from './people.ts'
 
@@ -39,7 +40,7 @@ afterEach(async () => {
 })
 
 async function server(options: { backupStore?: BackupStore } = {}) {
-  const db = await pgliteDb()
+  const db = await scratchDb()
   const app = await buildApp({ db, ...options })
   cleanup.push(async () => {
     await app.close()

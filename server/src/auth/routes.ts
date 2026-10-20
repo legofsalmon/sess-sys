@@ -81,6 +81,61 @@ async function busiestLink(db: Db): Promise<string | null> {
 }
 const writePreview = (p: Preview) => (p.personId || p.department ? Buffer.from(JSON.stringify(p)).toString('base64url') : p.role)
 
+/** Wrong passcodes one address may send in a window before it's turned away till the window ends. */
+export const WRONG_TRIES = 10
+const WRONG_WINDOW_MS = 15 * 60_000
+
+/**
+ * Wrong passcodes, counted by where they came from, in memory: a restart
+ * forgets them, which costs a guesser more than it gives. The one-second
+ * pause alone doesn't slow guesses sent all at once. Kept small: windows
+ * that are over are dropped as new ones start, and past a few thousand
+ * addresses the oldest go first.
+ */
+class WrongTries {
+  private readonly from = new Map<string, { since: number; count: number }>()
+  private now() {
+    return Date.now()
+  }
+
+  /** How long this address must wait, or 0. */
+  waitFor(address: string): number {
+    const entry = this.from.get(address)
+    if (!entry) return 0
+    const left = entry.since + WRONG_WINDOW_MS - this.now()
+    if (left <= 0) {
+      this.from.delete(address)
+      return 0
+    }
+    return entry.count >= WRONG_TRIES ? left : 0
+  }
+
+  add(address: string) {
+    const at = this.now()
+    const entry = this.from.get(address)
+    if (entry && entry.since + WRONG_WINDOW_MS > at) {
+      entry.count++
+      return
+    }
+    this.from.delete(address)
+    for (const [key, e] of this.from) {
+      if (this.from.size < 5_000 && e.since + WRONG_WINDOW_MS > at) break
+      this.from.delete(key)
+    }
+    this.from.set(address, { since: at, count: 1 })
+  }
+}
+
+/**
+ * Where a request came from. Behind Railway's proxy the socket is the proxy's, and the proxy adds the address it was
+ * reached from at the end of x-forwarded-for: that last one, since anything before it the sender could have written.
+ */
+function clientAddress(req: FastifyRequest): string {
+  const forwarded = req.headers['x-forwarded-for']
+  const last = (Array.isArray(forwarded) ? forwarded.at(-1) : forwarded)?.split(',').at(-1)?.trim()
+  return last || req.socket.remoteAddress || 'unknown'
+}
+
 /** What the passcode cookie holds: changes whenever the passcode does, so changing it locks every device out. */
 const passcodeProof = (passcode: string) => createHmac('sha256', passcode).update('session-hire demo').digest('base64url')
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
@@ -119,6 +174,7 @@ export async function signedInStaff(db: Db, req: FastifyRequest, reply: FastifyR
  * secret is its own credential.
  */
 export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | undefined, passcode?: string) {
+  const wrongTries = new WrongTries()
   app.decorateRequest('user', null)
   app.decorateRequest('role', null)
   app.decorateRequest('reader', null as unknown as ReaderOf)
@@ -229,9 +285,21 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
   app.post<{ Body: { passcode?: unknown } }>('/api/auth/passcode', { config: { public: true } }, async (req, reply) => {
     reply.header('cache-control', 'no-store')
     if (!proof) return reply.code(404).send({ error: 'This copy of the app has no passcode.' })
+    // Too many wrong tries from one address, and even the right one is turned away till the window ends, so the answer
+    // says nothing about the guess (audit finding 24).
+    const from = clientAddress(req)
+    const waitMs = wrongTries.waitFor(from)
+    if (waitMs > 0) {
+      const minutes = Math.ceil(waitMs / 60_000)
+      return reply
+        .code(429)
+        .header('retry-after', String(Math.ceil(waitMs / 1000)))
+        .send({ error: `Too many wrong passcodes from here. Try again in ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.` })
+    }
     const given = typeof req.body?.passcode === 'string' ? req.body.passcode.trim() : ''
     if (!same(passcodeProof(given), proof)) {
-      // A pause on every wrong guess, so guessing takes far too long.
+      wrongTries.add(from)
+      // A pause on every wrong guess as well, so one person guessing one at a time takes far too long.
       await new Promise((r) => setTimeout(r, 1_000))
       return reply.code(403).send({ error: "That passcode isn't right." })
     }

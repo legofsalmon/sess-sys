@@ -242,6 +242,8 @@ test('each phase of a job says how it stands on the calendar', async ({ browser 
 
   await page.goto('/#jobs')
   await expect(page.getByRole('status')).toHaveText('Up to date')
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await form.getByLabel('Job').fill(job)
   await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
@@ -299,6 +301,8 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
     await expect(page.getByRole('region', { name: 'People' }).getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible()
   }
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Jobs' }).click()
+  // New job waits behind its button at the top of the list on a phone (audit finding 22).
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
   await form.getByLabel('Job').fill(job)
   await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
