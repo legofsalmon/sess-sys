@@ -13,7 +13,7 @@ import {
   type View,
 } from '@sh/shared'
 import { CERTIFICATE_SOON_DAYS, certificateName, daysBetween, dayLabel, whatsappNumber } from '@sh/shared'
-import { ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
+import { holdsARole, ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
 import { useId, useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -79,6 +79,8 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   // Someone whose role doesn't cover crew sees a person as they are, with nothing to change (ADR 0034).
   const mayEdit = access.can('crew') && !person.archived
   const role = roleOfPerson(person)
+  // Their main email is how they're written to; for someone with a role, only who changes settings changes it, as with the email itself.
+  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can('settings'))
   const [editing, setEditing] = useState(false)
   const { run, error } = useAct()
   const phone = person.phone?.trim()
@@ -154,11 +156,32 @@ function Who({ person, view }: { person: PersonView; view: View }) {
                 <dd>{email}</dd>
               </div>
             )}
-            {/* The addresses they had as someone combined with them (ADR 0055): a bring-in and their sign-in find them by these too. */}
+            {/* The addresses they had as someone combined with them (ADR 0055): a bring-in and their sign-in find them by these too.
+                Any can be made the main one (ADR 0064); the one it replaces joins these, so it's undone the same way. */}
             {(person.otherEmails ?? []).length > 0 && (
               <div>
                 <dt>Also found by</dt>
-                <dd>{person.otherEmails!.join(', ')}</dd>
+                <dd>
+                  {mayMakeMain ? (
+                    <ul className="also-emails">
+                      {person.otherEmails!.map((e) => (
+                        <li key={e}>
+                          {e}{' '}
+                          <button
+                            type="button"
+                            className="link"
+                            aria-label={`Make ${e} ${person.name}'s main email`}
+                            onClick={() => void run(() => client.mutate('person.mainEmail', { id: person.id, email: e }))}
+                          >
+                            Make main
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    person.otherEmails!.join(', ')
+                  )}
+                </dd>
               </div>
             )}
             {(person.dayRateCents !== null || person.rateHidden) && (
