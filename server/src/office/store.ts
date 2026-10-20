@@ -10,12 +10,15 @@ const toSetting = (r: Row): Setting => ({
   name: r.name,
   phone: r.phone,
   email: r.email,
+  // Only once set, so a device or a test that knows nothing of them sees the office as before.
+  ...(r.id === OFFICE_SETTING_ID && r.vat_number ? { vatNumber: r.vat_number } : {}),
+  ...(r.id === OFFICE_SETTING_ID && r.address ? { address: r.address } : {}),
   ...(r.id === READING_SETTING_ID ? { headsSeeRates: r.heads_see_rates === true } : {}),
   ...(r.id === MESSAGES_SETTING_ID ? { promptMessages: r.prompt_messages === true } : {}),
 })
 
 export async function getSetting(q: Queryable, id: string) {
-  const { rows } = await q.query(`SELECT id, name, phone, email, heads_see_rates, prompt_messages FROM settings WHERE id = $1`, [id])
+  const { rows } = await q.query(`SELECT id, name, phone, email, vat_number, address, heads_see_rates, prompt_messages FROM settings WHERE id = $1`, [id])
   return rows[0] ? toSetting(rows[0]) : undefined
 }
 

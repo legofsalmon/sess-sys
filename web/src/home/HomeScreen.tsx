@@ -1,9 +1,10 @@
-import { canApproveLeave, crewByDay, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, type Department, type PersonView, type View } from '@sh/shared'
+import { canApproveLeave, crewByDay, crewFill, departmentOf, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, STATUS_LABELS, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { useState } from 'react'
 import { useMe } from '../crew/Leave.tsx'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
 import { JobRow } from '../jobs/JobsScreen.tsx'
+import { kitShort } from '../jobs/Kit.tsx'
 import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
@@ -123,10 +124,10 @@ function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<st
   )
 }
 
-/** What's on today, each job with its crew; the next one when nothing is. */
+/** What's on today, a line a job with its crew (audit finding 22); the next one when nothing is. */
 function Today({ view, today }: { view: View; today: string }) {
   const on = jobsOn(view, today)
-  const next = on.length === 0 ? weekAhead(view, today)[0] : undefined
+  const next = on.length === 0 ? weekAhead(view, today).find((j) => j.status !== 'enquiry') : undefined
   return (
     <section className="card">
       <Heading icon="time">Today{on.length > 0 ? ` (${on.length})` : ''}</Heading>
@@ -136,12 +137,32 @@ function Today({ view, today }: { view: View; today: string }) {
         <ul className="job-list">
           {on.map((j) => (
             <li key={j.id}>
-              <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={false} />
+              <TodayRow job={j} view={view} />
             </li>
           ))}
         </ul>
       )}
     </section>
+  )
+}
+
+/** A job on today in one line: its name, then a quote not yet confirmed, its crew and kit short, as the jobs list says them. */
+function TodayRow({ job, view }: { job: JobView; view: View }) {
+  const crew = crewFill(job.calls)
+  const short = kitShort(view.kit.byJob.get(job.id))
+  return (
+    <a className="job-row today-row" href={`#jobs/${job.id}`}>
+      <b>{job.name}</b>
+      <span className="side">
+        {job.status !== 'confirmed' && <small>{STATUS_LABELS[job.status]}</small>}
+        {crew.needed > 0 && (
+          <small>
+            Crew {crew.booked} of {crew.needed}
+          </small>
+        )}
+        {short && <small className={`flag ${short}`}>Kit short</small>}
+      </span>
+    </a>
   )
 }
 
@@ -170,8 +191,9 @@ function ForCompany({ view, today, me }: { view: View; today: string; me: Person
   const pencilled = view.jobs.jobs.filter((j) => (j.status === 'enquiry' || j.status === 'quoted') && (!j.span || j.span.end >= today)).length
   return (
     <>
-      <Today view={view} today={today} />
+      {/* What needs someone first, then what's on (audit finding 22). */}
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
+      <Today view={view} today={today} />
       <Chart title="Jobs by week" icon="calendar" series={JOBS} columns={jobsByWeek(view.jobs.jobs, today)} empty="No gigs or hires in the next eight weeks." />
       <CrewChart view={view} today={today} />
       <WeekAhead view={view} today={today} />
@@ -309,6 +331,9 @@ function ForDepartment({
     .flatMap((c) => c.offers.filter((o) => o.status === 'confirmed' && o.person && !o.person.archived && by.person(o.person) && o.days.some((d) => d >= today && d <= week)).map((o) => ({ c, o })))
     .sort((a, b) => a.o.days[0]!.localeCompare(b.o.days[0]!) || a.o.person!.name.localeCompare(b.o.person!.name))
   const people = new Map(view.crew.people.map((p) => [p.id, p]))
+  // Calls are counted by their own department (ADR 0046): those with none aren't in the tile, so it says how many.
+  const fortnight = addDays(today, 14)
+  const noDepartment = view.crew.calls.filter((c) => c.status === 'open' && c.end >= today && c.start <= fortnight && c.openDays.some((d) => d >= today) && !departmentOf(c)?.trim()).length
   const away = view.crew.unavailability
     .filter((u) => u.end >= today && u.start <= week && by.person(people.get(u.personId)) && !people.get(u.personId)?.archived)
     .sort((a, b) => a.start.localeCompare(b.start))
@@ -325,7 +350,11 @@ function ForDepartment({
         </select>
       </label>
       <Tiles all={tiles(view, today, me, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
-      <p className="hint">Crew still needed and kit still out after a job are for every department, on Crew and Stock: a call doesn't say its department yet.</p>
+      <p className="hint">
+        {noDepartment > 0 &&
+          `${plural(noDepartment, 'call')} still needing crew in the next fortnight ${noDepartment === 1 ? "has no department, so it isn't" : "have no department, so they aren't"} counted here: give ${noDepartment === 1 ? 'it' : 'them'} one on Crew. `}
+        Kit still out after a job is the job's, not a department's: it's on Stock.
+      </p>
       <CrewChart view={view} today={today} department={department} />
       {kitOf(department) && <KitChart view={view} today={today} department={kitOf(department)} />}
       <section className="card">
@@ -412,8 +441,8 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
           </ul>
         )}
       </section>
-      <KitChart view={view} today={today} />
       <Tiles all={tiles(view, today, me)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
+      <KitChart view={view} today={today} />
       {view.moves.stillOut.length > 0 && (
         <section className="card">
           <Heading icon="warehouse">Coming back ({view.moves.stillOut.length})</Heading>
