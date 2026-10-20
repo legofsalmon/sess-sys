@@ -32,3 +32,15 @@ sess-sys takes the system's colours only, as an override. Its own layout,
 type, density and components stay as they are. Its brand red stays as "you"
 and burnt orange as bad, by decision; everything else about colour follows the
 grammar.
+
+## Changelog and version
+
+Every PR that changes the app (anything under `server/`, `web/` or
+`shared/`) adds an entry at the top of `shared/src/changelog.ts` and with it
+bumps the version: the middle number for something new a person can use,
+the last for a fix or a change that only makes it work better ([ADR
+0071](docs/adr/0071-whats-changed-and-version-numbers.md)). Write it for the
+office, in plain English with no code words, and give the PR number (fill it
+in once the PR is open) and any ADR. Admin › What's changed shows it. If
+another PR merges first with the same number, take the next one before
+merging. Docs-only PRs don't get a version.

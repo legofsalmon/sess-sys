@@ -212,7 +212,7 @@ export const MENU: PlaceGroup[] = [
         icon: 'settings',
         href: '#admin',
         label: 'Admin',
-        about: 'The office, Google Calendar, backups and data',
+        about: "The office, Google Calendar, backups, data and what's changed",
         needs: ['settings', 'company'],
       },
       {

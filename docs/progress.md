@@ -3,6 +3,19 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: What's changed, and version numbers
+
+**Done**
+
+- Admin ends with the app's version and its latest change, and "See every
+  change" opens Admin › What's changed: every version from 0.1.0 (29
+  September) to 1.26.0, newest first, in plain words, each with its pull
+  requests and decisions
+  ([Decision 0071](adr/0071-whats-changed-and-version-numbers.md), Colly's
+  ask). From now on every change to the app adds an entry and a version.
+- Checked: typecheck, and a test that the list runs newest first, each
+  number one step up, and every decision it names exists.
+
 ## 20 October 2026: finding a product by typing
 
 **Done**

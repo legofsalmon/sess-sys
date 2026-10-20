@@ -18,6 +18,7 @@ import { StockScreen } from './stock/StockScreen.tsx'
 import { StorageBanner, useUnkept } from './StorageBanner.tsx'
 import { UpdateBar } from './update.tsx'
 import { YouScreen } from './YouScreen.tsx'
+import { ChangesScreen } from './ChangesScreen.tsx'
 
 /**
  * Switches between the app's areas. The address keeps the area, and within
@@ -45,6 +46,7 @@ const AREAS = [
 
 /** Places reached from the Menu, which keep its tab. */
 const UNDER_MENU = [
+  { hash: '#admin/changes', Screen: ChangesScreen },
   { hash: '#admin', Screen: AccountScreen },
   { hash: '#history', Screen: HistoryScreen },
   { hash: '#me', Screen: YouScreen },
