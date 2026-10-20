@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
-import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv } from './auth/config.ts'
+import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv, passcodeWarning } from './auth/config.ts'
 import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
 import { dirStore, storeFromEnv } from './backup/store.ts'
@@ -83,7 +83,11 @@ async function main() {
   void app.documents.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
-  else if (passcode) app.log.info('Sign-in: a shared passcode (DEMO_PASSCODE), for made-up data only')
+  else if (passcode) {
+    app.log.info('Sign-in: a shared passcode (DEMO_PASSCODE), for made-up data only')
+    const short = passcodeWarning(passcode)
+    if (short) app.log.warn(short)
+  }
   else app.log.warn('Sign-in is off: anyone who can reach the app can use it. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to switch it on.')
   if (restored)
     app.log.warn(

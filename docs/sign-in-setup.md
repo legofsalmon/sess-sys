@@ -249,8 +249,12 @@ everything whatever their role, and nobody can take that away in the app.
   variables, so they can't go missing unnoticed. To run without sign-in on
   purpose, set `AUTH_MODE` to `open`.
 - A demo copy with made-up data can be locked before Google is set up:
-  set `DEMO_PASSCODE` (at least 8 characters) on that copy's server, and
-  it asks for the passcode instead of a Google account. Freelancers'
+  set `DEMO_PASSCODE` (at least 12 characters, such as three words
+  joined by hyphens; under 8 is refused, and under 12 starts with a
+  warning in the log) on that copy's server, and
+  it asks for the passcode instead of a Google account. After ten wrong
+  passcodes from one address in a quarter of an hour, that address is
+  turned away until the quarter of an hour is up. Freelancers'
   private links still open without it. Changing the passcode locks every
   device out until they enter the new one. Once the Google variables are
   set, the passcode is ignored and Google decides who gets in.

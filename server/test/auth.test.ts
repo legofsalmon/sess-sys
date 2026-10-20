@@ -1,9 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { newId } from '@sh/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
-import { assertSignInKept, authFromEnv, passcodeFromEnv, type AuthConfig } from '../src/auth/config.ts'
+import { assertSignInKept, authFromEnv, passcodeFromEnv, passcodeWarning, type AuthConfig } from '../src/auth/config.ts'
 import { googleProvider, identityFromIdToken, type Identity, type IdentityProvider } from '../src/auth/google.ts'
 import { pgliteDb } from '../src/db.ts'
 
@@ -426,6 +426,26 @@ describe('demo passcode', () => {
     expect((await app.inject({ url: '/api/me', cookies: { sh_passcode: 'made-up' } })).statusCode).toBe(401)
   })
 
+  it('turns away an address that has sent too many wrong ones, even with the right one, till a quarter of an hour is up', async () => {
+    // Proves: guesses sent all at once, which the pause alone doesn't slow, stop at ten (audit finding 24).
+    const { app } = await demo()
+    const from = (address: string, passcode: string) =>
+      app.inject({ method: 'POST', url: '/api/auth/passcode', payload: { passcode }, headers: { 'x-forwarded-for': `203.0.113.9, ${address}` } })
+    const guesses = await Promise.all(Array.from({ length: 12 }, (_, i) => from('198.51.100.7', `guess-number-${i}`)))
+    expect(guesses.map((r) => r.statusCode).sort()).toEqual([...Array(10).fill(403), 429, 429])
+    const locked = await from('198.51.100.7', 'loud-speakers-42')
+    expect(locked.statusCode).toBe(429)
+    expect(locked.json()).toEqual({ error: 'Too many wrong passcodes from here. Try again in 15 minutes.' })
+    expect(Number(locked.headers['retry-after'])).toBeGreaterThan(14 * 60)
+    // Someone else, though the first address in the header is the same: only the last is the proxy's own.
+    expect((await from('192.0.2.44', 'loud-speakers-42')).statusCode).toBe(200)
+
+    const later = Date.now() + 15 * 60_000 + 1_000
+    vi.spyOn(Date, 'now').mockReturnValue(later)
+    cleanup.push(async () => void vi.restoreAllMocks())
+    expect((await from('198.51.100.7', 'loud-speakers-42')).statusCode).toBe(200)
+  })
+
   it("says on a freelancer's page that it's the demo, with the way back to choosing whose eyes (ADR 0033)", async () => {
     const { app, db } = await demo()
     const set = cookie(await enter(app, 'loud-speakers-42'), 'sh_passcode')!
@@ -446,7 +466,12 @@ describe('demo passcode', () => {
   it('is read from DEMO_PASSCODE, and refuses a short one', () => {
     expect(passcodeFromEnv({})).toBeUndefined()
     expect(passcodeFromEnv({ DEMO_PASSCODE: ' loud-speakers-42 ' })).toBe('loud-speakers-42')
-    expect(() => passcodeFromEnv({ DEMO_PASSCODE: '1234' })).toThrow('too short')
+    expect(() => passcodeFromEnv({ DEMO_PASSCODE: '1234' })).toThrow('too short: use at least 12 characters')
+    // Eight to eleven still start, with a warning to change it (audit finding 24).
+    expect(passcodeWarning('loud-speakers-42')).toBeUndefined()
+    expect(passcodeWarning('speakers')).toBe(
+      'DEMO_PASSCODE is 8 characters: change it to one of at least 12, such as three words joined by hyphens.'
+    )
   })
 })
 

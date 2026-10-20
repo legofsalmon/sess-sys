@@ -87,6 +87,8 @@ export async function enterPasscode(passcode: string): Promise<string | undefine
       signal: AbortSignal.timeout(8_000),
     })
     if (res.status === 403) return "That passcode isn't right."
+    // Too many wrong ones from here: the server says how long to wait.
+    if (res.status === 429) return ((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Too many wrong passcodes from here. Try again in a few minutes.'
     if (!res.ok) return `The server answered ${res.status}. Please try again.`
   } catch {
     return "Couldn't reach the server. Check the signal and try again."
