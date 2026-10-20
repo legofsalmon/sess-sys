@@ -4,6 +4,7 @@ import {
   departmentOfPeople,
   addDays,
   cleanText,
+  fullName,
   isDay,
   newId,
   PROJECT_KINDS,
@@ -15,6 +16,7 @@ import {
   type ImportJob,
   type ImportPreview,
   type ImportResult,
+  type NameParts,
 } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
@@ -56,7 +58,18 @@ const bringBody = lookBody.extend({
   jobs: z
     .array(z.object({ key: z.string().min(1).max(400), name: z.string().max(200).transform(cleanText), kind: z.enum(PROJECT_KINDS).optional(), include: z.boolean() }))
     .max(5000),
-  people: z.array(z.object({ email: z.string().max(320), name: z.string().max(200).transform(cleanText).optional(), include: z.boolean() })).max(5000),
+  people: z
+    .array(
+      z.object({
+        email: z.string().max(320),
+        name: z.string().max(200).transform(cleanText).optional(),
+        // The name in two, as the office typed it (ADR 0066); left out by a version of the app from before, and the name is split.
+        firstName: z.string().max(100).transform(cleanText).optional(),
+        lastName: z.string().max(100).transform(cleanText).optional(),
+        include: z.boolean(),
+      })
+    )
+    .max(5000),
 })
 
 export interface ImportRoutes {
@@ -216,14 +229,25 @@ class NothingToBring extends Error {}
  * one round trip a row made a whole season take minutes, longer than the
  * app waits.
  */
-async function bring(ctx: Ctx, plan: Plan, people: ReadonlySet<string>, calendar: ImportCalendar, app: AppData): Promise<Omit<ImportResult, 'missing'>> {
+async function bring(
+  ctx: Ctx,
+  plan: Plan,
+  people: ReadonlySet<string>,
+  calendar: ImportCalendar,
+  app: AppData,
+  parts: ReadonlyMap<string, NameParts> = new Map()
+): Promise<Omit<ImportResult, 'missing'>> {
   const personIds = new Map<string, string>()
   for (const p of plan.people) {
     if (!people.has(p.email)) continue
     const id = newId()
+    const name = (p.name.trim() || p.email).slice(0, 200)
+    // The two the office typed, while they still make the name the plan has; otherwise the name is split.
+    const typed = parts.get(p.email.toLowerCase())
     await crewHandlers['person.upsert'](ctx, {
       id,
-      name: (p.name.trim() || p.email).slice(0, 200),
+      name,
+      ...(typed && fullName(typed) === name ? typed : {}),
       kind: p.kind,
       email: p.email,
       phone: null,
@@ -513,6 +537,9 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     const kinds = new Map(choices.jobs.flatMap((j) => (j.kind ? [[j.key, j.kind] as const] : [])))
     const people = new Set(choices.people.filter((p) => p.include).map((p) => p.email.toLowerCase()))
     const personNames = new Map(choices.people.flatMap((p) => (p.name?.trim() ? [[p.email.toLowerCase(), p.name.trim()] as const] : [])))
+    const personParts = new Map(
+      choices.people.flatMap((p) => (p.firstName?.trim() ? [[p.email.toLowerCase(), { firstName: p.firstName.trim(), lastName: p.lastName?.trim() ?? '' }] as const] : []))
+    )
     const client = typeof req.query.client === 'string' && /^[a-z0-9]{1,64}$/.test(req.query.client) ? req.query.client : undefined
     const options = { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today }
     /** The plan for what's ticked, and every job the calendar holds that isn't in the app yet. */
@@ -545,7 +572,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : plans(app)
           missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
-          const done = await bring(ctx, plan, people, read.calendar, app)
+          const done = await bring(ctx, plan, people, read.calendar, app, personParts)
           // The history keeps the first day asked for and what was left out, which the screen showed and is gone once brought in (audit finding 10).
           const leftOut = plan.leftOut.map((l) => ({ reason: l.reason, count: l.count }))
           await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ calendar: read.calendar.name, from: read.from, ...done, leftOut })])

@@ -1,5 +1,6 @@
 import {
   clientWords,
+  fullName,
   samePeople,
   joinedPhaseName,
   jobsNaming,
@@ -13,6 +14,7 @@ import {
   venueGuesses,
   withCapital,
   type JobView,
+  type NameParts,
   type PersonView,
   type SameJob,
   type TidyJob,
@@ -228,8 +230,8 @@ function Names({ people }: { people: readonly PersonView[] }) {
     <section className="card" aria-label="People named from their address">
       <Heading icon="person">People named from their address</Heading>
       <p className="hint">
-        Google had no name for these guests, so they're named from their email. That name is what call sheets, the planner and their own page show. Type the name
-        they go by.
+        Google had no name for these guests, so they're named from their email. That name is what call sheets, the planner and their own page show. Type their first
+        and last name.
       </p>
       <ShowAll items={people} limit={10} what="people">
         {(shown) => (
@@ -245,21 +247,39 @@ function Names({ people }: { people: readonly PersonView[] }) {
 }
 
 function NameRow({ person }: { person: PersonView }) {
-  const [name, setName] = useState('')
+  const [names, setNames] = useState<NameParts>({ firstName: '', lastName: '' })
   const { run, error, refuse } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return refuse('Type their name first.')
+    const typed = { firstName: names.firstName.trim(), lastName: names.lastName.trim() }
+    if (!typed.firstName) return refuse('Type their first name.')
     const { id, kind, email, phone, skills, notes } = person
-    void run(() => client.mutate('person.upsert', { id, name: name.trim(), kind, email, phone, skills, notes }))
+    void run(() => client.mutate('person.upsert', { id, name: fullName(typed), ...typed, kind, email, phone, skills, notes }))
   }
   return (
     <li>
       <form className="tick" onSubmit={save} aria-label={`Name for ${person.email}`}>
         <span>
-          <input className="name" value={name} placeholder={person.name} onChange={(e) => setName(e.target.value)} maxLength={200} aria-label={`Name for ${person.email}`} />
+          <span className="names">
+            <input
+              className="name"
+              value={names.firstName}
+              placeholder="First name"
+              onChange={(e) => setNames({ ...names, firstName: e.target.value })}
+              maxLength={100}
+              aria-label={`First name for ${person.email}`}
+            />
+            <input
+              className="name"
+              value={names.lastName}
+              placeholder="Last name"
+              onChange={(e) => setNames({ ...names, lastName: e.target.value })}
+              maxLength={100}
+              aria-label={`Last name for ${person.email}`}
+            />
+          </span>
           <small>
-            {person.email} · {person.kind === 'staff' ? 'staff' : 'freelancer'}
+            {person.name} · {person.email} · {person.kind === 'staff' ? 'staff' : 'freelancer'}
           </small>
           <Refusal error={error} />
         </span>

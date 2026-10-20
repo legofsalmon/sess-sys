@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Refusals, where they can be seen (audit findings 11 and 15): a change
@@ -31,7 +32,7 @@ test('a change the server turns down is counted in the top bar and listed from i
   })
   await page.getByRole('button', { name: 'Add person' }).click()
   const person = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
-  await person.getByLabel('Name').fill(`Nora Walsh ${id}`)
+  await fillName(person, `Nora Walsh ${id}`)
   await person.getByRole('button', { name: 'Add person' }).click()
   const count = page.getByRole('button', { name: /not done$/ })
   await expect(count).toHaveText('1 not done')

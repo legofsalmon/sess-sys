@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Crew booking end to end: the office adds a freelancer and a job and makes
@@ -21,7 +22,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   // The forms sit behind their buttons until wanted (audit finding 16).
   await office.getByRole('button', { name: 'Add person' }).click()
   const person = office.locator('form').filter({ has: office.getByRole('button', { name: 'Add person' }) })
-  await person.getByLabel('Name').fill('Aoife Byrne')
+  await fillName(person, 'Aoife Byrne')
   await person.getByLabel('Mobile').fill('+353 87 123 4567')
   await person.getByLabel('Skills').fill('audio, monitors')
   await person.getByRole('button', { name: 'Add person' }).click()

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * The screens fit the device (audit findings 16, 25 and 26). On a phone a
@@ -29,15 +30,15 @@ test('on a phone a call is one line that opens on a tap, the picker narrows as y
   await expect(office.getByRole('form', { name: 'Add person' })).toHaveCount(0)
   await office.getByRole('button', { name: 'Add person' }).click()
   const person = office.getByRole('form', { name: 'Add person' })
-  await expect(person.getByLabel('Name')).toBeFocused()
+  await expect(person.getByLabel('First name')).toBeFocused()
   for (const [name, skills] of [
     [`Maeve Doyle ${id}`, 'audio, monitors'],
     [`Ronan Burke ${id}`, 'rigger'],
   ]) {
-    await person.getByLabel('Name').fill(name!)
+    await fillName(person, name!)
     await person.getByLabel('Skills').fill(skills!)
     await person.getByRole('button', { name: 'Add person' }).click()
-    await expect(person.getByLabel('Name')).toHaveValue('')
+    await expect(person.getByLabel('First name')).toHaveValue('')
   }
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
@@ -183,9 +184,9 @@ test('the people list finds someone as the picker does, shows its first ten, and
   await expect(rows).toHaveCount(10)
   await list.getByRole('button', { name: 'Add person' }).click()
   const form = list.getByRole('form', { name: 'Add person' })
-  await form.getByLabel('Name').fill(name('Zoë'))
+  await fillName(form, name('Zoë'))
   await form.getByRole('button', { name: 'Add person' }).click()
-  await expect(form.getByLabel('Name')).toHaveValue('')
+  await expect(form.getByLabel('First name')).toHaveValue('')
   await expect(list.locator('.added')).toHaveText(`Added ${name('Zoë')}.`)
   await expect(row('Zoë')).toBeVisible()
   await expect(rows).toHaveCount(11)

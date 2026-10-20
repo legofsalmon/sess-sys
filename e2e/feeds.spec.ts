@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fillName } from './names.ts'
 
 /**
  * Personal calendar feeds (ADR 0012): a read-only address for each person,
@@ -19,7 +20,7 @@ test('the office copies a freelancer their calendar address, the same one their 
 
   await office.getByRole('button', { name: 'Add person' }).click()
   const form = office.locator('form').filter({ has: office.getByRole('button', { name: 'Add person' }) })
-  await form.getByLabel('Name').fill('Orla Murphy')
+  await fillName(form, 'Orla Murphy')
   await form.getByLabel('Mobile').fill('+353 86 765 4321')
   await form.getByRole('button', { name: 'Add person' }).click()
   await expect(office.getByRole('status')).toHaveText('Up to date')
@@ -64,7 +65,7 @@ test('staff who also work jobs find their own bookings feed under You', async ({
   await page.goto('/#crew/people')
   await page.getByRole('button', { name: 'Add person' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add person' }) })
-  await form.getByLabel('Name').fill('Ciara Walsh')
+  await fillName(form, 'Ciara Walsh')
   await form.getByLabel('Email').fill('Ciara@SessionHire.com')
   await form.getByLabel('Type').selectOption('Staff')
   await form.getByRole('button', { name: 'Add person' }).click()

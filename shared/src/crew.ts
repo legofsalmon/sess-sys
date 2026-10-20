@@ -194,10 +194,75 @@ export type Company = z.infer<typeof company>
 
 const department = text(60, 'The department').nullable()
 const knownAs = text(100, 'The name they go by').nullable()
+// Trimmed, so spaces alone are no first name.
+const givenName = z.string().transform((s) => s.trim()).pipe(needed(100, 'The first name', 'A first name'))
+const familyName = z.string().transform((s) => s.trim()).pipe(text(100, 'The last name'))
+
+/**
+ * Words that start a last name rather than end a first one, as Irish and
+ * other names have them: "Seán Ó Briain", "Áine Nic Dhonnchadha", "Jan van
+ * der Berg". Each as it's usually written, capitalised and in capitals, and
+ * matched exactly, so the server's own split of the names already held
+ * (crew/schema.ts) reads them the same way, whatever its database's locale.
+ */
+const PARTICLES = ['ó', 'ní', 'nic', 'mac', 'mc', 'ua', 'uí', 'mhic', 'o', 'de', 'van', 'von', 'der', 'den', 'da', 'di', 'du', 'le', 'la', 'del', 'della', 'st', 'st.']
+export const NAME_PARTICLES: readonly string[] = [...new Set(PARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
+const PARTICLE = new Set(NAME_PARTICLES)
+
+export interface NameParts {
+  firstName: string
+  lastName: string
+}
+
+/**
+ * A whole name as a first and a last name: the last word is the last name,
+ * with any words before it that start one ("Ó", "Mac", "van"); one word is a
+ * first name alone. Names typed before the two were asked for are split this
+ * way, and the office corrects any it gets wrong.
+ */
+export function splitName(name: string): NameParts {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length < 2) return { firstName: words[0] ?? '', lastName: '' }
+  let i = words.length - 1
+  while (i > 1 && PARTICLE.has(words[i - 1]!)) i--
+  return { firstName: words.slice(0, i).join(' '), lastName: words.slice(i).join(' ') }
+}
+
+/** The whole name, as lists, call sheets and messages show it: "Seán Ó Briain", or the first name alone. */
+export function fullName(p: NameParts): string {
+  return [p.firstName.trim(), p.lastName.trim()].filter(Boolean).join(' ')
+}
+
+/** A person's first and last name: as held, or split from the whole name for a record from before they were (or a copy that lacks them). */
+export function nameParts(p: { name: string; firstName?: string; lastName?: string }): NameParts {
+  return p.firstName?.trim() ? { firstName: p.firstName.trim(), lastName: p.lastName?.trim() ?? '' } : splitName(p.name)
+}
+
+/**
+ * The name a change to someone's details leaves them with, on the server and
+ * on a device alike. The whole name is the one sent. A first and last name
+ * sent with it are kept when they make it, as the form sends them. A whole
+ * name alone (an older version of the app, a calendar or crew-list bring-in),
+ * or with two that no longer make it, keeps the two they have when it's the
+ * name they had, and is split otherwise.
+ */
+export function namesAfter(a: { name: string; firstName?: string; lastName?: string }, was: { name: string; firstName?: string; lastName?: string } | undefined): NameParts & { name: string } {
+  const sent = { firstName: a.firstName?.trim() ?? '', lastName: a.lastName?.trim() ?? '' }
+  if (sent.firstName && fullName(sent) === a.name.trim().replace(/\s+/g, ' ')) return { name: fullName(sent), ...sent }
+  const parts = was && was.name === a.name ? nameParts(was) : splitName(a.name)
+  return { name: a.name, ...parts }
+}
 
 export const person = z.object({
   id,
   name: needed(200, 'The name', 'A name'),
+  /**
+   * The name in two (asked for since 2026-10-20): the whole name is always
+   * the two joined. The server sends both; a copy from before they existed
+   * has neither, so read them through nameParts, which splits the name.
+   */
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
   kind: z.enum(['staff', 'freelancer']),
   email: z.string().max(200).nullable(),
   /**
@@ -260,9 +325,9 @@ export const person = z.object({
 })
 export type Person = z.infer<typeof person>
 
-/** What a person is called in a greeting or a message: the name they go by, or else the first word of their name. */
-export function firstName(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs'>>): string {
-  return p.knownAs?.trim() || p.name.trim().split(/\s+/)[0] || p.name
+/** What a person is called in a greeting or a message: the name they go by, their first name, or else the first word of their name. */
+export function firstName(p: Pick<Person, 'name'> & Partial<Pick<Person, 'knownAs' | 'firstName'>>): string {
+  return p.knownAs?.trim() || p.firstName?.trim() || p.name.trim().split(/\s+/)[0] || p.name
 }
 
 /** A freelancer who charges VAT: the invoicing work reads this. */
@@ -421,7 +486,10 @@ const offerDays = z.array(day).min(1).max(MAX_OFFER_DAYS, `Up to ${MAX_OFFER_DAY
 export const crewCommandSchemas = {
   'person.upsert': z.object({
     id,
+    /** The whole name. A version of the app that asks for the two sends them as well, and they make it (namesAfter). */
     name: needed(200, 'The name', 'A name'),
+    firstName: givenName.optional(),
+    lastName: familyName.optional(),
     kind: z.enum(['staff', 'freelancer']),
     email: contactEmail,
     phone: contactPhone,
