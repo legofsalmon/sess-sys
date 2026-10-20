@@ -145,6 +145,25 @@ describe('combining people brought in twice', () => {
     expect((await latest<Person>(app, 'person', colly.id))!.name).toBe('Colly Hewson')
   })
 
+  it('makes another of their addresses the main one, and they still sign in with the same role by either (ADR 0064)', async () => {
+    const { app, db } = await server()
+    const colly = await person(app, 'Colly', { kind: 'staff', email: 'colly@sessionhire.com' })
+    const again = await person(app, 'Colly Hewson', { kind: 'staff', email: 'colly@gmail.com' })
+    ok(await send(app, 'person.role', { id: colly.id, role: 'director' }))
+    ok(await send(app, 'person.merge', { id: colly.id, from: [again.id] }))
+
+    ok(await send(app, 'person.mainEmail', { id: colly.id, email: 'Colly@Gmail.com' }))
+    const now = (await latest<Person>(app, 'person', colly.id))!
+    expect([now.email, now.otherEmails]).toEqual(['colly@gmail.com', ['colly@sessionhire.com']])
+    for (const e of ['colly@gmail.com', 'colly@sessionhire.com']) expect(await roleOfAccount(db, e)).toMatchObject({ role: 'director', personId: colly.id })
+
+    // Back again is the same move; an address they aren't found by isn't theirs to make main.
+    ok(await send(app, 'person.mainEmail', { id: colly.id, email: 'colly@sessionhire.com' }))
+    expect((await latest<Person>(app, 'person', colly.id))!.email).toBe('colly@sessionhire.com')
+    expect(reason(await send(app, 'person.mainEmail', { id: colly.id, email: 'colly@sessionhire.com' }))?.code).toBe('conflict')
+    expect(reason(await send(app, 'person.mainEmail', { id: colly.id, email: 'someone@else.ie' }))?.code).toBe('conflict')
+  })
+
   it('refuses two different roles, and leaves everything as it was', async () => {
     const { app, db } = await server()
     const a = await person(app, 'Sean Murphy', { kind: 'staff', email: 'sean@sessionhire.com' })

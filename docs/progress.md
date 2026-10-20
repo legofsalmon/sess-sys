@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - All of the 18 October audit's P2s (findings 13 to 26) and its P3 polish,
-  in [Decision 0064](adr/0064-the-audits-p2-and-p3s.md) (Colly's "proceed
+  in [Decision 0067](adr/0067-the-audits-p2-and-p3s.md) (Colly's "proceed
   with all the P2s and P3s"). A new phone reads the latest of each record
   rather than the whole feed; a deploy without screen changes costs a phone
   2 KB, not 1.2 MB; devices poll only while the live connection is down,
@@ -34,6 +34,18 @@ waiting on someone.
 - Colly: clear the start command in Railway's dashboard on both services
   (audit finding 25), and say when a demo passcode under 12 characters
   should be refused rather than warned about.
+## 20 October 2026: making another email the main one
+
+**Done**
+
+- A person's main email can be swapped for another of theirs, in
+  [Decision 0064](adr/0064-making-another-email-the-main-one.md) (Colly's
+  "change the primary email address for users that have been combined"):
+  on their page, each address under "Also found by" has **Make main**, and
+  the one it replaces joins the others. They answer to the same addresses,
+  so sign-in and roles don't change; for someone with a role only the
+  office and directors can do it.
+- Checked: typecheck, all tests (new unit and server tests).
 ## 20 October 2026: skills as picks
 
 **Done**

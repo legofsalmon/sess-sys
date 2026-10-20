@@ -1,4 +1,4 @@
-import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, offerKept, ROLE_LABELS, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
+import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, offerKept, ROLE_LABELS, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
 import { getDocument } from '../documents/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
@@ -109,6 +109,25 @@ export const mergeHandlers = {
     // The others' earlier copies stay in the feed, so the history still reads their names as they were.
     await emitRemovedAll(ctx, 'person', ids)
     await emit(ctx, 'person', into.id, await getPerson(tx, into.id))
+  },
+
+  /**
+   * One of the addresses someone answers to made their main one (ADR 0064).
+   * They answer to the same addresses after, so nobody's sign-in or role
+   * changes, and no address can come to belong to two people; who may
+   * change a role holder's email is still who may change this.
+   */
+  async 'person.mainEmail'(ctx: Ctx, a: CommandArgs<'person.mainEmail'>) {
+    const { tx } = ctx
+    const person = await getPerson(tx, a.id)
+    if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    if (ctx.via !== 'app') throw new Refused({ code: 'forbidden', message: "Your email can't be changed here. Ask the office to change it." })
+    if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to change their email.` })
+    const next = withMainEmail(person, a.email)
+    if (!next) throw new Refused({ code: 'conflict', message: `${person.name} isn't found by that address any more. Look at their page again.` })
+    if (holdsARole(person) && !mayChangeWhoSignsIn(ctx.role)) throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(person.name, person.role!, ctx.role) })
+    await tx.query('UPDATE people SET email = $2, other_emails = $3 WHERE id = $1', [person.id, next.email, JSON.stringify(next.otherEmails)])
+    await emit(ctx, 'person', person.id, await getPerson(tx, person.id))
   },
 }
 

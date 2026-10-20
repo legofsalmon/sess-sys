@@ -162,7 +162,7 @@ WebSocket carries a `beat` every 25 s; a device that hears nothing for
 connection is down. The app's version comes from `version.json` beside
 the page, not from the code, so a deploy that changes no screen changes
 no file a phone has to download again
-([ADR 0064](adr/0064-the-audits-p2-and-p3s.md)).
+([ADR 0067](adr/0067-the-audits-p2-and-p3s.md)).
 
 What the first sketch had and the code doesn't, yet: SQLite on the device
 (IndexedDB holds the copy; `web/src/storage.ts`), a sequence number per

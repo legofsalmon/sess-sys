@@ -228,6 +228,8 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
 .app .facts dt { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .app .facts dd { margin: 0; }
+.app .also-emails { list-style: none; margin: 0; padding: 0; }
+.app .also-emails li { overflow-wrap: anywhere; }
 .app .notes { margin: 0; white-space: pre-line; color: var(--muted); font-size: var(--text-small); }
 .app .muted { color: var(--muted); font-weight: 500; }
 .app .card > button { justify-self: start; }

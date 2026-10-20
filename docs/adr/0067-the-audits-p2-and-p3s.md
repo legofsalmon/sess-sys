@@ -1,4 +1,4 @@
-# ADR 0064: The 18 October audit's P2s and P3s
+# ADR 0067: The 18 October audit's P2s and P3s
 
 - **Status:** accepted
 - **Date:** 20 October 2026
