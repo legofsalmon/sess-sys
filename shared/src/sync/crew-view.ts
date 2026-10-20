@@ -1,6 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { irishToday } from '../calendar.ts'
-import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, departmentOf, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, departmentOf, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, tidyDepartment, tidyNeeds, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
 import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
@@ -209,15 +209,18 @@ export function crewView(
       case 'call.create': {
         const a = m.args as CommandArgs<'call.create'>
         // A call sent without a department is given the one its role suggests, as the server will (ADR 0046).
-        const department = a.department !== undefined ? a.department : departmentForRole(a.role, { calls: [...calls.values()], people: [...people.values()] })
-        if (!calls.has(a.id)) calls.set(a.id, { ...a, department, projectId: a.projectId ?? null, phaseId: a.phaseId ?? null, status: 'open', pending: true })
+        // Tidied as the server keeps it: "audio" is Audio.
+        const department = a.department !== undefined ? (a.department ? tidyDepartment(a.department) : null) : departmentForRole(a.role, { calls: [...calls.values()], people: [...people.values()] })
+        if (!calls.has(a.id))
+          calls.set(a.id, { ...a, department, needsCertificates: tidyNeeds(a.needsCertificates), projectId: a.projectId ?? null, phaseId: a.phaseId ?? null, status: 'open', pending: true })
         break
       }
       case 'call.department': {
         const a = m.args as CommandArgs<'call.department'>
+        const department = a.department ? tidyDepartment(a.department) : null
         for (const id of a.ids) {
           const c = calls.get(id)
-          if (c && departmentOf(c) !== a.department) calls.set(id, { ...c, department: a.department, pending: true })
+          if (c && departmentOf(c) !== department) calls.set(id, { ...c, department, pending: true })
         }
         break
       }
@@ -236,6 +239,8 @@ export function crewView(
         const c = calls.get(a.id)
         if (!c) break
         const next = { ...c, ...(changed(a) as Partial<CrewCall>), pending: true }
+        if (a.needsCertificates !== undefined) next.needsCertificates = tidyNeeds(a.needsCertificates)
+        if (a.department !== undefined) next.department = a.department ? tidyDepartment(a.department) : null
         calls.set(c.id, next)
         if (next.start !== c.start || next.end !== c.end) moveOffers(c.id, eachDay(c.start, c.end), eachDay(next.start, next.end))
         // A new rate reaches only offers nobody has answered; the rest keep what was agreed.

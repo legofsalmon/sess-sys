@@ -253,13 +253,14 @@ export function kitView(
     switch (m.name) {
       case 'kit.add': {
         const a = m.args as CommandArgs<'kit.add'>
-        if (!lines.has(a.id)) lines.set(a.id, { ...a, pending: true })
+        // Trimmed, as the server keeps them.
+        if (!lines.has(a.id)) lines.set(a.id, { ...a, supplier: a.supplier.trim(), notes: a.notes.trim(), pending: true })
         break
       }
       case 'kit.update': {
         const a = m.args as CommandArgs<'kit.update'>
         const found = lines.get(a.id)
-        if (found) lines.set(a.id, { ...patch(found, a), pending: true })
+        if (found) lines.set(a.id, { ...patch(found, { ...a, supplier: a.supplier?.trim(), notes: a.notes?.trim() }), pending: true })
         break
       }
       case 'kit.remove':
