@@ -34,6 +34,18 @@ waiting on someone.
 - Colly: clear the start command in Railway's dashboard on both services
   (audit finding 25), and say when a demo passcode under 12 characters
   should be refused rather than warned about.
+## 20 October 2026: skills as picks
+
+**Done**
+
+- Skills as picks, in [Decision 0063](adr/0063-skills-as-picks.md)
+  (Colly's "an autocomplete free type field, that can populate with
+  multiple selections"): the person form's Skills field holds chips, offers
+  the skills already on the crew list as you type (most used first, in the
+  spelling most people have), and still takes a new one as typed. Enter or
+  a comma adds, Backspace or a chip's own button takes one off.
+- Checked: typecheck, all unit and server tests, the browser suite (new
+  skills test).
 
 ## 19 October 2026: what crew and freelancers read of other people
 
