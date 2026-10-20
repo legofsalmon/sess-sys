@@ -411,6 +411,13 @@ export const REPLY_BY_AFTER = "The reply-by day is after the job's last day."
 const contactEmail = z.string().email("That email address doesn't look right.").max(200, 'The email address can be up to 200 characters.').nullable()
 const contactPhone = z.string().regex(/^\+?[0-9 ()-]{6,40}$/, 'Phone numbers need digits only, ideally starting with +353.').nullable()
 
+/**
+ * The most days one answer to an offer can pick: as many as a phase can have (MAX_PHASE_DAYS in jobs.ts, which imports
+ * this file), so one answer can't make the server check any number of them (audit, P3).
+ */
+export const MAX_OFFER_DAYS = 366
+const offerDays = z.array(day).min(1).max(MAX_OFFER_DAYS, `Up to ${MAX_OFFER_DAYS} days, please.`).nullable()
+
 export const crewCommandSchemas = {
   'person.upsert': z.object({
     id,
@@ -518,13 +525,13 @@ export const crewCommandSchemas = {
   'offer.send': z.object({ id, callId: id, personId: id, override: z.boolean() }),
   /** The freelancer's answer, from their link or the app. */
   'offer.respond': z.discriminatedUnion('answer', [
-    z.object({ id, answer: z.literal('accept'), days: z.array(day).min(1).nullable(), note: text(1000, 'The note') }),
+    z.object({ id, answer: z.literal('accept'), days: offerDays, note: text(1000, 'The note') }),
     z.object({ id, answer: z.literal('decline'), note: text(1000, 'The note') }),
     z.object({
       id,
       answer: z.literal('counter'),
       counterRateCents: cents,
-      days: z.array(day).min(1).nullable(),
+      days: offerDays,
       note: text(1000, 'The note'),
     }),
     /** Can't make it any more, having accepted or been booked: the place is free again and the office finds cover. */

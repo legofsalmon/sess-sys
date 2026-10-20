@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { commandSchemas, type Mutation } from '../src/commands.ts'
-import { movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, suggestedReplyBy, type CrewCall, type Offer } from '../src/crew.ts'
+import { MAX_OFFER_DAYS, movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, suggestedReplyBy, type CrewCall, type Offer } from '../src/crew.ts'
+import { addDays } from '../src/sync/plan.ts'
 import type { Phase } from '../src/jobs.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import { crewFill } from '../src/sync/jobs-view.ts'
@@ -173,5 +174,17 @@ describe('the reply-by day when asking for crew (audit finding 21)', () => {
     expect(refused.error?.issues[0]?.message).toBe(REPLY_BY_AFTER)
     expect(create('2026-10-12').success).toBe(true)
     expect(create(null).success).toBe(true)
+  })
+})
+
+describe('an answer to an offer', () => {
+  it('picks at most as many days as a phase can have', () => {
+    // Proves: offer.respond's days have a maximum (audit, P3), so one answer can't make the server check any number of them.
+    const days = (n: number) => Array.from({ length: n }, (_, i) => addDays('2026-01-01', i))
+    const accept = (n: number) => commandSchemas['offer.respond'].safeParse({ id: 'o1', answer: 'accept', days: days(n), note: '' })
+    expect(accept(MAX_OFFER_DAYS).success).toBe(true)
+    const over = accept(MAX_OFFER_DAYS + 1)
+    expect(over.success).toBe(false)
+    expect(over.error?.issues[0]?.message).toBe(`Up to ${MAX_OFFER_DAYS} days, please.`)
   })
 })
