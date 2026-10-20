@@ -114,7 +114,7 @@ export const mergeHandlers = {
 }
 
 /**
- * Their photo (ADR 0063): the one kept keeps theirs; with none, they take
+ * Their photo (ADR 0065): the one kept keeps theirs; with none, they take
  * the newest of the others'. Every other photo goes on the list of files to
  * delete, in the same change.
  */

@@ -1,4 +1,4 @@
-# ADR 0063: A photo on a person's page
+# ADR 0065: A photo on a person's page
 
 - **Status:** accepted
 - **Date:** 20 October 2026

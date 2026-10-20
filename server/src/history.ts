@@ -416,7 +416,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Gave ${person(a.id)} a new private link; the old one stopped working`
     case 'person.archive':
       return a.archived ? `Archived ${person(a.id)}` : `Brought ${person(a.id)} back`
-    // Their photo (ADR 0063): that it changed, never the picture.
+    // Their photo (ADR 0065): that it changed, never the picture.
     case PHOTO_ACTIONS.put:
       return `${a.replaced ? 'Put a new photo' : 'Put a photo'} on ${person(a.id)}'s page`
     case PHOTO_ACTIONS.remove:

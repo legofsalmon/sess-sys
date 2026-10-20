@@ -8,7 +8,7 @@ import { Icon, type IconName } from './Icon.tsx'
  * with the icon for what kind of thing it is; a person's photo or, until
  * they give one, their initials. The name is always beside it, so the
  * picture is hidden from screen readers. A person's photo comes from the
- * server once they have one (ADR 0063); things have only placeholders yet,
+ * server once they have one (ADR 0065); things have only placeholders yet,
  * and `src` is for when they have photos too.
  */
 
@@ -25,7 +25,7 @@ function Photo({ src, fallback }: { src?: string; fallback: React.ReactNode }) {
 
 const base = import.meta.env.VITE_API_BASE ?? ''
 
-/** Where a person's photo is, once they have one (ADR 0063). */
+/** Where a person's photo is, once they have one (ADR 0065). */
 export const photoOf = (p: Pick<Person, 'id' | 'photo'> | undefined) => (p?.photo ? `${base}${photoPath(p.id, p.photo.at)}` : undefined)
 
 /** A thing: a product, an item, a case. */

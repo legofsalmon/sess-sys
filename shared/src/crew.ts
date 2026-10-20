@@ -258,7 +258,7 @@ export const person = z.object({
    */
   detailsHidden: z.boolean().optional(),
   /**
-   * Their photo (ADR 0063): when it was put up, which makes its address
+   * Their photo (ADR 0065): when it was put up, which makes its address
    * (photoPath). Set by the server, never by an edit; none is their
    * initials. Not sent to a reader who doesn't read their details.
    */

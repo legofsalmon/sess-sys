@@ -92,7 +92,7 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   return (
     <section className="card who-card" aria-label={person.name}>
       <header className="title">
-        {/* Their picture before their name (ADR 0038): their photo once there is one (ADR 0063), their initials until then. */}
+        {/* Their picture before their name (ADR 0038): their photo once there is one (ADR 0065), their initials until then. */}
         <div className="pictured">
           <Avatar name={person.name} src={photoOf(person)} size="large" />
           <div className="who-name">

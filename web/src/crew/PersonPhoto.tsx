@@ -9,7 +9,7 @@ import { refusal, useDocumentStorage } from './Documents.tsx'
 
 /**
  * Putting a photo on a person's page, changing it, or taking it down (ADR
- * 0063): for the person themselves and whoever can change crew. The photo
+ * 0065): for the person themselves and whoever can change crew. The photo
  * is made a small square JPEG here before it's sent, from the middle of
  * what was chosen: a phone's photo of several megabytes goes as a few
  * dozen kilobytes, and where it was taken (its EXIF) stays behind. It goes

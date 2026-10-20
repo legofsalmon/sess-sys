@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * A person's photo (ADR 0063): put up from their page in place of their
+ * A person's photo (ADR 0065): put up from their page in place of their
  * initials, shown in the People list too, and taken down again after a
  * question. The test server keeps files in a folder (DOCUMENTS_DIR), as a
  * bucket would. Every name here is this run's own.

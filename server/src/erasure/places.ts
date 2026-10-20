@@ -64,7 +64,7 @@ export const GONE: readonly Gone[] = [
   { table: 'running_late', entity: 'runningLate' },
   // Days off, approved leave's included: those have the request's id. The request is the record of the leave (LEAVE, below).
   { table: 'unavailability', entity: 'unavailability' },
-  // Their documents (ADR 0029): no law asks for them, so they go at once. Their files, and their photo (ADR 0063), go on the list of files to delete
+  // Their documents (ADR 0029): no law asks for them, so they go at once. Their files, and their photo (ADR 0065), go on the list of files to delete
   // in the same change, and the server deletes them from the storage straight after, and again each day until they've gone.
   { table: 'documents', entity: 'document', first: queueFilesOf },
   // Their own calendar's address and their busy times (ADR 0044): about their life, not their work, so they go at once,
@@ -284,7 +284,7 @@ export async function erasePerson(ctx: Ctx, personId: string, how: EraseHow): Pr
   values.certificates = JSON.stringify(after.certificates)
   values.link_token = `erased-${randomBytes(18).toString('base64url')}`
   Object.assign(values, { company_name: null, company_vat_number: null, company_cro_number: null })
-  // Their photo (ADR 0063): its file went on the list of files to delete with their documents' (queueFilesOf).
+  // Their photo (ADR 0065): its file went on the list of files to delete with their documents' (queueFilesOf).
   Object.assign(values, { photo_key: null, photo_type: null, photo_bytes: null, photo_at: null })
   const columns = Object.keys(values)
   await tx.query(`UPDATE people SET ${columns.map((c, i) => `${c} = $${i + 2}`).join(', ')} WHERE id = $1`, [personId, ...columns.map((c) => values[c])])

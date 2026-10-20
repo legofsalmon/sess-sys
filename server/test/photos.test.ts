@@ -9,7 +9,7 @@ import type { Db } from '../src/db.ts'
 import { IPHONE, server, staff } from './people.ts'
 
 /**
- * A person's photo on their page (ADR 0063): put up, changed and taken
+ * A person's photo on their page (ADR 0065): put up, changed and taken
  * down by the office or the person themselves, kept in the storage as
  * documents' files are, shown to everyone who reads that person's details,
  * and gone from the storage when it's replaced, removed, the person is

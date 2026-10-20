@@ -32,7 +32,7 @@ export const toPerson = (r: Row): Person => ({
   // A company is there when any of its three columns is.
   company: r.company_name || r.company_vat_number || r.company_cro_number ? { name: r.company_name ?? '', vatNumber: r.company_vat_number ?? null, croNumber: r.company_cro_number ?? null } : null,
   role: r.kind === 'staff' ? (r.role ?? null) : null,
-  // Only once they have one (ADR 0063), so a person without is sent as before.
+  // Only once they have one (ADR 0065), so a person without is sent as before.
   ...(r.photo_at ? { photo: { at: new Date(r.photo_at).toISOString() } } : {}),
 })
 export const toCall = (r: Row): CrewCall => ({

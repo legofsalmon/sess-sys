@@ -258,7 +258,7 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnC
   // Their own calendar (ADR 0044): never its address, which no command or history entry carries, only whose and who gave it.
   [OWN_CALENDAR_ACTIONS.share]: { names: { field: 'personId' }, refused: true, keep: only('personId', 'by', 'replaced') },
   'ownCalendar.stop': { names: { field: 'personId' }, refused: true, keep: as },
-  // Their photo (ADR 0063) goes with them; the history keeps only that one was put up or taken down.
+  // Their photo (ADR 0065) goes with them; the history keeps only that one was put up or taken down.
   [PHOTO_ACTIONS.put]: { names: { field: 'id' }, refused: true, keep: only('id', 'type', 'bytes', 'replaced') },
   [PHOTO_ACTIONS.remove]: { names: { field: 'id' }, refused: true, keep: only('id') },
 }

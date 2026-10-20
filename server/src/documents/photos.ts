@@ -10,7 +10,7 @@ import { FileGone, FileLocked, NotKept, type DocumentFiles } from './files.ts'
 import { claimFile, queueFile } from './store.ts'
 
 /**
- * A person's photo on their page (ADR 0063), kept as documents' files are
+ * A person's photo on their page (ADR 0065), kept as documents' files are
  * (ADR 0029): sent by the device as the request's whole body, already made
  * a small square JPEG there, and checked again here by its first bytes.
  * Put up and taken down by the person themselves or a role that changes

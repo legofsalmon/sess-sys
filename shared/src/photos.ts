@@ -3,7 +3,7 @@ import type { Reading } from './reading.ts'
 import { roleCan, type Role } from './roles.ts'
 
 /**
- * A person's photo on their page (ADR 0063), in place of their initials
+ * A person's photo on their page (ADR 0065), in place of their initials
  * (ADR 0038). Kept as documents' files are (ADR 0029): in the storage
  * bucket, read only through the server, deleted when it's replaced,
  * removed, or the person is erased. Devices are sent when it was put up,

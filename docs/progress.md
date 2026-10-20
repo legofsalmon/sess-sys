@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- A photo on a person's page, in [Decision 0063](adr/0063-a-photo-on-a-persons-page.md)
+- A photo on a person's page, in [Decision 0065](adr/0065-a-photo-on-a-persons-page.md)
   (Colly's "upload of peoples images on their staff page"). Add a photo,
   Change photo and Remove photo under their picture, for the person and
   whoever can change crew. The device squares and shrinks it before sending;
