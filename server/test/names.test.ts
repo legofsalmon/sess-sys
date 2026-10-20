@@ -83,6 +83,20 @@ describe('first and last names', () => {
     expect((await db.query(`SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'sh_split_name'`)).rows).toEqual([{ n: 0 }])
   })
 
+  it('once checked in Tidy up, stay checked (ADR 0068)', async () => {
+    const { app } = await server()
+    const id = newId()
+    const aoife = { ...details(id, 'Aoife Byrne'), email: 'aoife.byrne@gmail.com' }
+    expect((await send(app, 'person.upsert', aoife)).status).toBe('applied')
+    expect((await person(app, id)).nameChecked).toBeUndefined()
+    expect((await send(app, 'person.upsert', { ...aoife, firstName: 'Aoife', lastName: 'Byrne', nameChecked: true })).status).toBe('applied')
+    expect(await person(app, id)).toMatchObject({ name: 'Aoife Byrne', nameChecked: true })
+    // An edit that doesn't say, or says false, keeps it.
+    expect((await send(app, 'person.upsert', { ...aoife, phone: '+353871234567' })).status).toBe('applied')
+    expect((await send(app, 'person.upsert', { ...aoife, nameChecked: false })).status).toBe('applied')
+    expect(await person(app, id)).toMatchObject({ nameChecked: true, phone: null })
+  })
+
   it('make the whole name, and are kept by a change that sends only the name', async () => {
     const { app, db } = await server()
     const id = newId()

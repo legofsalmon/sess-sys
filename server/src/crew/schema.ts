@@ -223,6 +223,11 @@ const MIGRATIONS: string[] = [
   ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_bytes integer;
   ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_at timestamptz;
   `,
+  // A name the office gave or checked in Jobs › Tidy up (ADR 0068), so someone whose name is what their address spells
+  // can be named and leave the list.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS name_checked boolean NOT NULL DEFAULT false;
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

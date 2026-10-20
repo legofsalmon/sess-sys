@@ -219,6 +219,7 @@ describe('download everything', () => {
       'photo_type',
       'photo_bytes',
       'photo_at',
+      'name_checked',
     ])
     expect(people[0]).toMatchObject({
       name: 'Seán Ó Briain',

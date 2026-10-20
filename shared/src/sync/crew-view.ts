@@ -141,6 +141,8 @@ export function crewView(
           ...(was?.photo ? { photo: was.photo } : {}),
           ...a,
           ...namesAfter(a, was),
+          // A name once checked stays checked (ADR 0068).
+          ...(a.nameChecked || was?.nameChecked ? { nameChecked: true } : { nameChecked: undefined }),
           dayRateCents: a.dayRateCents !== undefined ? a.dayRateCents : (was?.dayRateCents ?? null),
           ...(a.dayRateCents === undefined && was?.rateHidden ? { rateHidden: true } : {}),
           approvesLeave,

@@ -4,7 +4,7 @@ import { sortByIds } from '../projects/store.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, first_name, last_name, kind, email, other_emails, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role, photo_at`
+const PERSON = `id, name, first_name, last_name, kind, email, other_emails, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role, photo_at, name_checked`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status, needs_certificates, department`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
@@ -36,6 +36,8 @@ export const toPerson = (r: Row): Person => ({
   role: r.kind === 'staff' ? (r.role ?? null) : null,
   // Only once they have one (ADR 0065), so a person without is sent as before.
   ...(r.photo_at ? { photo: { at: new Date(r.photo_at).toISOString() } } : {}),
+  // Only once checked (ADR 0068), so everyone else is sent as before.
+  ...(r.name_checked ? { nameChecked: true } : {}),
 })
 export const toCall = (r: Row): CrewCall => ({
   id: r.id,

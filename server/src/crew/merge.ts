@@ -85,7 +85,7 @@ export const mergeHandlers = {
     await tx.query(
       `UPDATE people SET name = $2, email = $3, other_emails = $4, phone = $5, skills = $6, day_rate_cents = $7, notes = $8, archived = $9, approves_leave = $10,
          department = $11, level = $12, known_as = $13, certificates = $14, company_name = $15, company_vat_number = $16, company_cro_number = $17, role = $18,
-         first_name = $19, last_name = $20
+         first_name = $19, last_name = $20, name_checked = $21
        WHERE id = $1`,
       [
         one.id,
@@ -108,6 +108,7 @@ export const mergeHandlers = {
         one.role,
         nameParts(one).firstName,
         nameParts(one).lastName,
+        one.nameChecked ?? false,
       ]
     )
     // The others' earlier copies stay in the feed, so the history still reads their names as they were.

@@ -165,8 +165,9 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
  * added to a person fails to compile here until it has a column (and
  * `erasedPerson` says whether it goes). The company is three columns;
  * the hidden flags (ADR 0046) are only ever on what's sent, never stored.
+ * Whether their name was checked (ADR 0068) says nothing about them, and stays.
  */
-const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden' | 'detailsHidden' | 'photo'>]: string } = {
+const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden' | 'detailsHidden' | 'photo' | 'nameChecked'>]: string } = {
   name: 'name',
   firstName: 'first_name',
   lastName: 'last_name',

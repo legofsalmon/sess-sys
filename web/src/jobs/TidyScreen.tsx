@@ -254,7 +254,8 @@ function NameRow({ person }: { person: PersonView }) {
     const typed = { firstName: names.firstName.trim(), lastName: names.lastName.trim() }
     if (!typed.firstName) return refuse('Type their first name.')
     const { id, kind, email, phone, skills, notes } = person
-    void run(() => client.mutate('person.upsert', { id, name: fullName(typed), ...typed, kind, email, phone, skills, notes }))
+    // Checked, so they leave the list even when their name is what their address spells (ADR 0068).
+    void run(() => client.mutate('person.upsert', { id, name: fullName(typed), ...typed, kind, email, phone, skills, notes, nameChecked: true }))
   }
   return (
     <li>

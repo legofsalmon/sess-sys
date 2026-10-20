@@ -3,6 +3,19 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: saving names in Tidy up
+
+**Done**
+
+- Jobs › Tidy up › People named from their address: a name saved for
+  someone whose address already spells it (aoife.byrne@…, saved as Aoife
+  Byrne) left them on the list as if nothing was saved. The office's save
+  is now remembered, so each person leaves the list once named
+  ([Decision 0068](adr/0068-a-name-checked-in-tidy-up.md), Colly's bug
+  report).
+- Checked: typecheck, all unit tests, a browser test saving three names in
+  a row, which failed before the fix.
+
 ## 20 October 2026: the Skills field, reviewed against the design system
 
 **Done**
