@@ -1,4 +1,4 @@
-import { changesLinkOf, COMMAND_NEEDS, LINKS_REFUSAL, personForEmail, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
+import { changesLinkOf, COMMAND_NEEDS, departmentForRole, RATES_REFUSAL_DEPARTMENT, readsRatesIn, LINKS_REFUSAL, personForEmail, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
 import { currentAuth, useAuth, type Auth } from './auth.ts'
 import { previewKey, usePreview } from './home/Preview.tsx'
 import { client } from './sync.ts'
@@ -69,6 +69,14 @@ client.guard = (name, args) => {
   const relinked = changesLinkOf(name, args)
   if (relinked && view.crew.people.some((p) => p.id === relinked && p.linkHidden)) return LINKS_REFUSAL
   // Crew pay is for a role that reads it (ADR 0046): setting a rate, agreeing a counter-offer or deciding a timesheet.
+  // A head who reads their own department's (ADR 0062) sets those alone; the server says the same.
+  if (view.reading.rates && view.reading.ratesBy === 'department' && setsRates(name, args)) {
+    const a = args as { id?: string; role?: string; department?: string | null }
+    const call =
+      name === 'call.create' ? undefined : view.crew.calls.find((c) => c.id === a.id || c.offers.some((o) => o.id === a.id))
+    const department = name === 'call.create' ? (a.department ?? departmentForRole(a.role ?? '')) : name === 'call.update' && a.department !== undefined ? a.department : call?.department
+    return readsRatesIn(view.reading, department) ? undefined : RATES_REFUSAL_DEPARTMENT
+  }
   if (view.reading.rates) return undefined
   const countered = name === 'offer.confirm' && view.crew.calls.some((c) => c.offers.some((o) => o.id === (args as CommandArgs<'offer.confirm'>).id && o.status === 'countered'))
   return setsRates(name, args) || countered ? RATES_REFUSAL : undefined

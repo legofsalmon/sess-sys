@@ -118,7 +118,7 @@ export const SELECT = `
                        OR (m.client_id LIKE 'calendar:%' AND p.id = coalesce(pm.into_id, substr(m.client_id, 10)))`
 
 /** One page of the history, newest first. */
-export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true): Promise<HistoryPage> {
+export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true, notes = true): Promise<HistoryPage> {
   const limit = Math.min(Math.max(1, Math.floor(Number(query.limit) || PAGE)), MAX_PAGE)
   const where: string[] = []
   const params: unknown[] = []
@@ -149,7 +149,7 @@ export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates 
   const page = rows.slice(0, limit)
   const last = page.at(-1)
   return {
-    entries: await toEntries(q, page, rates),
+    entries: await toEntries(q, page, rates, notes),
     ...(rows.length > limit && last ? { next: writeCursor(last.received, last.id) } : {}),
     ...(query.before ? {} : { people: await historyPeople(q) }),
   }
@@ -203,7 +203,7 @@ function readCursor(text: string): { at: string; id: string } {
   throw new BadCursor('That page of the history no longer exists; start again from the newest.')
 }
 
-export async function toEntries(q: Queryable, rows: Row[], rates = true): Promise<HistoryEntry[]> {
+export async function toEntries(q: Queryable, rows: Row[], rates = true, notes = true): Promise<HistoryEntry[]> {
   const look = await lookup(q, rows)
   const left = await itemsAsLeft(q, rows)
   return rows.map((r) => {
@@ -213,7 +213,7 @@ export async function toEntries(q: Queryable, rows: Row[], rates = true): Promis
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app', rates),
+      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app', rates, notes),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -328,10 +328,12 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
  * own link, for the few commands that read differently in their voice.
  */
 /**
- * In words. `rates` false leaves crew pay out (ADR 0046), for a reader whose
+ * In words. `notes` false leaves out what people wrote about their own time
+ * off, pulling out and running late, and the reasons they were given (ADR
+ * 0062). `rates` false leaves crew pay out (ADR 0046), for a reader whose
  * role doesn't see it: the history says a rate changed, never to what.
  */
-export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar', rates = true): string {
+export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar', rates = true, notes = true): string {
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
     const c = look('crewCall', id)
@@ -386,7 +388,9 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     const verb = approved ? 'approved' : 'declined'
     return by ? `${person(by)} ${verb}` : verb[0]!.toUpperCase() + verb.slice(1)
   }
-  const why = (approved: unknown, reason: unknown) => (!approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
+  const why = (approved: unknown, reason: unknown) => (notes && !approved && typeof reason === 'string' && reason.trim() ? `: ${clip(reason.trim())}` : '')
+  /** What someone wrote about their own time, left out for staff crew and freelancers reading others' (ADR 0062). */
+  const said = (note: unknown, before: string, after = '') => (notes && typeof note === 'string' && note.trim() ? `${before}${clip(note.trim())}${after}` : '')
   /** ", needing working at height and IPAF" (ADR 0028); nothing when a call needs nothing. */
   const needsIn = (v: unknown) => tidyNeeds(Array.isArray(v) ? v : [])
   const needing = (needs: unknown) => (needsIn(needs).length ? `, needing ${needsLabel(needsIn(needs))}` : '')
@@ -447,7 +451,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return from === 'link' ? `${who} stopped sharing their own calendar` : `Stopped reading ${who}'s own calendar`
     }
     case 'unavailability.add':
-      return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${typeof a.note === 'string' && a.note ? ` (${clip(a.note)})` : ''}`
+      return `Marked ${person(a.personId)} away ${dates(a.start, a.end)}${said(a.note, ' (', ')')}`
     case 'unavailability.remove': {
       const u = look('unavailability', a.id)
       return u ? `Removed ${person(u.personId)}'s days off, ${dates(u.start, u.end)}` : 'Removed some days off'
@@ -484,7 +488,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const o = offer(a.id)
       if (a.answer === 'decline') return `${o.who} declined ${o.what}`
       if (a.answer === 'counter') return rates ? `${o.who} asked for ${euro(a.counterRateCents as number)} a day for ${o.what}` : `${o.who} asked for a different rate for ${o.what}`
-      if (a.answer === 'pullOut') return `${o.who} can't make it any more: ${o.what}${typeof a.note === 'string' && a.note.trim() ? ` (${clip(a.note.trim())})` : ''}`
+      if (a.answer === 'pullOut') return `${o.who} can't make it any more: ${o.what}${said(a.note, ' (', ')')}`
       return `${o.who} accepted ${o.what}${Array.isArray(a.days) && a.days.length ? `, ${daysLabel(a.days as string[])}` : ''}`
     }
     case 'offer.seen': {
@@ -790,7 +794,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'late.say': {
       const l = lateOf(a.id, a.offerId)
       const how = lateWords({ by: LATE_BY.find((b) => b === a.by) ?? null, arriveAt: typeof a.arriveAt === 'string' ? a.arriveAt : null })
-      const note = typeof a.note === 'string' && a.note.trim() ? `: ${clip(a.note.trim())}` : ''
+      const note = said(a.note, ': ')
       const what = `${how} for ${l.job}${typeof a.day === 'string' ? `, ${dayLabel(a.day)}` : ''}${note}`
       // From the app it's the office noting someone who rang; the entry's own who names whoever noted it.
       return from === 'app' ? `Noted that ${l.who} rang to say they'll be ${what}` : `${l.who} said they'll be ${what}`

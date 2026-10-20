@@ -166,7 +166,7 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
  * `erasedPerson` says whether it goes). The company is three columns;
  * the hidden flags (ADR 0046) are only ever on what's sent, never stored.
  */
-const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden'>]: string } = {
+const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden' | 'detailsHidden'>]: string } = {
   name: 'name',
   email: 'email',
   otherEmails: 'other_emails',

@@ -1,7 +1,7 @@
 import compress from '@fastify/compress'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { join, sep } from 'node:path'
 import { constants as zlib } from 'node:zlib'
@@ -432,9 +432,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
     try {
-      // Read by every member of staff, so in words without crew pay for a role that doesn't see it (ADR 0046).
-      const { rates } = await readingOf(db, req.role, req.reader ?? {})
-      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, rates)
+      // Read by every member of staff, so in words without crew pay for a role that doesn't see it (ADR 0046), nor for a
+      // head who sees only their department's (ADR 0062): the history names everyone's.
+      const reading = await readingOf(db, req.role, req.reader ?? {})
+      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, readsEveryRate(reading), (reading.details ?? 'all') === 'all')
     } catch (err) {
       if (err instanceof BadCursor) return reply.code(400).send({ error: err.message })
       throw err

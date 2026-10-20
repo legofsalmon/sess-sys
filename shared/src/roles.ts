@@ -6,8 +6,9 @@ import type { CommandName } from './commands.ts'
  * server, where it counts, and on the device, so a button that can't work
  * isn't offered. Everyone signed in reads the company's work, but money:
  * prices, quotes and what's owed reach only the roles that can see them
- * (ADR 0042), and crew rates and private links only the roles that need
- * them (ADR 0046, reading.ts).
+ * (ADR 0042), crew rates and private links only the roles that need
+ * them (ADR 0046, reading.ts), and other people's details, documents and
+ * notes on their time off the office's and heads' (ADR 0062).
  *
  * A role belongs to a staff person on the Crew tab, found by the email
  * their Google account signs in with, as leave already finds "me" (ADR
@@ -39,8 +40,8 @@ export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',
   office: 'Jobs, crew, kit and stock, money, and the settings: calendar, office details, bringing lists in, downloads.',
   head: 'Crew and their bookings, kit on jobs, stock and the warehouse. Not jobs themselves, nor settings.',
-  crew: 'Their own leave and days in lieu, and reporting a fault. Everything else they can look at.',
-  freelancer: "Reporting a fault. Their offers, bookings, timesheets and days off go through their private link; everything else they can look at, but nobody else's pay or link.",
+  crew: "Their own leave and days in lieu, and reporting a fault. They can look at the rest, but nobody else's pay, link, email, notes or documents.",
+  freelancer: "Reporting a fault. Their offers, bookings, timesheets and days off go through their private link; they can look at the rest, but nobody else's pay, link, phone, email, notes or documents.",
 }
 
 /** The kinds of change a role can make. Each command needs exactly one. */

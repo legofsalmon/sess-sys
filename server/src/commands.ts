@@ -3,7 +3,10 @@ import {
   COMMAND_NEEDS,
   commandSchemas,
   RATES_REFUSAL,
+  RATES_REFUSAL_DEPARTMENT,
+  departmentForRole,
   readingFor,
+  readsRatesIn,
   refusalFor,
   roleMayRun,
   setsRates,
@@ -88,6 +91,35 @@ async function mayChangeLink(q: Queryable, reading: Reading, name: CommandName, 
   return !rows[0] || readsLinkOf(reading, { id, department: rows[0].department })
 }
 
+/**
+ * The department of what a change sets or keeps a rate on, for a head who
+ * reads only their own department's rates (ADR 0062): a call's (as sent, or
+ * as its role suggests), a booking's call's, or a person's. Undefined for a
+ * change that touches no rate.
+ */
+async function rateDepartmentOf(q: Queryable, name: CommandName, args: unknown): Promise<{ department: string | null } | undefined> {
+  const a = (args ?? {}) as { id?: string; role?: string; department?: string | null }
+  const one = async (sql: string) => {
+    const { rows } = await q.query<{ department: string | null }>(sql, [a.id])
+    return rows[0] ? { department: rows[0].department } : undefined
+  }
+  switch (name) {
+    case 'call.create':
+      return { department: a.department ?? departmentForRole(a.role ?? '') }
+    case 'call.update':
+      return a.department !== undefined ? { department: a.department } : one('SELECT department FROM crew_calls WHERE id = $1')
+    case 'offer.confirm':
+    case 'timesheet.send':
+    case 'timesheet.approve':
+    case 'timesheet.reopen':
+      return one('SELECT c.department FROM offers o JOIN crew_calls c ON c.id = o.call_id WHERE o.id = $1')
+    case 'person.upsert':
+      return (await one('SELECT department FROM people WHERE id = $1')) ?? { department: a.department ?? null }
+    default:
+      return undefined
+  }
+}
+
 /** Where a command came from, kept on it for the history (ADR 0006). */
 export interface From {
   /**
@@ -135,9 +167,11 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
   // included: a resend gets the same answer anyway, and the rest of the push carries on.
   if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
 
-  // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them.
+  // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them, and then only
+  // their own department's (ADR 0062), so for a change to another department's call, booking or person, not at all.
   const reading = readingFor(from.role, { ...from.reader, headsSeeRates: from.role === 'head' && (await headsSeeRates(tx)) })
-  const seesRates = reading.rates
+  const target = reading.ratesBy === 'department' ? await rateDepartmentOf(tx, m.name, m.args) : undefined
+  const seesRates = reading.rates && (!target || readsRatesIn(reading, target.department))
   const ctx: Ctx = {
     tx,
     mutationId: m.id,
@@ -166,7 +200,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid request.' } }
   } else if (!seesRates && setsRates(m.name, parsed.data)) {
     // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
-    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: RATES_REFUSAL } }
+    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: reading.rates ? RATES_REFUSAL_DEPARTMENT : RATES_REFUSAL } }
   } else if (!(await mayChangeLink(tx, reading, m.name, parsed.data))) {
     // A new link for someone is for a role that reads their link (ADR 0046).
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: LINKS_REFUSAL } }

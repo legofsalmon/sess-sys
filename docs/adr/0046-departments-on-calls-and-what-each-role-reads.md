@@ -141,7 +141,10 @@ the crew screens for everyone.
 ## Open
 
 - **Phones and certificates are still read by all staff** (ADR 0034).
-  Rated 2: the warehouse and crew chiefs ring crew on the day.
+  Rated 2: the warehouse and crew chiefs ring crew on the day. Closed by
+  [ADR 0062](0062-what-crew-and-freelancers-read-of-other-people.md):
+  documents and everything but the phone are narrowed, and heads' rates to
+  their department.
 - **Rate-free roles can't fill in a timesheet for someone.** The office
   does. Rated 1: heads of department haven't asked to.
 - **A department is one per call.** A call needing a sound tech who can

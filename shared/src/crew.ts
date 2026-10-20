@@ -251,6 +251,12 @@ export const person = z.object({
    */
   rateHidden: z.boolean().optional(),
   linkHidden: z.boolean().optional(),
+  /**
+   * Set by the server on what it sends staff crew and freelancers (ADR
+   * 0062): someone else's email, notes and company are left out, and for a
+   * freelancer their phone too. Never stored.
+   */
+  detailsHidden: z.boolean().optional(),
 })
 export type Person = z.infer<typeof person>
 

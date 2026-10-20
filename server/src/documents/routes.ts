@@ -1,4 +1,6 @@
 import {
+  DOCUMENTS_REFUSAL,
+  readsDocumentOf,
   cleanText,
   DOCUMENT_KINDS,
   DOCUMENT_TITLES,
@@ -25,6 +27,7 @@ import { getPerson, personByToken } from '../crew/store.ts'
 import type { Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { Refused } from '../kernel.ts'
+import { readingOf } from '../reading.ts'
 import { linkSend, officeFile } from './actions.ts'
 import { FileGone, FileLocked, NotKept, type DocumentFiles } from './files.ts'
 import { NotAForm, readForm } from './form.ts'
@@ -111,6 +114,8 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
     scope.get('/api/documents/:id/file', async (req: OfficeReq, reply) => {
       const doc = await getDocument(db, req.params.id)
       if (!doc) return reply.code(404).send({ error: 'That document is no longer there.' })
+      // Someone else's certificate or insurance is for the office, directors and heads (ADR 0062), as the feed sends it.
+      if (!readsDocumentOf(await readingOf(db.reads, req.role, req.reader ?? {}), doc)) return reply.code(403).send({ error: DOCUMENTS_REFUSAL })
       const key = await fileKeyOf(db, doc.id)
       if (!key || !doc.file) return reply.code(404).send({ error: "There's no file for this document yet." })
       if (!files.on) return reply.code(409).send({ error: "The file is in the storage bucket, which isn't set up on this server." })

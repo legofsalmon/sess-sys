@@ -1,4 +1,4 @@
-import { LIVE, NOTICE_WHY, type Notice, type NoticesPage } from '@sh/shared'
+import { LIVE, NOTICE_WHY, readsEveryRate, type Notice, type NoticesPage } from '@sh/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { HAS_EMAIL } from './crew/store.ts'
 import type { Db, Queryable } from './db.ts'
@@ -56,7 +56,7 @@ interface Hit {
 }
 
 /** The changes, newest first, that others made to what's this reader's own. */
-export async function readNotices(q: Queryable, reader: NoticeReader, rates = true): Promise<Notice[]> {
+export async function readNotices(q: Queryable, reader: NoticeReader, rates = true, notes = true): Promise<Notice[]> {
   const user = reader.userId ?? null
   const person = reader.personId ?? null
   // What they did themselves, wherever they did it.
@@ -110,7 +110,7 @@ export async function readNotices(q: Queryable, reader: NoticeReader, rates = tr
   if (hits.length === 0) return []
   const { rows } = await q.query<Row>(`${SELECT} WHERE m.id = ANY($1::text[]) ORDER BY m.received_at DESC, m.id DESC`, [hits.map((h) => h.id)])
   const byId = new Map(hits.map((h) => [h.id, h]))
-  const entries = await toEntries(q, rows, rates)
+  const entries = await toEntries(q, rows, rates, notes)
   return entries.map((e) => {
     const hit = byId.get(e.id)!
     const [entity, ...rest] = hit.about.split(':')
@@ -160,9 +160,9 @@ export function registerNoticeRoutes(app: FastifyInstance, { db }: { db: Db }) {
   app.get<{ Querystring: { client?: string } }>('/api/notices', async (req, reply): Promise<NoticesPage> => {
     reply.header('cache-control', 'no-store')
     const reader = await readerOf(db, req, req.query.client)
-    // In the history's words, without crew pay for a role that doesn't see it (ADR 0046).
-    const { rates } = await readingOf(db.reads, req.role, req.reader ?? {})
-    const [notices, upTo] = await Promise.all([readNotices(db.reads, reader, rates), readUpTo(db.reads, reader)])
+    // In the history's words, without crew pay for a role that doesn't see every rate (ADR 0046, ADR 0062).
+    const reading = await readingOf(db.reads, req.role, req.reader ?? {})
+    const [notices, upTo] = await Promise.all([readNotices(db.reads, reader, readsEveryRate(reading), (reading.details ?? 'all') === 'all'), readUpTo(db.reads, reader)])
     return { notices, readUpTo: upTo, found: reader.personId !== undefined }
   })
 

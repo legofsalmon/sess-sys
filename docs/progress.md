@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 19 October 2026: what crew and freelancers read of other people
+
+**Done**
+
+- Reading narrowed further, in [Decision 0062](adr/0062-what-crew-and-freelancers-read-of-other-people.md)
+  (Colly's "limit what each role can see"). Rates, money and private links
+  were already narrowed (Decisions 0042 and 0046); now staff crew read a
+  colleague's phone but not their email, notes or company, and a signed-in
+  freelancer none of it. Other people's certificates and insurance, and
+  their files, go only to the office, directors and heads. Time off, running
+  late and answers to offers keep their days and lose what was written, in
+  the feed, the history and the notifications. A head allowed to see rates
+  sees their own department's, and can set only those. All on the server;
+  each screen says what's hidden.
+- Checked: typecheck, all tests (new unit and server tests).
+
 ## 19 October 2026, night: one place for a whole stock list
 
 **Done**
