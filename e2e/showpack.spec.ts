@@ -73,7 +73,7 @@ test('the crew chief’s show pack, for a phase and, with no signal, for the who
   // The running order as acts, the kit with the number out, and who to ring.
   expect(pack['running-order.csv']).toContain(',Doors,,')
   // Seven lines, one order for each of the phase's two days.
-  expect(pack['running-order.csv'].trim().split('\r\n')).toHaveLength(15)
+  expect(pack['running-order.csv']!.trim().split('\r\n')).toHaveLength(15)
   expect(pack['kit.csv']).toMatch(new RegExp(`audio,Speakers,d&b Y10P,12,0,,1,${number}`))
   expect(pack['contacts.csv']).toContain('Contact on the day,Aoife Brennan')
   expect(pack['crew-list.html']).toContain('<svg')
