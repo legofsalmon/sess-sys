@@ -5,6 +5,7 @@ import { emptySnapshot, FEED, MemoryStorage, PUSH_LIMIT, PUSH_SLICE, SyncClient,
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp, type AppOptions } from '../src/app.ts'
+import { OLDER_APP } from '../src/commands.ts'
 import { pgliteDb, type Db, type Queryable } from '../src/db.ts'
 
 /**
@@ -293,6 +294,20 @@ describe('a command the app no longer has', () => {
     // Sent again, as a phone does until it hears back: the same answer, and still nothing kept.
     expect((await push()).json().results.slice(0, 2)).toEqual([{ id: 'old', ...refused }, { id: 'odd', ...refused }])
     expect((await app.inject('/api/export')).json().mutations).toHaveLength(1)
+  })
+
+  it('says plainly the app needs updating when a change leaves out something this version needs', async () => {
+    // Proves: a field an older version of the app didn't send is answered in words that say what to do, not "Required"
+    // (audit, P3: words); a value that's wrong keeps its own reason.
+    const app = await server()
+    const createdAt = new Date().toISOString()
+    const older = { id: 'older', name: 'place.upsert', args: { id: 'a9', name: 'Bay A9' }, createdAt }
+    const wrong = { id: 'wrong', name: 'place.upsert', args: { id: 'a9', name: 42, notes: '' }, createdAt }
+    const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'old-phone', mutations: [older, wrong] } })
+    const [first, second] = res.json().results
+    expect(first.reason).toEqual({ code: 'invalid', message: OLDER_APP })
+    expect(OLDER_APP).toContain('older version of the app')
+    expect(second.reason.message).not.toBe(OLDER_APP)
   })
 
   it('leaves a phone still on the old version working: its sync test records sit unused and its waiting booking becomes a problem', async () => {
