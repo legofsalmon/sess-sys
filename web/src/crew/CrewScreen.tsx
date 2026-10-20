@@ -371,8 +371,10 @@ export function CrewScreen() {
 
   return (
     <div className="app crew">
-      <Top view={view} title="Crew" root />
+      {/* Calls is Crew's own screen; People and Timesheets are titled by themselves, as every other page is (audit of 18 October). */}
+      <Top view={view} title="Crew" root={page === 'calls'} />
       <CrewViews view={view} current={page} />
+      {page !== 'calls' && <h1 className="area-title">{page === 'people' ? 'People' : 'Timesheets'}</h1>}
 
       {page === 'timesheets' &&
         (view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
@@ -688,6 +690,9 @@ function GiveDepartment({ view, calls, onGiven }: { view: View; calls: readonly 
 /** Offered, holding or booked: the people a call's one line names. */
 const ON_CALL: readonly OfferView['status'][] = [...OPEN, ...HOLDING]
 
+/** How many on a call are named on its line at rest: the rest are counted, and listed once it's opened. */
+const WHO_SHOWN = 8
+
 /**
  * One crew call. At rest it's one line (audit finding 16): the role, its
  * phase or days and who's on it, with where it stands as a pill beside it
@@ -729,11 +734,14 @@ export function CallCard({
   const filled = call.openDays.length === 0
   const live = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
-  // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn, Niamh Kelly (offered)".
+  // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn, Niamh Kelly (offered)". The first few at rest, then
+  // "and 17 more", which opening the line lists (audit of 18 October, finding 20).
   const onIt = call.offers.filter((o) => o.person && ON_CALL.includes(o.status))
   const who = onIt
+    .slice(0, WHO_SHOWN)
     .map((o) => `${o.person!.name}${o.status === 'confirmed' ? '' : ` (${STATUS[o.status][0].toLowerCase()})`}`)
     .join(', ')
+  const more = onIt.length - WHO_SHOWN
 
   const withdraw = (o: OfferView) => {
     void run(() => client.mutate('offer.cancel', { id: o.id })).then(
@@ -754,12 +762,6 @@ export function CallCard({
           {(!inJob || !call.phaseId) && call.phase && <span className="muted"> · {call.phase}</span>}
           {inJob && !phaseDays && <span className="muted"> · {daysLabel(call.days)}</span>}
         </b>
-        {who && (
-          <span className="who-line">
-            <Avatars names={onIt.map((o) => o.person!.name)} />
-            <span>{who}</span>
-          </span>
-        )}
       </button>
       {/* The one word at rest on where it stands: a cancelled call kept for the record says so, and a change to it or an offer on it still on its way says that. */}
       <StatusPill tone={!live ? 'cancelled' : filled ? 'confirmed' : 'pending'} pending={call.pending || call.offers.some((o) => o.pending)}>
@@ -769,6 +771,26 @@ export function CallCard({
             ? 'Filled'
             : heldLabel(call)}
       </StatusPill>
+      {/* Under the line at the card's full width, not squeezed beside the pill into a column of one word a line (audit of 18 October, finding 20). */}
+      {who && (
+        <p className="who-line">
+          <Avatars names={onIt.map((o) => o.person!.name)} />
+          <span>
+            {who}
+            {more > 0 &&
+              (open ? (
+                ` and ${more} more`
+              ) : (
+                <>
+                  {' '}
+                  <button type="button" className="link" aria-expanded={false} onClick={() => setOpen(true)}>
+                    and {more} more
+                  </button>
+                </>
+              ))}
+          </span>
+        </p>
+      )}
       {/* Lines that need acting on stay out at rest (audit finding 16): anyone short of a certificate it needs, and anyone running late (ADR 0028). */}
       {certificateWarnings(call, today).map((w) => (
         <p key={w} className="warn-line">
