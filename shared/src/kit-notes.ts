@@ -215,7 +215,8 @@ export interface KitMatch {
   likely: string[]
 }
 
-type Product = Pick<Model, 'id' | 'name' | 'department'>
+/** A product as matched: its other names (ADR 0069) are matched as its name is. */
+type Product = Pick<Model, 'id' | 'name' | 'department'> & { aliases?: readonly string[] }
 
 /** Pairs of letters, for a forgiving comparison. */
 function pairs(s: string): Map<string, number> {
@@ -248,15 +249,16 @@ interface Indexed {
   size: number
 }
 
-function indexOf(p: Product): Indexed {
-  const key = kitKey(p.name)
+function indexOf(p: Product, other?: string): Indexed {
+  const key = kitKey(other ?? p.name)
   const words = key.split(' ').filter(Boolean)
   const squashed = squash(key)
   return {
     p,
     key,
     squashed,
-    model: words.length > 1 ? squash(words.slice(1).join(' ')) : undefined,
+    // An other name is a name as a whole: "Beta 58" is no maker and a model.
+    model: !other && words.length > 1 ? squash(words.slice(1).join(' ')) : undefined,
     codes: words.filter((w) => w.length >= 2 && /\d/.test(w) && /[a-z]/.test(w)),
     pairs: pairs(squashed),
     size: Math.max(0, squashed.length - 1),
@@ -277,9 +279,11 @@ export class KitMatcher {
   private readonly cache = new Map<string, Omit<KitMatch, 'notKit'>>()
 
   constructor(products: readonly Product[]) {
-    this.all = products.map(indexOf)
+    // A product once for its name and once for each other name it goes by: every name before any other name, so another
+    // product's other name never takes the place of a name.
+    this.all = [...products.map((p) => indexOf(p)), ...products.flatMap((p) => (p.aliases ?? []).map((n) => indexOf(p, n)))]
     for (const x of this.all) {
-      this.byKey.set(x.key, x)
+      if (!this.byKey.has(x.key)) this.byKey.set(x.key, x)
       if (!this.bySquashed.has(x.squashed)) this.bySquashed.set(x.squashed, x)
       if (x.model) this.byModel.set(x.model, [...(this.byModel.get(x.model) ?? []), x])
       for (const c of x.codes) this.byCode.set(c, [...(this.byCode.get(c) ?? []), x])
@@ -302,7 +306,11 @@ export class KitMatcher {
     const exact = this.byKey.get(key) ?? this.bySquashed.get(squashed)
     if (exact) return { how: 'name', modelId: exact.p.id, likely: [exact.p.id] }
     // Where there's a choice, the product in the department the line's heading names.
-    const pick = (xs: Indexed[]) => (xs.length === 1 ? xs[0] : xs.filter((x) => x.p.department === section).length === 1 ? xs.find((x) => x.p.department === section) : undefined)
+    const pick = (all: Indexed[]) => {
+      // A product once, though it may be here by more than one of its names.
+      const xs = all.filter((x, i) => all.findIndex((y) => y.p.id === x.p.id) === i)
+      return xs.length === 1 ? xs[0] : xs.filter((x) => x.p.department === section).length === 1 ? xs.find((x) => x.p.department === section) : undefined
+    }
     const model = this.byModel.get(squashed)
     const byModel = model && pick(model)
     if (byModel) return { how: 'code', modelId: byModel.p.id, likely: [byModel.p.id] }
@@ -312,7 +320,8 @@ export class KitMatcher {
     // The ones most like it, by letters shared, with a word of the line's in the product's name, or the heading's department, counted for it.
     const own = pairs(squashed)
     const size = Math.max(0, squashed.length - 1)
-    const scored = this.all
+    const best = new Map<string, { x: Indexed; score: number }>()
+    for (const s of this.all
       .map((x) => {
         let score = alike(own, size, x.pairs, x.size)
         if (x.model && squashed.includes(x.model) && x.model.length >= 3) score = Math.max(score, 0.62)
@@ -320,14 +329,18 @@ export class KitMatcher {
         if (section && x.p.department === section) score += 0.04
         return { x, score }
       })
-      .filter((s) => s.score >= SUGGEST)
-      .sort((a, b) => b.score - a.score || a.x.p.name.localeCompare(b.x.p.name))
+      .filter((s) => s.score >= SUGGEST)) {
+      // A product once, by whichever of its names is most like the line.
+      const was = best.get(s.x.p.id)
+      if (!was || s.score > was.score) best.set(s.x.p.id, s)
+    }
+    const scored = [...best.values()].sort((a, b) => b.score - a.score || a.x.p.name.localeCompare(b.x.p.name))
     const likely = [...new Set([...(byCode ? [byCode.p.id] : []), ...scored.slice(0, 4).map((s) => s.x.p.id)])].slice(0, 4)
     if (byCode) return { how: 'code', modelId: byCode.p.id, likely }
-    const best = scored[0]
+    const top = scored[0]
     // Two nearly as good is a choice to make, not a guess to go with.
-    const clear = best && best.score >= LIKELY && !(scored[1] && scored[1].score > best.score - 0.05)
-    if (clear) return { how: 'close', modelId: best.x.p.id, likely }
+    const clear = top && top.score >= LIKELY && !(scored[1] && scored[1].score > top.score - 0.05)
+    if (clear) return { how: 'close', modelId: top.x.p.id, likely }
     return { how: 'none', modelId: undefined, likely }
   }
 }
@@ -337,7 +350,7 @@ let matchers: { sig: string; matcher: KitMatcher }[] = []
 
 /** The matcher for this stock list, made once. */
 export function matcherFor(products: readonly Product[]): KitMatcher {
-  const sig = products.map((p) => `${p.id}\u0001${p.name}\u0001${p.department}`).join('\u0002')
+  const sig = products.map((p) => `${p.id}\u0001${p.name}\u0001${p.department}\u0001${(p.aliases ?? []).join('\u0003')}`).join('\u0002')
   const found = matchers.find((m) => m.sig === sig)
   if (found) return found.matcher
   const matcher = new KitMatcher(products)

@@ -35,6 +35,7 @@ import { ROLE_LABELS, type Role } from '@sh/shared'
 import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
+import { aliasesOf } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -626,6 +627,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.patMonths !== undefined) parts.push(typeof a.patMonths === 'number' ? `a PAT every ${monthsText(a.patMonths)}` : 'no PAT')
       if (a.liftingMonths !== undefined)
         parts.push(typeof a.liftingMonths === 'number' ? `a thorough examination every ${monthsText(a.liftingMonths)}` : 'no thorough examination')
+      if (Array.isArray(a.aliases))
+        parts.push(a.aliases.length ? `other names to ${aliasesOf(a.aliases.filter((x) => typeof x === 'string').join(',')).join(', ')}` : 'no other names')
       return `Changed the product ${model(a.id)}: ${inWords(parts)}`
     }
     case 'model.remove':

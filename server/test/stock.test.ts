@@ -256,6 +256,22 @@ describe('cases', () => {
 })
 
 describe('products and places', () => {
+  it('keeps the other names a product goes by, tidied, and says so in the history (ADR 0069)', async () => {
+    const { app, db, y10p } = await warehouse()
+    expect((await all<Model>(app, 'model')).get(y10p.id)?.aliases).toEqual([])
+    await ok(app, 'model.update', { id: y10p.id, aliases: ['Wedge ', 'wedge', 'd&b Y10P', 'Y10'] })
+    expect((await all<Model>(app, 'model')).get(y10p.id)?.aliases).toEqual(['Wedge', 'Y10'])
+    await ok(app, 'model.create', product('Shure SM58', { aliases: ['58'] }))
+    expect([...(await all<Model>(app, 'model')).values()].find((m) => m.name === 'Shure SM58')?.aliases).toEqual(['58'])
+    await ok(app, 'model.update', { id: y10p.id, aliases: [] })
+    expect((await all<Model>(app, 'model')).get(y10p.id)?.aliases).toEqual([])
+    const { entries } = await readHistory(db)
+    expect(entries.filter((e) => e.command === 'model.update').map((e) => e.what)).toEqual([
+      'Changed the product d&b Y10P: no other names',
+      'Changed the product d&b Y10P: other names to Wedge, d&b Y10P, Y10',
+    ])
+  })
+
   it('keeps names unique and removes only what has nothing left', async () => {
     const { app, y10p, xlr, bay } = await warehouse()
     expect(await refused(app, 'model.create', product('D&B y10p'))).toBe("There's already a product called d&b Y10P.")

@@ -3,7 +3,7 @@ import type { Queryable } from '../db.ts'
 
 /** Reading warehouse rows back as the records devices see (ADR 0013). */
 
-const MODEL = `id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, mistake`
+const MODEL = `id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, mistake, aliases`
 const PLACE = `id, name, notes`
 const STOCK = `id, model_id, place_id, case_id, qty`
 // An item with its current number and the ones it had before, oldest first.
@@ -26,6 +26,7 @@ export const toModel = (r: Row): Model => ({
   patMonths: r.pat_months,
   liftingMonths: r.lifting_months,
   mistake: r.mistake,
+  aliases: r.aliases ?? [],
 })
 export const toPlace = (r: Row): Place => ({ id: r.id, name: r.name, notes: r.notes })
 export const toStock = (r: Row): Stock => ({ id: r.id, modelId: r.model_id, placeId: r.place_id, caseId: r.case_id, qty: r.qty })

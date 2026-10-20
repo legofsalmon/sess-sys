@@ -4,7 +4,9 @@ import {
   DEPARTMENTS,
   euroText,
   INSPECTION_MONTHS,
+  aliasesOf,
   MAX_MONTHS,
+  MOST_ALIASES,
   MAX_QTY,
   newId,
   normaliseNumber,
@@ -150,6 +152,12 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
         <Pending pending={m.pending} />
       </header>
       <dl className="facts">
+        {m.aliases.length > 0 && (
+          <div>
+            <dt>Also called</dt>
+            <dd>{m.aliases.join(', ')}</dd>
+          </div>
+        )}
         <div>
           <dt>Department</dt>
           <dd>{DEPARTMENT_LABELS[m.department]}</dd>
@@ -275,6 +283,7 @@ function monthsTyped(text: string): number | null {
 function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone: () => void }) {
   const [f, setF] = useState({
     name: m.name,
+    aliases: m.aliases.join(', '),
     department: m.department,
     category: m.category,
     tracking: m.tracking,
@@ -289,6 +298,9 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     e.preventDefault()
     const name = f.name.trim()
     if (!name) return
+    const aliases = aliasesOf(f.aliases, name)
+    if (aliases.length > MOST_ALIASES) return refuse(`Up to ${MOST_ALIASES} other names, please.`)
+    if (aliases.some((a) => a.length > 100)) return refuse('Another name can be up to 100 letters.')
     const taken = w.models.find((x) => x.id !== m.id && x.name.trim().toLowerCase() === name.toLowerCase())
     if (taken) return refuse(`There's already a product called ${taken.name}.`)
     const value = parseEuro(f.value)
@@ -318,6 +330,7 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     }
     const changes: Partial<CommandInput<'model.update'>> = {}
     for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== m[k]) (changes as Record<string, unknown>)[k] = next[k]
+    if (aliases.join('\n') !== m.aliases.join('\n')) changes.aliases = aliases
     if (Object.keys(changes).length === 0) return onDone()
     void run(() => client.mutate('model.update', { id: m.id, ...changes })).then((ok) => ok && onDone())
   }
@@ -326,6 +339,17 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     <form className="grid-form" onSubmit={save}>
       <label className="wide">
         Name <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
+      </label>
+      <label className="wide">
+        Other names it goes by
+        <input
+          value={f.aliases}
+          onChange={(e) => setF({ ...f, aliases: e.target.value })}
+          placeholder="e.g. 58, Beta 58"
+          autoComplete="off"
+          aria-describedby="aliases-hint"
+        />
+        <small id="aliases-hint">What crew and job notes call it, with commas between. Adding kit to a job and Kit from the notes find it by these too.</small>
       </label>
       <label>
         Department

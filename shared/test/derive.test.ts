@@ -19,6 +19,7 @@ const TODAY = new Date('2026-10-01T09:00:00Z')
 const day = (n: number) => `2026-10-${String(n).padStart(2, '0')}`
 
 const model = (id: string, name: string): Model => ({
+  aliases: [],
   id,
   name,
   department: 'audio',
