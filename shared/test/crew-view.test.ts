@@ -42,7 +42,7 @@ describe('a pending change to a person', () => {
   it('lays an edit over them like a new person, keeping their link and whether they are archived', () => {
     const edit = pending('person.upsert', { id: 'p1', name: 'Aoife Byrne-Walsh', kind: 'freelancer', email: null, phone: '+353871234568', skills: ['audio', 'rf'], dayRateCents: 27500, notes: 'Has a van' })
     const view = crewView({ person: { p1: { ...aoife, archived: true } } }, [edit], 0)
-    expect(view.people).toEqual([{ ...aoife, name: 'Aoife Byrne-Walsh', email: null, phone: '+353871234568', skills: ['audio', 'rf'], dayRateCents: 27500, notes: 'Has a van', archived: true, pending: true, worked: [] }])
+    expect(view.people).toEqual([{ ...aoife, name: 'Aoife Byrne-Walsh', firstName: 'Aoife', lastName: 'Byrne-Walsh', email: null, phone: '+353871234568', skills: ['audio', 'rf'], dayRateCents: 27500, notes: 'Has a van', archived: true, pending: true, worked: [] }])
     // Once the server has applied it and the device has pulled past it, the server's record stands.
     expect(crewView({ person: { p1: aoife } }, [{ ...edit, appliedSeq: 5 }], 5).people[0]).toMatchObject({ name: 'Aoife Byrne', pending: false })
   })

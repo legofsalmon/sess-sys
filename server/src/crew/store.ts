@@ -1,10 +1,10 @@
-import { DEFAULT_LEVEL, eachDay, HOLDING, tidyNeeds, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
+import { DEFAULT_LEVEL, eachDay, HOLDING, splitName, tidyNeeds, type CrewCall, type Offer, type Person, type Unavailability } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 import { sortByIds } from '../projects/store.ts'
 
 /** Reading crew rows back as the entities devices and pages see. */
 
-const PERSON = `id, name, kind, email, other_emails, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role, photo_at`
+const PERSON = `id, name, first_name, last_name, kind, email, other_emails, phone, skills, day_rate_cents, notes, link_token, archived, approves_leave, department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, role, photo_at`
 const CALL = `id, project_id, phase_id, project, phase, venue, role, start_day::text, end_day::text, call_time, needed, day_rate_cents, details, reply_by::text, status, needs_certificates, department`
 const OFFER = `id, call_id, person_id, status, days, day_rate_cents, counter_rate_cents, note, responded_at, responded_via, override, seen_at`
 const AWAY = `id, person_id, start_day::text, end_day::text, note, source`
@@ -14,6 +14,8 @@ type Row = Record<string, any>
 export const toPerson = (r: Row): Person => ({
   id: r.id,
   name: r.name,
+  // Held since the two were asked for; a row from before is split from the whole name, as its migration split them.
+  ...(r.first_name ? { firstName: r.first_name, lastName: r.last_name ?? '' } : splitName(r.name)),
   kind: r.kind,
   email: r.email,
   // Only once combined with someone (ADR 0055), so a person never combined is sent as before.

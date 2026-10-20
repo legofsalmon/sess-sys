@@ -1,6 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { irishToday } from '../calendar.ts'
-import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, departmentOf, eachDay, HOLDING, LIVE, movedCallSpan, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
+import { certificatesAfter, daysBetween, DEFAULT_LEVEL, departmentForRole, departmentOf, eachDay, HOLDING, LIVE, movedCallSpan, nameParts, namesAfter, offerDaysAfter, OPEN, type CrewCall, type CrewEntities, type Offer, type Person, type Unavailability } from '../crew.ts'
 import { certificateOf, type Document } from '../documents.ts'
 import { STOPPED, type Phase, type Project } from '../jobs.ts'
 import { leaveLabel, type LeaveRequest } from '../leave.ts'
@@ -62,6 +62,8 @@ function changed(a: object): Record<string, unknown> {
 /** A person synced before the profile existed (ADR 0025) reads as not archived, not approving leave, Level 1, with nothing else set. */
 const withDefaults = (p: Person): Person => ({
   ...p,
+  // Split from the whole name for a copy from before the two were asked for.
+  ...nameParts(p),
   archived: p.archived ?? false,
   approvesLeave: p.approvesLeave ?? false,
   department: p.department ?? null,
@@ -138,6 +140,7 @@ export function crewView(
           // Their photo is the server's to set (ADR 0065).
           ...(was?.photo ? { photo: was.photo } : {}),
           ...a,
+          ...namesAfter(a, was),
           dayRateCents: a.dayRateCents !== undefined ? a.dayRateCents : (was?.dayRateCents ?? null),
           ...(a.dayRateCents === undefined && was?.rateHidden ? { rateHidden: true } : {}),
           approvesLeave,

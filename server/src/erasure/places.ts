@@ -168,6 +168,8 @@ export const RECORDS: Record<PersonRecord, { table: string; madeBy: CommandName 
  */
 const PERSON_COLUMNS: { [K in Exclude<keyof Person, 'id' | 'kind' | 'company' | 'rateHidden' | 'linkHidden' | 'detailsHidden' | 'photo'>]: string } = {
   name: 'name',
+  firstName: 'first_name',
+  lastName: 'last_name',
   email: 'email',
   otherEmails: 'other_emails',
   phone: 'phone',

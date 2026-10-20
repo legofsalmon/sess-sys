@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { CommandName } from './commands.ts'
-import { DEFAULT_LEVEL, type Person } from './crew.ts'
+import { DEFAULT_LEVEL, nameParts, type Person } from './crew.ts'
 import { irishToday } from './day.ts'
 import { DOCUMENT_ACTIONS, type DocumentAction } from './documents.ts'
 import { OWN_CALENDAR_ACTIONS, type OwnCalendarAction } from './own-calendar.ts'
@@ -163,11 +163,12 @@ export function nameKeptUntil(records: KeptRecords, today: string): string | nul
  * the row a new random one that matches nothing, and devices are sent
  * none.
  */
-export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'>, keepName: boolean): Person {
+export function erasedPerson(p: Pick<Person, 'id' | 'kind' | 'name'> & Partial<Pick<Person, 'firstName' | 'lastName'>>, keepName: boolean): Person {
   return {
     id: p.id,
     kind: p.kind,
     name: keepName ? p.name : ERASED_NAME,
+    ...(keepName ? nameParts(p) : { firstName: ERASED_NAME, lastName: '' }),
     email: null,
     otherEmails: [],
     phone: null,
