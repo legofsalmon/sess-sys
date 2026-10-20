@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addSkills, skillsInUse, suggestSkills } from '../src/skills.ts'
+import { addSkills, firstPick, skillsInUse, suggestSkills } from '../src/skills.ts'
 
 describe('skills in use', () => {
   it('counts each once per person whatever its case, most used first, in the spelling most have', () => {
@@ -17,6 +17,21 @@ describe('suggesting skills', () => {
     expect(suggestSkills(known, 'man', [])).toEqual(['Stage manager'])
     expect(suggestSkills(known, 'au', ['Audio'])).toEqual(['Audio No.2'])
     expect(suggestSkills(known, 'eng', [])).toEqual(['Monitor engineer'])
+  })
+})
+
+describe('the offer Enter takes', () => {
+  it('is the one spelt as typed, else the first starting with it', () => {
+    expect(firstPick(['Audio No.2', 'Audio'], 'audio', [], false)).toBe(1)
+    expect(firstPick(['Audio', 'Audio No.2'], 'au', [], true)).toBe(0)
+  })
+  it('is the new one when none starts with what is typed', () => {
+    expect(firstPick(['Monitor engineer'], 'eng', [], true)).toBe(1)
+    expect(firstPick([], 'Pyro', [], true)).toBe(0)
+  })
+  it('is none with nothing typed, or with what is typed already chosen', () => {
+    expect(firstPick(['Audio'], '  ', [], false)).toBe(-1)
+    expect(firstPick(['Audio No.2'], 'AUDIO', ['Audio'], false)).toBe(-1)
   })
 })
 

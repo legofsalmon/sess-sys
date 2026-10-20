@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: the Skills field, reviewed against the design system
+
+**Done**
+
+- The Skills field ([Decision 0063](adr/0063-skills-as-picks.md)) given a
+  full review against the shared design system (Colly's "give it a full
+  review to align with the style and design guide"). While something is
+  typed one offer is highlighted, the one Enter or a comma takes, the
+  spelling in use before a new one, so "aud" and Enter is Audio. The list
+  scrolls to keep the highlight in sight; Backspace held down to clear
+  what's typed no longer runs on into the chips; each chip added or taken
+  off is said aloud; the highlighted row looks apart from the one under the
+  pointer; and the "Add as a new skill" row is readable when highlighted.
+- Checked: typecheck, all unit tests, the browser tests, contrast of each
+  row in both themes.
+
 ## 20 October 2026: first and last names
 
 **Done**

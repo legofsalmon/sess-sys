@@ -51,6 +51,21 @@ export function suggestSkills(known: readonly string[], typed: string, chosen: r
 }
 
 /**
+ * Which offer Enter takes before Up or Down has moved, so the highlight shows what Enter will do: the one spelt as typed, else
+ * the first starting with it, else the new one (its index is just past the offers). None while nothing is typed, or when
+ * what's typed is already chosen, so Enter there sends the form or says it's already on.
+ */
+export function firstPick(offered: readonly string[], typed: string, chosen: readonly string[], hasNew: boolean): number {
+  const q = typed.trim().toLowerCase()
+  if (!q || chosen.some((s) => s.toLowerCase() === q)) return -1
+  const exact = offered.findIndex((s) => s.toLowerCase() === q)
+  if (exact >= 0) return exact
+  const starts = offered.findIndex((s) => s.toLowerCase().startsWith(q))
+  if (starts >= 0) return starts
+  return hasNew ? offered.length : -1
+}
+
+/**
  * Adds what was typed (one skill, or several pasted with commas) to those
  * chosen: each once, in the crew list's own spelling when it already has
  * one, up to the 30 a person can hold.

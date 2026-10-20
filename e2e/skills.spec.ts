@@ -5,7 +5,8 @@ import { fillName } from './names.ts'
  * Skills as picks (ADR 0063): the Skills field offers what the crew list
  * already calls people, the most used first and in the spelling most have,
  * and takes a new one as typed. Chosen ones sit in the field as chips that
- * come off with their own button or Backspace. The test server is shared
+ * come off with their own button or Backspace, and each one added or taken
+ * off is said in the field's live line. The test server is shared
  * with the other browser tests, so every name here is this run's own.
  */
 
@@ -28,16 +29,40 @@ test('the Skills field offers the skills in use and takes new ones as chips', as
   const name = `Dara Spark ${id}`
   await fillName(form, name)
 
-  // Typing part of it offers the one in use, once, in the spelling most people have; Down and Enter choose it.
+  // Typing part of it offers the one in use, once, in the spelling most people have, highlighted as the one Enter takes
+  // before the new one; Down moves to the new one and Up back.
   const skills = form.getByRole('combobox', { name: 'Skills' })
-  await skills.fill(`pyro${id.slice(0, 3)}`)
+  const part = `pyro${id.slice(0, 3)}`
+  await skills.fill(part)
   const list = form.getByRole('listbox', { name: 'In use' })
-  await expect(list.getByRole('option', { name: pyro, exact: true })).toHaveCount(1)
+  const inUse = list.getByRole('option', { name: pyro, exact: true })
+  await expect(inUse).toHaveCount(1)
+  await expect(inUse).toHaveAttribute('aria-selected', 'true')
   await skills.press('ArrowDown')
+  await expect(list.getByRole('option', { name: `Add “${part}” as a new skill` })).toHaveAttribute('aria-selected', 'true')
+  await skills.press('ArrowUp')
   await skills.press('Enter')
   const chosen = form.getByRole('list', { name: 'Chosen' })
   await expect(chosen.getByRole('listitem')).toHaveText([pyro])
   await expect(skills).toHaveValue('')
+  const said = form.locator('[aria-live="polite"]')
+  await expect(said).toHaveText(`Added ${pyro}. 1 skill.`)
+
+  // A comma after part of one takes the highlighted offer too, and Backspace takes it off again, said aloud.
+  await skills.pressSequentially('rigg,')
+  await expect(chosen.getByRole('listitem')).toHaveText([pyro, 'Rigger'])
+  await skills.press('Backspace')
+  await expect(chosen.getByRole('listitem')).toHaveText([pyro])
+  await expect(said).toHaveText('Removed Rigger. 1 skill.')
+
+  // Backspace held down to clear what's typed stops at the empty field rather than running on into the chips.
+  await skills.fill('ab')
+  await page.keyboard.down('Backspace')
+  await page.keyboard.down('Backspace')
+  await page.keyboard.down('Backspace')
+  await page.keyboard.up('Backspace')
+  await expect(skills).toHaveValue('')
+  await expect(chosen.getByRole('listitem')).toHaveText([pyro])
 
   // A new one goes in as typed with a comma, Backspace takes it off again, and its own button takes one off too.
   await skills.pressSequentially(`Forklift ${id},`)
