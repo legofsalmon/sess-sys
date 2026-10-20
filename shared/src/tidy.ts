@@ -104,10 +104,12 @@ export function sameJobs(all: readonly TidyJob[]): SameJob[] {
 /**
  * Someone a bring-in named from their address (audit finding 7):
  * "Craicaudio" from craicaudio@gmail.com. Their name is still exactly what
- * the address gave, so nobody has given them theirs yet.
+ * the address gave, so nobody has given them theirs yet. Once the office
+ * has named or checked them (ADR 0068) they're named, even where the name
+ * is what the address spells.
  */
-export function namedFromAddress(p: Pick<Person, 'name' | 'email' | 'archived'>): boolean {
-  if (!p.email || p.archived) return false
+export function namedFromAddress(p: Pick<Person, 'name' | 'email' | 'archived'> & Partial<Pick<Person, 'nameChecked'>>): boolean {
+  if (!p.email || p.archived || p.nameChecked) return false
   return nameKey(p.name) === nameKey(nameFromEmail(p.email))
 }
 

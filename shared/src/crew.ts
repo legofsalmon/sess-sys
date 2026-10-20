@@ -328,6 +328,12 @@ export const person = z.object({
    * initials. Not sent to a reader who doesn't read their details.
    */
   photo: z.object({ at: z.string() }).nullable().optional(),
+  /**
+   * Their name was given or checked in Jobs › Tidy up (ADR 0068), so it's
+   * theirs even where it's what their address spells ("Aoife Byrne" from
+   * aoife.byrne@…). Sent only once true; none is not yet.
+   */
+  nameChecked: z.boolean().optional(),
 })
 export type Person = z.infer<typeof person>
 
@@ -511,6 +517,8 @@ export const crewCommandSchemas = {
     knownAs: knownAs.optional(),
     certificates: certificates.optional(),
     company: company.nullable().optional(),
+    /** True from Jobs › Tidy up when the office names someone (ADR 0068). Never unset: left out or false, what the server has stays. */
+    nameChecked: z.boolean().optional(),
   }),
   /** Move a person up or down a level from their card, so the history says so by name (ADR 0025). */
   'person.level': z.object({ id, level }),

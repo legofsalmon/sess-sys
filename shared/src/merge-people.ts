@@ -40,7 +40,7 @@ export const mergeCommandSchemas = {
 }
 
 /** A name the bring-in made from their address, archived or not ("Craicaudio" from craicaudio@gmail.com), as Tidy up finds them. */
-const namedFromAddress = (p: Pick<Person, 'name' | 'email'>) => !!p.email && nameKey(p.name) === nameKey(nameFromEmail(p.email))
+const namedFromAddress = (p: Pick<Person, 'name' | 'email' | 'nameChecked'>) => !!p.email && !p.nameChecked && nameKey(p.name) === nameKey(nameFromEmail(p.email))
 
 /** An address as it's matched: trimmed, in any case. */
 export const emailKey = (e: string | null | undefined) => (e ?? '').trim().toLowerCase()
@@ -119,6 +119,8 @@ export function mergedPerson(into: Person, from: readonly Person[]): Person {
     certificates,
     company: first((p) => p.company),
     role: into.kind === 'staff' ? first((p) => (p.kind === 'staff' ? p.role : null)) : null,
+    // Checked (ADR 0068) when the name kept is one the office checked.
+    ...((realName ?? into).nameChecked ? { nameChecked: true } : {}),
   }
 }
 

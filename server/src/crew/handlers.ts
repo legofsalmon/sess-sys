@@ -309,13 +309,13 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     const dayRateCents = a.dayRateCents === undefined || ctx.seesRates === false ? (was?.dayRateCents ?? null) : a.dayRateCents
     await ctx.tx.query(
       `INSERT INTO people (id, name, kind, email, phone, skills, day_rate_cents, notes, link_token, approves_leave,
-                           department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, first_name, last_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                           department, level, known_as, certificates, company_name, company_vat_number, company_cro_number, first_name, last_name, name_checked)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, kind = EXCLUDED.kind, email = EXCLUDED.email,
          phone = EXCLUDED.phone, skills = EXCLUDED.skills, day_rate_cents = EXCLUDED.day_rate_cents, notes = EXCLUDED.notes,
          approves_leave = EXCLUDED.approves_leave, department = EXCLUDED.department, level = EXCLUDED.level, known_as = EXCLUDED.known_as,
          certificates = EXCLUDED.certificates, company_name = EXCLUDED.company_name, company_vat_number = EXCLUDED.company_vat_number,
-         company_cro_number = EXCLUDED.company_cro_number`,
+         company_cro_number = EXCLUDED.company_cro_number, name_checked = EXCLUDED.name_checked`,
       [
         a.id,
         names.name,
@@ -336,6 +336,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
         company?.croNumber ?? null,
         names.firstName,
         names.lastName,
+        // Once the office has checked their name (ADR 0068) it stays checked.
+        a.nameChecked === true || (was?.nameChecked ?? false),
       ]
     )
     await emit(ctx, 'person', a.id, await getPerson(ctx.tx, a.id))

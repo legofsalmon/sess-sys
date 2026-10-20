@@ -71,6 +71,11 @@ describe('people named from their address', () => {
     expect(namedFromAddress({ name: 'Ciarán Doyle', email: 'ciandoeslights@gmail.com', archived: false })).toBe(false)
     expect(namedFromAddress({ name: 'Info', email: 'info@sessionhire.com', archived: true })).toBe(false)
   })
+
+  it('lets go of one the office named, even where the address spells their name (ADR 0068)', () => {
+    expect(namedFromAddress({ name: 'Aoife Byrne', email: 'aoife.byrne@gmail.com', archived: false })).toBe(true)
+    expect(namedFromAddress({ name: 'Aoife Byrne', email: 'aoife.byrne@gmail.com', archived: false, nameChecked: true })).toBe(false)
+  })
 })
 
 describe('venues and clients from names', () => {
