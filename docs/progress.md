@@ -17,6 +17,18 @@ waiting on someone.
 - Checked: typecheck, all unit and server tests, the kit, notes, pick list,
   faults and inspections browser tests, one new test typing part of a name.
 
+## 20 October 2026: To sort out, from today on
+
+**Done**
+
+- Jobs › Week and Month: "To sort out" no longer lists clashes and checks
+  on days gone; the day itself still shows them. Notifications now open
+  with the clashes and checks from today to four weeks out, for anyone who
+  books crew ([Decision 0069](adr/0069-to-sort-out-today-and-ahead.md),
+  Colly's ask).
+- Checked: typecheck and unit tests, with a test that a day gone leaves
+  the list but keeps its mark.
+
 ## 20 October 2026: saving names in Tidy up
 
 **Done**

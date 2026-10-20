@@ -10,6 +10,7 @@ import {
   phaseCode,
   plan,
   SyncClient,
+  sortOutDays,
   weekOf,
   type CallView,
   type CommandInput,
@@ -220,6 +221,14 @@ describe('the week by person', () => {
     ])
     // Everyone has a row, busy or not, by name.
     expect(week.people.map((l) => l.person.name)).toEqual(['Aoife Byrne', 'Conor Walsh', 'Dara Nolan', 'Niamh Kelly'])
+
+    // Once Tuesday has gone it's history: the day still says so, the list to sort out doesn't (ADR 0069).
+    const later = plan(await synced(app), weekOf(MON!), WED!)
+    expect(later.problems).toEqual([])
+    expect(later.people.find((l) => l.person.id === aoife)!.days[TUE!]!.severity).toBe('clash')
+    // The notifications look from today to four weeks out.
+    expect(sortOutDays(TUE!)).toHaveLength(28)
+    expect(plan(await synced(app), sortOutDays(TUE!), TUE!).problems.map((x) => x.day)).toEqual([TUE, TUE])
   })
 
   it('counts someone booked on two calls on one day as a clash, and leaves out answers that hold nothing', () => {
