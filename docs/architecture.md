@@ -152,6 +152,18 @@ also work for other companies, so the system bends to them instead:
        S3-compatible bucket: the nightly backups and documents' files
 ```
 
+A new device doesn't replay the whole feed: its first pull asks with
+`latest=new` and is sent only the latest change of each record, with the
+deletes from before its copy began left out, page by page, each page read
+in one statement with how far the feed went, so nothing committed during
+the read is skipped. After that it reads the feed as before. The
+WebSocket carries a `beat` every 25 s; a device that hears nothing for
+60 s pulls and reconnects, and it polls every 30 s only while the live
+connection is down. The app's version comes from `version.json` beside
+the page, not from the code, so a deploy that changes no screen changes
+no file a phone has to download again
+([ADR 0064](adr/0064-the-audits-p2-and-p3s.md)).
+
 What the first sketch had and the code doesn't, yet: SQLite on the device
 (IndexedDB holds the copy; `web/src/storage.ts`), a sequence number per
 scope (there is one feed, and every device reads all of it but what its
