@@ -19,13 +19,12 @@ import { redact, type ClientConfig } from '@sh/shared'
  * Nothing about the person, what they typed or what the app was showing.
  */
 
-declare const __APP_VERSION__: string
-
-export function start({ dsn, environment }: NonNullable<ClientConfig['errors']>) {
+/** `release` is the build's version (version.ts). */
+export function start({ dsn, environment }: NonNullable<ClientConfig['errors']>, release: string) {
   init({
     dsn,
     environment,
-    release: __APP_VERSION__,
+    release,
     // Only the integrations that catch errors: no breadcrumbs of clicks, typing or requests.
     defaultIntegrations: false,
     integrations: [
