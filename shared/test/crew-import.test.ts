@@ -98,7 +98,7 @@ describe('a row of the crew list', () => {
     expect(dara).toEqual({
       row: 2,
       name: 'Dara Quinn',
-      // In two, as the file's own columns have it (ADR 0063).
+      // In two, as the file's own columns have it (ADR 0066).
       firstName: 'Dara',
       lastName: 'Quinn',
       kind: 'freelancer',

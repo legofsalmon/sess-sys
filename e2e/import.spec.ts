@@ -258,7 +258,7 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(people.getByRole('checkbox', { name: 'Add Aoife Byrne' })).toBeChecked()
   await expect(people.getByRole('checkbox', { name: 'Add Seán Murphy' })).toBeChecked()
   await expect(people.getByRole('checkbox', { name: 'Add Client' })).not.toBeChecked()
-  // Each name in two (ADR 0063), split from what Google had: a first name is needed.
+  // Each name in two (ADR 0066), split from what Google had: a first name is needed.
   const handle = people.getByRole('listitem').filter({ has: page.getByRole('textbox', { name: 'First name for craicaudio@gmail.com' }) })
   await expect(handle).toContainText('Named from their address: give them their name.')
   await expect(people.getByRole('textbox', { name: 'Last name for aoife.byrne@gmail.com' })).toHaveValue('Byrne')

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { firstName, fullName, nameParts, namesAfter, namesOfRow, readCrewList, splitName } from '../src/index.ts'
 
-/** A first and a last name in place of one name (ADR 0063). */
+/** A first and a last name in place of one name (ADR 0066). */
 describe('a name in two', () => {
   it('is split at the last name, with the words that start one', () => {
     expect(splitName('Aoife Byrne')).toEqual({ firstName: 'Aoife', lastName: 'Byrne' })

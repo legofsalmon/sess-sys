@@ -21,7 +21,7 @@ export interface CrewListPerson extends Pick<Person, 'name' | 'kind' | 'email' |
   dayRate: string
   /**
    * The first and last name, when the file has them in columns of their own
-   * (ADR 0063). They go in only while they still make the name: a name the
+   * (ADR 0066). They go in only while they still make the name: a name the
    * office retyped is split as any other is.
    */
   firstName?: string

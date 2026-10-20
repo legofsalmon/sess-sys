@@ -80,7 +80,7 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
       company: 'company details',
     },
     what: (d) => (typeof d?.name === 'string' && d.name ? d.name : 'this person'),
-    // A copy from before the name was asked for in two (ADR 0063) reads as split, as the server reads the row.
+    // A copy from before the name was asked for in two (ADR 0066) reads as split, as the server reads the row.
     read: (d) => (typeof d.name === 'string' ? { ...d, ...nameParts(d as { name: string; firstName?: string; lastName?: string }) } : d),
   },
   'call.update': {

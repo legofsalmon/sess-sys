@@ -7,7 +7,7 @@ import { pgliteDb } from '../src/db.ts'
 import { readEverything } from '../src/export.ts'
 import { migrateAll } from '../src/modules.ts'
 
-/** A first and a last name in place of one name (ADR 0063): the people already here split on deploy, and the two kept from then on. */
+/** A first and a last name in place of one name (ADR 0066): the people already here split on deploy, and the two kept from then on. */
 
 let cleanup: (() => Promise<void>)[] = []
 afterEach(async () => {

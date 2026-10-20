@@ -63,7 +63,7 @@ const bringBody = lookBody.extend({
       z.object({
         email: z.string().max(320),
         name: z.string().max(200).transform(cleanText).optional(),
-        // The name in two, as the office typed it (ADR 0063); left out by a version of the app from before, and the name is split.
+        // The name in two, as the office typed it (ADR 0066); left out by a version of the app from before, and the name is split.
         firstName: z.string().max(100).transform(cleanText).optional(),
         lastName: z.string().max(100).transform(cleanText).optional(),
         include: z.boolean(),

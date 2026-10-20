@@ -1,4 +1,4 @@
-# ADR 0063: First and last names
+# ADR 0066: First and last names
 
 - **Status:** accepted
 - **Date:** 20 October 2026

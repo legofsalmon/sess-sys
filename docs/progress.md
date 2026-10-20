@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - A person's name is asked for in two, first and last, in
-  [Decision 0063](adr/0063-first-and-last-names.md) (Colly's "first name and
+  [Decision 0066](adr/0066-first-and-last-names.md) (Colly's "first name and
   last name fields whenever name is asked for"): the person form, Tidy up's
   people named from their address, and the people on a calendar bring-in.
   The whole name stays as the two joined, so everything else reads as

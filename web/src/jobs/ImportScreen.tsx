@@ -249,7 +249,7 @@ function Look(p: {
   const [kinds, setKinds] = useState<Record<string, ProjectKind>>(() => ({ ...Object.fromEntries(preview.jobs.map((j) => [j.key, j.kind])), ...p.kept?.kinds }))
   const [skip, setSkip] = useState<ReadonlySet<string>>(() => p.kept?.skip ?? new Set())
   const [people, setPeople] = useState<ReadonlySet<string>>(() => p.kept?.people ?? new Set(preview.people.filter((x) => x.suggested).map((x) => x.email)))
-  // Each person's name in two, split from what Google had, to correct (ADR 0063).
+  // Each person's name in two, split from what Google had, to correct (ADR 0066).
   const [personNames, setPersonNames] = useState<Record<string, NameParts>>(() => ({ ...Object.fromEntries(preview.people.map((x) => [x.email, splitName(x.name)])), ...p.kept?.personNames }))
   const partsOf = (x: { email: string; name: string }) => personNames[x.email] ?? splitName(x.name)
   const setPart = (email: string, part: keyof NameParts, value: string) => setPersonNames({ ...personNames, [email]: { ...(personNames[email] ?? { firstName: '', lastName: '' }), [part]: value } })

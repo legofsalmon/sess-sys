@@ -186,7 +186,7 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS person_merges_into ON person_merges (into_id);
   `,
-  // A first and a last name, asked for in place of one name (ADR 0063). The whole name stays, always the two joined, so
+  // A first and a last name, asked for in place of one name (ADR 0066). The whole name stays, always the two joined, so
   // everything that reads it reads as before. Everyone already here is split as splitName in shared/src/crew.ts splits
   // a name, word for word: the last word is the last name, with any words before it that start one ("Ó", "Mac", "van").
   // One word is a first name alone. The office corrects any it gets wrong.

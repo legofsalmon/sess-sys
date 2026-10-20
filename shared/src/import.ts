@@ -107,7 +107,7 @@ export interface ImportChoices {
   calendarId: string
   from: string
   jobs: { key: string; name: string; kind?: ProjectKind; include: boolean }[]
-  /** The name as it will show, when the office changed it, and the first and last name that make it (ADR 0063). */
+  /** The name as it will show, when the office changed it, and the first and last name that make it (ADR 0066). */
   people: { email: string; name?: string; firstName?: string; lastName?: string; include: boolean }[]
 }
 
