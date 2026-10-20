@@ -3,6 +3,19 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 20 October 2026: a photo on a person's page
+
+**Done**
+
+- A photo on a person's page, in [Decision 0063](adr/0063-a-photo-on-a-persons-page.md)
+  (Colly's "upload of peoples images on their staff page"). Add a photo,
+  Change photo and Remove photo under their picture, for the person and
+  whoever can change crew. The device squares and shrinks it before sending;
+  it's kept in the bucket the documents use, and shown in place of the
+  initials on their page, the People list and Home. Erasing and combining
+  people handle it.
+- Checked: typecheck, all tests (new server tests for photos).
+
 ## 19 October 2026: what crew and freelancers read of other people
 
 **Done**

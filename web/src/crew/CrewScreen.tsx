@@ -70,7 +70,7 @@ import { CrewViews } from './CrewViews.tsx'
 import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
 import { useSamePeople } from './Combine.tsx'
-import { Avatar, Avatars } from '../Picture.tsx'
+import { Avatar, Avatars, photoOf } from '../Picture.tsx'
 
 /**
  * Ops' crew screen: jobs that need people, the offers out for them, and
@@ -1361,7 +1361,7 @@ function PersonRow({ person, crew }: { person: PersonView; crew: CrewView }) {
   return (
     <div className="row person">
       <a className="who pictured" href={personHref(person.id)}>
-        <Avatar name={person.name} />
+        <Avatar name={person.name} src={photoOf(person)} />
         <span>
           <b>{person.name}</b>
           <small>

@@ -57,21 +57,24 @@ export async function claimFile(q: Queryable, key: string) {
   await q.query(`DELETE FROM document_files_to_delete WHERE key = $1`, [key])
 }
 
-/** Every file of a person's documents, on the list at once: they're being erased (ADR 0027). */
+/** Every file of a person's documents, and their photo (ADR 0063), on the list at once: they're being erased (ADR 0027). */
 export async function queueFilesOf(q: Queryable, personId: string) {
   await q.query(
-    `INSERT INTO document_files_to_delete (key, since, after) SELECT file_key, now(), now() FROM documents WHERE person_id = $1 AND file_key IS NOT NULL
+    `INSERT INTO document_files_to_delete (key, since, after)
+       SELECT file_key, now(), now() FROM documents WHERE person_id = $1 AND file_key IS NOT NULL
+       UNION SELECT photo_key, now(), now() FROM people WHERE id = $1 AND photo_key IS NOT NULL
      ON CONFLICT (key) DO UPDATE SET after = now()`,
     [personId]
   )
 }
 
-/** Every document's file, people's and those on venues and clients (ADR 0032), on the list at once: everything is going (starting fresh, ADR 0019). */
+/** Every document's file, people's and those on venues and clients (ADR 0032), and people's photos (ADR 0063), on the list at once: everything is going (starting fresh, ADR 0019). */
 export async function queueAllFiles(q: Queryable) {
   await q.query(
     `INSERT INTO document_files_to_delete (key, since, after)
        SELECT file_key, now(), now() FROM documents WHERE file_key IS NOT NULL
        UNION SELECT file_key, now(), now() FROM attachments WHERE file_key IS NOT NULL
+       UNION SELECT photo_key, now(), now() FROM people WHERE photo_key IS NOT NULL
      ON CONFLICT (key) DO UPDATE SET after = now()`
   )
 }

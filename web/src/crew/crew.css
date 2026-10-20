@@ -194,6 +194,11 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .person-page .card > p, .person-page .documents p { font-size: var(--text-small); }
 .crew a.who { color: inherit; text-decoration: none; }
 .person-page .who-card a.button { gap: var(--space-6); }
+/* Their photo (ADR 0063): the file field is hidden inside its button (a label, drawn as a.button is), which shows the field's focus ring. */
+.person-page .person-photo { display: grid; gap: var(--space-6); }
+.person-page .person-photo label.button { gap: var(--space-6); cursor: pointer; }
+.person-page .person-photo label.button:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.person-page .person-photo label.button[aria-busy="true"] { cursor: progress; }
 
 /* Combining people brought in twice (ADR 0055): the ticks are Tidy up's; the search sits above them. */
 .person-page .combine { display: grid; gap: var(--space-10); }

@@ -185,6 +185,14 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS person_merges_into ON person_merges (into_id);
   `,
+  // A person's photo (ADR 0063), kept in the storage as documents' files are (ADR 0029), on the same list of files to
+  // delete: where it's kept, which devices never see, what it is, and when it was put up, which makes its address.
+  `
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_key text UNIQUE;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_type text CHECK (photo_type IN ('jpeg', 'png', 'webp'));
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_bytes integer;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS photo_at timestamptz;
+  `,
 ]
 
 export const CREW: Module = { versionTable: 'crew_schema_version', migrations: MIGRATIONS }

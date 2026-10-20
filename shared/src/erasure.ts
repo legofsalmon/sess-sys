@@ -4,6 +4,7 @@ import { DEFAULT_LEVEL, type Person } from './crew.ts'
 import { irishToday } from './day.ts'
 import { DOCUMENT_ACTIONS, type DocumentAction } from './documents.ts'
 import { OWN_CALENDAR_ACTIONS, type OwnCalendarAction } from './own-calendar.ts'
+import { PHOTO_ACTIONS, type PhotoAction } from './photos.ts'
 import { yearOf, type LeaveAllowance, type LeaveRequest, type LeaveStatus, type LieuEntry } from './leave.ts'
 
 /**
@@ -213,7 +214,7 @@ const only =
  * what it carried after the person is erased. The test beside this file
  * checks every command naming a person is listed.
  */
-export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnCalendarAction, PersonCommand>> = {
+export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnCalendarAction | PhotoAction, PersonCommand>> = {
   // The name is the one they have now: "Erased person", or the name kept with their pay or leave records.
   'person.upsert': { names: { field: 'id' }, refused: true, keep: (a, name) => ({ ...only('id', 'kind')(a), name }) },
   // Which details changed, never what to: the history's words need only that.
@@ -257,6 +258,9 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnC
   // Their own calendar (ADR 0044): never its address, which no command or history entry carries, only whose and who gave it.
   [OWN_CALENDAR_ACTIONS.share]: { names: { field: 'personId' }, refused: true, keep: only('personId', 'by', 'replaced') },
   'ownCalendar.stop': { names: { field: 'personId' }, refused: true, keep: as },
+  // Their photo (ADR 0063) goes with them; the history keeps only that one was put up or taken down.
+  [PHOTO_ACTIONS.put]: { names: { field: 'id' }, refused: true, keep: only('id', 'type', 'bytes', 'replaced') },
+  [PHOTO_ACTIONS.remove]: { names: { field: 'id' }, refused: true, keep: only('id') },
 }
 
 /**
@@ -265,7 +269,7 @@ export const PERSON_COMMANDS: Partial<Record<CommandName | DocumentAction | OwnC
  * the caller holds (the server's tables, or a device's copy).
  */
 export function personNamedBy(name: string, args: unknown, personOf: (record: PersonRecord, id: string) => string | undefined): string | undefined {
-  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction | OwnCalendarAction]
+  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction | OwnCalendarAction | PhotoAction]
   if (!rule || !args || typeof args !== 'object') return undefined
   const value = (args as Args)[rule.names.field]
   if (typeof value !== 'string') return undefined
@@ -274,7 +278,7 @@ export function personNamedBy(name: string, args: unknown, personOf: (record: Pe
 
 /** A command's arguments with only what erasing keeps, or as they are when it isn't about a person. */
 export function keptArgs(name: string, args: unknown, personName: string): unknown {
-  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction | OwnCalendarAction]
+  const rule = PERSON_COMMANDS[name as CommandName | DocumentAction | OwnCalendarAction | PhotoAction]
   if (!rule || !args || typeof args !== 'object') return args
   return rule.keep(args as Args, personName)
 }

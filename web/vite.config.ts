@@ -47,6 +47,13 @@ export default defineConfig({
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'map-pictures', expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 }, cacheableResponse: { statuses: [200] } },
           },
+          // People's photos (ADR 0063), kept as they're seen so a face shows with no signal. A new photo is a new address,
+          // so one kept is never out of date; the newest 400, for three months.
+          {
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /^\/api\/people\/[^/]+\/photo$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'faces', expiration: { maxEntries: 400, maxAgeSeconds: 90 * 24 * 60 * 60 }, cacheableResponse: { statuses: [200] } },
+          },
         ],
       },
     }),
