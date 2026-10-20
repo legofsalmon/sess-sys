@@ -18,6 +18,8 @@ import {
   type VanCell,
   type VanLane,
   type Plan,
+  type PlanProblem,
+  type VanProblem,
   type View,
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
@@ -102,7 +104,6 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
   const busy = p.people.filter((l) => Object.keys(l.days).length > 0)
   const people = everyone ? p.people : busy
   const lanes = rows === 'jobs' ? p.jobs.length : rows === 'people' ? people.length : p.vans.length
-  const clashes = [...p.problems, ...p.vanProblems].filter((x) => x.severity === 'clash').length
   const rowWord = rows === 'jobs' ? 'job' : rows === 'people' ? 'person' : 'vehicle'
 
   // On a phone the days start at today, so the day that matters most is in view: when the days change, and once there is something to show.
@@ -152,38 +153,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
         <p className="hint">{summary(p, scale)}</p>
       </section>
 
-      {p.problems.length + p.vanProblems.length > 0 && (
-        <section className={`card ${clashes ? 'attention' : 'checks'}`}>
-          <h2>To sort out</h2>
-          {p.problems.map((x) => (
-            <div className="row problem" key={`${x.person.id} ${x.day}`}>
-              <div>
-                <b>{x.person.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
-                <p>
-                  {dayLabel(x.day)}: {x.text}
-                </p>
-              </div>
-              <a className="button" href={x.jobId ? `#jobs/${x.jobId}` : '#crew'}>
-                {x.jobId ? 'Open job' : 'Open Crew'}
-              </a>
-            </div>
-          ))}
-          {/* A van on two jobs, or booked while off the road or with a check run out (ADR 0047). */}
-          {p.vanProblems.map((x) => (
-            <div className="row problem" key={`van ${x.vehicle.id} ${x.day}`}>
-              <div>
-                <b>{x.vehicle.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
-                <p>
-                  {dayLabel(x.day)}: {x.text}
-                </p>
-              </div>
-              <a className="button" href={x.jobId ? `#jobs/${x.jobId}` : vehicleHref(x.vehicle.id)}>
-                {x.jobId ? 'Open job' : 'Open vehicle'}
-              </a>
-            </div>
-          ))}
-        </section>
-      )}
+      <SortOut problems={p.problems} vanProblems={p.vanProblems} />
 
       <section className="card">
         {lanes === 0 && (
@@ -477,5 +447,48 @@ function Legend({ rows }: { rows: Rows }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * Clashes first, then checks, for people and then vans, each with the job
+ * to open. Days gone are left out (ADR 0069). The planner shows it for the
+ * days on screen, the notifications for the next four weeks.
+ */
+export function SortOut({ problems, vanProblems, hint }: { problems: readonly PlanProblem[]; vanProblems: readonly VanProblem[]; hint?: string }) {
+  if (problems.length + vanProblems.length === 0) return null
+  const clashes = [...problems, ...vanProblems].filter((x) => x.severity === 'clash').length
+  return (
+    <section className={`card ${clashes ? 'attention' : 'checks'}`}>
+      <h2>To sort out</h2>
+      {hint && <p className="hint">{hint}</p>}
+      {problems.map((x) => (
+        <div className="row problem" key={`${x.person.id} ${x.day}`}>
+          <div>
+            <b>{x.person.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
+            <p>
+              {dayLabel(x.day)}: {x.text}
+            </p>
+          </div>
+          <a className="button" href={x.jobId ? `#jobs/${x.jobId}` : '#crew'}>
+            {x.jobId ? 'Open job' : 'Open Crew'}
+          </a>
+        </div>
+      ))}
+      {/* A van on two jobs, or booked while off the road or with a check run out (ADR 0047). */}
+      {vanProblems.map((x) => (
+        <div className="row problem" key={`van ${x.vehicle.id} ${x.day}`}>
+          <div>
+            <b>{x.vehicle.name}</b> <StatusPill tone={x.severity === 'clash' ? 'bad' : 'pending'}>{x.severity === 'clash' ? 'Clash' : 'Check'}</StatusPill>
+            <p>
+              {dayLabel(x.day)}: {x.text}
+            </p>
+          </div>
+          <a className="button" href={x.jobId ? `#jobs/${x.jobId}` : vehicleHref(x.vehicle.id)}>
+            {x.jobId ? 'Open job' : 'Open vehicle'}
+          </a>
+        </div>
+      ))}
+    </section>
   )
 }
