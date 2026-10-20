@@ -54,7 +54,10 @@ async function newProduct(page: Page, name: string, at: string, count: number) {
 
 /** What a label's QR code says, read from a picture of it as a camera would. */
 async function readQr(label: Locator): Promise<string | undefined> {
-  await label.page().addScriptTag({ path: decoder })
+  // From the app's own address, as its content security policy lets in no script written into the page (audit finding 24).
+  const page = label.page()
+  await page.route('**/e2e/jsQR.js', (route) => route.fulfill({ contentType: 'text/javascript', path: decoder }))
+  await page.addScriptTag({ url: '/e2e/jsQR.js' })
   return label.locator('svg.qr').evaluate(async (svg) => {
     const img = new Image()
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`

@@ -375,6 +375,23 @@ function earlierLine(j: PageData['jobs'][number], how: string): string {
 }
 
 /**
+ * The Copy button's script, the one script on any of these pages. The pages' content security policy lets in this
+ * script by its hash and no other (audit finding 24), so it is kept exactly as it is here.
+ */
+export const COPY_SCRIPT = `
+    (function () {
+      var field = document.getElementById('feed'), copy = document.querySelector('.copy')
+      field.addEventListener('focus', function () { field.select() })
+      if (!navigator.clipboard) return
+      copy.hidden = false
+      copy.addEventListener('click', function () {
+        // Where the browser won't copy after all, the address is selected for copying by hand.
+        navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
+      })
+    })()
+    `
+
+/**
  * The calendar feed address (ADR 0012), in a field that can be copied by
  * hand on any phone, with Subscribe for the calendar apps that take a
  * webcal: link and Copy where the browser can copy. The Copy button is the
@@ -388,18 +405,7 @@ function feedBlock(feed: string): string {
       <div class="feed-buttons"><a class="button" href="${h(feed.replace(/^https?:/, 'webcal:'))}">Subscribe</a><button type="button" class="copy" hidden>Copy address</button></div>
       <p class="small">On a phone, Subscribe adds it to your calendar app. Google Calendar can't take it on a phone: copy the address and add it on a laptop, under Other calendars, From URL.</p>
     </div>
-    <script>
-    (function () {
-      var field = document.getElementById('feed'), copy = document.querySelector('.copy')
-      field.addEventListener('focus', function () { field.select() })
-      if (!navigator.clipboard) return
-      copy.hidden = false
-      copy.addEventListener('click', function () {
-        // Where the browser won't copy after all, the address is selected for copying by hand.
-        navigator.clipboard.writeText(field.value).then(function () { copy.textContent = 'Copied' }, function () { field.focus(); field.select() })
-      })
-    })()
-    </script>`
+    <script>${COPY_SCRIPT}</script>`
 }
 
 /** How long a list of busy days the page shows: the next few are what someone checks. */

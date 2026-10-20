@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
+import { readFileSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { constants as zlib } from 'node:zlib'
 import type { WebSocket } from 'ws'
@@ -22,6 +23,7 @@ import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
 import { registerPeopleImportRoutes } from './crew/import.ts'
 import { registerCrewLinks } from './crew/links.ts'
+import { COPY_SCRIPT } from './crew/page.ts'
 import { OwnCalendars, type OwnCalendarsOptions } from './crew/own-calendars.ts'
 import { registerOwnCalendarRoutes } from './crew/own-calendar-routes.ts'
 import type { Db } from './db.ts'
@@ -32,7 +34,7 @@ import { DueErasures } from './erasure/due.ts'
 import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
-import { publicOrigin, requestForLog } from './http.ts'
+import { appShellPolicy, inlineScripts, pagePolicy, publicOrigin, requestForLog } from './http.ts'
 import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { registerNoticeRoutes } from './notices.ts'
@@ -266,10 +268,16 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // only where a link came from, not which page. Browsers remember the https
   // rule for a year, so it goes out only on https (Railway says so in the
   // forwarded protocol), never from a local server on http.
+  // The server's own pages get a strict content security policy (audit finding 24); the app shell sets its own as it's
+  // served, below, and a document's file a stricter one of its own (ADR 0029). Anything else isn't a page, and needs only
+  // to stay out of other sites' frames.
+  const pages = pagePolicy([COPY_SCRIPT])
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff')
-    // A document's file sets a stricter one of its own (ADR 0029), which already holds this.
-    if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', "frame-ancestors 'none'")
+    if (!reply.hasHeader('content-security-policy')) {
+      const html = String(reply.getHeader('content-type') ?? '').startsWith('text/html')
+      reply.header('content-security-policy', html ? pages : "frame-ancestors 'none'")
+    }
     reply.header('referrer-policy', 'strict-origin-when-cross-origin')
     if (publicOrigin(req).startsWith('https:')) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains')
   })
@@ -497,12 +505,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // service worker and the manifest keep their names, so they are checked every time.
     // Judged from the web root, so a checkout in a folder that happens to be called assets changes nothing.
     const assets = join(webRoot, 'assets') + sep
+    const page = join(webRoot, 'index.html')
+    // Its inline theme script is let in by its hash, read from the page as built (audit finding 24).
+    const shell = appShellPolicy(inlineScripts(readFileSync(page, 'utf8')), errorReporting?.dsn)
     await app.register(fastifyStatic, {
       root: webRoot,
       // The .br and .gz beside each file, made when the app is built, go to a browser that takes them (audit finding 6).
       preCompressed: true,
       cacheControl: false,
-      setHeaders: (reply, path) => reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+      setHeaders: (reply, path) => {
+        reply.header('cache-control', path.startsWith(assets) ? 'public, max-age=31536000, immutable' : 'no-cache')
+        if (path === page) reply.header('content-security-policy', shell)
+      },
     })
     // Anything that is not an API call, a private link, a feed or a file is the app; the app routes it.
     // A missing file under /assets/ is a plain 404, never the page: a page from before a deploy

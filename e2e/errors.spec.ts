@@ -2,9 +2,11 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 
 /**
  * Error reports from the app (ADR 0005). The test server has no Sentry
- * project, so the app is told of a made-up one here, and each report the
- * app sends it is caught on the way out and kept, or turned away as if the
- * device had no signal.
+ * project, so the app is told of a made-up one here, at an address of
+ * Sentry's own that the app's content security policy lets it report to,
+ * and each report the app sends it is caught on the way out, before it
+ * leaves the browser, and kept, or turned away as if the device had no
+ * signal.
  */
 
 // The service worker would otherwise stand between the page and the stand-ins below.
@@ -20,9 +22,9 @@ interface Report {
 async function standIn(context: BrowserContext) {
   const sentry = { reports: [] as { body: Report; raw: string }[], signal: true, turnedAway: 0 }
   await context.route('**/api/config', (route) =>
-    route.fulfill({ json: { errors: { dsn: 'https://publickey@errors.example/1', environment: 'e2e' } } })
+    route.fulfill({ json: { errors: { dsn: 'https://publickey@o1.ingest.de.sentry.io/1', environment: 'e2e' } } })
   )
-  await context.route('https://errors.example/**', (route) => {
+  await context.route('https://o1.ingest.de.sentry.io/**', (route) => {
     if (!sentry.signal) {
       sentry.turnedAway++
       return route.abort('internetdisconnected')
@@ -69,23 +71,28 @@ const waiting = (page: Page) =>
       })
   )
 
-test('reports an error in the app, with nothing about the person using it', async ({ context, page }) => {
-  const sentry = await standIn(context)
-  await page.goto('/?from=aoife@example.ie')
-  await reporting(page)
-  // A browser extension's error is none of the app's business, and isn't sent.
-  await fault(page, 'The extension broke', 'https://extension.example/content.js')
-  await fault(page, 'Stock count failed for aoife.byrne@sessionhire.com', '/fault.js?from=aoife@example.ie')
+test.describe(() => {
+  // A browser extension's script runs whatever the page's policy says, which turns away any other site's (audit finding 24); the bypass stands in for that.
+  test.use({ bypassCSP: true })
 
-  await expect.poll(() => messages(sentry)).toEqual(['Stock count failed for [email]'])
-  const { body, raw } = sentry.reports[0]!
-  // Which screen and which script, but not what followed the path in either address.
-  expect(body.request?.url).toBe(new URL('/', page.url()).href)
-  expect(body.exception.values.at(-1)?.stacktrace?.frames.map((f) => f.filename)).toContain(new URL('/fault.js', page.url()).href)
-  expect(body.environment).toBe('e2e')
-  expect(body).not.toHaveProperty('user')
-  expect(body).not.toHaveProperty('breadcrumbs')
-  for (const secret of ['aoife', 'example.ie', 'sessionhire.com']) expect(raw).not.toContain(secret)
+  test('reports an error in the app, with nothing about the person using it', async ({ context, page }) => {
+    const sentry = await standIn(context)
+    await page.goto('/?from=aoife@example.ie')
+    await reporting(page)
+    // A browser extension's error is none of the app's business, and isn't sent.
+    await fault(page, 'The extension broke', 'https://extension.example/content.js')
+    await fault(page, 'Stock count failed for aoife.byrne@sessionhire.com', '/fault.js?from=aoife@example.ie')
+
+    await expect.poll(() => messages(sentry)).toEqual(['Stock count failed for [email]'])
+    const { body, raw } = sentry.reports[0]!
+    // Which screen and which script, but not what followed the path in either address.
+    expect(body.request?.url).toBe(new URL('/', page.url()).href)
+    expect(body.exception.values.at(-1)?.stacktrace?.frames.map((f) => f.filename)).toContain(new URL('/fault.js', page.url()).href)
+    expect(body.environment).toBe('e2e')
+    expect(body).not.toHaveProperty('user')
+    expect(body).not.toHaveProperty('breadcrumbs')
+    for (const secret of ['aoife', 'example.ie', 'sessionhire.com']) expect(raw).not.toContain(secret)
+  })
 })
 
 test('keeps a report made with no signal on the device, and sends it when the signal is back', async ({ context, page }) => {
