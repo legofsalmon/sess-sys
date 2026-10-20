@@ -215,7 +215,7 @@ export interface KitMatch {
   likely: string[]
 }
 
-/** A product as matched: its other names (ADR 0069) are matched as its name is. */
+/** A product as matched: its other names (ADR 0070) are matched as its name is. */
 type Product = Pick<Model, 'id' | 'name' | 'department'> & { aliases?: readonly string[] }
 
 /** Pairs of letters, for a forgiving comparison. */

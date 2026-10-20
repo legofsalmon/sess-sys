@@ -295,7 +295,7 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 }
 .skill-options li[aria-selected='true'] { background: var(--ds-wash-pressed); box-shadow: inset 3px 0 0 var(--accent); }
 .skill-options li.new { color: var(--ds-ink-secondary); }
-/* The product picker (ADR 0069): a field like the others in a form, its offers two lines, the name then why it's offered
+/* The product picker (ADR 0070): a field like the others in a form, its offers two lines, the name then why it's offered
    and where it belongs; notes in the list ("Most like it", "40 more") aren't offers, so they're quiet and never highlight. */
 .picker-field { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
 .picker-field input { width: 100%; }

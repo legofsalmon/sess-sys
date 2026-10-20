@@ -12,7 +12,7 @@ waiting on someone.
   category or department, in any order ("shure 58", "beta", "wedge"), the
   best first and Enter takes it. Products can have other names, set on
   their page, and Kit from the notes matches lines written that way
-  ([Decision 0069](adr/0069-finding-a-product-by-typing.md), Colly's ask).
+  ([Decision 0070](adr/0070-finding-a-product-by-typing.md), Colly's ask).
   The design system's combobox gained the pattern for picking one record.
 - Checked: typecheck, all unit and server tests, the kit, notes, pick list,
   faults and inspections browser tests, one new test typing part of a name.

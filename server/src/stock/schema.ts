@@ -235,7 +235,7 @@ const MIGRATIONS: string[] = [
     read_at     timestamptz NOT NULL DEFAULT now()
   );
   `,
-  // Other names a product goes by (ADR 0069), for the product picker and
+  // Other names a product goes by (ADR 0070), for the product picker and
   // Kit from the notes to find it by.
   `
   ALTER TABLE models ADD COLUMN IF NOT EXISTS aliases jsonb NOT NULL DEFAULT '[]';

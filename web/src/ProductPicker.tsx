@@ -13,7 +13,7 @@ export interface PickerAction {
 }
 
 /**
- * Choosing one product from the stock list by typing (ADR 0069), in place of
+ * Choosing one product from the stock list by typing (ADR 0070), in place of
  * a long dropdown: the design system's combobox, picking one record. What's
  * typed can be anywhere in the name, in another name the product goes by, or
  * its category or department (findProducts), and each offer says which other

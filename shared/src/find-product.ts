@@ -2,7 +2,7 @@ import { kitKey } from './kit-notes.ts'
 import { DEPARTMENT_LABELS, type Model } from './stock.ts'
 
 /**
- * Finding a product as it's typed (ADR 0069), for the product picker: what's
+ * Finding a product as it's typed (ADR 0070), for the product picker: what's
  * typed can be anywhere in the name ("58" finds Shure SM58), in another name
  * it goes by ("beta" finds it by "Beta 58"), or in its category or
  * department ("cable"). Every word typed has to be found, in any of those and

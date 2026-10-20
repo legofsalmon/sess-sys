@@ -1,4 +1,4 @@
-# ADR 0069: Finding a product by typing, and other names
+# ADR 0070: Finding a product by typing, and other names
 
 - **Status:** accepted
 - **Date:** 20 October 2026

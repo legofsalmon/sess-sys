@@ -87,7 +87,7 @@ export const model = z.object({
   patMonths: months.default(null),
   liftingMonths: months.default(null),
   /**
-   * Other names it goes by (ADR 0069): what crew and the notes call it, such
+   * Other names it goes by (ADR 0070): what crew and the notes call it, such
    * as "58" or "Beta 58" for a Shure SM58. Found by the product picker and by
    * Kit from the notes as the name is. Left out by an older app, so a default.
    */

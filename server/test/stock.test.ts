@@ -256,7 +256,7 @@ describe('cases', () => {
 })
 
 describe('products and places', () => {
-  it('keeps the other names a product goes by, tidied, and says so in the history (ADR 0069)', async () => {
+  it('keeps the other names a product goes by, tidied, and says so in the history (ADR 0070)', async () => {
     const { app, db, y10p } = await warehouse()
     expect((await all<Model>(app, 'model')).get(y10p.id)?.aliases).toEqual([])
     await ok(app, 'model.update', { id: y10p.id, aliases: ['Wedge ', 'wedge', 'd&b Y10P', 'Y10'] })
