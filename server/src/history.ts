@@ -552,6 +552,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.venueId !== undefined) parts.push(a.venueId ? `venue to ${venue(a.venueId)}` : "venue to the job's")
       if (a.notes !== undefined) parts.push('the notes')
       if (a.contactId !== undefined) parts.push(a.contactId ? `the contact on the day to ${person(a.contactId)}` : 'no contact on the day')
+      if (a.localCrew !== undefined) parts.push(a.localCrew ? `local crew to ${a.localCrew}` : 'no local crew')
       return `Changed ${text(p?.name, 'a phase')} on ${job(p?.projectId)}: ${inWords(parts)}`
     }
     case 'phase.remove': {

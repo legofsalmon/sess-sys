@@ -14,7 +14,7 @@ import { crewFill, jobsView } from '../src/sync/jobs-view.ts'
  */
 
 const project = (id: string, name: string, status: Project['status'] = 'confirmed'): Project => ({ id, name, clientId: null, venueId: null, status, notes: '' })
-const phase = (id: string, projectId: string, name: string, start: string, end: string): Phase => ({ id, projectId, name, start, end, venueId: null, notes: '', contactId: null })
+const phase = (id: string, projectId: string, name: string, start: string, end: string): Phase => ({ id, projectId, name, start, end, venueId: null, notes: '', contactId: null, localCrew: 0 })
 const call = (id: string, projectId: string, phaseId: string | null, start: string, end: string, needed = 1): CrewCall => ({
   id,
   projectId,
@@ -58,7 +58,7 @@ describe('a phase added on this device', () => {
     const view = jobsView({ project: nissan, phase: { ph2: show } }, [added], 0, [])
     const [job] = view.jobs
     expect(job!.phases.map((p) => p.id)).toEqual(['ph1', 'ph2'])
-    expect(job!.phases[0]).toEqual({ id: 'ph1', projectId: 'j1', name: 'Build', start: '2026-10-03', end: '2026-10-04', venueId: null, notes: '', contactId: null, pending: true, venue: undefined, calls: [] })
+    expect(job!.phases[0]).toEqual({ id: 'ph1', projectId: 'j1', name: 'Build', start: '2026-10-03', end: '2026-10-04', venueId: null, notes: '', contactId: null, localCrew: 0, pending: true, venue: undefined, calls: [] })
     // Every field a synced phase has, so a form reading any of them finds it.
     expect(Object.keys(job!.phases[0]!).sort()).toEqual(Object.keys(job!.phases[1]!).sort())
     // The job's dates take it in, and with them the phases the Ask-for-crew form offers.

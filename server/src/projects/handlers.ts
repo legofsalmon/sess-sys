@@ -37,7 +37,7 @@ const PROJECT_COLUMNS = {
   prepDays: 'prep_days',
   returnDays: 'return_days',
 } as const
-const PHASE_COLUMNS = { name: 'name', start: 'start_day', end: 'end_day', venueId: 'venue_id', notes: 'notes', contactId: 'contact_id' } as const
+const PHASE_COLUMNS = { name: 'name', start: 'start_day', end: 'end_day', venueId: 'venue_id', notes: 'notes', contactId: 'contact_id', localCrew: 'local_crew' } as const
 
 /** Set only the fields given; the rest stay as they are. */
 async function setFields(ctx: Ctx, table: 'projects' | 'phases', columns: Record<string, string>, a: { id: string } & Record<string, unknown>) {
@@ -155,8 +155,8 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     await checkVenue(ctx, a.venueId)
     await checkContact(ctx, a.contactId)
     await ctx.tx.query(
-      'INSERT INTO phases (id, project_id, name, start_day, end_day, venue_id, notes, contact_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [a.id, a.projectId, a.name, a.start, a.end, a.venueId, a.notes, a.contactId ?? null]
+      'INSERT INTO phases (id, project_id, name, start_day, end_day, venue_id, notes, contact_id, local_crew) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [a.id, a.projectId, a.name, a.start, a.end, a.venueId, a.notes, a.contactId ?? null, a.localCrew ?? 0]
     )
     await emit(ctx, 'phase', a.id, await getPhase(ctx.tx, a.id))
   },
