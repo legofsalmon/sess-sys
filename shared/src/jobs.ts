@@ -143,6 +143,12 @@ export const PHASE_NAMES = ['Prep', 'Load in', 'Build', 'Rehearsal', 'Show', 'Ba
 /** Longer than this is more likely a typing slip than a phase. */
 export const MAX_PHASE_DAYS = 366
 
+/** More local crew than this on one phase is more likely a typing slip. */
+export const MAX_LOCAL_CREW = 999
+
+/** How many crew the venue or client brings on a phase: a count, nobody booked through the app. */
+const localCrew = z.number().int('Local crew is a whole number.').min(0, "Local crew can't be less than none.").max(MAX_LOCAL_CREW, `Local crew can be at most ${MAX_LOCAL_CREW}.`)
+
 export const phase = z.object({
   id,
   projectId: id,
@@ -158,6 +164,8 @@ export const phase = z.object({
    * before call sheets, and from older versions of the app.
    */
   contactId: id.nullable().optional(),
+  /** Crew found locally, by the venue or the client: just how many. Missing from older versions of the app means none. */
+  localCrew: localCrew.optional(),
 })
 export type Phase = z.infer<typeof phase>
 
@@ -219,6 +227,7 @@ export const jobCommandSchemas = {
       venueId: phase.shape.venueId.optional(),
       notes: phase.shape.notes.optional(),
       contactId: phase.shape.contactId,
+      localCrew: localCrew.optional(),
       moveCrew: z.boolean().optional(),
     })
     .refine(...somethingToChange)

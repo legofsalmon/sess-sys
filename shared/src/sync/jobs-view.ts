@@ -101,7 +101,7 @@ export function jobsView(
       case 'phase.add': {
         const a = m.args as CommandArgs<'phase.add'>
         // The whole shape of a synced phase, so the screens treat it as one: its Change form reads every field.
-        if (!phases.has(a.id)) phases.set(a.id, { ...a, contactId: a.contactId ?? null, pending: true })
+        if (!phases.has(a.id)) phases.set(a.id, { ...a, contactId: a.contactId ?? null, localCrew: a.localCrew ?? 0, pending: true })
         break
       }
       case 'phase.update': {

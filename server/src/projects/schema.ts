@@ -68,6 +68,10 @@ const MIGRATIONS: string[] = [
   ALTER TABLE venues ADD COLUMN IF NOT EXISTS lng double precision CHECK (lng BETWEEN -180 AND 180);
   ALTER TABLE venues ADD CONSTRAINT venues_pin_whole CHECK ((lat IS NULL) = (lng IS NULL));
   `,
+  // How many crew the venue or client brings on each phase: a count, nobody booked through the app.
+  `
+  ALTER TABLE phases ADD COLUMN IF NOT EXISTS local_crew integer NOT NULL DEFAULT 0 CHECK (local_crew BETWEEN 0 AND 999);
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }

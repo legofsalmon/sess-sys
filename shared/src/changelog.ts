@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.27.0',
+    date: '2026-10-21',
+    title: 'Local crew on each phase',
+    what: "Each phase of a job can now say how many local crew it has: the people the venue or the client brings, who aren't booked through the app. Change the phase and type the number; it shows beside the phase's crew.",
+    prs: [114],
+  },
+  {
     version: '1.26.0',
     date: '2026-10-20',
     title: "What's changed, and a version number",

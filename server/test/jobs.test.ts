@@ -159,6 +159,20 @@ describe('a job, its phases, client and venue', () => {
     expect(await send(app, 'project.update', { id: ids.job })).toMatchObject({ status: 'rejected', reason: { message: 'Nothing to change.' } })
   })
 
+  it('keeps a count of local crew on each phase, none until it says', async () => {
+    const { app } = await server()
+    const ids = await nissan(app)
+    expect(await latest<Phase>(app, 'phase', ids.build)).toMatchObject({ localCrew: 0 })
+    expect(await send(app, 'phase.update', { id: ids.build, localCrew: 6 })).toMatchObject({ status: 'applied' })
+    expect(await latest<Phase>(app, 'phase', ids.build)).toMatchObject({ localCrew: 6, name: 'Build' })
+    expect(await latest<Phase>(app, 'phase', ids.show)).toMatchObject({ localCrew: 0 })
+    expect(await send(app, 'phase.update', { id: ids.build, localCrew: -1 })).toMatchObject({ status: 'rejected' })
+    expect(await send(app, 'phase.update', { id: ids.build, localCrew: 2.5 })).toMatchObject({ status: 'rejected' })
+    const added = newId()
+    await send(app, 'phase.add', { id: added, projectId: ids.job, name: 'Load out', start: '2026-10-10', end: '2026-10-10', venueId: null, notes: '', localCrew: 4 })
+    expect(await latest<Phase>(app, 'phase', added)).toMatchObject({ localCrew: 4 })
+  })
+
   it("says so when a job's client, venue or job is gone, instead of saving half of it", async () => {
     const { app } = await server()
     const job = await send(app, 'project.create', { id: newId(), name: 'Fuel', clientId: 'nobody', venueId: null, status: 'enquiry', notes: '' })

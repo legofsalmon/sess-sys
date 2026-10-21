@@ -10,6 +10,7 @@ import {
   parseEuro,
   phaseOnCalendar,
   phaseOnlyGrew,
+  MAX_LOCAL_CREW,
   PHASE_NAMES,
   KIND_LABELS,
   kindOf,
@@ -563,6 +564,7 @@ function Phase({
   const [editing, setEditing] = useState(false)
   const today = useToday()
   const fill = crewFill(phase.calls)
+  const local = phase.localCrew ?? 0
   const ownVenue = phase.venueId && phase.venueId !== job.venueId ? phase.venue : undefined
   const contact = phase.contactId ? view.crew.people.find((p) => p.id === phase.contactId) : undefined
   const on = phaseOnCalendar(job, phase, view.calendar.link, view.calendar.days, today)
@@ -601,11 +603,16 @@ function Phase({
       </details>
       {editing && mayChange && <EditPhase phase={phase} view={view} onDone={() => setEditing(false)} onTell={onTell} />}
       {/* Its calls are under Crew; here, how they stand, a tap from them. */}
-      {fill.needed > 0 && (
+      {/* Local crew are the venue's or the client's, so they're only a count here and never a call. */}
+      {(fill.needed > 0 || local > 0) && (
         <p className="phase-crew">
-          <button type="button" className="link" onClick={onCrew}>
-            Crew: {fill.booked} of {fill.needed} booked{fill.toConfirm > 0 && `, ${fill.toConfirm} to confirm`}
-          </button>
+          {fill.needed > 0 && (
+            <button type="button" className="link" onClick={onCrew}>
+              Crew: {fill.booked} of {fill.needed} booked{fill.toConfirm > 0 && `, ${fill.toConfirm} to confirm`}
+            </button>
+          )}
+          {fill.needed > 0 && local > 0 && ' · '}
+          {local > 0 && <span>Local crew: {local}</span>}
         </p>
       )}
     </article>
@@ -614,7 +621,7 @@ function Phase({
 
 function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: View; onDone: () => void; onTell: (share: Share | undefined) => void }) {
   const { venues } = view.jobs
-  const [f, setF] = useState({ name: phase.name, start: phase.start, end: phase.end, venue: phase.venueId ? (phase.venue?.name ?? '') : '', notes: phase.notes })
+  const [f, setF] = useState({ name: phase.name, start: phase.start, end: phase.end, venue: phase.venueId ? (phase.venue?.name ?? '') : '', notes: phase.notes, localCrew: String(phase.localCrew ?? 0) })
   // A change of dates to a phase with crew waits here until the office says whether the crew move too.
   const [ask, setAsk] = useState<CommandInput<'phase.update'> | undefined>()
   const [removing, setRemoving] = useState(false)
@@ -644,6 +651,9 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
       if (f.start !== phase.start) changes.start = f.start
       if (f.end !== phase.end) changes.end = f.end < f.start ? f.start : f.end
       if (f.notes.trim() !== phase.notes) changes.notes = f.notes.trim()
+      // Left empty, it's none.
+      const localCrew = f.localCrew.trim() === '' ? 0 : Number(f.localCrew)
+      if (localCrew !== (phase.localCrew ?? 0)) changes.localCrew = localCrew
       const venueId = await venueNamed(f.venue, venues)
       if (venueId !== phase.venueId) changes.venueId = venueId
       if (Object.keys(changes).length === 1) return
@@ -686,6 +696,23 @@ function EditPhase({ phase, view, onDone, onTell }: { phase: PhaseView; view: Vi
         Venue{' '}
         <input list="phase-venue-names" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="The job's venue" disabled={held} />
       </label>
+      <label>
+        Local crew{' '}
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={MAX_LOCAL_CREW}
+          step={1}
+          value={f.localCrew}
+          onChange={(e) => setF({ ...f, localCrew: e.target.value })}
+          aria-describedby={`local-crew-${phase.id}`}
+          disabled={held}
+        />
+      </label>
+      <p className="muted" id={`local-crew-${phase.id}`}>
+        How many the venue or client brings.
+      </p>
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={held} />
       </label>
