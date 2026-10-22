@@ -1,4 +1,4 @@
-import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, nameParts, offerKept, ROLE_LABELS, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
+import { hasEmail, holdsARole, mayChangeWhoSignsIn, mergedPerson, ownAddressRefusal, signInAbility, mergeRefusal, nameParts, offerKept, ROLE_LABELS, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
 import { getDocument, queueFile } from '../documents/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
@@ -54,13 +54,18 @@ export const mergeHandlers = {
     const why = mergeRefusal(into, from)
     if (why) throw new Refused({ code: 'conflict', message: why })
     // Their addresses decide who signs in as what (ADR 0034), so someone with a role is combined only by who can change that.
-    const holder = all.find((p) => p.kind === 'staff' && holdsARole(p))
+    // A director's addresses need a director (audit, 20 October 2026, finding 10), so a director among them is checked first.
+    const holders = all.filter((p) => p.kind === 'staff' && holdsARole(p))
+    const holder = holders.find((p) => p.role === 'director') ?? holders[0]
     if (ctx.via !== 'app') throw new Refused({ code: 'forbidden', message: 'Only the office can combine people.' })
-    if (holder && !mayChangeWhoSignsIn(ctx.role))
+    if (holder && !mayChangeWhoSignsIn(ctx.role, holder.role))
       throw new Refused({
         code: 'forbidden',
-        message: `${holder.name} signs in as ${ROLE_LABELS[holder.role!]}, so only the office and directors can combine them with someone.${ctx.role ? ` Your role is ${ROLE_LABELS[ctx.role]}.` : ''}`,
+        message: `${holder.name} signs in as ${ROLE_LABELS[holder.role!]}, so only ${signInAbility(holder.role) === 'company' ? 'directors' : 'the office and directors'} can combine them with someone.${ctx.role ? ` Your role is ${ROLE_LABELS[ctx.role]}.` : ''}`,
       })
+    // Combining someone with the sender's own address into another person would hand the sender's account to them.
+    if (ctx.user && !hasEmail(into, ctx.user.email) && from.some((p) => hasEmail(p, ctx.user!.email)))
+      throw new Refused({ code: 'forbidden', message: ownAddressRefusal(ctx.user.email) })
 
     await moveOffers(ctx, into.id, ids)
     await moveOneEach(ctx, into.id, ids)
@@ -130,7 +135,7 @@ export const mergeHandlers = {
     if (person.archived) throw new Refused({ code: 'conflict', message: `${person.name} has been archived. Bring them back on the Crew tab to change their email.` })
     const next = withMainEmail(person, a.email)
     if (!next) throw new Refused({ code: 'conflict', message: `${person.name} isn't found by that address any more. Look at their page again.` })
-    if (holdsARole(person) && !mayChangeWhoSignsIn(ctx.role)) throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(person.name, person.role!, ctx.role) })
+    if (holdsARole(person) && !mayChangeWhoSignsIn(ctx.role, person.role)) throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(person.name, person.role!, ctx.role) })
     await tx.query('UPDATE people SET email = $2, other_emails = $3 WHERE id = $1', [person.id, next.email, JSON.stringify(next.otherEmails)])
     await emit(ctx, 'person', person.id, await getPerson(tx, person.id))
   },

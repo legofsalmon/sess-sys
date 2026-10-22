@@ -52,7 +52,10 @@ describe('roles', () => {
   it("keep the email and type of someone who holds a role to the office and directors, and each email to one person (audit finding 12)", () => {
     expect([null, 'crew', 'freelancer', 'head', 'director'].map((role) => holdsARole({ role: role as RolePerson['role'] }))).toEqual([false, false, false, true, true])
     expect([undefined, 'director', 'office', 'head', 'crew', 'freelancer'].map((r) => mayChangeWhoSignsIn(r as RolePerson['role']))).toEqual([true, true, true, false, false, false])
-    expect(whoSignsInRefusal('Colly', 'director', 'head')).toBe("Only the office and directors can change Colly's email or type: it's how they sign in as Director. Your role is Head of department.")
+    expect(whoSignsInRefusal('Colly', 'director', 'head')).toBe("Only directors can change Colly's email or type: it's how they sign in as Director. Your role is Head of department.")
+    expect(whoSignsInRefusal('Seán', 'head', 'crew')).toBe("Only the office and directors can change Seán's email or type: it's how they sign in as Head of department. Your role is Staff crew.")
+    // A director's needs a director (audit, 20 October 2026, finding 10).
+    expect(['director', 'office', 'head'].map((r) => mayChangeWhoSignsIn('office', r as RolePerson['role']))).toEqual([false, true, true])
     const people = [p('a', ' Colly@SessionHire.com '), p('b', 'sean@sessionhire.com', { archived: true }), p('c', null)]
     expect(emailTakenBy(people, 'x', 'colly@sessionhire.com')?.id).toBe('a')
     expect(emailTakenBy(people, 'a', 'colly@sessionhire.com')).toBeUndefined()

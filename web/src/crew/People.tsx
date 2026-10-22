@@ -24,6 +24,7 @@ import {
   emailInUseRefusal,
   emailTakenBy,
   holdsARole,
+  signInAbility,
   ROLE_LABELS,
   sameEmail,
   whoSignsInRefusal,
@@ -160,7 +161,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   // Who approves time off is a permission, so it's a director's to give once roles are on (ADR 0034); the form keeps it as it was.
   const mayApprove = access.can('company')
   // The email and type of someone who holds a role are how they sign in as it, so only the office and directors change them (audit finding 12).
-  const whoFixed = initial && initial.role && holdsARole(initial) && !access.can('settings') ? initial.role : null
+  const whoFixed = initial && initial.role && holdsARole(initial) && !access.can(signInAbility(initial.role)) ? initial.role : null
   const people = useView().crew.people
   // A rate this device isn't sent (ADR 0046) isn't in the form, and the server keeps the one it has.
   const seesRates = useSeesRates() && !initial?.rateHidden

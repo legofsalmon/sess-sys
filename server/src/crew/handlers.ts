@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, namesAfter, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, emailBackRefusal, holdsARole, mayChangeWhoSignsIn, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, namesAfter, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, emailBackRefusal, hasEmail, holdsARole, mayChangeWhoSignsIn, ownAddressRefusal, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { stopOwnCalendar } from './own-calendars.ts'
@@ -271,13 +271,17 @@ async function openCall(ctx: Ctx, callId: string) {
  */
 async function checkWhoSignsIn(ctx: Ctx, was: Person | undefined, next: { id: string; name: string; email: string | null; kind: Person['kind'] }) {
   const emailChanged = !sameEmail(was?.email, next.email)
-  if (was && (emailChanged || was.kind !== next.kind) && (ctx.via === 'link' || !mayChangeWhoSignsIn(ctx.role))) {
+  if (was && (emailChanged || was.kind !== next.kind) && (ctx.via === 'link' || !mayChangeWhoSignsIn(ctx.role, 'director'))) {
     // The role as kept, which a freelancer who held one still has, and would have again as staff.
     const { rows } = await ctx.tx.query<{ role: Role | null }>('SELECT role FROM people WHERE id = $1', [was.id])
     const held = rows[0]?.role ?? null
-    if (holdsARole({ role: held })) throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(was.name, held!, ctx.role) })
+    if (holdsARole({ role: held }) && (ctx.via === 'link' || !mayChangeWhoSignsIn(ctx.role, held)))
+      throw new Refused({ code: 'forbidden', message: whoSignsInRefusal(was.name, held!, ctx.role) })
   }
   if (!emailChanged || !next.email?.trim()) return
+  // The address the sender signs in with goes to nobody else here, even once they've let it go in the same push (audit, 20 October
+  // 2026, finding 10); a person made new with it holds no role, so putting yourself on the Crew tab is still yours to do.
+  if (ctx.user && was && sameEmail(next.email, ctx.user.email) && !hasEmail(was, ctx.user.email)) throw new Refused({ code: 'forbidden', message: ownAddressRefusal(next.email.trim()) })
   const { rows } = await ctx.tx.query<{ name: string }>(
     `SELECT name FROM people WHERE id <> $1 AND NOT archived AND ${HAS_EMAIL('$2')} ORDER BY id LIMIT 1`,
     [next.id, next.email.trim().toLowerCase()]
