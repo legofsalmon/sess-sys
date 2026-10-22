@@ -3,6 +3,18 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: Accept after a counter takes the rate offered
+
+**Done**
+
+- Finding 6 of the [20 October audit](audit-2026-10-20.md) (PR #121): a
+  freelancer who countered and then pressed Accept was booked at their own
+  rate. On a countered card Accept now reads "Accept these days at €250 a
+  day instead" (or "the rate the office sets"), Send rate is the main
+  button, and accepting withdraws the counter with the words "the rate
+  you asked for is withdrawn. The office will confirm." App 1.29.2.
+- Checked: typecheck, unit tests, and the crew server tests.
+
 ## 22 October 2026: a shorter pick list, with the scan box kept in view
 
 **Done**

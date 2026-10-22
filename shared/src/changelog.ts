@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.2',
+    date: '2026-10-22',
+    title: 'Accepting after asking for another rate takes the rate offered',
+    what: 'When a freelancer asked for a different rate and then pressed Accept on their link, the booking went in at the rate they had asked for. The button now says which rate they are accepting (“Accept these days at €250 a day instead”), the rate they asked for is withdrawn, and the page says so.',
+    prs: [121],
+  },
+  {
     version: '1.29.1',
     date: '2026-10-22',
     title: 'A shorter pick list, with the scan box kept in view',
