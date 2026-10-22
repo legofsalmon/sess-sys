@@ -145,6 +145,13 @@ export const MENU: PlaceGroup[] = [
         about: 'Faults and missing kit to sort out',
       },
       {
+        key: 'racks',
+        icon: 'case',
+        href: '#stock/racks',
+        label: 'Racks',
+        about: 'Kit built into rack cases, and what goes where',
+      },
+      {
         key: 'vehicles',
         icon: 'van',
         href: '#stock/vehicles',

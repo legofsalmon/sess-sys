@@ -10,7 +10,7 @@ import { runMigrations, type Module } from '../migrations.ts'
  * inspections (ADR 0020); what was added by mistake (audit finding 19);
  * what the stock list brings in that items didn't hold before (ADR 0026);
  * counts of places and cases (ADR 0030); and kit read from jobs' notes
- * (ADR 0043).
+ * (ADR 0043); and racks and their layouts (ADR 0074).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -245,6 +245,33 @@ const MIGRATIONS: string[] = [
   // before its name.
   `
   ALTER TABLE models ADD COLUMN IF NOT EXISTS list_id text NOT NULL DEFAULT '';
+  `,
+  // Racks (ADR 0074): a product that is a rack built up with kit, its own
+  // stock code, and sizes for anything that goes in a rack; and each rack's
+  // layout, a slot for each thing in it. A slot points at products, so a
+  // product in a layout can't be removed.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS is_rack boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS code text NOT NULL DEFAULT '';
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS units integer CHECK (units BETWEEN 1 AND 60);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS depth_mm integer CHECK (depth_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS weight_kg numeric(5, 1) CHECK (weight_kg >= 0);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS power_w integer CHECK (power_w >= 0);
+  ALTER TABLE models ADD CONSTRAINT models_rack_is_case CHECK (is_case OR NOT is_rack);
+  CREATE UNIQUE INDEX IF NOT EXISTS models_code ON models (lower(code)) WHERE code <> '' AND NOT mistake;
+  CREATE TABLE IF NOT EXISTS rack_slots (
+    id        text PRIMARY KEY,
+    rack_id   text NOT NULL REFERENCES models(id),
+    model_id  text NOT NULL REFERENCES models(id),
+    top       integer CHECK (top BETWEEN 1 AND 60),
+    side      text NOT NULL CHECK (side IN ('front', 'rear')),
+    qty       integer NOT NULL CHECK (qty BETWEEN 1 AND 999),
+    notes     text NOT NULL DEFAULT '',
+    CHECK (rack_id <> model_id),
+    CHECK (top IS NULL OR qty = 1)
+  );
+  CREATE INDEX IF NOT EXISTS rack_slots_rack ON rack_slots (rack_id);
+  CREATE INDEX IF NOT EXISTS rack_slots_model ON rack_slots (model_id);
   `,
 ]
 

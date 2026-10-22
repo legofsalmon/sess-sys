@@ -37,6 +37,7 @@ import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import { VehicleScreen, VehiclesScreen } from './Vehicles.tsx'
+import { RacksScreen } from './Racks.tsx'
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
@@ -58,7 +59,7 @@ import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
  * #stock/item/<id>, #stock/place/<id>), a run of labels on its own
  * (#stock/labels/<id>), and a count's on #stock/count/<id> (ADR 0030).
  * The company's vehicles are along the row too (#stock/vehicles), each on
- * #stock/vehicles/<id> (ADR 0047).
+ * #stock/vehicles/<id> (ADR 0047). Racks are along it too (#stock/racks, ADR 0074).
  * The stock list is brought in at #stock/import (ADR 0026).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -73,6 +74,7 @@ export function StockScreen() {
   if (hash === '#stock/testing') return <TestingScreen view={view} />
   if (hash === '#stock/count') return <CountScreen view={view} />
   if (hash === '#stock/vehicles') return <VehiclesScreen view={view} />
+  if (hash === '#stock/racks') return <RacksScreen view={view} />
   const [, vehicle] = /^#stock\/vehicles\/(.+)$/.exec(hash) ?? []
   if (vehicle) return <VehicleScreen key={vehicle} view={view} id={decodeURIComponent(vehicle)} />
   const [, count] = /^#stock\/count\/(.+)$/.exec(hash) ?? []
@@ -205,7 +207,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
       : []
   const inDepartment = (m: ModelView) => department === 'all' || m.department === department
   const matches = (m: ModelView) => {
-    const text = `${m.name} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
+    const text = `${m.name} ${m.code} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
     return words.every((x) => text.includes(x))
   }
   const shown = w.models.filter((m) => inDepartment(m) && matches(m))

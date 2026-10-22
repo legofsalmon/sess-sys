@@ -5,13 +5,15 @@ import { DEPARTMENT_LABELS, type Model } from './stock.ts'
  * Finding a product as it's typed (ADR 0070), for the product picker: what's
  * typed can be anywhere in the name ("58" finds Shure SM58), in another name
  * it goes by ("beta" finds it by "Beta 58"), or in its category or
- * department ("cable"). Every word typed has to be found, in any of those and
+ * department ("cable"), or its stock code (ADR 0074). Every word typed has to be found, in any of those and
  * in any order, so "shure 58" and "58 shure" find the same. Capitals,
  * accents, spaces and dashes don't count: "sm-58" is "SM58".
  */
 
 type Findable = Pick<Model, 'id' | 'name' | 'department' | 'category'> & {
   aliases?: readonly string[]
+  /** Its stock code (ADR 0074), found as another name is. */
+  code?: string
 }
 
 export interface Found<P> {
@@ -37,7 +39,7 @@ export function findProducts<P extends Findable>(products: readonly P[], typed: 
   const out: { f: Found<P>; rank: number }[] = []
   for (const p of products) {
     const name = kitKey(p.name)
-    const others = (p.aliases ?? []).map((a) => ({ a, key: kitKey(a) }))
+    const others = [...(p.aliases ?? []), ...(p.code ? [p.code] : [])].map((a) => ({ a, key: kitKey(a) }))
     const meta = `${kitKey(p.category)} ${kitKey(DEPARTMENT_LABELS[p.department] ?? '')}`
     let rank: number
     let via: string | undefined

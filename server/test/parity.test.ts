@@ -155,6 +155,13 @@ const CASES: Case[] = [
   c('model.update', { id: 'xlr', name: 'XLR 10m', category: 'Cable', valueCents: 1500 }),
   c('model.remove', { id: 'unused' }, { before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('model.mistake', { id: 'unused' }, { before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
+  // Racks (ADR 0074).
+  c('model.create', { id: 'monrack', name: 'Monitor rack', department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, code: 'RK-MON', units: 12, depthMm: 450, weightKg: 18.25, powerW: null, valueCents: null, notes: '' }, { as: 'a rack' }),
+  c('model.update', { id: 'rack', isRack: true, units: 12, depthMm: 500, code: ' RK-AMP ' }, { as: 'made a rack, its kit no longer free on its own' }),
+  c('model.update', { id: 'y10p', units: 2, depthMm: 300, weightKg: 12.4, powerW: 0 }, { as: 'a size' }),
+  c('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 3, side: 'front', qty: 1, notes: ' Top ' }, { as: 'on the rails', before: [m('model.update', { id: 'rack', isRack: true, units: 4 })] }),
+  c('rackSlot.set', { id: 's2', rackId: 'rack', modelId: 'xlr', top: null, side: 'front', qty: 6, notes: '' }, { as: 'loose', before: [m('model.update', { id: 'rack', isRack: true })] }),
+  c('rackSlot.remove', { id: 's1' }, { before: [m('model.update', { id: 'rack', isRack: true }), m('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 1, side: 'rear', qty: 1, notes: '' })] }),
   c('place.upsert', { id: 'van-shelf', name: 'Van shelf', notes: '' }),
   c('place.remove', { id: 'bay' }),
   c('asset.add', { id: 'a3', modelId: 'y10p', number: 'SH-000004', serial: 'Y3', placeId: 'bay', caseId: null, notes: '', fromCount: false }),

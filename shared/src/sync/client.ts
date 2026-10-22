@@ -26,6 +26,7 @@ import { moneyView, type MoneyView } from './money-view.ts'
 import { ownCalendarsView, type OwnCalendarsView } from './own-calendar-view.ts'
 import { vehiclesView, type VehiclesView } from './vehicles-view.ts'
 import { stepsView, type StepsView } from './steps-view.ts'
+import { racksView, type RacksView } from './racks-view.ts'
 import { MONEY_ENTITY_NAMES } from '../quotes.ts'
 import { READS_EVERYTHING, sameReading, type Reading } from '../reading.ts'
 
@@ -195,6 +196,8 @@ export interface View {
   vehicles: VehiclesView
   /** Each job's steps from the quote to the kit put away, who each is down to, and each person's own (ADR 0073). */
   steps: StepsView
+  /** Racks: each rack product's layout, what it comes to, and each built one against it (ADR 0074). */
+  racks: RacksView
   /**
    * What would keep a person's name were they erased on a day (today
    * unless said): their pay records and their leave records, each with
@@ -241,6 +244,7 @@ const LAZY = [
   'ownCalendars',
   'vehicles',
   'steps',
+  'racks',
 ] as const satisfies readonly (keyof View)[]
 type Lazy = (typeof LAZY)[number]
 type MovesKit = { moves: MovesView; kit: KitView }
@@ -572,6 +576,8 @@ export class SyncClient {
     lazy.steps = part('steps', () => [lazy.jobs(), lazy.crew(), lazy.kit(), lazy.moves(), lazy.money(), lazy.vehicles()], (e, o) =>
       stepsView(e, o, cursor, lazy.jobs(), lazy.crew(), lazy.kit(), lazy.moves(), lazy.money(), lazy.vehicles(), today)
     )
+
+    lazy.racks = part('racks', () => [lazy.warehouse()], (e, o) => racksView(e, o, cursor, lazy.warehouse()))
 
     const view = {
       problems: [...this.state.problems],

@@ -249,6 +249,8 @@ const REFERENCES = [
   'clientId',
   'venueId',
   'modelId',
+  // Racks' layouts (ADR 0074).
+  'rackId',
   'placeId',
   'caseId',
   'assetId',
@@ -618,7 +620,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
     }
     case 'model.create':
-      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isCase ? ', holds other kit' : ''})`
+      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''})`
     case 'model.update': {
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a product')}`)
@@ -633,6 +635,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
         parts.push(typeof a.liftingMonths === 'number' ? `a thorough examination every ${monthsText(a.liftingMonths)}` : 'no thorough examination')
       if (Array.isArray(a.aliases))
         parts.push(a.aliases.length ? `other names to ${aliasesOf(a.aliases.filter((x) => typeof x === 'string').join(',')).join(', ')}` : 'no other names')
+      // Racks (ADR 0074).
+      if (a.isRack !== undefined) parts.push(a.isRack ? 'a rack' : 'not a rack')
+      if (a.code !== undefined) parts.push(typeof a.code === 'string' && a.code.trim() ? `stock code to ${clip(a.code.trim())}` : 'no stock code')
+      const sized = (['units', 'depthMm', 'weightKg', 'powerW'] as const).filter((k) => a[k] !== undefined)
+      if (sized.length) parts.push('its size')
       if (a.listId !== undefined) parts.push(typeof a.listId === 'string' && a.listId ? `its id in the list it came from to ${a.listId}` : 'no id from a list')
       return `Changed the product ${model(a.id)}: ${inWords(parts)}`
     }
@@ -688,6 +695,16 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'kit.remove': {
       const k = look('kitLine', a.id)
       return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
+    }
+    // Racks' layouts (ADR 0074): "Put Shure ULXD4Q at U3 on the front of Monitor rack".
+    case 'rackSlot.set': {
+      const at = typeof a.top === 'number' ? `at U${a.top} on the ${a.side === 'rear' ? 'back' : 'front'}` : 'loose'
+      const many = typeof a.qty === 'number' && a.qty > 1 ? `${a.qty} × ` : ''
+      return `Put ${many}${model(a.modelId)} ${at} in the layout of ${model(a.rackId)}`
+    }
+    case 'rackSlot.remove': {
+      const was = look('rackSlot', a.id)
+      return was ? `Took ${model(was.modelId)} out of the layout of ${model(was.rackId)}` : 'Took something out of a rack layout'
     }
     case 'kit.fromNotes': {
       // Kit read from jobs' notes (ADR 0043): each line is how many there should be, so it may have added fewer, or none.

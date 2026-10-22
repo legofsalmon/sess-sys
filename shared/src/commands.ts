@@ -21,6 +21,7 @@ import { quoteCommandSchemas } from './quotes.ts'
 import { ownCalendarCommandSchemas } from './own-calendar.ts'
 import { vehicleCommandSchemas } from './vehicles.ts'
 import { stepCommandSchemas } from './steps.ts'
+import { rackCommandSchemas } from './racks.ts'
 
 /**
  * Commands are what a device asks for, not rows it has already changed. The
@@ -54,6 +55,7 @@ export const commandSchemas = {
   ...ownCalendarCommandSchemas,
   ...vehicleCommandSchemas,
   ...stepCommandSchemas,
+  ...rackCommandSchemas,
 } as const
 
 export type CommandName = keyof typeof commandSchemas

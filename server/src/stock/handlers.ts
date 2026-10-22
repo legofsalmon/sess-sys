@@ -17,7 +17,9 @@ import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
 import { movementsOf, outWithJobs } from './moves.ts'
+import { clearLayout, inLayoutsReason, racksUsing, slotsIn } from './racks.ts'
 import {
+  codeTaken,
   atPlace,
   caseChain,
   casesInUse,
@@ -45,6 +47,8 @@ import {
  * - a product with items or counts, a place with anything at it, and a
  *   case with anything in it can't be removed or retired, nor a product
  *   on a job's kit (ADR 0014);
+ * - a product's stock code is its own (ADR 0074), and a product in a
+ *   rack's layout, or a rack with a layout, can't be removed;
  * - a product added by mistake (audit finding 19) is kept for the history
  *   with its items retired as a mistake and its counts gone, and nothing
  *   more can be done as it; it can't be marked so while any of it is on a
@@ -80,6 +84,12 @@ const MODEL_COLUMNS = {
   liftingMonths: 'lifting_months',
   aliases: 'aliases',
   listId: 'list_id',
+  isRack: 'is_rack',
+  code: 'code',
+  units: 'units',
+  depthMm: 'depth_mm',
+  weightKg: 'weight_kg',
+  powerW: 'power_w',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -229,9 +239,13 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (await getModel(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This product already exists.' })
     const taken = await nameTaken(ctx.tx, 'models', a.name.trim(), a.id)
     if (taken) throw new Refused({ code: 'conflict', message: `There's already a product called ${taken}.` })
+    const code = a.code.trim()
+    const coded = code && (await codeTaken(ctx.tx, code, a.id))
+    if (coded) throw new Refused({ code: 'conflict', message: `${coded} already has the stock code ${code}.` })
     await ctx.tx.query(
-      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id,
+                           is_rack, code, units, depth_mm, weight_kg, power_w)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         a.id,
         a.name.trim(),
@@ -245,6 +259,12 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         a.liftingMonths,
         JSON.stringify(aliasesOf((a.aliases ?? []).join(','), a.name)),
         a.listId ?? '',
+        a.isRack,
+        code,
+        a.units,
+        a.depthMm,
+        a.weightKg,
+        a.powerW,
       ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
@@ -257,6 +277,18 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       next.name = a.name.trim()
       const taken = await nameTaken(ctx.tx, 'models', next.name, a.id)
       if (taken) throw new Refused({ code: 'conflict', message: `There's already a product called ${taken}.` })
+    }
+    if (a.code !== undefined) {
+      const code = a.code.trim()
+      const coded = code && (await codeTaken(ctx.tx, code, a.id))
+      if (coded) throw new Refused({ code: 'conflict', message: `${coded} already has the stock code ${code}.` })
+    }
+    if (next.isRack && !next.isCase) throw new Refused({ code: 'invalid', message: 'A rack holds other kit, so it is a case.' })
+    if (!next.isRack && m.isRack && (await slotsIn(ctx.tx, a.id)) > 0)
+      throw new Refused({ code: 'conflict', message: `${m.name} has a layout. Take everything out of it first.` })
+    if (next.isRack && !m.isRack) {
+      const racks = await racksUsing(ctx.tx, a.id)
+      if (racks.length) throw new Refused({ code: 'conflict', message: `${m.name} ${inLayoutsReason(racks)}` })
     }
     if (next.isCase && next.tracking === 'bulk') throw new Refused({ code: 'invalid', message: 'A case has its own number, so it is numbered, not counted.' })
     if (next.tracking === 'bulk' && m.tracking !== 'bulk') {
@@ -276,7 +308,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     await ctx.tx.query(`UPDATE models SET ${fields.map((k, i) => `${MODEL_COLUMNS[k]} = $${i + 2}`).join(', ')} WHERE id = $1`, [
       a.id,
       ...fields.map((k) =>
-        k === 'name' || k === 'category' ? String(a[k]).trim() : k === 'aliases' ? JSON.stringify(aliasesOf(a.aliases!.join(','), next.name)) : a[k]
+        k === 'name' || k === 'category' || k === 'code' ? String(a[k]).trim() : k === 'aliases' ? JSON.stringify(aliasesOf(a.aliases!.join(','), next.name)) : a[k]
       ),
     ])
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
@@ -290,6 +322,9 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (uses.counted > 0) throw new Refused({ code: 'conflict', message: `${m.name} still has ${uses.counted} counted. Count them as none first.` })
     const onKit = await onKitFor(ctx, a.id)
     if (onKit) throw new Refused({ code: 'conflict', message: `${m.name} is on the kit for ${onKit}` })
+    const racks = await racksUsing(ctx.tx, a.id)
+    if (racks.length) throw new Refused({ code: 'conflict', message: `${m.name} ${inLayoutsReason(racks)}` })
+    if ((await slotsIn(ctx.tx, a.id)) > 0) throw new Refused({ code: 'conflict', message: `${m.name} has a layout. Take everything out of it first.` })
     if ((await movementsOf(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has been out on jobs, which is kept for the record, so it can't be removed.` })
     if ((await faultsOf(ctx.tx, a.id)) > 0)
@@ -307,11 +342,15 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (onKit) throw new Refused({ code: 'conflict', message: `${m.name} is on the kit for ${onKit}` })
     const out = await outWithJobs(ctx.tx, a.id)
     if (out.length) throw new Refused({ code: 'conflict', message: stillOutReason(m.name, out) })
+    const racks = await racksUsing(ctx.tx, a.id)
+    if (racks.length) throw new Refused({ code: 'conflict', message: `${m.name} ${inLayoutsReason(racks)}` })
     // Its items go the way a retirement takes them, a case among them only once it's empty.
     const { rows: items } = await ctx.tx.query<{ id: string }>(`SELECT id FROM assets WHERE model_id = $1 AND status = 'active' ORDER BY id`, [a.id])
     for (const { id } of items) await retireItem(ctx, id, 'mistake', '')
     const { rows: counts } = await ctx.tx.query<{ place_id: string | null; case_id: string | null }>('SELECT place_id, case_id FROM stock WHERE model_id = $1', [a.id])
     for (const c of counts) await adjust(ctx, a.id, { placeId: c.place_id, caseId: c.case_id }, { to: 0 })
+    // A rack's layout goes with it: it was never a rack.
+    await clearLayout(ctx, a.id)
     await ctx.tx.query('UPDATE models SET mistake = true WHERE id = $1', [a.id])
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },

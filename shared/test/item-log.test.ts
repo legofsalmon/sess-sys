@@ -1,3 +1,4 @@
+import { NOT_RACKED } from '../src/stock.ts'
 import { describe, expect, it } from 'vitest'
 import { deviceItemLog, itemLogWords, joinItemLog, type ItemEvent, type ItemLogEntry } from '../src/item-log.ts'
 import type { Asset, Model } from '../src/stock.ts'
@@ -17,6 +18,7 @@ const never: Transport = {
   pull: () => Promise.reject(new Error('No signal')),
 }
 const model = (id: string, name: string, isCase = false): Model => ({
+  ...NOT_RACKED,
   aliases: [],
   id,
   name,
