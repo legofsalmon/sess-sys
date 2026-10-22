@@ -205,7 +205,8 @@ test('reads Current RMS’s exports chosen together into one counted list, and s
   await expect(read).toContainText('4 products and 11 pieces of kit from Current RMS, with the rates. Everything comes in counted, to be labelled later.')
   const k12 = office.getByRole('region', { name: 'Rows' }).getByRole('listitem', { name: 'Row 2' })
   await expect(k12).toContainText('2 counted · €1,250 · €60 a day')
-  await expect(k12).toContainText('Updates Corvo K12: day price €60')
+  // The export's id rides along, so bringing the list in again finds this product by it (audit, 20 October 2026, finding 7).
+  await expect(k12).toContainText('Updates Corvo K12: its id in the old system kept, 1 and day price €60')
   // The list places nothing, so one place is asked for once, for all of it (ADR 0061), rather than on every row.
   const where = office.getByRole('region', { name: 'Places and cases' })
   await expect(where.getByRole('checkbox', { name: /Put all of it there/ })).toHaveCount(0)
