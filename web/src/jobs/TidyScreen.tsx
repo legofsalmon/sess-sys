@@ -45,32 +45,47 @@ export const TIDY: Step = { href: '#jobs/tidy', label: 'Tidy up' }
 const tidyJob = (j: JobView): TidyJob => ({ ...j, phaseVenues: j.phases.map((p) => p.venueId) })
 const whenOf = (j: TidyJob) => (j.span ? spanLabel(j.span) : 'No dates yet')
 
-/** Everything the page would suggest, worked out once per change of the data. */
-export function useTidy(view: View) {
-  return useMemo(() => {
-    const jobs = view.jobs.jobs.map(tidyJob)
-    return {
-      same: sameJobs(jobs),
-      // The same person brought in twice (ADR 0055), before naming anyone: combining may give them their name.
-      twice: samePeople(view.crew.people),
-      people: view.crew.people.filter(namedFromAddress),
-      venues: venueGuesses(jobs, view.jobs.venues),
-      words: clientWords(jobs, { clients: view.jobs.clients, venues: view.jobs.venues }).slice(0, 12),
-      small: view.jobs.jobs.filter((j) => withCapital(j.name) !== j.name),
-    }
-  }, [view.jobs, view.crew.people])
+/** The last analysis, kept while the jobs and people it read are the same, so leaving Jobs and coming back doesn't redo it (audit, 20 October 2026, finding 2). */
+let kept: { jobs: View['jobs']; people: View['crew']['people']; tidy: Tidy } | undefined
+
+type Tidy = ReturnType<typeof tidyOf>
+
+function tidyOf(view: View) {
+  const jobs = view.jobs.jobs.map(tidyJob)
+  return {
+    same: sameJobs(jobs),
+    // The same person brought in twice (ADR 0055), before naming anyone: combining may give them their name.
+    twice: samePeople(view.crew.people),
+    people: view.crew.people.filter(namedFromAddress),
+    venues: venueGuesses(jobs, view.jobs.venues),
+    words: clientWords(jobs, { clients: view.jobs.clients, venues: view.jobs.venues }).slice(0, 12),
+    small: view.jobs.jobs.filter((j) => withCapital(j.name) !== j.name),
+  }
+}
+
+/** Everything the page would suggest, worked out once per change of the jobs or people. */
+export function tidyFor(view: View): Tidy {
+  const { jobs } = view
+  const { people } = view.crew
+  if (kept?.jobs !== jobs || kept.people !== people) kept = { jobs, people, tidy: tidyOf(view) }
+  return kept.tidy
 }
 
 /** How much there is to tidy, for the line on Jobs and Crew. */
-export function tidyCount(t: ReturnType<typeof useTidy>) {
+export function tidyCount(t: Tidy) {
   return t.same.length + t.twice.length + t.people.length + t.venues.length + t.small.length
 }
 
 /** On Jobs, once a calendar has been brought in and there's something to tidy. */
 export function TidyNudge({ view }: { view: View }) {
-  const t = useTidy(view)
   const mayJobs = useAccess().can('jobs')
+  // Before any of the work: with nothing from a calendar there's nothing to say (audit, 20 October 2026, finding 2).
   if (!mayJobs || !view.jobs.jobs.some((j) => j.sourceCalendar)) return null
+  return <Nudge view={view} />
+}
+
+function Nudge({ view }: { view: View }) {
+  const t = tidyFor(view)
   const parts = [
     t.same.length && plural(t.same.length, 'job', 'jobs') + ' brought in as several',
     t.twice.length && plural(t.twice.length, 'person', 'people') + ' brought in twice',
@@ -89,7 +104,7 @@ export function TidyNudge({ view }: { view: View }) {
 }
 
 export function TidyScreen({ view }: { view: View }) {
-  const t = useTidy(view)
+  const t = tidyFor(view)
   const access = useAccess()
   const nothing = tidyCount(t) === 0 && t.words.length === 0
   return (

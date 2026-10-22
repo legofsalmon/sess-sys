@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: the Jobs tab opens quicker
+
+**Done**
+
+- Finding 2 of the [20 October audit](audit-2026-10-20.md) (PR #118): a
+  tap on Jobs took 1.3 s cold on a slowed phone at 800 jobs, half of it
+  the Tidy up nudge comparing every pair of jobs. The nudge now checks for
+  a calendar job first, the analysis is kept while the jobs and people are
+  the same, the pair check stops once jobs start too late to be near
+  (about 250 ms to 22 ms at 810 jobs here), and the Jobs list's counts and
+  weeks are worked out only when something they read changes. App 1.28.1.
+- Checked: typecheck, all unit and server tests, and the Jobs, Tidy up,
+  import and screens browser tests.
+
 ## 22 October 2026: a new phone says when it is still catching up
 
 **Done**
