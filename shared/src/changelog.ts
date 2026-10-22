@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.28.0',
+    date: '2026-10-22',
+    title: 'A new phone says when it is still catching up',
+    what: "The first time the app opens on a new phone or computer, it fetches the company's records before it can show them. It used to say “Up to date” while that was still going on, so Home could show no jobs today when there were some. The top bar now says “Catching up” with how far it has got, Home says it is still catching up instead of showing empty counts, and the Crew tab holds back its badge until the records are in.",
+    prs: [117],
+  },
+  {
     version: '1.27.1',
     date: '2026-10-22',
     title: 'The checks pass on Thursdays',
