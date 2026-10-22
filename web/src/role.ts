@@ -1,4 +1,4 @@
-import { changesLinkOf, COMMAND_NEEDS, departmentForRole, RATES_REFUSAL_DEPARTMENT, readsRatesIn, LINKS_REFUSAL, personForEmail, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
+import { changesLinkOf, COMMAND_NEEDS, STEP_NOT_YOURS, departmentForRole, RATES_REFUSAL_DEPARTMENT, readsRatesIn, LINKS_REFUSAL, personForEmail, RATES_REFUSAL, refusalFor, roleCan, roleForEmail, setsRates, type Ability, type CommandArgs, type Role, type View } from '@sh/shared'
 import { currentAuth, useAuth, type Auth } from './auth.ts'
 import { previewKey, usePreview } from './home/Preview.tsx'
 import { client } from './sync.ts'
@@ -63,8 +63,14 @@ export const useSeesRates = () => useView().reading.rates
 // Every change goes through the client, so a role's limits hold on every screen, offline too, before anything is kept.
 client.guard = (name, args) => {
   const view = client.view()
-  const { role } = accessOf(currentAuth(), view, previewKey())
+  const { role, personId } = accessOf(currentAuth(), view, previewKey())
   if (role && !roleCan(role, COMMAND_NEEDS[name])) return refusalFor(role, COMMAND_NEEDS[name])
+  // Staff crew change only the steps that are theirs (ADR 0073); the server says the same.
+  if (role === 'crew' && name === 'jobStep.set') {
+    const a = args as CommandArgs<'jobStep.set'>
+    const step = view.steps.of(a.projectId)?.steps.find((s) => s.key === a.step)
+    if (!personId || step?.ownerId !== personId) return STEP_NOT_YOURS
+  }
   // A new link is for a role that is sent the person's link (ADR 0046); the server says the same.
   const relinked = changesLinkOf(name, args)
   if (relinked && view.crew.people.some((p) => p.id === relinked && p.linkHidden)) return LINKS_REFUSAL

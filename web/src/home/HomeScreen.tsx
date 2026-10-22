@@ -93,6 +93,8 @@ export function HomeScreen() {
           ))}
         </div>
 
+        {/* The job steps given to whoever is looking (ADR 0073): their to-do list, on top of whichever view. */}
+        {me && <MySteps view={view} me={me} all={shownFor === 'me'} />}
         {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
         {shownFor === 'department' && (
           <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
@@ -583,5 +585,50 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
       {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
       <Today view={view} today={today} />
     </>
+  )
+}
+
+/**
+ * The job steps given to you (ADR 0073), not done yet: the ones the job is
+ * at first, as they're yours to do now, then by the job's first day. Each
+ * opens the job, whose steps are at the top. On Me, all of them; on the
+ * other views, on top as they're yours whichever you look at, only the
+ * first few to do now. Nothing at all while there are none.
+ */
+const STEPS_ON_TOP = 5
+
+function MySteps({ view, me, all }: { view: View; me: PersonView; all: boolean }) {
+  const steps = view.steps.mine(me.id)
+  const now = steps.filter((s) => s.next)
+  const shown = all ? steps : now.slice(0, STEPS_ON_TOP)
+  if (shown.length === 0) return null
+  const more = steps.length - shown.length
+  return (
+    <section className="card my-steps" aria-labelledby="my-steps-title">
+      <Heading icon="done" id="my-steps-title">{all ? `Your steps (${steps.length})` : `Your steps to do now (${now.length})`}</Heading>
+      <ul className="job-list">
+        {shown.map(({ job, step, next }) => {
+          const at = view.steps.of(job.id)?.current
+          return (
+            <li key={`${job.id}.${step.key}`}>
+              <a className="job-row" href={`#jobs/${encodeURIComponent(job.id)}`}>
+                <div>
+                  <b>{step.label}</b>
+                  <p>
+                    {job.name}
+                    {step.hint && ` · ${step.hint}`}
+                  </p>
+                </div>
+                <div className="side">
+                  {next ? <small className="flag">Now</small> : at && <small>After {at.label}</small>}
+                  {job.span && <small>{dayLabel(job.span.start)}</small>}
+                </div>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+      {!all && more > 0 && <p className="hint">{plural(more, 'more step')} of yours on Me.</p>}
+    </section>
   )
 }

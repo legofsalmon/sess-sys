@@ -48,11 +48,13 @@ import { KitCard, kitSummary } from './Kit.tsx'
 import { VansCard } from './Vans.tsx'
 import { QuoteCard } from './Quote.tsx'
 import { ShowPackCard } from './ShowPack.tsx'
+import { StepsCard } from './Steps.tsx'
 import { Heading } from '../Icon.tsx'
 import { JOBS } from '../Up.tsx'
 
 /**
- * One job: what it is, then its parts one at a time (a tab each): its
+ * One job: what it is, the steps it goes through and who each is down to
+ * (ADR 0073), then its parts one at a time (a tab each): its
  * phases and how each will read on the calendar, its crew, its kit and
  * vans (ADR 0014, 0047), its show pack and its quote. Crew calls made here
  * belong to the job and its phase, so freelancers always see the job's
@@ -126,6 +128,8 @@ export function JobScreen({ view, id, part: asked }: { view: View; id: string; p
     <Page view={view} className="crew jobs job-page" up={up}>
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
+      {/* The way the job goes, from the quote to the kit put away, and who each step is down to (ADR 0073). */}
+      <StepsCard job={job} view={view} onPart={pick} />
 
       <PartTabs parts={parts} current={part} counts={counts} onPick={pick} />
       <div className="job-part" role="tabpanel" id="job-part" aria-labelledby={`job-tab-${part}`}>

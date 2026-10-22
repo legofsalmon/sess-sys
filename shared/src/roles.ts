@@ -39,13 +39,13 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',
   office: 'Jobs, crew, kit and stock, money, and the settings: calendar, office details, bringing lists in, downloads.',
-  head: 'Crew and their bookings, kit on jobs, stock and the warehouse. Not jobs themselves, nor settings.',
-  crew: "Their own leave and days in lieu, and reporting a fault. They can look at the rest, but nobody else's pay, link, email, notes or documents.",
+  head: "Crew and their bookings, kit on jobs, stock and the warehouse, and jobs' steps. Not jobs themselves, nor settings.",
+  crew: "Their own leave and days in lieu, the job steps given to them, and reporting a fault. They can look at the rest, but nobody else's pay, link, email, notes or documents.",
   freelancer: "Reporting a fault. Their offers, bookings, timesheets and days off go through their private link; they can look at the rest, but nobody else's pay, link, phone, email, notes or documents.",
 }
 
 /** The kinds of change a role can make. Each command needs exactly one. */
-export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'money', 'settings', 'company'] as const
+export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'money', 'settings', 'company'] as const
 export type Ability = (typeof ABILITIES)[number]
 
 /** Each kind of change, as "Only … can ___". */
@@ -56,6 +56,7 @@ const ABILITY_WORDS: Record<Ability, string> = {
   stock: 'change stock and the warehouse',
   fault: 'report a fault',
   leave: 'ask for leave',
+  steps: "tick off and give out a job's steps",
   money: 'see and change prices, quotes and what is owed',
   settings: 'change settings, bring lists in or download everything',
   company: 'change roles, erase a person or start fresh',
@@ -64,9 +65,10 @@ const ABILITY_WORDS: Record<Ability, string> = {
 /** What each role can change. A director can change everything. */
 export const ROLE_CAN: Record<Role, readonly Ability[]> = {
   director: ABILITIES,
-  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'money', 'settings'],
-  head: ['crew', 'kit', 'stock', 'fault', 'leave'],
-  crew: ['fault', 'leave'],
+  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'money', 'settings'],
+  head: ['crew', 'kit', 'stock', 'fault', 'leave', 'steps'],
+  // Staff crew tick or hand on their own steps only (ADR 0073), which the step's handler checks on top.
+  crew: ['fault', 'leave', 'steps'],
   freelancer: ['fault'],
 }
 
@@ -167,6 +169,9 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'lieu.log': 'leave',
   'lieu.cancel': 'leave',
   'lieu.decide': 'leave',
+
+  // A job's steps (ADR 0073): every member of staff ticks their own; staff crew only theirs, checked by the handler.
+  'jobStep.set': 'steps',
 
   // Money (ADR 0042): prices, quotes and what's owed are the office's and the directors'. A role without it isn't sent them either.
   'quote.save': 'money',

@@ -180,6 +180,9 @@ function recordPlace({ entity, id }: { entity: string; id: string }, view: View)
       return '#crew/leave'
     case 'timesheet':
       return '#crew/timesheets'
+    // A job's step (ADR 0073): "<job>.<step>", opened on its job, whose steps are at the top.
+    case 'jobStep':
+      return job(id.slice(0, id.lastIndexOf('.')))
     default:
       return undefined
   }

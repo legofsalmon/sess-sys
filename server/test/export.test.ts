@@ -117,6 +117,7 @@ describe('download everything', () => {
       'faults',
       'identifiers',
       'inspections',
+      'job_steps',
       'kit_lines',
       'kit_names',
       'kit_notes_read',

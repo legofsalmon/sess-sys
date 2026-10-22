@@ -3,6 +3,28 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: each job's steps, and who has each
+
+**Done**
+
+- [ADR 0073](adr/0073-a-jobs-steps-and-who-has-each.md) (PR #126), on
+  Colly's ask for a line of steps on every job page, from the quote to the
+  deprep, each given to a member of staff and on their to-do list. Eight
+  steps for gigs and dry hires; the app ticks Quote sent, Confirmed, Crew
+  booked, Picked, On the job and Back in from the job's own records, and
+  Kit and vans and Deprepped are ticked by hand (any step can be). Steps
+  are given to staff (`job_steps`, `jobStep.set`, a new `steps` ability:
+  staff crew change only their own). "Your steps" on Home, and
+  Notifications for a step given to you; nothing is sent outside the app.
+  App 1.31.0.
+- Checked: typecheck, unit tests (steps, roles, parity, export), and a
+  browser test (steps.spec.ts).
+
+**Not done, for later if wanted**
+
+- Choosing the steps per company, due dates on steps, and an office list
+  of every step by who has it.
+
 ## 22 October 2026: picking on the phone
 
 **Done**

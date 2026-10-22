@@ -261,6 +261,11 @@ const CASES: Case[] = [
   c('vehicleBooking.add', { id: 'run2', vehicleId: 'van', projectId: 'gala', phaseId: 'show', start: day(5), end: day(5), driverId: null, notes: '', override: false }),
   c('vehicleBooking.update', { id: 'run', start: day(4), end: day(4), driverId: null, notes: 'Collect from Bay A1' }),
   c('vehicleBooking.remove', { id: 'run' }),
+
+  // A job's steps (ADR 0073).
+  c('jobStep.set', { projectId: 'gala', step: 'deprep', ownerId: 'aoife' }, { as: 'given to someone' }),
+  c('jobStep.set', { projectId: 'gala', step: 'kit', done: true, by: 'cian' }, { as: 'ticked' }),
+  c('jobStep.set', { projectId: 'gala', step: 'kit', done: false, ownerId: null }, { as: 'the tick and the name taken off', before: [m('jobStep.set', { projectId: 'gala', step: 'kit', ownerId: 'cian', done: true })] }),
 ]
 
 /**
