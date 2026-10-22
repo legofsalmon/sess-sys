@@ -108,6 +108,15 @@ server needs no key at all.
   Hire's size that is a few megabytes, well within the server's limits; if
   the data ever grows past a few hundred megabytes, backups should move to
   streaming, and to a separate job.
+  *Since 22 October 2026 (audit of 20 October, finding 9):* the scratch
+  database alone takes about 300 MB to boot, and a test restore at the
+  size the stock bring-in plans peaked near 1 GB, Railway's limit. The test
+  restore now runs in a process of its own with a 512 MB cap on its
+  JavaScript memory, so its memory is given back when it ends and a failure
+  is a failed backup, not a stopped server; a backup and a download of
+  everything take turns. The peak still counts against the service's
+  memory, so the Railway limit wants raising to 2 GB, and streaming the file
+  into the scratch database is still the next step if the data grows.
 - A drill every few months is still worth doing: restore the latest backup
   into a new Neon branch or a local database with the `backup` command, and
   open the app on it.

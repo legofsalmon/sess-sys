@@ -26,6 +26,7 @@ import { createSession, upsertUser } from '../src/auth/sessions.ts'
 import { backupKeyFromEnv, isEncrypted } from '../src/backup/crypto.ts'
 import { newGeneration, readGeneration, restoreBackup, writeBackup } from '../src/backup/format.ts'
 import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toThin } from '../src/backup/service.ts'
+import { takeTurns } from '../src/turns.ts'
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
 import { CREW, migrateCrew } from '../src/crew/schema.ts'
 import type { Db } from '../src/db.ts'
@@ -308,6 +309,34 @@ describe('the backup file', () => {
     await restoreBackup(copy, backup.data)
     expect(await contents(copy, 'products')).toEqual(await contents(db, 'products'))
     expect(await keptSyncTestTables(copy)).toEqual([{ table: 'products', rows: 1 }])
+  })
+})
+
+describe('the test restore, in a process of its own (audit, 20 October 2026, finding 9)', () => {
+  it("gives its memory back when it's done, and a restore that runs too long is a failed check, not a stopped server", async () => {
+    const db = await database()
+    await seed(await server(db), db)
+    const backup = await writeBackup(db)
+    const before = process.memoryUsage().rss
+    for (let i = 0; i < 3; i++) expect((await checkRestores(backup.data)).rows).toBe(backup.rows)
+    // A scratch database booted in a worker thread kept about 400 MB in the server after three of these; in its own process, none.
+    expect(process.memoryUsage().rss - before).toBeLessThan(150 * 1024 * 1024)
+    await expect(checkRestores(backup.data, undefined, { timeoutMs: 1 })).rejects.toThrow('The test restore failed: it took too long.')
+  })
+
+  it('takes turns with whatever else holds the whole company in memory', async () => {
+    const said: string[] = []
+    const slow = (name: string, ms: number) => takeTurns(async () => {
+      said.push(`${name} starts`)
+      await new Promise((r) => setTimeout(r, ms))
+      said.push(`${name} ends`)
+      if (name === 'export') throw new Error('it broke')
+      return name
+    })
+    const [backup, exported, again] = await Promise.allSettled([slow('backup', 30), slow('export', 5), slow('backup again', 1)])
+    expect([backup.status, exported.status, again.status]).toEqual(['fulfilled', 'rejected', 'fulfilled'])
+    // One at a time, in the order asked, and one that fails doesn't stop the next.
+    expect(said).toEqual(['backup starts', 'backup ends', 'export starts', 'export ends', 'backup again starts', 'backup again ends'])
   })
 })
 

@@ -43,6 +43,7 @@ import { reportError, reportNowAndThen, type ErrorReporting } from './monitoring
 import { keptSyncTestTables } from './schema.ts'
 import { asRead, readingOf } from './reading.ts'
 import { registerStockImportRoutes, type StockImportRound } from './stock/import.ts'
+import { takeTurns } from './turns.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 import { nominatim, registerPlaceRoutes, type PlaceSearch } from './projects/places.ts'
 
@@ -596,9 +597,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return reply.header('cache-control', 'no-store').send({ rows })
   })
 
+  // Taking turns with a backup, which also holds the whole company in memory (turns.ts, audit, 20 October 2026, finding 9).
   app.get('/api/export.zip', { config: { needs: 'settings' } }, async (req, reply) => {
-    const everything = await readEverything(db)
-    const zip = everythingZip(everything, req.user ?? undefined)
+    const { everything, zip } = await takeTurns(async () => {
+      const everything = await readEverything(db)
+      return { everything, zip: everythingZip(everything, req.user ?? undefined) }
+    })
     return reply
       .type('application/zip')
       .header('content-disposition', `attachment; filename="${zipName(everything)}"`)
@@ -608,8 +612,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // The same, as JSON, for scripts. A script that wants its download in the history posts to /api/export/record first.
   app.get('/api/export', { config: { needs: 'settings' } }, async (_req, reply) => {
-    const everything = await readEverything(db)
-    return reply.header('cache-control', 'no-store').send(everythingJson(everything))
+    const json = await takeTurns(async () => everythingJson(await readEverything(db)))
+    return reply.header('cache-control', 'no-store').send(json)
   })
 
   if (webRoot) {
