@@ -35,6 +35,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { CrewViews } from './CrewViews.tsx'
 import { Heading } from '../Icon.tsx'
+import { inDepartment, Narrowed, useNarrowed } from './Narrowed.tsx'
 
 /**
  * Staff leave and time in lieu (ADR 0024), at #crew/leave: my year's
@@ -561,10 +562,13 @@ function EntryRow({ e, me }: { e: LieuEntryView; me: PersonView }) {
 
 /** The queue for whoever can approve time off, with what to weigh up, and the decision in place. */
 function ToApprove({ view, me }: { view: View; me: PersonView }) {
-  const queue = view.leave.queue
+  // Opened from a count on Home for a department, that department's requests, as Home counted them (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#crew/leave')
+  const queue = view.leave.queue.filter((q) => inDepartment(department)(q.person))
   return (
     <section className="card" aria-label="To approve">
       <h2>To approve</h2>
+      <Narrowed department={department} onWiden={widen} />
       {queue.length === 0 && <Empty />}
       {queue.map((item) => (
         <QueueRow key={item.kind === 'request' ? item.request.id : item.entry.id} item={item} me={me} />

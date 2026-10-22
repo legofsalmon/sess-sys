@@ -28,6 +28,7 @@ import { useAccess, useSeesRates } from '../role.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './Messages.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
+import { inDepartment, Narrowed, useNarrowed } from './Narrowed.tsx'
 
 /**
  * Timesheets (ADR 0022) as the office works with them: the ones sent to
@@ -42,7 +43,12 @@ const job = (r: TimesheetRow) => `${r.call.project}${r.call.phase ? ` · ${r.cal
 
 /** For the Crew tab: what's waiting on the office. */
 export function TimesheetsCard({ view }: { view: View }) {
-  const { toApprove, notIn, approved } = view.timesheets
+  // Opened from a count on Home for a department, that department's, as Home counted them (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#crew/timesheets')
+  const theirs = inDepartment(department)
+  const toApprove = view.timesheets.toApprove.filter((r) => theirs(r.person))
+  const notIn = view.timesheets.notIn.filter((r) => theirs(r.person))
+  const { approved } = view.timesheets
   const [remind, setRemind] = useState<TimesheetRow | undefined>()
   const lately = approved.slice(0, 5)
   // Timesheets carry pay, which a role that doesn't see rates isn't sent (ADR 0046): said once, at the top.
@@ -56,6 +62,7 @@ export function TimesheetsCard({ view }: { view: View }) {
   return (
     <section className="card timesheets" aria-label="Timesheets">
       <Heading icon="timesheet">Timesheets</Heading>
+      <Narrowed department={department} onWiden={widen} />
       {!seesRates && <p className="hint">Your role doesn't see crew rates, so the amounts are hidden, and the office checks and approves timesheets.</p>}
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (

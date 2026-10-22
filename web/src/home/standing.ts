@@ -17,6 +17,8 @@ export interface Tile {
   /** What the count is of, after the number: "answers to check". */
   label: string
   href: string
+  /** The part of that screen it counted, by its heading, landed on when it's tapped (audit, 20 October 2026, finding 4). */
+  part?: string
   /** Something stopping work, drawn as bad; otherwise neutral. */
   bad?: boolean
 }
@@ -131,19 +133,19 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
   const approver = canApproveLeave(me)
 
   const all: Tile[] = [
-    { key: 'late', count: late, label: late === 1 ? 'person running late, not yet noted' : 'people running late, not yet noted', href: '#crew' },
-    { key: 'answers', count: answers, label: answers === 1 ? 'answer to check' : 'answers to check', href: '#crew' },
-    { key: 'crew-needed', count: crewNeeded, label: crewNeeded === 1 ? 'call still needs crew' : 'calls still need crew', href: '#crew' },
-    { key: 'timesheets', count: timesheets, label: timesheets === 1 ? 'timesheet to approve' : 'timesheets to approve', href: '#crew/timesheets' },
-    { key: 'leave', count: leave, label: leave === 1 ? 'leave request waiting on you' : 'leave requests waiting on you', href: '#crew/leave' },
+    { key: 'late', count: late, label: late === 1 ? 'person running late, not yet noted' : 'people running late, not yet noted', href: '#crew', part: 'Answers to check' },
+    { key: 'answers', count: answers, label: answers === 1 ? 'answer to check' : 'answers to check', href: '#crew', part: 'Answers to check' },
+    { key: 'crew-needed', count: crewNeeded, label: crewNeeded === 1 ? 'call still needs crew' : 'calls still need crew', href: '#crew', part: 'Crew needed' },
+    { key: 'timesheets', count: timesheets, label: timesheets === 1 ? 'timesheet to approve' : 'timesheets to approve', href: '#crew/timesheets', part: 'To approve' },
+    { key: 'leave', count: leave, label: leave === 1 ? 'leave request waiting on you' : 'leave requests waiting on you', href: '#crew/leave', part: 'To approve' },
     { key: 'certificates', count: certificates, label: certificates === 1 ? 'certificate or document running out' : 'certificates and documents running out', href: '#crew/people' },
-    { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock' },
-    { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true },
-    { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short' : 'kit lines short', href: '#stock', bad: short.some((l) => l.hold === 'held') },
+    { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock', part: 'Pick lists' },
+    { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true, part: 'Still out after the job' },
+    { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short' : 'kit lines short', href: '#stock', bad: short.some((l) => l.hold === 'held'), part: 'Kit short' },
     { key: 'faults', count: faults.length, label: faults.length === 1 ? 'fault open' : 'faults open', href: '#stock/repairs', bad: faults.some((f) => f.stops) },
-    { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock/testing', bad: true },
-    { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock/testing' },
-    { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut },
+    { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock/testing', bad: true, part: 'Inspections due' },
+    { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock/testing', part: 'Inspections due' },
+    { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut, part: 'Vehicle checks running out' },
     { key: 'counts', count: counts, label: counts === 1 ? 'place to count this week' : 'places to count this week', href: '#stock/count' },
   ]
   const offered = (t: Tile) => (NEEDS[t.key] === 'approve-leave' ? approver : can(NEEDS[t.key] as Ability))

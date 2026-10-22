@@ -83,6 +83,18 @@ test('Home for a department counts the crew its calls still need', async ({ brow
   await page.getByLabel('Department').selectOption('Video')
   await expect(page.getByRole('heading', { name: 'Needs attention in Video' })).toBeVisible()
   await expect(page.locator('.standing').getByRole('link', { name: /call(s)? still need(s)? crew/ })).toBeVisible()
+
+  // The count opens the list it counted (audit, 20 October 2026, finding 4): Crew needed, in view, narrowed to Video.
+  await page.locator('.standing').getByRole('link', { name: /call(s)? still need(s)? crew/ }).click()
+  const needed = page.getByRole('heading', { name: 'Crew needed' })
+  await expect(needed).toBeFocused()
+  await expect(needed).toBeInViewport()
+  await expect(page.getByLabel('Calls for department')).toHaveValue('Video')
+  await expect(page.getByText(/Camera op/).first()).toBeVisible()
+  // Opened from the tab bar, it's every department again.
+  await page.goto('/#home')
+  await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: /^Crew/ }).click()
+  await expect(page.getByLabel('Calls for department')).toHaveValue('')
 })
 
 /**

@@ -9,6 +9,7 @@ import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
+import { arrive } from '../arrival.ts'
 import { useAccess } from '../role.ts'
 import { Chart, type Series } from './Chart.tsx'
 import { Copying, STILL_ARRIVING, useCopying } from './copying.ts'
@@ -104,7 +105,7 @@ export function HomeScreen() {
 }
 
 /** The counts that aren't nothing, as tiles; a word when all are. */
-function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string }) {
+function Tiles({ all, keys, title = 'Needs attention', clear, department }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string }) {
   const shown = keys.map((k) => all[k]!).filter((t) => t && t.count > 0)
   const copying = useCopying()
   return (
@@ -118,7 +119,7 @@ function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<st
         <ul className="tiles">
           {shown.map((t) => (
             <li key={t.key}>
-              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href}>
+              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
                 <b>{t.count.toLocaleString('en-IE')}</b>
                 <span>{t.label}</span>
               </a>
@@ -363,7 +364,7 @@ function ForDepartment({
           ))}
         </select>
       </label>
-      <Tiles all={tiles(view, today, me, can, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
+      <Tiles all={tiles(view, today, me, can, department)} keys={TILES_FOR.department} department={department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
       <p className="hint">
         {noDepartment > 0 &&
           `${plural(noDepartment, 'call')} still needing crew in the next fortnight ${noDepartment === 1 ? "has no department, so it isn't" : "have no department, so they aren't"} counted here: give ${noDepartment === 1 ? 'it' : 'them'} one on Crew. `}
