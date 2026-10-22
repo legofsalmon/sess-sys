@@ -133,13 +133,14 @@ export function Shell() {
       // Someone already typing on the new screen, in its search say, keeps their place: this runs a frame after the move, and a quick
       // hand can be in a field by then. Taking the focus away would send the rest of what they type, and their Enter, nowhere.
       const typing = !!active && !!main.current?.contains(active) && active.matches(TYPED_INTO)
-      // A new screen starts at its top, Back finds its place again (audit finding 8); the toggle keeps the page where it is.
-      settlePlace(toggled)
       if (movedTo.current !== undefined && movedTo.current !== hash && heading && !toggled && !typing) {
         heading.el.tabIndex = -1
         heading.el.focus({ preventScroll: true })
       }
       movedTo.current = hash
+      // A new screen starts at its top, Back finds its place again (audit finding 8); the toggle keeps the page where it is.
+      // After the title has focus, so a part a count on Home landed on (arrival.ts) takes it from there.
+      settlePlace(toggled)
     })
     return () => cancelAnimationFrame(frame)
   }, [hash, auth.status, area.label])

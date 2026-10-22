@@ -91,3 +91,23 @@ kept for sale.
   fixes them; the office and directors are sent them (money ability).
 - Labelling the kit is warehouse work from here: each label takes one off
   its product's count.
+
+## Bringing it in again (audit, 20 October 2026, finding 7)
+
+A second bring-in used to double the counts when the place typed for the
+list differed from the first time, and a product renamed in Current RMS
+came in as a new one beside the old. Now:
+
+- Current RMS's own id for each product is carried as a column and kept
+  on the product (`models.list_id`). A later bring-in matches by it before
+  the name, so a rename there renames the product here. A product brought
+  in before the id was carried picks it up the next time, matched by name.
+- Where the place came from what the office typed for the whole list, the
+  list's count is all of that product: a count of it at another place the
+  list doesn't mention is set to none, said on the row ("Counts none at
+  Store one (12 there now)"), as [ADR 0061](0061-one-place-for-a-whole-stock-list.md)
+  promised. A row giving its own place leaves the other count alone and
+  says so in an aside.
+- A new product with the same category, value and count as one here that
+  the list doesn't name is said to look like that one renamed, for the
+  office to rename it first.

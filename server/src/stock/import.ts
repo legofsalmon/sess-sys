@@ -68,6 +68,7 @@ async function knownStock(q: Queryable): Promise<KnownStock> {
   const { rows: models } = await q.query<{
     id: string
     name: string
+    category: string
     tracking: 'serialised' | 'bulk'
     is_case: boolean
     value_cents: number | null
@@ -75,8 +76,9 @@ async function knownStock(q: Queryable): Promise<KnownStock> {
     notes: string
     mistake: boolean
     day_cents: number | null
+    list_id: string
   }>(
-    `SELECT m.id, m.name, m.tracking, m.is_case, m.value_cents, m.pat_months, m.notes, m.mistake, pp.day_cents
+    `SELECT m.id, m.name, m.category, m.tracking, m.is_case, m.value_cents, m.pat_months, m.notes, m.mistake, pp.day_cents, m.list_id
        FROM models m LEFT JOIN product_prices pp ON pp.model_id = m.id ORDER BY m.id`
   )
   const { rows: places } = await q.query<{ id: string; name: string }>('SELECT id, name FROM places ORDER BY id')
@@ -94,6 +96,8 @@ async function knownStock(q: Queryable): Promise<KnownStock> {
       notes: m.notes,
       mistake: m.mistake,
       dayCents: m.day_cents,
+      category: m.category,
+      listId: m.list_id,
     })),
     items: (await everyAsset(q)).map((a) => ({
       id: a.id,
@@ -149,7 +153,7 @@ function stepsOf(plan: StockPlan): Step[] {
 
   for (const p of plan.places) steps.push({ name: 'place.upsert', args: { id: idOf(p), name: p.name, notes: '' }, row: p.row, tally: 'places' })
   for (const { key, row, ...p } of plan.products) steps.push({ name: 'model.create', args: { ...p, id: idOf({ key }), liftingMonths: null }, row, tally: 'products' })
-  for (const { id, name: _name, row, ...changes } of plan.productChanges) steps.push({ name: 'model.update', args: { id, ...changes }, row })
+  for (const { id, name: _name, rename, row, ...changes } of plan.productChanges) steps.push({ name: 'model.update', args: { id, ...(rename ? { name: rename } : {}), ...changes }, row })
   for (const p of plan.prices) steps.push({ name: 'price.product', args: { modelId: idOf(p.model), dayCents: p.dayCents }, row: p.row })
 
   const added = new Set<string>()

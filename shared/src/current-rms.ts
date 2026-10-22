@@ -142,14 +142,15 @@ export function currentRmsList(texts: readonly string[]): { list: CurrentRmsList
     return { problem: `The stock levels count ${unknown.length === 1 ? `“${unknown[0]}”, which isn't` : `${unknown.length} products that aren't`} in the products file. Export both again at the same time.` }
 
   const priced = rates ? dayPrices(rates) : new Map<string, string>()
-  const out = [['Product', 'Department', 'Category', 'Quantity', 'Value', 'Day price']]
+  // Its id there is kept on the product, so the next bring-in finds it however it's renamed (audit, 20 October 2026, finding 7).
+  const out = [['Product', 'Department', 'Category', 'Quantity', 'Value', 'Day price', 'Current RMS id']]
   let items = 0
   for (const p of products.rows) {
     if (p.Active === 'No' || p['Allowed Stock Type'] === 'Sale') continue
     const n = held.get(p.Name!) ?? 0
     items += n
     const group = p['Product Group'] ?? ''
-    out.push([p.Name!, departmentOfGroup(group), group, String(n), money(p['Replacement Charge']), priced.get(p.Name!) || money(p['Rental Price'])])
+    out.push([p.Name!, departmentOfGroup(group), group, String(n), money(p['Replacement Charge']), priced.get(p.Name!) || money(p['Rental Price']), p.Id ?? ''])
   }
   const said = `${out.length - 1} products and ${items.toLocaleString('en-IE')} pieces of kit from Current RMS${rates ? ', with the rates' : ''}. Everything comes in counted, to be labelled later.`
   return { list: { text: out.map((r) => r.map(quoted).join(',')).join('\n') + '\n', said } }

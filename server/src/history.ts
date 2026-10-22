@@ -630,6 +630,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
         parts.push(typeof a.liftingMonths === 'number' ? `a thorough examination every ${monthsText(a.liftingMonths)}` : 'no thorough examination')
       if (Array.isArray(a.aliases))
         parts.push(a.aliases.length ? `other names to ${aliasesOf(a.aliases.filter((x) => typeof x === 'string').join(',')).join(', ')}` : 'no other names')
+      if (a.listId !== undefined) parts.push(typeof a.listId === 'string' && a.listId ? `its id in the list it came from to ${a.listId}` : 'no id from a list')
       return `Changed the product ${model(a.id)}: ${inWords(parts)}`
     }
     case 'model.remove':

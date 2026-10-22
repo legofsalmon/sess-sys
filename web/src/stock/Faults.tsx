@@ -20,6 +20,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { numberLabel } from './common.tsx'
 import { Heading } from '../Icon.tsx'
+import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Faults and missing kit (ADR 0018): reporting damage or kit that's
@@ -297,7 +298,9 @@ function EditFault({ f, onDone }: { f: FaultView; onDone: () => void }) {
 
 /** The Stock tab's repair list: every open fault, oldest first. */
 export function RepairList({ view }: { view: View }) {
-  const open = view.faults.open
+  // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#stock/repairs')
+  const open = view.faults.open.filter((f) => inKitOf(department)(f.model))
   if (open.length === 0) return null
   const missing = open.filter((f) => f.kind === 'missing')
   const damaged = open.filter((f) => f.kind === 'damaged')
@@ -311,6 +314,7 @@ export function RepairList({ view }: { view: View }) {
   return (
     <section className="card faults" aria-label="Faults and repairs">
       <Heading icon="repair">Faults and repairs</Heading>
+      <Narrowed department={department} onWiden={widen} />
       <p className="hint">Kit that can't go out is taken off what's free for jobs until it's fixed or found.</p>
       {damaged.length > 0 && (
         <>

@@ -28,6 +28,41 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.3',
+    date: '2026-10-22',
+    title: "Bringing the stock list in again doesn't double the counts",
+    what: 'Bringing the Current RMS stock in a second time with a different place typed counted everything twice, once at each place, and a product renamed in Current RMS came in as a new one. Products now keep their Current RMS id, so a renamed one is renamed here; where you type one place for the whole list, a count of the same kit somewhere else is taken off and the preview says so; and a new product that looks like one here renamed is pointed out.',
+    prs: [122],
+  },
+  {
+    version: '1.29.2',
+    date: '2026-10-22',
+    title: 'Accepting after asking for another rate takes the rate offered',
+    what: 'When a freelancer asked for a different rate and then pressed Accept on their link, the booking went in at the rate they had asked for. The button now says which rate they are accepting (“Accept these days at €250 a day instead”), the rate they asked for is withdrawn, and the page says so.',
+    prs: [121],
+  },
+  {
+    version: '1.29.1',
+    date: '2026-10-22',
+    title: 'A shorter pick list, with the scan box kept in view',
+    what: 'A pick list of a few hundred lines ran to many screens, with every number spelled out and the scan box at the top. Each place now says how many to take from it, with the numbers folded away until you open them; lines already picked fold under “done” at the end of their department; and the scan box stays at the top of the screen as you scroll.',
+    prs: [120],
+  },
+  {
+    version: '1.29.0',
+    date: '2026-10-22',
+    title: 'Home counts open on what they counted',
+    what: 'Home now only offers a count to someone who can act on it: a head no longer sees timesheets or leave to approve that only the office decides. Tapping a count opens the next screen at the part it counted, such as Answers to check or Kit short, and a count for one department opens the list showing that department only, with a line to show them all.',
+    prs: [119],
+  },
+  {
+    version: '1.28.1',
+    date: '2026-10-22',
+    title: 'The Jobs tab opens quicker',
+    what: 'With hundreds of jobs, a tap on Jobs took a second or two on a phone, most of it spent looking for jobs brought in from the calendars as several. That check is now about ten times quicker, runs only when there are calendar jobs, and is kept while you go to other tabs and come back.',
+    prs: [118],
+  },
+  {
     version: '1.28.0',
     date: '2026-10-22',
     title: 'A new phone says when it is still catching up',

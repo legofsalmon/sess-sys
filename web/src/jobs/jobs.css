@@ -173,6 +173,11 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Pick lists (ADR 0017): each product on the job's kit, what's out, and where to find the rest. */
 .jobs .pick-link { display: flex; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
 .jobs .pick-link span { color: var(--muted); font-size: .9rem; }
+.pick .scan-dock.docked { position: sticky; top: var(--under-top, 0px); z-index: 1; }
+.pick .from details { display: inline; margin-left: var(--space-6); font-size: .9rem; }
+.pick .from details > summary { display: inline; cursor: pointer; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.pick .from details > p { margin: var(--space-4) 0 0; color: var(--muted); }
+.pick .pick-done > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-weight: 600; }
 .pick .pick-total { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pick .said { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); font-size: .9rem; }
 .pick .said.ok { background: var(--good-soft); color: var(--good); }

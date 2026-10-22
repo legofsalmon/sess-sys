@@ -17,7 +17,7 @@ import {
   type PickRow,
   type View,
 } from '@sh/shared'
-import { useRef, useState, type FormEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
@@ -96,6 +96,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const pick = view.moves.pickList(job.id)!
   // Sending kit out and back is stock's (audit finding 9): a role without it reads the list, and can still report damage or a loss.
   const mayMove = useAccess().can('stock')
+  const dock = useUnderTop(mayMove)
   const say = (tone: Tone, text: string, back?: AssetView) => setSaid({ tone, text, at: Date.now(), back })
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
@@ -197,7 +198,12 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               : 'Nothing has gone out yet.'}
         </p>
         {!mayMove && <p className="hint">Whoever keeps the stock scans kit out and back here.</p>}
-        {mayMove && (
+      </section>
+
+      {/* The scan box stays under the top bar while the list scrolls (audit, 20 October 2026, finding 5), as Jobs' week headings
+          do; not while the camera is on, which would cover the list. */}
+      {mayMove && (
+        <section className={`card scan-dock${camera ? '' : ' docked'}`} aria-label="Scan" ref={dock}>
           <form className="scan-row" onSubmit={submit}>
             <input
               ref={field}
@@ -220,28 +226,28 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               Scan
             </button>
           </form>
-        )}
-        {camera && mayMove && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
-        {said && (
-          <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
-            {said.text}
-          </p>
-        )}
-        {failed.length > 0 && (
-          <div className="alert scan-failed" role="alert">
-            <p>{failed.length === 1 ? "1 scan wasn't recorded. Scan it again:" : `${failed.length} scans weren't recorded. Scan them again:`}</p>
-            <ul>
-              {failed.map((f, i) => (
-                <li key={i}>{f}</li>
-              ))}
-            </ul>
-            <button type="button" onClick={() => setFailed([])}>
-              Dismiss
-            </button>
-          </div>
-        )}
-        {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
-      </section>
+          {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
+          {said && (
+            <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
+              {said.text}
+            </p>
+          )}
+          {failed.length > 0 && (
+            <div className="alert scan-failed" role="alert">
+              <p>{failed.length === 1 ? "1 scan wasn't recorded. Scan it again:" : `${failed.length} scans weren't recorded. Scan them again:`}</p>
+              <ul>
+                {failed.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+              <button type="button" onClick={() => setFailed([])}>
+                Dismiss
+              </button>
+            </div>
+          )}
+          {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
+        </section>
+      )}
 
       <section className="card pick-list" aria-label="Kit">
         <h2>{mode === 'out' ? 'Kit to go out' : 'Kit coming back'}</h2>
@@ -253,17 +259,24 @@ function Pick({ view, job }: { view: View; job: JobView }) {
         {mode === 'in' && rows.length > 0 && shown.length === 0 && <Empty>Kit shows here once it has gone out with this job.</Empty>}
         {groups
           .filter(([d]) => byDepartment.get(d)?.some((r) => shown.includes(r)))
-          .map(([d, label]) => (
-            <div className="kit-group" key={d}>
-              <h3>{label}</h3>
-              {byDepartment
-                .get(d)!
-                .filter((r) => shown.includes(r))
-                .map((r) => (
-                  <Row key={r.modelId} row={r} job={job} mode={mode} say={say} mayMove={mayMove} />
-                ))}
-            </div>
-          ))}
+          .map(([d, label]) => {
+            const here = byDepartment.get(d)!.filter((r) => shown.includes(r))
+            // What's still to do first, and what's done folded under it (audit, 20 October 2026, finding 5).
+            const done = here.filter((r) => rowDone(r, mode))
+            const row = (r: PickRow) => <Row key={r.modelId} row={r} job={job} mode={mode} say={say} mayMove={mayMove} />
+            return (
+              <div className="kit-group" key={d}>
+                <h3>{label}</h3>
+                {here.filter((r) => !rowDone(r, mode)).map(row)}
+                {done.length > 0 && (
+                  <details className="pick-done">
+                    <summary>{done.length === here.length ? `All ${done.length.toLocaleString('en-IE')} done` : `${done.length.toLocaleString('en-IE')} done`}</summary>
+                    {done.map(row)}
+                  </details>
+                )}
+              </div>
+            )
+          })}
       </section>
     </div>
   )
@@ -286,6 +299,25 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
 /** What a tap on the list did, said in the scan line at the top, where the eye already goes. */
 type Say = (tone: Tone, text: string) => void
 
+/** Where the top bar ends, for what stays under it: it grows on a phone when its words wrap. */
+function useUnderTop(on: boolean) {
+  const el = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const top = document.querySelector<HTMLElement>('.top')
+    if (!el.current || !top || typeof ResizeObserver === 'undefined') return
+    const card = el.current
+    const set = () => card.style.setProperty('--under-top', `${(parseFloat(getComputedStyle(top).top) || 0) + top.offsetHeight}px`)
+    const watch = new ResizeObserver(set)
+    watch.observe(top)
+    set()
+    return () => watch.disconnect()
+  }, [on])
+  return el
+}
+
+/** All out that's needed, or all back: nothing left to do on the row. */
+const rowDone = (row: PickRow, mode: Direction) => (mode === 'out' ? row.lines.length > 0 && row.out >= row.need : row.out === 0 && row.missing === 0)
+
 function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mode: Direction; say: Say; mayMove: boolean }) {
   const name = rowName(row)
   const extra = row.lines.length === 0
@@ -300,7 +332,7 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
         : row.missing
           ? `${row.back} back${missing}`
           : `All ${row.back} back`
-  const done = mode === 'out' ? !extra && row.out >= row.need : row.out === 0 && row.missing === 0
+  const done = rowDone(row, mode)
   const [damage, setDamage] = useState(false)
   const { run, error } = useAct()
   const countable = row.model?.tracking === 'bulk' || (row.model?.countedTotal ?? 0) > 0 || row.counted > 0 || row.countedBack > 0
@@ -321,11 +353,18 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
       )}
       {mode === 'out' && !extra && row.out < row.need && row.from.length > 0 && (
         <ul className="from" aria-label="Where to find them">
+          {/* One line a place with how many are there; the numbers folded under it (audit, 20 October 2026, finding 5): every
+              number of every item in stock made a 300-line pick list 56,000 px long on a phone. */}
           {row.from.map((f) => (
             <li key={f.where}>
               <b>{f.where}</b>
-              {': '}
-              {[f.items.map((a) => a.number || 'no number yet').join(', '), f.counted > 0 && `${f.counted.toLocaleString('en-IE')} counted`].filter(Boolean).join('; ')}
+              {`: ${(f.items.length + f.counted).toLocaleString('en-IE')} here`}
+              {f.items.length > 0 && (
+                <details>
+                  <summary>{f.items.length === 1 ? 'Its number' : `The ${f.items.length.toLocaleString('en-IE')} numbers`}</summary>
+                  <p>{f.items.map((a) => a.number || 'no number yet').join(', ')}</p>
+                </details>
+              )}
             </li>
           ))}
         </ul>
