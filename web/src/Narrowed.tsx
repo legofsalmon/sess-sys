@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { arrival } from '../arrival.ts'
+import type { Department } from '@sh/shared'
+import { arrival } from './arrival.ts'
+import { narrower } from './home/standing.ts'
 
 /**
  * A list a count on Home opened for one department (audit, 20 October
@@ -15,6 +17,12 @@ export function useNarrowed(hash: string): [department: string | undefined, wide
 /** Whether someone is in the department a list is narrowed to: everyone, when it isn't. */
 export const inDepartment = (department: string | undefined) => (p: { department?: string | null } | undefined) =>
   !department || p?.department?.trim().toLowerCase() === department.trim().toLowerCase()
+
+/** Whether kit is in the department a list is narrowed to, by the stock list's department for it (Home's own reading): all of it, when it isn't. */
+export const inKitOf = (department: string | undefined) => {
+  const kit = narrower(department).kit
+  return (model: { department?: Department } | undefined) => kit(model?.department)
+}
 
 export function Narrowed({ department, onWiden }: { department: string | undefined; onWiden: () => void }) {
   if (!department) return null

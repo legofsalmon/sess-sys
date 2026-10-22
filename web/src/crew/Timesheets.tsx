@@ -28,7 +28,7 @@ import { useAccess, useSeesRates } from '../role.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './Messages.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
-import { inDepartment, Narrowed, useNarrowed } from './Narrowed.tsx'
+import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Timesheets (ADR 0022) as the office works with them: the ones sent to

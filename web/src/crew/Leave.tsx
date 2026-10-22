@@ -35,7 +35,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { CrewViews } from './CrewViews.tsx'
 import { Heading } from '../Icon.tsx'
-import { inDepartment, Narrowed, useNarrowed } from './Narrowed.tsx'
+import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Staff leave and time in lieu (ADR 0024), at #crew/leave: my year's

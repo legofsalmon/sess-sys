@@ -20,7 +20,7 @@ import {
 import { VehicleReminders } from '../stock/Vehicles.tsx'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { arrival } from '../arrival.ts'
-import { inDepartment, Narrowed, useNarrowed } from './Narrowed.tsx'
+import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 import { useWindowed } from '../windowed.ts'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
