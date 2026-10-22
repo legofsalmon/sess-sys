@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import { encode } from 'uqr'
 
+/** A row of the pick list, whether it's still to do or folded under the done ones (audit, 20 October 2026, finding 5). */
+const pickRow = (page: Page, name: string) => page.locator('article.pick-row').filter({ has: page.locator('header b').getByText(name, { exact: true }) })
+
 /**
  * Pick lists end to end (ADR 0017), at phone size: a job two days out needs
  * two speakers and 12 cables. Its pick list says where they are; the
@@ -166,11 +169,16 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   // What's needed, and where to find it.
   await expect(page.getByRole('heading', { level: 1, name: 'Pick list' })).toBeVisible()
   await expect(page.locator('.pick-total')).toHaveText('0 of 14 out')
-  const speakerRow = page.getByRole('article', { name: speaker })
-  const cableRow = page.getByRole('article', { name: cable })
+  const speakerRow = pickRow(page, speaker)
+  const cableRow = pickRow(page, cable)
   await expect(speakerRow.locator('.count')).toHaveText('0 of 2 out')
-  await expect(speakerRow.getByRole('list', { name: 'Where to find them' })).toHaveText(`${bay}: ${speakers.join(', ')}`)
-  await expect(cableRow.getByRole('list', { name: 'Where to find them' })).toHaveText('Warehouse: 40 counted')
+  // A line a place with how many are there, the numbers folded under it (audit, 20 October 2026, finding 5).
+  const speakersAt = speakerRow.getByRole('list', { name: 'Where to find them' })
+  await expect(speakersAt.getByRole('listitem')).toHaveCount(1)
+  await expect(speakersAt).toContainText(`${bay}: ${speakers.length} here`)
+  await speakersAt.getByText(`The ${speakers.length} numbers`).click()
+  await expect(speakersAt.locator('details p')).toHaveText(speakers.join(', '))
+  await expect(cableRow.getByRole('list', { name: 'Where to find them' })).toHaveText('Warehouse: 40 here')
 
   // The first speaker, with the camera; held still, it's read once.
   await page.getByRole('button', { name: 'Scan' }).click()
@@ -192,7 +200,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await page.getByLabel('Number or serial').press('Enter')
   await expect(said).toHaveText(`${micNumber} ${mic} out. It isn't on the kit for ${job}. Add it to the kit, or scan it back in if it isn't going.`)
   await expect(said).toHaveClass(/warn/)
-  const micRow = page.getByRole('article', { name: mic })
+  const micRow = pickRow(page, mic)
   await expect(micRow.locator('.kit-state')).toHaveText(`Not on the kit for ${job}.`)
 
   // The cables, counted out.
@@ -211,12 +219,16 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await hold(page, speakers[1]!)
   await expect(said).toHaveText(`${speakers[1]} ${speaker}: 2 of 2 out.`)
   await expect(page.locator('.pick-total')).toHaveText('14 of 14 out')
-  await expect(speakerRow.getByRole('list', { name: 'Out' })).toContainText(speakers[1]!)
+  await expect(speakerRow.locator('.out-items')).toContainText(speakers[1]!)
   await hold(page, null)
   await page.getByRole('button', { name: 'Stop camera' }).click()
   await expect(page.locator('.conn')).toHaveText('Up to date')
+  // The scan box stays under the top bar at the foot of the list.
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight))
+  await expect(page.getByLabel('Number or serial')).toBeInViewport()
 
-  // The speaker's page says where it is, and the Stock tab lists the job as all out.
+  // All out, the speakers are folded under what's done; the speaker's page says where it is, and the Stock tab lists the job as all out.
+  await page.locator('.pick-done', { has: speakerRow }).locator('summary').click()
   await speakerRow.getByRole('link', { name: speakers[0]! }).click()
   await expect(page.locator('.facts')).toContainText(`OutWith ${job} since today at`)
   await page.goto('/#stock')
