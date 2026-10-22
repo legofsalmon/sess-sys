@@ -46,6 +46,12 @@ describe('the same job brought in as several', () => {
     expect(groups.map((g) => [g.name, g.sure, g.jobs.length])).toEqual([['Addison Rae', false, 2]])
   })
 
+  it('still finds a job starting late in a long one, past the short jobs between them, and stops looking past the near days (audit, 20 October 2026, finding 2)', () => {
+    const between = Array.from({ length: 30 }, (_, i) => job(`Other ${i}`, `2026-07-${String(2 + (i % 20)).padStart(2, '0')}`))
+    const groups = sameJobs([job('Longitude - Build', '2026-07-01', '2026-07-25'), ...between, job('Longitude - Show', '2026-07-24'), job('Longitude - Out', '2026-07-31')])
+    expect(groups.map((g) => g.jobs.map((j) => j.name))).toEqual([['Longitude - Build', 'Longitude - Show']])
+  })
+
   it("doesn't put a job made in the app with one brought in, nor one not going ahead", () => {
     expect(sameJobs([job('Fuel', '2026-10-25'), job('Fuel - Cupra', '2026-10-25', '2026-10-25', { sourceCalendar: undefined })])).toEqual([])
     expect(sameJobs([job('Fuel', '2026-10-25'), job('Fuel - Cupra', '2026-10-25', '2026-10-25', { status: 'cancelled' })])).toEqual([])

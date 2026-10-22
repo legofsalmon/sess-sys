@@ -43,6 +43,7 @@ import { StockViews } from '../Views.tsx'
 import { Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from './kitIcon.ts'
 import { Heading, Icon } from '../Icon.tsx'
+import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Stock (ADR 0013): the catalogue of products, the numbered items of each,
@@ -361,7 +362,9 @@ function StockCard({ view, current }: { view: View; current?: string }) {
 
 /** Every line of kit short on a day from today on, soonest first; the first few, then the rest on request. */
 function ShortKit({ view }: { view: View }) {
-  const short = view.kit.short
+  // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#stock')
+  const short = view.kit.short.filter((l) => inKitOf(department)(l.model))
   if (short.length === 0) return null
   const row = (l: (typeof short)[number]) => (
     <li key={l.id}>
@@ -382,6 +385,7 @@ function ShortKit({ view }: { view: View }) {
   return (
     <section className="card kit-short" aria-label="Kit short">
       <Heading icon="attention">Kit short</Heading>
+      <Narrowed department={department} onWiden={widen} />
       <p className="hint">
         On jobs from today on, once the confirmed jobs on the same days have theirs. Quotes and enquiries show what they'd need if they go ahead.
       </p>
