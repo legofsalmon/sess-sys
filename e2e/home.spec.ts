@@ -41,10 +41,21 @@ test('Home is where the app opens, and says how things stand for whoever is look
   await expect(attention.getByRole('link', { name: /answers to check/ })).toBeVisible()
   await expect(attention.getByRole('link', { name: /kit lines short/ })).toBeVisible()
 
-  // A count opens the screen that sorts it out.
+  // A count opens the screen that sorts it out, at the part it counted (audit, 20 October 2026, finding 4).
   await attention.getByRole('link', { name: /answers to check/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Crew' })).toBeVisible()
   await expect(bar.getByRole('link', { name: /^Crew/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: /^Answers to check/ })).toBeFocused()
+  await bar.getByRole('link', { name: 'Home' }).click()
+  await attention.getByRole('link', { name: /kit lines short/ }).click()
+  const short = page.getByRole('heading', { name: 'Kit short' })
+  await expect(short).toBeFocused()
+  await expect(short).toBeInViewport()
+  // Back to Home, and Back again comes to the part as it was left.
+  await page.goBack()
+  await expect(attention.getByRole('link', { name: /kit lines short/ })).toBeVisible()
+  await page.goForward()
+  await expect(short).toBeInViewport()
 
   // The warehouse: what's going out, opening its pick list. Remembered on this phone.
   await bar.getByRole('link', { name: 'Home' }).click()
