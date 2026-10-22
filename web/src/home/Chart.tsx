@@ -1,6 +1,7 @@
 import type { Column } from '@sh/shared'
 import { useState, type ReactNode } from 'react'
 import { Heading, type IconName } from '../Icon.tsx'
+import { STILL_ARRIVING, useCopying } from './copying.ts'
 
 /**
  * A column chart for Home (ADR 0054), drawn in HTML so it is light on a
@@ -38,6 +39,7 @@ export function Chart({
   /** A link under the chart to where it's sorted out. */
   more?: ReactNode
 }) {
+  const copying = useCopying()
   const totals = columns.map((c) => c.parts.reduce((s, n) => s + n, 0))
   const max = Math.max(0, ...totals)
   const [picked, setPicked] = useState(() => Math.max(0, columns.findIndex((c) => c.now)))
@@ -56,7 +58,7 @@ export function Chart({
     <section className="card chart">
       <Heading icon={icon}>{title}</Heading>
       {max === 0 ? (
-        <p className="empty">{empty}</p>
+        <p className="empty">{copying ? STILL_ARRIVING : empty}</p>
       ) : (
         <>
           <p className="chart-readout" aria-live="polite">

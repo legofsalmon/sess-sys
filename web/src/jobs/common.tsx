@@ -68,8 +68,8 @@ export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: V
         <div className="state">
           {aside}
           {notDone.count}
-          <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting ? 'syncing' : 'online'}`} role="status">
-            {view.connection === 'offline' ? `No signal${waiting ? ` · ${waiting} waiting` : ''}` : waiting ? `${waiting} waiting` : 'Up to date'}
+          <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting || view.copying ? 'syncing' : 'online'}`} role="status">
+            {connWords(view)}
           </span>
           <NoticesButton />
           <ThemeButton />
@@ -81,6 +81,20 @@ export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: V
       {root && <h1 className="area-title">{title}</h1>}
     </>
   )
+}
+
+/**
+ * The top bar's word for the connection. "Up to date" only once the copy has
+ * arrived in full: before that, "Catching up" with how far it has got, so a
+ * new phone's counts aren't vouched for while they're still climbing (audit,
+ * 20 October 2026, finding 1).
+ */
+export function connWords(view: Pick<View, 'connection' | 'pendingCount' | 'copying'>): string {
+  const waiting = view.pendingCount
+  const share = view.copying && view.copying.share !== undefined ? ` · ${Math.floor(view.copying.share * 100)}%` : ''
+  if (view.connection === 'offline') return `No signal${view.copying ? ' · not caught up' : ''}${waiting ? ` · ${waiting} waiting` : ''}`
+  if (view.copying) return `Catching up${share}`
+  return waiting ? `${waiting} waiting` : 'Up to date'
 }
 
 /** Beside each screen's name while the app holds made-up data (ADR 0019), so nobody mistakes it for real work. */
