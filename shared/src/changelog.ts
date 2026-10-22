@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.0',
+    date: '2026-10-22',
+    title: 'Home counts open on what they counted',
+    what: 'Home now only offers a count to someone who can act on it: a head no longer sees timesheets or leave to approve that only the office decides. Tapping a count opens the next screen at the part it counted, such as Answers to check or Kit short, and a count for one department opens the list showing that department only, with a line to show them all.',
+    prs: [119],
+  },
+  {
     version: '1.28.1',
     date: '2026-10-22',
     title: 'The Jobs tab opens quicker',

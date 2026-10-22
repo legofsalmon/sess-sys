@@ -28,6 +28,7 @@ import { useAccess, useSeesRates } from '../role.ts'
 import { promptFor, SharePanel, SharePanelFor, type Share } from './Messages.tsx'
 import { Heading } from '../Icon.tsx'
 import { CREW, TIMESHEETS } from '../Up.tsx'
+import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Timesheets (ADR 0022) as the office works with them: the ones sent to
@@ -42,23 +43,31 @@ const job = (r: TimesheetRow) => `${r.call.project}${r.call.phase ? ` · ${r.cal
 
 /** For the Crew tab: what's waiting on the office. */
 export function TimesheetsCard({ view }: { view: View }) {
-  const { toApprove, notIn, approved } = view.timesheets
+  // Opened from a count on Home for a department, that department's, as Home counted them (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#crew/timesheets')
+  const theirs = inDepartment(department)
+  const toApprove = view.timesheets.toApprove.filter((r) => theirs(r.person))
+  const notIn = view.timesheets.notIn.filter((r) => theirs(r.person))
+  const { approved } = view.timesheets
   const [remind, setRemind] = useState<TimesheetRow | undefined>()
   const lately = approved.slice(0, 5)
   // Timesheets carry pay, which a role that doesn't see rates isn't sent (ADR 0046): said once, at the top.
   const seesRates = useSeesRates()
   // Deciding them, and chasing them, is crew's (audit finding 9): a role without it opens them to read.
   const mayDecide = useAccess().can('crew')
-  const checks = seesRates && mayDecide
+  // Decided per timesheet, from what this device is sent (audit, 20 October 2026, finding 3): a head who reads their own
+  // department's rates (ADR 0062) checks theirs and opens the rest.
+  const checks = (r: TimesheetRow) => mayDecide && !r.amountsHidden
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
       <Heading icon="timesheet">Timesheets</Heading>
+      <Narrowed department={department} onWiden={widen} />
       {!seesRates && <p className="hint">Your role doesn't see crew rates, so the amounts are hidden, and the office checks and approves timesheets.</p>}
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
-        <div className="ts-group" role="group" aria-label="To approve">
-          <h3>To approve ({toApprove.length})</h3>
+        <div className="ts-group" role="group" aria-label={toApprove.some(checks) ? 'To approve' : 'Waiting on the office'}>
+          <h3>{toApprove.some(checks) ? 'To approve' : 'Waiting on the office'} ({toApprove.length})</h3>
           <ShowAll items={toApprove} limit={3} what="timesheets">
             {(rows) =>
               rows.map((r) => (
@@ -66,8 +75,8 @@ export function TimesheetsCard({ view }: { view: View }) {
                   key={r.offer.id}
                   r={r}
                   action={
-                    <a className={checks ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
-                      {checks ? 'Check' : 'Open'}
+                    <a className={checks(r) ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                      {checks(r) ? 'Check' : 'Open'}
                     </a>
                   }
                 />
@@ -92,7 +101,7 @@ export function TimesheetsCard({ view }: { view: View }) {
                           Ask
                         </button>
                       )}
-                      {checks && (
+                      {checks(r) && (
                         <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
                           Fill in
                         </a>

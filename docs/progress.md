@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: Home counts open on what they counted
+
+**Done**
+
+- Findings 3 and 4 of the [20 October audit](audit-2026-10-20.md) (PR
+  #119): Home offered counts to roles that couldn't act on them, and every
+  count opened the top of a whole-company list. Each tile now needs the
+  ability its screen asks for (timesheets and leave to approve need the
+  approving ability, crew tiles crew, stock tiles stock); tapping one lands
+  on the part it counted, focused, with Back and Forward keeping it; and a
+  department's count opens the list narrowed to that department, with
+  "Showing Video only. Show all departments". App 1.29.0.
+- Checked: typecheck, all unit and server tests, and the Home, departments
+  and screens browser tests.
+
 ## 22 October 2026: the Jobs tab opens quicker
 
 **Done**

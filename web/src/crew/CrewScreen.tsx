@@ -19,6 +19,8 @@ import {
 } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { arrival } from '../arrival.ts'
+import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 import { useWindowed } from '../windowed.ts'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -145,8 +147,8 @@ export function CrewScreen() {
   // Archived people (leavers) are kept for the record but out of the way.
   const active = crew.people.filter((p) => !p.archived)
   const archived = crew.people.filter((p) => p.archived)
-  // The list narrowed to one department (ADR 0025): the ones in use, not a fixed list.
-  const [department, setDepartment] = useState('')
+  // The list narrowed to one department (ADR 0025): the ones in use, not a fixed list. Opened from a count on Home for a department, that one (audit, 20 October 2026, finding 4).
+  const [department, setDepartment] = useState(() => arrival('#crew/people')?.department ?? '')
   const departments: string[] = []
   for (const p of active) if (p.department && !departments.some((d) => d.toLowerCase() === dept(p))) departments.push(p.department)
   departments.sort((a, b) => a.localeCompare(b))
@@ -164,7 +166,8 @@ export function CrewScreen() {
   // Crew needed narrowed to a department (ADR 0046). A head of department starts on their own, everyone else on all.
   const access = useAccess()
   const myDepartment = access.role === 'head' ? (access.personId && people.get(access.personId)?.department) || view.reading.department || '' : ''
-  const [narrowedTo, setNarrowedTo] = useState<string | undefined>()
+  // Opened from a count on Home for a department (audit, 20 October 2026, finding 4), the calls start on that department too.
+  const [narrowedTo, setNarrowedTo] = useState<string | undefined>(() => arrival('#crew')?.department)
   // Said after calls are given a department, which takes the list to it, so what was done stays in view (ADR 0046).
   const [gave, setGave] = useState('')
   const setCallsFor = (d: string) => {
@@ -179,12 +182,18 @@ export function CrewScreen() {
   const shownCalls = upcoming.filter((c) => !callsFor || (callsFor === NO_DEPARTMENT ? !departmentOf(c) : sameDepartment(departmentOf(c), callsFor)))
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
-  const toCheck = answersToCheck(crew, today).map((a) => ({ ...a, warning: onCalendar(a.offer)?.warning }))
-  const toSortOut = calendarAnswersToSortOut(view, today)
+  // Opened from a count on Home for a department, the answers are that department's people's, as Home counted them (audit,
+  // 20 October 2026, finding 4); answers on Google Calendar aren't anyone's department.
+  const [answersFor, allAnswers] = useNarrowed('#crew')
+  const theirs = inDepartment(answersFor)
+  const toCheck = answersToCheck(crew, today)
+    .filter((a) => theirs(a.offer.person))
+    .map((a) => ({ ...a, warning: onCalendar(a.offer)?.warning }))
+  const toSortOut = answersFor ? [] : calendarAnswersToSortOut(view, today)
   // Running late, said on a link (ADR 0028): first in the queue, as it's about today.
-  const late = view.late.toCheck
+  const late = view.late.toCheck.filter((n) => theirs(n.person))
   // Documents sent from a link, for the office to check (ADR 0029).
-  const docs = view.documents.toCheck
+  const docs = view.documents.toCheck.filter((d) => theirs(d.person))
   // What the device turned down, said in the card it was asked from.
   const answers = useAct()
   const roster = useAct()
@@ -276,6 +285,7 @@ export function CrewScreen() {
         <section className="card">
           {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
           <Heading icon="message">Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</Heading>
+          <Narrowed department={answersFor} onWiden={allAnswers} />
           <Refusal error={answers.error} />
           <ShowAll
             items={[
