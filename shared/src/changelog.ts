@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.4',
+    date: '2026-10-22',
+    title: 'Combining two people keeps their leave allowance',
+    what: 'Combining a person brought in twice moved their leave allowance to the person kept, but under the wrong record, so it no longer showed and the next change could lose it. It now moves properly, and any allowance already moved the wrong way is put right when the app updates.',
+    prs: [123],
+  },
+  {
     version: '1.29.3',
     date: '2026-10-22',
     title: "Bringing the stock list in again doesn't double the counts",

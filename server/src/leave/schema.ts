@@ -78,6 +78,25 @@ const MIGRATIONS: string[] = [
     jsonb_build_object('id', year::text, 'year', year, 'openedAt', to_char(opened_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
   FROM opened ORDER BY year;
   `,
+  // An allowance moved by combining two people (ADR 0055) kept the old person's id, so nothing found it and the balance fell
+  // back to the default (audit, 20 October 2026, finding 8). Each is put under its person's own id for its year, and devices
+  // hear of the old one gone and the new one there, as the server's own bookkeeping.
+  `
+  SELECT pg_advisory_xact_lock(7331);
+  WITH moved AS (
+    UPDATE leave_allowances a SET id = a.person_id || '-' || a.year FROM leave_allowances o
+    WHERE o.id = a.id AND a.id <> a.person_id || '-' || a.year
+    RETURNING o.id AS was, a.id, a.person_id, a.year, a.days, a.carried_over, a.note
+  ),
+  gone AS (
+    INSERT INTO changes (entity, entity_id, op, data)
+    SELECT 'leaveAllowance', was, 'delete', NULL FROM moved ORDER BY was
+  )
+  INSERT INTO changes (entity, entity_id, op, data)
+  SELECT 'leaveAllowance', id, 'put',
+    jsonb_build_object('id', id, 'personId', person_id, 'year', year, 'days', days, 'carriedOver', carried_over, 'note', note)
+  FROM moved ORDER BY id;
+  `,
 ]
 
 export const LEAVE: Module = { versionTable: 'leave_schema_version', migrations: MIGRATIONS }

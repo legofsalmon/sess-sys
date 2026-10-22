@@ -3,6 +3,18 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: combining people keeps the leave allowance
+
+**Done**
+
+- Finding 8 of the [20 October audit](audit-2026-10-20.md) (PR #123):
+  `person.merge` moved leave allowance rows to the kept person but left
+  their ids keyed to the person merged away, so the allowance vanished
+  from devices. The move now re-keys each row to the kept person and year
+  and tells devices the old one is gone; a leave migration puts right any
+  row already moved wrongly. App 1.29.4.
+- Checked: typecheck, unit tests, and the merge and leave server tests.
+
 ## 22 October 2026: a second stock bring-in doesn't double the counts
 
 **Done**
