@@ -185,6 +185,13 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const clash = days.length === 1 && canAnswer && busy[days[0]!] ? `<p class="clash">You're booked on ${h(busy[days[0]!])} that day.</p>` : ''
   // Staff are paid through payroll (audit finding 21): no rate to ask for, only a note to go with the answer.
   const staff = isStaff(d.person)
+  // After a counter, sending a rate is what they're doing, and Accept says what it agrees to (audit, 20 October 2026, finding 6):
+  // a plain Accept under "Rate sent to the office" read as accepting their own rate, and booked them at the one offered.
+  const countered = offer.status === 'countered' && !staff
+  const offered = offer.dayRateCents ?? call.dayRateCents
+  const these = days.length > 1 ? 'Accept these days' : 'Accept'
+  const accept =
+    offer.status === 'accepted' ? 'Update my days' : countered ? `${these} at ${offered === null ? 'the rate the office sets' : `${euro(offered)} a day`} instead` : these
   // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
     ${d.flash?.offer === offer.id && !d.flash.section ? flash(d.flash) : ''}
@@ -198,12 +205,12 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
       ${onEnter}
       ${dayPicker}
       <div class="buttons one">
-        <button class="yes" name="answer" value="accept">${offer.status === 'accepted' ? 'Update my days' : days.length > 1 ? 'Accept these days' : 'Accept'}</button>
+        <button${countered ? '' : ' class="yes"'} name="answer" value="accept">${accept}</button>
       </div>
       <details${offer.status === 'countered' || typed?.get('rate')?.trim() || (typed?.get('note') ?? '') !== '' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
         ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${h(typed ? (typed.get('rate') ?? '') : offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : '')}"></label>`}
         <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(typed ? (typed.get('note') ?? '') : offer.note)}</textarea></label>
-        ${staff ? '<p class="small">It goes with your answer.</p>' : '<button name="answer" value="counter">Send rate</button>'}
+        ${staff ? '<p class="small">It goes with your answer.</p>' : `<button${countered ? ' class="yes"' : ''} name="answer" value="counter">Send rate</button>`}
       </details>
       ${holding ? '' : decline(call)}
     </form>`

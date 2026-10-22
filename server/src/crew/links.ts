@@ -54,6 +54,8 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/D
 const SAID = {
   // Answering an offer.
   accepted: { ok: true, text: "Thanks, you're down for it. The office will confirm." },
+  // Accepted after asking a different rate (audit, 20 October 2026, finding 6): said plainly which rate stands.
+  'accepted-instead': { ok: true, text: "You're down for it at the rate offered, shown here; the rate you asked for is withdrawn. The office will confirm." },
   declined: { ok: true, text: "Thanks for letting us know. You're off this one." },
   'pulled-out': { ok: true, text: "Thanks for telling us. You're off this one, and the office will find cover." },
   'rate-sent': { ok: true, text: 'Thanks, your rate has gone to the office.' },
@@ -334,7 +336,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     } else return back(reply, person.linkToken, 'try-again')
 
     if (result.status === 'rejected') return turnedDown(result)
-    const said: Said = answer === 'accept' ? 'accepted' : answer === 'decline' ? 'declined' : answer === 'pullOut' ? 'pulled-out' : 'rate-sent'
+    const said: Said = answer === 'accept' ? (offer.status === 'countered' ? 'accepted-instead' : 'accepted') : answer === 'decline' ? 'declined' : answer === 'pullOut' ? 'pulled-out' : 'rate-sent'
     // A pull-out leaves the card for "Declined and withdrawn", so its message goes at the top.
     return back(reply, person.linkToken, said, answer === 'pullOut' ? undefined : offer.id)
   })
