@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.31.0',
+    date: '2026-10-22',
+    title: 'Each job’s steps, and who has each',
+    what: 'Every gig and dry hire now shows its steps across the top of its page, from the quote sent to the kit deprepped, with the step it’s at marked. Each step can be given to a member of staff, and is then on their list on Home and in their notifications. The app ticks the steps it can tell from the job itself (the quote sent, the client’s yes, every crew booked, everything picked, the job over, all the kit back); the rest are ticked by whoever does them. Nobody is emailed or texted.',
+    prs: [126],
+    adrs: [73],
+  },
+  {
     version: '1.30.0',
     date: '2026-10-22',
     title: 'Picking a job’s kit on the phone',

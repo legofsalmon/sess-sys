@@ -5,6 +5,7 @@ import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
 import { getPhases } from '../projects/store.ts'
 import { getCount } from '../stock/counts.ts'
 import { getBooking } from '../vehicles/store.ts'
+import { getStep } from '../steps/store.ts'
 import { getLate } from './late.ts'
 import { getOwnCalendar } from './own-calendars.ts'
 import { getAway, getOffers, getPerson } from './store.ts'
@@ -29,6 +30,8 @@ const MOVED: readonly { table: string; column: string; entity?: EntityName; read
   { table: 'running_late', column: 'person_id', entity: 'runningLate', read: getLate },
   { table: 'counts', column: 'counted_by', entity: 'count', read: getCount },
   { table: 'vehicle_bookings', column: 'driver_id', entity: 'vehicleBooking', read: getBooking },
+  { table: 'job_steps', column: 'owner_id', entity: 'jobStep', read: getStep },
+  { table: 'job_steps', column: 'done_by', entity: 'jobStep', read: getStep },
   // Their own calendar (ADR 0044) and leave allowances have one a person, and are handled first; guests on Google
   // Calendar (ADR 0009) are one a person a day, and devices never see them.
   { table: 'calendar_guests', column: 'person_id' },

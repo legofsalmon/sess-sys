@@ -35,6 +35,7 @@ import { ROLE_LABELS, type Role } from '@sh/shared'
 import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
+import { STEP_LABELS, type JobStep } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
@@ -261,6 +262,8 @@ const REFERENCES = [
   // Vans and drivers (ADR 0047).
   'vehicleId',
   'driverId',
+  // A job's steps (ADR 0073).
+  'ownerId',
   // Jobs made one (ADR 0050): a list of them.
   'from',
 ] as const
@@ -902,6 +905,15 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'vehicleBooking.remove': {
       const b = look('vehicleBooking', a.id)
       return b ? `Took ${vehicle(b.vehicleId)} off ${job(b.projectId)}` : 'Took a vehicle off a job'
+    }
+    // A job's steps (ADR 0073): "Gave Picked on Harbour Lights to Aoife Brennan", "Ticked Back in on Harbour Lights".
+    case 'jobStep.set': {
+      const step = typeof a.step === 'string' && a.step in STEP_LABELS ? `“${STEP_LABELS[a.step as JobStep]}”` : 'a step'
+      const parts: string[] = []
+      if (a.ownerId !== undefined) parts.push(a.ownerId ? `gave ${step} on ${job(a.projectId)} to ${person(a.ownerId)}` : `took whoever had ${step} on ${job(a.projectId)} off it`)
+      if (a.done !== undefined) parts.push(`${a.done ? 'ticked' : 'took the tick off'} ${parts.length ? 'it' : `${step} on ${job(a.projectId)}`}`)
+      const said = parts.join(' and ') || `changed ${step} on ${job(a.projectId)}`
+      return said[0]!.toUpperCase() + said.slice(1)
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

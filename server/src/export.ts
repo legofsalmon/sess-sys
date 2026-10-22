@@ -242,6 +242,8 @@ const ABOUT: Record<string, string> = {
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
+  // A job's steps (ADR 0073).
+  job_steps: "Each job's steps given to someone or ticked by hand: the job, the step (quote, confirmed, crew, kit, prep, show, back, deprep), who it's down to, and when it was ticked and by whom. Steps the app ticks from the job's own records aren't kept.",
   // Vans and drivers (ADR 0047).
   vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',
   vehicles:

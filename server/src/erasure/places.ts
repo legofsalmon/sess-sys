@@ -124,6 +124,9 @@ export const POINTERS: readonly { table: string; column: string }[] = [
   // Who drove a vehicle on a job (ADR 0047): the job's record, reading "Erased person" once their name goes; erasing is
   // refused while a booking they drive hasn't ended.
   { table: 'vehicle_bookings', column: 'driver_id' },
+  // Who a job's step is down to, and who ticked it (ADR 0073): the job's record, reading "Erased person" once their name goes.
+  { table: 'job_steps', column: 'owner_id' },
+  { table: 'job_steps', column: 'done_by' },
 ]
 
 /** Records of theirs the law asks the business to keep for a time: stripped like STRIPPED while it lasts, then gone like GONE. */

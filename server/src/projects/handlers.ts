@@ -1,4 +1,4 @@
-import { departmentInWords, joinedPhaseName, kindOf, kitDaysOf, MAX_PHASE_DAYS, STOPPED, tailOf, type CommandArgs } from '@sh/shared'
+import { departmentInWords, joinedPhaseName, kindOf, kitDaysOf, MAX_PHASE_DAYS, stepId, STOPPED, tailOf, type CommandArgs, type JobStep } from '@sh/shared'
 import { cancelCall, moveCallsWithPhase } from '../crew/handlers.ts'
 import { getCall, getCalls, getPerson, openCallsFor } from '../crew/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
@@ -9,6 +9,7 @@ import { dayEntity, readDaysById } from '../calendar/store.ts'
 import { getQuote } from '../finance/store.ts'
 import { getClient, getPhase, getPhases, getProject, getVenue, namesForCall } from './store.ts'
 import { getBooking, vehiclesOnPhase } from '../vehicles/store.ts'
+import { getStep } from '../steps/store.ts'
 
 /**
  * The job rules the server keeps, whichever device a change comes from
@@ -253,6 +254,23 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
     for (const id of await move('movements')) await emit(ctx, 'movement', id, await getMovement(ctx.tx, id))
     for (const id of await move('vehicle_bookings')) await emit(ctx, 'vehicleBooking', id, await getBooking(ctx.tx, id))
     for (const id of await move('quotes')) await emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
+    // A job has one of each step (ADR 0073): this job's stays; a step only another had becomes this job's.
+    const { rows: steps } = await ctx.tx.query<{ id: string; project_id: string; step: JobStep }>(
+      'SELECT id, project_id, step FROM job_steps WHERE project_id = ANY($1::text[]) ORDER BY project_id = $2 DESC, done_at IS NULL, owner_id IS NULL, id',
+      [ids, a.id]
+    )
+    const { rows: kept } = await ctx.tx.query<{ step: JobStep }>('SELECT step FROM job_steps WHERE project_id = $1', [a.id])
+    const taken = new Set(kept.map((r) => r.step))
+    for (const r of steps) {
+      if (!taken.has(r.step)) {
+        taken.add(r.step)
+        const to = stepId(a.id, r.step)
+        await ctx.tx.query('INSERT INTO job_steps (id, project_id, step, owner_id, done_at, done_by) SELECT $2, $3, step, owner_id, done_at, done_by FROM job_steps WHERE id = $1', [r.id, to, a.id])
+        await emit(ctx, 'jobStep', to, await getStep(ctx.tx, to))
+      }
+      await ctx.tx.query('DELETE FROM job_steps WHERE id = $1', [r.id])
+      await emitRemoved(ctx, 'jobStep', r.id)
+    }
     const days = await move('calendar_days')
     if (days.length) for (const d of await readDaysById(ctx.tx, days)) await emit(ctx, 'calendarDay', d.id, dayEntity(d))
     await ctx.tx.query('UPDATE calendar_imports SET project_id = $1 WHERE project_id = ANY($2::text[])', [a.id, ids])
