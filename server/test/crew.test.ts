@@ -179,6 +179,24 @@ describe('freelancer link', () => {
     expect(await entity<Offer>(app, 'offer', n.id)).toMatchObject({ status: 'confirmed', dayRateCents: 30000 })
   })
 
+  it('after a counter, names the rate Accept agrees to and says the asked rate is withdrawn (audit, 20 October 2026, finding 6)', async () => {
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const o = await offer(app, await call(app), aoife.id)
+    const before = cardOf((await app.inject({ url: `/f/${aoife.linkToken}` })).body, o.id)
+    expect(before).toContain('<button class="yes" name="answer" value="accept">Accept these days</button>')
+
+    expect(await answer(app, aoife.linkToken, o.id, { answer: 'counter', picker: '1', days: ['2026-10-02', '2026-10-03'], rate: '300' })).toMatchObject({ ok: true })
+    const countered = cardOf((await app.inject({ url: `/f/${aoife.linkToken}` })).body, o.id)
+    // Sending a rate is the one filled button; Accept is plain, and says the rate it agrees to.
+    expect(countered).toContain('<button name="answer" value="accept">Accept these days at €250 a day instead</button>')
+    expect(countered).toContain('<button class="yes" name="answer" value="counter">Send rate</button>')
+
+    const accepted = await answer(app, aoife.linkToken, o.id, { answer: 'accept', picker: '1', days: ['2026-10-02', '2026-10-03'] })
+    expect(accepted).toMatchObject({ ok: true, message: "You're down for it at the rate offered, shown here; the rate you asked for is withdrawn. The office will confirm." })
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'accepted', counterRateCents: null, dayRateCents: 25000 })
+  })
+
   it('takes Enter in the rate field as Send rate, or asks for a tap: never as Accept', async () => {
     // Enter presses the form's out-of-sight first button, which answers "implicit": a rate is a counter, and nothing else happens.
     const app = await server()
