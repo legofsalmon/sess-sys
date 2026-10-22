@@ -24,6 +24,8 @@ export function CrewBadge() {
   const today = useToday()
   const { me } = useMe(view)
   const mayCrew = useAccess().can('crew')
+  // Not while the copy is still arriving: the count would climb under the tab (audit, 20 October 2026, finding 1).
+  if (view.copying) return null
   const n = (mayCrew ? crewToCheck(view, today) : 0) + (canApproveLeave(me) ? view.leave.queue.length : 0)
   if (n === 0) return null
   return (

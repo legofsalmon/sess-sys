@@ -28,6 +28,27 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.0',
+    date: '2026-10-22',
+    title: 'Home counts open on what they counted',
+    what: 'Home now only offers a count to someone who can act on it: a head no longer sees timesheets or leave to approve that only the office decides. Tapping a count opens the next screen at the part it counted, such as Answers to check or Kit short, and a count for one department opens the list showing that department only, with a line to show them all.',
+    prs: [119],
+  },
+  {
+    version: '1.28.1',
+    date: '2026-10-22',
+    title: 'The Jobs tab opens quicker',
+    what: 'With hundreds of jobs, a tap on Jobs took a second or two on a phone, most of it spent looking for jobs brought in from the calendars as several. That check is now about ten times quicker, runs only when there are calendar jobs, and is kept while you go to other tabs and come back.',
+    prs: [118],
+  },
+  {
+    version: '1.28.0',
+    date: '2026-10-22',
+    title: 'A new phone says when it is still catching up',
+    what: "The first time the app opens on a new phone or computer, it fetches the company's records before it can show them. It used to say “Up to date” while that was still going on, so Home could show no jobs today when there were some. The top bar now says “Catching up” with how far it has got, Home says it is still catching up instead of showing empty counts, and the Crew tab holds back its badge until the records are in.",
+    prs: [117],
+  },
+  {
     version: '1.27.1',
     date: '2026-10-22',
     title: 'The checks pass on Thursdays',

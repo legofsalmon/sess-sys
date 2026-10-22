@@ -308,7 +308,8 @@ describe('a round that finds nothing', () => {
     await phone.sync()
     expect(phone.view().connection).toBe('idle')
     expect(phone.view()).not.toBe(offline)
-    expect(told).toHaveBeenCalledTimes(1)
+    // Once that the copy has arrived (it was a new phone's first read), once that the round is over.
+    expect(told).toHaveBeenCalledTimes(2)
   })
 
   it('still tells a screen that opened mid-round how the round ended', async () => {
@@ -325,9 +326,10 @@ describe('a round that finds nothing', () => {
     expect(told).toHaveBeenLastCalledWith(expect.objectContaining({ connection: 'syncing' }))
     release()
     await round
-    expect(told).toHaveBeenCalledTimes(2)
+    // Opening, the copy arrived (a new phone's first read), and the round over.
+    expect(told).toHaveBeenCalledTimes(3)
     expect(told).toHaveBeenLastCalledWith(expect.objectContaining({ connection: 'idle' }))
-    expect(told.mock.calls[1]![0]).toBe(phone.view())
+    expect(told.mock.calls[2]![0]).toBe(phone.view())
 
     // And one opened during a retry with no signal hears that there still is none.
     server.wait = undefined
@@ -443,6 +445,41 @@ describe('a long feed', () => {
     expect(phone.view().warehouse.places.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5'])
     expect(phone.cursor).toBe(5)
     expect((await storage.load())?.cursor).toBe(5)
+  })
+})
+
+describe('a copy still arriving', () => {
+  // Audit, 20 October 2026, finding 1: "Up to date" was said while a new phone's first copy was still coming in.
+  it('says so until the copy has been read to the end, with how far it has got, and remembers once it has', async () => {
+    const server = new PretendServer()
+    server.pageSize = 2
+    server.seq = 5
+    server.changes = Array.from({ length: 5 }, (_, i) => ({ ...placed(`p${i + 1}`, `Bay ${i + 1}`), seq: i + 1 }))
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    expect(phone.view().copying).toEqual({})
+    const seen: unknown[] = []
+    phone.subscribe((v) => seen.push(v.copying))
+    await phone.sync()
+    expect(seen).toContainEqual({ share: 0.4 })
+    expect(seen).toContainEqual({ share: 0.8 })
+    expect(phone.view().copying).toBe(false)
+    expect((await device(server, storage)).view().copying).toBe(false)
+  })
+
+  it('stays so while the first read cannot get through', async () => {
+    const server = new PretendServer()
+    server.down = true
+    const phone = await device(server)
+    await phone.sync().catch(() => {})
+    expect(phone.view().copying).toEqual({})
+  })
+
+  it('is not said of a copy saved before the flag that holds a copy already', async () => {
+    const storage = new MemoryStorage()
+    await storage.save({ ...emptySnapshot('phone'), cursor: 7 })
+    const phone = await device(new PretendServer(), storage)
+    expect(phone.view().copying).toBe(false)
   })
 })
 

@@ -9,8 +9,10 @@ import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
+import { arrive } from '../arrival.ts'
 import { useAccess } from '../role.ts'
 import { Chart, type Series } from './Chart.tsx'
+import { Copying, STILL_ARRIVING, useCopying } from './copying.ts'
 
 /**
  * Home (ADR 0033): how things stand, for whoever is looking. One screen,
@@ -68,51 +70,56 @@ export function HomeScreen() {
   }
 
   return (
-    <div className="app home">
-      {/* Today's date top right, so Home is the page's one title (Colly, 12 October 2026). */}
-      <Top view={view} title="Home" root aside={<span className="top-date">{dayLabel(today)}</span>} />
-      {me && <p className="home-day">Hello, {firstName(me)}</p>}
+    <Copying.Provider value={view.copying !== false}>
+      <div className="app home">
+        {/* Today's date top right, so Home is the page's one title (Colly, 12 October 2026). */}
+        <Top view={view} title="Home" root aside={<span className="top-date">{dayLabel(today)}</span>} />
+        {me && <p className="home-day">Hello, {firstName(me)}</p>}
 
-      <div className="views home-for" role="group" aria-label="Show for">
-        {FOR.map(([f, label]) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={shownFor === f}
-            onClick={(e) => {
-              // A toggle, not a move: it keeps focus, as the Shell expects of one (audit finding 22).
-              e.currentTarget.focus()
-              choose({ for: f, department })
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        <div className="views home-for" role="group" aria-label="Show for">
+          {FOR.map(([f, label]) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={shownFor === f}
+              onClick={(e) => {
+                // A toggle, not a move: it keeps focus, as the Shell expects of one (audit finding 22).
+                e.currentTarget.focus()
+                choose({ for: f, department })
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
+        {shownFor === 'department' && (
+          <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
+        )}
+        {shownFor === 'warehouse' && <ForWarehouse view={view} today={today} me={me} />}
+        {shownFor === 'me' && <ForMe view={view} today={today} me={me} onPick={pick} />}
       </div>
-
-      {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
-      {shownFor === 'department' && (
-        <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
-      )}
-      {shownFor === 'warehouse' && <ForWarehouse view={view} today={today} me={me} />}
-      {shownFor === 'me' && <ForMe view={view} today={today} me={me} onPick={pick} />}
-    </div>
+    </Copying.Provider>
   )
 }
 
 /** The counts that aren't nothing, as tiles; a word when all are. */
-function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string }) {
+function Tiles({ all, keys, title = 'Needs attention', clear, department }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string }) {
   const shown = keys.map((k) => all[k]!).filter((t) => t && t.count > 0)
+  const copying = useCopying()
   return (
     <section className="card standing">
       <h2>{title}</h2>
-      {shown.length === 0 ? (
+      {copying ? (
+        <p className="all-clear">{STILL_ARRIVING}</p>
+      ) : shown.length === 0 ? (
         <p className="all-clear">{clear}</p>
       ) : (
         <ul className="tiles">
           {shown.map((t) => (
             <li key={t.key}>
-              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href}>
+              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
                 <b>{t.count.toLocaleString('en-IE')}</b>
                 <span>{t.label}</span>
               </a>
@@ -128,10 +135,13 @@ function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<st
 function Today({ view, today }: { view: View; today: string }) {
   const on = jobsOn(view, today)
   const next = on.length === 0 ? weekAhead(view, today).find((j) => j.status !== 'enquiry') : undefined
+  const copying = useCopying()
   return (
     <section className="card">
       <Heading icon="time">Today{on.length > 0 ? ` (${on.length})` : ''}</Heading>
-      {on.length === 0 ? (
+      {on.length === 0 && copying ? (
+        <p className="empty">{STILL_ARRIVING}</p>
+      ) : on.length === 0 ? (
         <p className="empty">Nothing on today.{next?.span && ` Next: ${next.name}, ${dayLabel(next.span.start)}.`}</p>
       ) : (
         <ul className="job-list">
@@ -168,10 +178,13 @@ function TodayRow({ job, view }: { job: JobView; view: View }) {
 
 function WeekAhead({ view, today }: { view: View; today: string }) {
   const week = weekAhead(view, today)
+  const copying = useCopying()
   return (
     <section className="card">
       <Heading icon="calendar">The week ahead{week.length > 0 ? ` (${week.length})` : ''}</Heading>
-      {week.length === 0 ? (
+      {week.length === 0 && copying ? (
+        <p className="empty">{STILL_ARRIVING}</p>
+      ) : week.length === 0 ? (
         <Empty>Nothing starts in the next seven days.</Empty>
       ) : (
         <ul className="job-list">
@@ -187,12 +200,13 @@ function WeekAhead({ view, today }: { view: View; today: string }) {
 }
 
 function ForCompany({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
+  const { can } = useAccess()
   const confirmed = view.jobs.jobs.filter((j) => j.status === 'confirmed' && j.span && j.span.end >= today).length
   const pencilled = view.jobs.jobs.filter((j) => (j.status === 'enquiry' || j.status === 'quoted') && (!j.span || j.span.end >= today)).length
   return (
     <>
       {/* What needs someone first, then what's on (audit finding 22). */}
-      <Tiles all={tiles(view, today, me)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
+      <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
       <Today view={view} today={today} />
       <Chart title="Jobs by week" icon="calendar" series={JOBS} columns={jobsByWeek(view.jobs.jobs, today)} empty="No gigs or hires in the next eight weeks." />
       <CrewChart view={view} today={today} />
@@ -317,6 +331,7 @@ function ForDepartment({
   department: string | undefined
   onDepartment: (d: string) => void
 }) {
+  const { can } = useAccess()
   if (!department)
     return (
       <section className="card">
@@ -349,7 +364,7 @@ function ForDepartment({
           ))}
         </select>
       </label>
-      <Tiles all={tiles(view, today, me, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
+      <Tiles all={tiles(view, today, me, can, department)} keys={TILES_FOR.department} department={department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
       <p className="hint">
         {noDepartment > 0 &&
           `${plural(noDepartment, 'call')} still needing crew in the next fortnight ${noDepartment === 1 ? "has no department, so it isn't" : "have no department, so they aren't"} counted here: give ${noDepartment === 1 ? 'it' : 'them'} one on Crew. `}
@@ -409,6 +424,7 @@ function ForDepartment({
 }
 
 function ForWarehouse({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
+  const { can } = useAccess()
   const tomorrow = addDays(today, 1)
   const out = view.moves.soon.filter((p) => p.job.span && p.job.span.start <= addDays(today, 7))
   const word = (start: string) => (start <= today ? 'Today · ' : start === tomorrow ? 'Tomorrow · ' : '')
@@ -441,7 +457,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
           </ul>
         )}
       </section>
-      <Tiles all={tiles(view, today, me)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
+      <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
       <KitChart view={view} today={today} />
       {view.moves.stillOut.length > 0 && (
         <section className="card">
@@ -468,6 +484,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
 }
 
 function ForMe({ view, today, me, onPick }: { view: View; today: string; me: PersonView | undefined; onPick: (id: string) => void }) {
+  const { can } = useAccess()
   const [id, setId] = useState('')
   if (!me) {
     const staff = view.leave.staff
@@ -513,11 +530,14 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
   const balance = me.kind === 'staff' ? view.leave.balance(me.id, year) : undefined
   const waiting = view.leave.requestsFor(me.id, year).filter((r) => r.status === 'waiting')
   const approver = canApproveLeave(me)
+  const copying = useCopying()
   return (
     <>
       <section className="card">
         <Heading icon="calendar">Your work{mine.length > 0 ? ` (${mine.length})` : ''}</Heading>
-        {mine.length === 0 ? (
+        {mine.length === 0 && copying ? (
+          <p className="empty">{STILL_ARRIVING}</p>
+        ) : mine.length === 0 ? (
           <Empty>No bookings coming up.</Empty>
         ) : (
           <ul className="job-list">
@@ -547,16 +567,20 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
       {balance && (
         <section className="card">
           <Heading icon="leave">Your leave</Heading>
-          <p>
-            {leaveDaysLabel(balance.annual.left)} of annual leave left this year, {leaveDaysLabel(balance.lieu.left)} in lieu to take.
-            {waiting.length > 0 && ` ${plural(waiting.length, 'request')} waiting to be approved.`}
-          </p>
+          {copying ? (
+            <p className="empty">{STILL_ARRIVING}</p>
+          ) : (
+            <p>
+              {leaveDaysLabel(balance.annual.left)} of annual leave left this year, {leaveDaysLabel(balance.lieu.left)} in lieu to take.
+              {waiting.length > 0 && ` ${plural(waiting.length, 'request')} waiting to be approved.`}
+            </p>
+          )}
           <a className="button" href="#crew/leave">
             Open leave
           </a>
         </section>
       )}
-      {approver && <Tiles all={tiles(view, today, me)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
+      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
       <Today view={view} today={today} />
     </>
   )

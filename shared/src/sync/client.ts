@@ -88,6 +88,13 @@ export interface Snapshot {
    * for the next page (`PullResponse.latest`); gone once it's read to the end.
    */
   latest?: number
+  /**
+   * The copy has been read to the end at least once (audit, 20 October
+   * 2026, finding 1): until then it's still arriving, and the screens say so
+   * rather than "Up to date". Copies saved before this existed, holding a
+   * copy already, count as read.
+   */
+  readToEnd?: boolean
 }
 
 export interface Storage {
@@ -196,6 +203,14 @@ export interface View {
   pendingCount: number
   connection: Connection
   cursor: number
+  /**
+   * The copy is still arriving (audit, 20 October 2026, finding 1): a new
+   * device's first read, or one reading again from the start, not yet read
+   * to the end. `share` is how far through the server's changes it has
+   * read, 0 to 1, once the server has said how many there are. Counts and
+   * empty lists aren't to be trusted until it's gone.
+   */
+  copying: false | { share?: number }
   /** The server holds made-up data to try the app with (ADR 0019), as of the last sync. */
   madeUp: boolean
 }
@@ -270,6 +285,8 @@ export interface SyncClientOptions {
 export class SyncClient {
   private state!: Snapshot
   private connection: Connection = 'idle'
+  /** The server's latest change number, as the last pull said: how far a copy still arriving has to go. */
+  private head: number | undefined
   /**
    * The view the screens were last told. A round that finds nothing leaves
    * it as it is and needn't wake them; one that moves on from it (the
@@ -308,6 +325,8 @@ export class SyncClient {
     const saved = await this.storage.load()
     this.state = saved ?? emptySnapshot(this.options.clientId ?? newId())
     if (!saved) this.dirty = 'all'
+    // Saved before the flag: a copy that has read anything has been read to the end before, or is mid-read with `latest`.
+    if (saved && saved.readToEnd === undefined && saved.cursor > 0 && saved.latest === undefined) this.state.readToEnd = true
     await this.unbrick()
     return this
   }
@@ -556,6 +575,7 @@ export class SyncClient {
       pendingCount: outbox.filter((m) => m.appliedSeq === undefined).length,
       cursor,
       madeUp: this.state.madeUp === true,
+      copying: this.copying(),
     } as Omit<View, 'connection'>
     for (const key of LAZY) Object.defineProperty(view, key, { enumerable: true, get: lazy[key] })
     return view
@@ -640,6 +660,12 @@ export class SyncClient {
     }
   }
 
+  private copying(): View['copying'] {
+    if (this.state.readToEnd === true && this.state.held === undefined) return false
+    const { head } = this
+    return head && head > 0 ? { share: Math.min(1, this.state.cursor / head) } : {}
+  }
+
   /**
    * Whether this pull asks for only the latest change of each record, and how: from the start, a copy that holds nothing
    * asks "new", one that holds records 0, for the deletes too; the pages after, what the server answered. Never while a
@@ -662,6 +688,7 @@ export class SyncClient {
       const res = await this.transport.pull(this.state.cursor, this.latestOnly())
       const restored = res.generation !== undefined && this.state.generation !== undefined && res.generation !== this.state.generation
       const behind = res.head !== undefined && res.head < this.state.cursor
+      if (res.head !== undefined) this.head = res.head
       if (restored || behind) return this.restart(res.generation, restored && res.cleared === true)
       // What the server sends this device's role changed (ADR 0042). Given money, the copy is read again from the start for
       // the records it was never sent; what it has stays, as reading it again only lands it as it is. Without, it lets go of
@@ -725,6 +752,9 @@ export class SyncClient {
         this.remember(done)
         changed = true
       }
+      if (!res.more && this.state.readToEnd !== true) [this.state.readToEnd, changed] = [true, true]
+      // Still arriving, the screens hear each page, so how far it has got moves even when a page lands nothing new.
+      else if (res.more && this.state.readToEnd !== true) changed = true
       if (changed) {
         this.version++
         await this.persist()

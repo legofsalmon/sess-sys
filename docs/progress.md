@@ -3,6 +3,49 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: Home counts open on what they counted
+
+**Done**
+
+- Findings 3 and 4 of the [20 October audit](audit-2026-10-20.md) (PR
+  #119): Home offered counts to roles that couldn't act on them, and every
+  count opened the top of a whole-company list. Each tile now needs the
+  ability its screen asks for (timesheets and leave to approve need the
+  approving ability, crew tiles crew, stock tiles stock); tapping one lands
+  on the part it counted, focused, with Back and Forward keeping it; and a
+  department's count opens the list narrowed to that department, with
+  "Showing Video only. Show all departments". App 1.29.0.
+- Checked: typecheck, all unit and server tests, and the Home, departments
+  and screens browser tests.
+
+## 22 October 2026: the Jobs tab opens quicker
+
+**Done**
+
+- Finding 2 of the [20 October audit](audit-2026-10-20.md) (PR #118): a
+  tap on Jobs took 1.3 s cold on a slowed phone at 800 jobs, half of it
+  the Tidy up nudge comparing every pair of jobs. The nudge now checks for
+  a calendar job first, the analysis is kept while the jobs and people are
+  the same, the pair check stops once jobs start too late to be near
+  (about 250 ms to 22 ms at 810 jobs here), and the Jobs list's counts and
+  weeks are worked out only when something they read changes. App 1.28.1.
+- Checked: typecheck, all unit and server tests, and the Jobs, Tidy up,
+  import and screens browser tests.
+
+## 22 October 2026: a new phone says when it is still catching up
+
+**Done**
+
+- Finding 1 of the [20 October audit](audit-2026-10-20.md) (PR #117): a
+  new phone or computer said "Up to date" while its first copy of the
+  company was still arriving, and Home showed empty counts meanwhile. The
+  sync client now remembers whether it has ever read to the end and tells
+  screens how far it has got; the top bar says "Catching up · 40%", Home's
+  tiles, charts and lists say they are still catching up instead of
+  showing nothing, and the Crew badge waits. Devices that already hold a
+  full copy are unaffected. App version 1.28.0.
+- Checked: typecheck, all unit and server tests, and the browser tests.
+
 ## 22 October 2026: the checks pass on Thursdays
 
 **Done**
@@ -13,6 +56,7 @@ waiting on someone.
   in five. The seed and the parity test now pick working days (Colly's
   "separate small PR"). App version 1.27.1; nothing on the screens changes.
 - Checked: typecheck, all unit and server tests, on the Thursday itself.
+
 ## 22 October 2026: a full audit at real size, by role
 
 **Done**
