@@ -49,7 +49,9 @@ export function TimesheetsCard({ view }: { view: View }) {
   const seesRates = useSeesRates()
   // Deciding them, and chasing them, is crew's (audit finding 9): a role without it opens them to read.
   const mayDecide = useAccess().can('crew')
-  const checks = seesRates && mayDecide
+  // Decided per timesheet, from what this device is sent (audit, 20 October 2026, finding 3): a head who reads their own
+  // department's rates (ADR 0062) checks theirs and opens the rest.
+  const checks = (r: TimesheetRow) => mayDecide && !r.amountsHidden
   if (!toApprove.length && !notIn.length && !lately.length) return null
   return (
     <section className="card timesheets" aria-label="Timesheets">
@@ -57,8 +59,8 @@ export function TimesheetsCard({ view }: { view: View }) {
       {!seesRates && <p className="hint">Your role doesn't see crew rates, so the amounts are hidden, and the office checks and approves timesheets.</p>}
       {/* Each kind counted in full and showing its first three (audit finding 16), so a long week's are a tap away and never out of mind. */}
       {toApprove.length > 0 && (
-        <div className="ts-group" role="group" aria-label="To approve">
-          <h3>To approve ({toApprove.length})</h3>
+        <div className="ts-group" role="group" aria-label={toApprove.some(checks) ? 'To approve' : 'Waiting on the office'}>
+          <h3>{toApprove.some(checks) ? 'To approve' : 'Waiting on the office'} ({toApprove.length})</h3>
           <ShowAll items={toApprove} limit={3} what="timesheets">
             {(rows) =>
               rows.map((r) => (
@@ -66,8 +68,8 @@ export function TimesheetsCard({ view }: { view: View }) {
                   key={r.offer.id}
                   r={r}
                   action={
-                    <a className={checks ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
-                      {checks ? 'Check' : 'Open'}
+                    <a className={checks(r) ? 'button primary' : 'link'} href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
+                      {checks(r) ? 'Check' : 'Open'}
                     </a>
                   }
                 />
@@ -92,7 +94,7 @@ export function TimesheetsCard({ view }: { view: View }) {
                           Ask
                         </button>
                       )}
-                      {checks && (
+                      {checks(r) && (
                         <a className="link" href={`#crew/timesheet/${encodeURIComponent(r.offer.id)}`}>
                           Fill in
                         </a>

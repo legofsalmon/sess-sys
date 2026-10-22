@@ -1,4 +1,4 @@
-import { answersToCheck, canApproveLeave, departmentOf, runningOut, sameDepartment, type Department, type JobView, type PersonView, type View } from '@sh/shared'
+import { answersToCheck, canApproveLeave, departmentOf, runningOut, sameDepartment, type Ability, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { calendarAnswersToSortOut } from '../crew/CrewScreen.tsx'
 
 /**
@@ -77,8 +77,31 @@ export function weekAhead(view: View, today: string): JobView[] {
     .sort((a, b) => a.span!.start.localeCompare(b.span!.start) || a.name.localeCompare(b.name))
 }
 
-/** Every count Home knows, narrowed to a department when one is given, keyed for picking. */
-export function tiles(view: View, today: string, me: PersonView | undefined, department?: string): Record<string, Tile> {
+/**
+ * What each count needs before it's offered: a tile opens a page to act
+ * on, so it's only for someone who can (ADR 0034 point 7; audit, 20
+ * October 2026, finding 3). Leave is for whoever approves it, whatever
+ * their role.
+ */
+const NEEDS: Record<string, Ability | 'approve-leave'> = {
+  late: 'crew',
+  answers: 'crew',
+  'crew-needed': 'crew',
+  timesheets: 'crew',
+  certificates: 'crew',
+  leave: 'approve-leave',
+  'to-pick': 'stock',
+  'still-out': 'stock',
+  'kit-short': 'kit',
+  faults: 'stock',
+  'cant-go': 'stock',
+  'tests-soon': 'stock',
+  vehicles: 'stock',
+  counts: 'stock',
+}
+
+/** Every count Home knows that this person can act on, narrowed to a department when one is given, keyed for picking. */
+export function tiles(view: View, today: string, me: PersonView | undefined, can: (a: Ability) => boolean, department?: string): Record<string, Tile> {
   const by = narrower(department)
   const answers =
     answersToCheck(view.crew, today).filter((a) => by.person(a.offer.person)).length +
@@ -90,7 +113,8 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
   const crewNeeded = view.crew.calls.filter(
     (c) => c.status === 'open' && c.end >= today && c.start <= fortnight && c.openDays.some((d) => d >= today) && (!department || sameDepartment(departmentOf(c), department)),
   ).length
-  const timesheets = view.timesheets.toApprove.filter((r) => by.person(r.person)).length
+  // Only the ones this person can decide: a timesheet whose amounts they aren't sent is the office's (ADR 0062).
+  const timesheets = view.timesheets.toApprove.filter((r) => by.person(r.person) && !r.amountsHidden).length
   const leave = view.leave.queue.filter((q) => by.person(q.person)).length
   const certificates = runningOut(view.crew.people, view.documents.all, today).filter((r) => by.person(r.person)).length
   const short = view.kit.short.filter((l) => by.kit(l.model?.department))
@@ -111,7 +135,7 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
     { key: 'answers', count: answers, label: answers === 1 ? 'answer to check' : 'answers to check', href: '#crew' },
     { key: 'crew-needed', count: crewNeeded, label: crewNeeded === 1 ? 'call still needs crew' : 'calls still need crew', href: '#crew' },
     { key: 'timesheets', count: timesheets, label: timesheets === 1 ? 'timesheet to approve' : 'timesheets to approve', href: '#crew/timesheets' },
-    { key: 'leave', count: leave, label: approver ? (leave === 1 ? 'leave request waiting on you' : 'leave requests waiting on you') : leave === 1 ? 'leave request waiting' : 'leave requests waiting', href: '#crew/leave' },
+    { key: 'leave', count: leave, label: leave === 1 ? 'leave request waiting on you' : 'leave requests waiting on you', href: '#crew/leave' },
     { key: 'certificates', count: certificates, label: certificates === 1 ? 'certificate or document running out' : 'certificates and documents running out', href: '#crew/people' },
     { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock' },
     { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true },
@@ -122,7 +146,8 @@ export function tiles(view: View, today: string, me: PersonView | undefined, dep
     { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut },
     { key: 'counts', count: counts, label: counts === 1 ? 'place to count this week' : 'places to count this week', href: '#stock/count' },
   ]
-  return Object.fromEntries(all.map((t) => [t.key, t]))
+  const offered = (t: Tile) => (NEEDS[t.key] === 'approve-leave' ? approver : can(NEEDS[t.key] as Ability))
+  return Object.fromEntries(all.filter(offered).map((t) => [t.key, t]))
 }
 
 /** Which counts each view of Home shows, in order: the first is what that person reaches for first. */
