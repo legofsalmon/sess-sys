@@ -79,6 +79,7 @@ const MODEL_COLUMNS = {
   patMonths: 'pat_months',
   liftingMonths: 'lifting_months',
   aliases: 'aliases',
+  listId: 'list_id',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -229,8 +230,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const taken = await nameTaken(ctx.tx, 'models', a.name.trim(), a.id)
     if (taken) throw new Refused({ code: 'conflict', message: `There's already a product called ${taken}.` })
     await ctx.tx.query(
-      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         a.id,
         a.name.trim(),
@@ -243,6 +244,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         a.patMonths,
         a.liftingMonths,
         JSON.stringify(aliasesOf((a.aliases ?? []).join(','), a.name)),
+        a.listId ?? '',
       ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
