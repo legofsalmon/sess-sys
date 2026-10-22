@@ -144,6 +144,9 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'asset.reinstate': 'stock',
   'stock.set': 'stock',
   'stock.move': 'stock',
+  // Racks' layouts (ADR 0074) are the stock list's.
+  'rackSlot.set': 'stock',
+  'rackSlot.remove': 'stock',
   'move.record': 'stock',
   'labels.reserve': 'stock',
   'labels.update': 'stock',

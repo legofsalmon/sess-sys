@@ -139,6 +139,7 @@ describe('download everything', () => {
       'product_prices',
       'projects',
       'quotes',
+      'rack_slots',
       'role_prices',
       'running_late',
       'settings',

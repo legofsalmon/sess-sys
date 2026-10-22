@@ -17,6 +17,16 @@ import { euroCents, needed, text, whole } from './plain.ts'
  */
 
 const id = z.string().min(1).max(64)
+/** The tallest rack there is: 60 rack units. */
+export const MAX_UNITS = 60
+/** Kilos to a tenth, as typed: "12.5". */
+const kilos = z
+  .number({ invalid_type_error: 'The weight is a number of kilos, such as 12.5.' })
+  .min(0, 'The weight is a number of kilos, such as 12.5.')
+  .max(5000, 'The weight can be up to 5,000 kg.')
+  .transform((n) => Math.round(n * 10) / 10)
+/** A stock code as kept: trimmed, so the phone shows what the server keeps. */
+const stockCode = text(30, 'The stock code').transform((s) => s.trim())
 /** Money in euro cents, so sums never drift. */
 const cents = euroCents(1_000_000_00, 'A value')
 
@@ -98,7 +108,30 @@ export const model = z.object({
    * it however it has been renamed there. Empty or left out for none.
    */
   listId: text(100, 'Its id in the list').optional(),
+  /**
+   * A rack (ADR 0074): kit built up in a rack case that travels as one, with
+   * a layout of what goes where (rackSlot). Its items are the built racks,
+   * each holding the kit in it, so it's always a numbered case. What's in a
+   * built rack goes with the rack, not on its own.
+   */
+  isRack: z.boolean().default(false),
+  /** Its own short stock code, such as RK-MON-A; found as its name is. Empty for none. */
+  code: stockCode.default(''),
+  /**
+   * Its size in a rack (ADR 0074): how many rack units high, and how deep,
+   * for anything that goes in one; for a rack, the room in it. Null where
+   * not given.
+   */
+  units: whole(1, MAX_UNITS, 'Rack units').nullable().default(null),
+  depthMm: whole(1, 3000, 'The depth in mm').nullable().default(null),
+  /** What one weighs, to a tenth of a kilo; for a rack, the case empty. */
+  weightKg: kilos.nullable().default(null),
+  /** What it draws at most, in watts. */
+  powerW: whole(0, 100_000, 'The power in watts').nullable().default(null),
 })
+/** A product that isn't a rack and has no size or stock code given (ADR 0074), as products made before racks read. */
+export const NOT_RACKED = { isRack: false, code: '', units: null, depthMm: null, weightKg: null, powerW: null } as const
+
 export type Model = z.infer<typeof model> & {
   /**
    * Marked as added by mistake (audit finding 19): kept for the history, with
@@ -204,6 +237,10 @@ const caseIsNumbered = [
   (m: { tracking?: Tracking; isCase?: boolean }) => !(m.isCase && m.tracking === 'bulk'),
   { message: 'A case has its own number, so it is numbered, not counted.' },
 ] as const
+const rackIsCase = [
+  (m: { isRack?: boolean; isCase?: boolean }) => !(m.isRack && m.isCase === false),
+  { message: 'A rack holds other kit, so it is a case.' },
+] as const
 const somethingToChange = [
   (u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined),
   { message: 'Nothing to change.' },
@@ -217,7 +254,7 @@ const oldNumber = text(100, 'The old number')
 const patDue = day.nullable()
 
 export const stockCommandSchemas = {
-  'model.create': model.refine(...caseIsNumbered),
+  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase),
   /** Only the fields the person changed, as for jobs. */
   'model.update': z
     .object({
@@ -233,9 +270,16 @@ export const stockCommandSchemas = {
       liftingMonths: months.optional(),
       aliases: model.shape.aliases.removeDefault().optional(),
       listId: model.shape.listId,
+      isRack: z.boolean().optional(),
+      code: stockCode.optional(),
+      units: model.shape.units.removeDefault().optional(),
+      depthMm: model.shape.depthMm.removeDefault().optional(),
+      weightKg: model.shape.weightKg.removeDefault().optional(),
+      powerW: model.shape.powerW.removeDefault().optional(),
     })
     .refine(...somethingToChange)
-    .refine(...caseIsNumbered),
+    .refine(...caseIsNumbered)
+    .refine(...rackIsCase),
   /** Refused while it has items, retired ones included, or counted stock. */
   'model.remove': z.object({ id }),
   /**

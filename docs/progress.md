@@ -3,6 +3,31 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: racks
+
+**Done**
+
+- [ADR 0074](adr/0074-racks.md) (PR #127), part 1 of Colly's ask for racks
+  in the stock and a rack designer. A rack is a product marked as a rack
+  (always a numbered case) with its own stock code; each built one is an
+  item holding its kit, so scanning it takes the lot. Any product can have
+  a stock code (found by search and the product picker) and a size: rack
+  units, depth, weight, power. Each rack has a layout (`rack_slots`,
+  `rackSlot.set`/`remove`): what goes at which unit, front or back, or
+  loose. The app draws it front and back, adds up units, weight and power,
+  and says what won't fit (off the bottom, on top of something, too deep,
+  front and back meeting); the server never refuses a plan. Built racks
+  are checked against the layout ("2 missing"). Kit built into a rack isn't
+  free for jobs on its own. Stock › Racks lists them. App 1.32.0.
+- Checked: typecheck, unit tests (racks, parity, export and the rest), and a
+  browser test (racks.spec.ts).
+
+**Next (part 2)**
+
+- Ours or dry hired in on every product (supplier, hire and buy price),
+  a catalogue filter, dry hire never short; then the rack designer
+  (drag gear in, owned and dry hire, same checks, cost to buy or hire in).
+
 ## 22 October 2026: each job's steps, and who has each
 
 **Done**

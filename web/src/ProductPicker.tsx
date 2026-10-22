@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 /** Offers shown at once; past these a line says how many more, to type more and narrow. */
 const SHOWN = 8
 
-type Product = Pick<Model, 'id' | 'name' | 'department' | 'category' | 'aliases'>
+type Product = Pick<Model, 'id' | 'name' | 'department' | 'category' | 'aliases'> & { code?: string }
 
 /** A row under the products that isn't one: "Not kit", "New product…". */
 export interface PickerAction {

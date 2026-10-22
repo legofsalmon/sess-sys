@@ -55,6 +55,7 @@ import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { STOCK } from '../Up.tsx'
+import { RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, weightPowerLabel } from './Racks.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -85,6 +86,7 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
   return (
     <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
       <Summary m={m} w={w} view={view} />
+      {m.isRack && view.racks.of(m.id) && <RackCard view={view} r={view.racks.of(m.id)!} />}
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
       {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
       <Counted m={m} w={w} />
@@ -106,6 +108,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   const mayChange = useAccess().can('stock')
   const onKit = view.kit.lines.filter((l) => l.modelId === m.id)
   const unusable = view.faults.unusable(m.id)
+  const racksUsing = view.racks.using(m.id)
   // What stops a plain Remove on the server stops it here, so "Added by mistake" is offered instead: any item ever labelled as it,
   // even one retired as added by mistake and so in no list here, and any time it went out with a job.
   const hadItems = [...w.assets.values()].some((a) => a.modelId === m.id)
@@ -166,10 +169,36 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
           <dt>Category</dt>
           <dd>{m.category || 'None'}</dd>
         </div>
+        {m.code && (
+          <div>
+            <dt>Stock code</dt>
+            <dd>{m.code}</dd>
+          </div>
+        )}
         <div>
           <dt>Kept track of</dt>
-          <dd>{m.tracking === 'bulk' ? 'Counted' : m.isCase ? 'Numbered; holds other kit' : 'Numbered'}</dd>
+          <dd>{m.tracking === 'bulk' ? 'Counted' : m.isRack ? 'Numbered; a rack built up with kit' : m.isCase ? 'Numbered; holds other kit' : 'Numbered'}</dd>
         </div>
+        {(sizeLabel(m) || weightPowerLabel(m)) && (
+          <div>
+            <dt>{m.isRack ? 'Room in it' : 'Size'}</dt>
+            <dd>{[sizeLabel(m), weightPowerLabel(m)].filter(Boolean).join(', ')}</dd>
+          </div>
+        )}
+        {racksUsing.length > 0 && (
+          <div className="wide">
+            <dt>In the layout of</dt>
+            <dd>
+              {racksUsing.map((r, i) => (
+                <span key={r.model.id}>
+                  {i > 0 && ', '}
+                  <a href={`#stock/product/${r.model.id}`}>{r.model.name}</a>
+                </span>
+              ))}
+              {m.racked > 0 && ` · ${m.racked.toLocaleString('en-IE')} built into racks, which go out with them`}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Value of one</dt>
           <dd>{m.valueCents === null ? 'Not given' : valueLabel(m.valueCents)}</dd>
@@ -195,7 +224,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
       <Refusal error={error} />
       {/* Changing the stock list is stock's (audit finding 9): a role without it reads it. */}
       {!mayChange ? null : editing ? (
-        <EditProduct m={m} w={w} onDone={() => setEditing(false)} />
+        <EditProduct m={m} w={w} view={view} onDone={() => setEditing(false)} />
       ) : removing ? (
         <Confirm question={`Remove ${m.name} from the stock list? Nothing is counted or labelled as it, so nothing else changes.`} yes="Remove it" onYes={remove} onNo={() => setRemoving(false)} />
       ) : mistaking ? (
@@ -280,7 +309,7 @@ function monthsTyped(text: string): number | null {
   return Number.isInteger(n) && n >= 1 && n <= MAX_MONTHS ? n : NaN
 }
 
-function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone: () => void }) {
+function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; view: View; onDone: () => void }) {
   const [f, setF] = useState({
     name: m.name,
     aliases: m.aliases.join(', '),
@@ -292,7 +321,9 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     notes: m.notes,
     pat: m.patMonths === null ? '' : String(m.patMonths),
     lifting: m.liftingMonths === null ? '' : String(m.liftingMonths),
+    isRack: m.isRack,
   })
+  const [size, setSize] = useState(sizeTypedOf(m))
   const { run, error, refuse } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
@@ -316,6 +347,12 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
     const patMonths = numbered ? monthsTyped(f.pat) : m.patMonths
     const liftingMonths = numbered ? monthsTyped(f.lifting) : m.liftingMonths
     if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return refuse(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
+    const sized = sizeFrom(size, w.models, m.id)
+    if (!sized.size) return refuse(sized.reason)
+    const isRack = f.isRack && f.isCase && numbered
+    if (!isRack && m.isRack && (view.racks.of(m.id)?.slots.length ?? 0) > 0) return refuse(`${m.name} has a layout. Take everything out of it first.`)
+    const inRacks = view.racks.using(m.id)
+    if (isRack && !m.isRack && inRacks.length) return refuse(`${m.name} is in the layout of ${inRacks.map((r) => r.model.name).join(', ')}. Take it out of that first.`)
     // Only what changed, so two people changing different things both keep theirs.
     const next = {
       name,
@@ -327,6 +364,8 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
       notes: f.notes.trim(),
       patMonths,
       liftingMonths,
+      isRack,
+      ...sized.size,
     }
     const changes: Partial<CommandInput<'model.update'>> = {}
     for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== m[k]) (changes as Record<string, unknown>)[k] = next[k]
@@ -364,7 +403,17 @@ function EditProduct({ m, w, onDone }: { m: ModelView; w: WarehouseView; onDone:
       <label>
         Category <input list="edit-category-names" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} />
       </label>
-      <TrackingChoice tracking={f.tracking} isCase={f.isCase} onChange={(t) => setF({ ...f, ...t })} />
+      <TrackingChoice tracking={f.tracking} isCase={f.isCase} onChange={(t) => setF({ ...f, ...t, isRack: f.isRack && t.isCase })} />
+      {f.isCase && f.tracking === 'serialised' && (
+        <label className="choice wide">
+          <input type="checkbox" checked={f.isRack} onChange={(e) => setF({ ...f, isRack: e.target.checked })} />
+          <span>
+            <b>A rack</b>
+            <small>Built up with kit that travels together, with a layout of what goes where. What's in one goes out with it, not on its own.</small>
+          </span>
+        </label>
+      )}
+      <SizeFields f={size} onChange={setSize} rack={f.isRack && f.isCase} />
       {f.tracking === 'serialised' && (
         <>
           <label>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { commandSchemas, type Mutation } from '../src/commands.ts'
 import type { Fault } from '../src/faults.ts'
 import type { LabelRun } from '../src/labels.ts'
-import { stillOutReason, stockId, type Asset, type Model, type Place } from '../src/stock.ts'
+import { stillOutReason, stockId, type Asset, type Model, type Place, NOT_RACKED } from '../src/stock.ts'
 import { faultsView } from '../src/sync/faults-view.ts'
 import type { JobsView } from '../src/sync/jobs-view.ts'
 import { labelsView } from '../src/sync/labels-view.ts'
@@ -17,6 +17,7 @@ import { warehouseView } from '../src/sync/stock-view.ts'
  */
 
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
+  ...NOT_RACKED,
   aliases: [],
   id,
   name,

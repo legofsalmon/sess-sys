@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.32.0',
+    date: '2026-10-22',
+    title: 'Racks',
+    what: 'Stock has a Racks page. A rack is a flightcase built up with kit that travels together, with its own name and stock code. Lay out what goes in it, at which rack unit, front or back, or loose in the drawer, and the app draws it, adds up the weight and power, and says what doesn’t fit. Each rack built is checked against its layout, so you can see what’s missing. Kit built into a rack goes out with the rack and isn’t free on its own, and a job books the rack by its name. Any product can now have a stock code and its size in a rack.',
+    prs: [127],
+    adrs: [74],
+  },
+  {
     version: '1.31.0',
     date: '2026-10-22',
     title: 'Each job’s steps, and who has each',
