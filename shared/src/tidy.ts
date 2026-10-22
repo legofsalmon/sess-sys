@@ -77,14 +77,18 @@ export function sameJobs(all: readonly TidyJob[]): SameJob[] {
   const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)))
   const heads = jobs.map((j) => nameKey(headOf(j.name)))
   const fulls = jobs.map((j) => nameKey(j.name))
-  for (let i = 0; i < jobs.length; i++)
+  for (let i = 0; i < jobs.length; i++) {
+    // In order of start, so once a job starts past this one's end and the near days, none after it is near either (audit, 20 October 2026, finding 2).
+    const last = addDays(jobs[i]!.span!.end, NEAR_DAYS + 1)
     for (let k = i + 1; k < jobs.length; k++) {
       const [a, b] = [jobs[i]!, jobs[k]!]
+      if (b.span!.start > last) break
       if ((a.kind ?? 'gig') !== (b.kind ?? 'gig') || !a.sourceCalendar !== !b.sourceCalendar || !near(a.span!, b.span!)) continue
       const head = !!heads[i] && heads[i] === heads[k]
       if (!head && !wordPrefix(fulls[i]!, fulls[k]!)) continue
       parent[root(k)] = root(i)
     }
+  }
   const groups = new Map<number, number[]>()
   for (let i = 0; i < jobs.length; i++) groups.set(root(i), [...(groups.get(root(i)) ?? []), i])
   const out: SameJob[] = []
