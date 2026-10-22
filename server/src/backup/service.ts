@@ -1,10 +1,12 @@
 import { newId, type BackupRun, type BackupStatus } from '@sh/shared'
-import { Worker } from 'node:worker_threads'
+import { fork } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import type { Db } from '../db.ts'
 import { eraseAgainFromStore } from '../erasure/list.ts'
 import { encryptBackup } from './crypto.ts'
 import { BackupError, isEmptyDatabase, restoreBackup, writeBackup, type RestoreReport } from './format.ts'
 import type { BackupStore, StoredFile } from './store.ts'
+import { takeTurns } from '../turns.ts'
 
 /**
  * The nightly backup (ADR 0004). Each run copies the database to a file,
@@ -138,12 +140,16 @@ export class Backups {
     const watching = this.options.watch?.started(trigger)
     let run: BackupRun
     try {
-      const backup = await writeBackup(this.db, { now: at, commit: this.options.commit })
-      const key = backupKey(at, this.options.key !== undefined)
-      // What goes to the store is what the test restore proves, so an encrypted file is shown to unlock and restore.
-      const file = this.options.key ? encryptBackup(backup.data, this.options.key) : backup.data
-      await store.put(key, file)
-      await checkRestores(file, this.options.key)
+      // Writing and proving it hold the whole company in memory, so a download of everything waits its turn (turns.ts).
+      const { key, file, backup } = await takeTurns(async () => {
+        const backup = await writeBackup(this.db, { now: at, commit: this.options.commit })
+        const key = backupKey(at, this.options.key !== undefined)
+        // What goes to the store is what the test restore proves, so an encrypted file is shown to unlock and restore.
+        const file = this.options.key ? encryptBackup(backup.data, this.options.key) : backup.data
+        await store.put(key, file)
+        await checkRestores(file, this.options.key)
+        return { key, file, backup }
+      })
       await this.thin(store)
       run = await this.finish(id, { status: 'ok', key, bytes: file.length, rows: backup.rows })
       log?.info({ key, bytes: file.length, rows: backup.rows, encrypted: this.options.key !== undefined }, 'Backup made and checked by a test restore')
@@ -235,30 +241,39 @@ export class Backups {
   }
 }
 
-/** The longest a test restore may take before its worker is stopped and the backup counted as failed. */
+/** The longest a test restore may take before its process is stopped and the backup counted as failed. */
 const RESTORE_CHECK_MS = 10 * 60_000
+/** The most JavaScript memory the test restore's process may take, in MB: past it, that process stops, not the server. */
+const RESTORE_HEAP_MB = 512
 
 /**
  * Prove a backup file restores: load it into a throwaway database in memory and check every table. It runs in a
- * worker thread (restore-worker.ts), so the seconds it takes don't stall the server for everyone else: "Back up now"
- * and starting fresh run it in the day (audit finding 13). The file is checked there before any database is booted.
+ * process of its own (restore-worker.ts), so the seconds it takes don't stall the server for everyone else ("Back up
+ * now" and starting fresh run it in the day, audit finding 13), and the memory it takes, about 600 MB at real size, is
+ * given back when it ends and can't take the server down with it (audit, 20 October 2026, finding 9): a worker thread
+ * kept it, and shared the server's. The file is checked there before any database is booted.
  */
 export function checkRestores(data: Buffer, key?: Buffer, { timeoutMs = RESTORE_CHECK_MS } = {}): Promise<RestoreReport> {
   return new Promise<RestoreReport>((resolve, reject) => {
-    const worker = new Worker(new URL('./restore-worker.mjs', import.meta.url), { workerData: { data, key } })
+    const child = fork(fileURLToPath(new URL('./restore-worker.mjs', import.meta.url)), [], {
+      execArgv: [`--max-old-space-size=${RESTORE_HEAP_MB}`],
+      serialization: 'advanced',
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+    })
     let settled = false
     const settle = (fn: () => void) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       fn()
-      void worker.terminate()
+      if (child.exitCode === null) child.kill('SIGKILL')
     }
     const failed = (why: string) => settle(() => reject(new BackupError(`The test restore failed: ${why}`)))
     const timer = setTimeout(() => failed('it took too long.'), timeoutMs)
-    worker.once('message', (m: { report?: RestoreReport; failed?: string }) => (m.report ? settle(() => resolve(m.report!)) : failed(m.failed ?? 'no reason given.')))
-    worker.once('error', (err) => failed(err instanceof Error ? err.message : String(err)))
-    worker.once('exit', () => failed('its worker stopped without answering.'))
+    child.once('message', (m: { report?: RestoreReport; failed?: string }) => (m.report ? settle(() => resolve(m.report!)) : failed(m.failed ?? 'no reason given.')))
+    child.once('error', (err) => failed(err.message))
+    child.once('exit', (code, signal) => failed(signal || code ? `its process stopped (${signal ?? `code ${code}`}), perhaps out of memory.` : 'its process stopped without answering.'))
+    child.send({ data, key })
   })
 }
 

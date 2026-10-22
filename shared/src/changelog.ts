@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.5',
+    date: '2026-10-22',
+    title: 'The nightly backup check uses far less memory',
+    what: 'Each night the app checks that its backup can be restored. That check took the server close to its memory limit and kept the memory afterwards. It now runs on its own with a firm limit and gives everything back when it finishes, and backups, test restores and Download everything take turns rather than run at once.',
+    prs: [124],
+  },
+  {
     version: '1.29.4',
     date: '2026-10-22',
     title: 'Combining two people keeps their leave allowance',
