@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
+/** A row of the pick list, whether it's still to do or folded under the done ones (audit, 20 October 2026, finding 5). */
+const pickRow = (page: Page, name: string) => page.locator('article.pick-row').filter({ has: page.locator('header b').getByText(name, { exact: true }) })
+
 /**
  * Faults and missing kit end to end (ADR 0018), at phone size: three
  * speakers and 20 cables go out to a job. With no signal, one speaker comes
@@ -124,8 +127,8 @@ test('damaged and missing kit, reported on return, then fixed, found and written
     await typeIn(n)
     await expect(said).toHaveText(`${n} ${speaker}: ${i + 1} of 3 out.`)
   }
-  const speakerRow = page.getByRole('article', { name: speaker })
-  const cableRow = page.getByRole('article', { name: cable })
+  const speakerRow = pickRow(page, speaker)
+  const cableRow = pickRow(page, cable)
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('20')
   await countOut.getByRole('button', { name: 'Count out' }).click()

@@ -1,3 +1,5 @@
+import { arrival, partHeading } from './arrival.ts'
+
 /**
  * Where each screen was scrolled to (audit finding 8). A move to a new
  * screen starts at its top, where its title and the strip that says where
@@ -24,6 +26,8 @@ interface Place {
   y: number
   row?: string
   top?: number
+  /** A part of the screen to land on, by its heading (arrival.ts): a count on Home asked for it. */
+  part?: string
 }
 
 /** A step's place, by its number. A plain number is a place kept before rows were. */
@@ -53,6 +57,13 @@ function placeNow(): Place {
 /** Where the page goes for a place: its row back where it was on the screen, or the same distance down if the row isn't drawn. */
 function yOf(place: Place | number): number {
   if (typeof place === 'number') return place
+  if (place.part !== undefined) {
+    const heading = partHeading(place.part)
+    // A card's heading brings its card, under the bar that stays at the top; a heading inside a card, itself.
+    const at = heading && (heading.tagName === 'H2' ? (heading.parentElement ?? heading) : heading)
+    const bar = document.querySelector('main .top')?.getBoundingClientRect().bottom ?? 0
+    return at ? Math.max(0, Math.round(scrollY + at.getBoundingClientRect().top - bar - 8)) : place.y
+  }
   const row = place.row === undefined ? null : document.querySelector(`[data-place="${CSS.escape(place.row)}"]`)
   return row ? Math.max(0, Math.round(scrollY + row.getBoundingClientRect().top - (place.top ?? 0))) : place.y
 }
@@ -102,7 +113,8 @@ export function keepPlaces() {
     cancelAnimationFrame(frame)
     const back = numberOf(history.state)
     current = back ?? number()
-    next = back ? (places[back] ?? 0) : 0
+    const part = arrival()?.part
+    next = back ? (places[back] ?? 0) : part ? { y: 0, part } : 0
   })
 }
 
@@ -124,10 +136,25 @@ export function settlePlace(stay = false) {
   // A screen still filling in may be too short at first, and the strip of its parts under the title comes a frame after it,
   // which the browser would scroll past to keep the same rows in view: the place is held for a few frames, until a hand moves the page.
   let frames = 12
-  const moved = () => (frames = 0)
+  // A part to land on may be on a screen still loading: it's waited for, a second and a half at most, then held as any place is.
+  let waiting = typeof to === 'object' && to.part !== undefined ? 90 : 0
+  const moved = () => (frames = waiting = 0)
   const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const
   for (const e of events) addEventListener(e, moved, { once: true, passive: true })
   const hold = () => {
+    if (waiting > 0 && typeof to === 'object' && to.part !== undefined) {
+      const heading = partHeading(to.part)
+      if (heading) {
+        waiting = 0
+        // Focus goes with the eye, as the strip of parts does, so a keyboard and a screen reader start at the part.
+        heading.tabIndex = -1
+        heading.focus({ preventScroll: true })
+      } else {
+        waiting--
+        requestAnimationFrame(hold)
+        return
+      }
+    }
     if (frames-- <= 0) {
       for (const e of events) removeEventListener(e, moved)
       return

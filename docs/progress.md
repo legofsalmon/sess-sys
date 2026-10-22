@@ -3,6 +3,93 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: combining people keeps the leave allowance
+
+**Done**
+
+- Finding 8 of the [20 October audit](audit-2026-10-20.md) (PR #123):
+  `person.merge` moved leave allowance rows to the kept person but left
+  their ids keyed to the person merged away, so the allowance vanished
+  from devices. The move now re-keys each row to the kept person and year
+  and tells devices the old one is gone; a leave migration puts right any
+  row already moved wrongly. App 1.29.4.
+- Checked: typecheck, unit tests, and the merge and leave server tests.
+
+## 22 October 2026: a second stock bring-in doesn't double the counts
+
+**Done**
+
+- Finding 7 of the [20 October audit](audit-2026-10-20.md) (PR #122): a
+  second Current RMS bring-in with another place typed counted every
+  product at both places, and a rename there made a new product. The
+  bring-in now carries Current RMS's id onto the product
+  (`models.list_id`) and matches by it before the name; a count at a place
+  the list doesn't mention is set to none where the place was typed for
+  the whole list ("Counts none at Store one (12 there now)"), or noted
+  where the row names its own place; a new product with the same category,
+  value and count as an unnamed one says "Looks like Amp renamed". The
+  238 products already live pick up their id, by name, on the next
+  bring-in. [ADR 0056](adr/0056-bringing-the-stock-in-from-current-rms.md)
+  notes it. App 1.29.3.
+- Checked: typecheck, all unit and server tests, with new ones for the
+  move, the aside, the rename by id and by likeness, and the whole round
+  trip on the server.
+
+## 22 October 2026: Accept after a counter takes the rate offered
+
+**Done**
+
+- Finding 6 of the [20 October audit](audit-2026-10-20.md) (PR #121): a
+  freelancer who countered and then pressed Accept was booked at their own
+  rate. On a countered card Accept now reads "Accept these days at €250 a
+  day instead" (or "the rate the office sets"), Send rate is the main
+  button, and accepting withdraws the counter with the words "the rate
+  you asked for is withdrawn. The office will confirm." App 1.29.2.
+- Checked: typecheck, unit tests, and the crew server tests.
+
+## 22 October 2026: a shorter pick list, with the scan box kept in view
+
+**Done**
+
+- Finding 5 of the [20 October audit](audit-2026-10-20.md) (PR #120): a
+  300-line pick list measured 56,142 px on a phone, mostly every item
+  number written out under "Where to find them", and the scan box scrolled
+  away. Each place is now one line ("Bay A1: 12 here") with its numbers
+  folded; lines done fold under "N done" at the foot of their department;
+  the scan box, what it said and anything that failed stay docked under
+  the top bar while the camera is off. App 1.29.1.
+- Checked: typecheck, unit tests, and the pick list and faults browser
+  tests (the scan field stays in view after scrolling).
+
+## 22 October 2026: Home counts open on what they counted
+
+**Done**
+
+- Findings 3 and 4 of the [20 October audit](audit-2026-10-20.md) (PR
+  #119): Home offered counts to roles that couldn't act on them, and every
+  count opened the top of a whole-company list. Each tile now needs the
+  ability its screen asks for (timesheets and leave to approve need the
+  approving ability, crew tiles crew, stock tiles stock); tapping one lands
+  on the part it counted, focused, with Back and Forward keeping it; and a
+  department's count opens the list narrowed to that department, with
+  "Showing Video only. Show all departments". App 1.29.0.
+- Checked: typecheck, all unit and server tests, and the Home, departments
+  and screens browser tests.
+
+## 22 October 2026: the Jobs tab opens quicker
+
+**Done**
+
+- Finding 2 of the [20 October audit](audit-2026-10-20.md) (PR #118): a
+  tap on Jobs took 1.3 s cold on a slowed phone at 800 jobs, half of it
+  the Tidy up nudge comparing every pair of jobs. The nudge now checks for
+  a calendar job first, the analysis is kept while the jobs and people are
+  the same, the pair check stops once jobs start too late to be near
+  (about 250 ms to 22 ms at 810 jobs here), and the Jobs list's counts and
+  weeks are worked out only when something they read changes. App 1.28.1.
+- Checked: typecheck, all unit and server tests, and the Jobs, Tidy up,
+  import and screens browser tests.
+
 ## 22 October 2026: a new phone says when it is still catching up
 
 **Done**
