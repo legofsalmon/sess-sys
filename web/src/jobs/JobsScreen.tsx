@@ -21,7 +21,7 @@ import {
   type VenueView,
   type View,
 } from '@sh/shared'
-import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
@@ -265,20 +265,28 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
   const mayAdd = useAccess().can('jobs')
   const card = useUnderTop(phone)
   const day = useToday()
-  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  const matches = (j: JobView) => {
-    const text = [j.name, j.client?.name, j.venue?.name, ...j.phases.map((p) => p.venue?.name)].filter(Boolean).join(' ').toLowerCase()
-    return words.every((w) => text.includes(w))
-  }
-  const shown = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
-  // Past jobs newest first; everything else soonest first.
-  if (filter === 'past') shown.reverse()
-  const count = (f: Filter) => jobs.filter((j) => filterOf(j, day) === f).length
-  // The next fortnight, and the ones with no dates yet, until Show all; a search looks through them all.
-  const soonOnly = filter === 'coming' && !all && words.length === 0
-  const soonEnd = addDays(day, SOON_DAYS)
-  const listed = soonOnly ? shown.filter((j) => !j.span || j.span.start < soonEnd) : shown
-  const rows = byWeek(listed, day)
+  // Worked out again only when the jobs, the day or what's asked for change, not on every render (audit, 20 October 2026, finding 2).
+  const counts = useMemo(() => {
+    const counted = new Map<Filter, number>()
+    for (const j of jobs) counted.set(filterOf(j, day), (counted.get(filterOf(j, day)) ?? 0) + 1)
+    return counted
+  }, [jobs, day])
+  const count = (f: Filter) => counts.get(f) ?? 0
+  const { rows, shownCount, listedCount } = useMemo(() => {
+    const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const matches = (j: JobView) => {
+      const text = [j.name, j.client?.name, j.venue?.name, ...j.phases.map((p) => p.venue?.name)].filter(Boolean).join(' ').toLowerCase()
+      return words.every((w) => text.includes(w))
+    }
+    const shown = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
+    // Past jobs newest first; everything else soonest first.
+    if (filter === 'past') shown.reverse()
+    // The next fortnight, and the ones with no dates yet, until Show all; a search looks through them all.
+    const soonOnly = filter === 'coming' && !all && words.length === 0
+    const soonEnd = addDays(day, SOON_DAYS)
+    const listed = soonOnly ? shown.filter((j) => !j.span || j.span.start < soonEnd) : shown
+    return { rows: byWeek(listed, day), shownCount: shown.length, listedCount: listed.length }
+  }, [jobs, day, filter, search, all])
   const win = useWindowed('jobs', rows, rowKey, 110)
 
   return (
@@ -300,13 +308,13 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
           </button>
         ))}
       </div>
-      {shown.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
-      {shown.length > 0 && listed.length === 0 && <p className="hint">Nothing in the next fortnight.</p>}
+      {shownCount === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
+      {shownCount > 0 && listedCount === 0 && <p className="hint">Nothing in the next fortnight.</p>}
       {/* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, and Back finds its place by them (places.ts). */}
       <ul className="job-list windowed" ref={win.list} style={win.style}>
         {win.rows.map((r) =>
           'job' in r ? (
-            <li key={r.job.id} ref={win.row(r.job.id)} data-place={r.job.id} aria-setsize={listed.length} aria-posinset={r.n + 1}>
+            <li key={r.job.id} ref={win.row(r.job.id)} data-place={r.job.id} aria-setsize={listedCount} aria-posinset={r.n + 1}>
               <JobRow job={r.job} kit={view.kit.byJob.get(r.job.id)} current={false} />
             </li>
           ) : (
@@ -316,7 +324,7 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
           )
         )}
       </ul>
-      {listed.length < shown.length && (
+      {listedCount < shownCount && (
         <button
           type="button"
           className="link show-all"
@@ -325,7 +333,7 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
             setAll(true)
           }}
         >
-          Show all {shown.length.toLocaleString('en-IE')} coming up
+          Show all {shownCount.toLocaleString('en-IE')} coming up
         </button>
       )}
     </section>
