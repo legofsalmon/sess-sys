@@ -92,6 +92,12 @@ export const model = z.object({
    * Kit from the notes as the name is. Left out by an older app, so a default.
    */
   aliases: z.array(needed(100, 'Another name', 'Another name')).max(MOST_ALIASES, `Up to ${MOST_ALIASES} other names, please.`).default([]),
+  /**
+   * Its id in the list it was brought in from, such as Current RMS's (audit,
+   * 20 October 2026, finding 7), so a later bring-in of the same list finds
+   * it however it has been renamed there. Empty or left out for none.
+   */
+  listId: text(100, 'Its id in the list').optional(),
 })
 export type Model = z.infer<typeof model> & {
   /**
@@ -226,6 +232,7 @@ export const stockCommandSchemas = {
       patMonths: months.optional(),
       liftingMonths: months.optional(),
       aliases: model.shape.aliases.removeDefault().optional(),
+      listId: model.shape.listId,
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered),

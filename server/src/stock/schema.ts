@@ -240,6 +240,12 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE models ADD COLUMN IF NOT EXISTS aliases jsonb NOT NULL DEFAULT '[]';
   `,
+  // Its id in the list it was brought in from, such as Current RMS's (audit,
+  // 20 October 2026, finding 7), so a second bring-in matches it by that
+  // before its name.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS list_id text NOT NULL DEFAULT '';
+  `,
 ]
 
 export const STOCK: Module = { versionTable: 'stock_schema_version', migrations: MIGRATIONS }
