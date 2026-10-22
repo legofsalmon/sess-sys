@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0075](adr/0075-dry-hire-stock-and-the-rack-designer.md), part 2 of
+- [ADR 0075](adr/0075-dry-hire-stock-and-the-rack-designer.md) (PR #128), part 2 of
   racks. Every product is Ours or Dry hire (`dry_hire`, `supplier`,
   `hire_day_cents`); the catalogue filters by Whose; dry hire can't have
   items or counts, is never short on a job ("hired in"), and a built rack
