@@ -1,6 +1,6 @@
 import { COMMAND_NAMES, newId, type CommandInput, type CommandName, type Mutation, type View } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
-import { company, day, m, ok, person, phone, today, year, checks } from './company.ts'
+import { company, day, m, ok, person, phone, today, year, checks, leaveSpanFrom } from './company.ts'
 
 /**
  * The device and the server can't drift (audit, 18 October 2026, finding
@@ -216,7 +216,7 @@ const CASES: Case[] = [
   c('messages.prompt', { on: false }),
 
   // Leave and time in lieu.
-  c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', start: day(40), end: day(41), note: 'Family' }),
+  c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(40), note: 'Family' }),
   c('leave.cancel', { id: 'hol', by: 'aoife' }),
   c('leave.decide', { id: 'hol', approved: true, reason: '', by: 'cian' }, { as: 'approved' }),
   c('leave.decide', { id: 'hol', approved: false, reason: 'Busy week', by: 'cian' }, { as: 'turned down' }),

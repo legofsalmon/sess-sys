@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.27.1',
+    date: '2026-10-22',
+    title: 'The checks pass on Thursdays',
+    what: "Nothing changes on the screens. The app's own checks, which run before every change is merged, asked for a test holiday that fell on a weekend whenever they ran on a Thursday, so they failed one day in five for no reason. They now pick working days.",
+    prs: [116],
+  },
+  {
     version: '1.27.0',
     date: '2026-10-21',
     title: 'Local crew on each phase',
