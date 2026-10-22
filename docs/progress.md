@@ -3,6 +3,17 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: the checks pass on Thursdays
+
+**Done**
+
+- Finding 57 of the 20 October audit (its own pull request is open): the
+  shared test seed asked for leave 30 and 31 days ahead, which on a
+  Thursday is a Saturday and a Sunday, so 116 server tests failed one day
+  in five. The seed and the parity test now pick working days (Colly's
+  "separate small PR"). App version 1.27.1; nothing on the screens changes.
+- Checked: typecheck, all unit and server tests, on the Thursday itself.
+
 ## 20 October 2026: What's changed, and version numbers
 
 **Done**

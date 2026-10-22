@@ -12,6 +12,7 @@ import {
   type PushRequest,
   type PushResponse,
   type Transport,
+  workingDays,
 } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, expect } from 'vitest'
@@ -33,6 +34,11 @@ afterEach(async () => {
 
 export const today = irishToday()
 export const day = (n: number) => addDays(today, n)
+/** A two-day leave span of working days on or after day n, so it holds weekdays whatever today is (audit 20 Oct, finding 57). */
+export const leaveSpanFrom = (n: number): { start: string; end: string } => {
+  const [start, end] = workingDays(day(n), day(n + 14))
+  return { start: start!, end: end! }
+}
 export const year = Number(today.slice(0, 4))
 
 export function m<N extends CommandName>(name: N, args: CommandInput<N>): Mutation {
@@ -136,7 +142,7 @@ export async function company() {
     m('price.product', { modelId: 'y10p', dayCents: 4500 }),
     m('leave.open', { year, by: 'aoife' }),
     m('leave.allowance', { personId: 'aoife', year, days: 21, carriedOver: 0, note: '', by: 'cian' }),
-    m('leave.request', { id: 'hol', personId: 'aoife', type: 'annual', start: day(30), end: day(31), note: '' }),
+    m('leave.request', { id: 'hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(30), note: '' }),
     m('unavailability.add', { id: 'away', personId: 'eimear', start: day(10), end: day(11), note: '' }),
     m('fault.report', { id: 'f1', kind: 'damaged', assetId: 'a2', modelId: 'y10p', qty: 1, projectId: null, usable: true, note: 'Grille dented', at: new Date().toISOString() }),
     m('labels.reserve', { id: 'run1', count: 10, name: 'Speakers', notes: '' }),
