@@ -3,6 +3,40 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: a full audit at real size, by role
+
+**Done**
+
+- A full audit of the app as it stood on 20 October, once the 18 October
+  audit's fixes and the week's features were in
+  ([Audit, 20 October 2026](audit-2026-10-20.md), Colly's ask): the
+  server, the sync engine and the data; every screen as each kind of
+  person, on a phone and a desk; and speed on a slow phone and at the
+  distance from Railway to Neon. Three reviews side by side, every finding
+  re-run and weighed independently, and the three folded into one list:
+  115 findings (no P0, 10 P1, 47 P2, 58 P3), with each of the 18 October
+  findings re-checked (12 fixed and holding, 14 partly, the leftovers
+  numbered). The P1s: "Up to date" shown before a new phone's first copy
+  has arrived, the Jobs tab's second on a phone, Home's tiles offered to
+  people who can't act on them and landing on the whole company's list, a
+  300-line pick list fifty-six thousand pixels long, Accept on a countered
+  offer booking the original rate, a second stock bring-in doubling counts,
+  combining people losing a leave allowance, the backup's test restore
+  taking the server to Railway's 1 GB limit, and the office able to take
+  the director's account with the settings ability.
+- Checked: everything was local on copies seeded at the company's size;
+  nothing live was read or changed, nothing was written to Google, and
+  nobody was contacted. Nothing is fixed yet: the audit asks Colly which to
+  take first.
+
+**Waiting on**
+
+- Colly: which findings to fix, and in what order (the audit proposes one);
+  and four dashboard things only Colly can do: `?sslmode=verify-full` on
+  the live database address (finding 55), the start command on both
+  Railway services (56), the service's memory limit to 2 GB (9), and
+  `PUBLIC_URL` on the live service (87).
+
 ## 20 October 2026: What's changed, and version numbers
 
 **Done**
