@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.30.0',
+    date: '2026-10-22',
+    title: 'Picking a job’s kit on the phone',
+    what: 'A job’s pick list is made for whoever picks it, not only whoever planned it. It says when the kit is first needed, where, and which van it goes in; a head of department sees their own department’s kit first, with how many rows are left in each; the list can be read as a walk round the warehouse, place by place; the notes on the kit show on each row; the last scan or count can be undone; counted kit like cables can be counted out or back in one tap; it says “ready to load” when everything is out; and the screen stays on while picking.',
+    prs: [125],
+    adrs: [72],
+  },
+  {
     version: '1.29.5',
     date: '2026-10-22',
     title: 'The nightly backup check uses far less memory',

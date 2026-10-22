@@ -191,9 +191,21 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .pick-row.done .count { color: var(--good); }
 .pick .from { margin: 0; padding-left: var(--space-16); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .pick .out-items li { display: flex; align-items: center; gap: var(--space-2); }
-.pick .count-row { display: grid; grid-template-columns: 1fr 7.5rem auto; gap: var(--space-6); align-items: center; }
-.pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; }
-.pick .count-row .alert { grid-column: 1 / -1; }
+.pick .count-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; }
+.pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1 0 100%; }
+.pick .count-row input { width: 7.5rem; }
+.pick .count-row .alert { flex: 1 0 100%; }
+/* Picking on the phone (ADR 0072): whose kit and in what order, what to know before starting, the kit's own notes, and Undo beside the answer. */
+.pick .pick-total.done { color: var(--good); }
+.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: .9rem; }
+.pick .pick-ways { display: grid; gap: var(--space-8); }
+.pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.pick .pick-ways button[aria-pressed='true'] .left { color: inherit; }
+.pick .pick-note { margin: 0; font-size: .9rem; }
+.pick .pick-note b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--space-4); }
+.pick .said-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: stretch; }
+.pick .said-row .said { flex: 1; }
+.pick .said-row .alert { flex: 1 0 100%; }
 
 /* Call sheets (ADR 0021): the office's, and a plain one on paper. */
 .jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
