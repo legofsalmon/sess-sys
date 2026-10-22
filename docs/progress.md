@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: a shorter pick list, with the scan box kept in view
+
+**Done**
+
+- Finding 5 of the [20 October audit](audit-2026-10-20.md) (PR #120): a
+  300-line pick list measured 56,142 px on a phone, mostly every item
+  number written out under "Where to find them", and the scan box scrolled
+  away. Each place is now one line ("Bay A1: 12 here") with its numbers
+  folded; lines done fold under "N done" at the foot of their department;
+  the scan box, what it said and anything that failed stay docked under
+  the top bar while the camera is off. App 1.29.1.
+- Checked: typecheck, unit tests, and the pick list and faults browser
+  tests (the scan field stays in view after scrolling).
+
 ## 22 October 2026: Home counts open on what they counted
 
 **Done**

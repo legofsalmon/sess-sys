@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.1',
+    date: '2026-10-22',
+    title: 'A shorter pick list, with the scan box kept in view',
+    what: 'A pick list of a few hundred lines ran to many screens, with every number spelled out and the scan box at the top. Each place now says how many to take from it, with the numbers folded away until you open them; lines already picked fold under “done” at the end of their department; and the scan box stays at the top of the screen as you scroll.',
+    prs: [120],
+  },
+  {
     version: '1.29.0',
     date: '2026-10-22',
     title: 'Home counts open on what they counted',
