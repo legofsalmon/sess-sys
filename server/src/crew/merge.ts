@@ -248,6 +248,13 @@ async function moveOneEach(ctx: Ctx, intoId: string, ids: string[]) {
     [ids, intoId]
   )
   if (dropped.length) await emitRemovedAll(ctx, 'leaveAllowance', dropped.map((d) => d.id))
-  const { rows: moved } = await tx.query<{ id: string }>('UPDATE leave_allowances SET person_id = $1 WHERE person_id = ANY($2::text[]) RETURNING id', [intoId, ids])
+  // Moved under the kept person's own id for the year, as every read finds an allowance by it (audit, 20 October 2026, finding 8):
+  // kept under the old person's id it was never found again, and the balance fell back to the default.
+  const { rows: moved } = await tx.query<{ was: string; id: string }>(
+    `UPDATE leave_allowances a SET person_id = $1, id = $1 || '-' || a.year FROM leave_allowances o
+      WHERE o.id = a.id AND a.person_id = ANY($2::text[]) RETURNING o.id AS was, a.id`,
+    [intoId, ids]
+  )
+  if (moved.length) await emitRemovedAll(ctx, 'leaveAllowance', moved.map((m) => m.was).sort())
   for (const m of moved.sort((x, y) => x.id.localeCompare(y.id))) await emit(ctx, 'leaveAllowance', m.id, await getAllowanceById(tx, m.id))
 }
