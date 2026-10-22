@@ -47,7 +47,7 @@ describe('racks', () => {
     expect(rack.slots.map((s) => s.id)).toEqual(['s1', 's2', 's3'])
     expect(rack.layout).toMatchObject({ frontUsed: 4, rearUsed: 0, weightKg: 31.2, powerW: 2400, problems: [] })
     // The built one is short an amp; the cables are in.
-    expect(rack.built.map((b) => b.check)).toEqual([{ missing: [{ modelId: 'amp', qty: 1 }], extra: [] }])
+    expect(rack.built.map((b) => b.check)).toEqual([{ missing: [{ modelId: 'amp', qty: 1 }], extra: [], hireIn: [] }])
     // The amp in the rack goes with the rack: one free, so the gala is short one.
     expect(v.warehouse.models.find((x) => x.id === 'amp')).toMatchObject({ total: 2, racked: 1 })
     expect(v.kit.lines.find((l) => l.id === 'amps')).toMatchObject({ owned: 1, short: 1 })
@@ -76,5 +76,35 @@ describe('racks', () => {
     expect(said).toContain('Put d&b D20 at U1 on the front in the layout of Monitor rack')
     expect(said).toContain('Put 4 × XLR 10 m loose in the layout of Monitor rack')
     expect(said).toContain('Took DI box out of the layout of Monitor rack')
+  })
+})
+
+describe('dry hire stock', () => {
+  it("is never short, can't be labelled or counted as ours, and a rack says what it costs to hire in or buy", async () => {
+    const { app } = await company()
+    await ok(
+      app,
+      m('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: 'PRG', hireDayCents: 4500, valueCents: 350000, notes: '', units: 3 }),
+      m('model.create', { id: 'mon', name: 'Monitor rack', ...RACK, code: '', units: 6, depthMm: 600 }),
+      m('rackSlot.set', { id: 's1', rackId: 'mon', modelId: 'haze', top: 1, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's2', rackId: 'mon', modelId: 'y10p', top: 4, side: 'front', qty: 1, notes: '' }),
+      m('asset.add', { id: 'mon1', modelId: 'mon', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false }),
+      m('asset.move', { id: 'a1', placeId: null, caseId: 'mon1' }),
+      m('kit.add', { id: 'hazers', projectId: 'gala', phaseId: null, modelId: 'haze', qty: 4, subhireQty: 0, supplier: '', notes: '' })
+    )
+    const refusal = 'MDG ATMe is dry hire, hired in when needed, so none of it is ours to label or count. Mark it as ours first.'
+    expect(await send(app, 'asset.add', { id: newId(), modelId: 'haze', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false })).toMatchObject({ reason: { message: refusal } })
+    expect(await send(app, 'stock.set', { modelId: 'haze', placeId: 'wh', caseId: null, qty: 2 })).toMatchObject({ status: 'rejected' })
+    // Our own can't become dry hire while we have some, nor a rack.
+    expect(await send(app, 'model.update', { id: 'y10p', dryHire: true })).toMatchObject({ status: 'rejected', reason: { message: /^d&b Y10P has 2 items of our own/ } })
+    expect(await send(app, 'model.update', { id: 'mon', dryHire: true })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const v = client.view()
+    expect(v.kit.lines.find((l) => l.id === 'hazers')).toMatchObject({ own: 0, short: 0 })
+    const rack = v.racks.of('mon')!
+    expect(rack.layout.hire).toEqual({ count: 1, dayCents: 4500, dayMissing: 0, buyCents: 350000, buyMissing: 0 })
+    // The built one has its speaker; the hazer is hired in for each job, not missing.
+    expect(rack.built[0]!.check).toEqual({ missing: [], extra: [], hireIn: [{ modelId: 'haze', qty: 1 }] })
   })
 })

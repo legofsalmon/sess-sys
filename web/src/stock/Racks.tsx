@@ -1,11 +1,14 @@
 import {
   DEPARTMENT_LABELS,
   DEPARTMENTS,
+  euroText,
   MAX_SLOT_QTY,
   MAX_UNITS,
   newId,
+  parseEuro,
   plural,
   RACK_SIDE_LABELS,
+  valueLabel,
   unitsAt,
   type AssetView,
   type BuiltRack,
@@ -218,7 +221,8 @@ function NewRack({ view }: { view: View }) {
         powerW: null,
       })
     ).then((ok) => {
-      if (ok) location.hash = `#stock/product/${id}`
+      // Straight to laying it out (ADR 0075).
+      if (ok) location.hash = `#stock/racks/${id}`
     })
   }
   return (
@@ -249,15 +253,8 @@ function NewRack({ view }: { view: View }) {
 export function RackCard({ view, r }: { view: View; r: RackView }) {
   const mayChange = useAccess().can('stock')
   const { run, error } = useAct()
-  const m = r.model
-  const l = r.layout
   const onRails = r.slots.filter((s) => s.top !== null)
   const loose = r.slots.filter((s) => s.top === null)
-  const totals = [
-    m.units !== null ? `Front ${l.frontUsed} of ${m.units}U, back ${l.rearUsed} of ${m.units}U` : `${l.frontUsed}U on the front, ${l.rearUsed}U on the back`,
-    `${l.weightKg.toLocaleString('en-IE')} kg${l.weightMissing ? ` and ${plural(l.weightMissing, 'thing')} not weighed` : ''}`,
-    `${l.powerW.toLocaleString('en-IE')} W${l.powerMissing ? ` and ${l.powerMissing} without a figure` : ''}`,
-  ]
   const remove = (s: SlotView) => void run(() => client.mutate('rackSlot.remove', { id: s.id }))
   return (
     <section className="card rack-card" aria-labelledby="layout-title">
@@ -265,17 +262,15 @@ export function RackCard({ view, r }: { view: View; r: RackView }) {
         Layout
       </Heading>
       {r.slots.length === 0 ? (
-        <Empty>Nothing laid out yet. Add what goes in it below, at the rack unit it sits at.</Empty>
+        <Empty>
+          Nothing laid out yet. <a href={`#stock/racks/${r.model.id}`}>Design it</a>, dragging kit in, or add what goes in it below.
+        </Empty>
       ) : (
         <>
-          <p className="rack-totals">{totals.join(' · ')}</p>
-          {l.problems.length > 0 && (
-            <ul className="rack-problems" aria-label="What won't fit">
-              {l.problems.map((p, i) => (
-                <li key={`${p.slotId}-${i}`}>{p.message}</li>
-              ))}
-            </ul>
-          )}
+          <LayoutTotals r={r} />
+          <a className="button" href={`#stock/racks/${r.model.id}`}>
+            Design it
+          </a>
           <div className="rack-sides">
             <Elevation r={r} side="front" />
             <Elevation r={r} side="rear" />
@@ -288,6 +283,7 @@ export function RackCard({ view, r }: { view: View; r: RackView }) {
                   <p>
                     {s.qty > 1 && `${s.qty.toLocaleString('en-IE')} × `}
                     {s.model ? <a href={`#stock/product/${s.model.id}`}>{s.model.name}</a> : 'A product no longer listed'}
+                    {s.model?.dryHire && ` · Dry hire${s.model.supplier ? ` from ${s.model.supplier}` : ''}`}
                     {s.notes && ` · ${s.notes}`}
                   </p>
                 </div>
@@ -334,7 +330,7 @@ function Elevation({ r, side }: { r: RackView; side: RackSide }) {
           return (
             <span
               key={s.id}
-              className={`rack-thing${bad.has(s.id) ? ' bad' : ''}${s.pending ? ' is-pending' : ''}`}
+              className={`rack-thing${bad.has(s.id) ? ' bad' : ''}${s.pending ? ' is-pending' : ''}${s.model?.dryHire ? ' hired' : ''}`}
               style={{ gridRow: `${s.top} / span ${units}` }}
               title={s.model?.name}
             >
@@ -471,7 +467,10 @@ export function BuiltRackCheck({ view, item }: { view: View; item: AssetView }) 
           <a href={`#stock/product/${r.model.id}`}>{r.model.name}</a> has nothing laid out yet, so there's nothing to check it against.
         </p>
       ) : c.tone === 'ok' ? (
-        <p>Everything in its layout is in it.</p>
+        <>
+          <p>Everything in its layout is in it.</p>
+          <HireIn b={b} name={name} />
+        </>
       ) : (
         <>
           {b.check.missing.length > 0 && (
@@ -498,9 +497,126 @@ export function BuiltRackCheck({ view, item }: { view: View; item: AssetView }) 
               </ul>
             </>
           )}
+          <HireIn b={b} name={name} />
           <p className="hint">Put kit in it from the item's own page (Where it's kept), or by moving it here below.</p>
         </>
       )}
     </section>
+  )
+}
+
+/** Ours or dry hire, as typed (ADR 0075). */
+export interface WhoseTyped {
+  dryHire: boolean
+  supplier: string
+  hire: string
+}
+
+export const whoseTypedOf = (m?: Pick<ModelView, 'dryHire' | 'supplier' | 'hireDayCents'>): WhoseTyped => ({
+  dryHire: m?.dryHire ?? false,
+  supplier: m?.supplier ?? '',
+  hire: m?.hireDayCents === null || m?.hireDayCents === undefined ? '' : euroText(m.hireDayCents),
+})
+
+/** What the ours-or-dry-hire fields say, or why they can't be saved. */
+export function whoseFrom(f: WhoseTyped) {
+  if (!f.dryHire) return { whose: { dryHire: false } }
+  const hire = parseEuro(f.hire)
+  if (hire.reason !== undefined) return { reason: hire.reason }
+  if (f.supplier.trim().length > 200) return { reason: 'The supplier can be up to 200 characters.' }
+  return { whose: { dryHire: true, supplier: f.supplier.trim(), hireDayCents: hire.cents } }
+}
+
+/**
+ * Whose it is (ADR 0075): ours, labelled and counted here, or dry hired in
+ * from a supplier whenever a job or a rack needs it.
+ */
+export function WhoseFields({ f, onChange, suppliers }: { f: WhoseTyped; onChange: (f: WhoseTyped) => void; suppliers: readonly string[] }) {
+  return (
+    <fieldset className="wide tracking">
+      <legend>Whose it is</legend>
+      <label className="choice">
+        <input type="radio" name="whose" checked={!f.dryHire} onChange={() => onChange({ ...f, dryHire: false })} />
+        <span>
+          <b>Ours</b>
+          <small>Labelled or counted here, and checked for what's free.</small>
+        </span>
+      </label>
+      <label className="choice">
+        <input type="radio" name="whose" checked={f.dryHire} onChange={() => onChange({ ...f, dryHire: true })} />
+        <span>
+          <b>Dry hire</b>
+          <small>Not ours: hired in from a supplier when a job or a rack needs it, so it's never short.</small>
+        </span>
+      </label>
+      {f.dryHire && (
+        <div className="size-fields">
+          <label>
+            Hired from <input list="dry-hire-suppliers" value={f.supplier} onChange={(e) => onChange({ ...f, supplier: e.target.value })} placeholder="e.g. PRG" />
+          </label>
+          <label>
+            Their price a day, in euro <input inputMode="decimal" value={f.hire} onChange={(e) => onChange({ ...f, hire: e.target.value })} placeholder="Optional" />
+          </label>
+          <datalist id="dry-hire-suppliers">
+            {suppliers.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        </div>
+      )}
+    </fieldset>
+  )
+}
+
+/** Suppliers already in use, on products and on jobs' subhired kit, alphabetically. */
+export function suppliersOf(view: View): string[] {
+  const all = new Map<string, string>()
+  for (const s of [...view.warehouse.models.map((m) => m.supplier), ...view.kit.suppliers]) if (s.trim()) all.set(s.trim().toLowerCase(), s.trim())
+  return [...all.values()].sort((a, b) => a.localeCompare(b))
+}
+
+/** The dry hire kit in a built rack's layout (ADR 0075): hired in for each job it goes out on, so never missing. */
+function HireIn({ b, name }: { b: BuiltRack; name: (id: string) => string }) {
+  if (!b.check.hireIn.length) return null
+  return (
+    <>
+      <h3>Hired in for each job</h3>
+      <ul className="rack-check">
+        {b.check.hireIn.map((x) => (
+          <li key={x.modelId}>
+            {x.qty.toLocaleString('en-IE')} × <a href={`#stock/product/${x.modelId}`}>{name(x.modelId)}</a>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/** What a layout comes to: units each side, weight, power, the dry hire kit's cost, and what won't fit. */
+export function LayoutTotals({ r }: { r: RackView }) {
+  const m = r.model
+  const l = r.layout
+  const totals = [
+    m.units !== null ? `Front ${l.frontUsed} of ${m.units}U, back ${l.rearUsed} of ${m.units}U` : `${l.frontUsed}U on the front, ${l.rearUsed}U on the back`,
+    `${l.weightKg.toLocaleString('en-IE')} kg${l.weightMissing ? ` and ${plural(l.weightMissing, 'thing')} not weighed` : ''}`,
+    `${l.powerW.toLocaleString('en-IE')} W${l.powerMissing ? ` and ${l.powerMissing} without a figure` : ''}`,
+  ]
+  const h = l.hire
+  // Dry hire kit in it (ADR 0075): hired in each time it goes out, or bought.
+  const hireLine = h.count
+    ? `${plural(h.count, 'thing')} dry hired: ${valueLabel(h.dayCents)} a day to hire in${h.dayMissing ? ` (${h.dayMissing} with no price)` : ''}, ${valueLabel(h.buyCents)} to buy${h.buyMissing ? ` (${h.buyMissing} with no price)` : ''}`
+    : ''
+  return (
+    <>
+      <p className="rack-totals">{totals.join(' · ')}</p>
+      {hireLine && <p className="rack-totals">{hireLine}</p>}
+      {l.problems.length > 0 && (
+        <ul className="rack-problems" aria-label="What won't fit">
+          {l.problems.map((p, i) => (
+            <li key={`${p.slotId}-${i}`}>{p.message}</li>
+          ))}
+        </ul>
+      )}
+    </>
   )
 }

@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: dry hire stock and the rack designer
+
+**Done**
+
+- [ADR 0075](adr/0075-dry-hire-stock-and-the-rack-designer.md) (PR #128), part 2 of
+  racks. Every product is Ours or Dry hire (`dry_hire`, `supplier`,
+  `hire_day_cents`); the catalogue filters by Whose; dry hire can't have
+  items or counts, is never short on a job ("hired in"), and a built rack
+  isn't missing it but lists it to hire in. The rack designer at
+  `#stock/racks/<id>`: kit to build with (search, whose, free on a day)
+  beside the rack front and back; drag or press to put in, move and take
+  out; totals include the dry hire's day rate and buy price. App 1.33.0.
+- Checked: typecheck, unit tests (dry hire refusals, parity, racks), and
+  browser tests (racks.spec.ts: designer drag, press, move, take out,
+  catalogue filter).
+
 ## 22 October 2026: racks
 
 **Done**
@@ -22,7 +38,7 @@ waiting on someone.
 - Checked: typecheck, unit tests (racks, parity, export and the rest), and a
   browser test (racks.spec.ts).
 
-**Next (part 2)**
+**Next (part 2, done above)**
 
 - Ours or dry hired in on every product (supplier, hire and buy price),
   a catalogue filter, dry hire never short; then the rack designer

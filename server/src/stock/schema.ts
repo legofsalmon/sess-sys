@@ -10,7 +10,7 @@ import { runMigrations, type Module } from '../migrations.ts'
  * inspections (ADR 0020); what was added by mistake (audit finding 19);
  * what the stock list brings in that items didn't hold before (ADR 0026);
  * counts of places and cases (ADR 0030); and kit read from jobs' notes
- * (ADR 0043); and racks and their layouts (ADR 0074).
+ * (ADR 0043); racks and their layouts (ADR 0074); and dry hire stock (ADR 0075).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -272,6 +272,14 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS rack_slots_rack ON rack_slots (rack_id);
   CREATE INDEX IF NOT EXISTS rack_slots_model ON rack_slots (model_id);
+  `,
+  // Dry hire stock (ADR 0075): a product that isn't ours, hired in from a
+  // supplier at a price a day whenever it's needed. A rack is ours.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS dry_hire boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS supplier text NOT NULL DEFAULT '';
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS hire_day_cents integer CHECK (hire_day_cents >= 0);
+  ALTER TABLE models ADD CONSTRAINT models_rack_is_ours CHECK (NOT (is_rack AND dry_hire));
   `,
 ]
 

@@ -1,4 +1,4 @@
-import { NOT_RACKED } from '../src/stock.ts'
+import { PLAIN_PRODUCT } from '../src/stock.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { Phase, Project } from '../src/jobs.ts'
 import type { KitLine } from '../src/kit.ts'
@@ -20,7 +20,7 @@ const TODAY = new Date('2026-10-01T09:00:00Z')
 const day = (n: number) => `2026-10-${String(n).padStart(2, '0')}`
 
 const model = (id: string, name: string): Model => ({
-  ...NOT_RACKED,
+  ...PLAIN_PRODUCT,
   aliases: [],
   id,
   name,

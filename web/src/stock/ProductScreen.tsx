@@ -55,7 +55,7 @@ import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { STOCK } from '../Up.tsx'
-import { RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, weightPowerLabel } from './Racks.tsx'
+import { RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -88,8 +88,9 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
       <Summary m={m} w={w} view={view} />
       {m.isRack && view.racks.of(m.id) && <RackCard view={view} r={view.racks.of(m.id)!} />}
       <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
-      {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
-      <Counted m={m} w={w} />
+      {/* Dry hire stock (ADR 0075) has none of its own to list. */}
+      {m.tracking === 'serialised' && !m.dryHire && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
+      {!m.dryHire && <Counted m={m} w={w} />}
       {(m.tracking === 'bulk' || m.countedTotal > 0 || view.faults.ofModel(m.id).length > 0) && (
         <FaultsCard faults={view.faults.ofModel(m.id)} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
           {m.countedTotal > 0 && <ReportButtons model={m} most={m.countedTotal} />}
@@ -199,8 +200,17 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
             </dd>
           </div>
         )}
+        {m.dryHire && (
+          <div className="wide">
+            <dt>Whose</dt>
+            <dd>
+              Dry hire{m.supplier ? ` from ${m.supplier}` : ''}
+              {m.hireDayCents !== null && `, ${valueLabel(m.hireDayCents)} a day`}
+            </dd>
+          </div>
+        )}
         <div>
-          <dt>Value of one</dt>
+          <dt>{m.dryHire ? 'To buy one' : 'Value of one'}</dt>
           <dd>{m.valueCents === null ? 'Not given' : valueLabel(m.valueCents)}</dd>
         </div>
         <div className="wide">
@@ -324,6 +334,7 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
     isRack: m.isRack,
   })
   const [size, setSize] = useState(sizeTypedOf(m))
+  const [whose, setWhose] = useState(whoseTypedOf(m))
   const { run, error, refuse } = useAct()
   const save = (e: FormEvent) => {
     e.preventDefault()
@@ -349,6 +360,10 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
     if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return refuse(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
     const sized = sizeFrom(size, w.models, m.id)
     if (!sized.size) return refuse(sized.reason)
+    const owned = whoseFrom(whose)
+    if (!owned.whose) return refuse(owned.reason)
+    if (owned.whose.dryHire && !m.dryHire && (m.items.length > 0 || m.countedTotal > 0))
+      return refuse(`${m.name} has ${[m.items.length > 0 && plural(m.items.length, 'item'), m.countedTotal > 0 && `${m.countedTotal} counted`].filter(Boolean).join(' and ')} of our own, so it isn't dry hire only. Retire or count them away first.`)
     const isRack = f.isRack && f.isCase && numbered
     if (!isRack && m.isRack && (view.racks.of(m.id)?.slots.length ?? 0) > 0) return refuse(`${m.name} has a layout. Take everything out of it first.`)
     const inRacks = view.racks.using(m.id)
@@ -366,6 +381,7 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
       liftingMonths,
       isRack,
       ...sized.size,
+      ...(isRack ? { dryHire: false } : owned.whose),
     }
     const changes: Partial<CommandInput<'model.update'>> = {}
     for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== m[k]) (changes as Record<string, unknown>)[k] = next[k]
@@ -413,6 +429,7 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
           </span>
         </label>
       )}
+      {!(f.isRack && f.isCase) && <WhoseFields f={whose} onChange={setWhose} suppliers={suppliersOf(view)} />}
       <SizeFields f={size} onChange={setSize} rack={f.isRack && f.isCase} />
       {f.tracking === 'serialised' && (
         <>
@@ -438,7 +455,7 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
         </>
       )}
       <label className="wide">
-        Value of one, in euro <input inputMode="decimal" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} />
+        {whose.dryHire ? 'To buy one, in euro' : 'Value of one, in euro'} <input inputMode="decimal" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} />
       </label>
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />

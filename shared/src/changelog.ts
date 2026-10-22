@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.33.0',
+    date: '2026-10-22',
+    title: 'Dry hire stock and the rack designer',
+    what: 'Every product in the stock list is now ours or dry hire. A dry hire product says who we hire it from and their price a day, and what one would cost to buy; the stock list can show just ours or just dry hire. Dry hire is never counted short on a job: it says it’s hired in. Racks get a designer: the kit on one side, with how many are free on a day, and the rack front and back on the other. Drag kit in, or press it and press where it goes, move it about or drag it back out, and see what fits and what the rack would cost to hire in or buy.',
+    prs: [128],
+    adrs: [75],
+  },
+  {
     version: '1.32.0',
     date: '2026-10-22',
     title: 'Racks',

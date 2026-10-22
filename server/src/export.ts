@@ -222,7 +222,7 @@ const ABOUT: Record<string, string> = {
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
   leave_years: 'The years the office has opened for leave, and when: staff can ask for leave only in an open year.',
   lieu_entries: 'Days staff worked that earn days in lieu, and whether each was approved.',
-  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code and size (rack units, depth, weight, power), and whether one was added by mistake and so hidden from the list.',
+  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code and size (rack units, depth, weight, power), whether it is ours or dry hired in and from whom at what a day, and whether one was added by mistake and so hidden from the list.',
   // Racks (ADR 0074).
   rack_slots: "Each rack's layout: the product that goes in it, at which rack unit from the top and on the front or the back (blank for loose in it), how many, and a note.",
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',

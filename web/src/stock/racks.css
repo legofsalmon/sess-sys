@@ -19,3 +19,33 @@
 .warehouse .size-fields .hint { grid-column: 1 / -1; }
 .warehouse .flag.ok { color: var(--muted); }
 .warehouse .flag.warn { color: var(--warn); font-weight: 600; }
+.warehouse .rack-thing.hired { font-style: italic; color: var(--muted); }
+
+/* The rack designer (ADR 0075): the kit beside the rack on a desk, above it on a phone. */
+.warehouse .rack-designer { display: grid; gap: var(--space-12); }
+.warehouse .designer-head h1 { margin: 0; }
+.warehouse .designer-body { display: grid; gap: var(--space-12); align-items: start; }
+@media (min-width: 900px) {
+  .warehouse .designer-body { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
+  .warehouse .designer-palette { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow: auto; }
+}
+.warehouse .designer-rack .rack-sides { --rack-u: 34px; }
+.warehouse .designer-palette.over, .warehouse .designer-loose.over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.warehouse .palette-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+.warehouse .palette-item { display: grid; gap: var(--space-2); width: 100%; min-height: 44px; text-align: left; padding: var(--space-6) var(--space-10); cursor: grab; }
+.warehouse .palette-item small { color: var(--muted); font-weight: 400; }
+.warehouse .palette-item .none-free { color: var(--warn); font-weight: 600; }
+.warehouse .palette-item[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.warehouse .free-on { display: flex; align-items: center; gap: var(--space-8); color: var(--muted); font-size: var(--text-small); }
+.warehouse .holding { margin: 0; font-weight: 600; }
+.warehouse .rack-slot { grid-column: 1 / -1; display: flex; align-items: center; min-height: 0; padding: 0; margin: 0; border: 0; border-top: 1px dashed var(--line); border-radius: 0; background: transparent; color: var(--muted); font-size: .7rem; box-shadow: none; }
+.warehouse .rack-slot .rack-u-n { width: 2.2em; text-align: right; padding-right: var(--space-4); font-variant-numeric: tabular-nums; }
+.warehouse .rack-slot:first-child { border-top: 0; }
+.warehouse .rack-slot.lit { background: var(--ds-wash-hover); }
+.warehouse .rack-slot.lit.no-fit { background: var(--warn-soft); }
+.warehouse .designer-side .rack-thing { cursor: grab; z-index: 1; text-align: left; }
+.warehouse .rack-thing.picked { outline: 2px solid var(--accent); outline-offset: 1px; }
+.warehouse .rack-thing small { font-weight: 400; margin-left: .35em; }
+.warehouse .designer-loose { display: grid; gap: var(--space-6); margin-top: var(--space-12); padding-top: var(--space-12); border-top: 1px solid var(--line); }
+/* While something is held, what's in the rack lets the units under it take the drop or the press, so a thing can move by a unit. */
+.warehouse .designer-side.holding-one .rack-thing { pointer-events: none; }

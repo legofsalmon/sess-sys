@@ -128,9 +128,19 @@ export const model = z.object({
   weightKg: kilos.nullable().default(null),
   /** What it draws at most, in watts. */
   powerW: whole(0, 100_000, 'The power in watts').nullable().default(null),
+  /**
+   * Dry hire stock (ADR 0075): not ours, hired in from a supplier whenever a
+   * job or a rack needs it, so it has no items or counts of its own and is
+   * never short. Its value is then what one would cost to buy.
+   */
+  dryHire: z.boolean().default(false),
+  /** Who it's hired from, as typed. */
+  supplier: text(200, 'The supplier').transform((s) => s.trim()).default(''),
+  /** What the supplier charges for one a day. */
+  hireDayCents: euroCents(100_000_00, 'A hire price').nullable().default(null),
 })
-/** A product that isn't a rack and has no size or stock code given (ADR 0074), as products made before racks read. */
-export const NOT_RACKED = { isRack: false, code: '', units: null, depthMm: null, weightKg: null, powerW: null } as const
+/** A product of our own that isn't a rack and has no size or stock code given (ADR 0074), as products made before racks read. */
+export const PLAIN_PRODUCT = { isRack: false, code: '', units: null, depthMm: null, weightKg: null, powerW: null, dryHire: false, supplier: '', hireDayCents: null } as const
 
 export type Model = z.infer<typeof model> & {
   /**
@@ -237,6 +247,10 @@ const caseIsNumbered = [
   (m: { tracking?: Tracking; isCase?: boolean }) => !(m.isCase && m.tracking === 'bulk'),
   { message: 'A case has its own number, so it is numbered, not counted.' },
 ] as const
+const rackIsOurs = [
+  (m: { isRack?: boolean; dryHire?: boolean }) => !(m.isRack && m.dryHire),
+  { message: 'A rack is built here, so it is ours, not dry hired.' },
+] as const
 const rackIsCase = [
   (m: { isRack?: boolean; isCase?: boolean }) => !(m.isRack && m.isCase === false),
   { message: 'A rack holds other kit, so it is a case.' },
@@ -254,7 +268,7 @@ const oldNumber = text(100, 'The old number')
 const patDue = day.nullable()
 
 export const stockCommandSchemas = {
-  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase),
+  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase).refine(...rackIsOurs),
   /** Only the fields the person changed, as for jobs. */
   'model.update': z
     .object({
@@ -276,10 +290,14 @@ export const stockCommandSchemas = {
       depthMm: model.shape.depthMm.removeDefault().optional(),
       weightKg: model.shape.weightKg.removeDefault().optional(),
       powerW: model.shape.powerW.removeDefault().optional(),
+      dryHire: z.boolean().optional(),
+      supplier: model.shape.supplier.removeDefault().optional(),
+      hireDayCents: model.shape.hireDayCents.removeDefault().optional(),
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered)
-    .refine(...rackIsCase),
+    .refine(...rackIsCase)
+    .refine(...rackIsOurs),
   /** Refused while it has items, retired ones included, or counted stock. */
   'model.remove': z.object({ id }),
   /**

@@ -37,7 +37,8 @@ import { PlaceScreen } from './PlaceScreen.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import { VehicleScreen, VehiclesScreen } from './Vehicles.tsx'
-import { RacksScreen } from './Racks.tsx'
+import { RackDesigner } from './RackDesigner.tsx'
+import { RacksScreen, suppliersOf, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
@@ -75,6 +76,8 @@ export function StockScreen() {
   if (hash === '#stock/count') return <CountScreen view={view} />
   if (hash === '#stock/vehicles') return <VehiclesScreen view={view} />
   if (hash === '#stock/racks') return <RacksScreen view={view} />
+  const [, rack] = /^#stock\/racks\/(.+)$/.exec(hash) ?? []
+  if (rack) return <RackDesigner key={rack} view={view} id={decodeURIComponent(rack)} />
   const [, vehicle] = /^#stock\/vehicles\/(.+)$/.exec(hash) ?? []
   if (vehicle) return <VehicleScreen key={vehicle} view={view} id={decodeURIComponent(vehicle)} />
   const [, count] = /^#stock\/count\/(.+)$/.exec(hash) ?? []
@@ -180,6 +183,8 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   const w = view.warehouse
   const mayAdd = useAccess().can('stock')
   const [department, setDepartment] = useState<Department | 'all'>('all')
+  // Our own stock or dry hire (ADR 0075), once there's any dry hire to tell apart.
+  const [whose, setWhose] = useState<'all' | 'ours' | 'dryHire'>('all')
   const [search, setSearch] = useState('')
   const q = search.trim().toLowerCase()
   const words = q.split(/\s+/).filter(Boolean)
@@ -205,7 +210,9 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           .sort((a, b) => a.number.localeCompare(b.number))
           .slice(0, 20)
       : []
-  const inDepartment = (m: ModelView) => department === 'all' || m.department === department
+  const inDepartment = (m: ModelView) =>
+    (department === 'all' || m.department === department) && (whose === 'all' || (whose === 'dryHire') === m.dryHire)
+  const dryHires = w.models.filter((m) => m.dryHire).length
   const matches = (m: ModelView) => {
     const text = `${m.name} ${m.code} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
     return words.every((x) => text.includes(x))
@@ -302,6 +309,19 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           </button>
         ))}
       </div>
+      {dryHires > 0 && (
+        <div className="filters" role="group" aria-label="Whose">
+          <button type="button" aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
+            Ours and dry hire
+          </button>
+          <button type="button" aria-pressed={whose === 'ours'} onClick={() => setWhose('ours')}>
+            Ours ({w.models.length - dryHires})
+          </button>
+          <button type="button" aria-pressed={whose === 'dryHire'} onClick={() => setWhose('dryHire')}>
+            Dry hire ({dryHires})
+          </button>
+        </div>
+      )}
       {(exact || items.length > 0) && (
         <ul className="item-list" aria-label="Items found">
           {[...(exact ? [exact] : []), ...items].map((a) => (
@@ -442,6 +462,7 @@ function NewProduct({ view, department }: { view: View; department: Department }
   const w = view.warehouse
   const blank = { name: '', department, category: '', tracking: 'serialised' as Tracking, isCase: false, value: '' }
   const [f, setF] = useState(blank)
+  const [whose, setWhose] = useState(whoseTypedOf())
   const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -452,8 +473,11 @@ function NewProduct({ view, department }: { view: View; department: Department }
     const value = parseEuro(f.value)
     if (value.reason !== undefined) return refuse(value.reason)
     const valueCents = value.cents
+    const owned = whoseFrom(whose)
+    if (!owned.whose) return refuse(owned.reason)
     const id = newId()
     const args = {
+      ...owned.whose,
       id,
       name,
       department: f.department,
@@ -491,8 +515,9 @@ function NewProduct({ view, department }: { view: View; department: Department }
         Category <input list="category-names" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="e.g. Speakers" />
       </label>
       <TrackingChoice tracking={f.tracking} isCase={f.isCase} onChange={(t) => setF({ ...f, ...t })} />
+      <WhoseFields f={whose} onChange={setWhose} suppliers={suppliersOf(view)} />
       <label className="wide">
-        Value of one, in euro{' '}
+        {whose.dryHire ? 'To buy one, in euro' : 'Value of one, in euro'}{' '}
         <input
           inputMode="decimal"
           value={f.value}

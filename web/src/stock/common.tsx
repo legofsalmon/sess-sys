@@ -30,6 +30,8 @@ export const numberLabel = (a: { number: string }) => a.number || 'Number when s
 
 /** "12 items · 4 not labelled yet", or "120 counted". */
 export function amountLabel(m: ModelView): string {
+  // Dry hire stock (ADR 0075) has none of its own.
+  if (m.dryHire) return m.supplier ? `Dry hire from ${m.supplier}` : 'Dry hire'
   if (m.tracking === 'bulk') return `${m.countedTotal.toLocaleString('en-IE')} counted`
   const parts = [plural(m.items.length, 'item')]
   if (m.countedTotal > 0) parts.push(`${m.countedTotal.toLocaleString('en-IE')} not labelled yet`)

@@ -90,6 +90,9 @@ const MODEL_COLUMNS = {
   depthMm: 'depth_mm',
   weightKg: 'weight_kg',
   powerW: 'power_w',
+  dryHire: 'dry_hire',
+  supplier: 'supplier',
+  hireDayCents: 'hire_day_cents',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -97,6 +100,9 @@ const described = async (ctx: Ctx, assetId: string) => {
   const m = a && (await getModel(ctx.tx, a.modelId))
   return a ? `${a.number || 'That item'}${m ? ` (${m.name})` : ''}` : 'That item'
 }
+
+/** Why dry hire stock (ADR 0075) can't be labelled or counted as ours. */
+const dryHireRefusal = (name: string) => `${name} is dry hire, hired in when needed, so none of it is ours to label or count. Mark it as ours first.`
 
 /** A product in the stock list: one marked as added by mistake is out of it for good. */
 async function mustModel(ctx: Ctx, id: string, lock = false) {
@@ -244,8 +250,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (coded) throw new Refused({ code: 'conflict', message: `${coded} already has the stock code ${code}.` })
     await ctx.tx.query(
       `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id,
-                           is_rack, code, units, depth_mm, weight_kg, power_w)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+                           is_rack, code, units, depth_mm, weight_kg, power_w, dry_hire, supplier, hire_day_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
       [
         a.id,
         a.name.trim(),
@@ -265,6 +271,9 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         a.depthMm,
         a.weightKg,
         a.powerW,
+        a.dryHire,
+        a.supplier,
+        a.hireDayCents,
       ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
@@ -282,6 +291,15 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       const code = a.code.trim()
       const coded = code && (await codeTaken(ctx.tx, code, a.id))
       if (coded) throw new Refused({ code: 'conflict', message: `${coded} already has the stock code ${code}.` })
+    }
+    if (next.isRack && next.dryHire) throw new Refused({ code: 'invalid', message: 'A rack is built here, so it is ours, not dry hired.' })
+    if (next.dryHire && !m.dryHire) {
+      const { active, counted } = await usesOf(ctx.tx, a.id)
+      if (active > 0 || counted > 0)
+        throw new Refused({
+          code: 'conflict',
+          message: `${m.name} has ${[active > 0 && plural(active, 'item'), counted > 0 && `${counted} counted`].filter(Boolean).join(' and ')} of our own, so it isn't dry hire only. Retire or count them away first.`,
+        })
     }
     if (next.isRack && !next.isCase) throw new Refused({ code: 'invalid', message: 'A rack holds other kit, so it is a case.' })
     if (!next.isRack && m.isRack && (await slotsIn(ctx.tx, a.id)) > 0)
@@ -383,6 +401,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const m = await mustModel(ctx, a.modelId)
     if (m.tracking !== 'serialised')
       throw new Refused({ code: 'conflict', message: `${m.name} is counted, not numbered. Change it to numbered to label them one by one.` })
+    if (m.dryHire) throw new Refused({ code: 'conflict', message: dryHireRefusal(m.name) })
     await checkWhere(ctx, a)
     const number = await numberFor(ctx, a.number)
     const old = await oldNumberFor(ctx, a.oldNumber, a.id)
@@ -401,6 +420,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (a.modelId !== undefined && a.modelId !== asset.modelId) {
       const m = await mustModel(ctx, a.modelId)
       if (m.tracking !== 'serialised') throw new Refused({ code: 'conflict', message: `${m.name} is counted, not numbered, so an item can't be one.` })
+      if (m.dryHire) throw new Refused({ code: 'conflict', message: dryHireRefusal(m.name) })
       const inside = await contentsOf(ctx.tx, a.id)
       if (!m.isCase && (inside.items > 0 || inside.counted > 0)) {
         throw new Refused({ code: 'conflict', message: `${asset.number} has kit in it, and ${m.name} doesn't hold other kit. Empty it first.` })
@@ -448,7 +468,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
   },
 
   async 'stock.set'(ctx, a) {
-    await mustModel(ctx, a.modelId)
+    const m = await mustModel(ctx, a.modelId)
+    if (m.dryHire && a.qty > 0) throw new Refused({ code: 'conflict', message: dryHireRefusal(m.name) })
     if (a.qty > 0) await checkWhere(ctx, a)
     await adjust(ctx, a.modelId, a, { to: a.qty })
   },
