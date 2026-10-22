@@ -55,7 +55,7 @@ export const rackCommandSchemas = {
 } as const
 
 /** The size of one thing in a rack, from its product. */
-type Sized = Pick<Model, 'id' | 'name' | 'units' | 'depthMm' | 'weightKg' | 'powerW'>
+type Sized = Pick<Model, 'id' | 'name' | 'units' | 'depthMm' | 'weightKg' | 'powerW'> & Partial<Pick<Model, 'dryHire' | 'hireDayCents' | 'valueCents'>>
 
 /** Something about a layout that won't work as planned, said plainly. */
 export interface RackProblem {
@@ -75,6 +75,11 @@ export interface RackLayout {
   /** What it all draws at most, in watts, and how many on the rails have no figure. */
   powerW: number
   powerMissing: number
+  /**
+   * The dry hire kit in it (ADR 0075): what hiring it in costs a day, what
+   * buying it would, and how many have no price given for each.
+   */
+  hire: { count: number; dayCents: number; dayMissing: number; buyCents: number; buyMissing: number }
   problems: RackProblem[]
 }
 
@@ -99,6 +104,7 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
   let weightMissing = rack.weightKg === null ? 1 : 0
   let powerW = 0
   let powerMissing = 0
+  const hire = { count: 0, dayCents: 0, dayMissing: 0, buyCents: 0, buyMissing: 0 }
   const placed: { slot: RackSlot; m: Sized | undefined; from: number; to: number }[] = []
   for (const s of slots) {
     const m = models.get(s.modelId)
@@ -106,6 +112,13 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
     else weightMissing += s.qty
     if (m?.powerW !== null && m?.powerW !== undefined) powerW += m.powerW * s.qty
     else if (s.top !== null) powerMissing += 1
+    if (m?.dryHire) {
+      hire.count += s.qty
+      if (m.hireDayCents !== null && m.hireDayCents !== undefined) hire.dayCents += m.hireDayCents * s.qty
+      else hire.dayMissing += s.qty
+      if (m.valueCents !== null && m.valueCents !== undefined) hire.buyCents += m.valueCents * s.qty
+      else hire.buyMissing += s.qty
+    }
     if (s.top === null) continue
     const units = m?.units ?? 1
     if (m && m.units === null) problems.push({ slotId: s.id, kind: 'no-size', message: `${m.name} has no height given, so it's drawn as 1U.` })
@@ -139,13 +152,15 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
           message: `${an} on the ${RACK_SIDE_LABELS[a.slot.side].toLowerCase()} and ${bn} on the ${RACK_SIDE_LABELS[b.slot.side].toLowerCase()} meet in the middle: ${a.m.depthMm + b.m.depthMm} mm in a ${rack.depthMm} mm rack.`,
         })
     }
-  return { frontUsed, rearUsed, weightKg: Math.round(weightKg * 10) / 10, weightMissing, powerW, powerMissing, problems }
+  return { frontUsed, rearUsed, weightKg: Math.round(weightKg * 10) / 10, weightMissing, powerW, powerMissing, hire, problems }
 }
 
 /** What a built rack should hold and doesn't, and what it holds that its layout doesn't have. */
 export interface RackCheck {
   missing: { modelId: string; qty: number }[]
   extra: { modelId: string; qty: number }[]
+  /** Dry hire kit in its layout (ADR 0075): hired in for each job, so never missing. */
+  hireIn: { modelId: string; qty: number }[]
 }
 
 /**
@@ -153,9 +168,13 @@ export interface RackCheck {
  * (each slot's product and how many) against what's in it (its items and
  * what's counted in it, directly).
  */
-export function checkBuilt(slots: readonly RackSlot[], holds: ReadonlyMap<string, number>): RackCheck {
+export function checkBuilt(slots: readonly RackSlot[], holds: ReadonlyMap<string, number>, dryHire: (modelId: string) => boolean = () => false): RackCheck {
   const want = new Map<string, number>()
-  for (const s of slots) want.set(s.modelId, (want.get(s.modelId) ?? 0) + s.qty)
+  const hired = new Map<string, number>()
+  for (const s of slots) {
+    const into = dryHire(s.modelId) ? hired : want
+    into.set(s.modelId, (into.get(s.modelId) ?? 0) + s.qty)
+  }
   const missing: RackCheck['missing'] = []
   const extra: RackCheck['extra'] = []
   for (const [modelId, qty] of want) {
@@ -166,5 +185,5 @@ export function checkBuilt(slots: readonly RackSlot[], holds: ReadonlyMap<string
     const short = qty - (want.get(modelId) ?? 0)
     if (short > 0) extra.push({ modelId, qty: short })
   }
-  return { missing, extra }
+  return { missing, extra, hireIn: [...hired].map(([modelId, qty]) => ({ modelId, qty })) }
 }

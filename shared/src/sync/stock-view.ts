@@ -105,6 +105,10 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     depthMm: m.depthMm ?? null,
     weightKg: m.weightKg ?? null,
     powerW: m.powerW ?? null,
+    // And before dry hire stock (ADR 0075), all of it ours.
+    dryHire: m.dryHire ?? false,
+    supplier: m.supplier ?? '',
+    hireDayCents: m.hireDayCents ?? null,
   })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })
   const places = new Map<string, Place & { pending: boolean }>()

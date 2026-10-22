@@ -162,6 +162,10 @@ const CASES: Case[] = [
   c('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 3, side: 'front', qty: 1, notes: ' Top ' }, { as: 'on the rails', before: [m('model.update', { id: 'rack', isRack: true, units: 4 })] }),
   c('rackSlot.set', { id: 's2', rackId: 'rack', modelId: 'xlr', top: null, side: 'front', qty: 6, notes: '' }, { as: 'loose', before: [m('model.update', { id: 'rack', isRack: true })] }),
   c('rackSlot.remove', { id: 's1' }, { before: [m('model.update', { id: 'rack', isRack: true }), m('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 1, side: 'rear', qty: 1, notes: '' })] }),
+  // Dry hire stock (ADR 0075).
+  c('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: ' PRG ', hireDayCents: 4500, valueCents: 350000, notes: '' }, { as: 'dry hire' }),
+  c('model.update', { id: 'unused', dryHire: true, supplier: 'Stage Hire Co' }, { as: 'made dry hire', before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
+  c('kit.add', { id: 'hazer', projectId: 'gala', phaseId: null, modelId: 'haze', qty: 2, subhireQty: 0, supplier: '', notes: '' }, { as: 'dry hire, never short', before: [m('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: 'PRG', hireDayCents: null, valueCents: null, notes: '' })] }),
   c('place.upsert', { id: 'van-shelf', name: 'Van shelf', notes: '' }),
   c('place.remove', { id: 'bay' }),
   c('asset.add', { id: 'a3', modelId: 'y10p', number: 'SH-000004', serial: 'Y3', placeId: 'bay', caseId: null, notes: '', fromCount: false }),

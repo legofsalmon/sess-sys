@@ -1,4 +1,4 @@
-import { NOT_RACKED } from '../src/stock.ts'
+import { PLAIN_PRODUCT } from '../src/stock.ts'
 import { describe, expect, it } from 'vitest'
 import { countCommandSchemas, countSetTo, countSummaryWords, type Count, type CountDraft, type CountItem } from '../src/counts.ts'
 import type { Fault } from '../src/faults.ts'
@@ -22,7 +22,7 @@ const never: Transport = {
   pull: () => Promise.reject(new Error('No signal')),
 }
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
-  ...NOT_RACKED,
+  ...PLAIN_PRODUCT,
   aliases: [],
   id,
   name,

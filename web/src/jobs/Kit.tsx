@@ -28,7 +28,7 @@ import { ProductChoices } from '../stock/common.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { useToday } from '../view.ts'
+import { useToday, useView } from '../view.ts'
 import { Heading, Icon } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from '../stock/kitIcon.ts'
@@ -85,6 +85,8 @@ function whichDay(l: KitLineView, day: string): string {
  * when there's nothing to say: a stopped job, or days gone by.
  */
 export function kitState(l: KitLineView, today: string): { tone: Tone; text: string } | undefined {
+  // Dry hire stock (ADR 0075) is hired in for every job, so it's never short.
+  if (l.model?.dryHire) return { tone: 'quiet', text: `Dry hire${l.model.supplier ? ` from ${l.model.supplier}` : ''}: hired in for the job.` }
   const subhired = l.subhireQty > 0 ? `${l.subhireQty === l.qty ? 'All' : l.subhireQty} subhired${l.supplier ? ` from ${l.supplier}` : ''}.` : ''
   const say = (tone: Tone, text: string) => ({ tone, text: [subhired, text].filter(Boolean).join(' ') })
   if (l.hold === 'none' || (l.held && l.held.end < today)) return subhired ? say('quiet', '') : undefined
@@ -447,8 +449,28 @@ function KitLine({ line, job, today, mayChange, brief }: { line: KitLineView; jo
         )}
       </header>
       {state && <p className={`kit-state ${state.tone}${brief ? ' brief' : ''}`}>{state.text}</p>}
+      {line.model?.isRack && <RackHireIn line={line} />}
       {editing && <EditKit line={line} job={job} onDone={() => setEditing(false)} />}
     </article>
+  )
+}
+
+/** A rack booked with dry hire kit in its layout (ADR 0075): what to hire in for it, for each one booked. */
+function RackHireIn({ line }: { line: KitLineView }) {
+  const rack = useView().racks.of(line.modelId)
+  const hired = (rack?.slots ?? []).filter((s) => s.model?.dryHire)
+  if (!hired.length) return null
+  const by = new Map<string, { name: string; supplier: string; qty: number }>()
+  for (const s of hired) {
+    const was = by.get(s.modelId)
+    if (was) was.qty += s.qty
+    else by.set(s.modelId, { name: s.model!.name, supplier: s.model!.supplier, qty: s.qty })
+  }
+  return (
+    <p className="kit-state quiet">
+      To hire in for it:{' '}
+      {[...by.values()].map((h) => `${(h.qty * line.qty).toLocaleString('en-IE')} × ${h.name}${h.supplier ? ` from ${h.supplier}` : ''}`).join(', ')}.
+    </p>
   )
 }
 

@@ -292,7 +292,8 @@ export function kitView(
       hold: job ? holdOf(job.status) : 'none',
       span,
       held: span && job && heldAround(job, span),
-      own: Math.max(0, l.qty - l.subhireQty),
+      // Dry hire stock (ADR 0075) is all hired in, so none of it comes out of our own.
+      own: model?.dryHire ? 0 : Math.max(0, l.qty - l.subhireQty),
       // What's built into a rack goes with the rack (ADR 0074), so it isn't free on its own.
       owned: Math.max(0, (model?.total ?? 0) - (model?.racked ?? 0) - unusable - late),
       unusable,

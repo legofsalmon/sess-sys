@@ -5,7 +5,7 @@ import type { Inspection } from '../src/inspections.ts'
 import { monthsLater } from '../src/inspections.ts'
 import type { Phase, Project } from '../src/jobs.ts'
 import type { KitLine } from '../src/kit.ts'
-import { DEPARTMENTS, type Asset, type Model, type Place, NOT_RACKED } from '../src/stock.ts'
+import { DEPARTMENTS, type Asset, type Model, type Place, PLAIN_PRODUCT } from '../src/stock.ts'
 import { crewView } from '../src/sync/crew-view.ts'
 import { inspectionsView } from '../src/sync/inspections-view.ts'
 import { jobsView } from '../src/sync/jobs-view.ts'
@@ -36,7 +36,7 @@ const day = (n: number) => `2026-10-${String(n).padStart(2, '0')}`
 const NAMES = ['Aoife', 'áine', 'Brian', 'Ciarán', 'ciara', 'Dónal', 'Éabha', 'eoin', 'Niamh', 'Órla', 'oisín', 'Pádraig', 'Róisín', 'Séan', 'sinéad', 'Tadhg']
 
 const model = (id: string, name: string, extra: Partial<Model> = {}): Model => ({
-  ...NOT_RACKED,
+  ...PLAIN_PRODUCT,
   aliases: [],
   id,
   name,

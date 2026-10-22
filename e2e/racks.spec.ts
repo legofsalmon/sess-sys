@@ -43,7 +43,10 @@ test('a rack, laid out, drawn, and a built one checked against its layout', asyn
   await page.getByLabel('Depth it takes, in mm').fill('800')
   await page.getByLabel('Weight empty, in kg').fill('14')
   await page.getByRole('button', { name: 'Add rack' }).click()
+  // A new rack opens in the designer; this test lays it out on its page.
   await expect(page.getByRole('heading', { name: `Monitor rack ${id}`, level: 1 })).toBeVisible()
+  await page.getByRole('link', { name: `Monitor rack ${id}` }).first().click()
+  await expect(page.getByRole('region', { name: 'Layout' })).toBeVisible()
 
   const layout = page.getByRole('region', { name: 'Layout' })
   const add = async (product: string, top?: string, side?: 'Front' | 'Back') => {
@@ -99,3 +102,52 @@ test('a rack, laid out, drawn, and a built one checked against its layout', asyn
 async function rackId(page: import('@playwright/test').Page) {
   return decodeURIComponent(/#stock\/product\/(.+)$/.exec(page.url())![1]!)
 }
+
+test('the rack designer: kit dragged in from ours and dry hire, moved, taken out, and what it costs to hire in', async ({ browser, request }) => {
+  const id = Date.now().toString(36)
+  const amp = `Powersoft X8 ${id}`
+  const haze = `MDG ATMe ${id}`
+  await push(request, id, [
+    ['place.upsert', { id: `wh-${id}`, name: `Designer bay ${id}`, notes: '' }],
+    ['model.create', { id: `amp-${id}`, name: amp, ...AMP, units: 2, depthMm: 480, weightKg: 12, powerW: 2000 }],
+    ['asset.add', { id: `a1-${id}`, modelId: `amp-${id}`, number: null, serial: '', placeId: `wh-${id}`, caseId: null, notes: '', fromCount: false }],
+    ['model.create', { id: `haze-${id}`, name: haze, ...AMP, category: 'Haze', units: 3, depthMm: 400, dryHire: true, supplier: 'PRG', hireDayCents: 4500, valueCents: 350000 }],
+    ['model.create', { id: `rack-${id}`, name: `Amp rack ${id}`, department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '', units: 6, depthMm: 600 }],
+  ])
+
+  const page = await (await browser.newContext({ viewport: deskSize })).newPage()
+  await page.goto(`/#stock/racks/rack-${id}`)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  const palette = page.getByRole('region', { name: 'Kit to build with' })
+  const rack = page.getByRole('region', { name: 'The rack' })
+  await palette.getByLabel('Find kit').fill(id)
+  await expect(palette.getByRole('button', { name: `Pick up ${amp}` })).toContainText('2U, 480 mm · 1 free today')
+  await expect(palette.getByRole('button', { name: `Pick up ${haze}` })).toContainText('Dry hire from PRG')
+
+  // Dragged in from the list.
+  await palette.getByRole('button', { name: `Pick up ${amp}` }).dragTo(rack.getByRole('button', { name: 'U1 front' }))
+  await expect(rack.getByRole('button', { name: `${amp}, U1–2 on the front` })).toBeVisible()
+  // Picked up and put down by pressing, as on a phone.
+  await palette.getByRole('button', { name: `Pick up ${haze}` }).click()
+  await expect(page.getByText(`Holding ${haze}. Press where it goes.`)).toBeVisible()
+  await rack.getByRole('button', { name: 'U3 front' }).click()
+  await expect(rack.getByRole('button', { name: `${haze}, U3–5 on the front` })).toBeVisible()
+  await expect(page.getByText('1 thing dry hired: €45 a day to hire in, €3,500 to buy')).toBeVisible()
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  if (process.env.SHOTS) await page.screenshot({ path: 'docs/hub/img/rack-designer.png' })
+
+  // Moved to the back, then dragged back to the list to take it out.
+  await rack.getByRole('button', { name: `${amp}, U1–2 on the front` }).dragTo(rack.getByRole('button', { name: 'U4 back' }))
+  await expect(rack.getByRole('button', { name: `${amp}, U4–5 on the back` })).toBeVisible()
+  await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette)
+  await expect(rack.getByRole('button', { name: new RegExp(`^${haze}`) })).toHaveCount(0)
+  await expect(page.getByText('dry hired:')).toHaveCount(0)
+
+  // The catalogue tells ours from dry hire.
+  await page.goto('/#stock')
+  const whose = page.getByRole('group', { name: 'Whose' })
+  await whose.getByRole('button', { name: /^Dry hire/ }).click()
+  await page.getByLabel('Find', { exact: true }).fill(id)
+  await expect(page.getByRole('link', { name: new RegExp(`^${haze}`) })).toContainText('Dry hire from PRG')
+  await expect(page.getByRole('link', { name: new RegExp(`^${amp}`) })).toHaveCount(0)
+})

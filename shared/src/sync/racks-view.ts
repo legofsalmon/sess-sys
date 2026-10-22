@@ -87,7 +87,7 @@ export function racksView(entities: Partial<Tables>, outbox: readonly (Mutation 
       const holds = new Map<string, number>()
       for (const a of item.items) holds.set(a.modelId, (holds.get(a.modelId) ?? 0) + 1)
       for (const s of item.counted) holds.set(s.modelId, (holds.get(s.modelId) ?? 0) + s.qty)
-      return { item, holds, check: checkBuilt(list, holds) }
+      return { item, holds, check: checkBuilt(list, holds, (id) => !!models.get(id)?.dryHire) }
     })
     const view: RackView = { model, slots: list, layout: layoutOf(model, list, models), built }
     racks.push(view)
