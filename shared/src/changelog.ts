@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.29.3',
+    date: '2026-10-22',
+    title: "Bringing the stock list in again doesn't double the counts",
+    what: 'Bringing the Current RMS stock in a second time with a different place typed counted everything twice, once at each place, and a product renamed in Current RMS came in as a new one. Products now keep their Current RMS id, so a renamed one is renamed here; where you type one place for the whole list, a count of the same kit somewhere else is taken off and the preview says so; and a new product that looks like one here renamed is pointed out.',
+    prs: [122],
+  },
+  {
     version: '1.29.2',
     date: '2026-10-22',
     title: 'Accepting after asking for another rate takes the rate offered',

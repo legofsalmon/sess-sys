@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: a second stock bring-in doesn't double the counts
+
+**Done**
+
+- Finding 7 of the [20 October audit](audit-2026-10-20.md) (PR #122): a
+  second Current RMS bring-in with another place typed counted every
+  product at both places, and a rename there made a new product. The
+  bring-in now carries Current RMS's id onto the product
+  (`models.list_id`) and matches by it before the name; a count at a place
+  the list doesn't mention is set to none where the place was typed for
+  the whole list ("Counts none at Store one (12 there now)"), or noted
+  where the row names its own place; a new product with the same category,
+  value and count as an unnamed one says "Looks like Amp renamed". The
+  238 products already live pick up their id, by name, on the next
+  bring-in. [ADR 0056](adr/0056-bringing-the-stock-in-from-current-rms.md)
+  notes it. App 1.29.3.
+- Checked: typecheck, all unit and server tests, with new ones for the
+  move, the aside, the rename by id and by likeness, and the whole round
+  trip on the server.
+
 ## 22 October 2026: Accept after a counter takes the rate offered
 
 **Done**
