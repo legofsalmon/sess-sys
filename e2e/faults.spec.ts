@@ -131,8 +131,8 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   const cableRow = pickRow(page, cable)
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('20')
-  await countOut.getByRole('button', { name: 'Count out' }).click()
-  await expect(page.locator('.pick-total')).toHaveText('23 of 23 out')
+  await countOut.getByRole('button', { name: 'Count out', exact: true }).click()
+  await expect(page.locator('.pick-total')).toHaveText('All 23 out: ready to load.')
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // Back, with no signal.
@@ -159,7 +159,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   // 17 cables back, 3 missing, and 2 of those back are cut.
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('17')
-  await countBack.getByRole('button', { name: 'Count back' }).click()
+  await countBack.getByRole('button', { name: 'Count back', exact: true }).click()
   await expect(cableRow.locator('.count')).toHaveText('3 still out')
   await countBack.getByLabel('How many').fill('3')
   await countBack.getByRole('button', { name: 'Missing' }).click()

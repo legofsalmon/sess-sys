@@ -3,6 +3,31 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: picking on the phone
+
+**Done**
+
+- [ADR 0072](adr/0072-picking-on-the-phone.md) (PR #125), on Colly's ask
+  to think through a warehouse hand or head of department who inherits a
+  pick list and picks it on a phone. Built on the audit's shorter pick
+  list (PR #120). Going out, the pick list now says when the kit is first
+  needed, where, and the vans booked; "Whose kit" narrows it to one
+  department (a head starts on their own), with rows left in each; "By
+  where it's kept" lists what's left place by place; kit line notes show
+  on rows; the answer to a scan or count has Undo (the opposite movement,
+  nothing deleted); counted kit has "Count out the 12" and "Count back all
+  12"; "All 40 out: ready to load."; and the screen is kept on while
+  picking. Department and order are kept on the phone (`sh.pick`). No
+  server change. App 1.30.0.
+- Checked: typecheck, unit tests, and the browser tests, with a new one
+  for picking on the phone (pick.spec.ts) and the pick and faults tests
+  reading the new total.
+
+**Not done, for later if wanted**
+
+- Who scanned what, a "picked by" sign-off the office sees, and splitting
+  one pick list between two people.
+
 ## 22 October 2026: the backup check gives its memory back
 
 **Done**
