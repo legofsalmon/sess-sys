@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.28.1',
+    date: '2026-10-22',
+    title: 'The Jobs tab opens quicker',
+    what: 'With hundreds of jobs, a tap on Jobs took a second or two on a phone, most of it spent looking for jobs brought in from the calendars as several. That check is now about ten times quicker, runs only when there are calendar jobs, and is kept while you go to other tabs and come back.',
+    prs: [118],
+  },
+  {
     version: '1.28.0',
     date: '2026-10-22',
     title: 'A new phone says when it is still catching up',
