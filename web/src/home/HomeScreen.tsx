@@ -70,35 +70,35 @@ export function HomeScreen() {
 
   return (
     <Copying.Provider value={view.copying !== false}>
-    <div className="app home">
-      {/* Today's date top right, so Home is the page's one title (Colly, 12 October 2026). */}
-      <Top view={view} title="Home" root aside={<span className="top-date">{dayLabel(today)}</span>} />
-      {me && <p className="home-day">Hello, {firstName(me)}</p>}
+      <div className="app home">
+        {/* Today's date top right, so Home is the page's one title (Colly, 12 October 2026). */}
+        <Top view={view} title="Home" root aside={<span className="top-date">{dayLabel(today)}</span>} />
+        {me && <p className="home-day">Hello, {firstName(me)}</p>}
 
-      <div className="views home-for" role="group" aria-label="Show for">
-        {FOR.map(([f, label]) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={shownFor === f}
-            onClick={(e) => {
-              // A toggle, not a move: it keeps focus, as the Shell expects of one (audit finding 22).
-              e.currentTarget.focus()
-              choose({ for: f, department })
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        <div className="views home-for" role="group" aria-label="Show for">
+          {FOR.map(([f, label]) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={shownFor === f}
+              onClick={(e) => {
+                // A toggle, not a move: it keeps focus, as the Shell expects of one (audit finding 22).
+                e.currentTarget.focus()
+                choose({ for: f, department })
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
+        {shownFor === 'department' && (
+          <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
+        )}
+        {shownFor === 'warehouse' && <ForWarehouse view={view} today={today} me={me} />}
+        {shownFor === 'me' && <ForMe view={view} today={today} me={me} onPick={pick} />}
       </div>
-
-      {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
-      {shownFor === 'department' && (
-        <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
-      )}
-      {shownFor === 'warehouse' && <ForWarehouse view={view} today={today} me={me} />}
-      {shownFor === 'me' && <ForMe view={view} today={today} me={me} onPick={pick} />}
-    </div>
     </Copying.Provider>
   )
 }
