@@ -3,6 +3,23 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 22 October 2026: the backup check gives its memory back
+
+**Done**
+
+- Finding 9 of the [20 October audit](audit-2026-10-20.md) (PR #124): the
+  nightly test restore ran in a worker thread that took the server to
+  about 1 GB and kept 420 MB after. It now runs in a child process capped
+  at 512 MB that ends when the check does (about 1 MB kept), and backups,
+  test restores and the exports take turns. ADR 0004 notes it. App 1.29.5.
+- Checked: typecheck, unit tests, and the backup server tests (memory
+  growth under 150 MB over three restores; a timed-out restore fails).
+
+**Waiting on Colly**
+
+- Railway's memory limit for the app is worth raising to 2 GB on the
+  dashboard, as the audit says.
+
 ## 22 October 2026: combining people keeps the leave allowance
 
 **Done**
