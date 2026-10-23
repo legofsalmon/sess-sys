@@ -141,7 +141,8 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   // Moved to the back, then dragged back to the list to take it out.
   await rack.getByRole('button', { name: `${amp}, U1–2 on the front` }).dragTo(rack.getByRole('button', { name: 'U4 back' }))
   await expect(rack.getByRole('button', { name: `${amp}, U4–5 on the back` })).toBeVisible()
-  await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette)
+  // Dropped on the list's heading, which is in sight: the middle of the list can be below the fold on a shorter screen.
+  await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette.getByRole('heading', { name: 'Kit to build with' }))
   await expect(rack.getByRole('button', { name: new RegExp(`^${haze}`) })).toHaveCount(0)
   await expect(page.getByText('dry hired:')).toHaveCount(0)
 
