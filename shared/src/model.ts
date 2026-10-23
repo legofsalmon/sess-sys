@@ -21,6 +21,7 @@ import { OWN_CALENDAR_ENTITY_NAMES, type OwnCalendarEntities } from './own-calen
 import { VEHICLE_ENTITY_NAMES, type VehicleEntities } from './vehicles.ts'
 import { STEP_ENTITY_NAMES, type StepEntities } from './steps.ts'
 import { RACK_ENTITY_NAMES, type RackEntities } from './racks.ts'
+import { PURCHASE_ENTITY_NAMES, type PurchaseEntities } from './purchases.ts'
 
 /** Every record a device keeps, by the name the change feed gives it, gathered from each module. */
 export interface Entities
@@ -46,7 +47,8 @@ export interface Entities
     OwnCalendarEntities,
     VehicleEntities,
     StepEntities,
-    RackEntities {}
+    RackEntities,
+    PurchaseEntities {}
 export type EntityName = keyof Entities
 export const ENTITY_NAMES: readonly EntityName[] = [
   ...CREW_ENTITY_NAMES,
@@ -72,4 +74,5 @@ export const ENTITY_NAMES: readonly EntityName[] = [
   ...VEHICLE_ENTITY_NAMES,
   ...STEP_ENTITY_NAMES,
   ...RACK_ENTITY_NAMES,
+  ...PURCHASE_ENTITY_NAMES,
 ]

@@ -38,6 +38,7 @@ import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import { VehicleScreen, VehiclesScreen } from './Vehicles.tsx'
 import { RackDesigner } from './RackDesigner.tsx'
+import { BringInPurchasesScreen, PurchaseScreen, PurchasesScreen } from './Purchases.tsx'
 import { RacksScreen, sizeFrom, SizeFields, sizeTypedOf, suppliersOf, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
@@ -60,7 +61,8 @@ import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
  * #stock/item/<id>, #stock/place/<id>), a run of labels on its own
  * (#stock/labels/<id>), and a count's on #stock/count/<id> (ADR 0030).
  * The company's vehicles are along the row too (#stock/vehicles), each on
- * #stock/vehicles/<id> (ADR 0047). Racks are along it too (#stock/racks, ADR 0074).
+ * #stock/vehicles/<id> (ADR 0047). Racks are along it too (#stock/racks, ADR 0074), and the purchase list
+ * (#stock/buy, each request on #stock/buy/<id>, a list brought in at #stock/buy/bring-in; ADR 0077).
  * The stock list is brought in at #stock/import (ADR 0026).
  * Everything works with no signal and syncs later, like the rest of the app.
  */
@@ -76,6 +78,10 @@ export function StockScreen() {
   if (hash === '#stock/count') return <CountScreen view={view} />
   if (hash === '#stock/vehicles') return <VehiclesScreen view={view} />
   if (hash === '#stock/racks') return <RacksScreen view={view} />
+  if (hash === '#stock/buy') return <PurchasesScreen view={view} />
+  if (hash === '#stock/buy/bring-in') return <BringInPurchasesScreen view={view} />
+  const [, buy] = /^#stock\/buy\/(.+)$/.exec(hash) ?? []
+  if (buy) return <PurchaseScreen key={buy} view={view} id={decodeURIComponent(buy)} />
   const [, rack] = /^#stock\/racks\/(.+)$/.exec(hash) ?? []
   if (rack) return <RackDesigner key={rack} view={view} id={decodeURIComponent(rack)} />
   const [, vehicle] = /^#stock\/vehicles\/(.+)$/.exec(hash) ?? []

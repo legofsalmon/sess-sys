@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.34.0',
+    version: '1.35.0',
     date: '2026-10-23',
     title: 'Rack-mount kit and the rack in 3D',
     what: 'Products have a Rack-mount tick box: tick it to give the height in rack units, the width (full, half or a third) and the depth. The rack designer draws the rack in 3D: turn it, zoom in, look square at the front, back or side, and drag kit onto it or press kit and then press where it goes. There’s also a view from the side showing how deep each thing goes. A rack can have its outside size, castors and what its power can take; the totals now give amps and heat, and say when a rack is too heavy to lift or draws more than its power can take.',
     prs: [129],
     adrs: [76],
+  },
+  {
+    version: '1.34.0',
+    date: '2026-10-23',
+    title: 'The purchase list, with votes',
+    what: 'Stock has a Purchase list. Anyone signed in, freelancers too, can ask for kit to be bought: what, how many, a link and the department. Everyone can see the list and vote for what they would find most useful, and it is listed with the most votes first. The office and heads of department say where each one is at (agreed, ordered, arrived or not buying) with a note, and whoever asked sees it in their notifications. A list can be brought in from a spreadsheet, as the WhatsApp group’s requests were. Nothing is ordered and nobody is contacted by the app.',
+    prs: [130],
+    adrs: [77],
   },
   {
     version: '1.33.0',

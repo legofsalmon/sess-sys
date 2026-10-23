@@ -245,6 +245,10 @@ const ABOUT: Record<string, string> = {
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
   // A job's steps (ADR 0073).
+  // The purchase list (ADR 0077).
+  purchase_requests:
+    "Kit the crew asked to be bought: what, how many and details, a link, the department, who asked (or the name a list brought in gave) and on which day, where it's at (asked for, agreed, ordered, arrived, not buying) and the office's notes.",
+  purchase_votes: 'Who voted for each request on the purchase list, one vote each.',
   job_steps: "Each job's steps given to someone or ticked by hand: the job, the step (quote, confirmed, crew, kit, prep, show, back, deprep), who it's down to, and when it was ticked and by whom. Steps the app ticks from the job's own records aren't kept.",
   // Vans and drivers (ADR 0047).
   vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',

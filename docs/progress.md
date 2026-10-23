@@ -16,7 +16,7 @@ waiting on someone.
   too heavy to lift or past its power, and kit on the rails that isn't
   rack-mount. The designer draws the rack in 3D (three.js, lazy-loaded):
   turn, zoom, square views, drop or press kit onto the face towards you; and
-  from the side. App 1.34.0.
+  from the side. App 1.35.0.
 - Checked: typecheck, unit tests (racks, parity, export), browser test
   (racks.spec.ts: 3D placing, side view, rack-mount tick box).
 
@@ -25,6 +25,26 @@ waiting on someone.
 - Part 2: half-width kit side by side, shelves, drawers, blanks, labels and
   colours, undo, copy a rack. Part 3: product photos on the panels and a
   printable rack sheet.
+
+## 23 October 2026: the purchase list, with votes
+
+**Done**
+
+- [ADR 0077](adr/0077-the-purchase-list.md) (PR #130). Stock › Purchase
+  list (`#stock/buy`): anyone signed in asks for kit to be bought and votes,
+  one vote each; asked for and agreed ranked by votes; the office and heads
+  say where each is at; whoever asked sees changes in Notifications. A list
+  comes in from a .csv at `#stock/buy/bring-in`, names matched to the Crew
+  tab, the same list twice adding nothing. App 1.34.0.
+- The WhatsApp group's export sorted into 38 requests, kept in the
+  project's private files for the office to bring in on the live app.
+- Checked: typecheck, unit tests (purchases, parity, roles, history,
+  export, erasure pointers), browser test (purchases.spec.ts).
+
+**Waiting**
+
+- Colly brings the WhatsApp list in on the live app (Stock › Purchase list
+  › Bring in a list).
 
 ## 22 October 2026: dry hire stock and the rack designer
 
