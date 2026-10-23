@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 23 October 2026: reading Current RMS through its API
+
+**Done**
+
+- [ADR 0078](adr/0078-reading-current-rms-through-its-api.md) (PR #131),
+  the first step of the quoting engine, on Colly's ask. The server reads
+  Current RMS's API with the key Colly saved on Railway (`CURRENT_CMS_KEY`,
+  subdomain `sessionhire`), GET only: every opportunity and its lines into
+  `rms_opportunities` and `rms_lines`, a request a second, "too many" waited
+  out, a second read re-reading only changed lines. Admin › Current RMS
+  starts, shows and stops a read and downloads two spreadsheets; Jobs ›
+  Money › Past quotes lists and opens them. Office and directors only. App
+  1.36.0.
+- Checked: typecheck, unit tests (a stand-in Current RMS), export.
+
+**Next**
+
+- Colly runs the first read on live and sends the downloads or an export,
+  to shape parts 1 and 2 of the quoting plan.
+
 ## 23 October 2026: rack-mount kit and the rack in 3D
 
 **Done**

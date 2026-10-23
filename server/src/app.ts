@@ -46,6 +46,9 @@ import { registerStockImportRoutes, type StockImportRound } from './stock/import
 import { takeTurns } from './turns.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 import { nominatim, registerPlaceRoutes, type PlaceSearch } from './projects/places.ts'
+import { RmsApi, type RmsConfig } from './rms/api.ts'
+import { RmsReader } from './rms/reader.ts'
+import { registerRmsRoutes } from './rms/routes.ts'
 
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
@@ -127,6 +130,8 @@ export interface AppOptions {
   ownCalendars?: OwnCalendarsOptions
   /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
   places?: PlaceSearch
+  /** Current RMS's API, read only (ADR 0078): the subdomain and key. Without it Admin says it isn't set up. */
+  currentRms?: RmsConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
 }
@@ -152,6 +157,8 @@ declare module 'fastify' {
     documents: DocumentFiles
     /** Freelancers' own calendars, read only (ADR 0044); the caller starts reading them on a schedule. */
     ownCalendars: OwnCalendars
+    /** Reading Current RMS (ADR 0078), run from Admin. */
+    rms: RmsReader
   }
 }
 
@@ -564,6 +571,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerPlaceRoutes(app, { search: options.places ?? nominatim() })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
+  const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)
+  app.decorate('rms', rms)
+  registerRmsRoutes(app, { db, reader: rms })
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
@@ -646,6 +656,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   } else app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'Not found' }))
 
   app.addHook('onClose', async () => {
+    rms.stop()
+    await rms.done?.catch(() => {})
     backups.stop()
     app.dueErasures.stop()
     documents.stop()
