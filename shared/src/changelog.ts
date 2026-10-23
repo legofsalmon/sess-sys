@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.36.0',
+    date: '2026-10-23',
+    title: 'Past quotes from Current RMS',
+    what: 'The app can now read Current RMS directly. On Admin, the office and directors can bring in every opportunity there (quotes, orders, lost and dead ones) with all their lines, prices and discounts. The first time takes up to half an hour and shows how far it’s got; after that only what changed is read again. They’re listed under Jobs › Money › Past quotes, to search by number, job, client or venue, and can be downloaded as spreadsheets. The app only reads: it never changes anything in Current RMS.',
+    prs: [131],
+    adrs: [78],
+  },
+  {
     version: '1.35.0',
     date: '2026-10-23',
     title: 'Rack-mount kit and the rack in 3D',
