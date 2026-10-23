@@ -620,7 +620,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
     }
     case 'model.create':
-      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`
+      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${a.rackMount ? ', rack-mount' : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`
     case 'model.update': {
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a product')}`)
@@ -638,8 +638,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       // Racks (ADR 0074).
       if (a.isRack !== undefined) parts.push(a.isRack ? 'a rack' : 'not a rack')
       if (a.code !== undefined) parts.push(typeof a.code === 'string' && a.code.trim() ? `stock code to ${clip(a.code.trim())}` : 'no stock code')
-      const sized = (['units', 'depthMm', 'weightKg', 'powerW'] as const).filter((k) => a[k] !== undefined)
+      // Rack-mount kit and rack cases (ADR 0076).
+      if (a.rackMount !== undefined) parts.push(a.rackMount ? 'rack-mount' : 'not rack-mount')
+      const sized = (['units', 'depthMm', 'weightKg', 'powerW', 'rackWidth'] as const).filter((k) => a[k] !== undefined)
       if (sized.length) parts.push('its size')
+      if ((['caseWidthMm', 'caseHeightMm', 'caseDepthMm', 'castors', 'powerLimitA'] as const).some((k) => a[k] !== undefined)) parts.push('its case')
       // Dry hire stock (ADR 0075).
       if (a.dryHire !== undefined) parts.push(a.dryHire ? 'dry hire' : 'ours')
       if (a.supplier !== undefined) parts.push(typeof a.supplier === 'string' && a.supplier.trim() ? `hired from ${clip(a.supplier.trim())}` : 'no supplier')

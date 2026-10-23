@@ -17,7 +17,7 @@ async function send<N extends CommandName>(app: FastifyInstance, name: N, args: 
 }
 
 const RACK = { department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '' } as const
-const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '' } as const
+const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true } as const
 
 describe('racks', () => {
   it('have a stock code of their own, a layout, and take their kit off what is free', async () => {
@@ -106,5 +106,32 @@ describe('dry hire stock', () => {
     expect(rack.layout.hire).toEqual({ count: 1, dayCents: 4500, dayMissing: 0, buyCents: 350000, buyMissing: 0 })
     // The built one has its speaker; the hazer is hired in for each job, not missing.
     expect(rack.built[0]!.check).toEqual({ missing: [], extra: [], hireIn: [{ modelId: 'haze', qty: 1 }] })
+  })
+})
+
+describe('rack-mount kit and rack cases', () => {
+  it('says kit not marked rack-mount on the rails, a rack too heavy to lift, and power past what it can take', async () => {
+    const { app } = await company()
+    await ok(
+      app,
+      m('model.create', { id: 'amp', name: 'Powersoft X8', department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true, units: 2, rackWidth: 'full', depthMm: 480, weightKg: 24, powerW: 2400 }),
+      m('model.create', { id: 'di', name: 'Radial DI', department: 'audio', category: 'DI', tracking: 'bulk', isCase: false, valueCents: null, notes: '', weightKg: 1 }),
+      m('model.create', { id: 'amps', name: 'Touring amp rack', ...RACK, code: '', units: 6, depthMm: 600, weightKg: 20, caseWidthMm: 600, caseHeightMm: 450, caseDepthMm: 750, powerLimitA: 16 }),
+      m('rackSlot.set', { id: 's1', rackId: 'amps', modelId: 'amp', top: 1, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's2', rackId: 'amps', modelId: 'amp', top: 3, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's3', rackId: 'amps', modelId: 'di', top: 5, side: 'front', qty: 1, notes: '' })
+    )
+    // A rack can't go on another's rails.
+    expect(await send(app, 'model.update', { id: 'amps', rackMount: true })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const l = client.view().racks.of('amps')!.layout
+    expect(l).toMatchObject({ weightKg: 69, powerW: 4800, amps: 20.9, heatBtu: 16378 })
+    expect(l.problems.map((p) => p.kind).sort()).toEqual(['no-size', 'not-rack-mount', 'over-power', 'too-heavy'])
+    expect(l.problems.find((p) => p.kind === 'over-power')?.message).toBe('It draws up to 20.9 A, more than its 16 A power can take.')
+
+    // On castors, it's wheeled, not lifted; the DI goes loose.
+    await ok(app, m('model.update', { id: 'amps', castors: true }), m('rackSlot.set', { id: 's3', rackId: 'amps', modelId: 'di', top: null, side: 'front', qty: 1, notes: '' }))
+    expect((await phone(app)).client.view().racks.of('amps')!.layout.problems.map((p) => p.kind)).toEqual(['over-power'])
   })
 })

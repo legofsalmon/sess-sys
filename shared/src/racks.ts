@@ -55,13 +55,21 @@ export const rackCommandSchemas = {
 } as const
 
 /** The size of one thing in a rack, from its product. */
-type Sized = Pick<Model, 'id' | 'name' | 'units' | 'depthMm' | 'weightKg' | 'powerW'> & Partial<Pick<Model, 'dryHire' | 'hireDayCents' | 'valueCents'>>
+type Sized = Pick<Model, 'id' | 'name' | 'units' | 'depthMm' | 'weightKg' | 'powerW'> &
+  Partial<Pick<Model, 'dryHire' | 'hireDayCents' | 'valueCents' | 'rackMount' | 'rackWidth' | 'castors' | 'powerLimitA'>>
+
+/** The mains voltage power is worked out at, in amps (ADR 0076). */
+export const MAINS_VOLTS = 230
+/** Heat given off, in BTU an hour, for each watt drawn. */
+export const BTU_PER_WATT = 3.412
+/** A rack heavier than this, all in, needs castors or more than two people to lift it. */
+export const LIFT_LIMIT_KG = 50
 
 /** Something about a layout that won't work as planned, said plainly. */
 export interface RackProblem {
   /** The slot it's about, if one. */
   slotId?: string
-  kind: 'no-room' | 'overlap' | 'too-deep' | 'no-size' | 'clash'
+  kind: 'no-room' | 'overlap' | 'too-deep' | 'no-size' | 'clash' | 'not-rack-mount' | 'too-heavy' | 'over-power'
   message: string
 }
 
@@ -75,6 +83,9 @@ export interface RackLayout {
   /** What it all draws at most, in watts, and how many on the rails have no figure. */
   powerW: number
   powerMissing: number
+  /** That power in amps at 230 V, to one decimal place, and the heat it gives off in BTU an hour (ADR 0076). */
+  amps: number
+  heatBtu: number
   /**
    * The dry hire kit in it (ADR 0075): what hiring it in costs a day, what
    * buying it would, and how many have no price given for each.
@@ -121,6 +132,8 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
     }
     if (s.top === null) continue
     const units = m?.units ?? 1
+    if (m && m.rackMount === false)
+      problems.push({ slotId: s.id, kind: 'not-rack-mount', message: `${m.name} isn't marked as rack-mount, so it may not go on the rails. Put it loose, or mark it rack-mount.` })
     if (m && m.units === null) problems.push({ slotId: s.id, kind: 'no-size', message: `${m.name} has no height given, so it's drawn as 1U.` })
     const from = s.top
     const to = s.top + units - 1
@@ -152,7 +165,13 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
           message: `${an} on the ${RACK_SIDE_LABELS[a.slot.side].toLowerCase()} and ${bn} on the ${RACK_SIDE_LABELS[b.slot.side].toLowerCase()} meet in the middle: ${a.m.depthMm + b.m.depthMm} mm in a ${rack.depthMm} mm rack.`,
         })
     }
-  return { frontUsed, rearUsed, weightKg: Math.round(weightKg * 10) / 10, weightMissing, powerW, powerMissing, hire, problems }
+  weightKg = Math.round(weightKg * 10) / 10
+  const amps = Math.round((powerW / MAINS_VOLTS) * 10) / 10
+  if (weightKg > LIFT_LIMIT_KG && rack.castors === false)
+    problems.push({ kind: 'too-heavy', message: `It weighs ${weightKg} kg all in, more than two people should lift (${LIFT_LIMIT_KG} kg), and it isn't on castors.` })
+  if (rack.powerLimitA !== null && rack.powerLimitA !== undefined && amps > rack.powerLimitA)
+    problems.push({ kind: 'over-power', message: `It draws up to ${amps} A, more than its ${rack.powerLimitA} A power can take.` })
+  return { frontUsed, rearUsed, weightKg, weightMissing, powerW, powerMissing, amps, heatBtu: Math.round(powerW * BTU_PER_WATT), hire, problems }
 }
 
 /** What a built rack should hold and doesn't, and what it holds that its layout doesn't have. */

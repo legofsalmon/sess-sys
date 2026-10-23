@@ -281,6 +281,22 @@ const MIGRATIONS: string[] = [
   ALTER TABLE models ADD COLUMN IF NOT EXISTS hire_day_cents integer CHECK (hire_day_cents >= 0);
   ALTER TABLE models ADD CONSTRAINT models_rack_is_ours CHECK (NOT (is_rack AND dry_hire));
   `,
+  // Rack-mount kit and rack cases (ADR 0076): whether a product goes on a
+  // rack's rails and how wide it is; a rack case's outside size, castors and
+  // power. Kit given a height before, or already on a layout's rails, was
+  // rack-mount.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS rack_mount boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS rack_width text NOT NULL DEFAULT 'full' CHECK (rack_width IN ('full', 'half', 'third'));
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_width_mm integer CHECK (case_width_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_height_mm integer CHECK (case_height_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_depth_mm integer CHECK (case_depth_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS castors boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS power_limit_a integer CHECK (power_limit_a BETWEEN 1 AND 125);
+  UPDATE models SET rack_mount = true
+   WHERE NOT is_rack AND (units IS NOT NULL OR id IN (SELECT model_id FROM rack_slots WHERE top IS NOT NULL));
+  ALTER TABLE models ADD CONSTRAINT models_rack_not_mounted CHECK (NOT (is_rack AND rack_mount));
+  `,
 ]
 
 export const STOCK: Module = { versionTable: 'stock_schema_version', migrations: MIGRATIONS }

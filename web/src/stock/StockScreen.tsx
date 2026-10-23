@@ -38,7 +38,7 @@ import { CameraScanner, primeSound } from './Scanner.tsx'
 import { ProductScreen } from './ProductScreen.tsx'
 import { VehicleScreen, VehiclesScreen } from './Vehicles.tsx'
 import { RackDesigner } from './RackDesigner.tsx'
-import { RacksScreen, suppliersOf, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
+import { RacksScreen, sizeFrom, SizeFields, sizeTypedOf, suppliersOf, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
@@ -463,6 +463,7 @@ function NewProduct({ view, department }: { view: View; department: Department }
   const blank = { name: '', department, category: '', tracking: 'serialised' as Tracking, isCase: false, value: '' }
   const [f, setF] = useState(blank)
   const [whose, setWhose] = useState(whoseTypedOf())
+  const [size, setSize] = useState(sizeTypedOf())
   const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -475,9 +476,12 @@ function NewProduct({ view, department }: { view: View; department: Department }
     const valueCents = value.cents
     const owned = whoseFrom(whose)
     if (!owned.whose) return refuse(owned.reason)
+    const sized = sizeFrom(size, w.models)
+    if (!sized.size) return refuse(sized.reason)
     const id = newId()
     const args = {
       ...owned.whose,
+      ...sized.size,
       id,
       name,
       department: f.department,
@@ -491,8 +495,10 @@ function NewProduct({ view, department }: { view: View; department: Department }
     const cleared = { ...blank, department: f.department }
     setF(cleared)
     void run(() => client.mutate('model.create', args)).then((ok) => {
-      if (ok) location.hash = `#stock/product/${id}`
-      else setF((now) => (now === cleared ? f : now))
+      if (ok) {
+        setSize(sizeTypedOf())
+        location.hash = `#stock/product/${id}`
+      } else setF((now) => (now === cleared ? f : now))
     })
   }
   const categories = [...new Set([...w.categories, ...CATEGORY_IDEAS])]
@@ -525,6 +531,7 @@ function NewProduct({ view, department }: { view: View; department: Department }
           placeholder="What it would cost to replace; optional"
         />
       </label>
+      <SizeFields f={size} onChange={setSize} rack={false} />
       <Refusal error={error} className="wide" />
       <button type="submit" className="primary wide">
         Add product

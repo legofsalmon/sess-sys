@@ -3,6 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 23 October 2026: rack-mount kit and the rack in 3D
+
+**Done**
+
+- [ADR 0076](adr/0076-rack-mount-kit-and-the-rack-in-3d.md), part 1 of 3 of
+  Colly's "more advanced rack builder", after a survey of web rack builders
+  (STAGERACK, Rackula, ConnectCAD, Stardraw, Lanberg). Products get a
+  Rack-mount tick box that reveals height, width (full, half, third) and
+  depth (`rack_mount`, `rack_width`); rack cases get outside size, castors
+  and a power limit in amps. Layout totals add amps and heat, and say a rack
+  too heavy to lift or past its power, and kit on the rails that isn't
+  rack-mount. The designer draws the rack in 3D (three.js, lazy-loaded):
+  turn, zoom, square views, drop or press kit onto the face towards you; and
+  from the side. App 1.34.0.
+- Checked: typecheck, unit tests (racks, parity, export), browser test
+  (racks.spec.ts: 3D placing, side view, rack-mount tick box).
+
+**Next**
+
+- Part 2: half-width kit side by side, shelves, drawers, blanks, labels and
+  colours, undo, copy a rack. Part 3: product photos on the panels and a
+  printable rack sheet.
+
 ## 22 October 2026: dry hire stock and the rack designer
 
 **Done**

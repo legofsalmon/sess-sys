@@ -19,6 +19,13 @@ import { euroCents, needed, text, whole } from './plain.ts'
 const id = z.string().min(1).max(64)
 /** The tallest rack there is: 60 rack units. */
 export const MAX_UNITS = 60
+
+/** How much of a rack's width a thing takes (ADR 0076). */
+export const RACK_WIDTHS = ['full', 'half', 'third'] as const
+export type RackWidth = (typeof RACK_WIDTHS)[number]
+export const RACK_WIDTH_LABELS: Record<RackWidth, string> = { full: 'Full width', half: 'Half width', third: 'A third' }
+/** How many fit side by side. */
+export const RACK_WIDTH_PARTS: Record<RackWidth, number> = { full: 1, half: 2, third: 3 }
 /** Kilos to a tenth, as typed: "12.5". */
 const kilos = z
   .number({ invalid_type_error: 'The weight is a number of kilos, such as 12.5.' })
@@ -138,9 +145,42 @@ export const model = z.object({
   supplier: text(200, 'The supplier').transform((s) => s.trim()).default(''),
   /** What the supplier charges for one a day. */
   hireDayCents: euroCents(100_000_00, 'A hire price').nullable().default(null),
+  /**
+   * Made to go on a rack's rails (ADR 0076): its height in rack units, how
+   * wide it is across the rails and its depth then mean something, and it
+   * can be put on the rails in a layout. Kit that isn't can go loose in one.
+   */
+  rackMount: z.boolean().default(false),
+  /** How much of the rails' width it takes: a whole 19-inch width, half or a third. */
+  rackWidth: z.enum(RACK_WIDTHS).default('full'),
+  /** A rack's case from the outside, in mm, for the truck and the lift (ADR 0076). Null where not given. */
+  caseWidthMm: whole(1, 3000, 'The width in mm').nullable().default(null),
+  caseHeightMm: whole(1, 3000, 'The height in mm').nullable().default(null),
+  caseDepthMm: whole(1, 3000, 'The depth in mm').nullable().default(null),
+  /** A rack's case on castors, so it's wheeled rather than lifted. */
+  castors: z.boolean().default(false),
+  /** What a rack's power can take, in amps, such as a 16 A distro in it. Null where not given. */
+  powerLimitA: whole(1, 125, 'The amps').nullable().default(null),
 })
 /** A product of our own that isn't a rack and has no size or stock code given (ADR 0074), as products made before racks read. */
-export const PLAIN_PRODUCT = { isRack: false, code: '', units: null, depthMm: null, weightKg: null, powerW: null, dryHire: false, supplier: '', hireDayCents: null } as const
+export const PLAIN_PRODUCT = {
+  isRack: false,
+  code: '',
+  units: null,
+  depthMm: null,
+  weightKg: null,
+  powerW: null,
+  dryHire: false,
+  supplier: '',
+  hireDayCents: null,
+  rackMount: false,
+  rackWidth: 'full',
+  caseWidthMm: null,
+  caseHeightMm: null,
+  caseDepthMm: null,
+  castors: false,
+  powerLimitA: null,
+} as const
 
 export type Model = z.infer<typeof model> & {
   /**
@@ -255,6 +295,10 @@ const rackIsCase = [
   (m: { isRack?: boolean; isCase?: boolean }) => !(m.isRack && m.isCase === false),
   { message: 'A rack holds other kit, so it is a case.' },
 ] as const
+const rackIsNotMounted = [
+  (m: { isRack?: boolean; rackMount?: boolean }) => !(m.isRack && m.rackMount),
+  { message: 'A rack holds rack-mount kit; it doesn\'t go on the rails of another.' },
+] as const
 const somethingToChange = [
   (u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined),
   { message: 'Nothing to change.' },
@@ -268,7 +312,7 @@ const oldNumber = text(100, 'The old number')
 const patDue = day.nullable()
 
 export const stockCommandSchemas = {
-  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase).refine(...rackIsOurs),
+  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase).refine(...rackIsOurs).refine(...rackIsNotMounted),
   /** Only the fields the person changed, as for jobs. */
   'model.update': z
     .object({
@@ -293,11 +337,19 @@ export const stockCommandSchemas = {
       dryHire: z.boolean().optional(),
       supplier: model.shape.supplier.removeDefault().optional(),
       hireDayCents: model.shape.hireDayCents.removeDefault().optional(),
+      rackMount: z.boolean().optional(),
+      rackWidth: model.shape.rackWidth.removeDefault().optional(),
+      caseWidthMm: model.shape.caseWidthMm.removeDefault().optional(),
+      caseHeightMm: model.shape.caseHeightMm.removeDefault().optional(),
+      caseDepthMm: model.shape.caseDepthMm.removeDefault().optional(),
+      castors: z.boolean().optional(),
+      powerLimitA: model.shape.powerLimitA.removeDefault().optional(),
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered)
     .refine(...rackIsCase)
-    .refine(...rackIsOurs),
+    .refine(...rackIsOurs)
+    .refine(...rackIsNotMounted),
   /** Refused while it has items, retired ones included, or counted stock. */
   'model.remove': z.object({ id }),
   /**
