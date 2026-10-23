@@ -93,6 +93,13 @@ const MODEL_COLUMNS = {
   dryHire: 'dry_hire',
   supplier: 'supplier',
   hireDayCents: 'hire_day_cents',
+  rackMount: 'rack_mount',
+  rackWidth: 'rack_width',
+  caseWidthMm: 'case_width_mm',
+  caseHeightMm: 'case_height_mm',
+  caseDepthMm: 'case_depth_mm',
+  castors: 'castors',
+  powerLimitA: 'power_limit_a',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -250,8 +257,10 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     if (coded) throw new Refused({ code: 'conflict', message: `${coded} already has the stock code ${code}.` })
     await ctx.tx.query(
       `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id,
-                           is_rack, code, units, depth_mm, weight_kg, power_w, dry_hire, supplier, hire_day_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+                           is_rack, code, units, depth_mm, weight_kg, power_w, dry_hire, supplier, hire_day_cents,
+                           rack_mount, rack_width, case_width_mm, case_height_mm, case_depth_mm, castors, power_limit_a)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
+               $22, $23, $24, $25, $26, $27, $28)`,
       [
         a.id,
         a.name.trim(),
@@ -274,6 +283,13 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         a.dryHire,
         a.supplier,
         a.hireDayCents,
+        a.rackMount,
+        a.rackWidth,
+        a.caseWidthMm,
+        a.caseHeightMm,
+        a.caseDepthMm,
+        a.castors,
+        a.powerLimitA,
       ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
@@ -302,6 +318,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         })
     }
     if (next.isRack && !next.isCase) throw new Refused({ code: 'invalid', message: 'A rack holds other kit, so it is a case.' })
+    if (next.isRack && next.rackMount) throw new Refused({ code: 'invalid', message: 'A rack holds rack-mount kit; it doesn\'t go on the rails of another.' })
     if (!next.isRack && m.isRack && (await slotsIn(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has a layout. Take everything out of it first.` })
     if (next.isRack && !m.isRack) {

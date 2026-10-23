@@ -3,6 +3,7 @@ import {
   findProducts,
   newId,
   RACK_SIDE_LABELS,
+  RACK_WIDTH_LABELS,
   unitsAt,
   type ModelView,
   type RackSide,
@@ -10,7 +11,7 @@ import {
   type SlotView,
   type View,
 } from '@sh/shared'
-import { useEffect, useState, type DragEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Heading } from '../Icon.tsx'
@@ -19,6 +20,8 @@ import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { RACKS, STOCK } from '../Up.tsx'
 import { useToday } from '../view.ts'
+import { DRAG_TYPE, heldOf, type Held } from './rack-drag.ts'
+import { GUESS_KIT_DEPTH, RACK_U, rackSize } from './rack-size.ts'
 import { LayoutTotals, sizeLabel } from './Racks.tsx'
 
 /**
@@ -34,20 +37,6 @@ import { LayoutTotals, sizeLabel } from './Racks.tsx'
  * shows is what the rack's page and the built racks are checked against;
  * the checks and totals are the same ones.
  */
-
-/** What's picked up: a product from the list, or a thing already in the rack. */
-type Held = ({ kind: 'new'; modelId: string } | { kind: 'slot'; slotId: string }) & {
-  /** Picked up by dragging, which needs no line telling how to put it down. */
-  drag?: true
-}
-
-const DRAG_TYPE = 'application/x-sh-rack'
-const heldOf = (e: DragEvent): Held | undefined => {
-  const raw = e.dataTransfer.getData(DRAG_TYPE)
-  if (!raw) return undefined
-  const [kind, id] = raw.split(':')
-  return kind === 'new' ? { kind, modelId: id! } : kind === 'slot' ? { kind, slotId: id! } : undefined
-}
 
 /**
  * How many of a product are free to build into a rack on a day: what we
@@ -75,6 +64,72 @@ export function RackDesigner({ view, id, bare }: { view: View; id: string; bare?
     <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
       <Designer key={r.model.id} view={view} r={r} />
     </Page>
+  )
+}
+
+// The 3D drawing (ADR 0076) and three.js come down only when it's shown.
+const Rack3D = lazy(() => import('./Rack3D.tsx'))
+
+type Drawn = 'flat' | '3d' | 'side'
+const VIEWS: [Drawn, string][] = [
+  ['3d', 'In 3D'],
+  ['flat', 'Front and back'],
+  ['side', 'From the side'],
+]
+/** How the rack was last drawn on this device; a convenience, so it's kept only here. */
+const DRAWN_KEY = 'sh.rackDrawn'
+/** As last drawn here, or in 3D on a desk and flat on a phone. */
+function drawnAtFirst(): Drawn {
+  try {
+    const kept = localStorage.getItem(DRAWN_KEY)
+    if (kept === 'flat' || kept === '3d' || kept === 'side') return kept
+  } catch {
+    // Storage may be off; fall through.
+  }
+  return matchMedia('(min-width: 900px)').matches ? '3d' : 'flat'
+}
+
+/**
+ * The rack cut through from the side (ADR 0076): the front rails on the
+ * left, the back on the right, each thing on them as deep as it is, so the
+ * room left behind it for cables and air is seen, and front and back kit
+ * that meet in the middle.
+ */
+function SideCut({ r, bad }: { r: RackView; bad: ReadonlySet<string | undefined> }) {
+  const size = rackSize(r)
+  const placed = r.slots.filter((s) => s.top !== null)
+  const pad = 30
+  const width = size.depth + pad * 2
+  const height = size.height + pad * 2
+  return (
+    <figure className="rack-side-cut">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="side-cut-title">
+        <title id="side-cut-title">{`${r.model.name} from the side, ${size.depth} mm rail to rail${size.depthGuessed ? ' (no depth given, drawn at 500 mm)' : ''}`}</title>
+        <rect className="cut-case" x={pad} y={pad} width={size.depth} height={size.height} />
+        {Array.from({ length: size.units + 1 }, (_, i) => (
+          <line key={i} className="cut-unit" x1={pad} x2={pad + size.depth} y1={pad + i * RACK_U} y2={pad + i * RACK_U} />
+        ))}
+        <line className="cut-rail" x1={pad} x2={pad} y1={pad} y2={pad + size.height} />
+        <line className="cut-rail" x1={pad + size.depth} x2={pad + size.depth} y1={pad} y2={pad + size.height} />
+        {placed.map((s) => {
+          const units = s.model?.units ?? 1
+          const deep = Math.min(s.model?.depthMm ?? GUESS_KIT_DEPTH, size.depth)
+          const x = s.side === 'front' ? pad : pad + size.depth - deep
+          return (
+            <g key={s.id} className={`cut-thing${bad.has(s.id) ? ' bad' : ''}${s.model?.dryHire ? ' hired' : ''}${s.model?.depthMm === null ? ' guessed' : ''}`}>
+              <rect x={x} y={pad + (s.top! - 1) * RACK_U + 1} width={deep} height={units * RACK_U - 2} />
+              <text x={x + 8} y={pad + (s.top! - 1) * RACK_U + (units * RACK_U) / 2} dominantBaseline="middle">
+                {s.model?.name ?? '?'}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+      <figcaption className="hint">
+        Front on the left, back on the right, {size.depth.toLocaleString('en-IE')} mm rail to rail. Each thing is drawn as deep as it is
+        {placed.some((s) => s.model?.depthMm === null) ? '; dashed ones have no depth given' : ''}.
+      </figcaption>
+    </figure>
   )
 }
 
@@ -120,6 +175,16 @@ function Designer({ view, r }: { view: View; r: RackView }) {
     setHeld(undefined)
     void run(() => client.mutate('rackSlot.remove', { id: slotId }))
   }
+  const [drawn, setDrawnState] = useState<Drawn>(drawnAtFirst)
+  const setDrawn = (d: Drawn) => {
+    setDrawnState(d)
+    try {
+      localStorage.setItem(DRAWN_KEY, d)
+    } catch {
+      // Not kept, which only means it opens as it would anyway next time.
+    }
+  }
+  const bad = useMemo(() => new Set(r.layout.problems.map((p) => p.slotId)), [r.layout])
 
   return (
     <div className="rack-designer">
@@ -146,10 +211,25 @@ function Designer({ view, r }: { view: View; r: RackView }) {
       <div className="designer-body">
         {mayChange && <Palette view={view} r={r} day={day} onDay={setDay} today={today} held={held} onHold={setHeld} onTakeOut={takeOut} />}
         <section className="card designer-rack" aria-label="The rack">
-          <div className="rack-sides">
-            <DropSide r={r} side="front" held={held} heldModel={heldModel} mayChange={mayChange} onHold={setHeld} onPlace={place} />
-            <DropSide r={r} side="rear" held={held} heldModel={heldModel} mayChange={mayChange} onHold={setHeld} onPlace={place} />
+          <div className="filters rack-views" role="group" aria-label="How it's drawn">
+            {VIEWS.map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={drawn === k} onClick={() => setDrawn(k)}>
+                {label}
+              </button>
+            ))}
           </div>
+          {drawn === 'flat' && (
+            <div className="rack-sides">
+              <DropSide r={r} side="front" held={held} heldModel={heldModel} mayChange={mayChange} onHold={setHeld} onPlace={place} />
+              <DropSide r={r} side="rear" held={held} heldModel={heldModel} mayChange={mayChange} onHold={setHeld} onPlace={place} />
+            </div>
+          )}
+          {drawn === '3d' && (
+            <Suspense fallback={<p className="hint">Drawing it in 3D…</p>}>
+              <Rack3D r={r} held={held} heldUnits={heldModel?.units ?? 1} mayChange={mayChange} bad={bad} onHold={setHeld} onPlace={place} />
+            </Suspense>
+          )}
+          {drawn === 'side' && <SideCut r={r} bad={bad} />}
           <Loose r={r} held={held} mayChange={mayChange} onHold={setHeld} onPlace={place} />
         </section>
       </div>
@@ -181,10 +261,13 @@ function Palette({
 }) {
   const [typed, setTyped] = useState('')
   const [whose, setWhose] = useState<'all' | 'ours' | 'dryHire'>('all')
+  // Rack-mount kit (ADR 0076) is what goes on the rails; everything else can go loose in it.
+  const [mounted, setMounted] = useState(true)
   const [over, setOver] = useState(false)
-  // Anything but a rack; what has a height in a rack first, as that's what goes on the rails.
-  const all = view.warehouse.models.filter((m) => !m.isRack && m.id !== r.model.id && (whose === 'all' || (whose === 'dryHire') === m.dryHire))
-  const found = typed.trim() ? findProducts(all, typed).map((f) => f.product) : [...all].sort((a, b) => (a.units === null ? 1 : 0) - (b.units === null ? 1 : 0))
+  const all = view.warehouse.models.filter(
+    (m) => !m.isRack && m.id !== r.model.id && (!mounted || m.rackMount) && (whose === 'all' || (whose === 'dryHire') === m.dryHire)
+  )
+  const found = typed.trim() ? findProducts(all, typed).map((f) => f.product) : [...all].sort((a, b) => (a.rackMount ? 0 : 1) - (b.rackMount ? 0 : 1))
   const shown = found.slice(0, 40)
   const drop = (e: DragEvent) => {
     e.preventDefault()
@@ -222,6 +305,14 @@ function Palette({
           </button>
         ))}
       </div>
+      <div className="filters" role="group" aria-label="Which kit">
+        <button type="button" aria-pressed={mounted} onClick={() => setMounted(true)}>
+          Rack-mount
+        </button>
+        <button type="button" aria-pressed={!mounted} onClick={() => setMounted(false)}>
+          Everything, to go loose
+        </button>
+      </div>
       <label className="free-on">
         Free on <input type="date" value={day} min={today} onChange={(e) => onDay(e.target.value || today)} />
       </label>
@@ -248,7 +339,10 @@ function Palette({
               >
                 <b>{m.name}</b>
                 <small>
-                  {[m.units ? `${m.units}U` : 'No height', m.depthMm && `${m.depthMm} mm`].filter(Boolean).join(', ')} ·{' '}
+                  {m.rackMount
+                    ? [m.units ? `${m.units}U` : 'No height', m.rackWidth !== 'full' && RACK_WIDTH_LABELS[m.rackWidth].toLowerCase(), m.depthMm && `${m.depthMm} mm`].filter(Boolean).join(', ')
+                    : 'Goes loose'}{' '}
+                  ·{' '}
                   {free === undefined ? (
                     `Dry hire${m.supplier ? ` from ${m.supplier}` : ''}`
                   ) : (
@@ -263,7 +357,9 @@ function Palette({
         })}
       </ul>
       {found.length > shown.length && <p className="hint">{found.length - shown.length} more: type to narrow them down.</p>}
-      {found.length === 0 && <p className="hint">Nothing found. Add a product to the stock list first, as ours or dry hire.</p>}
+      {found.length === 0 && (
+        <p className="hint">{mounted ? 'No rack-mount kit found. Tick Rack-mount on a product to lay it out here, or show everything to put it loose.' : 'Nothing found. Add a product to the stock list first, as ours or dry hire.'}</p>
+      )}
       <p className="hint">Drag kit onto the rack, or press it and then press where it goes. Drag something out of the rack back here to take it out.</p>
     </section>
   )

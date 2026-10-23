@@ -20,7 +20,7 @@ async function push(request: APIRequestContext, id: string, mutations: [string, 
   expect(results.map((r) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
 }
 
-const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '' }
+const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true }
 
 test('a rack, laid out, drawn, and a built one checked against its layout', async ({ browser, request }) => {
   const id = Date.now().toString(36)
@@ -40,7 +40,7 @@ test('a rack, laid out, drawn, and a built one checked against its layout', asyn
   await page.getByLabel('Name').fill(`Monitor rack ${id}`)
   await page.getByLabel('Stock code').fill(`RK-${id}`)
   await page.getByLabel('Room in it, in rack units').fill('4')
-  await page.getByLabel('Depth it takes, in mm').fill('800')
+  await page.getByLabel('Rail to rail depth, in mm').fill('800')
   await page.getByLabel('Weight empty, in kg').fill('14')
   await page.getByRole('button', { name: 'Add rack' }).click()
   // A new rack opens in the designer; this test lays it out on its page.
@@ -120,6 +120,8 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   await expect(page.locator('.conn')).toHaveText('Up to date')
   const palette = page.getByRole('region', { name: 'Kit to build with' })
   const rack = page.getByRole('region', { name: 'The rack' })
+  // A desk opens it in 3D (below); this part works on it drawn flat.
+  await rack.getByRole('button', { name: 'Front and back' }).click()
   await palette.getByLabel('Find kit').fill(id)
   await expect(palette.getByRole('button', { name: `Pick up ${amp}` })).toContainText('2U, 480 mm · 1 free today')
   await expect(palette.getByRole('button', { name: `Pick up ${haze}` })).toContainText('Dry hire from PRG')
@@ -142,6 +144,35 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette)
   await expect(rack.getByRole('button', { name: new RegExp(`^${haze}`) })).toHaveCount(0)
   await expect(page.getByText('dry hired:')).toHaveCount(0)
+
+  // In 3D (ADR 0076): picked up, and put down on the face towards you, square to the front.
+  await rack.getByRole('button', { name: 'In 3D' }).click()
+  const scene = rack.getByRole('img', { name: new RegExp(`^Amp rack ${id} in 3D`) })
+  await expect(scene).toHaveAccessibleName(new RegExp(`1 thing on the rails: ${amp} at U4 on the back`))
+  await expect(scene.locator('canvas')).toBeVisible()
+  await rack.getByRole('button', { name: 'Front', exact: true }).click()
+  await palette.getByRole('button', { name: `Pick up ${haze}` }).click()
+  await scene.click()
+  await expect(scene).toHaveAccessibleName(new RegExp(`2 things on the rails: .*${haze} at U3 on the front`))
+  if (process.env.SHOTS) {
+    await rack.getByRole('button', { name: 'At an angle' }).click()
+    await page.screenshot({ path: 'docs/hub/img/rack-3d.png' })
+  }
+  // From the side, the hazer and the amp behind it meet in the middle.
+  await rack.getByRole('button', { name: 'From the side' }).click()
+  await expect(rack.getByRole('img', { name: `Amp rack ${id} from the side, 600 mm rail to rail` })).toBeVisible()
+  await expect(page.getByText(`${haze} on the front and ${amp} on the back meet in the middle: 880 mm in a 600 mm rack.`)).toBeVisible()
+
+  // A product ticked as rack-mount shows its size in a rack; one that isn't, doesn't.
+  await page.goto(`/#stock/product/haze-${id}`)
+  await page.getByRole('button', { name: 'Change details' }).click()
+  await expect(page.getByLabel('Height, in rack units')).toHaveValue('3')
+  await page.getByRole('checkbox', { name: /^Rack-mount/ }).uncheck()
+  await expect(page.getByLabel('Height, in rack units')).toHaveCount(0)
+  await page.getByRole('checkbox', { name: /^Rack-mount/ }).check()
+  await page.getByLabel('Width').selectOption({ label: 'Half width' })
+  await page.getByRole('button', { name: 'Save product' }).click()
+  await expect(page.getByText('rack-mount, 3U, half width, 400 mm deep')).toBeVisible()
 
   // The catalogue tells ours from dry hire.
   await page.goto('/#stock')

@@ -49,3 +49,22 @@
 .warehouse .designer-loose { display: grid; gap: var(--space-6); margin-top: var(--space-12); padding-top: var(--space-12); border-top: 1px solid var(--line); }
 /* While something is held, what's in the rack lets the units under it take the drop or the press, so a thing can move by a unit. */
 .warehouse .designer-side.holding-one .rack-thing { pointer-events: none; }
+
+/* How the rack is drawn in the designer, and the 3D and side drawings (ADR 0076). */
+.warehouse .rack-views { margin-bottom: var(--space-10); }
+.warehouse .rack-3d { display: grid; gap: var(--space-8); }
+.warehouse .rack-3d-scene { position: relative; height: clamp(320px, 62vh, 640px); border-radius: var(--radius-control); background: var(--bg); overflow: hidden; touch-action: none; cursor: grab; }
+.warehouse .rack-3d-scene:active { cursor: grabbing; }
+.warehouse .rack-3d-scene.holding-one { cursor: copy; }
+.warehouse .rack-3d-scene canvas { display: block; width: 100%; height: 100%; }
+.warehouse .rack-side-cut { margin: 0; display: grid; gap: var(--space-8); }
+.warehouse .rack-side-cut svg { width: 100%; max-height: 62vh; background: var(--bg); border-radius: var(--radius-control); }
+.warehouse .rack-side-cut .cut-case { fill: none; stroke: var(--line); stroke-width: 2; }
+.warehouse .rack-side-cut .cut-unit { stroke: var(--line); stroke-width: 1; stroke-dasharray: 4 6; }
+.warehouse .rack-side-cut .cut-rail { stroke: var(--muted); stroke-width: 6; }
+.warehouse .rack-side-cut .cut-thing rect { fill: var(--panel); stroke: var(--ds-line-strong); stroke-width: 2; }
+.warehouse .rack-side-cut .cut-thing.guessed rect { stroke-dasharray: 8 6; }
+.warehouse .rack-side-cut .cut-thing.hired rect { fill-opacity: .55; }
+.warehouse .rack-side-cut .cut-thing.bad rect { stroke: var(--warn); stroke-width: 3; }
+.warehouse .rack-side-cut .cut-thing text { fill: var(--ink); font-size: 22px; font-weight: 600; }
+.warehouse .rack-side-cut .cut-thing.bad text { fill: var(--warn); }

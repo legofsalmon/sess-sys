@@ -8,6 +8,9 @@ import {
   parseEuro,
   plural,
   RACK_SIDE_LABELS,
+  RACK_WIDTH_LABELS,
+  RACK_WIDTHS,
+  type RackWidth,
   valueLabel,
   unitsAt,
   type AssetView,
@@ -43,9 +46,28 @@ import './racks.css'
  * what's missing from it.
  */
 
-/** "12U, 450 mm deep". */
-export function sizeLabel(m: Pick<ModelView, 'units' | 'depthMm'>): string {
-  return [m.units !== null && `${m.units}U`, m.depthMm !== null && `${m.depthMm} mm deep`].filter(Boolean).join(', ')
+/** "12U, 450 mm deep"; kit as "rack-mount, 1U, half width, 300 mm deep" (ADR 0076). */
+export function sizeLabel(m: Pick<ModelView, 'units' | 'depthMm'> & Partial<Pick<ModelView, 'isRack' | 'rackMount' | 'rackWidth'>>): string {
+  return [
+    m.rackMount && 'rack-mount',
+    m.units !== null && `${m.units}U`,
+    m.rackMount && m.rackWidth && m.rackWidth !== 'full' && RACK_WIDTH_LABELS[m.rackWidth].toLowerCase(),
+    m.depthMm !== null && `${m.depthMm} mm deep`,
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** A rack's case: "600 × 750 × 650 mm outside, on castors, 16 A power". */
+export function caseLabel(m: Pick<ModelView, 'caseWidthMm' | 'caseHeightMm' | 'caseDepthMm' | 'castors' | 'powerLimitA'>): string {
+  const outside = [m.caseWidthMm, m.caseHeightMm, m.caseDepthMm]
+  return [
+    outside.some((n) => n !== null) && `${outside.map((n) => (n === null ? '?' : n.toLocaleString('en-IE'))).join(' × ')} mm outside (wide × high × deep)`,
+    m.castors && 'on castors',
+    m.powerLimitA !== null && `${m.powerLimitA} A power`,
+  ]
+    .filter(Boolean)
+    .join(', ')
 }
 
 /** "18.5 kg, 1,200 W". */
@@ -129,64 +151,147 @@ function kilosTyped(text: string): number | null {
 /** The size fields as typed. */
 export interface SizeTyped {
   code: string
+  /** Goes on a rack's rails (ADR 0076): shows its height, width and depth. */
+  rackMount: boolean
   units: string
+  width: RackWidth
   depth: string
   weight: string
   power: string
+  /** A rack case's outside, castors and power (ADR 0076). */
+  caseWidth: string
+  caseHeight: string
+  caseDepth: string
+  castors: boolean
+  amps: string
 }
 
-export const sizeTypedOf = (m?: Pick<ModelView, 'code' | 'units' | 'depthMm' | 'weightKg' | 'powerW'>): SizeTyped => ({
+const typed = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n))
+
+type Sizes = Pick<ModelView, 'code' | 'units' | 'depthMm' | 'weightKg' | 'powerW' | 'rackMount' | 'rackWidth' | 'caseWidthMm' | 'caseHeightMm' | 'caseDepthMm' | 'castors' | 'powerLimitA'>
+
+export const sizeTypedOf = (m?: Sizes): SizeTyped => ({
   code: m?.code ?? '',
-  units: m?.units === null || m?.units === undefined ? '' : String(m.units),
-  depth: m?.depthMm === null || m?.depthMm === undefined ? '' : String(m.depthMm),
-  weight: m?.weightKg === null || m?.weightKg === undefined ? '' : String(m.weightKg),
-  power: m?.powerW === null || m?.powerW === undefined ? '' : String(m.powerW),
+  rackMount: m?.rackMount ?? false,
+  units: typed(m?.units),
+  width: m?.rackWidth ?? 'full',
+  depth: typed(m?.depthMm),
+  weight: typed(m?.weightKg),
+  power: typed(m?.powerW),
+  caseWidth: typed(m?.caseWidthMm),
+  caseHeight: typed(m?.caseHeightMm),
+  caseDepth: typed(m?.caseDepthMm),
+  castors: m?.castors ?? false,
+  amps: typed(m?.powerLimitA),
 })
 
-/** What the size fields say, or why they can't be saved. */
-export function sizeFrom(f: SizeTyped, models: readonly ModelView[], self?: string) {
+/**
+ * What the size fields say, or why they can't be saved. Kit that isn't
+ * rack-mount keeps no height or depth, as nothing shows them; a rack keeps
+ * no power of its own, only what its power can take.
+ */
+export function sizeFrom(f: SizeTyped, models: readonly ModelView[], self?: string, rack = false) {
   const code = f.code.trim()
   const coded = code && models.find((x) => x.id !== self && x.code.toLowerCase() === code.toLowerCase())
   if (coded) return { reason: `${coded.name} already has the stock code ${coded.code}.` }
   if (code.length > 30) return { reason: 'The stock code can be up to 30 characters.' }
-  const units = wholeTyped(f.units, MAX_UNITS)
+  const sized = rack || f.rackMount
+  const units = sized ? wholeTyped(f.units, MAX_UNITS) : null
   if (Number.isNaN(units) || units === 0) return { reason: `Rack units are a whole number from 1 to ${MAX_UNITS}, or blank.` }
-  const depthMm = wholeTyped(f.depth, 3000)
+  const depthMm = sized ? wholeTyped(f.depth, 3000) : null
   if (Number.isNaN(depthMm) || depthMm === 0) return { reason: 'The depth is a whole number of millimetres, up to 3,000, or blank.' }
   const weightKg = kilosTyped(f.weight)
   if (Number.isNaN(weightKg)) return { reason: 'The weight is a number of kilos, such as 12.5, or blank.' }
-  const powerW = wholeTyped(f.power, 100_000)
+  const powerW = rack ? null : wholeTyped(f.power, 100_000)
   if (Number.isNaN(powerW)) return { reason: 'The power is a whole number of watts, or blank.' }
-  return { size: { code, units, depthMm, weightKg, powerW } }
+  const outside = rack ? [f.caseWidth, f.caseHeight, f.caseDepth].map((t) => wholeTyped(t, 3000)) : [null, null, null]
+  if (outside.some((n) => Number.isNaN(n) || n === 0)) return { reason: 'The outside sizes are whole numbers of millimetres, up to 3,000, or blank.' }
+  const powerLimitA = rack ? wholeTyped(f.amps, 125) : null
+  if (Number.isNaN(powerLimitA) || powerLimitA === 0) return { reason: 'What its power can take is a whole number of amps, up to 125, or blank.' }
+  const [caseWidthMm, caseHeightMm, caseDepthMm] = outside as (number | null)[]
+  return {
+    size: {
+      code,
+      rackMount: !rack && f.rackMount,
+      units,
+      rackWidth: !rack && f.rackMount ? f.width : ('full' as RackWidth),
+      depthMm,
+      weightKg,
+      powerW,
+      caseWidthMm: caseWidthMm ?? null,
+      caseHeightMm: caseHeightMm ?? null,
+      caseDepthMm: caseDepthMm ?? null,
+      castors: rack && f.castors,
+      powerLimitA,
+    },
+  }
 }
 
-/** A product's stock code and its size in a rack, for the product forms. */
+/**
+ * A product's stock code, size and weight, for the product forms. Kit is
+ * ticked as rack-mount to give its size in a rack (ADR 0076); a rack gives
+ * the room in it and its case from the outside.
+ */
 export function SizeFields({ f, onChange, rack }: { f: SizeTyped; onChange: (f: SizeTyped) => void; rack: boolean }) {
+  const field = (key: keyof SizeTyped, label: string, placeholder: string, mode: 'numeric' | 'decimal' = 'numeric') => (
+    <label>
+      {label}
+      <input inputMode={mode} value={f[key] as string} onChange={(e) => onChange({ ...f, [key]: e.target.value })} placeholder={placeholder} />
+    </label>
+  )
   return (
     <fieldset className="wide size-fields">
-      <legend>Stock code and size</legend>
+      <legend>{rack ? 'Stock code and size' : 'Stock code, size and weight'}</legend>
       <label>
         Stock code <input value={f.code} onChange={(e) => onChange({ ...f, code: e.target.value })} placeholder={rack ? 'e.g. RK-MON-A' : 'Optional'} autoComplete="off" />
       </label>
-      <label>
-        {rack ? 'Room in it, in rack units' : 'Height in a rack, in units'}
-        <input inputMode="numeric" value={f.units} onChange={(e) => onChange({ ...f, units: e.target.value })} placeholder={rack ? 'e.g. 12' : 'e.g. 2, or blank'} />
-      </label>
-      <label>
-        {rack ? 'Depth it takes, in mm' : 'Depth, in mm'}
-        <input inputMode="numeric" value={f.depth} onChange={(e) => onChange({ ...f, depth: e.target.value })} placeholder="e.g. 450" />
-      </label>
-      <label>
-        {rack ? 'Weight empty, in kg' : 'Weight, in kg'}
-        <input inputMode="decimal" value={f.weight} onChange={(e) => onChange({ ...f, weight: e.target.value })} placeholder="e.g. 12.5" />
-      </label>
-      {!rack && (
-        <label>
-          Power at most, in watts
-          <input inputMode="numeric" value={f.power} onChange={(e) => onChange({ ...f, power: e.target.value })} placeholder="e.g. 1200" />
-        </label>
+      {rack ? (
+        <>
+          {field('units', 'Room in it, in rack units', 'e.g. 12')}
+          {field('depth', 'Rail to rail depth, in mm', 'e.g. 450')}
+          {field('weight', 'Weight empty, in kg', 'e.g. 28', 'decimal')}
+          {field('caseWidth', 'Outside width, in mm', 'e.g. 600')}
+          {field('caseHeight', 'Outside height, in mm', 'e.g. 750')}
+          {field('caseDepth', 'Outside depth, in mm', 'e.g. 650')}
+          {field('amps', 'Its power takes, in amps', 'e.g. 16')}
+          <label className="choice wide">
+            <input type="checkbox" checked={f.castors} onChange={(e) => onChange({ ...f, castors: e.target.checked })} />
+            <span>
+              <b>On castors</b>
+              <small>Wheeled rather than lifted, so a heavy one isn't flagged as too heavy to lift.</small>
+            </span>
+          </label>
+          <p className="hint wide">The room and depth are checked against what goes in it; the outside size is for the truck.</p>
+        </>
+      ) : (
+        <>
+          {field('weight', 'Weight, in kg', 'e.g. 12.5', 'decimal')}
+          {field('power', 'Power at most, in watts', 'e.g. 1200')}
+          <label className="choice wide">
+            <input type="checkbox" checked={f.rackMount} onChange={(e) => onChange({ ...f, rackMount: e.target.checked })} />
+            <span>
+              <b>Rack-mount</b>
+              <small>Made to go on a rack's rails. Give its size in a rack and it can be laid out in racks.</small>
+            </span>
+          </label>
+          {f.rackMount && (
+            <>
+              {field('units', 'Height, in rack units', 'e.g. 2')}
+              <label>
+                Width
+                <select value={f.width} onChange={(e) => onChange({ ...f, width: e.target.value as RackWidth })}>
+                  {RACK_WIDTHS.map((w) => (
+                    <option key={w} value={w}>
+                      {RACK_WIDTH_LABELS[w]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {field('depth', 'Depth, in mm', 'e.g. 450')}
+            </>
+          )}
+        </>
       )}
-      <p className="hint wide">{rack ? 'The room and depth are checked against what goes in it.' : 'Anything that goes in a rack: its height, depth, weight and power are added up in the racks it goes in.'}</p>
     </fieldset>
   )
 }
@@ -195,7 +300,7 @@ function NewRack({ view }: { view: View }) {
   const w = view.warehouse
   const [name, setName] = useState('')
   const [department, setDepartment] = useState<Department>('audio')
-  const [size, setSize] = useState<SizeTyped>({ code: '', units: '', depth: '', weight: '', power: '' })
+  const [size, setSize] = useState<SizeTyped>(sizeTypedOf())
   const { run, error, refuse } = useAct()
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -203,7 +308,7 @@ function NewRack({ view }: { view: View }) {
     if (!n) return
     const taken = w.models.find((m) => m.name.trim().toLowerCase() === n.toLowerCase())
     if (taken) return refuse(`There's already a product called ${taken.name}.`)
-    const got = sizeFrom(size, w.models)
+    const got = sizeFrom(size, w.models, undefined, true)
     if (!got.size) return refuse(got.reason)
     const id = newId()
     void run(() =>
@@ -218,7 +323,6 @@ function NewRack({ view }: { view: View }) {
         valueCents: null,
         notes: '',
         ...got.size,
-        powerW: null,
       })
     ).then((ok) => {
       // Straight to laying it out (ADR 0075).
@@ -599,7 +703,7 @@ export function LayoutTotals({ r }: { r: RackView }) {
   const totals = [
     m.units !== null ? `Front ${l.frontUsed} of ${m.units}U, back ${l.rearUsed} of ${m.units}U` : `${l.frontUsed}U on the front, ${l.rearUsed}U on the back`,
     `${l.weightKg.toLocaleString('en-IE')} kg${l.weightMissing ? ` and ${plural(l.weightMissing, 'thing')} not weighed` : ''}`,
-    `${l.powerW.toLocaleString('en-IE')} W${l.powerMissing ? ` and ${l.powerMissing} without a figure` : ''}`,
+    `${l.powerW.toLocaleString('en-IE')} W${l.powerMissing ? ` and ${l.powerMissing} without a figure` : ''}${l.powerW ? `, ${l.amps.toLocaleString('en-IE')} A at 230 V, ${l.heatBtu.toLocaleString('en-IE')} BTU an hour of heat` : ''}`,
   ]
   const h = l.hire
   // Dry hire kit in it (ADR 0075): hired in each time it goes out, or bought.
@@ -611,7 +715,7 @@ export function LayoutTotals({ r }: { r: RackView }) {
       <p className="rack-totals">{totals.join(' · ')}</p>
       {hireLine && <p className="rack-totals">{hireLine}</p>}
       {l.problems.length > 0 && (
-        <ul className="rack-problems" aria-label="What won't fit">
+        <ul className="rack-problems" aria-label="What won't work">
           {l.problems.map((p, i) => (
             <li key={`${p.slotId}-${i}`}>{p.message}</li>
           ))}

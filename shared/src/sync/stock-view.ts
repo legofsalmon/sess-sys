@@ -109,6 +109,14 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     dryHire: m.dryHire ?? false,
     supplier: m.supplier ?? '',
     hireDayCents: m.hireDayCents ?? null,
+    // And before rack-mount kit and rack cases (ADR 0076): kit with a height was rack-mount.
+    rackMount: m.rackMount ?? (!m.isRack && m.units !== null && m.units !== undefined),
+    rackWidth: m.rackWidth ?? 'full',
+    caseWidthMm: m.caseWidthMm ?? null,
+    caseHeightMm: m.caseHeightMm ?? null,
+    caseDepthMm: m.caseDepthMm ?? null,
+    castors: m.castors ?? false,
+    powerLimitA: m.powerLimitA ?? null,
   })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })
   const places = new Map<string, Place & { pending: boolean }>()

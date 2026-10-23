@@ -55,7 +55,7 @@ import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { STOCK } from '../Up.tsx'
-import { RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
+import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
 /**
  * One product: what it is, the jobs it's on (ADR 0014), its numbered items,
@@ -184,6 +184,12 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
           <div>
             <dt>{m.isRack ? 'Room in it' : 'Size'}</dt>
             <dd>{[sizeLabel(m), weightPowerLabel(m)].filter(Boolean).join(', ')}</dd>
+          </div>
+        )}
+        {m.isRack && caseLabel(m) && (
+          <div>
+            <dt>Its case</dt>
+            <dd>{caseLabel(m)}</dd>
           </div>
         )}
         {racksUsing.length > 0 && (
@@ -358,7 +364,7 @@ function EditProduct({ m, w, view, onDone }: { m: ModelView; w: WarehouseView; v
     const patMonths = numbered ? monthsTyped(f.pat) : m.patMonths
     const liftingMonths = numbered ? monthsTyped(f.lifting) : m.liftingMonths
     if (Number.isNaN(patMonths) || Number.isNaN(liftingMonths)) return refuse(`How often is a whole number of months, from 1 to ${MAX_MONTHS}, or blank for never.`)
-    const sized = sizeFrom(size, w.models, m.id)
+    const sized = sizeFrom(size, w.models, m.id, f.isRack && f.isCase && f.tracking === 'serialised')
     if (!sized.size) return refuse(sized.reason)
     const owned = whoseFrom(whose)
     if (!owned.whose) return refuse(owned.reason)
