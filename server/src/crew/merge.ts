@@ -1,4 +1,4 @@
-import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, nameParts, offerKept, ROLE_LABELS, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
+import { holdsARole, mayChangeWhoSignsIn, mergedPerson, mergeRefusal, nameParts, offerKept, ROLE_LABELS, voteId, whoSignsInRefusal, withMainEmail, type CommandArgs, type EntityName, type Offer, type Person } from '@sh/shared'
 import { getDocument, queueFile } from '../documents/store.ts'
 import { emit, emitAll, emitRemoved, emitRemovedAll, Refused, type Ctx } from '../kernel.ts'
 import { getAllowanceById, getEntry, getRequest } from '../leave/store.ts'
@@ -6,6 +6,7 @@ import { getPhases } from '../projects/store.ts'
 import { getCount } from '../stock/counts.ts'
 import { getBooking } from '../vehicles/store.ts'
 import { getStep } from '../steps/store.ts'
+import { getPurchase, getVote } from '../purchases/store.ts'
 import { getLate } from './late.ts'
 import { getOwnCalendar } from './own-calendars.ts'
 import { getAway, getOffers, getPerson } from './store.ts'
@@ -32,6 +33,8 @@ const MOVED: readonly { table: string; column: string; entity?: EntityName; read
   { table: 'vehicle_bookings', column: 'driver_id', entity: 'vehicleBooking', read: getBooking },
   { table: 'job_steps', column: 'owner_id', entity: 'jobStep', read: getStep },
   { table: 'job_steps', column: 'done_by', entity: 'jobStep', read: getStep },
+  { table: 'purchase_requests', column: 'asked_by', entity: 'purchaseRequest', read: getPurchase },
+  // Votes for the purchase list (ADR 0077) are one a person, and are handled first.
   // Their own calendar (ADR 0044) and leave allowances have one a person, and are handled first; guests on Google
   // Calendar (ADR 0009) are one a person a day, and devices never see them.
   { table: 'calendar_guests', column: 'person_id' },
@@ -67,6 +70,7 @@ export const mergeHandlers = {
 
     await moveOffers(ctx, into.id, ids)
     await moveOneEach(ctx, into.id, ids)
+    await moveVotes(ctx, into.id, ids)
     for (const m of MOVED) {
       const { rows } = await tx.query<{ id?: string }>(
         `UPDATE ${m.table} SET ${m.column} = $1 WHERE ${m.column} = ANY($2::text[])${m.entity ? ' RETURNING id' : ''}`,
@@ -260,4 +264,21 @@ async function moveOneEach(ctx: Ctx, intoId: string, ids: string[]) {
   )
   if (moved.length) await emitRemovedAll(ctx, 'leaveAllowance', moved.map((m) => m.was).sort())
   for (const m of moved.sort((x, y) => x.id.localeCompare(y.id))) await emit(ctx, 'leaveAllowance', m.id, await getAllowanceById(tx, m.id))
+}
+
+/**
+ * Votes for the purchase list (ADR 0077): one a person, kept by the request
+ * and the person together. The kept person's vote stands; another's vote
+ * becomes theirs where they hadn't voted, and goes where they had.
+ */
+async function moveVotes(ctx: Ctx, intoId: string, ids: string[]) {
+  const { rows } = await ctx.tx.query<{ id: string; request_id: string }>('SELECT id, request_id FROM purchase_votes WHERE person_id = ANY($1::text[]) ORDER BY id', [ids])
+  for (const r of rows) {
+    await ctx.tx.query('DELETE FROM purchase_votes WHERE id = $1', [r.id])
+    await emitRemoved(ctx, 'purchaseVote', r.id)
+    const to = voteId(r.request_id, intoId)
+    if (await getVote(ctx.tx, to)) continue
+    await ctx.tx.query('INSERT INTO purchase_votes (id, request_id, person_id) VALUES ($1, $2, $3)', [to, r.request_id, intoId])
+    await emit(ctx, 'purchaseVote', to, await getVote(ctx.tx, to))
+  }
 }

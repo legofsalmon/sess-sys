@@ -32,6 +32,7 @@ export const MONEY: Step = { href: '#jobs/money', label: 'Money' }
 export const PLACES: Step = { href: '#stock/places', label: 'Places', up: 'All places' }
 export const VEHICLES: Step = { href: '#stock/vehicles', label: 'Vehicles', up: 'All vehicles' }
 export const RACKS: Step = { href: '#stock/racks', label: 'Racks', up: 'All racks' }
+export const BUY: Step = { href: '#stock/buy', label: 'Purchase list' }
 export const LABELS: Step = { href: '#stock/labels', label: 'Labels' }
 export const PEOPLE: Step = { href: '#crew/people', label: 'People', up: 'All people' }
 export const TIMESHEETS: Step = { href: '#crew/timesheets', label: 'Timesheets' }

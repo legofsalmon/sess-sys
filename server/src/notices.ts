@@ -16,8 +16,9 @@ import { readingOf } from './reading.ts'
  *
  * - **you**: their record on the Crew tab, their offers and bookings, the
  *   timesheets for them, their leave, days in lieu and allowance, days
- *   marked off, their documents, the vans they're down to drive, and the
- *   job steps given to them (ADR 0073);
+ *   marked off, their documents, the vans they're down to drive, the
+ *   job steps given to them (ADR 0073), and what they asked to be bought
+ *   (ADR 0077);
  * - **sent**: the offers they sent, so an answer comes back to them;
  * - **on**: the jobs they're on, as crew on a live offer, the contact on
  *   the day for a phase, a driver, or with a step of it given to them: the
@@ -86,6 +87,7 @@ export async function readNotices(q: Queryable, reader: NoticeReader, rates = tr
        UNION ALL SELECT 'document', id, 0 FROM documents WHERE person_id = $2::text
        UNION ALL SELECT 'vehicleBooking', id, 0 FROM vehicle_bookings WHERE driver_id = $2::text
        UNION ALL SELECT 'jobStep', id, 0 FROM job_steps WHERE owner_id = $2::text
+       UNION ALL SELECT 'purchaseRequest', id, 0 FROM purchase_requests WHERE asked_by = $2::text
        UNION ALL SELECT 'offer', c.entity_id, 1 FROM mutations m JOIN changes c ON c.mutation_id = m.id
                   WHERE ${BY_THEM} AND m.name = 'offer.send' AND c.entity = 'offer'
        UNION ALL SELECT 'project', id, 2 FROM onjob

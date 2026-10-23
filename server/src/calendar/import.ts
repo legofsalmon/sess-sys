@@ -412,6 +412,8 @@ async function importedPeopleToGo(q: Queryable): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM phases ph WHERE ph.contact_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM vehicle_bookings b WHERE b.driver_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM job_steps s WHERE s.owner_id = p.id OR s.done_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM purchase_requests r WHERE r.asked_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM purchase_votes v WHERE v.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM erasures e WHERE e.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM person_merges pm WHERE pm.into_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM calendar_link cl WHERE cl.state <> 'off' AND lower(trim(cl.account_email)) = lower(trim(coalesce(p.email, ''))))

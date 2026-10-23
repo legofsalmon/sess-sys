@@ -13,6 +13,7 @@ import { CORE } from './schema.ts'
 import { STOCK } from './stock/schema.ts'
 import { VEHICLES } from './vehicles/schema.ts'
 import { STEPS } from './steps/schema.ts'
+import { PURCHASES } from './purchases/schema.ts'
 
 /**
  * Every module's tables, in the order they are set up: crew calls refer to
@@ -22,10 +23,11 @@ import { STEPS } from './steps/schema.ts'
  * so they come after. People's documents (ADR 0029) refer to people. Money
  * (ADR 0042) refers to jobs, clients, products and timesheets. Vehicles
  * (ADR 0047) are booked on jobs and phases with a driver from the people. A
- * job's steps (ADR 0073) are given to people. The
+ * job's steps (ADR 0073) are given to people, and the purchase list (ADR
+ * 0077) is asked for and voted on by them. The
  * list of erasures (ADR 0027) refers to nothing, on purpose, and comes last.
  */
-export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, FINANCE, VEHICLES, STEPS, ERASURE]
+export const MODULES: readonly Module[] = [CORE, PROJECTS, CREW, AUTH, CALENDAR, STOCK, LEAVE, OFFICE, DOCUMENTS, FINANCE, VEHICLES, STEPS, PURCHASES, ERASURE]
 
 /** Set up or upgrade the whole database. */
 export async function migrateAll(db: Db) {

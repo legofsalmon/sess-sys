@@ -183,6 +183,9 @@ function recordPlace({ entity, id }: { entity: string; id: string }, view: View)
     // A job's step (ADR 0073): "<job>.<step>", opened on its job, whose steps are at the top.
     case 'jobStep':
       return job(id.slice(0, id.lastIndexOf('.')))
+    // A request on the purchase list (ADR 0077), on its own page.
+    case 'purchaseRequest':
+      return `#stock/buy/${encodeURIComponent(id)}`
     default:
       return undefined
   }

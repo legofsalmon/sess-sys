@@ -127,6 +127,10 @@ export const POINTERS: readonly { table: string; column: string }[] = [
   // Who a job's step is down to, and who ticked it (ADR 0073): the job's record, reading "Erased person" once their name goes.
   { table: 'job_steps', column: 'owner_id' },
   { table: 'job_steps', column: 'done_by' },
+  // Who asked for kit to be bought, and who voted for it (ADR 0077): the company's list, reading "Erased person" once their
+  // name goes. What they wrote is about the kit, not them.
+  { table: 'purchase_requests', column: 'asked_by' },
+  { table: 'purchase_votes', column: 'person_id' },
 ]
 
 /** Records of theirs the law asks the business to keep for a time: stripped like STRIPPED while it lasts, then gone like GONE. */
