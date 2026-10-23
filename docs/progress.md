@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0076](adr/0076-rack-mount-kit-and-the-rack-in-3d.md), part 1 of 3 of
+- [ADR 0076](adr/0076-rack-mount-kit-and-the-rack-in-3d.md) (PR #129), part 1 of 3 of
   Colly's "more advanced rack builder", after a survey of web rack builders
   (STAGERACK, Rackula, ConnectCAD, Stardraw, Lanberg). Products get a
   Rack-mount tick box that reveals height, width (full, half, third) and

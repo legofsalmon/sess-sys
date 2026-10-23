@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-23',
     title: 'Rack-mount kit and the rack in 3D',
     what: 'Products have a Rack-mount tick box: tick it to give the height in rack units, the width (full, half or a third) and the depth. The rack designer draws the rack in 3D: turn it, zoom in, look square at the front, back or side, and drag kit onto it or press kit and then press where it goes. There’s also a view from the side showing how deep each thing goes. A rack can have its outside size, castors and what its power can take; the totals now give amps and heat, and say when a rack is too heavy to lift or draws more than its power can take.',
-    prs: [0],
+    prs: [129],
     adrs: [76],
   },
   {
