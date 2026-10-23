@@ -38,6 +38,7 @@ import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { STEP_LABELS, type JobStep } from '@sh/shared'
 import { PURCHASE_STATUS_LABELS, type PurchaseStatus } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
+import { RACK_PART_LABELS, type RackPart } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -243,6 +244,7 @@ type Look = (entity: string, id: unknown) => Data | undefined
 
 const REFERENCES = [
   'id',
+  'inSlotId',
   'personId',
   'callId',
   'projectId',
@@ -624,7 +626,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
     }
     case 'model.create':
-      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${a.rackMount ? ', rack-mount' : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`
+      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${a.rackMount ? ', rack-mount' : ''}${typeof a.rackPart === 'string' ? `, ${RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part'}` : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`
     case 'model.update': {
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a product')}`)
@@ -646,6 +648,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.rackMount !== undefined) parts.push(a.rackMount ? 'rack-mount' : 'not rack-mount')
       const sized = (['units', 'depthMm', 'weightKg', 'powerW', 'rackWidth'] as const).filter((k) => a[k] !== undefined)
       if (sized.length) parts.push('its size')
+      // Rack parts (ADR 0078).
+      if (a.rackPart !== undefined) parts.push(typeof a.rackPart === 'string' ? (RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part') : 'kit, not a rack part')
       if ((['caseWidthMm', 'caseHeightMm', 'caseDepthMm', 'castors', 'powerLimitA'] as const).some((k) => a[k] !== undefined)) parts.push('its case')
       // Dry hire stock (ADR 0075).
       if (a.dryHire !== undefined) parts.push(a.dryHire ? 'dry hire' : 'ours')
@@ -711,7 +715,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'rackSlot.set': {
       const at = typeof a.top === 'number' ? `at U${a.top} on the ${a.side === 'rear' ? 'back' : 'front'}` : 'loose'
       const many = typeof a.qty === 'number' && a.qty > 1 ? `${a.qty} × ` : ''
-      return `Put ${many}${model(a.modelId)} ${at} in the layout of ${model(a.rackId)}`
+      // Placing across the rails, labels, groups and shelves (ADR 0078).
+      const across = typeof a.top === 'number' && (a.across === 'middle' || a.across === 'right') ? `, ${a.across === 'middle' ? 'in the middle' : 'on the right'},` : ''
+      const inIt = typeof a.top !== 'number' && typeof a.inSlotId === 'string' ? (look('rackSlot', a.inSlotId) ? ` in the ${model(look('rackSlot', a.inSlotId)!.modelId)}` : ' in a shelf or drawer') : ''
+      const marked = [typeof a.label === 'string' && a.label.trim() && `labelled ${clip(a.label.trim())}`, typeof a.group === 'string' && a.group.trim() && `in the group ${clip(a.group.trim())}`].filter(Boolean)
+      return `Put ${many}${model(a.modelId)} ${at}${across}${inIt} in the layout of ${model(a.rackId)}${marked.length ? `, ${inWords(marked as string[])}` : ''}`
     }
     case 'rackSlot.remove': {
       const was = look('rackSlot', a.id)

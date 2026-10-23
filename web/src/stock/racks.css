@@ -4,11 +4,11 @@
 .warehouse .rack-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-12); --rack-u: 26px; }
 .warehouse .rack-elevation { margin: 0; display: grid; gap: var(--space-4); }
 .warehouse .rack-elevation figcaption { color: var(--muted); font-size: var(--text-small); font-weight: 600; }
-.warehouse .rack-units { display: grid; grid-template-columns: 2.2em minmax(0, 1fr); background: var(--ds-surface-inset); border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-2); }
+.warehouse .rack-units { display: grid; grid-template-columns: 2.2em repeat(12, minmax(0, 1fr)); background: var(--ds-surface-inset); border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-2); }
 .warehouse .rack-u { grid-column: 1; display: flex; align-items: center; justify-content: flex-end; padding-right: var(--space-4); color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; border-top: 1px dashed var(--line); }
 .warehouse .rack-u:first-child { border-top: 0; }
 .warehouse .rack-u.past { color: var(--warn); }
-.warehouse .rack-thing { grid-column: 2; display: flex; align-items: center; min-width: 0; margin: 1px 0; padding: 0 var(--space-6); background: var(--panel); border: 1px solid var(--ds-line-strong); border-radius: 4px; font-size: .78rem; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.warehouse .rack-thing { grid-column: 2 / -1; display: flex; align-items: center; min-width: 0; margin: 1px 0; padding: 0 var(--space-6); background: var(--panel); border: 1px solid var(--ds-line-strong); border-radius: 4px; font-size: .78rem; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .warehouse .rack-thing.bad { border-color: var(--warn); color: var(--warn); }
 .warehouse .rack-thing.is-pending { border-style: dashed; }
 .warehouse .slot-list .item-row { align-items: center; }
@@ -68,3 +68,25 @@
 .warehouse .rack-side-cut .cut-thing.bad rect { stroke: var(--warn); stroke-width: 3; }
 .warehouse .rack-side-cut .cut-thing text { fill: var(--ink); font-size: 22px; font-weight: 600; }
 .warehouse .rack-side-cut .cut-thing.bad text { fill: var(--warn); }
+
+/* Building a rack up (ADR 0078): narrower kit side by side, rack parts, tape and groups, undo. */
+.warehouse .designer-tools { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
+.warehouse .copy-rack { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: end; }
+.warehouse .slot-details { margin-top: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.warehouse .rack-thing { margin: 1px; }
+/* The tape is content (a swatch of the colour on the kit), drawn as a strip at the panel's left, never as a status. */
+.warehouse .rack-thing.taped, .warehouse .palette-item.taped { box-shadow: inset 6px 0 0 var(--tape); padding-left: calc(var(--space-6) + 6px); }
+.warehouse .tape-swatch { display: inline-block; width: 1em; height: 1em; border-radius: 3px; background: var(--tape); border: 1px solid var(--ds-line-strong); vertical-align: -0.15em; margin-right: .35em; }
+.warehouse .tape-pick { display: flex; align-items: center; gap: var(--space-6); }
+.warehouse .tape-pick select { flex: 1; }
+.warehouse .rack-thing.part-blank { background: var(--ds-surface-inset); color: var(--muted); font-weight: 400; }
+.warehouse .rack-thing.part-vent { background: repeating-linear-gradient(90deg, var(--ds-surface-inset) 0 6px, var(--panel) 6px 10px); color: var(--muted); font-weight: 400; }
+.warehouse .rack-thing.part-drawer { border-bottom-width: 3px; }
+.warehouse .rack-thing.part-shelf { border-top-color: transparent; border-left-color: transparent; border-right-color: transparent; border-bottom-width: 3px; background: transparent; }
+.warehouse .rack-ghost { pointer-events: none; z-index: 2; margin: 1px; border: 2px dashed var(--accent); border-radius: 4px; }
+.warehouse .rack-ghost.no-fit { border-color: var(--warn); }
+.warehouse .rack-groups { margin-top: var(--space-12); }
+.warehouse .rack-groups h3, .warehouse .loose-lot h4 { margin: 0 0 var(--space-6); }
+.warehouse .rack-groups ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); font-size: var(--text-small); }
+.warehouse .loose-lot h4 { font-size: var(--text-small); color: var(--muted); }
+.warehouse .usual-parts { display: grid; gap: var(--space-6); }
