@@ -8,8 +8,11 @@ import {
   parseEuro,
   plural,
   RACK_SIDE_LABELS,
+  RACK_PART_LABELS,
+  RACK_PARTS,
   RACK_WIDTH_LABELS,
   RACK_WIDTHS,
+  type RackPart,
   type RackWidth,
   valueLabel,
   unitsAt,
@@ -35,6 +38,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { StockViews } from '../Views.tsx'
 import { numberLabel } from './common.tsx'
+import { slotName, thingClass, thingStyle } from './rack-look.ts'
 import './racks.css'
 
 /**
@@ -47,9 +51,9 @@ import './racks.css'
  */
 
 /** "12U, 450 mm deep"; kit as "rack-mount, 1U, half width, 300 mm deep" (ADR 0076). */
-export function sizeLabel(m: Pick<ModelView, 'units' | 'depthMm'> & Partial<Pick<ModelView, 'isRack' | 'rackMount' | 'rackWidth'>>): string {
+export function sizeLabel(m: Pick<ModelView, 'units' | 'depthMm'> & Partial<Pick<ModelView, 'isRack' | 'rackMount' | 'rackWidth' | 'rackPart'>>): string {
   return [
-    m.rackMount && 'rack-mount',
+    m.rackMount && (m.rackPart ? RACK_PART_LABELS[m.rackPart].replace(/^An? /, '').toLowerCase() : 'rack-mount'),
     m.units !== null && `${m.units}U`,
     m.rackMount && m.rackWidth && m.rackWidth !== 'full' && RACK_WIDTH_LABELS[m.rackWidth].toLowerCase(),
     m.depthMm !== null && `${m.depthMm} mm deep`,
@@ -164,11 +168,13 @@ export interface SizeTyped {
   caseDepth: string
   castors: boolean
   amps: string
+  /** A rack part rather than kit (ADR 0078); empty for kit. */
+  part: RackPart | ''
 }
 
 const typed = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n))
 
-type Sizes = Pick<ModelView, 'code' | 'units' | 'depthMm' | 'weightKg' | 'powerW' | 'rackMount' | 'rackWidth' | 'caseWidthMm' | 'caseHeightMm' | 'caseDepthMm' | 'castors' | 'powerLimitA'>
+type Sizes = Pick<ModelView, 'code' | 'units' | 'depthMm' | 'weightKg' | 'powerW' | 'rackMount' | 'rackWidth' | 'caseWidthMm' | 'caseHeightMm' | 'caseDepthMm' | 'castors' | 'powerLimitA' | 'rackPart'>
 
 export const sizeTypedOf = (m?: Sizes): SizeTyped => ({
   code: m?.code ?? '',
@@ -183,6 +189,7 @@ export const sizeTypedOf = (m?: Sizes): SizeTyped => ({
   caseDepth: typed(m?.caseDepthMm),
   castors: m?.castors ?? false,
   amps: typed(m?.powerLimitA),
+  part: m?.rackPart ?? '',
 })
 
 /**
@@ -223,6 +230,7 @@ export function sizeFrom(f: SizeTyped, models: readonly ModelView[], self?: stri
       caseDepthMm: caseDepthMm ?? null,
       castors: rack && f.castors,
       powerLimitA,
+      rackPart: !rack && f.rackMount && f.part ? f.part : null,
     },
   }
 }
@@ -288,6 +296,17 @@ export function SizeFields({ f, onChange, rack }: { f: SizeTyped; onChange: (f: 
                 </select>
               </label>
               {field('depth', 'Depth, in mm', 'e.g. 450')}
+              <label>
+                What it is
+                <select value={f.part} onChange={(e) => onChange({ ...f, part: e.target.value as RackPart | '' })}>
+                  <option value="">Kit</option>
+                  {RACK_PARTS.map((p) => (
+                    <option key={p} value={p}>
+                      {RACK_PART_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </>
           )}
         </>
@@ -386,7 +405,9 @@ export function RackCard({ view, r }: { view: View; r: RackView }) {
                   <b>{s.top === null ? 'Loose' : `${unitsAt(s.top, s.model?.units ?? 1)} ${RACK_SIDE_LABELS[s.side].toLowerCase()}`}</b>
                   <p>
                     {s.qty > 1 && `${s.qty.toLocaleString('en-IE')} × `}
+                    {s.label && `${s.label}: `}
                     {s.model ? <a href={`#stock/product/${s.model.id}`}>{s.model.name}</a> : 'A product no longer listed'}
+                    {s.group && ` · ${s.group}`}
                     {s.model?.dryHire && ` · Dry hire${s.model.supplier ? ` from ${s.model.supplier}` : ''}`}
                     {s.notes && ` · ${s.notes}`}
                   </p>
@@ -434,11 +455,11 @@ function Elevation({ r, side }: { r: RackView; side: RackSide }) {
           return (
             <span
               key={s.id}
-              className={`rack-thing${bad.has(s.id) ? ' bad' : ''}${s.pending ? ' is-pending' : ''}${s.model?.dryHire ? ' hired' : ''}`}
-              style={{ gridRow: `${s.top} / span ${units}` }}
-              title={s.model?.name}
+              className={`rack-thing ${thingClass(s)}${bad.has(s.id) ? ' bad' : ''}${s.pending ? ' is-pending' : ''}${s.model?.dryHire ? ' hired' : ''}`}
+              style={thingStyle(s, units)}
+              title={[s.model?.name, s.group].filter(Boolean).join(' · ')}
             >
-              {s.model?.name ?? '?'}
+              {s.model?.rackPart === 'blank' && !s.label ? '' : slotName(s)}
             </span>
           )
         })}

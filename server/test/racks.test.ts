@@ -135,3 +135,46 @@ describe('rack-mount kit and rack cases', () => {
     expect((await phone(app)).client.view().racks.of('amps')!.layout.problems.map((p) => p.kind)).toEqual(['over-power'])
   })
 })
+
+describe('building a rack up', () => {
+  it('puts narrower kit side by side, rack parts on the rails, loose kit in a drawer, labels and groups', async () => {
+    const { app, db } = await company()
+    const RX = { ...AMP, category: 'RF', rackWidth: 'half', units: 1, depthMm: 300 } as const
+    const PART = { ...AMP, category: 'Rack parts', tracking: 'bulk' } as const
+    await ok(
+      app,
+      m('model.create', { id: 'rf', name: 'RF rack', ...RACK, code: '', units: 4, depthMm: 400 }),
+      m('model.create', { id: 'rx', name: 'Shure AD4D', ...RX }),
+      m('model.create', { id: 'drawer', name: '2U drawer', ...PART, units: 2, depthMm: 350, rackPart: 'drawer' }),
+      m('model.create', { id: 'blank', name: '1U blank', ...PART, units: 1, rackPart: 'blank' }),
+      m('rackSlot.set', { id: 'l', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'left', label: 'IEM 1–2', group: 'RF', colour: 'blue' }),
+      m('rackSlot.set', { id: 'r', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'right', group: 'RF', colour: 'blue' }),
+      m('rackSlot.set', { id: 'd', rackId: 'rf', modelId: 'drawer', top: 3, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 'x', rackId: 'rf', modelId: 'xlr', top: null, side: 'front', qty: 6, notes: '', inSlotId: 'd' })
+    )
+    // A rack part is rack-mount; something on the rails isn't in a drawer; only a shelf or drawer holds anything.
+    expect(await send(app, 'model.update', { id: 'blank', rackMount: false })).toMatchObject({ status: 'rejected', reason: { message: 'A blank, vent, shelf or drawer goes on the rails, so it is rack-mount.' } })
+    expect(await send(app, 'rackSlot.set', { id: 'y', rackId: 'rf', modelId: 'xlr', top: null, side: 'front', qty: 1, notes: '', inSlotId: 'l' })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const rack = client.view().racks.of('rf')!
+    // Two halves side by side aren't on top of each other.
+    expect(rack.layout.problems).toEqual([])
+    expect(rack.slots.find((s) => s.id === 'l')).toMatchObject({ across: 'left', label: 'IEM 1–2', group: 'RF', colour: 'blue', inSlotId: null })
+    expect(rack.slots.find((s) => s.id === 'x')).toMatchObject({ inSlotId: 'd' })
+
+    // Two on the left are.
+    await ok(app, m('rackSlot.set', { id: 'r', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'left' }))
+    await client.sync()
+    expect(client.view().racks.of('rf')!.layout.problems.map((p) => p.kind)).toEqual(['overlap'])
+
+    // Taking the drawer out leaves its cables loose in the rack.
+    await ok(app, m('rackSlot.remove', { id: 'd' }))
+    const after = (await phone(app)).client.view().racks.of('rf')!
+    expect(after.slots.find((s) => s.id === 'x')).toMatchObject({ inSlotId: null })
+
+    const said = (await readHistory(db)).entries.filter((e) => e.command === 'rackSlot.set' && e.outcome === 'done').map((e) => e.what)
+    expect(said).toContain('Put Shure AD4D at U1 on the front, on the right, in the layout of RF rack, in the group RF')
+    expect(said).toContain('Put 6 × XLR 10 m loose in the 2U drawer in the layout of RF rack')
+  })
+})
