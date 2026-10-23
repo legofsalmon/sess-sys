@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0078](adr/0078-building-a-rack-up.md) (PR #131), part 2 of 3 of the
+- [ADR 0078](adr/0078-building-a-rack-up.md) (PR #132), part 2 of 3 of the
   advanced rack builder. Narrower kit sits side by side (`rack_slots.across`);
   rack parts are products (`models.rack_part`: blank, vent, shelf, drawer),
   with the usual six added in one press and Fill the gaps with blanks; loose
