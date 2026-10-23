@@ -39,13 +39,13 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_LINES: Record<Role, string> = {
   director: 'Everything, and the things only a director does: roles, erasing a person, starting fresh.',
   office: 'Jobs, crew, kit and stock, money, and the settings: calendar, office details, bringing lists in, downloads.',
-  head: "Crew and their bookings, kit on jobs, stock and the warehouse, and jobs' steps. Not jobs themselves, nor settings.",
-  crew: "Their own leave and days in lieu, the job steps given to them, and reporting a fault. They can look at the rest, but nobody else's pay, link, email, notes or documents.",
-  freelancer: "Reporting a fault. Their offers, bookings, timesheets and days off go through their private link; they can look at the rest, but nobody else's pay, link, phone, email, notes or documents.",
+  head: "Crew and their bookings, kit on jobs, stock and the warehouse, the purchase list, and jobs' steps. Not jobs themselves, nor settings.",
+  crew: "Their own leave and days in lieu, the job steps given to them, asking for kit to be bought and voting for it, and reporting a fault. They can look at the rest, but nobody else's pay, link, email, notes or documents.",
+  freelancer: "Reporting a fault, and asking for kit to be bought and voting for it. Their offers, bookings, timesheets and days off go through their private link; they can look at the rest, but nobody else's pay, link, phone, email, notes or documents.",
 }
 
 /** The kinds of change a role can make. Each command needs exactly one. */
-export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'money', 'settings', 'company'] as const
+export const ABILITIES = ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'ask', 'money', 'settings', 'company'] as const
 export type Ability = (typeof ABILITIES)[number]
 
 /** Each kind of change, as "Only … can ___". */
@@ -57,6 +57,7 @@ const ABILITY_WORDS: Record<Ability, string> = {
   fault: 'report a fault',
   leave: 'ask for leave',
   steps: "tick off and give out a job's steps",
+  ask: 'ask for kit to be bought, or vote for it',
   money: 'see and change prices, quotes and what is owed',
   settings: 'change settings, bring lists in or download everything',
   company: 'change roles, erase a person or start fresh',
@@ -65,11 +66,12 @@ const ABILITY_WORDS: Record<Ability, string> = {
 /** What each role can change. A director can change everything. */
 export const ROLE_CAN: Record<Role, readonly Ability[]> = {
   director: ABILITIES,
-  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'money', 'settings'],
-  head: ['crew', 'kit', 'stock', 'fault', 'leave', 'steps'],
+  office: ['jobs', 'crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'ask', 'money', 'settings'],
+  head: ['crew', 'kit', 'stock', 'fault', 'leave', 'steps', 'ask'],
   // Staff crew tick or hand on their own steps only (ADR 0073), which the step's handler checks on top.
-  crew: ['fault', 'leave', 'steps'],
-  freelancer: ['fault'],
+  crew: ['fault', 'leave', 'steps', 'ask'],
+  // Anyone signed in can ask for kit to be bought and vote for it (ADR 0077); changing someone else's request needs stock, checked by the handler.
+  freelancer: ['fault', 'ask'],
 }
 
 /**
@@ -175,6 +177,15 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
 
   // A job's steps (ADR 0073): every member of staff ticks their own; staff crew only theirs, checked by the handler.
   'jobStep.set': 'steps',
+
+  // The purchase list (ADR 0077): anyone asks and votes, and changes or takes back their own (the handler checks whose);
+  // saying where a request is at is stock's, and bringing a list in is settings', like every list.
+  'purchase.ask': 'ask',
+  'purchase.update': 'ask',
+  'purchase.remove': 'ask',
+  'purchase.vote': 'ask',
+  'purchase.status': 'stock',
+  'purchase.bringIn': 'settings',
 
   // Money (ADR 0042): prices, quotes and what's owed are the office's and the directors'. A role without it isn't sent them either.
   'quote.save': 'money',

@@ -277,6 +277,20 @@ const CASES: Case[] = [
   c('jobStep.set', { projectId: 'gala', step: 'deprep', ownerId: 'aoife' }, { as: 'given to someone' }),
   c('jobStep.set', { projectId: 'gala', step: 'kit', done: true, by: 'cian' }, { as: 'ticked' }),
   c('jobStep.set', { projectId: 'gala', step: 'kit', done: false, ownerId: null }, { as: 'the tick and the name taken off', before: [m('jobStep.set', { projectId: 'gala', step: 'kit', ownerId: 'cian', done: true })] }),
+
+  // The purchase list (ADR 0077).
+  c('purchase.ask', { id: 'nl4t', title: '  NL4T connectors ', details: '20', link: 'thomann.de/ie/nl4t.htm', department: 'audio', by: 'aoife' }),
+  c('purchase.update', { id: 'nl4t', details: '24, and 4 spare', link: '' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.status', { id: 'nl4t', status: 'ordered', notes: 'From Thomann' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.vote', { requestId: 'nl4t', vote: true, by: 'cian' }, { as: 'a vote', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.vote', { requestId: 'nl4t', vote: false, by: 'cian' }, { as: 'a vote taken back', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' }), m('purchase.vote', { requestId: 'nl4t', vote: true, by: 'cian' })] }),
+  c('purchase.remove', { id: 'nl4t' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' }), m('purchase.vote', { requestId: 'nl4t', vote: true, by: 'aoife' })] }),
+  c('purchase.bringIn', {
+    requests: [
+      { id: 'buy-1', title: 'Mic cable', details: '60 × 10 m', link: '', department: 'Audio', askedBy: 'dara', askedByName: 'Dara', askedOn: day(-180), status: 'ordered', notes: 'On the April order' },
+      { id: 'nl4t', title: 'NL4T', details: '', link: '', department: null, askedBy: null, askedByName: 'Smokey', askedOn: day(-180), status: 'asked', notes: '' },
+    ],
+  }, { as: 'a list, with one already in', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
 ]
 
 /**

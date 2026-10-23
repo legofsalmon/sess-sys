@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.34.0',
+    date: '2026-10-23',
+    title: 'The purchase list, with votes',
+    what: 'Stock has a Purchase list. Anyone signed in, freelancers too, can ask for kit to be bought: what, how many, a link and the department. Everyone can see the list and vote for what they would find most useful, and it is listed with the most votes first. The office and heads of department say where each one is at (agreed, ordered, arrived or not buying) with a note, and whoever asked sees it in their notifications. A list can be brought in from a spreadsheet, as the WhatsApp group’s requests were. Nothing is ordered and nobody is contacted by the app.',
+    prs: [130],
+    adrs: [77],
+  },
+  {
     version: '1.33.0',
     date: '2026-10-22',
     title: 'Dry hire stock and the rack designer',

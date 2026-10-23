@@ -36,6 +36,7 @@ import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { STEP_LABELS, type JobStep } from '@sh/shared'
+import { PURCHASE_STATUS_LABELS, type PurchaseStatus } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
@@ -266,6 +267,8 @@ const REFERENCES = [
   'driverId',
   // A job's steps (ADR 0073).
   'ownerId',
+  // The purchase list (ADR 0077): a vote's request.
+  'requestId',
   // Jobs made one (ADR 0050): a list of them.
   'from',
 ] as const
@@ -374,6 +377,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
   const numberGiven = (typed: unknown) => (typeof typed === 'string' && normaliseNumber(typed)) || text(left?.number, 'a number')
   const phaseName = (id: unknown) => text(look('phase', id)?.name, 'a phase')
   const vehicle = (id: unknown) => text(look('vehicle', id)?.name, 'a vehicle')
+  const purchase = (id: unknown) => text(look('purchaseRequest', id)?.title, 'a request')
   /** ", 2 subhired from PRG". */
   const subhired = (n: unknown, from: unknown) =>
     typeof n === 'number' && n > 0 ? `, ${n} subhired${typeof from === 'string' && from.trim() ? ` from ${clip(from.trim())}` : ''}` : ''
@@ -935,6 +939,28 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.done !== undefined) parts.push(`${a.done ? 'ticked' : 'took the tick off'} ${parts.length ? 'it' : `${step} on ${job(a.projectId)}`}`)
       const said = parts.join(' and ') || `changed ${step} on ${job(a.projectId)}`
       return said[0]!.toUpperCase() + said.slice(1)
+    }
+    // The purchase list (ADR 0077): "Asked for NL4T connectors to be bought", "Said Mics is Ordered".
+    case 'purchase.ask':
+      return `Asked for ${text(a.title, 'something')} to be bought`
+    case 'purchase.update': {
+      const r = look('purchaseRequest', a.id)
+      const parts = [a.title !== undefined && 'what it is', a.details !== undefined && 'how many and details', a.link !== undefined && 'the link', a.department !== undefined && 'the department'].filter(
+        (p): p is string => !!p
+      )
+      return `Changed ${parts.length ? inWords(parts) : 'a request'} on the purchase list for ${text(r?.title ?? a.title, 'a request')}`
+    }
+    case 'purchase.status': {
+      const status = typeof a.status === 'string' && a.status in PURCHASE_STATUS_LABELS ? PURCHASE_STATUS_LABELS[a.status as PurchaseStatus] : 'changed'
+      return `Marked ${purchase(a.id)} on the purchase list ${status.toLowerCase()}${a.notes ? ', with a note' : ''}`
+    }
+    case 'purchase.remove':
+      return `Took ${purchase(a.id)} off the purchase list`
+    case 'purchase.vote':
+      return `${a.vote === false ? 'Took back a vote for' : 'Voted for'} ${purchase(a.requestId)} on the purchase list`
+    case 'purchase.bringIn': {
+      const n = Array.isArray(a.requests) ? a.requests.length : 0
+      return `Brought in a purchase list of ${n.toLocaleString('en-IE')} request${n === 1 ? '' : 's'}`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

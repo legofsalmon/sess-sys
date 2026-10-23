@@ -159,6 +159,13 @@ export const MENU: PlaceGroup[] = [
         about: 'The vans, their checks, and the jobs they are on',
       },
       {
+        key: 'buy',
+        icon: 'kit',
+        href: '#stock/buy',
+        label: 'Purchase list',
+        about: 'Kit the crew ask to be bought, and their votes',
+      },
+      {
         key: 'import-stock',
         icon: 'download',
         href: '#stock/import',

@@ -1,7 +1,7 @@
 /**
  * An area's pages, side by side in one row under its header (ADR 0041's
  * tidy-up of where things live): Jobs' List, Week, Month, Clients and
- * Venues, and Money for the roles that see it (ADR 0042); Stock's Catalogue, Places, Labels, Counting, Testing, Repairs, Racks (ADR 0074) and Vehicles;
+ * Venues, and Money for the roles that see it (ADR 0042); Stock's Catalogue, Places, Labels, Counting, Testing, Repairs, Racks (ADR 0074), Vehicles and the Purchase list (ADR 0077);
  * Crew's Calls, People, Leave and Timesheets
  * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the
@@ -51,6 +51,7 @@ export function StockViews({ view, current }: { view: View; current: string }) {
         { key: 'repairs', href: '#stock/repairs', label: 'Repairs', count: repairs },
         { key: 'racks', href: '#stock/racks', label: 'Racks' },
         { key: 'vehicles', href: '#stock/vehicles', label: 'Vehicles', count: vehicles },
+        { key: 'buy', href: '#stock/buy', label: 'Purchase list' },
       ]}
     />
   )

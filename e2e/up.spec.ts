@@ -110,7 +110,7 @@ test('every area names its pages in a row, and the old addresses land on the new
 
   await page.goto('/#stock')
   const stock = page.getByRole('navigation', { name: 'Stock pages' })
-  await expect(stock.getByRole('link')).toHaveText(['Catalogue', 'Places', 'Labels', 'Counting', /^Testing/, /^Repairs/, 'Racks', /^Vehicles/])
+  await expect(stock.getByRole('link')).toHaveText(['Catalogue', 'Places', 'Labels', 'Counting', /^Testing/, /^Repairs/, 'Racks', /^Vehicles/, 'Purchase list'])
   await stock.getByRole('link', { name: /^Places/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Places' })).toBeVisible()
   await page.screenshot(shot('rows-phone'))
