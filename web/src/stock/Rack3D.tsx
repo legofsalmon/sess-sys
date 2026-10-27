@@ -1,4 +1,4 @@
-import { RACK_SIDE_LABELS, RACK_WIDTH_PARTS, type RackSide, type RackView, type SlotView } from '@sh/shared'
+import { acrossAt, acrossFor, RACK_SIDE_LABELS, spanAcross, TAPE_COLOUR_SWATCHES, type ModelView, type RackAcross, type RackPart, type RackSide, type RackView, type SlotView } from '@sh/shared'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -34,13 +34,13 @@ const LOOKS: [Look, string][] = [
 interface Props {
   r: RackView
   held: Held | undefined
-  /** The units what's held takes, for where it would go. */
-  heldUnits: number
+  /** What's held, for its size where it would go. */
+  heldModel: ModelView | undefined
   mayChange: boolean
   /** Slots something's wrong with. */
   bad: ReadonlySet<string | undefined>
   onHold: (h: Held | undefined) => void
-  onPlace: (h: Held, top: number, side: RackSide) => void
+  onPlace: (h: Held, top: number, side: RackSide, across?: RackAcross) => void
 }
 
 /** A colour role from the page's stylesheet, as three.js reads colours, whatever form the stylesheet gives it in. */
@@ -55,18 +55,43 @@ function roleColour(el: Element, role: string, fallback: string): THREE.Color {
   return new THREE.Color().setRGB(r! / 255, g! / 255, b! / 255, THREE.SRGBColorSpace)
 }
 
-/** A thing's name on its panel. */
-function labelTexture(text: string, units: number, ink: THREE.Color, face: THREE.Color): THREE.CanvasTexture {
+/**
+ * A thing's panel: its label or name, a strip of its tape colour at the
+ * left (content, as the tape is), and for a rack part (ADR 0079) what
+ * makes it one: a vent's slots, a drawer's handle, a shelf's lip.
+ */
+function labelTexture(text: string, units: number, parts: number, ink: THREE.Color, face: THREE.Color, tape: string | null, part: RackPart | null | undefined): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
-  canvas.width = 1024
+  canvas.width = Math.round(1024 / parts)
   canvas.height = Math.round(1024 * ((units * U) / PANEL))
   const c = canvas.getContext('2d')!
+  const inkHex = `#${ink.getHexString(THREE.SRGBColorSpace)}`
   c.fillStyle = `#${face.getHexString(THREE.SRGBColorSpace)}`
   c.fillRect(0, 0, canvas.width, canvas.height)
-  c.fillStyle = `#${ink.getHexString(THREE.SRGBColorSpace)}`
-  c.font = `600 ${Math.min(64, canvas.height * 0.45)}px system-ui, sans-serif`
+  c.strokeStyle = inkHex
+  c.globalAlpha = 0.35
+  c.lineWidth = 6
+  if (part === 'vent')
+    for (let x = 80; x < canvas.width - 80; x += 36) {
+      c.beginPath()
+      c.moveTo(x, canvas.height * 0.25)
+      c.lineTo(x, canvas.height * 0.75)
+      c.stroke()
+    }
+  if (part === 'drawer') {
+    c.lineWidth = 10
+    c.strokeRect(canvas.width * 0.38, canvas.height * 0.62, canvas.width * 0.24, canvas.height * 0.12)
+  }
+  if (part === 'shelf') c.fillRect(0, canvas.height * 0.82, canvas.width, canvas.height * 0.18)
+  c.globalAlpha = 1
+  if (tape) {
+    c.fillStyle = tape
+    c.fillRect(0, 0, 28, canvas.height)
+  }
+  c.fillStyle = inkHex
+  c.font = `600 ${Math.min(64, canvas.height * (part === 'drawer' ? 0.3 : 0.45))}px system-ui, sans-serif`
   c.textBaseline = 'middle'
-  c.fillText(text, 48, canvas.height / 2, canvas.width - 96)
+  c.fillText(text, 48, part === 'drawer' ? canvas.height * 0.3 : canvas.height / 2, canvas.width - 96)
   const t = new THREE.CanvasTexture(canvas)
   t.colorSpace = THREE.SRGBColorSpace
   return t
@@ -75,26 +100,30 @@ function labelTexture(text: string, units: number, ink: THREE.Color, face: THREE
 /** Where a thing on the rails sits, in mm from the middle of the rack: x across, y up, z towards the front. */
 function boxOf(s: SlotView, size: ReturnType<typeof rackSize>) {
   const units = s.model?.units ?? 1
-  const parts = RACK_WIDTH_PARTS[s.model?.rackWidth ?? 'full']
+  const [from, to] = spanAcross(s.model?.rackWidth, s.across)
+  const parts = Math.round(1 / (to - from))
   const face = PANEL / parts
-  const deep = s.model?.depthMm ?? GUESS_KIT_DEPTH
+  // A blank or vent is a panel and no more; a shelf a tray behind it (ADR 0079).
+  const part = s.model?.rackPart
+  const deep = part === 'blank' || part === 'vent' ? 4 : (s.model?.depthMm ?? GUESS_KIT_DEPTH)
   const h = units * U - 1.5
   const front = s.side === 'front'
   return {
     units,
     face,
     body: parts === 1 ? BODY : face - 8,
+    parts,
     deep,
     h,
-    // Kit narrower than the rack sits to the left until it has a place across (part 2 of ADR 0076).
-    x: -PANEL / 2 + face / 2,
+    // Left and right as seen facing those rails: from the back, the rack's left is on the right.
+    x: (front ? 1 : -1) * (-PANEL / 2 + ((from + to) / 2) * PANEL),
     y: size.height / 2 - (s.top! - 1) * U - h / 2 - 0.75,
     faceZ: front ? size.depth / 2 + 2 : -size.depth / 2 - 2,
     bodyZ: front ? size.depth / 2 - deep / 2 : -size.depth / 2 + deep / 2,
   }
 }
 
-export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onPlace }: Props) {
+export default function Rack3D({ r, held, heldModel, mayChange, bad, onHold, onPlace }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const three = useRef<{
     renderer: THREE.WebGLRenderer
@@ -109,8 +138,8 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
   const [noGl, setNoGl] = useState(false)
   const size = rackSize(r)
   // Kept current for the pointer handlers set up once.
-  const now = useRef({ r, held, heldUnits, size, onHold, onPlace, mayChange })
-  now.current = { r, held, heldUnits, size, onHold, onPlace, mayChange }
+  const now = useRef({ r, held, heldModel, size, onHold, onPlace, mayChange })
+  now.current = { r, held, heldModel, size, onHold, onPlace, mayChange }
 
   // The scene, the camera and the controls, once.
   useEffect(() => {
@@ -228,12 +257,15 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
       const tone = wrong ? warn : picked ? accent : line
       const group = new THREE.Group()
       group.userData.slotId = s.id
+      const part = s.model?.rackPart
+      // A shelf is a tray, not a box: what's on it shows.
       const body = new THREE.Mesh(
-        new THREE.BoxGeometry(b.body, b.h - 2, b.deep),
+        new THREE.BoxGeometry(b.body, part === 'shelf' ? 3 : b.h - 2, b.deep),
         new THREE.MeshStandardMaterial({ color: tone, roughness: 0.8, transparent: !!s.model?.dryHire, opacity: s.model?.dryHire ? 0.55 : 1 })
       )
-      body.position.set(b.x, b.y, b.bodyZ)
-      const label = labelTexture(`${s.model?.name ?? '?'}${s.model?.dryHire ? ' · dry hire' : ''}`, b.units, wrong ? warn : ink, panel)
+      body.position.set(b.x, part === 'shelf' ? b.y - b.h / 2 + 2 : b.y, b.bodyZ)
+      const named = part === 'blank' && !s.label ? '' : `${s.label || s.model?.name || '?'}${s.model?.dryHire ? ' · dry hire' : ''}`
+      const label = labelTexture(named, b.units, b.parts, wrong ? warn : ink, panel, s.colour ? TAPE_COLOUR_SWATCHES[s.colour] : null, part)
       const plain = new THREE.MeshStandardMaterial({ color: panel, roughness: 0.6 })
       const faces = [plain, plain, plain, plain, plain, plain].map((m) => m.clone())
       // A box's faces run +x, -x, +y, -y, +z, -z: the name goes on the one towards whoever faces that rail.
@@ -242,7 +274,8 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
       plate.position.set(b.x, b.y, b.faceZ)
       const edge = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry), new THREE.LineBasicMaterial({ color: tone }))
       edge.position.copy(plate.position)
-      group.add(body, plate, edge)
+      group.add(plate, edge)
+      if (part !== 'blank' && part !== 'vent') group.add(body)
       t.rack.add(group)
     }
     t.ghost.visible = false
@@ -272,7 +305,7 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
   }, [look, size.outside.w, size.outside.h, size.outside.d])
 
   /** The rack unit and the face under the pointer: the face towards the camera. */
-  const target = (clientX: number, clientY: number): { top: number; side: RackSide } | undefined => {
+  const target = (clientX: number, clientY: number): { top: number; side: RackSide; across: RackAcross } | undefined => {
     const t = three.current
     if (!t) return undefined
     const rect = t.renderer.domElement.getBoundingClientRect()
@@ -283,19 +316,23 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), side === 'front' ? -size.depth / 2 : size.depth / 2)
     const hit = ray.ray.intersectPlane(plane, new THREE.Vector3())
     if (!hit || Math.abs(hit.x) > PANEL / 2 + 60 || Math.abs(hit.y) > size.height / 2) return undefined
-    return { top: Math.min(size.units, Math.floor((size.height / 2 - hit.y) / U) + 1), side }
+    // Seen from the back, the left of the rack is on the right.
+    const x = side === 'front' ? (hit.x + PANEL / 2) / PANEL : (PANEL / 2 - hit.x) / PANEL
+    const across = acrossAt(Math.min(1, Math.max(0, x)), now.current.heldModel?.rackWidth)
+    return { top: Math.min(size.units, Math.floor((size.height / 2 - hit.y) / U) + 1), side, across }
   }
 
   /** Shows where what's held would go. */
-  const ghostAt = (at: { top: number; side: RackSide } | undefined) => {
+  const ghostAt = (at: { top: number; side: RackSide; across: RackAcross } | undefined) => {
     const t = three.current
     if (!t) return
-    const { size, heldUnits } = now.current
+    const { size, heldModel } = now.current
     t.ghost.visible = !!at
     if (at) {
-      const h = heldUnits * U
-      t.ghost.scale.set(PANEL, h, 30)
-      t.ghost.position.set(0, size.height / 2 - (at.top - 1) * U - h / 2, at.side === 'front' ? size.depth / 2 + 18 : -size.depth / 2 - 18)
+      const h = (heldModel?.units ?? 1) * U
+      const [from, to] = spanAcross(heldModel?.rackWidth, at.across)
+      t.ghost.scale.set(PANEL * (to - from), h, 30)
+      t.ghost.position.set((at.side === 'front' ? 1 : -1) * (-PANEL / 2 + ((from + to) / 2) * PANEL), size.height / 2 - (at.top - 1) * U - h / 2, at.side === 'front' ? size.depth / 2 + 18 : -size.depth / 2 - 18)
     }
     t.render()
   }
@@ -335,7 +372,7 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
           ref={box}
           className={`rack-3d-scene${held ? ' holding-one' : ''}`}
           role="img"
-          aria-label={`${r.model.name} in 3D: ${placed.length === 1 ? '1 thing' : `${placed.length} things`} on the rails${placed.length ? `: ${placed.map((s) => `${s.model?.name ?? '?'} at U${s.top} on the ${RACK_SIDE_LABELS[s.side].toLowerCase()}`).join(', ')}` : ''}. Front and back shows the same, to use with a keyboard.`}
+          aria-label={`${r.model.name} in 3D: ${placed.length === 1 ? '1 thing' : `${placed.length} things`} on the rails${placed.length ? `: ${placed.map((s) => `${s.label || s.model?.name || '?'} at U${s.top}${acrossFor(s.model?.rackWidth).length ? ` ${s.across === 'middle' ? 'in the middle' : `on the ${s.across}`}` : ''} on the ${RACK_SIDE_LABELS[s.side].toLowerCase()}`).join(', ')}` : ''}. Front and back shows the same, to use with a keyboard.`}
           onPointerDown={(e) => {
             down.current = { x: e.clientX, y: e.clientY }
           }}
@@ -347,7 +384,7 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
             const { held, onPlace, onHold } = now.current
             if (held) {
               const at = target(e.clientX, e.clientY)
-              if (at) onPlace(held, at.top, at.side)
+              if (at) onPlace(held, at.top, at.side, at.across)
               return
             }
             const slotId = slotUnder(e.clientX, e.clientY)
@@ -364,7 +401,7 @@ export default function Rack3D({ r, held, heldUnits, mayChange, bad, onHold, onP
             ghostAt(undefined)
             const h = heldOf(e)
             const at = target(e.clientX, e.clientY)
-            if (h && at) now.current.onPlace(h, at.top, at.side)
+            if (h && at) now.current.onPlace(h, at.top, at.side, at.across)
           }}
         />
       )}

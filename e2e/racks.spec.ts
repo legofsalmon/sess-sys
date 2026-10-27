@@ -141,7 +141,8 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   // Moved to the back, then dragged back to the list to take it out.
   await rack.getByRole('button', { name: `${amp}, U1–2 on the front` }).dragTo(rack.getByRole('button', { name: 'U4 back' }))
   await expect(rack.getByRole('button', { name: `${amp}, U4–5 on the back` })).toBeVisible()
-  await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette)
+  // Dropped on the list's heading, which is in sight: the middle of the list can be below the fold on a shorter screen.
+  await rack.getByRole('button', { name: `${haze}, U3–5 on the front` }).dragTo(palette.getByRole('heading', { name: 'Kit to build with' }))
   await expect(rack.getByRole('button', { name: new RegExp(`^${haze}`) })).toHaveCount(0)
   await expect(page.getByText('dry hired:')).toHaveCount(0)
 
@@ -181,4 +182,86 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   await page.getByLabel('Find', { exact: true }).fill(id)
   await expect(page.getByRole('link', { name: new RegExp(`^${haze}`) })).toContainText('Dry hire from PRG')
   await expect(page.getByRole('link', { name: new RegExp(`^${amp}`) })).toHaveCount(0)
+})
+
+test('building a rack up: half-width kit side by side, labels, groups and tape, a drawer, blanks, undo, and a copy', async ({ browser, request }) => {
+  const id = Date.now().toString(36)
+  const rx = `Shure AD4D ${id}`
+  const drawer = `2U drawer ${id}`
+  const xlr = `XLR loom ${id}`
+  const PART = { ...AMP, category: 'Rack parts', tracking: 'bulk' }
+  await push(request, id, [
+    ['model.create', { id: `rx-${id}`, name: rx, ...AMP, category: 'RF', units: 1, rackWidth: 'half', depthMm: 300 }],
+    ['model.create', { id: `drawer-${id}`, name: drawer, ...PART, units: 2, depthMm: 350, rackPart: 'drawer' }],
+    ['model.create', { id: `blank-${id}`, name: `1U blank ${id}`, ...PART, units: 1, rackPart: 'blank' }],
+    ['model.create', { id: `xlr-${id}`, name: xlr, ...AMP, rackMount: false, tracking: 'bulk', category: 'Cable' }],
+    ['model.create', { id: `rack-${id}`, name: `RF rack ${id}`, department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '', units: 4, depthMm: 450 }],
+  ])
+
+  const page = await (await browser.newContext({ viewport: deskSize })).newPage()
+  await page.goto(`/#stock/racks/rack-${id}`)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  const palette = page.getByRole('region', { name: 'Kit to build with' })
+  const rack = page.getByRole('region', { name: 'The rack' })
+  await rack.getByRole('button', { name: 'Front and back' }).click()
+  await palette.getByLabel('Find kit').fill(id)
+
+  // Two half-width receivers side by side on one unit, placed by where they're pressed.
+  const u1 = rack.getByRole('button', { name: 'U1 front' })
+  const box = (await u1.boundingBox())!
+  await palette.getByRole('button', { name: `Pick up ${rx}` }).click()
+  await u1.click({ position: { x: box.width * 0.3, y: box.height / 2 } })
+  await palette.getByRole('button', { name: `Pick up ${rx}` }).click()
+  await u1.click({ position: { x: box.width * 0.95, y: box.height / 2 } })
+  await expect(rack.getByRole('button', { name: `${rx}, U1 on the left on the front` })).toBeVisible()
+  await expect(rack.getByRole('button', { name: `${rx}, U1 on the right on the front` })).toBeVisible()
+  await expect(page.getByRole('list', { name: "What won't work" })).toHaveCount(0)
+
+  // Picked up, it's labelled, grouped and taped.
+  await rack.getByRole('button', { name: `${rx}, U1 on the left on the front` }).click()
+  const details = page.getByRole('form', { name: `${rx} in this rack` })
+  await details.getByLabel('Label').fill('IEM 1–2')
+  await details.getByLabel('Group').fill('RF')
+  await details.getByLabel('Tape colour').selectOption({ label: 'Blue' })
+  await details.getByRole('button', { name: `Save ${rx}` }).click()
+  const labelled = rack.getByRole('button', { name: `IEM 1–2 (${rx}), U1 on the left on the front, RF, blue tape` })
+  await expect(labelled).toBeVisible()
+  await expect(rack.getByText('RF · 1 thing, blue tape')).toBeVisible()
+
+  // Undo takes it back, Redo puts it again.
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(rack.getByRole('button', { name: `${rx}, U1 on the left on the front` })).toBeVisible()
+  await page.keyboard.press('Control+Shift+Z')
+  await expect(labelled).toBeVisible()
+
+  // A drawer, and the loom in it.
+  await palette.getByRole('button', { name: `Pick up ${drawer}` }).click()
+  await rack.getByRole('button', { name: 'U3 front' }).click()
+  await palette.getByRole('button', { name: 'Everything, to go loose' }).click()
+  await palette.getByRole('button', { name: `Pick up ${xlr}` }).click()
+  await rack.getByRole('button', { name: 'Put it loose in the rack' }).click()
+  await rack.getByRole('button', { name: xlr }).click()
+  await page.getByRole('form', { name: `${xlr} in this rack` }).getByRole('combobox', { name: 'In', exact: true }).selectOption({ label: `${drawer} at U3` })
+  await page.getByRole('button', { name: `Save ${xlr}` }).click()
+  await expect(rack.getByRole('heading', { name: `In the ${drawer} at U3` })).toBeVisible()
+
+  // The gap left on the front is filled with a blank.
+  await page.getByRole('button', { name: 'Fill the gaps with blanks' }).click()
+  await expect(rack.getByRole('button', { name: /, U2 on the front$/ })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Fill the gaps with blanks' })).toHaveCount(0)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  if (process.env.SHOTS) {
+    await rack.getByRole('button', { name: 'In 3D' }).click()
+    await rack.getByRole('button', { name: 'Front', exact: true }).click()
+    await page.screenshot({ path: 'docs/hub/img/rack-built-up.png' })
+    await rack.getByRole('button', { name: 'Front and back' }).click()
+  }
+
+  // Copied, the new rack has the same layout, labels and all.
+  await page.getByRole('button', { name: 'Copy this rack' }).click()
+  await page.getByLabel('Name of the copy').fill(`RF rack B ${id}`)
+  await page.getByRole('button', { name: 'Copy it' }).click()
+  await expect(page.getByRole('heading', { name: `RF rack B ${id}`, level: 1 })).toBeVisible()
+  await expect(rack.getByRole('button', { name: `IEM 1–2 (${rx}), U1 on the left on the front, RF, blue tape` })).toBeVisible()
+  await expect(rack.getByRole('heading', { name: `In the ${drawer} at U3` })).toBeVisible()
 })
