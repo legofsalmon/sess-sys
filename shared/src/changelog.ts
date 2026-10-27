@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.37.2',
+    date: '2026-10-27',
+    title: 'Every page says where you are, in the same place',
+    what: 'Each page now has the same top: the area’s pages in one row (one line on a phone, sliding sideways), then the page’s own name in large letters, such as Calls, Catalogue or Labels, rather than just Crew or Stock. A page’s main list is no longer boxed, card headings are quieter, and on a wide screen a page has a main column with the things beside it on the right, instead of cards zigzagging in pairs.',
+    prs: [136],
+    adrs: [82],
+  },
+  {
     version: '1.37.1',
     date: '2026-10-27',
     title: '“On this screen” sits with the page',

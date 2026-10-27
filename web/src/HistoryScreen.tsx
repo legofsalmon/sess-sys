@@ -93,8 +93,7 @@ export function HistoryScreen() {
   return (
     <div className="app history">
       {/* In the Menu (ADR 0035): a record for the directors and the office, used now and then. */}
-      <Top view={view} title="Menu" up={{ steps: [MENU], here: 'History' }} />
-      <h1>History</h1>
+      <Top view={view} title="Menu" up={{ steps: [MENU], here: 'History' }} heading="History" />
 
       <section className="card">
         <label className="field">

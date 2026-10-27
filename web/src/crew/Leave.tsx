@@ -139,14 +139,7 @@ export function LeaveScreen({ view }: { view: View }) {
   const approver = canApproveLeave(me)
   return (
     <div className="app crew jobs leave-screen">
-      <Top view={view} title="Crew" />
-      <CrewViews view={view} current="leave" />
-      {/* Until it's someone's own leave, which their name heads, the screen says what it is, so the move here lands on that and names the tab (audit finding 22). */}
-      {me?.kind !== 'staff' && (
-        <header className="title">
-          <h1>Leave</h1>
-        </header>
-      )}
+      <Top view={view} title="Crew" views={<CrewViews view={view} current="leave" />} heading="Leave" />
       {!me ? (
         <WhoAreYou view={view} signedIn={signedIn} email={email} onPick={pick} />
       ) : me.kind !== 'staff' ? (
@@ -300,7 +293,7 @@ function MyLeave({ view, me, year, onYear, onNotMe }: { view: View; me: PersonVi
       <section className="card">
         <p className="kicker">My leave</p>
         <div className="title">
-          <h1>{me.name}</h1>
+          <h2>{me.name}</h2>
           {onNotMe && (
             <button type="button" className="link" onClick={onNotMe}>
               Not you? Change

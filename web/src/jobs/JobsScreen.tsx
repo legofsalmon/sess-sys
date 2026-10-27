@@ -108,7 +108,7 @@ export function JobsScreen() {
   // On a laptop the list keeps a column of its own (audit finding 25), with its search and filter, beside the rest of the tab; on a phone it's above it.
   if (wide)
     return (
-      <Beside view={view} className="crew jobs" head={<JobViews />} list={<JobsCard view={view} />}>
+      <Beside view={view} className="crew jobs" views={<JobViews />} heading="Jobs" list={<JobsCard view={view} />}>
         <JobsRest view={view} />
       </Beside>
     )
@@ -118,8 +118,7 @@ export function JobsScreen() {
 function JobList({ view }: { view: View }) {
   return (
     <div className="app crew jobs">
-      <Top view={view} root />
-      <JobViews />
+      <Top view={view} views={<JobViews />} heading="Jobs" />
 
       <JobsCard view={view} phone />
 
@@ -162,13 +161,8 @@ function ClientsScreen({ view }: { view: View }) {
   const { jobs, clients } = view.jobs
   return (
     <div className="app crew jobs">
-      <Top view={view} />
-      <JobViews current="clients" />
-      <section className="card">
-        <h1 className="with-icon">
-          <Icon name="company" />
-          <span>Clients</span>
-        </h1>
+      <Top view={view} views={<JobViews current="clients" />} heading="Clients" />
+      <section className="card plain">
         {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {clients.map((c) => (
@@ -187,14 +181,9 @@ function VenuesScreen({ view }: { view: View }) {
   const { jobs, venues } = view.jobs
   return (
     <div className="app crew jobs">
-      <Top view={view} />
-      <JobViews current="venues" />
+      <Top view={view} views={<JobViews current="venues" />} heading="Venues" />
       <VenuesMapCard venues={venues} jobsAt={(id) => jobsAt(jobs, id).length} />
-      <section className="card">
-        <h1 className="with-icon">
-          <Icon name="venue" />
-          <span>Venues</span>
-        </h1>
+      <section className="card plain">
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
         <ul className="job-list">
           {venues.map((v) => (
@@ -293,8 +282,7 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
   const win = useWindowed('jobs', rows, rowKey, 110)
 
   return (
-    <section className="card jobs-card" aria-label="Jobs" ref={card}>
-      <Heading icon="calendar">Jobs</Heading>
+    <section className="card plain jobs-card" aria-label="Jobs" ref={card}>
       {phone && mayAdd && (
         <>
           <Fold label="New job" className="new-job">

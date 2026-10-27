@@ -23,8 +23,7 @@ export function AccountScreen() {
 
   return (
     <div className="app account">
-      <Top view={view} title="Admin" up={{ steps: [MENU], here: 'Admin' }} />
-      <h1>Admin</h1>
+      <Top view={view} title="Admin" up={{ steps: [MENU], here: 'Admin' }} heading="Admin" />
 
       {auth.status === 'open' && auth.passcode && (
         <section className="card">

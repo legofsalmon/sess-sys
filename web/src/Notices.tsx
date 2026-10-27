@@ -101,8 +101,7 @@ export function NoticesScreen() {
 
   return (
     <div className="app notices">
-      <Top view={view} title="Menu" up={{ steps: [MENU], here: 'Notifications' }} />
-      <h1>Notifications</h1>
+      <Top view={view} title="Menu" up={{ steps: [MENU], here: 'Notifications' }} heading="Notifications" />
 
       <section className="card">
         <p className="hint">

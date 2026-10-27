@@ -64,8 +64,7 @@ export function YouScreen() {
 
   return (
     <div className="app you">
-      <Top view={view} title="You" up={{ steps: [MENU], here: 'You' }} />
-      <h1>You</h1>
+      <Top view={view} title="You" up={{ steps: [MENU], here: 'You' }} heading="You" />
 
       {auth.status === 'open' && !auth.passcode && (
         <section className="card">
