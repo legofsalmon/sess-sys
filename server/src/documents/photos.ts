@@ -1,6 +1,25 @@
-import { FILE_HEAD_BYTES, FILE_TOO_BIG, fileTypeOf, isPhotoType, MAX_FILE_BYTES, mayChangePhoto, NO_FILE, NOT_A_PHOTO, PHOTO_ACTIONS, PHOTO_REFUSAL, PHOTOS_WAIT, photoMime, readsPhotoOf, type PhotoType } from '@sh/shared'
+import {
+  FILE_HEAD_BYTES,
+  FILE_TOO_BIG,
+  fileTypeOf,
+  isPhotoType,
+  MAX_FILE_BYTES,
+  mayChangePhoto,
+  mayChangeProductPhoto,
+  NO_FILE,
+  NOT_A_PHOTO,
+  PHOTO_ACTIONS,
+  PHOTO_REFUSAL,
+  PHOTOS_WAIT,
+  photoMime,
+  PRODUCT_PHOTO_ACTIONS,
+  PRODUCT_PHOTO_REFUSAL,
+  readsPhotoOf,
+  type PhotoType,
+} from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { getPerson } from '../crew/store.ts'
+import { getModel } from '../stock/store.ts'
 import type { Db, Queryable } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { emit, Refused, serverChange } from '../kernel.ts'
@@ -17,15 +36,18 @@ import { claimFile, queueFile } from './store.ts'
  * crew; read by everyone signed in who reads that person's details. The
  * photo is sent back to be shown, not downloaded, and its address changes
  * with each new one, so a browser keeps it for as long as it likes.
+ *
+ * A product's photo (ADR 0082) is kept and sent the same way, put up and
+ * taken down by whoever changes stock, and read by everyone signed in.
  */
 
 const ROUTE_LIMIT = MAX_FILE_BYTES + 256 * 1024
 
 type Req = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string } }>
 
-/** Where a person's photo is kept and what it is, for the server alone. */
-async function photoOf(q: Queryable, id: string): Promise<{ key: string; type: PhotoType } | undefined> {
-  const { rows } = await q.query<{ photo_key: string | null; photo_type: PhotoType | null }>('SELECT photo_key, photo_type FROM people WHERE id = $1', [id])
+/** Where a person's or product's photo is kept and what it is, for the server alone. */
+async function photoOf(q: Queryable, id: string, table: 'people' | 'models' = 'people'): Promise<{ key: string; type: PhotoType } | undefined> {
+  const { rows } = await q.query<{ photo_key: string | null; photo_type: PhotoType | null }>(`SELECT photo_key, photo_type FROM ${table} WHERE id = $1`, [id])
   return rows[0]?.photo_key ? { key: rows[0].photo_key, type: rows[0].photo_type! } : undefined
 }
 
@@ -66,64 +88,124 @@ export function removePhoto(db: Db, id: string, who: Who) {
   })
 }
 
+const NO_PRODUCT = () => new Refused({ code: 'not-found', message: "That product isn't in the stock list any more." })
+
+/** A photo put on a product (ADR 0082), in place of the one it had. */
+export function putProductPhoto(db: Db, files: DocumentFiles, id: string, data: Buffer, type: PhotoType, who: Who) {
+  const args = { id, type, bytes: data.length }
+  return withFile(files, data, (key) =>
+    serverChange(db, { name: PRODUCT_PHOTO_ACTIONS.put, args, ...who }, async (ctx) => {
+      if (!(await getModel(ctx.tx, id, true))) throw NO_PRODUCT()
+      const old = await photoOf(ctx.tx, id, 'models')
+      await claimFile(ctx.tx, key)
+      await ctx.tx.query('UPDATE models SET photo_key = $2, photo_type = $3, photo_bytes = $4, photo_at = now() WHERE id = $1', [id, key, type, data.length])
+      if (old) await queueFile(ctx.tx, old.key, true)
+      await emit(ctx, 'model', id, await getModel(ctx.tx, id))
+      await recordArgs(ctx, { ...args, replaced: !!old })
+    })
+  )
+}
+
+/** A product's photo taken down: its icon again, and the file on the list of files to delete. */
+export function removeProductPhoto(db: Db, id: string, who: Who) {
+  return serverChange(db, { name: PRODUCT_PHOTO_ACTIONS.remove, args: { id }, ...who }, async (ctx) => {
+    if (!(await getModel(ctx.tx, id, true))) throw NO_PRODUCT()
+    const old = await photoOf(ctx.tx, id, 'models')
+    if (!old) return
+    await queueFile(ctx.tx, old.key, true)
+    await ctx.tx.query('UPDATE models SET photo_key = NULL, photo_type = NULL, photo_bytes = NULL, photo_at = NULL WHERE id = $1', [id])
+    await emit(ctx, 'model', id, await getModel(ctx.tx, id))
+  })
+}
+
 export function registerPhotoRoutes(app: FastifyInstance, { db, files, onChange }: { db: Db; files: DocumentFiles; onChange: () => void }) {
   void app.register(async (scope) => {
     scope.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: ROUTE_LIMIT }, (_req, body, done) => done(null, body))
 
     const who = (req: Req): Who => ({ clientId: req.query.client, userId: req.user?.id, device: describeDevice(req.headers['user-agent']) })
-    const allowed = (req: Req) => mayChangePhoto(req.role, req.reader?.personId, req.params.id)
 
-    scope.post('/api/people/:id/photo', { bodyLimit: ROUTE_LIMIT }, async (req: Req, reply) => {
-      if (!allowed(req)) return reply.code(403).send({ error: PHOTO_REFUSAL })
-      if (!files.on) return reply.code(409).send({ error: PHOTOS_WAIT })
-      const body = req.body
-      if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })
-      if (body.length > MAX_FILE_BYTES) return reply.code(413).send({ error: FILE_TOO_BIG })
-      const found = fileTypeOf(body.subarray(0, FILE_HEAD_BYTES))
-      if ('refused' in found || !isPhotoType(found.type)) return reply.code(415).send({ error: NOT_A_PHOTO })
-      try {
-        await putPhoto(db, files, req.params.id, body, found.type, who(req))
-      } catch (err) {
-        if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
-        if (err instanceof NotKept) return reply.code(502).send({ error: err.message })
-        throw err
-      }
-      onChange()
-      return { ok: true }
+    /** Put up, taken down and sent back the same way for a person and a product; what differs is who, and where it's kept. */
+    const routes = (o: {
+      path: string
+      table: 'people' | 'models'
+      allowed: (req: Req) => boolean
+      refusal: string
+      reads: (req: Req) => Promise<boolean>
+      put: (id: string, data: Buffer, type: PhotoType, who: Who) => Promise<unknown>
+      remove: (id: string, who: Who) => Promise<unknown>
+    }) => {
+      scope.post(o.path, { bodyLimit: ROUTE_LIMIT }, async (req: Req, reply) => {
+        if (!o.allowed(req)) return reply.code(403).send({ error: o.refusal })
+        if (!files.on) return reply.code(409).send({ error: PHOTOS_WAIT })
+        const body = req.body
+        if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })
+        if (body.length > MAX_FILE_BYTES) return reply.code(413).send({ error: FILE_TOO_BIG })
+        const found = fileTypeOf(body.subarray(0, FILE_HEAD_BYTES))
+        if ('refused' in found || !isPhotoType(found.type)) return reply.code(415).send({ error: NOT_A_PHOTO })
+        try {
+          await o.put(req.params.id, body, found.type, who(req))
+        } catch (err) {
+          if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
+          if (err instanceof NotKept) return reply.code(502).send({ error: err.message })
+          throw err
+        }
+        onChange()
+        return { ok: true }
+      })
+
+      scope.delete(o.path, async (req: Req, reply) => {
+        if (!o.allowed(req)) return reply.code(403).send({ error: o.refusal })
+        try {
+          await o.remove(req.params.id, who(req))
+        } catch (err) {
+          if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
+          throw err
+        }
+        onChange()
+        return { ok: true }
+      })
+
+      scope.get(o.path, async (req: Req, reply: FastifyReply) => {
+        const notHere = () => reply.code(404).header('cache-control', 'no-store').send({ error: 'There is no photo here.' })
+        if (!(await o.reads(req))) return notHere()
+        const photo = await photoOf(db.reads, req.params.id, o.table)
+        if (!photo || !files.on) return notHere()
+        let data: Buffer
+        try {
+          data = await files.read(photo.key)
+        } catch (err) {
+          if (err instanceof FileGone || err instanceof FileLocked) return notHere()
+          throw err
+        }
+        // Shown in the page, as an image only: nothing a browser could guess from, and nothing it could run.
+        return reply
+          .type(photoMime(photo.type))
+          .header('content-disposition', 'inline')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-security-policy', "default-src 'none'; sandbox; frame-ancestors 'none'")
+          .header('cache-control', 'private, max-age=31536000, immutable')
+          .send(data)
+      })
+    }
+
+    routes({
+      path: '/api/people/:id/photo',
+      table: 'people',
+      allowed: (req) => mayChangePhoto(req.role, req.reader?.personId, req.params.id),
+      refusal: PHOTO_REFUSAL,
+      reads: async (req) => readsPhotoOf(await readingOf(db.reads, req.role, req.reader ?? {}), req.params.id),
+      put: (id, data, type, w) => putPhoto(db, files, id, data, type, w),
+      remove: (id, w) => removePhoto(db, id, w),
     })
-
-    scope.delete('/api/people/:id/photo', async (req: Req, reply) => {
-      if (!allowed(req)) return reply.code(403).send({ error: PHOTO_REFUSAL })
-      try {
-        await removePhoto(db, req.params.id, who(req))
-      } catch (err) {
-        if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
-        throw err
-      }
-      onChange()
-      return { ok: true }
-    })
-
-    scope.get('/api/people/:id/photo', async (req: Req, reply: FastifyReply) => {
-      const notHere = () => reply.code(404).header('cache-control', 'no-store').send({ error: 'There is no photo here.' })
-      if (!readsPhotoOf(await readingOf(db.reads, req.role, req.reader ?? {}), req.params.id)) return notHere()
-      const photo = await photoOf(db.reads, req.params.id)
-      if (!photo || !files.on) return notHere()
-      let data: Buffer
-      try {
-        data = await files.read(photo.key)
-      } catch (err) {
-        if (err instanceof FileGone || err instanceof FileLocked) return notHere()
-        throw err
-      }
-      // Shown in the page, as an image only: nothing a browser could guess from, and nothing it could run.
-      return reply
-        .type(photoMime(photo.type))
-        .header('content-disposition', 'inline')
-        .header('x-content-type-options', 'nosniff')
-        .header('content-security-policy', "default-src 'none'; sandbox; frame-ancestors 'none'")
-        .header('cache-control', 'private, max-age=31536000, immutable')
-        .send(data)
+    // A product's (ADR 0082): nobody's personal data, so whoever is signed in reads it.
+    routes({
+      path: '/api/models/:id/photo',
+      table: 'models',
+      allowed: (req) => mayChangeProductPhoto(req.role),
+      refusal: PRODUCT_PHOTO_REFUSAL,
+      reads: async () => true,
+      put: (id, data, type, w) => putProductPhoto(db, files, id, data, type, w),
+      remove: (id, w) => removeProductPhoto(db, id, w),
     })
   })
 }

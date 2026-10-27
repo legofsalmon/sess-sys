@@ -199,6 +199,12 @@ export type Model = z.infer<typeof model> & {
    * its items retired as `mistake` and its counts gone, and out of every list.
    */
   mistake: boolean
+  /**
+   * Its photo (ADR 0082): when it was put up, which makes its address
+   * (productPhotoPath). Set by the server, never by an edit; none until
+   * someone puts one up.
+   */
+  photo?: { at: string } | null
 }
 
 /** Why an item is no longer stock. `mistake` is for one that never was: it's hidden everywhere but the history. */

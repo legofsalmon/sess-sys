@@ -32,7 +32,7 @@ import {
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
-import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
+import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS, PRODUCT_PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { STEP_LABELS, type JobStep } from '@sh/shared'
@@ -662,6 +662,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Removed the product ${model(a.id)}`
     case 'model.mistake':
       return `Marked the product ${model(a.id)} as added by mistake`
+    // A product's photo (ADR 0082): that it changed, never the picture.
+    case PRODUCT_PHOTO_ACTIONS.put:
+      return `${a.replaced ? 'Put a new photo' : 'Put a photo'} on the product ${model(a.id)}`
+    case PRODUCT_PHOTO_ACTIONS.remove:
+      return `Took the photo off the product ${model(a.id)}`
     case 'place.upsert':
       return `Saved the place ${text(a.name, 'a place')}`
     case 'place.remove':

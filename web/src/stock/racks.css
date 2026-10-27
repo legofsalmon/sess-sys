@@ -90,3 +90,28 @@
 .warehouse .rack-groups ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); font-size: var(--text-small); }
 .warehouse .loose-lot h4 { font-size: var(--text-small); color: var(--muted); }
 .warehouse .usual-parts { display: grid; gap: var(--space-6); }
+
+/* A product's photo on its panel (ADR 0082), the name on it kept readable over it. */
+.warehouse .rack-thing.with-photo { background: var(--photo) center / cover no-repeat, var(--panel); }
+.warehouse .rack-thing .thing-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.warehouse .rack-thing.with-photo .thing-name { padding: 0 .3em; border-radius: 3px; background: color-mix(in srgb, var(--panel) 85%, transparent); }
+
+/* The rack sheet on paper (ADR 0082): black on white whatever the theme, front and back side by side, then what goes where. */
+@media print {
+  .print-sheet.rack-sheet {
+    --panel: #fff; --ink: #000; --muted: #444; --line: #bbb; --ds-line-strong: #555; --ds-surface-inset: #eee; --warn: #000; --accent: #000;
+    color: #000; background: #fff; font: 10pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .rack-sheet h1 { font-size: 17pt; margin: 2pt 0; }
+  .rack-sheet h2, .rack-sheet h3 { font-size: 11pt; margin: 6pt 0 3pt; text-transform: none; letter-spacing: 0; }
+  .rack-sheet p { margin: 0; }
+  .rack-sheet .kicker, .rack-sheet .rack-totals { color: #444; }
+  .rack-sheet .rack-sides { --rack-u: 18pt; display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .rack-sheet .rack-elevation, .rack-sheet tr { break-inside: avoid; }
+  .rack-sheet .rack-thing { font-size: 8pt; }
+  .rack-sheet .rack-sheet-table { width: 100%; border-collapse: collapse; }
+  .rack-sheet .rack-sheet-table th, .rack-sheet .rack-sheet-table td { text-align: left; vertical-align: top; padding: 2pt 4pt; border-bottom: 1px solid #bbb; }
+  .rack-sheet .rack-sheet-table thead th { color: #444; font-weight: 600; }
+  .rack-sheet .tape-swatch { margin-right: 3pt; }
+}

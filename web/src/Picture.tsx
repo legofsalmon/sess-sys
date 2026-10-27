@@ -1,4 +1,4 @@
-import { photoPath, type Person } from '@sh/shared'
+import { photoPath, productPhotoPath, type Model, type Person } from '@sh/shared'
 import { useState } from 'react'
 import { Icon, type IconName } from './Icon.tsx'
 
@@ -8,8 +8,7 @@ import { Icon, type IconName } from './Icon.tsx'
  * with the icon for what kind of thing it is; a person's photo or, until
  * they give one, their initials. The name is always beside it, so the
  * picture is hidden from screen readers. A person's photo comes from the
- * server once they have one (ADR 0065); things have only placeholders yet,
- * and `src` is for when they have photos too.
+ * server once they have one (ADR 0065), as a product's does (ADR 0082).
  */
 
 type Size = 'small' | 'large'
@@ -28,7 +27,10 @@ const base = import.meta.env.VITE_API_BASE ?? ''
 /** Where a person's photo is, once they have one (ADR 0065). */
 export const photoOf = (p: Pick<Person, 'id' | 'photo'> | undefined) => (p?.photo ? `${base}${photoPath(p.id, p.photo.at)}` : undefined)
 
-/** A thing: a product, an item, a case. */
+/** Where a product's photo is, once it has one (ADR 0082). */
+export const productPhotoOf = (m: Pick<Model, 'id' | 'photo'> | null | undefined) => (m?.photo ? `${base}${productPhotoPath(m.id, m.photo.at)}` : undefined)
+
+/** A thing: a product, an item, a case. Its photo shows whole, as it's often a wide front panel. */
 export function Thumb({ icon, src, size }: { icon: IconName; src?: string; size?: Size }) {
   return (
     <span className={cls('thumb', size)} aria-hidden="true">

@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.39.0',
+    date: '2026-10-27',
+    title: 'Photos of kit, and the rack sheet',
+    what: 'A product can now have a photo: open it in Stock and press Add a photo. A photo of its front panel shows on it in the rack designer, flat and in 3D, so a rack on screen looks like the one in the truck, and the photo shows in the stock lists and on a job’s kit too. Each rack also prints as a sheet to build it from: Print the rack sheet, on the rack’s page or in the designer, gives the front and back drawn side by side, then what goes where in words, with labels, groups, tape colours and notes, what’s in each drawer, and its weight and power.',
+    prs: [136],
+    adrs: [82],
+  },
+  {
     version: '1.38.0',
     date: '2026-10-27',
     title: 'Building a rack up',

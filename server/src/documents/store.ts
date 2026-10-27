@@ -68,13 +68,14 @@ export async function queueFilesOf(q: Queryable, personId: string) {
   )
 }
 
-/** Every document's file, people's and those on venues and clients (ADR 0032), and people's photos (ADR 0065), on the list at once: everything is going (starting fresh, ADR 0019). */
+/** Every document's file, people's and those on venues and clients (ADR 0032), people's photos (ADR 0065) and products' (ADR 0082), on the list at once: everything is going (starting fresh, ADR 0019). */
 export async function queueAllFiles(q: Queryable) {
   await q.query(
     `INSERT INTO document_files_to_delete (key, since, after)
        SELECT file_key, now(), now() FROM documents WHERE file_key IS NOT NULL
        UNION SELECT file_key, now(), now() FROM attachments WHERE file_key IS NOT NULL
        UNION SELECT photo_key, now(), now() FROM people WHERE photo_key IS NOT NULL
+       UNION SELECT photo_key, now(), now() FROM models WHERE photo_key IS NOT NULL
      ON CONFLICT (key) DO UPDATE SET after = now()`
   )
 }

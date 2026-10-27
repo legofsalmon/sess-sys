@@ -36,8 +36,9 @@ import { RACKS, STOCK } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { DRAG_TYPE, heldOf, type Held } from './rack-drag.ts'
 import { GUESS_KIT_DEPTH, RACK_U, rackSize } from './rack-size.ts'
-import { slotName, thingClass, thingStyle } from './rack-look.ts'
+import { holderName, holdersIn, slotName, thingClass, thingStyle } from './rack-look.ts'
 import { LayoutTotals, sizeLabel } from './Racks.tsx'
+import { PrintRackSheet } from './RackSheet.tsx'
 
 /**
  * The rack designer (ADR 0075), after stagerack.com: a rack drawn front and
@@ -289,6 +290,12 @@ function Designer({ view, r }: { view: View; r: RackView }) {
               </button>
             )}
             <CopyRack view={view} r={r} />
+            <PrintRackSheet r={r} />
+          </div>
+        )}
+        {!mayChange && (
+          <div className="designer-tools">
+            <PrintRackSheet r={r} />
           </div>
         )}
         <Refusal error={error} />
@@ -370,10 +377,6 @@ const slotArgs = (s: SlotView): SlotArgs => ({
 const contentsOf = (r: RackView, holderId: string): Op[] => r.slots.filter((x) => x.inSlotId === holderId).map((x) => ({ set: slotArgs(x) }))
 
 /** The shelves and drawers on a rack's rails, which loose kit can go in. */
-const holdersIn = (r: RackView) => r.slots.filter((s) => s.top !== null && (s.model?.rackPart === 'shelf' || s.model?.rackPart === 'drawer'))
-
-/** "2U drawer at U3", as a shelf or drawer is told from another. */
-const holderName = (s: SlotView) => `${s.label || s.model?.name || '?'} at U${s.top}${s.side === 'rear' ? ' on the back' : ''}`
 
 /**
  * The details of one thing in the rack (ADR 0079), shown while it's picked
@@ -477,7 +480,7 @@ function SlotDetails({ r, s, onSave }: { r: RackView; s: SlotView; onSave: (next
 }
 
 /** The groups in the rack and their tape (ADR 0079): a key to what the colours on the panels are. */
-function Groups({ r }: { r: RackView }) {
+export function Groups({ r }: { r: RackView }) {
   const groups = new Map<string, { count: number; colours: Set<TapeColour> }>()
   for (const s of r.slots) {
     if (!s.group) continue
@@ -868,7 +871,7 @@ function DropSide({
               onDragEnd={() => onHold(undefined)}
               onClick={() => onHold({ kind: 'slot', slotId: s.id })}
             >
-              {s.model?.rackPart === 'blank' && !s.label ? '' : slotName(s)}
+              {s.model?.rackPart === 'blank' && !s.label ? '' : <span className="thing-name">{slotName(s)}</span>}
               {s.model?.dryHire && <small>· dry hire</small>}
             </button>
           )

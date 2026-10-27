@@ -1,7 +1,8 @@
-import { mayChangePhoto, NOT_A_PHOTO, PHOTO_SIDE, PHOTOS_WAIT, type PersonView } from '@sh/shared'
+import { mayChangePhoto, PHOTO_SIDE, PHOTOS_WAIT, type PersonView } from '@sh/shared'
 import { useRef, useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Icon } from '../Icon.tsx'
+import { shrinkPhoto } from '../photo-file.ts'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useLate } from '../useLate.ts'
@@ -17,32 +18,6 @@ import { refusal, useDocumentStorage } from './Documents.tsx'
  */
 
 const base = import.meta.env.VITE_API_BASE ?? ''
-
-/** The middle square of a photo, PHOTO_SIDE across, as a JPEG; the browser turns it the right way up as it draws it. */
-async function square(file: File): Promise<Blob> {
-  const url = URL.createObjectURL(file)
-  try {
-    const img = new Image()
-    img.src = url
-    // An iPhone's HEIC opens in Safari; a browser that can't open it is told to send another kind.
-    await img.decode().catch(() => {
-      throw new Error(NOT_A_PHOTO)
-    })
-    const side = Math.min(img.naturalWidth, img.naturalHeight)
-    if (!side) throw new Error(NOT_A_PHOTO)
-    const out = Math.min(PHOTO_SIDE, side)
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = out
-    const g = canvas.getContext('2d')
-    if (!g) throw new Error(NOT_A_PHOTO)
-    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out)
-    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/jpeg', 0.85))
-    if (!blob) throw new Error(NOT_A_PHOTO)
-    return blob
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
 
 async function call(id: string, init: RequestInit) {
   let res: Response
@@ -72,7 +47,7 @@ export function PersonPhoto({ person }: { person: PersonView }) {
     if (picker.current) picker.current.value = ''
     if (!file) return
     setBusy(true)
-    await run(async () => call(person.id, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: await square(file) }))
+    await run(async () => call(person.id, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: await shrinkPhoto(file, { side: PHOTO_SIDE, square: true }) }))
     setBusy(false)
   }
   const what = mine ? 'your photo' : `${person.name}'s photo`

@@ -43,7 +43,7 @@ import { RacksScreen, sizeFrom, SizeFields, sizeTypedOf, suppliersOf, whoseFrom,
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
-import { Thumb } from '../Picture.tsx'
+import { productPhotoOf, Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from './kitIcon.ts'
 import { Heading, Icon } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
@@ -333,7 +333,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           {[...(exact ? [exact] : []), ...items].map((a) => (
             <li key={a.id}>
               <a className="item-row" href={`#stock/item/${a.id}`}>
-                <Thumb icon={kitIcon(a.model)} />
+                <Thumb icon={kitIcon(a.model)} src={productPhotoOf(a.model)} />
                 <div>
                   <b>{numberLabel(a)}</b> {a.model?.name}
                   <p>
@@ -363,7 +363,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
             {rows.map((m) => (
               <li key={m.id}>
                 <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
-                  <Thumb icon={kitIcon(m)} />
+                  <Thumb icon={kitIcon(m)} src={productPhotoOf(m)} />
                   <div>
                     <b>{m.name}</b>
                     <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>

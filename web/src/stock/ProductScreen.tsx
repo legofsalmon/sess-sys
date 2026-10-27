@@ -54,6 +54,7 @@ import { dueText } from './Inspections.tsx'
 import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
+import { ProductPhoto } from './ProductPhoto.tsx'
 import { STOCK } from '../Up.tsx'
 import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
@@ -155,6 +156,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
         </div>
         <Pending pending={m.pending} />
       </header>
+      <ProductPhoto m={m} />
       <dl className="facts">
         {m.aliases.length > 0 && (
           <div>
