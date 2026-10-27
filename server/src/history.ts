@@ -648,7 +648,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (a.rackMount !== undefined) parts.push(a.rackMount ? 'rack-mount' : 'not rack-mount')
       const sized = (['units', 'depthMm', 'weightKg', 'powerW', 'rackWidth'] as const).filter((k) => a[k] !== undefined)
       if (sized.length) parts.push('its size')
-      // Rack parts (ADR 0078).
+      // Rack parts (ADR 0079).
       if (a.rackPart !== undefined) parts.push(typeof a.rackPart === 'string' ? (RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part') : 'kit, not a rack part')
       if ((['caseWidthMm', 'caseHeightMm', 'caseDepthMm', 'castors', 'powerLimitA'] as const).some((k) => a[k] !== undefined)) parts.push('its case')
       // Dry hire stock (ADR 0075).
@@ -715,7 +715,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'rackSlot.set': {
       const at = typeof a.top === 'number' ? `at U${a.top} on the ${a.side === 'rear' ? 'back' : 'front'}` : 'loose'
       const many = typeof a.qty === 'number' && a.qty > 1 ? `${a.qty} × ` : ''
-      // Placing across the rails, labels, groups and shelves (ADR 0078).
+      // Placing across the rails, labels, groups and shelves (ADR 0079).
       const across = typeof a.top === 'number' && (a.across === 'middle' || a.across === 'right') ? `, ${a.across === 'middle' ? 'in the middle' : 'on the right'},` : ''
       const inIt = typeof a.top !== 'number' && typeof a.inSlotId === 'string' ? (look('rackSlot', a.inSlotId) ? ` in the ${model(look('rackSlot', a.inSlotId)!.modelId)}` : ' in a shelf or drawer') : ''
       const marked = [typeof a.label === 'string' && a.label.trim() && `labelled ${clip(a.label.trim())}`, typeof a.group === 'string' && a.group.trim() && `in the group ${clip(a.group.trim())}`].filter(Boolean)

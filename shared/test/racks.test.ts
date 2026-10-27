@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { acrossAt, blanksFor, gapsOf, spanAcross, type RackSlot } from '../src/index.ts'
 
-/** Building a rack up (ADR 0078): where narrower kit sits, the gaps left, and the blanks for them. */
+/** Building a rack up (ADR 0079): where narrower kit sits, the gaps left, and the blanks for them. */
 
 const slot = (id: string, modelId: string, top: number | null, side: 'front' | 'rear' = 'front'): RackSlot => ({
   id,

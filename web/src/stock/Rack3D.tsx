@@ -57,7 +57,7 @@ function roleColour(el: Element, role: string, fallback: string): THREE.Color {
 
 /**
  * A thing's panel: its label or name, a strip of its tape colour at the
- * left (content, as the tape is), and for a rack part (ADR 0078) what
+ * left (content, as the tape is), and for a rack part (ADR 0079) what
  * makes it one: a vent's slots, a drawer's handle, a shelf's lip.
  */
 function labelTexture(text: string, units: number, parts: number, ink: THREE.Color, face: THREE.Color, tape: string | null, part: RackPart | null | undefined): THREE.CanvasTexture {
@@ -103,7 +103,7 @@ function boxOf(s: SlotView, size: ReturnType<typeof rackSize>) {
   const [from, to] = spanAcross(s.model?.rackWidth, s.across)
   const parts = Math.round(1 / (to - from))
   const face = PANEL / parts
-  // A blank or vent is a panel and no more; a shelf a tray behind it (ADR 0078).
+  // A blank or vent is a panel and no more; a shelf a tray behind it (ADR 0079).
   const part = s.model?.rackPart
   const deep = part === 'blank' || part === 'vent' ? 4 : (s.model?.depthMm ?? GUESS_KIT_DEPTH)
   const h = units * U - 1.5

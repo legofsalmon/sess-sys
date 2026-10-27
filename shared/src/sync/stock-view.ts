@@ -117,7 +117,7 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     caseDepthMm: m.caseDepthMm ?? null,
     castors: m.castors ?? false,
     powerLimitA: m.powerLimitA ?? null,
-    // And before rack parts (ADR 0078), none were.
+    // And before rack parts (ADR 0079), none were.
     rackPart: m.rackPart ?? null,
   })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })

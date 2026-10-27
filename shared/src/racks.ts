@@ -22,7 +22,7 @@ export type RackSide = (typeof RACK_SIDES)[number]
 export const RACK_SIDE_LABELS: Record<RackSide, string> = { front: 'Front', rear: 'Back' }
 
 /**
- * Where kit narrower than the rails sits across them (ADR 0078): half-width
+ * Where kit narrower than the rails sits across them (ADR 0079): half-width
  * kit on the left or the right (or in the middle, on its own), a third in
  * any of the three.
  */
@@ -32,7 +32,7 @@ export const RACK_ACROSS_LABELS: Record<RackAcross, string> = { left: 'On the le
 
 /**
  * The colour of the tape or label a thing in a rack is marked with, as crew
- * colour-code a rack's kit and looms (ADR 0078). It's content, like a
+ * colour-code a rack's kit and looms (ADR 0079). It's content, like a
  * fixture's colour: shown as a swatch with its name, never meaning anything
  * in the app.
  */
@@ -78,7 +78,7 @@ export const rackSlot = z.object({
   qty: whole(1, MAX_SLOT_QTY, 'How many'),
   notes: text(200, 'The note'),
   /**
-   * Where it sits across the rails, for kit narrower than them (ADR 0078).
+   * Where it sits across the rails, for kit narrower than them (ADR 0079).
    * Left out by an older app, as are the rest, so they have defaults.
    */
   across: z.enum(RACK_ACROSS).default('left'),
@@ -113,7 +113,7 @@ type Sized = Pick<Model, 'id' | 'name' | 'units' | 'depthMm' | 'weightKg' | 'pow
 
 /**
  * The part of the rails' width a thing takes, from 0 at the left to 1 at
- * the right (ADR 0078). Half-width kit in the middle sits centred.
+ * the right (ADR 0079). Half-width kit in the middle sits centred.
  */
 export function spanAcross(width: RackWidth | undefined, across: RackAcross | undefined): [number, number] {
   const parts = RACK_WIDTH_PARTS[width ?? 'full']
@@ -215,7 +215,7 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
     if (m && m.units === null) problems.push({ slotId: s.id, kind: 'no-size', message: `${m.name} has no height given, so it's drawn as 1U.` })
     const from = s.top
     const to = s.top + units - 1
-    // A unit with narrower kit side by side on it is used once (ADR 0078).
+    // A unit with narrower kit side by side on it is used once (ADR 0079).
     for (let u = from; u <= to; u++) (s.side === 'front' ? frontUnits : rearUnits).add(u)
     if (rack.units !== null && to > rack.units)
       problems.push({
@@ -232,7 +232,7 @@ export function layoutOf(rack: Sized, slots: readonly RackSlot[], models: Readon
       const a = placed[i]!
       const b = placed[j]!
       if (a.to < b.from || b.to < a.from) continue
-      // Narrower kit side by side (ADR 0078) neither sits on top of the other nor meets it in the middle.
+      // Narrower kit side by side (ADR 0079) neither sits on top of the other nor meets it in the middle.
       if (sideBySide(a.span, b.span)) continue
       const an = a.m?.name ?? 'That'
       const bn = b.m?.name ?? 'that'
@@ -262,7 +262,7 @@ export interface RackGap {
 
 /**
  * The runs of rack units on one side with nothing on them at all, top to
- * bottom (ADR 0078): where blank panels would go. A unit with half-width
+ * bottom (ADR 0079): where blank panels would go. A unit with half-width
  * kit on it isn't empty.
  */
 export function gapsOf(rackUnits: number, slots: readonly RackSlot[], models: ReadonlyMap<string, Sized>, side: RackSide): RackGap[] {
@@ -283,7 +283,7 @@ export function gapsOf(rackUnits: number, slots: readonly RackSlot[], models: Re
 }
 
 /**
- * Blank panels to fill the gaps with (ADR 0078), the tallest that fits
+ * Blank panels to fill the gaps with (ADR 0079), the tallest that fits
  * first, from the blanks there are. A gap no blank is short enough for is
  * left, and said by what's returned as left over.
  */

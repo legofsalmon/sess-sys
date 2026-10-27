@@ -69,7 +69,7 @@
 .warehouse .rack-side-cut .cut-thing text { fill: var(--ink); font-size: 22px; font-weight: 600; }
 .warehouse .rack-side-cut .cut-thing.bad text { fill: var(--warn); }
 
-/* Building a rack up (ADR 0078): narrower kit side by side, rack parts, tape and groups, undo. */
+/* Building a rack up (ADR 0079): narrower kit side by side, rack parts, tape and groups, undo. */
 .warehouse .designer-tools { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
 .warehouse .copy-rack { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: end; }
 .warehouse .slot-details { margin-top: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }

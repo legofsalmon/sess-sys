@@ -61,7 +61,7 @@ export async function clearLayout(ctx: Ctx, rackId: string) {
   for (const r of rows) await emitRemoved(ctx, 'rackSlot', r.id)
 }
 
-/** What was in a shelf or drawer (ADR 0078) stays in the rack, loose. */
+/** What was in a shelf or drawer (ADR 0079) stays in the rack, loose. */
 async function emptyHolder(ctx: Ctx, slotId: string) {
   const { rows } = await ctx.tx.query<{ id: string }>('UPDATE rack_slots SET in_slot_id = NULL WHERE in_slot_id = $1 RETURNING id', [slotId])
   for (const r of rows) await emit(ctx, 'rackSlot', r.id, await getSlot(ctx.tx, r.id))
@@ -82,7 +82,7 @@ export const rackHandlers: { 'rackSlot.set': Handler<'rackSlot.set'>; 'rackSlot.
     if (m.id === rack.id) throw new Refused({ code: 'conflict', message: "A rack can't go inside itself." })
     if (m.isRack) throw new Refused({ code: 'conflict', message: `${m.name} is a rack itself. Put what's in it in this rack's layout instead.` })
     if (a.top !== null && a.qty > 1) throw new Refused({ code: 'invalid', message: 'Something on the rails is one at a time: add another for the next.' })
-    // Only loose kit is in a shelf or drawer (ADR 0078), and only one of this rack's, on its rails.
+    // Only loose kit is in a shelf or drawer (ADR 0079), and only one of this rack's, on its rails.
     const inSlotId = a.top === null ? a.inSlotId : null
     if (inSlotId) {
       const holder = await getSlot(ctx.tx, inSlotId)

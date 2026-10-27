@@ -149,7 +149,7 @@ function SideCut({ r, bad }: { r: RackView; bad: ReadonlySet<string | undefined>
 }
 
 type SlotArgs = CommandArgs<'rackSlot.set'>
-/** One change to a layout, as the designer makes it and takes it back (ADR 0078). */
+/** One change to a layout, as the designer makes it and takes it back (ADR 0079). */
 type Op = { set: SlotArgs } | { remove: string }
 /** A step made in the designer: the changes it made, and the ones that take it back. */
 interface Step {
@@ -256,7 +256,7 @@ function Designer({ view, r }: { view: View; r: RackView }) {
   }
   const bad = useMemo(() => new Set(r.layout.problems.map((p) => p.slotId)), [r.layout])
 
-  // The blanks there are, for Fill the gaps (ADR 0078).
+  // The blanks there are, for Fill the gaps (ADR 0079).
   const blanks = view.warehouse.models.filter((m) => m.rackPart === 'blank' && m.units !== null && m.rackWidth === 'full')
   const gaps = r.model.units === null ? [] : gapsOf(r.model.units, r.slots, models, 'front')
   const fillGaps = () => {
@@ -366,7 +366,7 @@ const slotArgs = (s: SlotView): SlotArgs => ({
   inSlotId: s.inSlotId,
 })
 
-/** What's in a shelf or drawer, put back in it: taking it off the rails empties it (ADR 0078). */
+/** What's in a shelf or drawer, put back in it: taking it off the rails empties it (ADR 0079). */
 const contentsOf = (r: RackView, holderId: string): Op[] => r.slots.filter((x) => x.inSlotId === holderId).map((x) => ({ set: slotArgs(x) }))
 
 /** The shelves and drawers on a rack's rails, which loose kit can go in. */
@@ -376,7 +376,7 @@ const holdersIn = (r: RackView) => r.slots.filter((s) => s.top !== null && (s.mo
 const holderName = (s: SlotView) => `${s.label || s.model?.name || '?'} at U${s.top}${s.side === 'rear' ? ' on the back' : ''}`
 
 /**
- * The details of one thing in the rack (ADR 0078), shown while it's picked
+ * The details of one thing in the rack (ADR 0079), shown while it's picked
  * up: its label, group and tape colour, where it sits across the rails if
  * it's narrower than them, and for loose kit, how many and what it's in.
  */
@@ -476,7 +476,7 @@ function SlotDetails({ r, s, onSave }: { r: RackView; s: SlotView; onSave: (next
   )
 }
 
-/** The groups in the rack and their tape (ADR 0078): a key to what the colours on the panels are. */
+/** The groups in the rack and their tape (ADR 0079): a key to what the colours on the panels are. */
 function Groups({ r }: { r: RackView }) {
   const groups = new Map<string, { count: number; colours: Set<TapeColour> }>()
   for (const s of r.slots) {
@@ -506,7 +506,7 @@ function Groups({ r }: { r: RackView }) {
 }
 
 /**
- * Copy a rack (ADR 0078): a new rack product, the same size, with the same
+ * Copy a rack (ADR 0079): a new rack product, the same size, with the same
  * layout, to build a second like it or start a variation from. Its stock
  * code is left for the new one to be given.
  */
@@ -602,7 +602,7 @@ function Palette({
   const all = view.warehouse.models.filter(
     (m) => !m.isRack && m.id !== r.model.id && (!mounted || m.rackMount) && (whose === 'all' || (whose === 'dryHire') === m.dryHire)
   )
-  // Rack parts (ADR 0078) after the kit, as they're what's put in last.
+  // Rack parts (ADR 0079) after the kit, as they're what's put in last.
   const found = typed.trim()
     ? findProducts(all, typed).map((f) => f.product)
     : [...all].sort((a, b) => (a.rackMount ? 0 : 1) - (b.rackMount ? 0 : 1) || (a.rackPart ? 1 : 0) - (b.rackPart ? 1 : 0))
@@ -705,7 +705,7 @@ function Palette({
   )
 }
 
-/** The rack parts most racks are built with, to add to the stock list in one go (ADR 0078). */
+/** The rack parts most racks are built with, to add to the stock list in one go (ADR 0079). */
 const USUAL_PARTS: { name: string; part: RackPart; units: number; depthMm: number | null }[] = [
   { name: '1U blank panel', part: 'blank', units: 1, depthMm: null },
   { name: '2U blank panel', part: 'blank', units: 2, depthMm: null },
@@ -776,7 +776,7 @@ function DropSide({
   const placed = r.slots.filter((s) => s.top !== null && s.side === side)
   const size = r.model.units ?? Math.max(4, ...placed.map((s) => s.top! + (s.model?.units ?? 1) - 1))
   const bad = new Set(r.layout.problems.map((p) => p.slotId))
-  // What's taken on this side, leaving out what's being moved: narrower kit only takes its part across (ADR 0078).
+  // What's taken on this side, leaving out what's being moved: narrower kit only takes its part across (ADR 0079).
   const movingId = held?.kind === 'slot' ? held.slotId : undefined
   const others = placed.filter((s) => s.id !== movingId)
   const width = heldModel?.rackWidth
@@ -894,7 +894,7 @@ function Loose({
 }) {
   const [over, setOver] = useState(false)
   const loose = r.slots.filter((s) => s.top === null)
-  // What's in each shelf and drawer (ADR 0078), then what's loose in the rack itself.
+  // What's in each shelf and drawer (ADR 0079), then what's loose in the rack itself.
   const holders = holdersIn(r)
   const inHolder = new Set(holders.map((h) => h.id))
   const lots = (

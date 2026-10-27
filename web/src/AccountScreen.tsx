@@ -2,6 +2,7 @@ import { useAuth } from './auth.ts'
 import { BackupsCard } from './BackupsCard.tsx'
 import { CalendarCard } from './CalendarCard.tsx'
 import { ChangesCard } from './ChangesScreen.tsx'
+import { CurrentRmsCard } from './CurrentRmsCard.tsx'
 import { DataCard } from './DataCard.tsx'
 import { ExportCard } from './ExportCard.tsx'
 import { ListsCard } from './ListsCard.tsx'
@@ -13,7 +14,7 @@ import { useAccess } from './role.ts'
 import { useView } from './view.ts'
 import { MENU } from './Up.tsx'
 
-/** The company's settings, at #admin from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, the way to where each list is brought in (ADR 0041), and the app's version with what changed in it (ADR 0071). A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
+/** The company's settings, at #admin from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, Current RMS (ADR 0078), the way to where each list is brought in (ADR 0041), and the app's version with what changed in it (ADR 0071). A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
 
 export function AccountScreen() {
   const auth = useAuth()
@@ -67,6 +68,7 @@ export function AccountScreen() {
           {access.can('company') && <DataCard view={view} />}
           {access.can('company') && !access.rolesOff && <ReadingCard office={view.office} />}
           {access.can('settings') && <ListsCard calendar={access.can('jobs')} />}
+          {access.can('settings') && access.can('money') && <CurrentRmsCard />}
         </>
       )}
 

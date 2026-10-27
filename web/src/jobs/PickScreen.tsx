@@ -22,7 +22,7 @@ import {
   type PickRow,
   type View,
 } from '@sh/shared'
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
@@ -35,6 +35,7 @@ import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { JobStatusPill, Top } from './common.tsx'
 import { JOBS } from '../Up.tsx'
+import { useUnderTop } from '../useUnderTop.ts'
 
 /**
  * A job's pick list (ADR 0017): what its kit needs from Session Hire's
@@ -514,22 +515,6 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
 
 /** What a scan or a tap on the list did, said in the scan line at the top, where the eye already goes. */
 type Say = (tone: Tone, text: string, more?: { back?: AssetView; undo?: Undo }) => void
-
-/** Where the top bar ends, for what stays under it: it grows on a phone when its words wrap. */
-function useUnderTop(on: boolean) {
-  const el = useRef<HTMLElement>(null)
-  useLayoutEffect(() => {
-    const top = document.querySelector<HTMLElement>('.top')
-    if (!el.current || !top || typeof ResizeObserver === 'undefined') return
-    const card = el.current
-    const set = () => card.style.setProperty('--under-top', `${(parseFloat(getComputedStyle(top).top) || 0) + top.offsetHeight}px`)
-    const watch = new ResizeObserver(set)
-    watch.observe(top)
-    set()
-    return () => watch.disconnect()
-  }, [on])
-  return el
-}
 
 /** All out that's needed, or all back: nothing left to do on the row. */
 const rowDone = (row: PickRow, mode: Direction) => (mode === 'out' ? row.lines.length > 0 && row.out >= row.need : row.out === 0 && row.missing === 0)

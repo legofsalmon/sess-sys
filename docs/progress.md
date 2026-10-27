@@ -3,17 +3,17 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
-## 23 October 2026: building a rack up
+## 27 October 2026: building a rack up
 
 **Done**
 
-- [ADR 0078](adr/0078-building-a-rack-up.md) (PR #132), part 2 of 3 of the
+- [ADR 0079](adr/0079-building-a-rack-up.md) (PR #132), part 2 of 3 of the
   advanced rack builder. Narrower kit sits side by side (`rack_slots.across`);
   rack parts are products (`models.rack_part`: blank, vent, shelf, drawer),
   with the usual six added in one press and Fill the gaps with blanks; loose
   kit in a shelf or drawer (`in_slot_id`); a label, group and tape colour on
   each slot, the tape drawn as content; undo and redo in the designer; Copy
-  this rack. App 1.36.0.
+  this rack. App 1.38.0.
 - Checked: typecheck, unit tests (racks, parity, export), browser test
   (racks.spec.ts: halves side by side, label and tape, undo and redo, a
   drawer with a loom in it, blanks, a copy).
@@ -21,6 +21,47 @@ waiting on someone.
 **Next**
 
 - Part 3: product photos on the panels and a printable rack sheet.
+
+## 27 October 2026: a quote that saves itself and keeps up with the job
+
+**Done**
+
+- [ADR 0080](adr/0080-a-quote-that-saves-itself-and-keeps-up-with-the-job.md),
+  part 1a of the quoting plan, on Colly's ask for ease of use and clarity.
+  The draft saves itself; the total and lines with no price stay in view;
+  lines read as a list, one open at a time; lines charged once as well as
+  by the day; Add kit / Add crew priced from the price list; Undo on
+  Remove; "The job has changed" offers the job's new kit and crew. App
+  1.37.0.
+- Checked: typecheck, unit tests (charged once, changes from the job), the
+  e2e quote test on a phone, and the pick tests (the "stay under the top
+  bar" hook moved to its own file).
+
+**Next**
+
+- 1b: starting a quote from Money with a client and dates, the job kept in
+  step with the quote, and quotes to follow up in To sort out.
+- 1c: the printed quote (number, valid until, terms, deposit).
+
+## 23 October 2026: reading Current RMS through its API
+
+**Done**
+
+- [ADR 0078](adr/0078-reading-current-rms-through-its-api.md) (PR #131),
+  the first step of the quoting engine, on Colly's ask. The server reads
+  Current RMS's API with the key Colly saved on Railway (`CURRENT_CMS_KEY`,
+  subdomain `sessionhire`), GET only: every opportunity and its lines into
+  `rms_opportunities` and `rms_lines`, a request a second, "too many" waited
+  out, a second read re-reading only changed lines. Admin › Current RMS
+  starts, shows and stops a read and downloads two spreadsheets; Jobs ›
+  Money › Past quotes lists and opens them. Office and directors only. App
+  1.36.0.
+- Checked: typecheck, unit tests (a stand-in Current RMS), export.
+
+**Next**
+
+- Colly runs the first read on live and sends the downloads or an export,
+  to shape parts 1 and 2 of the quoting plan.
 
 ## 23 October 2026: rack-mount kit and the rack in 3D
 

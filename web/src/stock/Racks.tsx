@@ -168,7 +168,7 @@ export interface SizeTyped {
   caseDepth: string
   castors: boolean
   amps: string
-  /** A rack part rather than kit (ADR 0078); empty for kit. */
+  /** A rack part rather than kit (ADR 0079); empty for kit. */
   part: RackPart | ''
 }
 

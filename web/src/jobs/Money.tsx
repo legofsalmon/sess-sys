@@ -42,7 +42,7 @@ import { QuotePill } from './Quote.tsx'
  * sends nothing and books nothing into accounts.
  */
 
-function NotYours({ view, here }: { view: View; here?: string }) {
+export function NotYours({ view, here }: { view: View; here?: string }) {
   return (
     <div className="app crew jobs money">
       <Top view={view} up={here ? { steps: [JOBS, MONEY], here } : undefined} />
@@ -89,7 +89,7 @@ export function MoneyScreen({ view }: { view: View }) {
           </div>
         </dl>
         <p className="hint">
-          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#jobs/money/prices">Price list</a>
+          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#jobs/money/prices">Price list</a> · <a href="#jobs/money/current-rms">Past quotes from Current RMS</a>
         </p>
       </section>
       {!m.any && (

@@ -1,4 +1,4 @@
-# ADR 0078: Building a rack up: side by side, rack parts, labels, undo and copies
+# ADR 0079: Building a rack up: side by side, rack parts, labels, undo and copies
 
 - **Status:** accepted (part 2 of 3 of a more advanced rack builder)
 - **Date:** 23 October 2026

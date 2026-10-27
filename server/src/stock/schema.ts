@@ -297,7 +297,7 @@ const MIGRATIONS: string[] = [
    WHERE NOT is_rack AND (units IS NOT NULL OR id IN (SELECT model_id FROM rack_slots WHERE top IS NOT NULL));
   ALTER TABLE models ADD CONSTRAINT models_rack_not_mounted CHECK (NOT (is_rack AND rack_mount));
   `,
-  // Racks built up further (ADR 0078): rack parts (blanks, vents, shelves,
+  // Racks built up further (ADR 0079): rack parts (blanks, vents, shelves,
   // drawers) as products, and in a layout, where narrower kit sits across
   // the rails, a label, a group and a tape colour, and loose kit in a shelf
   // or drawer.

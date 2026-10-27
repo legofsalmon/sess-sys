@@ -28,11 +28,27 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.36.0',
-    date: '2026-10-23',
+    version: '1.38.0',
+    date: '2026-10-27',
     title: 'Building a rack up',
     what: 'In the rack designer, half-width and third-width kit now sits side by side: press or drop it on the left or right of a unit. Blank panels, vent panels, shelves and drawers are products of their own (one press adds the usual ones), and Fill the gaps with blanks covers every empty unit on the front. Cables and spares can go in a drawer or on a shelf. Press something in the rack to give it a label, a group such as RF and the colour of its tape; the groups are listed under the rack. Undo and Redo take back or put again what you just did, and Copy this rack makes a second one laid out the same.',
     prs: [132],
+    adrs: [79],
+  },
+  {
+    version: '1.37.0',
+    date: '2026-10-27',
+    title: 'An easier quote to put together',
+    what: 'A draft quote now saves itself as you type, so there’s no Save to forget, and says “Saved” when it has. The total stays at the top while you work down the lines. Lines read as a short list, as the client will see them; press one to change it. Add kit, Add crew and Add something else fill in the price from the price list, and a line can be charged once (delivery, say) rather than by the day. Lines with no price are marked, a removed line can be put back with Undo, and if the job’s kit or crew has changed since the quote was made, the quote offers to catch up in one press.',
+    prs: [133],
+    adrs: [80],
+  },
+  {
+    version: '1.36.0',
+    date: '2026-10-23',
+    title: 'Past quotes from Current RMS',
+    what: 'The app can now read Current RMS directly. On Admin, the office and directors can bring in every opportunity there (quotes, orders, lost and dead ones) with all their lines, prices and discounts. The first time takes up to half an hour and shows how far it’s got; after that only what changed is read again. They’re listed under Jobs › Money › Past quotes, to search by number, job, client or venue, and can be downloaded as spreadsheets. The app only reads: it never changes anything in Current RMS.',
+    prs: [131],
     adrs: [78],
   },
   {
