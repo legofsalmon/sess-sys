@@ -22,7 +22,7 @@ interface Part {
 }
 
 /** Cards straight in the screen, or in either column beside each other on a laptop. */
-const PARTS = '.app > section.card > h2, .app > .columns > .column > section.card > h2'
+const PARTS = '.app > section.card > h2, .app > .columns > .column > section.card > h2, .app > .split > * > section.card > h2'
 const FEWEST = 3
 
 function partsIn(app: Element): Part[] {
@@ -51,10 +51,18 @@ function heldBottom(nav: HTMLElement | null): number {
   return app ? underBar(app) + (nav!.hidden ? 0 : nav!.offsetHeight) : 0
 }
 
-/** The screen's own child that holds the first part: the strip goes straight before it. */
+/**
+ * The screen's own child that holds the first part, or the page's main thing
+ * before it (a card with no heading of its own, standing under the page's
+ * title): the strip goes straight before it, so it's never under a long list.
+ */
 function before(app: Element, first: Part | undefined): Element | null {
   let at: Element | null = first?.heading.parentElement ?? null
   while (at && at.parentElement !== app) at = at.parentElement
+  for (const child of app.children) {
+    if (child === at) break
+    if (child.matches('section.card.plain') || child.querySelector(':scope > section.card.plain')) return child
+  }
   return at
 }
 

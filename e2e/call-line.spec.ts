@@ -50,7 +50,7 @@ test('a big call says how many it holds in words, and names the first eight acro
   expect(await office.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneSize.width)
 
   // People and Timesheets are each titled by itself; Calls is Crew's own.
-  await expect(office.getByRole('heading', { level: 1, name: 'Crew' })).toBeVisible()
+  await expect(office.getByRole('heading', { level: 1, name: 'Calls' })).toBeVisible()
   const row = office.getByRole('navigation', { name: 'Crew pages' })
   await row.getByRole('link', { name: /^People/ }).click()
   await expect(office.getByRole('heading', { level: 1, name: 'People' })).toBeVisible()

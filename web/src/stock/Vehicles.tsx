@@ -32,6 +32,7 @@ import { client } from '../sync.ts'
 import { STOCK, VEHICLES } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { StockViews } from '../Views.tsx'
+import { Split } from '../Split.tsx'
 import './vehicles.css'
 
 /**
@@ -66,34 +67,33 @@ export function VehiclesScreen({ view }: { view: View }) {
   const retired = view.vehicles.all.filter((v) => v.archived)
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="vehicles" />
-      <h1 className="area-title">Vehicles</h1>
-      <VehicleReminders view={view} />
-      <section className="card" aria-label="Vehicles">
-        <Heading icon="van">Vans and the rest</Heading>
-        {view.vehicles.vehicles.length === 0 && <Empty>Add the vans, so they can be booked on jobs with a driver.</Empty>}
-        <ul className="vehicle-list">
-          {view.vehicles.vehicles.map((v) => (
-            <VehicleRow key={v.id} v={v} today={today} />
-          ))}
-        </ul>
-        {mayChange && (
-          <Fold label="Add vehicle">
-            <VehicleForm onDone={(id) => (location.hash = vehicleHref(id))} />
-          </Fold>
-        )}
-        {retired.length > 0 && (
-          <details className="retired">
-            <summary>Retired ({retired.length})</summary>
-            <ul className="vehicle-list">
-              {retired.map((v) => (
-                <VehicleRow key={v.id} v={v} today={today} />
-              ))}
-            </ul>
-          </details>
-        )}
-      </section>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="vehicles" />} heading="Vehicles" />
+      <Split side={<VehicleReminders view={view} />}>
+        <section className="card" aria-label="Vehicles">
+          <Heading icon="van">Vans and the rest</Heading>
+          {view.vehicles.vehicles.length === 0 && <Empty>Add the vans, so they can be booked on jobs with a driver.</Empty>}
+          <ul className="vehicle-list">
+            {view.vehicles.vehicles.map((v) => (
+              <VehicleRow key={v.id} v={v} today={today} />
+            ))}
+          </ul>
+          {mayChange && (
+            <Fold label="Add vehicle">
+              <VehicleForm onDone={(id) => (location.hash = vehicleHref(id))} />
+            </Fold>
+          )}
+          {retired.length > 0 && (
+            <details className="retired">
+              <summary>Retired ({retired.length})</summary>
+              <ul className="vehicle-list">
+                {retired.map((v) => (
+                  <VehicleRow key={v.id} v={v} today={today} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      </Split>
     </div>
   )
 }
