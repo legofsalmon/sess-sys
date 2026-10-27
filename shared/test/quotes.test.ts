@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { csvText, linesFor, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
+import { changesFromJob, csvText, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { invoicesCsv, vatSummaryCsv } from '../src/sync/money-view.ts'
 
@@ -34,6 +34,16 @@ describe('what a quote comes to', () => {
     expect(t.discount).toBe(187)
     expect(t.vat).toBe(Math.round(1312 * 0.23))
     expect(quoteTotals({ lines: [], discountPct: 0 })).toMatchObject({ gross: 0, rates: [] })
+  })
+
+  it('charges a line once whatever its days, as a device from before reads it too', () => {
+    // Proves: a delivery charged once is how many × the price; it keeps 1 for its days, so lineCents without `per` agrees.
+    expect(lineCents(line({ qty: 2, days: 1, unitCents: 15000, per: 'once' }))).toBe(30000)
+    expect(lineCents(line({ qty: 2, days: 3, unitCents: 15000, per: 'once' }))).toBe(30000)
+    expect(lineCents(line({ qty: 2, days: 3, unitCents: 15000, per: 'day' }))).toBe(90000)
+    expect(lineCents(line({ qty: 2, days: 3, unitCents: 15000 }))).toBe(90000)
+    expect(quoteLine.safeParse(line({ per: 'once' })).success).toBe(true)
+    expect(quoteLine.safeParse({ ...line({}), per: 'week' }).success).toBe(false)
   })
 
   it('writes euros as a quote does', () => {
@@ -80,6 +90,34 @@ describe("a job's kit and crew as lines", () => {
       ['Crew', 3],
       ['Other', 1],
     ])
+  })
+})
+
+describe('a quote against its job as the job changes', () => {
+  const prices = { product: (id: string) => (id === 'y10p' ? 4500 : undefined), role: () => 30000 }
+  let n = 0
+  const ids = () => `x${++n}`
+  const kit = [{ id: 'k1', modelId: 'y10p', name: 'd&b Y10P', group: 'Audio', qty: 8, days: 3 }]
+  const crew = [{ id: 'c1', role: 'Rigger', needed: 2, days: 2, bookedCents: null }]
+  const quoted = linesFor(kit, crew, prices, ids)
+
+  it('finds nothing when the quote was built from the job as it is', () => {
+    expect(changesFromJob(quoted, kit, crew, prices, ids)).toEqual({ added: [], gone: [], changed: [] })
+  })
+
+  it('finds kit and crew added, lines whose kit or call has gone, and how many changed, leaving lines typed in alone', () => {
+    // Proves: matched by what each line was built from; only how many is compared; a line typed in is never "gone".
+    const typed = line({ id: 'typed', what: 'Delivery', per: 'once' })
+    const now = changesFromJob(
+      [...quoted, typed],
+      [{ ...kit[0]!, qty: 10 }, { id: 'k2', modelId: 'hazer', name: 'Hazer', group: 'Lighting', qty: 1, days: 1 }],
+      [],
+      prices,
+      ids
+    )
+    expect(now.added.map((l) => [l.what, l.ref, l.unitCents, l.modelId])).toEqual([['Hazer', 'k2', 0, 'hazer']])
+    expect(now.gone.map((l) => l.what)).toEqual(['Rigger'])
+    expect(now.changed.map((c) => [c.line.what, c.line.qty, c.qty])).toEqual([['d&b Y10P', 8, 10]])
   })
 })
 

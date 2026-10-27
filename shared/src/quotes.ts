@@ -37,6 +37,10 @@ const PERCENT: Record<VatRate, number> = { '23': 23, '13.5': 13.5, '0': 0 }
 export const LINE_KINDS = ['kit', 'crew', 'other'] as const
 export type LineKind = (typeof LINE_KINDS)[number]
 
+/** How a line is charged: so much a day for the days charged, or once. */
+export const LINE_PER = ['day', 'once'] as const
+export type LinePer = (typeof LINE_PER)[number]
+
 /** A quote has room for this many lines: more than any job's kit and crew. */
 export const MAX_LINES = 300
 
@@ -69,9 +73,16 @@ export const quoteLine = z.object({
   qty: lineQty,
   /** Days charged: the days it's out or worked, unless the office charges fewer (a week for three, say). */
   days: lineDays,
-  /** The price for one, for a day. */
+  /** The price for one, for a day, or for the whole job when it's charged once. */
   unitCents: dayPrice,
   vat: z.enum(VAT_RATES),
+  /**
+   * Charged by the day (kit, crew), or once (delivery, transport, things sold). Left out by the app before it, which
+   * meant by the day. A line charged once keeps 1 for its days, so a device from before reads the same amount.
+   */
+  per: z.enum(LINE_PER).optional(),
+  /** The product a kit line is for, when it's one from the stock list: built from the job or picked on the quote. */
+  modelId: id.nullable().optional(),
 })
 export type QuoteLine = z.infer<typeof quoteLine>
 
@@ -178,7 +189,7 @@ export const quoteCommandSchemas = {
 // The sums.
 
 /** A line's amount: how many, for how many days, at the price for one a day, to the cent. */
-export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents'>) => Math.round(l.qty * l.days * l.unitCents)
+export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'per'>) => Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * l.unitCents)
 
 export interface RateTotal {
   rate: VatRate
@@ -206,7 +217,7 @@ export interface QuoteTotals {
  * VAT is worked out on what's left at that rate, each to the cent, as an
  * invoice has it; the totals are the sums of those, so they always add up.
  */
-export function quoteTotals(q: { lines: readonly Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'vat'>[]; discountPct: number }): QuoteTotals {
+export function quoteTotals(q: { lines: readonly Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'vat' | 'per'>[]; discountPct: number }): QuoteTotals {
   const rates: RateTotal[] = []
   for (const rate of VAT_RATES) {
     const at = q.lines.filter((l) => l.vat === rate)
@@ -285,6 +296,8 @@ export function linesFor(kit: readonly KitToQuote[], crew: readonly CrewToQuote[
         days: Math.max(1, k.days),
         unitCents: prices.product(k.modelId) ?? 0,
         vat: STANDARD_VAT,
+        per: 'day',
+        modelId: k.modelId,
       })
     ),
     ...crew.map(
@@ -298,9 +311,45 @@ export function linesFor(kit: readonly KitToQuote[], crew: readonly CrewToQuote[
         days: Math.max(1, c.days),
         unitCents: prices.role(c.role) ?? c.bookedCents ?? 0,
         vat: STANDARD_VAT,
+        per: 'day',
       })
     ),
   ]
+}
+
+/** What the job has that its quote doesn't, what the quote has that the job no longer does, and how many have changed. */
+export interface JobChanges {
+  /** The job's kit and crew not on the quote, as lines to add. */
+  added: QuoteLine[]
+  /** Lines built from the job's kit or crew that the job no longer has. */
+  gone: QuoteLine[]
+  /** Lines built from the job whose how many is no longer the job's. */
+  changed: { line: QuoteLine; qty: number }[]
+}
+
+/**
+ * How a quote's lines stand against the job's kit and crew now, matched by
+ * the kit line or crew call each was built from. Only how many is compared:
+ * the days and prices on a quote are the office's to change, and a job's
+ * dates moving says nothing about what the client is charged for.
+ */
+export function changesFromJob(lines: readonly QuoteLine[], kit: readonly KitToQuote[], crew: readonly CrewToQuote[], prices: PriceList, newId: () => string): JobChanges {
+  const refs = new Map(lines.filter((l) => l.ref && l.kind !== 'other').map((l) => [l.ref!, l]))
+  const fresh = linesFor(
+    kit.filter((k) => !refs.has(k.id)),
+    crew.filter((c) => !refs.has(c.id)),
+    prices,
+    newId
+  )
+  const now = new Map<string, number>([...kit.map((k) => [k.id, k.qty] as const), ...crew.map((c) => [c.id, c.needed] as const)])
+  const gone: QuoteLine[] = []
+  const changed: JobChanges['changed'] = []
+  for (const l of refs.values()) {
+    const qty = now.get(l.ref!)
+    if (qty === undefined) gone.push(l)
+    else if (qty !== l.qty && qty >= 1) changed.push({ line: l, qty })
+  }
+  return { added: fresh, gone, changed }
 }
 
 /** The groups a quote lists its lines under, in its order: kit by department first, then crew, then anything else. */

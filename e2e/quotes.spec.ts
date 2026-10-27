@@ -3,9 +3,10 @@ import { expect, test } from '@playwright/test'
 
 /**
  * Quotes and money (ADR 0042): the office builds a quote from a job's kit
- * and crew at the price list, changes a line and adds one at the lower VAT
- * rate, saves it, prints it to save as a PDF, marks it sent, makes a second
- * version, and records the client accepting it and the invoice. Money then
+ * and crew at the price list, changes a line and adds one charged once at
+ * the lower VAT rate, the draft saving itself, removes it and puts it back,
+ * prints it to save as a PDF, marks it sent, makes a second version, and
+ * records the client accepting it and the invoice. Money then
  * shows who owes what, a freelancer is marked paid, and the accountant's
  * file comes down. Uses the made-up data (ADR 0019), so it starts fresh
  * before and after: the other tests share this server.
@@ -39,23 +40,33 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(office.getByRole('heading', { name: 'Liffey Brands Launch' })).toBeVisible()
   await office.getByRole('button', { name: 'Build it from the job' }).click()
   const draft = office.getByRole('form', { name: 'Version 1, a draft' })
-  await expect(draft.getByLabel('Line 1: what')).toHaveValue('Robe Spiider')
-  await expect(draft.getByLabel('Line 2: what')).toHaveValue('LX op (Show)')
-  await expect(draft.getByLabel('Line 2: price a day')).toHaveValue('360')
-  await expect(draft.locator('.quote-totals')).toContainText('Before VAT€2,040.00')
+  // On a phone the lines read as a list, each opened to change it, one at a time.
+  await expect(draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' })).toContainText('12 × €55.00 a day × 2 days')
+  await draft.getByRole('button', { name: 'Line 2: LX op (Show), change it' }).click()
+  await expect(draft.getByLabel('Line 2: price')).toHaveValue('360')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €2,040.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
 
-  // The kit charged for one day, and delivery added at 13.5%.
+  // The kit charged for one day, and delivery added, charged once, at 13.5%. It saves itself.
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
   await draft.getByLabel('Line 1: days charged').fill('1')
-  await draft.getByRole('button', { name: 'Add a line' }).click()
+  await draft.getByRole('button', { name: 'Add something else' }).click()
   await draft.getByLabel('Line 3: what').fill('Delivery')
-  await draft.getByLabel('Line 3: price a day').fill('150')
+  await expect(draft.getByLabel('Line 3: days charged')).toHaveCount(0)
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('1 line with no price')
+  await draft.getByLabel('Line 3: price').fill('150')
+  await draft.getByRole('button', { name: 'Line 3: VAT is 23%, change it' }).click()
   await draft.getByLabel('Line 3: VAT').selectOption('13.5')
-  await expect(draft.getByText('Not saved yet.')).toBeVisible()
   await expect(draft.locator('.quote-totals')).toContainText('VAT at 13.5% on €150.00€20.25')
   await expect(draft.locator('.quote-totals')).toContainText('Total€1,867.65')
-  await draft.getByRole('button', { name: 'Save draft' }).click()
-  await expect(draft.getByRole('button', { name: 'Saved' })).toBeDisabled()
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
   await expect(office.getByRole('status')).toHaveText('Up to date')
+
+  // Removed by mistake, and put back.
+  await draft.getByRole('button', { name: 'Remove line 3' }).click()
+  await draft.getByRole('button', { name: 'Undo' }).click()
+  await expect(draft.getByRole('button', { name: 'Line 3: Delivery, change it' })).toContainText('€150.00 once')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
 
   // Printed as an A4 page to save as a PDF: only the quote is on the page.
   await draft.getByRole('button', { name: 'Print or save as PDF' }).click()
@@ -78,8 +89,8 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await v1.getByRole('button', { name: 'Start a new version' }).click()
   const v2 = office.getByRole('form', { name: 'Version 2, a draft' })
   await v2.getByLabel('Discount, %').fill('10')
-  await v2.getByRole('button', { name: 'Save draft' }).click()
   await expect(v2.locator('.quote-totals')).toContainText('Total€1,680.89')
+  await expect(v2.locator('.save-state')).toHaveText('Saved')
   await v2.getByRole('button', { name: 'Mark as sent' }).click()
 
   // The client said yes; the office invoiced it outside the app and records that here.

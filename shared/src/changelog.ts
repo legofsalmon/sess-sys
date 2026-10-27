@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.37.0',
+    date: '2026-10-27',
+    title: 'An easier quote to put together',
+    what: 'A draft quote now saves itself as you type, so there’s no Save to forget, and says “Saved” when it has. The total stays at the top while you work down the lines. Lines read as a short list, as the client will see them; press one to change it. Add kit, Add crew and Add something else fill in the price from the price list, and a line can be charged once (delivery, say) rather than by the day. Lines with no price are marked, a removed line can be put back with Undo, and if the job’s kit or crew has changed since the quote was made, the quote offers to catch up in one press.',
+    prs: [133],
+    adrs: [80],
+  },
+  {
     version: '1.36.0',
     date: '2026-10-23',
     title: 'Past quotes from Current RMS',

@@ -251,17 +251,38 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Quotes and money (ADR 0042): the lines as a table, typed in a row each while a draft, the sums under them, and the A4 page. */
 .quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
 .quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
-.quote-screen .quote-line { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
+.quote-screen .quote-draft { container-type: inline-size; }
+.quote-screen .quote-line { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(5.5em, 1.2fr) minmax(0, 0.8fr); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
 .quote-screen .quote-line label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line label input, .quote-screen .quote-line label select { min-width: 0; width: 100%; color: var(--ink); }
-.quote-screen .quote-line .what { grid-column: 1 / -1; }
-.quote-screen .quote-line .amount { grid-column: 1 / 3; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
-.quote-screen .quote-line button.link { grid-column: 3 / -1; justify-self: end; }
-@media (min-width: 720px) {
-  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) repeat(4, minmax(4.5em, 1fr)) minmax(6em, 1fr) auto; }
-  .quote-screen .quote-line .what, .quote-screen .quote-line .amount, .quote-screen .quote-line button.link { grid-column: auto; }
-  .quote-screen .quote-line .amount { text-align: right; }
+.quote-screen .quote-line .what, .quote-screen .quote-line .line-problem { grid-column: 1 / -1; }
+.quote-screen .quote-line .link.vat { grid-column: 1 / 3; justify-self: start; align-self: center; font-size: var(--text-small); }
+.quote-screen .quote-line .vat-rate { grid-column: 1 / 3; }
+.quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
+.quote-screen .quote-line .amount small { display: block; font-weight: 400; }
+.quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
+.quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
+.quote-screen .quote-line.unpriced input[aria-invalid] { border-color: var(--warn); }
+.quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
+/* Where the draft has the room, a line is one row, like the table it prints as. */
+@container (min-width: 860px) {
+  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(6em, 1.1fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
+  .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
 }
+/* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
+.quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
+.quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* What it comes to stays in view under the top bar while the lines are changed. */
+.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .undo-line { margin: 0; font-size: var(--text-small); }
+.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.quote-screen .quote-add .adding { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); width: 100%; }
+.quote-screen .quote-add .adding > :first-child { flex: 1 1 16em; }
+.quote-screen .job-changes { border: 1px solid var(--warn); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--warn-soft); }
+.quote-screen .job-changes p, .quote-screen .job-changes ul { margin: 0 0 var(--space-6); }
+.quote-screen .job-changes ul { padding-left: var(--space-16); }
 .quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all input { width: 4.5em; }
