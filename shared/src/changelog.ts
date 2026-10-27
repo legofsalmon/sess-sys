@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.38.0',
+    version: '1.39.0',
     date: '2026-10-27',
     title: 'Start a quote in a few words, and know which to chase',
     what: 'Money has a New quote button: give the job a name, the client and the days, and its quote opens, with the job added as an enquiry. Marking a quote sent now moves the job to quoted. When the client says yes or no, the quote offers to confirm the job or mark it lost in one press. Money lists every quote waiting on the office: answered, waiting for an answer (with a nudge after a week) and not sent yet, and Notifications shows the ones worth a call. The app still contacts nobody.',
     prs: [134],
     adrs: [81],
+  },
+  {
+    version: '1.38.0',
+    date: '2026-10-27',
+    title: 'Building a rack up',
+    what: 'In the rack designer, half-width and third-width kit now sits side by side: press or drop it on the left or right of a unit. Blank panels, vent panels, shelves and drawers are products of their own (one press adds the usual ones), and Fill the gaps with blanks covers every empty unit on the front. Cables and spares can go in a drawer or on a shelf. Press something in the rack to give it a label, a group such as RF and the colour of its tape; the groups are listed under the rack. Undo and Redo take back or put again what you just did, and Copy this rack makes a second one laid out the same.',
+    prs: [132],
+    adrs: [79],
   },
   {
     version: '1.37.1',

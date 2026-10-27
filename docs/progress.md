@@ -12,13 +12,32 @@ waiting on someone.
   name, client and days); marking a quote sent makes the job quoted; an
   answer offers to confirm the job or mark it lost; Money lists quotes
   waiting on the office, and Notifications the ones worth a call. App
-  1.38.0.
+  1.39.0.
 - Checked: typecheck, unit tests (`quotesToFollow`), a new e2e test from New
   quote to confirming the job, and the quotes e2e test.
 
 **Next**
 
 - 1c: the printed quote (number, valid until, terms, deposit).
+
+## 27 October 2026: building a rack up
+
+**Done**
+
+- [ADR 0079](adr/0079-building-a-rack-up.md) (PR #132), part 2 of 3 of the
+  advanced rack builder. Narrower kit sits side by side (`rack_slots.across`);
+  rack parts are products (`models.rack_part`: blank, vent, shelf, drawer),
+  with the usual six added in one press and Fill the gaps with blanks; loose
+  kit in a shelf or drawer (`in_slot_id`); a label, group and tape colour on
+  each slot, the tape drawn as content; undo and redo in the designer; Copy
+  this rack. App 1.38.0.
+- Checked: typecheck, unit tests (racks, parity, export), browser test
+  (racks.spec.ts: halves side by side, label and tape, undo and redo, a
+  drawer with a loom in it, blanks, a copy).
+
+**Next**
+
+- Part 3: product photos on the panels and a printable rack sheet.
 
 ## 27 October 2026: a quote that saves itself and keeps up with the job
 
