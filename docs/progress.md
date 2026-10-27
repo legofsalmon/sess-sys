@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 27 October 2026: a quote that saves itself and keeps up with the job
+
+**Done**
+
+- [ADR 0080](adr/0080-a-quote-that-saves-itself-and-keeps-up-with-the-job.md),
+  part 1a of the quoting plan, on Colly's ask for ease of use and clarity.
+  The draft saves itself; the total and lines with no price stay in view;
+  lines read as a list, one open at a time; lines charged once as well as
+  by the day; Add kit / Add crew priced from the price list; Undo on
+  Remove; "The job has changed" offers the job's new kit and crew. App
+  1.37.0.
+- Checked: typecheck, unit tests (charged once, changes from the job), the
+  e2e quote test on a phone, and the pick tests (the "stay under the top
+  bar" hook moved to its own file).
+
+**Next**
+
+- 1b: starting a quote from Money with a client and dates, the job kept in
+  step with the quote, and quotes to follow up in To sort out.
+- 1c: the printed quote (number, valid until, terms, deposit).
+
 ## 23 October 2026: reading Current RMS through its API
 
 **Done**
