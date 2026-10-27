@@ -70,7 +70,8 @@ export const mergeHandlers = {
         message: `${holder.name} signs in as ${ROLE_LABELS[holder.role!]}, so only ${signInAbility(holder.role) === 'company' ? 'directors' : 'the office and directors'} can combine them with someone.${ctx.role ? ` Your role is ${ROLE_LABELS[ctx.role]}.` : ''}`,
       })
     // Combining someone with the sender's own address into another person would hand the sender's account to them.
-    if (ctx.user && !hasEmail(into, ctx.user.email) && from.some((p) => hasEmail(p, ctx.user!.email)))
+    // A director may still combine her own two records, as a director may change anyone's addresses.
+    if (ctx.user && !mayChangeWhoSignsIn(ctx.role, 'director') && !hasEmail(into, ctx.user.email) && from.some((p) => hasEmail(p, ctx.user!.email)))
       throw new Refused({ code: 'forbidden', message: ownAddressRefusal(ctx.user.email) })
 
     await moveOffers(ctx, into.id, ids)
