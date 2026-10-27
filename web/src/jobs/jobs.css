@@ -425,3 +425,9 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Past quotes from Current RMS (ADR 0078): a group's name heads its lines, as Current RMS lists them. */
 .past-quote .rms-lines .rms-group { padding-top: var(--space-12); }
 .past-quote .rms-lines .rms-group:first-child { padding-top: 0; }
+
+/* Under a job's name (ADR 0082): its client, venue and dates, then its crew and kit, as lines rather than a card of facts, so its parts start on the first screen. Its notes and Change details follow, unboxed until they're being changed. */
+.job-page .job-line { color: var(--ink); }
+.job-page .job-line + .job-line { color: var(--muted); }
+.job-page .job-notes { display: grid; gap: var(--space-6); justify-items: start; }
+.job-page .job-notes .notes { margin: 0; color: var(--muted); }

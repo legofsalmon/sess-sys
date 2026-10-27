@@ -35,7 +35,8 @@ export function StepsCard({ job, view, onPart }: { job: JobView; view: View; onP
       </section>
     )
   }
-  const shown = steps.steps.find((s) => s.key === open) ?? steps.current ?? steps.steps[steps.steps.length - 1]!
+  // A slim strip until a step is opened (ADR 0082), so the job's parts are on the first screen; the hint says where it's at meanwhile.
+  const shown = steps.steps.find((s) => s.key === open)
   const at = steps.current
   return (
     <section className="card job-steps" aria-labelledby="job-steps-title">
@@ -51,7 +52,7 @@ export function StepsCard({ job, view, onPart }: { job: JobView; view: View; onP
       <ol className="steps-flow" data-stopped={steps.stopped ? 'true' : undefined}>
         {steps.steps.map((s) => (
           <li key={s.key} data-state={s.state} aria-current={s.state === 'now' && !steps.stopped ? 'step' : undefined}>
-            <button type="button" aria-pressed={s.key === shown.key} aria-controls="job-step-open" aria-label={stepName(s, steps.stopped !== undefined)} onClick={() => setOpen(s.key)}>
+            <button type="button" aria-expanded={s.key === shown?.key} aria-controls="job-step-open" aria-label={stepName(s, steps.stopped !== undefined)} onClick={() => setOpen((was) => (was === s.key ? undefined : s.key))}>
               <span className="step-dot" aria-hidden="true">
                 {s.done ? <Icon name="done" /> : s.number}
               </span>
@@ -65,7 +66,7 @@ export function StepsCard({ job, view, onPart }: { job: JobView; view: View; onP
           </li>
         ))}
       </ol>
-      <OpenStep key={`${job.id}.${shown.key}`} job={job} view={view} step={shown} stopped={steps.stopped !== undefined} onPart={onPart} />
+      {shown && <OpenStep key={`${job.id}.${shown.key}`} job={job} view={view} step={shown} stopped={steps.stopped !== undefined} onPart={onPart} />}
     </section>
   )
 }

@@ -222,7 +222,10 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 /* Every page's head, in the same place on every screen and outside any card: its title, large, naming this page (Calls, Labels, Admin), so
    checking you're in the right place is one look in one place; and a line under it, quieter, saying what matters most about it. */
 .page-head { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
-.app .page-head .page-sub { margin: 0; color: var(--muted); }
+.page-words { display: grid; gap: var(--space-4); min-width: 0; flex: 1; }
+.page-title-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); }
+.app .page-head .page-sub { margin: 0; color: var(--muted); display: grid; gap: var(--space-2); }
+.app .page-head .page-sub p { margin: 0; }
 /* The page's title, large, so Home, Calls, Catalogue and Admin read as different places (ADR 0033), and the biggest words on the screen. */
 .app h1.page-title, .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; }
 .app h1.area-title { margin-top: calc(-1 * var(--space-6)); }
@@ -523,3 +526,6 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .release-version { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: var(--space-4); }
 .release-refs { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-12); }
 .card > a[href="#admin/changes"] { justify-self: start; }
+
+/* A page's parts as tabs (Tabs.tsx, ADR 0082): the open part's cards one after another under the row, as a job's (jobs.css draws the row). */
+.tab-part { display: grid; gap: var(--space-14); min-width: 0; }
