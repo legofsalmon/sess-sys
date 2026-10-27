@@ -43,14 +43,16 @@ export interface RacksView {
 type Tables = { rackSlot: Record<string, RackEntities['rackSlot']> }
 
 export function racksView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number, warehouse: WarehouseView): RacksView {
+  // Slots kept from before placing across the rails, labels and groups (ADR 0079) have none.
+  const withDefaults = (s: Partial<RackSlot>) => ({ across: 'left' as const, label: '', group: '', colour: null, inSlotId: null, ...s }) as RackSlot
   const slots = new Map<string, RackSlot & { pending: boolean }>()
-  for (const s of Object.values(entities.rackSlot ?? {})) slots.set(s.id, { ...s, pending: false })
+  for (const s of Object.values(entities.rackSlot ?? {})) slots.set(s.id, { ...withDefaults(s), pending: false })
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
     switch (m.name) {
       case 'rackSlot.set': {
         const a = m.args as CommandArgs<'rackSlot.set'>
-        slots.set(a.id, { ...a, notes: a.notes.trim(), pending: true })
+        slots.set(a.id, { ...withDefaults(a), notes: a.notes.trim(), label: (a.label ?? '').trim(), group: (a.group ?? '').trim(), pending: true })
         break
       }
       case 'rackSlot.remove':

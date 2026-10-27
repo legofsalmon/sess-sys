@@ -100,6 +100,7 @@ const MODEL_COLUMNS = {
   caseDepthMm: 'case_depth_mm',
   castors: 'castors',
   powerLimitA: 'power_limit_a',
+  rackPart: 'rack_part',
 } as const
 
 const described = async (ctx: Ctx, assetId: string) => {
@@ -258,9 +259,9 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     await ctx.tx.query(
       `INSERT INTO models (id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, aliases, list_id,
                            is_rack, code, units, depth_mm, weight_kg, power_w, dry_hire, supplier, hire_day_cents,
-                           rack_mount, rack_width, case_width_mm, case_height_mm, case_depth_mm, castors, power_limit_a)
+                           rack_mount, rack_width, case_width_mm, case_height_mm, case_depth_mm, castors, power_limit_a, rack_part)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
-               $22, $23, $24, $25, $26, $27, $28)`,
+               $22, $23, $24, $25, $26, $27, $28, $29)`,
       [
         a.id,
         a.name.trim(),
@@ -290,6 +291,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
         a.caseDepthMm,
         a.castors,
         a.powerLimitA,
+        a.rackPart,
       ]
     )
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
@@ -319,6 +321,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     }
     if (next.isRack && !next.isCase) throw new Refused({ code: 'invalid', message: 'A rack holds other kit, so it is a case.' })
     if (next.isRack && next.rackMount) throw new Refused({ code: 'invalid', message: 'A rack holds rack-mount kit; it doesn\'t go on the rails of another.' })
+    if (next.rackPart && (!next.rackMount || next.isRack)) throw new Refused({ code: 'invalid', message: 'A blank, vent, shelf or drawer goes on the rails, so it is rack-mount.' })
     if (!next.isRack && m.isRack && (await slotsIn(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has a layout. Take everything out of it first.` })
     if (next.isRack && !m.isRack) {

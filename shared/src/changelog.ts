@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.38.0',
+    date: '2026-10-27',
+    title: 'Building a rack up',
+    what: 'In the rack designer, half-width and third-width kit now sits side by side: press or drop it on the left or right of a unit. Blank panels, vent panels, shelves and drawers are products of their own (one press adds the usual ones), and Fill the gaps with blanks covers every empty unit on the front. Cables and spares can go in a drawer or on a shelf. Press something in the rack to give it a label, a group such as RF and the colour of its tape; the groups are listed under the rack. Undo and Redo take back or put again what you just did, and Copy this rack makes a second one laid out the same.',
+    prs: [132],
+    adrs: [79],
+  },
+  {
     version: '1.37.1',
     date: '2026-10-27',
     title: '“On this screen” sits with the page',

@@ -26,6 +26,14 @@ export type RackWidth = (typeof RACK_WIDTHS)[number]
 export const RACK_WIDTH_LABELS: Record<RackWidth, string> = { full: 'Full width', half: 'Half width', third: 'A third' }
 /** How many fit side by side. */
 export const RACK_WIDTH_PARTS: Record<RackWidth, number> = { full: 1, half: 2, third: 3 }
+/**
+ * The parts a rack is built with besides kit (ADR 0079): a
+ * blank panel over an empty unit, a vent panel, a shelf for kit that isn't
+ * rack-mount, and a drawer for cables and spares.
+ */
+export const RACK_PARTS = ['blank', 'vent', 'shelf', 'drawer'] as const
+export type RackPart = (typeof RACK_PARTS)[number]
+export const RACK_PART_LABELS: Record<RackPart, string> = { blank: 'A blank panel', vent: 'A vent panel', shelf: 'A shelf', drawer: 'A drawer' }
 /** Kilos to a tenth, as typed: "12.5". */
 const kilos = z
   .number({ invalid_type_error: 'The weight is a number of kilos, such as 12.5.' })
@@ -161,6 +169,8 @@ export const model = z.object({
   castors: z.boolean().default(false),
   /** What a rack's power can take, in amps, such as a 16 A distro in it. Null where not given. */
   powerLimitA: whole(1, 125, 'The amps').nullable().default(null),
+  /** A rack part rather than kit (ADR 0079): a blank, a vent, a shelf or a drawer; null for kit. Only rack-mount products are. */
+  rackPart: z.enum(RACK_PARTS).nullable().default(null),
 })
 /** A product of our own that isn't a rack and has no size or stock code given (ADR 0074), as products made before racks read. */
 export const PLAIN_PRODUCT = {
@@ -180,6 +190,7 @@ export const PLAIN_PRODUCT = {
   caseDepthMm: null,
   castors: false,
   powerLimitA: null,
+  rackPart: null,
 } as const
 
 export type Model = z.infer<typeof model> & {
@@ -299,6 +310,10 @@ const rackIsNotMounted = [
   (m: { isRack?: boolean; rackMount?: boolean }) => !(m.isRack && m.rackMount),
   { message: 'A rack holds rack-mount kit; it doesn\'t go on the rails of another.' },
 ] as const
+const partIsMounted = [
+  (m: { isRack?: boolean; rackMount?: boolean; rackPart?: RackPart | null }) => !(m.rackPart && (m.rackMount === false || m.isRack)),
+  { message: 'A blank, vent, shelf or drawer goes on the rails, so it is rack-mount.' },
+] as const
 const somethingToChange = [
   (u: Record<string, unknown>) => Object.keys(u).some((k) => k !== 'id' && u[k] !== undefined),
   { message: 'Nothing to change.' },
@@ -312,7 +327,7 @@ const oldNumber = text(100, 'The old number')
 const patDue = day.nullable()
 
 export const stockCommandSchemas = {
-  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase).refine(...rackIsOurs).refine(...rackIsNotMounted),
+  'model.create': model.refine(...caseIsNumbered).refine(...rackIsCase).refine(...rackIsOurs).refine(...rackIsNotMounted).refine(...partIsMounted),
   /** Only the fields the person changed, as for jobs. */
   'model.update': z
     .object({
@@ -344,12 +359,14 @@ export const stockCommandSchemas = {
       caseDepthMm: model.shape.caseDepthMm.removeDefault().optional(),
       castors: z.boolean().optional(),
       powerLimitA: model.shape.powerLimitA.removeDefault().optional(),
+      rackPart: model.shape.rackPart.removeDefault().optional(),
     })
     .refine(...somethingToChange)
     .refine(...caseIsNumbered)
     .refine(...rackIsCase)
     .refine(...rackIsOurs)
-    .refine(...rackIsNotMounted),
+    .refine(...rackIsNotMounted)
+    .refine(...partIsMounted),
   /** Refused while it has items, retired ones included, or counted stock. */
   'model.remove': z.object({ id }),
   /**

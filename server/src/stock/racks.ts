@@ -10,7 +10,7 @@ import { getModel } from './store.ts'
  * the app's to say, not the server's to refuse: a layout is a plan.
  */
 
-const SLOT = `id, rack_id, model_id, top, side, qty, notes`
+const SLOT = `id, rack_id, model_id, top, side, qty, notes, across, label, grp, colour, in_slot_id`
 
 type Row = Record<string, any>
 
@@ -22,6 +22,11 @@ export const toSlot = (r: Row): RackSlot => ({
   side: r.side,
   qty: r.qty,
   notes: r.notes,
+  across: r.across,
+  label: r.label,
+  group: r.grp,
+  colour: r.colour,
+  inSlotId: r.in_slot_id,
 })
 
 export async function getSlot(q: Queryable, id: string) {
@@ -56,6 +61,12 @@ export async function clearLayout(ctx: Ctx, rackId: string) {
   for (const r of rows) await emitRemoved(ctx, 'rackSlot', r.id)
 }
 
+/** What was in a shelf or drawer (ADR 0079) stays in the rack, loose. */
+async function emptyHolder(ctx: Ctx, slotId: string) {
+  const { rows } = await ctx.tx.query<{ id: string }>('UPDATE rack_slots SET in_slot_id = NULL WHERE in_slot_id = $1 RETURNING id', [slotId])
+  for (const r of rows) await emit(ctx, 'rackSlot', r.id, await getSlot(ctx.tx, r.id))
+}
+
 type Handler<N extends 'rackSlot.set' | 'rackSlot.remove'> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 export const rackHandlers: { 'rackSlot.set': Handler<'rackSlot.set'>; 'rackSlot.remove': Handler<'rackSlot.remove'> } = {
@@ -71,17 +82,29 @@ export const rackHandlers: { 'rackSlot.set': Handler<'rackSlot.set'>; 'rackSlot.
     if (m.id === rack.id) throw new Refused({ code: 'conflict', message: "A rack can't go inside itself." })
     if (m.isRack) throw new Refused({ code: 'conflict', message: `${m.name} is a rack itself. Put what's in it in this rack's layout instead.` })
     if (a.top !== null && a.qty > 1) throw new Refused({ code: 'invalid', message: 'Something on the rails is one at a time: add another for the next.' })
+    // Only loose kit is in a shelf or drawer (ADR 0079), and only one of this rack's, on its rails.
+    const inSlotId = a.top === null ? a.inSlotId : null
+    if (inSlotId) {
+      const holder = await getSlot(ctx.tx, inSlotId)
+      const part = holder && holder.rackId === a.rackId && holder.top !== null ? (await getModel(ctx.tx, holder.modelId))?.rackPart : undefined
+      if (part !== 'shelf' && part !== 'drawer') throw new Refused({ code: 'conflict', message: "That shelf or drawer isn't on this rack's rails any more." })
+    }
     await ctx.tx.query(
-      `INSERT INTO rack_slots (id, rack_id, model_id, top, side, qty, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (id) DO UPDATE SET model_id = EXCLUDED.model_id, top = EXCLUDED.top, side = EXCLUDED.side, qty = EXCLUDED.qty, notes = EXCLUDED.notes`,
-      [a.id, a.rackId, a.modelId, a.top, a.side, a.qty, a.notes.trim()]
+      `INSERT INTO rack_slots (id, rack_id, model_id, top, side, qty, notes, across, label, grp, colour, in_slot_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO UPDATE SET model_id = EXCLUDED.model_id, top = EXCLUDED.top, side = EXCLUDED.side, qty = EXCLUDED.qty, notes = EXCLUDED.notes,
+         across = EXCLUDED.across, label = EXCLUDED.label, grp = EXCLUDED.grp, colour = EXCLUDED.colour, in_slot_id = EXCLUDED.in_slot_id`,
+      [a.id, a.rackId, a.modelId, a.top, a.side, a.qty, a.notes.trim(), a.across, a.label.trim(), a.group.trim(), a.colour, inSlotId]
     )
     await emit(ctx, 'rackSlot', a.id, await getSlot(ctx.tx, a.id))
+    // Off the rails, a shelf or drawer has nothing in it any more.
+    if (a.top === null) await emptyHolder(ctx, a.id)
   },
 
   async 'rackSlot.remove'(ctx, a) {
     // Taken out twice, by two phones: it's out already.
     if (!(await getSlot(ctx.tx, a.id))) return
+    await emptyHolder(ctx, a.id)
     await ctx.tx.query('DELETE FROM rack_slots WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'rackSlot', a.id)
   },
