@@ -69,6 +69,13 @@ The personas, the flows they follow and the problems rated are in
    it without being listed anywhere. A screen of one or two parts has no
    strip.
 
+   *27 October 2026:* moved out of the bar. In the bar it sat above the
+   screen's title, a step away from the parts it named, and read as part of
+   the bar rather than as the page's contents (Colly). It now sits straight
+   above the first part, under the title and anything that chooses what the
+   parts show (Home's Company, Department…), and once scrolled up to the bar
+   it stays under it, so it still says which part is in view.
+
 6. **A freelancer's page says what's waiting first**: a line at the top,
    "1 offer to answer · 1 timesheet to send · Next: Harbour Lights
    Festival, Wed 14 Oct, call 08:00", each part a link down the page.
