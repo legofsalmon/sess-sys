@@ -4,6 +4,7 @@ import { useAuth } from './auth.ts'
 import { Empty } from './Empty.tsx'
 import { Icon } from './Icon.tsx'
 import { Top } from './jobs/common.tsx'
+import { QuotesToChase } from './jobs/Money.tsx'
 import { SortOut } from './jobs/PlanScreen.tsx'
 import {
   dismissToast,
@@ -93,7 +94,9 @@ export function NoticesScreen() {
 
   // Clashes and checks from today to four weeks out (ADR 0069), for whoever books crew: worked out on this device, so they show without signal too.
   const today = useToday()
-  const booksCrew = useAccess().can('crew')
+  const access = useAccess()
+  const booksCrew = access.can('crew')
+  const seesMoney = access.can('money')
   const ahead = useMemo(() => (booksCrew ? plan(view, sortOutDays(today), today) : null), [booksCrew, view, today])
 
   const byId = useMemo(() => new Map(notices.notices.map((n) => [n.id, n])), [notices.notices])
@@ -146,6 +149,7 @@ export function NoticesScreen() {
       </section>
 
       {ahead && <SortOut problems={ahead.problems} vanProblems={ahead.vanProblems} hint="Clashes and checks from today to four weeks out. Each goes once it's sorted." />}
+      {seesMoney && <QuotesToChase view={view} />}
 
       {days.map((d) => (
         <section className="card day" key={d.day} aria-labelledby={`notices-${d.day}`}>
