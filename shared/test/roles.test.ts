@@ -8,16 +8,21 @@ describe('roles', () => {
     for (const name of COMMAND_NAMES) expect(ABILITIES, name).toContain(COMMAND_NEEDS[name])
   })
 
-  it('go from most to least: a director can do all, staff crew only their own leave and a fault', () => {
+  it('go from most to least: a director can do all, staff crew only their own leave, their own job steps, the purchase list and a fault', () => {
     expect(ROLE_CAN.director).toEqual(ABILITIES)
     for (const r of ROLES) for (const a of ROLE_CAN[r]) expect(ROLE_CAN.director).toContain(a)
-    expect(ROLE_CAN.crew).toEqual(['fault', 'leave'])
+    expect(ROLE_CAN.crew).toEqual(['fault', 'leave', 'steps', 'ask'])
     expect(roleMayRun('head', 'move.record')).toBe(true)
     expect(roleMayRun('head', 'project.update')).toBe(false)
     // A freelancer signed in reports a fault; their own offers, timesheets and days off go through their link (ADR 0051).
-    expect(ROLE_CAN.freelancer).toEqual(['fault'])
+    expect(ROLE_CAN.freelancer).toEqual(['fault', 'ask'])
+    // Anyone signed in asks for kit to be bought and votes (ADR 0077); saying where it's at is stock's.
+    expect(roleMayRun('freelancer', 'purchase.vote')).toBe(true)
+    expect(roleMayRun('crew', 'purchase.status')).toBe(false)
     expect(roleMayRun('freelancer', 'leave.request')).toBe(false)
     expect(roleMayRun('freelancer', 'move.record')).toBe(false)
+    // Job steps (ADR 0073) are staff's: a freelancer has none.
+    expect(roleMayRun('freelancer', 'jobStep.set')).toBe(false)
     expect(roleMayRun('office', 'person.role')).toBe(false)
   })
 

@@ -55,6 +55,8 @@ async function main() {
     // Local stand-ins the browser tests read calendars from (ADR 0044): never set where the server runs for real.
     places: nominatim({ base: process.env.NOMINATIM_URL || undefined }),
     ownCalendars: process.env.OWN_CALENDAR_TEST_HOSTS ? { testHosts: process.env.OWN_CALENDAR_TEST_HOSTS.split(',').map((h) => h.trim()).filter(Boolean) } : undefined,
+    // Current RMS, read only (ADR 0078). Colly saved the key as CURRENT_CMS_KEY, 23 October 2026; the subdomain is the company's own.
+    currentRms: currentRmsKey() ? { subdomain: process.env.CURRENT_RMS_SUBDOMAIN?.trim() || 'sessionhire', apiKey: currentRmsKey()! } : undefined,
     calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, ''), writes: process.env.CALENDAR_WRITES?.trim().toLowerCase() === 'on' } : undefined,
   })
   await assertSignInKept(db, auth)
@@ -121,4 +123,9 @@ async function main() {
       process.exit(0)
     })
   }
+}
+
+/** The Current RMS API key, by the name it was saved under on Railway or the name it was meant to have. */
+function currentRmsKey(): string | undefined {
+  return (process.env.CURRENT_RMS_API_KEY || process.env.CURRENT_CMS_KEY)?.trim() || undefined
 }

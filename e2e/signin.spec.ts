@@ -43,8 +43,9 @@ test('a device that is signed out sees only the way in, and keeps what it has wa
   await page.getByLabel('New place').fill(bay)
   await page.getByRole('button', { name: 'Add place' }).click()
   await expect(page.locator('.conn')).toHaveText(/1 waiting/)
-  signal = true
+  // Told to sign in before the signal is back, or a retry between the two reaches the server and nothing is left waiting.
   await notSignedIn(page)
+  signal = true
   await page.evaluate(() => dispatchEvent(new Event('online')))
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { currentRmsList, currentRmsTable } from '../src/current-rms.ts'
 import { parseCsv } from '../src/csv.ts'
-import { previewStockList, readStockFile, stockRows } from '../src/stock-import.ts'
+import { previewStockList, readStockFile, stockRows, UNCHANGED } from '../src/stock-import.ts'
 
 /**
  * Bringing the stock in from Current RMS (ADR 0056), on made-up exports:
@@ -28,18 +28,18 @@ describe('Current RMS’s exports', () => {
     expect(got.problem).toBeUndefined()
     // Sale-only stock isn't hire kit; an asset is one, bulk its balance; the store's rate fills the price the product table left at nothing.
     expect(parseCsv(got.list!.text).filter((r) => r.length > 1)).toEqual([
-      ['Product', 'Department', 'Category', 'Quantity', 'Value', 'Day price'],
-      ['Corvo K12', 'audio', 'Audio', '2', '1250.00', '60.00'],
-      ['10m XLR cable', 'other', 'Cables', '3', '20.00', '2.00'],
-      ['Lumo Par 7', 'lighting', 'Lighting', '6', '', ''],
-      ['Stage deck 2x1', 'staging', 'Pipe & Drape', '0', '300.00', '15.00'],
+      ['Product', 'Department', 'Category', 'Quantity', 'Value', 'Day price', 'Current RMS id'],
+      ['Corvo K12', 'audio', 'Audio', '2', '1250.00', '60.00', '1'],
+      ['10m XLR cable', 'other', 'Cables', '3', '20.00', '2.00', '2'],
+      ['Lumo Par 7', 'lighting', 'Lighting', '6', '', '', '3'],
+      ['Stage deck 2x1', 'staging', 'Pipe & Drape', '0', '300.00', '15.00', '5'],
     ])
     expect(got.list!.said).toBe('4 products and 11 pieces of kit from Current RMS, with the rates. Everything comes in counted, to be labelled later.')
   })
 
   it('go through the usual bring-in with no column step, every product new and counted where the office says', () => {
     const file = readStockFile(currentRmsList([PRODUCTS, LEVELS]).list!.text).file!
-    expect(file.columns).toEqual(['product', 'department', 'category', 'quantity', 'value', 'dayPrice'])
+    expect(file.columns).toEqual(['product', 'department', 'category', 'quantity', 'value', 'dayPrice', 'listId'])
     const p = previewStockList(stockRows(file), { products: [], items: [], places: [], counts: [] }, { make: true, defaultPlace: 'Warehouse' })
     expect(p.counts).toMatchObject({ rows: 4, products: 4, items: 0, counted: 3, problems: 0 })
     expect(p.rows[0]).toMatchObject({ product: 'Corvo K12', facts: '2 counted · Audio · €1,250 · €60 a day' })
@@ -95,5 +95,84 @@ describe('one place for all of it (ADR 0061)', () => {
   it('puts only unplaced kit there unless told to put all of it there; kit in a case stays in its case', () => {
     expect(where(false)).toEqual(['At Warehouse', 'At Bay D (new place)', 'In Cable trunk (new case)'])
     expect(where(true)).toEqual(['At Warehouse', 'At Warehouse', 'In Cable trunk (new case)'])
+  })
+})
+
+describe('a second bring-in of the same list (audit, 20 October 2026, finding 7)', () => {
+  const amp = { id: 'm1', name: 'Amp', tracking: 'bulk' as const, isCase: false, valueCents: 50000, patMonths: null, notes: '', mistake: false, category: 'Amps' }
+  const places = [
+    { id: 'p1', name: 'Store one' },
+    { id: 'p2', name: 'Store two' },
+  ]
+  const here = (over: Partial<typeof amp> & { listId?: string } = {}, counts = [{ modelId: 'm1', placeId: 'p1', caseId: null, qty: 12 }]) => ({
+    products: [{ ...amp, ...over }],
+    items: [],
+    places,
+    counts,
+  })
+  const row = (cells: Record<string, string>) => [{ row: 2, cells: { product: 'Amp', category: 'Amps', quantity: '12', value: '500', ...cells } }]
+
+  it('moves the count to the place typed for the list, rather than counting it twice', () => {
+    for (const options of [
+      { make: true, defaultPlace: 'Store two' },
+      { make: true, defaultPlace: 'Store two', allAt: true },
+    ]) {
+      const p = previewStockList(row({}), here(), options)
+      expect(p.rows[0]!.does).toEqual(['Counts 12 at Store two', 'Counts none at Store one (12 there now): the list counts them all at Store two'])
+      expect(p.plan.counts.map((c) => [c.where.place, c.qty])).toEqual([
+        [{ id: 'p2' }, 12],
+        [{ id: 'p1' }, 0],
+      ])
+    }
+    // To a new place the same.
+    const fresh = previewStockList(row({}), here(), { make: true, defaultPlace: 'Store three' })
+    expect(fresh.rows[0]!.does).toEqual(['Counts 12 at Store three (new place)', 'Counts none at Store one (12 there now): the list counts them all at Store three'])
+    // Brought in again where it is, nothing changes.
+    expect(previewStockList(row({}), here(), { make: true, defaultPlace: 'Store one' }).rows[0]!.does).toEqual([UNCHANGED])
+  })
+
+  it('leaves a count the list does not mention where the row names its own place, and says so', () => {
+    const p = previewStockList(row({ place: 'Store two' }), here(), { make: true, defaultPlace: '' })
+    expect(p.rows[0]!.does).toEqual(['Counts 12 at Store two'])
+    expect(p.rows[0]!.asides).toEqual(["12 more at Store one, which the list doesn't count, so that count stays."])
+    expect(p.plan.counts).toHaveLength(1)
+    // Where the list counts it at both places itself, both are as it says.
+    const both = previewStockList(
+      [
+        { row: 2, cells: { product: 'Amp', quantity: '4', place: 'Store one' } },
+        { row: 3, cells: { product: 'Amp', quantity: '8' } },
+      ],
+      here(),
+      { make: true, defaultPlace: 'Store two' }
+    )
+    expect(both.rows.map((r) => r.does)).toEqual([['Counts 4 at Store one (12 there now)'], ['Counts 8 at Store two']])
+  })
+
+  it('finds a product renamed in Current RMS by its id there, and renames it here', () => {
+    const p = previewStockList(row({ product: 'Amp mk2', listId: '7' }), here({ listId: '7' }), { make: true, defaultPlace: 'Store one' })
+    expect(p.counts.products).toBe(0)
+    expect(p.rows[0]!.does).toEqual(['Updates Amp: renamed Amp mk2'])
+    expect(p.plan.productChanges).toEqual([{ id: 'm1', name: 'Amp', row: 2, rename: 'Amp mk2' }])
+    // The first bring-in again keeps the id on each product, matched by name.
+    const kept = previewStockList(row({ listId: '7' }), here(), { make: true, defaultPlace: 'Store one' })
+    expect(kept.rows[0]!.does).toEqual(['Updates Amp: its id in the old system kept, 7'])
+    expect(kept.plan.productChanges).toEqual([{ id: 'm1', name: 'Amp', row: 2, listId: '7' }])
+    // A new product keeps its id from the start.
+    expect(previewStockList(row({ product: 'Desk', listId: '9' }), { products: [], items: [], places, counts: [] }, { make: true, defaultPlace: 'Store one' }).plan.products[0]).toMatchObject({ name: 'Desk', listId: '9' })
+  })
+
+  it('says a new product looks like one here renamed, where there is no id to go by', () => {
+    const p = previewStockList(row({ product: 'Amp mk2' }), here(), { make: true, defaultPlace: 'Store one' })
+    expect(p.rows[0]!.does[0]).toMatch(/^New product/)
+    expect(p.rows[0]!.asides).toEqual(["Looks like Amp renamed: the same category, value and count. If it is, rename Amp to Amp mk2 on its page first, so it isn't counted twice."])
+    // Not when the list names that product too, or the count differs.
+    expect(previewStockList([...row({ product: 'Amp mk2' }), { row: 3, cells: { product: 'Amp', quantity: '12', place: 'Store one' } }], here(), { make: true, defaultPlace: 'Store one' }).rows[0]!.asides).toEqual([])
+    expect(previewStockList(row({ product: 'Amp mk2', quantity: '11' }), here(), { make: true, defaultPlace: 'Store one' }).rows[0]!.asides).toEqual([])
+  })
+
+  it('marks a row whose id is another product’s than the one its name finds', () => {
+    const known = { products: [{ ...amp, listId: '7' }, { ...amp, id: 'm2', name: 'Desk', listId: '8' }], items: [], places, counts: [] }
+    const p = previewStockList(row({ product: 'Desk', listId: '7' }), known, { make: true, defaultPlace: 'Store one' })
+    expect(p.rows[0]!.problems.map((x) => x.text)).toEqual(["Desk is already here, and this row's id in the old system (7) is Amp's. Rename one of them on its page first."])
   })
 })

@@ -31,7 +31,7 @@ import type { WarehouseView } from './sync/stock-view.ts'
 
 // The columns.
 
-export const STOCK_FIELDS = ['product', 'make', 'model', 'department', 'category', 'quantity', 'serial', 'number', 'place', 'case', 'value', 'patDue', 'notes', 'dayPrice'] as const
+export const STOCK_FIELDS = ['product', 'make', 'model', 'department', 'category', 'quantity', 'serial', 'number', 'place', 'case', 'value', 'patDue', 'notes', 'dayPrice', 'listId'] as const
 export type StockField = (typeof STOCK_FIELDS)[number]
 
 export const STOCK_FIELD_LABELS: Record<StockField, string> = {
@@ -49,6 +49,7 @@ export const STOCK_FIELD_LABELS: Record<StockField, string> = {
   patDue: 'PAT due',
   notes: 'Notes',
   dayPrice: 'Day price',
+  listId: 'Id in the old system',
 }
 
 /** What each field is headed in a file, as `tidyHeader` leaves it; the first column found for a field is read. */
@@ -69,6 +70,8 @@ const HEADERS: Record<StockField, readonly string[]> = {
   notes: ['notes', 'note', 'comments', 'comment', 'remarks'],
   // A hire price for one day, for quotes (ADR 0042); a "price" alone is the value of one, as it always was.
   dayPrice: ['day price', 'day rate', 'daily rate', 'price a day', 'hire price', 'rental price'],
+  // The product's own id where the list came from (audit, 20 October 2026, finding 7). Never a bare "Id", which is as often a line's number or an asset number.
+  listId: ['current rms id', 'rms id', 'old system id', 'id in the old system'],
 }
 
 /** A header as it's compared: capitals, anything in brackets ("Value (€)"), and marks other than letters, digits, "/" and "&" left out. */
@@ -352,6 +355,10 @@ export interface KnownProduct {
   mistake: boolean
   /** Its day price on the price list (ADR 0042); null for none, undefined where this device isn't sent prices. */
   dayCents?: number | null
+  /** Its id in the list it was brought in from, such as Current RMS's; empty or left out for none. */
+  listId?: string
+  /** For saying a new product looks like one here renamed; left out where it isn't known. */
+  category?: string
 }
 export interface KnownItem {
   id: string
@@ -388,6 +395,8 @@ export function knownStockOf(w: WarehouseView, priceOf?: (modelId: string) => nu
       notes: m.notes,
       mistake: m.mistake,
       dayCents: priceOf ? (priceOf(m.id) ?? null) : undefined,
+      listId: m.listId ?? '',
+      category: m.category,
     })),
     items: [...w.assets.values()].map((a) => ({
       id: a.id,
@@ -519,11 +528,17 @@ export interface PlannedProduct {
   valueCents: number | null
   patMonths: number | null
   notes: string
+  /** Its id in the list, for the next bring-in to match it by. */
+  listId?: string
 }
 export interface PlannedProductChange {
   id: string
+  /** Its name here now, for a refusal to name. */
   name: string
   row: number
+  /** Renamed in the list, as its id there says. */
+  rename?: string
+  listId?: string
   tracking?: 'serialised'
   isCase?: true
   valueCents?: number
@@ -638,6 +653,10 @@ interface Read {
   notes: string
   placeCell: string
   caseCell: string
+  /** Its place is the one the office typed for the whole list, not one of its own. */
+  typedPlace: boolean
+  /** The product's id in the old system, such as Current RMS's. */
+  listId: string
   /** Its PAT due day is written month first, or could be read either way. */
   monthFirst: boolean
   eitherWay: boolean
@@ -704,6 +723,8 @@ function readRow(input: StockListRow & { skip?: boolean }, options: StockListOpt
     // Kit the row doesn't place goes where the office said, if it said; all of it, when the office said all of it.
     placeCell: caseCell ? (c.place ?? '') : options.allAt && options.defaultPlace.trim() ? options.defaultPlace.trim() : (c.place ?? options.defaultPlace.trim()),
     caseCell,
+    typedPlace: !caseCell && !!options.defaultPlace.trim() && (!!options.allAt || !c.place),
+    listId: (c.listId ?? '').slice(0, 100),
     monthFirst: writtenMonthFirst(c.patDue ?? ''),
     eitherWay: readsEitherWay(c.patDue ?? ''),
     problems,
@@ -720,6 +741,8 @@ interface Group {
   key: string
   name: string
   known: KnownProduct | undefined
+  /** The product's id in the old system, from the first row that gives one. */
+  listId: string
   rows: Read[]
   isCase: boolean
   department: Department
@@ -745,6 +768,9 @@ export function previewStockList(
   const productByName = new Map<string, KnownProduct>()
   for (const p of known.products) if (!p.mistake && !productByName.has(norm(p.name))) productByName.set(norm(p.name), p)
   const productById = new Map(known.products.map((p) => [p.id, p]))
+  const productByListId = new Map<string, KnownProduct>()
+  for (const p of known.products) if (!p.mistake && p.listId && !productByListId.has(p.listId)) productByListId.set(p.listId, p)
+  const placeById = new Map(known.places.map((p) => [p.id, p]))
   const placeByName = new Map(known.places.map((p) => [norm(p.name), p]))
   const byNumber = new Map<string, KnownItem>()
   const byFormer = new Map<string, KnownItem>()
@@ -778,8 +804,28 @@ export function previewStockList(
     if (!r.name) continue
     const k = norm(r.name)
     let g = groups.get(k)
-    if (!g) groups.set(k, (g = { key: k, name: r.name, known: productByName.get(k), rows: [], isCase: false, department: 'other', category: '', valueCents: null, dayCents: null, added: [] }))
+    if (!g) groups.set(k, (g = { key: k, name: r.name, known: productByName.get(k), listId: '', rows: [], isCase: false, department: 'other', category: '', valueCents: null, dayCents: null, added: [] }))
     g.rows.push(r)
+  }
+  // A product the old system's id names is matched by it before its name, so one renamed there is renamed here, not made again.
+  for (const g of groups.values()) {
+    g.listId = g.rows.find((r) => r.listId)?.listId ?? ''
+    const byId = g.listId ? productByListId.get(g.listId) : undefined
+    if (!byId || byId === g.known) continue
+    if (g.known)
+      g.rows[0]!.problems.push({
+        field: 'product',
+        text: `${g.known.name} is already here, and this row's id in the old system (${g.listId}) is ${byId.name}'s. Rename one of them on its page first.`,
+      })
+    g.known = byId
+  }
+  // One product here named by two of the list's products, one by its id and one by its name, is one of them twice.
+  const claimed = new Map<string, Group>()
+  for (const g of groups.values()) {
+    if (!g.known) continue
+    const other = claimed.get(g.known.id)
+    if (other) g.rows[0]!.problems.push({ field: 'product', text: `${other.name} on row ${other.rows[0]!.input.row} is ${g.known.name} here too. Make them one product in the list, or skip one.` })
+    else claimed.set(g.known.id, g)
   }
   for (const g of groups.values()) {
     let value: { cents: number; row: number } | undefined
@@ -1019,6 +1065,12 @@ export function previewStockList(
     if (first) r.problems.push({ field: null, text: `Row ${first.input.row} counts ${g.name} ${atSaid(first).replace(/ \(new (place|case)\)$/, '')} too. Add them up into one row, or skip one.` })
     else countedRows.set(k, r)
   }
+  // Where the list counts each product, so a count elsewhere is one the list doesn't mention.
+  const countedAt = new Map<string, Set<string>>()
+  for (const [k, r] of countedRows) {
+    const m = k.slice(0, k.lastIndexOf('@'))
+    countedAt.set(m, (countedAt.get(m) ?? new Set()).add(whereKey(whereOf.get(r)!)))
+  }
   const takeable = new Map<string, number>()
 
   const said = new Map<Read, { does: string[]; updates: boolean }>()
@@ -1038,7 +1090,19 @@ export function previewStockList(
       const numbered = g.isCase || g.rows.some((r) => r.numbered || r.patDue) || (g.valueCents ?? 0) >= NUMBERED_FROM_CENTS
       const tracking: Tracking = numbered ? 'serialised' : 'bulk'
       const patMonths = patDays ? LIST_PAT_MONTHS : null
-      plan.products.push({ key: `product:${g.key}`, row: first.input.row, name: g.name, department: g.department, category: g.category, tracking, isCase: g.isCase, valueCents: g.valueCents, patMonths, notes: notes.slice(0, 2000) })
+      plan.products.push({
+        key: `product:${g.key}`,
+        row: first.input.row,
+        name: g.name,
+        department: g.department,
+        category: g.category,
+        tracking,
+        isCase: g.isCase,
+        valueCents: g.valueCents,
+        patMonths,
+        notes: notes.slice(0, 2000),
+        ...(g.listId ? { listId: g.listId } : {}),
+      })
       const how = !numbered ? 'counted' : g.isCase ? 'numbered, holds other kit' : g.rows.some(makesItems) ? 'numbered' : 'numbered, counted until labelled'
       if (g.dayCents !== null) plan.prices.push({ row: first.input.row, model: { key: `product:${g.key}` }, dayCents: g.dayCents })
       doing(first).does.push(`New product, ${how}${patMonths ? `, a PAT every ${patMonths} months` : ''}${g.dayCents !== null ? `, ${dayLabel(g.dayCents)}` : ''}`)
@@ -1046,6 +1110,14 @@ export function previewStockList(
       const k = g.known
       const change: PlannedProductChange = { id: k.id, name: k.name, row: first.input.row }
       const parts: string[] = []
+      if (norm(k.name) !== g.key) {
+        change.rename = g.name
+        parts.push(`renamed ${g.name}`)
+      }
+      if (g.listId && k.listId !== g.listId) {
+        change.listId = g.listId
+        parts.push(`its id in the old system kept, ${g.listId}`)
+      }
       if (k.tracking === 'bulk' && (g.isCase || g.rows.some((r) => r.numbered))) {
         change.tracking = 'serialised'
         parts.push('numbered')
@@ -1184,7 +1256,36 @@ export function previewStockList(
         s.does.push(`Counts ${r.qty.toLocaleString('en-IE')} ${atSaid(r)}${now ? ` (${now.toLocaleString('en-IE')} there now)` : ''}`)
         if (now) s.updates = true
       }
+      // Counted at a place the list doesn't count it (audit, 20 October 2026, finding 7). Where the office typed the place
+      // for the list, the list's count is all of it, so the count there is taken off (ADR 0061); a row's own place leaves it.
+      if (g.known && !w.case) {
+        const listed = countedAt.get(refKey(model))!
+        const here = atSaid(r).replace(/ \(new (place|case)\)$/, '')
+        for (const e of known.counts) {
+          if (e.modelId !== g.known.id || e.caseId || !e.placeId || e.qty <= 0 || listed.has(`p:${e.placeId}`)) continue
+          const at = placeById.get(e.placeId)?.name ?? 'another place'
+          const n = e.qty.toLocaleString('en-IE')
+          if (r.typedPlace) {
+            plan.counts.push({ row: r.input.row, model, where: { place: { id: e.placeId }, case: null }, qty: 0 })
+            s.does.push(`Counts none at ${at} (${n} there now): the list counts them all ${here}`)
+            s.updates = true
+          } else r.asides.push(`${n} more at ${at}, which the list doesn't count, so that count stays.`)
+        }
+      }
     }
+  }
+
+  // A new product much like one here the list doesn't name: the same category, value and count, as a rename in the old system looks.
+  const heldOf = (p: KnownProduct) => known.counts.filter((c) => c.modelId === p.id).reduce((n, c) => n + c.qty, 0) + activeOf(p.id).length
+  const unnamed = known.products.filter((p) => !p.mistake && !claimed.has(p.id))
+  for (const g of groups.values()) {
+    if (g.known || g.rows.some((r) => r.numbered || r.qty === null)) continue
+    const qty = g.rows.reduce((n, r) => n + r.qty!, 0)
+    const like = unnamed.filter(
+      (p) => qty > 0 && p.valueCents === g.valueCents && p.category !== undefined && norm(p.category) === norm(g.category) && !(p.listId && g.listId) && heldOf(p) === qty
+    )
+    if (like.length === 1)
+      g.rows[0]!.asides.push(`Looks like ${like[0]!.name} renamed: the same category, value and count. If it is, rename ${like[0]!.name} to ${g.name} on its page first, so it isn't counted twice.`)
   }
 
   // Each row as the preview shows it.

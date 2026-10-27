@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
+/** A row of the pick list, whether it's still to do or folded under the done ones (audit, 20 October 2026, finding 5). */
+const pickRow = (page: Page, name: string) => page.locator('article.pick-row').filter({ has: page.locator('header b').getByText(name, { exact: true }) })
+
 /**
  * Faults and missing kit end to end (ADR 0018), at phone size: three
  * speakers and 20 cables go out to a job. With no signal, one speaker comes
@@ -124,12 +127,12 @@ test('damaged and missing kit, reported on return, then fixed, found and written
     await typeIn(n)
     await expect(said).toHaveText(`${n} ${speaker}: ${i + 1} of 3 out.`)
   }
-  const speakerRow = page.getByRole('article', { name: speaker })
-  const cableRow = page.getByRole('article', { name: cable })
+  const speakerRow = pickRow(page, speaker)
+  const cableRow = pickRow(page, cable)
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('20')
-  await countOut.getByRole('button', { name: 'Count out' }).click()
-  await expect(page.locator('.pick-total')).toHaveText('23 of 23 out')
+  await countOut.getByRole('button', { name: 'Count out', exact: true }).click()
+  await expect(page.locator('.pick-total')).toHaveText('All 23 out: ready to load.')
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   // Back, with no signal.
@@ -156,7 +159,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   // 17 cables back, 3 missing, and 2 of those back are cut.
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('17')
-  await countBack.getByRole('button', { name: 'Count back' }).click()
+  await countBack.getByRole('button', { name: 'Count back', exact: true }).click()
   await expect(cableRow.locator('.count')).toHaveText('3 still out')
   await countBack.getByLabel('How many').fill('3')
   await countBack.getByRole('button', { name: 'Missing' }).click()

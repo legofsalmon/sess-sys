@@ -41,10 +41,21 @@ test('Home is where the app opens, and says how things stand for whoever is look
   await expect(attention.getByRole('link', { name: /answers to check/ })).toBeVisible()
   await expect(attention.getByRole('link', { name: /kit lines short/ })).toBeVisible()
 
-  // A count opens the screen that sorts it out.
+  // A count opens the screen that sorts it out, at the part it counted (audit, 20 October 2026, finding 4).
   await attention.getByRole('link', { name: /answers to check/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Crew' })).toBeVisible()
   await expect(bar.getByRole('link', { name: /^Crew/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: /^Answers to check/ })).toBeFocused()
+  await bar.getByRole('link', { name: 'Home' }).click()
+  await attention.getByRole('link', { name: /kit lines short/ }).click()
+  const short = page.getByRole('heading', { name: 'Kit short' })
+  await expect(short).toBeFocused()
+  await expect(short).toBeInViewport()
+  // Back to Home, and Back again comes to the part as it was left.
+  await page.goBack()
+  await expect(attention.getByRole('link', { name: /kit lines short/ })).toBeVisible()
+  await page.goForward()
+  await expect(short).toBeInViewport()
 
   // The warehouse: what's going out, opening its pick list. Remembered on this phone.
   await bar.getByRole('link', { name: 'Home' }).click()
@@ -85,16 +96,25 @@ test('the Menu names every place, and Admin, History and You keep its tab with t
   }
 })
 
-test('a long screen names its parts at the top, and a tap goes to one', async ({ browser }) => {
+test('a long screen names its parts on them, and a tap goes to one', async ({ browser }) => {
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   const parts = page.getByRole('navigation', { name: 'On this screen' })
+  // Under the screen's title, out of the bar, and straight before the first part, so it reads as the page's contents.
+  await expect(page.locator('header.top').getByRole('navigation', { name: 'On this screen' })).toHaveCount(0)
+  expect(await parts.evaluate((nav) => nav.nextElementSibling?.querySelector('h2')?.textContent)).toMatch(/^Stock/)
+  const title = (await page.getByRole('heading', { level: 1, name: 'Stock' }).boundingBox())!
+  expect((await parts.boundingBox())!.y).toBeGreaterThanOrEqual(title.y + title.height)
   await parts.getByRole('button', { name: 'Pick lists' }).click()
   const lists = page.getByRole('heading', { name: 'Pick lists', exact: true })
   await expect(lists).toBeFocused()
   await expect(lists).toBeInViewport()
   await expect(parts.getByRole('button', { name: 'Pick lists' })).toHaveAttribute('aria-current', 'location')
+  // Scrolled to, a part clears the bar and the strip, which stays straight under the bar.
+  const [bar, strip, heading] = await Promise.all([page.locator('header.top'), parts, lists].map(async (l) => (await l.boundingBox())!))
+  expect(Math.round(strip!.y)).toBe(Math.round(bar!.y + bar!.height))
+  expect(heading!.y).toBeGreaterThanOrEqual(strip!.y + strip!.height)
   // A heading's count is the part's count.
   await page.goto('/#crew')
   await expect(parts.getByRole('button', { name: /^Answers to check/ }).locator('.count')).toHaveText(/^\d+$/)

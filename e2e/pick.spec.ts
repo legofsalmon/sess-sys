@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import { encode } from 'uqr'
 
+/** A row of the pick list, whether it's still to do or folded under the done ones (audit, 20 October 2026, finding 5). */
+const pickRow = (page: Page, name: string) => page.locator('article.pick-row').filter({ has: page.locator('header b').getByText(name, { exact: true }) })
+
 /**
  * Pick lists end to end (ADR 0017), at phone size: a job two days out needs
  * two speakers and 12 cables. Its pick list says where they are; the
@@ -77,11 +80,12 @@ async function ready(page: Page, hash = '#stock') {
   await expect(page.locator('.conn')).toHaveText('Up to date')
 }
 
-async function newProduct(page: Page, name: string, counted?: number) {
+async function newProduct(page: Page, name: string, counted?: number, department?: string) {
   await page.goto('/#stock')
   await page.getByRole('button', { name: 'Add product' }).click()
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add product' }) })
   await form.getByLabel('Name').fill(name)
+  if (department) await form.getByLabel('Department').selectOption({ label: department })
   if (counted) await form.getByRole('radio', { name: /^Counted/ }).check()
   await form.getByRole('button', { name: 'Add product' }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
@@ -166,11 +170,16 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   // What's needed, and where to find it.
   await expect(page.getByRole('heading', { level: 1, name: 'Pick list' })).toBeVisible()
   await expect(page.locator('.pick-total')).toHaveText('0 of 14 out')
-  const speakerRow = page.getByRole('article', { name: speaker })
-  const cableRow = page.getByRole('article', { name: cable })
+  const speakerRow = pickRow(page, speaker)
+  const cableRow = pickRow(page, cable)
   await expect(speakerRow.locator('.count')).toHaveText('0 of 2 out')
-  await expect(speakerRow.getByRole('list', { name: 'Where to find them' })).toHaveText(`${bay}: ${speakers.join(', ')}`)
-  await expect(cableRow.getByRole('list', { name: 'Where to find them' })).toHaveText('Warehouse: 40 counted')
+  // A line a place with how many are there, the numbers folded under it (audit, 20 October 2026, finding 5).
+  const speakersAt = speakerRow.getByRole('list', { name: 'Where to find them' })
+  await expect(speakersAt.getByRole('listitem')).toHaveCount(1)
+  await expect(speakersAt).toContainText(`${bay}: ${speakers.length} here`)
+  await speakersAt.getByText(`The ${speakers.length} numbers`).click()
+  await expect(speakersAt.locator('details p')).toHaveText(speakers.join(', '))
+  await expect(cableRow.getByRole('list', { name: 'Where to find them' })).toHaveText('Warehouse: 40 here')
 
   // The first speaker, with the camera; held still, it's read once.
   await page.getByRole('button', { name: 'Scan' }).click()
@@ -192,13 +201,13 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await page.getByLabel('Number or serial').press('Enter')
   await expect(said).toHaveText(`${micNumber} ${mic} out. It isn't on the kit for ${job}. Add it to the kit, or scan it back in if it isn't going.`)
   await expect(said).toHaveClass(/warn/)
-  const micRow = page.getByRole('article', { name: mic })
+  const micRow = pickRow(page, mic)
   await expect(micRow.locator('.kit-state')).toHaveText(`Not on the kit for ${job}.`)
 
   // The cables, counted out.
   const countOut = cableRow.getByRole('form', { name: `Count out ${cable}` })
   await countOut.getByLabel('How many').fill('12')
-  await countOut.getByRole('button', { name: 'Count out' }).click()
+  await countOut.getByRole('button', { name: 'Count out', exact: true }).click()
   await expect(cableRow.locator('.count')).toHaveText('12 of 12 out')
   await expect(page.locator('.pick-total')).toHaveText('13 of 14 out')
   await expect(page.locator('.conn')).toHaveText('Up to date')
@@ -210,13 +219,17 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await expect(micRow).toHaveCount(0)
   await hold(page, speakers[1]!)
   await expect(said).toHaveText(`${speakers[1]} ${speaker}: 2 of 2 out.`)
-  await expect(page.locator('.pick-total')).toHaveText('14 of 14 out')
-  await expect(speakerRow.getByRole('list', { name: 'Out' })).toContainText(speakers[1]!)
+  await expect(page.locator('.pick-total')).toHaveText('All 14 out: ready to load.')
+  await expect(speakerRow.locator('.out-items')).toContainText(speakers[1]!)
   await hold(page, null)
   await page.getByRole('button', { name: 'Stop camera' }).click()
   await expect(page.locator('.conn')).toHaveText('Up to date')
+  // The scan box stays under the top bar at the foot of the list.
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight))
+  await expect(page.getByLabel('Number or serial')).toBeInViewport()
 
-  // The speaker's page says where it is, and the Stock tab lists the job as all out.
+  // All out, the speakers are folded under what's done; the speaker's page says where it is, and the Stock tab lists the job as all out.
+  await page.locator('.pick-done', { has: speakerRow }).locator('summary').click()
   await speakerRow.getByRole('link', { name: speakers[0]! }).click()
   await expect(page.locator('.facts')).toContainText(`OutWith ${job} since today at`)
   await page.goto('/#stock')
@@ -238,7 +251,7 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await expect(said).toHaveText(`${speakers[2]} ${speaker} isn't out, so there's nothing to bring back.`)
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('10')
-  await countBack.getByRole('button', { name: 'Count back' }).click()
+  await countBack.getByRole('button', { name: 'Count back', exact: true }).click()
   await expect(cableRow.locator('.count')).toHaveText('2 still out')
   await expect(page.locator('.pick-total')).toHaveText('12 back, 3 still out')
   await expect(page.locator('.conn')).toContainText('No signal')
@@ -255,4 +268,102 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await page.reload()
   await page.getByRole('button', { name: 'Coming back' }).click()
   await expect(page.locator('.pick-total')).toHaveText('13 back, 2 still out')
+})
+
+/**
+ * Picking on the phone (ADR 0072): someone who didn't plan the job picks
+ * their own department's kit, walking the warehouse place by place, with
+ * the planner's note on the row, a scan undone, and counted kit counted out
+ * in one tap. Which department and which order are kept on the phone.
+ */
+test('picking on the phone: whose kit, a walk round the warehouse, notes, Undo and the rest in one tap', async ({ browser }) => {
+  const id = tag()
+  const speaker = named('L-Acoustics X12', id)
+  const light = named('Robe Spiider', id)
+  const cable = named('Socapex 20 m', id)
+  const front = named('Bay A1', id)
+  const back = named('Bay C4', id)
+  const job = named('Harbour Lights', id)
+  const context = await browser.newContext({ viewport: phoneSize })
+  const page = await context.newPage()
+  await ready(page)
+
+  await newProduct(page, speaker, undefined, 'Audio')
+  const speakers = await newItems(page, back, 2)
+  await newProduct(page, light, undefined, 'Lighting')
+  await newItems(page, front, 2)
+  await newProduct(page, cable, 30, 'Power')
+
+  await page.goto('/#jobs')
+  await page.getByRole('button', { name: 'New job', exact: true }).click()
+  const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
+  await form.getByLabel('Job').fill(job)
+  await form.getByLabel('Status').selectOption({ label: 'Confirmed' })
+  await form.getByLabel('Phase 1', { exact: true }).fill('Load in')
+  await form.getByLabel('Phase 1 from').fill(fromToday(2))
+  await form.getByLabel('Phase 1 to').fill(fromToday(3))
+  await form.getByRole('button', { name: 'Add job' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: job })).toBeVisible()
+  await page.getByRole('tab', { name: 'Kit and vans' }).click()
+  await page.getByRole('button', { name: 'Add kit' }).click()
+  for (const [product, qty] of [
+    [speaker, 2],
+    [light, 2],
+    [cable, 20],
+  ] as const) {
+    const add = page.getByRole('form', { name: 'Add kit' })
+    await add.getByLabel('Product').fill(product)
+    await add.getByLabel('How many').fill(String(qty))
+    await add.getByRole('button', { name: 'Add to kit' }).click()
+  }
+  // The planner's note, for whoever picks it.
+  const kit = page.getByRole('region', { name: 'Kit' })
+  await kit.getByRole('article', { name: `2 × ${speaker}` }).getByRole('button', { name: 'Change' }).click()
+  await page.getByRole('form', { name: `Change ${speaker}` }).getByLabel('Note').fill('The pair with the new grilles')
+  await page.getByRole('form', { name: `Change ${speaker}` }).getByRole('button', { name: /^Save/ }).click()
+  await expect(kit.locator('.pick-link')).toContainText('24 to go out')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await kit.getByRole('link', { name: 'Pick list' }).click()
+
+  // When it's needed, before starting.
+  await expect(page.getByRole('list', { name: 'Before you start' })).toContainText('In 2 days: Load in,')
+
+  // Their own department's kit: only audio, with the note.
+  const whose = page.getByRole('group', { name: 'Whose kit' })
+  await whose.getByRole('button', { name: /^Audio/ }).click()
+  await expect(page.locator('.pick-total')).toHaveText('Audio: 0 of 2 out · 0 of 24 in all')
+  await expect(page.locator('article.pick-row')).toHaveCount(1)
+  await expect(pickRow(page, speaker).locator('.pick-note')).toHaveText('Note The pair with the new grilles')
+  // Kept on the phone.
+  await page.reload()
+  await expect(page.getByRole('group', { name: 'Whose kit' }).getByRole('button', { name: /^Audio/ })).toHaveAttribute('aria-pressed', 'true')
+
+  // A scan, undone.
+  const said = page.getByRole('status', { name: 'Last scan' })
+  await page.getByLabel('Number or serial').fill(speakers[0]!)
+  await page.getByLabel('Number or serial').press('Enter')
+  await expect(said).toHaveText(`${speakers[0]} ${speaker}: 1 of 2 out.`)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(said).toHaveText(`Undone: ${speakers[0]} ${speaker} isn't out: it's back in stock.`)
+  await expect(page.locator('.pick-total')).toHaveText('Audio: 0 of 2 out · 0 of 24 in all')
+  await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+
+  // Everything, as a walk round the warehouse: place by place, in the stock list's order.
+  await page.getByRole('group', { name: 'Whose kit' }).getByRole('button', { name: 'All' }).click()
+  await page.getByRole('group', { name: 'In what order' }).getByRole('button', { name: "By where it's kept" }).click()
+  const list = page.getByRole('region', { name: 'Kit' })
+  await expect(list.locator('.kit-group h3')).toHaveText([front, back, 'Warehouse'])
+  await expect(list.locator('.kit-group', { has: page.getByRole('heading', { name: front }) }).locator('article.pick-row header b')).toHaveText([light])
+
+  // The cables in one tap, and undone.
+  const cableRow = pickRow(page, cable)
+  await cableRow.getByRole('button', { name: 'Count out the 20' }).click()
+  await expect(said).toHaveText(`20 × ${cable} counted out.`)
+  await expect(page.locator('.pick-total')).toHaveText('20 of 24 out')
+  await page.screenshot(shot('pick-walk'))
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(said).toHaveText(`Undone: 20 × ${cable} not counted out.`)
+  await expect(page.locator('.pick-total')).toHaveText('0 of 24 out')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await context.close()
 })

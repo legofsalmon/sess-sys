@@ -1,4 +1,4 @@
-import { newId, type CommandInput, type CommandName, type HistoryPage, type MutationResult, type Offer, type Person } from '@sh/shared'
+import { irishToday, newId, type CommandInput, type CommandName, type HistoryPage, type LeaveAllowance, type MutationResult, type Offer, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
@@ -6,6 +6,7 @@ import { roleOfAccount } from '../src/auth/roles.ts'
 import { readApp } from '../src/calendar/import.ts'
 import { personByEmail } from '../src/crew/store.ts'
 import { pgliteDb } from '../src/db.ts'
+import { LEAVE } from '../src/leave/schema.ts'
 
 /**
  * Combining people brought in twice (ADR 0055): a freelancer the calendars
@@ -162,6 +163,37 @@ describe('combining people brought in twice', () => {
     expect((await latest<Person>(app, 'person', colly.id))!.email).toBe('colly@sessionhire.com')
     expect(reason(await send(app, 'person.mainEmail', { id: colly.id, email: 'colly@sessionhire.com' }))?.code).toBe('conflict')
     expect(reason(await send(app, 'person.mainEmail', { id: colly.id, email: 'someone@else.ie' }))?.code).toBe('conflict')
+  })
+
+  it("keeps the leave allowance of the one combined, under the kept person's own id, so it's found and can be set again (audit, 20 October 2026, finding 8)", async () => {
+    const { app, db } = await server()
+    // Allowances are set for this year or next.
+    const year = Number(irishToday().slice(0, 4))
+    await db.query('INSERT INTO leave_years (year) VALUES ($1) ON CONFLICT DO NOTHING', [year])
+    const kept = await person(app, 'Siún Keogh', { kind: 'staff', email: 'siun@sessionhire.com' })
+    const twice = await person(app, 'Siunkeogh', { kind: 'staff', email: 'siunkeogh@gmail.com' })
+    const colly = await person(app, 'Colly Hewson', { kind: 'staff', email: 'colly@sessionhire.com', approvesLeave: true })
+    ok(await send(app, 'leave.allowance', { personId: twice.id, year, days: 25, carriedOver: 3, note: 'Five years in', by: colly.id }))
+    ok(await send(app, 'person.merge', { id: kept.id, from: [twice.id] }))
+
+    expect(await latest<LeaveAllowance>(app, 'leaveAllowance', `${twice.id}-${year}`)).toBeUndefined()
+    expect(await latest<LeaveAllowance>(app, 'leaveAllowance', `${kept.id}-${year}`)).toMatchObject({ personId: kept.id, year, days: 25, carriedOver: 3, note: 'Five years in' })
+    // Setting it again on the kept person changes that one: it used to break the one-a-year rule and be dropped.
+    ok(await send(app, 'leave.allowance', { personId: kept.id, year, days: 26, carriedOver: 3, note: 'Five years in', by: colly.id }))
+    expect(await latest<LeaveAllowance>(app, 'leaveAllowance', `${kept.id}-${year}`)).toMatchObject({ days: 26 })
+  })
+
+  it('puts right an allowance a combining before the fix left under the old id, on the next start (audit, 20 October 2026, finding 8)', async () => {
+    const { app, db } = await server()
+    const kept = await person(app, 'Siún Keogh', { kind: 'staff', email: 'siun@sessionhire.com' })
+    await db.query(`INSERT INTO leave_allowances (id, person_id, year, days, carried_over, note) VALUES ('gone-person-2026', $1, 2026, 25, 3, '')`, [kept.id])
+    await db.exec(LEAVE.migrations[2]!)
+    expect((await db.query<{ id: string }>('SELECT id FROM leave_allowances')).rows).toEqual([{ id: `${kept.id}-2026` }])
+    expect(await latest<LeaveAllowance>(app, 'leaveAllowance', 'gone-person-2026')).toBeUndefined()
+    expect(await latest<LeaveAllowance>(app, 'leaveAllowance', `${kept.id}-2026`)).toMatchObject({ personId: kept.id, year: 2026, days: 25, carriedOver: 3 })
+    // Run again, it finds nothing to put right.
+    await db.exec(LEAVE.migrations[2]!)
+    expect((await feed(app)).filter((c) => c.entity === 'leaveAllowance')).toHaveLength(2)
   })
 
   it('refuses two different roles, and leaves everything as it was', async () => {

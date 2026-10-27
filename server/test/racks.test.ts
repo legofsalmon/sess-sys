@@ -1,0 +1,180 @@
+import { newId, type CommandInput, type CommandName, type MutationResult } from '@sh/shared'
+import type { FastifyInstance } from 'fastify'
+import { describe, expect, it } from 'vitest'
+import { readHistory } from '../src/history.ts'
+import { company, m, ok, phone } from './company.ts'
+
+/**
+ * Racks (ADR 0074): a product that is a rack case built up with kit, with
+ * its own stock code and a layout of what goes where; each rack built of
+ * it holds its kit, which then goes with the rack and isn't free on its
+ * own; and the layout is a plan, said not refused when it doesn't fit.
+ */
+
+async function send<N extends CommandName>(app: FastifyInstance, name: N, args: CommandInput<N>): Promise<MutationResult> {
+  const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [m(name, args)] } })
+  return res.json().results[0]
+}
+
+const RACK = { department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '' } as const
+const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true } as const
+
+describe('racks', () => {
+  it('have a stock code of their own, a layout, and take their kit off what is free', async () => {
+    const { app, db } = await company()
+    await ok(
+      app,
+      m('model.create', { id: 'mon', name: 'Monitor rack', ...RACK, code: ' RK-MON ', units: 4, depthMm: 450, weightKg: 9.96 }),
+      m('model.create', { id: 'amp', name: 'd&b D20', ...AMP, units: 2, depthMm: 400, weightKg: 10.6, powerW: 1200 }),
+      m('model.create', { id: 'di', name: 'DI box', ...AMP, units: 1, depthMm: 100 }),
+      m('rackSlot.set', { id: 's1', rackId: 'mon', modelId: 'amp', top: 1, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's2', rackId: 'mon', modelId: 'amp', top: 3, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's3', rackId: 'mon', modelId: 'xlr', top: null, side: 'front', qty: 4, notes: 'In the drawer' }),
+      m('asset.add', { id: 'mon1', modelId: 'mon', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false }),
+      m('asset.add', { id: 'amp1', modelId: 'amp', number: null, serial: '', placeId: null, caseId: 'mon1', notes: '', fromCount: false }),
+      m('asset.add', { id: 'amp2', modelId: 'amp', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false }),
+      m('stock.move', { modelId: 'xlr', fromPlaceId: 'wh', fromCaseId: null, toPlaceId: null, toCaseId: 'mon1', qty: 4 }),
+      m('kit.add', { id: 'amps', projectId: 'gala', phaseId: null, modelId: 'amp', qty: 2, subhireQty: 0, supplier: '', notes: '' })
+    )
+
+    // A stock code is a product's own, whatever the capitals; kept trimmed.
+    expect(await send(app, 'model.update', { id: 'xlr', code: 'rk-mon' })).toMatchObject({ status: 'rejected', reason: { message: 'Monitor rack already has the stock code rk-mon.' } })
+
+    const { client } = await phone(app)
+    const v = client.view()
+    const rack = v.racks.of('mon')!
+    expect(rack.model).toMatchObject({ code: 'RK-MON', units: 4, depthMm: 450, weightKg: 10 })
+    expect(rack.slots.map((s) => s.id)).toEqual(['s1', 's2', 's3'])
+    expect(rack.layout).toMatchObject({ frontUsed: 4, rearUsed: 0, weightKg: 31.2, powerW: 2400, problems: [] })
+    // The built one is short an amp; the cables are in.
+    expect(rack.built.map((b) => b.check)).toEqual([{ missing: [{ modelId: 'amp', qty: 1 }], extra: [], hireIn: [] }])
+    // The amp in the rack goes with the rack: one free, so the gala is short one.
+    expect(v.warehouse.models.find((x) => x.id === 'amp')).toMatchObject({ total: 2, racked: 1 })
+    expect(v.kit.lines.find((l) => l.id === 'amps')).toMatchObject({ owned: 1, short: 1 })
+    expect(v.warehouse.assets.get('amp1')?.inRack?.id).toBe('mon1')
+
+    // A plan isn't refused for not fitting: the app says so.
+    await ok(app, m('rackSlot.set', { id: 's4', rackId: 'mon', modelId: 'di', top: 4, side: 'front', qty: 1, notes: '' }))
+    await client.sync()
+    expect(client.view().racks.of('mon')!.layout.problems.map((p) => p.message)).toEqual(['DI box at U4 is on top of d&b D20 at U3 on the front.'])
+
+    // What can't be meant is refused.
+    expect(await send(app, 'rackSlot.set', { id: newId(), rackId: 'amp', modelId: 'di', top: 1, side: 'front', qty: 1, notes: '' })).toMatchObject({
+      status: 'rejected',
+      reason: { message: "d&b D20 isn't a rack, so it has no layout." },
+    })
+    expect(await send(app, 'rackSlot.set', { id: newId(), rackId: 'mon', modelId: 'mon', top: 1, side: 'front', qty: 1, notes: '' })).toMatchObject({ status: 'rejected' })
+    expect(await send(app, 'rackSlot.set', { id: newId(), rackId: 'mon', modelId: 'di', top: 1, side: 'front', qty: 2, notes: '' })).toMatchObject({ status: 'rejected' })
+    // A product in a layout stays, and a rack with one stays a rack.
+    expect(await send(app, 'model.remove', { id: 'di' })).toMatchObject({ status: 'rejected', reason: { message: 'DI box is in the layout of Monitor rack. Take it out of that first.' } })
+    expect(await send(app, 'model.mistake', { id: 'di' })).toMatchObject({ status: 'rejected' })
+    expect(await send(app, 'model.update', { id: 'mon', isRack: false })).toMatchObject({ status: 'rejected', reason: { message: 'Monitor rack has a layout. Take everything out of it first.' } })
+    expect(await send(app, 'model.update', { id: 'mon', isCase: false })).toMatchObject({ status: 'rejected' })
+
+    await ok(app, m('rackSlot.remove', { id: 's4' }), m('model.remove', { id: 'di' }))
+    const said = (await readHistory(db)).entries.filter((e) => e.command.startsWith('rackSlot') && e.outcome === 'done').map((e) => e.what)
+    expect(said).toContain('Put d&b D20 at U1 on the front in the layout of Monitor rack')
+    expect(said).toContain('Put 4 × XLR 10 m loose in the layout of Monitor rack')
+    expect(said).toContain('Took DI box out of the layout of Monitor rack')
+  })
+})
+
+describe('dry hire stock', () => {
+  it("is never short, can't be labelled or counted as ours, and a rack says what it costs to hire in or buy", async () => {
+    const { app } = await company()
+    await ok(
+      app,
+      m('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: 'PRG', hireDayCents: 4500, valueCents: 350000, notes: '', units: 3 }),
+      m('model.create', { id: 'mon', name: 'Monitor rack', ...RACK, code: '', units: 6, depthMm: 600 }),
+      m('rackSlot.set', { id: 's1', rackId: 'mon', modelId: 'haze', top: 1, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's2', rackId: 'mon', modelId: 'y10p', top: 4, side: 'front', qty: 1, notes: '' }),
+      m('asset.add', { id: 'mon1', modelId: 'mon', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false }),
+      m('asset.move', { id: 'a1', placeId: null, caseId: 'mon1' }),
+      m('kit.add', { id: 'hazers', projectId: 'gala', phaseId: null, modelId: 'haze', qty: 4, subhireQty: 0, supplier: '', notes: '' })
+    )
+    const refusal = 'MDG ATMe is dry hire, hired in when needed, so none of it is ours to label or count. Mark it as ours first.'
+    expect(await send(app, 'asset.add', { id: newId(), modelId: 'haze', number: null, serial: '', placeId: 'wh', caseId: null, notes: '', fromCount: false })).toMatchObject({ reason: { message: refusal } })
+    expect(await send(app, 'stock.set', { modelId: 'haze', placeId: 'wh', caseId: null, qty: 2 })).toMatchObject({ status: 'rejected' })
+    // Our own can't become dry hire while we have some, nor a rack.
+    expect(await send(app, 'model.update', { id: 'y10p', dryHire: true })).toMatchObject({ status: 'rejected', reason: { message: /^d&b Y10P has 2 items of our own/ } })
+    expect(await send(app, 'model.update', { id: 'mon', dryHire: true })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const v = client.view()
+    expect(v.kit.lines.find((l) => l.id === 'hazers')).toMatchObject({ own: 0, short: 0 })
+    const rack = v.racks.of('mon')!
+    expect(rack.layout.hire).toEqual({ count: 1, dayCents: 4500, dayMissing: 0, buyCents: 350000, buyMissing: 0 })
+    // The built one has its speaker; the hazer is hired in for each job, not missing.
+    expect(rack.built[0]!.check).toEqual({ missing: [], extra: [], hireIn: [{ modelId: 'haze', qty: 1 }] })
+  })
+})
+
+describe('rack-mount kit and rack cases', () => {
+  it('says kit not marked rack-mount on the rails, a rack too heavy to lift, and power past what it can take', async () => {
+    const { app } = await company()
+    await ok(
+      app,
+      m('model.create', { id: 'amp', name: 'Powersoft X8', department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true, units: 2, rackWidth: 'full', depthMm: 480, weightKg: 24, powerW: 2400 }),
+      m('model.create', { id: 'di', name: 'Radial DI', department: 'audio', category: 'DI', tracking: 'bulk', isCase: false, valueCents: null, notes: '', weightKg: 1 }),
+      m('model.create', { id: 'amps', name: 'Touring amp rack', ...RACK, code: '', units: 6, depthMm: 600, weightKg: 20, caseWidthMm: 600, caseHeightMm: 450, caseDepthMm: 750, powerLimitA: 16 }),
+      m('rackSlot.set', { id: 's1', rackId: 'amps', modelId: 'amp', top: 1, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's2', rackId: 'amps', modelId: 'amp', top: 3, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 's3', rackId: 'amps', modelId: 'di', top: 5, side: 'front', qty: 1, notes: '' })
+    )
+    // A rack can't go on another's rails.
+    expect(await send(app, 'model.update', { id: 'amps', rackMount: true })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const l = client.view().racks.of('amps')!.layout
+    expect(l).toMatchObject({ weightKg: 69, powerW: 4800, amps: 20.9, heatBtu: 16378 })
+    expect(l.problems.map((p) => p.kind).sort()).toEqual(['no-size', 'not-rack-mount', 'over-power', 'too-heavy'])
+    expect(l.problems.find((p) => p.kind === 'over-power')?.message).toBe('It draws up to 20.9 A, more than its 16 A power can take.')
+
+    // On castors, it's wheeled, not lifted; the DI goes loose.
+    await ok(app, m('model.update', { id: 'amps', castors: true }), m('rackSlot.set', { id: 's3', rackId: 'amps', modelId: 'di', top: null, side: 'front', qty: 1, notes: '' }))
+    expect((await phone(app)).client.view().racks.of('amps')!.layout.problems.map((p) => p.kind)).toEqual(['over-power'])
+  })
+})
+
+describe('building a rack up', () => {
+  it('puts narrower kit side by side, rack parts on the rails, loose kit in a drawer, labels and groups', async () => {
+    const { app, db } = await company()
+    const RX = { ...AMP, category: 'RF', rackWidth: 'half', units: 1, depthMm: 300 } as const
+    const PART = { ...AMP, category: 'Rack parts', tracking: 'bulk' } as const
+    await ok(
+      app,
+      m('model.create', { id: 'rf', name: 'RF rack', ...RACK, code: '', units: 4, depthMm: 400 }),
+      m('model.create', { id: 'rx', name: 'Shure AD4D', ...RX }),
+      m('model.create', { id: 'drawer', name: '2U drawer', ...PART, units: 2, depthMm: 350, rackPart: 'drawer' }),
+      m('model.create', { id: 'blank', name: '1U blank', ...PART, units: 1, rackPart: 'blank' }),
+      m('rackSlot.set', { id: 'l', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'left', label: 'IEM 1–2', group: 'RF', colour: 'blue' }),
+      m('rackSlot.set', { id: 'r', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'right', group: 'RF', colour: 'blue' }),
+      m('rackSlot.set', { id: 'd', rackId: 'rf', modelId: 'drawer', top: 3, side: 'front', qty: 1, notes: '' }),
+      m('rackSlot.set', { id: 'x', rackId: 'rf', modelId: 'xlr', top: null, side: 'front', qty: 6, notes: '', inSlotId: 'd' })
+    )
+    // A rack part is rack-mount; something on the rails isn't in a drawer; only a shelf or drawer holds anything.
+    expect(await send(app, 'model.update', { id: 'blank', rackMount: false })).toMatchObject({ status: 'rejected', reason: { message: 'A blank, vent, shelf or drawer goes on the rails, so it is rack-mount.' } })
+    expect(await send(app, 'rackSlot.set', { id: 'y', rackId: 'rf', modelId: 'xlr', top: null, side: 'front', qty: 1, notes: '', inSlotId: 'l' })).toMatchObject({ status: 'rejected' })
+
+    const { client } = await phone(app)
+    const rack = client.view().racks.of('rf')!
+    // Two halves side by side aren't on top of each other.
+    expect(rack.layout.problems).toEqual([])
+    expect(rack.slots.find((s) => s.id === 'l')).toMatchObject({ across: 'left', label: 'IEM 1–2', group: 'RF', colour: 'blue', inSlotId: null })
+    expect(rack.slots.find((s) => s.id === 'x')).toMatchObject({ inSlotId: 'd' })
+
+    // Two on the left are.
+    await ok(app, m('rackSlot.set', { id: 'r', rackId: 'rf', modelId: 'rx', top: 1, side: 'front', qty: 1, notes: '', across: 'left' }))
+    await client.sync()
+    expect(client.view().racks.of('rf')!.layout.problems.map((p) => p.kind)).toEqual(['overlap'])
+
+    // Taking the drawer out leaves its cables loose in the rack.
+    await ok(app, m('rackSlot.remove', { id: 'd' }))
+    const after = (await phone(app)).client.view().racks.of('rf')!
+    expect(after.slots.find((s) => s.id === 'x')).toMatchObject({ inSlotId: null })
+
+    const said = (await readHistory(db)).entries.filter((e) => e.command === 'rackSlot.set' && e.outcome === 'done').map((e) => e.what)
+    expect(said).toContain('Put Shure AD4D at U1 on the front, on the right, in the layout of RF rack, in the group RF')
+    expect(said).toContain('Put 6 × XLR 10 m loose in the 2U drawer in the layout of RF rack')
+  })
+})

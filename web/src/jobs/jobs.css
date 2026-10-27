@@ -173,6 +173,11 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Pick lists (ADR 0017): each product on the job's kit, what's out, and where to find the rest. */
 .jobs .pick-link { display: flex; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
 .jobs .pick-link span { color: var(--muted); font-size: .9rem; }
+.pick .scan-dock.docked { position: sticky; top: var(--under-top, 0px); z-index: 1; }
+.pick .from details { display: inline; margin-left: var(--space-6); font-size: .9rem; }
+.pick .from details > summary { display: inline; cursor: pointer; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.pick .from details > p { margin: var(--space-4) 0 0; color: var(--muted); }
+.pick .pick-done > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-weight: 600; }
 .pick .pick-total { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pick .said { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); font-size: .9rem; }
 .pick .said.ok { background: var(--good-soft); color: var(--good); }
@@ -186,9 +191,21 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .pick-row.done .count { color: var(--good); }
 .pick .from { margin: 0; padding-left: var(--space-16); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .pick .out-items li { display: flex; align-items: center; gap: var(--space-2); }
-.pick .count-row { display: grid; grid-template-columns: 1fr 7.5rem auto; gap: var(--space-6); align-items: center; }
-.pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; }
-.pick .count-row .alert { grid-column: 1 / -1; }
+.pick .count-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; }
+.pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1 0 100%; }
+.pick .count-row input { width: 7.5rem; }
+.pick .count-row .alert { flex: 1 0 100%; }
+/* Picking on the phone (ADR 0072): whose kit and in what order, what to know before starting, the kit's own notes, and Undo beside the answer. */
+.pick .pick-total.done { color: var(--good); }
+.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: .9rem; }
+.pick .pick-ways { display: grid; gap: var(--space-8); }
+.pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.pick .pick-ways button[aria-pressed='true'] .left { color: inherit; }
+.pick .pick-note { margin: 0; font-size: .9rem; }
+.pick .pick-note b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--space-4); }
+.pick .said-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: stretch; }
+.pick .said-row .said { flex: 1; }
+.pick .said-row .alert { flex: 1 0 100%; }
 
 /* Call sheets (ADR 0021): the office's, and a plain one on paper. */
 .jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
@@ -234,17 +251,38 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Quotes and money (ADR 0042): the lines as a table, typed in a row each while a draft, the sums under them, and the A4 page. */
 .quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
 .quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
-.quote-screen .quote-line { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
+.quote-screen .quote-draft { container-type: inline-size; }
+.quote-screen .quote-line { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(5.5em, 1.2fr) minmax(0, 0.8fr); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
 .quote-screen .quote-line label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line label input, .quote-screen .quote-line label select { min-width: 0; width: 100%; color: var(--ink); }
-.quote-screen .quote-line .what { grid-column: 1 / -1; }
-.quote-screen .quote-line .amount { grid-column: 1 / 3; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
-.quote-screen .quote-line button.link { grid-column: 3 / -1; justify-self: end; }
-@media (min-width: 720px) {
-  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) repeat(4, minmax(4.5em, 1fr)) minmax(6em, 1fr) auto; }
-  .quote-screen .quote-line .what, .quote-screen .quote-line .amount, .quote-screen .quote-line button.link { grid-column: auto; }
-  .quote-screen .quote-line .amount { text-align: right; }
+.quote-screen .quote-line .what, .quote-screen .quote-line .line-problem { grid-column: 1 / -1; }
+.quote-screen .quote-line .link.vat { grid-column: 1 / 3; justify-self: start; align-self: center; font-size: var(--text-small); }
+.quote-screen .quote-line .vat-rate { grid-column: 1 / 3; }
+.quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
+.quote-screen .quote-line .amount small { display: block; font-weight: 400; }
+.quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
+.quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
+.quote-screen .quote-line.unpriced input[aria-invalid] { border-color: var(--warn); }
+.quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
+/* Where the draft has the room, a line is one row, like the table it prints as. */
+@container (min-width: 860px) {
+  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(6em, 1.1fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
+  .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
 }
+/* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
+.quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
+.quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* What it comes to stays in view under the top bar while the lines are changed. */
+.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .undo-line { margin: 0; font-size: var(--text-small); }
+.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.quote-screen .quote-add .adding { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); width: 100%; }
+.quote-screen .quote-add .adding > :first-child { flex: 1 1 16em; }
+.quote-screen .job-changes { border: 1px solid var(--warn); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--warn-soft); }
+.quote-screen .job-changes p, .quote-screen .job-changes ul { margin: 0 0 var(--space-6); }
+.quote-screen .job-changes ul { padding-left: var(--space-16); }
 .quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all input { width: 4.5em; }
@@ -383,3 +421,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* A person's first and last name side by side (ADR 0066), wrapping to two lines on a narrow phone. */
 :is(.import, .tidy) .names { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); }
 :is(.import, .tidy) .names .name { flex: 1 1 8rem; width: auto; min-width: 0; }
+
+/* Past quotes from Current RMS (ADR 0078): a group's name heads its lines, as Current RMS lists them. */
+.past-quote .rms-lines .rms-group { padding-top: var(--space-12); }
+.past-quote .rms-lines .rms-group:first-child { padding-top: 0; }

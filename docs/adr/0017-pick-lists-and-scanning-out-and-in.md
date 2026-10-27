@@ -1,6 +1,8 @@
 # ADR 0017: Pick lists, and scanning kit out and back in
 
 - **Status:** Accepted, 30 September 2026. The fifth part of Phase 2.
+  Picking on a phone (whose kit, the order, notes, Undo) is
+  [ADR 0072](0072-picking-on-the-phone.md).
 - **Decides:** what a job's pick list shows, how kit is scanned out to a
   job and back in on a phone with no signal, how the app knows what's out
   where, and what it does when a scan doesn't match the plan.

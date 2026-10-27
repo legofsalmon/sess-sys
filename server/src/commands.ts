@@ -47,6 +47,9 @@ import { countHandlers } from './stock/counts.ts'
 import { financeHandlers } from './finance/handlers.ts'
 import { ownCalendarHandlers } from './crew/own-calendars.ts'
 import { vehicleHandlers } from './vehicles/handlers.ts'
+import { stepHandlers } from './steps/handlers.ts'
+import { rackHandlers } from './stock/racks.ts'
+import { purchaseHandlers } from './purchases/handlers.ts'
 
 /**
  * Where the server decides. Each mutation runs in its own transaction:
@@ -80,6 +83,9 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...financeHandlers,
   ...ownCalendarHandlers,
   ...vehicleHandlers,
+  ...stepHandlers,
+  ...rackHandlers,
+  ...purchaseHandlers,
 }
 
 /** Whether this reader may make a new link for the person a change names: one whose link they're sent (ADR 0046). */

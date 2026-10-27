@@ -3,6 +3,287 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 27 October 2026: building a rack up
+
+**Done**
+
+- [ADR 0079](adr/0079-building-a-rack-up.md) (PR #132), part 2 of 3 of the
+  advanced rack builder. Narrower kit sits side by side (`rack_slots.across`);
+  rack parts are products (`models.rack_part`: blank, vent, shelf, drawer),
+  with the usual six added in one press and Fill the gaps with blanks; loose
+  kit in a shelf or drawer (`in_slot_id`); a label, group and tape colour on
+  each slot, the tape drawn as content; undo and redo in the designer; Copy
+  this rack. App 1.38.0.
+- Checked: typecheck, unit tests (racks, parity, export), browser test
+  (racks.spec.ts: halves side by side, label and tape, undo and redo, a
+  drawer with a loom in it, blanks, a copy).
+
+**Next**
+
+- Part 3: product photos on the panels and a printable rack sheet.
+
+## 27 October 2026: a quote that saves itself and keeps up with the job
+
+**Done**
+
+- [ADR 0080](adr/0080-a-quote-that-saves-itself-and-keeps-up-with-the-job.md),
+  part 1a of the quoting plan, on Colly's ask for ease of use and clarity.
+  The draft saves itself; the total and lines with no price stay in view;
+  lines read as a list, one open at a time; lines charged once as well as
+  by the day; Add kit / Add crew priced from the price list; Undo on
+  Remove; "The job has changed" offers the job's new kit and crew. App
+  1.37.0.
+- Checked: typecheck, unit tests (charged once, changes from the job), the
+  e2e quote test on a phone, and the pick tests (the "stay under the top
+  bar" hook moved to its own file).
+
+**Next**
+
+- 1b: starting a quote from Money with a client and dates, the job kept in
+  step with the quote, and quotes to follow up in To sort out.
+- 1c: the printed quote (number, valid until, terms, deposit).
+
+## 23 October 2026: reading Current RMS through its API
+
+**Done**
+
+- [ADR 0078](adr/0078-reading-current-rms-through-its-api.md) (PR #131),
+  the first step of the quoting engine, on Colly's ask. The server reads
+  Current RMS's API with the key Colly saved on Railway (`CURRENT_CMS_KEY`,
+  subdomain `sessionhire`), GET only: every opportunity and its lines into
+  `rms_opportunities` and `rms_lines`, a request a second, "too many" waited
+  out, a second read re-reading only changed lines. Admin › Current RMS
+  starts, shows and stops a read and downloads two spreadsheets; Jobs ›
+  Money › Past quotes lists and opens them. Office and directors only. App
+  1.36.0.
+- Checked: typecheck, unit tests (a stand-in Current RMS), export.
+
+**Next**
+
+- Colly runs the first read on live and sends the downloads or an export,
+  to shape parts 1 and 2 of the quoting plan.
+
+## 23 October 2026: rack-mount kit and the rack in 3D
+
+**Done**
+
+- [ADR 0076](adr/0076-rack-mount-kit-and-the-rack-in-3d.md) (PR #129), part 1 of 3 of
+  Colly's "more advanced rack builder", after a survey of web rack builders
+  (STAGERACK, Rackula, ConnectCAD, Stardraw, Lanberg). Products get a
+  Rack-mount tick box that reveals height, width (full, half, third) and
+  depth (`rack_mount`, `rack_width`); rack cases get outside size, castors
+  and a power limit in amps. Layout totals add amps and heat, and say a rack
+  too heavy to lift or past its power, and kit on the rails that isn't
+  rack-mount. The designer draws the rack in 3D (three.js, lazy-loaded):
+  turn, zoom, square views, drop or press kit onto the face towards you; and
+  from the side. App 1.35.0.
+- Checked: typecheck, unit tests (racks, parity, export), browser test
+  (racks.spec.ts: 3D placing, side view, rack-mount tick box).
+
+**Next**
+
+- Part 2: half-width kit side by side, shelves, drawers, blanks, labels and
+  colours, undo, copy a rack. Part 3: product photos on the panels and a
+  printable rack sheet.
+
+## 23 October 2026: the purchase list, with votes
+
+**Done**
+
+- [ADR 0077](adr/0077-the-purchase-list.md) (PR #130). Stock › Purchase
+  list (`#stock/buy`): anyone signed in asks for kit to be bought and votes,
+  one vote each; asked for and agreed ranked by votes; the office and heads
+  say where each is at; whoever asked sees changes in Notifications. A list
+  comes in from a .csv at `#stock/buy/bring-in`, names matched to the Crew
+  tab, the same list twice adding nothing. App 1.34.0.
+- The WhatsApp group's export sorted into 38 requests, kept in the
+  project's private files for the office to bring in on the live app.
+- Checked: typecheck, unit tests (purchases, parity, roles, history,
+  export, erasure pointers), browser test (purchases.spec.ts).
+
+**Waiting**
+
+- Colly brings the WhatsApp list in on the live app (Stock › Purchase list
+  › Bring in a list).
+
+## 22 October 2026: dry hire stock and the rack designer
+
+**Done**
+
+- [ADR 0075](adr/0075-dry-hire-stock-and-the-rack-designer.md) (PR #128), part 2 of
+  racks. Every product is Ours or Dry hire (`dry_hire`, `supplier`,
+  `hire_day_cents`); the catalogue filters by Whose; dry hire can't have
+  items or counts, is never short on a job ("hired in"), and a built rack
+  isn't missing it but lists it to hire in. The rack designer at
+  `#stock/racks/<id>`: kit to build with (search, whose, free on a day)
+  beside the rack front and back; drag or press to put in, move and take
+  out; totals include the dry hire's day rate and buy price. App 1.33.0.
+- Checked: typecheck, unit tests (dry hire refusals, parity, racks), and
+  browser tests (racks.spec.ts: designer drag, press, move, take out,
+  catalogue filter).
+
+## 22 October 2026: racks
+
+**Done**
+
+- [ADR 0074](adr/0074-racks.md) (PR #127), part 1 of Colly's ask for racks
+  in the stock and a rack designer. A rack is a product marked as a rack
+  (always a numbered case) with its own stock code; each built one is an
+  item holding its kit, so scanning it takes the lot. Any product can have
+  a stock code (found by search and the product picker) and a size: rack
+  units, depth, weight, power. Each rack has a layout (`rack_slots`,
+  `rackSlot.set`/`remove`): what goes at which unit, front or back, or
+  loose. The app draws it front and back, adds up units, weight and power,
+  and says what won't fit (off the bottom, on top of something, too deep,
+  front and back meeting); the server never refuses a plan. Built racks
+  are checked against the layout ("2 missing"). Kit built into a rack isn't
+  free for jobs on its own. Stock › Racks lists them. App 1.32.0.
+- Checked: typecheck, unit tests (racks, parity, export and the rest), and a
+  browser test (racks.spec.ts).
+
+**Next (part 2, done above)**
+
+- Ours or dry hired in on every product (supplier, hire and buy price),
+  a catalogue filter, dry hire never short; then the rack designer
+  (drag gear in, owned and dry hire, same checks, cost to buy or hire in).
+
+## 22 October 2026: each job's steps, and who has each
+
+**Done**
+
+- [ADR 0073](adr/0073-a-jobs-steps-and-who-has-each.md) (PR #126), on
+  Colly's ask for a line of steps on every job page, from the quote to the
+  deprep, each given to a member of staff and on their to-do list. Eight
+  steps for gigs and dry hires; the app ticks Quote sent, Confirmed, Crew
+  booked, Picked, On the job and Back in from the job's own records, and
+  Kit and vans and Deprepped are ticked by hand (any step can be). Steps
+  are given to staff (`job_steps`, `jobStep.set`, a new `steps` ability:
+  staff crew change only their own). "Your steps" on Home, and
+  Notifications for a step given to you; nothing is sent outside the app.
+  App 1.31.0.
+- Checked: typecheck, unit tests (steps, roles, parity, export), and a
+  browser test (steps.spec.ts).
+
+**Not done, for later if wanted**
+
+- Choosing the steps per company, due dates on steps, and an office list
+  of every step by who has it.
+
+## 22 October 2026: picking on the phone
+
+**Done**
+
+- [ADR 0072](adr/0072-picking-on-the-phone.md) (PR #125), on Colly's ask
+  to think through a warehouse hand or head of department who inherits a
+  pick list and picks it on a phone. Built on the audit's shorter pick
+  list (PR #120). Going out, the pick list now says when the kit is first
+  needed, where, and the vans booked; "Whose kit" narrows it to one
+  department (a head starts on their own), with rows left in each; "By
+  where it's kept" lists what's left place by place; kit line notes show
+  on rows; the answer to a scan or count has Undo (the opposite movement,
+  nothing deleted); counted kit has "Count out the 12" and "Count back all
+  12"; "All 40 out: ready to load."; and the screen is kept on while
+  picking. Department and order are kept on the phone (`sh.pick`). No
+  server change. App 1.30.0.
+- Checked: typecheck, unit tests, and the browser tests, with a new one
+  for picking on the phone (pick.spec.ts) and the pick and faults tests
+  reading the new total.
+
+**Not done, for later if wanted**
+
+- Who scanned what, a "picked by" sign-off the office sees, and splitting
+  one pick list between two people.
+
+## 22 October 2026: the backup check gives its memory back
+
+**Done**
+
+- Finding 9 of the [20 October audit](audit-2026-10-20.md) (PR #124): the
+  nightly test restore ran in a worker thread that took the server to
+  about 1 GB and kept 420 MB after. It now runs in a child process capped
+  at 512 MB that ends when the check does (about 1 MB kept), and backups,
+  test restores and the exports take turns. ADR 0004 notes it. App 1.29.5.
+- Checked: typecheck, unit tests, and the backup server tests (memory
+  growth under 150 MB over three restores; a timed-out restore fails).
+
+**Waiting on Colly**
+
+- Railway's memory limit for the app is worth raising to 2 GB on the
+  dashboard, as the audit says.
+
+## 22 October 2026: combining people keeps the leave allowance
+
+**Done**
+
+- Finding 8 of the [20 October audit](audit-2026-10-20.md) (PR #123):
+  `person.merge` moved leave allowance rows to the kept person but left
+  their ids keyed to the person merged away, so the allowance vanished
+  from devices. The move now re-keys each row to the kept person and year
+  and tells devices the old one is gone; a leave migration puts right any
+  row already moved wrongly. App 1.29.4.
+- Checked: typecheck, unit tests, and the merge and leave server tests.
+
+## 22 October 2026: a second stock bring-in doesn't double the counts
+
+**Done**
+
+- Finding 7 of the [20 October audit](audit-2026-10-20.md) (PR #122): a
+  second Current RMS bring-in with another place typed counted every
+  product at both places, and a rename there made a new product. The
+  bring-in now carries Current RMS's id onto the product
+  (`models.list_id`) and matches by it before the name; a count at a place
+  the list doesn't mention is set to none where the place was typed for
+  the whole list ("Counts none at Store one (12 there now)"), or noted
+  where the row names its own place; a new product with the same category,
+  value and count as an unnamed one says "Looks like Amp renamed". The
+  238 products already live pick up their id, by name, on the next
+  bring-in. [ADR 0056](adr/0056-bringing-the-stock-in-from-current-rms.md)
+  notes it. App 1.29.3.
+- Checked: typecheck, all unit and server tests, with new ones for the
+  move, the aside, the rename by id and by likeness, and the whole round
+  trip on the server.
+
+## 22 October 2026: Accept after a counter takes the rate offered
+
+**Done**
+
+- Finding 6 of the [20 October audit](audit-2026-10-20.md) (PR #121): a
+  freelancer who countered and then pressed Accept was booked at their own
+  rate. On a countered card Accept now reads "Accept these days at €250 a
+  day instead" (or "the rate the office sets"), Send rate is the main
+  button, and accepting withdraws the counter with the words "the rate
+  you asked for is withdrawn. The office will confirm." App 1.29.2.
+- Checked: typecheck, unit tests, and the crew server tests.
+
+## 22 October 2026: a shorter pick list, with the scan box kept in view
+
+**Done**
+
+- Finding 5 of the [20 October audit](audit-2026-10-20.md) (PR #120): a
+  300-line pick list measured 56,142 px on a phone, mostly every item
+  number written out under "Where to find them", and the scan box scrolled
+  away. Each place is now one line ("Bay A1: 12 here") with its numbers
+  folded; lines done fold under "N done" at the foot of their department;
+  the scan box, what it said and anything that failed stay docked under
+  the top bar while the camera is off. App 1.29.1.
+- Checked: typecheck, unit tests, and the pick list and faults browser
+  tests (the scan field stays in view after scrolling).
+
+## 22 October 2026: Home counts open on what they counted
+
+**Done**
+
+- Findings 3 and 4 of the [20 October audit](audit-2026-10-20.md) (PR
+  #119): Home offered counts to roles that couldn't act on them, and every
+  count opened the top of a whole-company list. Each tile now needs the
+  ability its screen asks for (timesheets and leave to approve need the
+  approving ability, crew tiles crew, stock tiles stock); tapping one lands
+  on the part it counted, focused, with Back and Forward keeping it; and a
+  department's count opens the list narrowed to that department, with
+  "Showing Video only. Show all departments". App 1.29.0.
+- Checked: typecheck, all unit and server tests, and the Home, departments
+  and screens browser tests.
+
 ## 22 October 2026: the Jobs tab opens quicker
 
 **Done**

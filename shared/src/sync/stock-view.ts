@@ -18,6 +18,8 @@ export interface ModelView extends Model {
   countedTotal: number
   /** How many there are: items in stock and what's counted. */
   total: number
+  /** Of those, how many are built into a rack (ADR 0074): they go out with the rack, not on their own. */
+  racked: number
 }
 
 export interface AssetView extends Asset {
@@ -30,6 +32,8 @@ export interface AssetView extends Asset {
   /** For a case: the items and counted stock in it, directly. */
   items: AssetView[]
   counted: StockView[]
+  /** The built rack it's in, however deep (ADR 0074). */
+  inRack: AssetView | undefined
 }
 
 export interface StockView extends Stock {
@@ -89,7 +93,33 @@ const byNumber = (a: Asset, b: Asset) => (a.number ? 0 : 1) - (b.number ? 0 : 1)
 export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutation & { appliedSeq?: number })[], cursor: number): WarehouseView {
   const models = new Map<string, Model & { pending: boolean }>()
   // Products saved before inspections (ADR 0020) have no intervals yet, and before audit finding 19 no mistake flag.
-  const checks = (m: Partial<Model>) => ({ patMonths: m.patMonths ?? null, liftingMonths: m.liftingMonths ?? null, mistake: m.mistake ?? false, aliases: m.aliases ?? [] })
+  // And before racks (ADR 0074), no rack, code or size.
+  const checks = (m: Partial<Model>) => ({
+    patMonths: m.patMonths ?? null,
+    liftingMonths: m.liftingMonths ?? null,
+    mistake: m.mistake ?? false,
+    aliases: m.aliases ?? [],
+    isRack: m.isRack ?? false,
+    code: m.code ?? '',
+    units: m.units ?? null,
+    depthMm: m.depthMm ?? null,
+    weightKg: m.weightKg ?? null,
+    powerW: m.powerW ?? null,
+    // And before dry hire stock (ADR 0075), all of it ours.
+    dryHire: m.dryHire ?? false,
+    supplier: m.supplier ?? '',
+    hireDayCents: m.hireDayCents ?? null,
+    // And before rack-mount kit and rack cases (ADR 0076): kit with a height was rack-mount.
+    rackMount: m.rackMount ?? (!m.isRack && m.units !== null && m.units !== undefined),
+    rackWidth: m.rackWidth ?? 'full',
+    caseWidthMm: m.caseWidthMm ?? null,
+    caseHeightMm: m.caseHeightMm ?? null,
+    caseDepthMm: m.caseDepthMm ?? null,
+    castors: m.castors ?? false,
+    powerLimitA: m.powerLimitA ?? null,
+    // And before rack parts (ADR 0079), none were.
+    rackPart: m.rackPart ?? null,
+  })
   for (const m of Object.values(entities.model ?? {})) models.set(m.id, { ...m, ...checks(m), pending: false })
   const places = new Map<string, Place & { pending: boolean }>()
   for (const p of Object.values(entities.place ?? {})) places.set(p.id, { ...p, pending: false })
@@ -213,7 +243,7 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
 
   // Items first, then what they're in and where that is.
   const assetViews = new Map<string, AssetView>()
-  for (const a of assets.values()) assetViews.set(a.id, { ...a, model: models.get(a.modelId), inCase: undefined, at: undefined, items: [], counted: [] })
+  for (const a of assets.values()) assetViews.set(a.id, { ...a, model: models.get(a.modelId), inCase: undefined, at: undefined, items: [], counted: [], inRack: undefined })
   for (const a of assetViews.values()) {
     if (a.status !== 'active') continue
     a.inCase = a.caseId ? assetViews.get(a.caseId) : undefined
@@ -227,9 +257,16 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     return placeOf(a.inCase, seen)
   }
   for (const a of assetViews.values()) if (a.status === 'active') a.at = placeOf(a)
+  /** The nearest case above it that is a rack, if any; a loop has none. */
+  const rackOf = (a: AssetView | undefined, seen = new Set<string>()): AssetView | undefined => {
+    if (!a || seen.has(a.id)) return undefined
+    seen.add(a.id)
+    return a.model?.isRack ? a : rackOf(a.inCase, seen)
+  }
+  for (const a of assetViews.values()) if (a.status === 'active') a.inRack = rackOf(a.inCase)
 
   const modelViews = new Map<string, ModelView>()
-  for (const m of models.values()) modelViews.set(m.id, { ...m, items: [], retired: [], counted: [], countedTotal: 0, total: 0 })
+  for (const m of models.values()) modelViews.set(m.id, { ...m, items: [], retired: [], counted: [], countedTotal: 0, total: 0, racked: 0 })
   const placeViews = new Map<string, PlaceView>()
   for (const p of places.values()) placeViews.set(p.id, { ...p, items: [], counted: [], itemTotal: 0, countedTotal: 0 })
 
@@ -241,6 +278,7 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
       continue
     }
     m?.items.push(a)
+    if (m && a.inRack) m.racked++
     if (a.placeId) placeViews.get(a.placeId)?.items.push(a)
     if (a.at) placeViews.get(a.at.id)!.itemTotal++
   }
@@ -252,6 +290,7 @@ export function warehouseView(entities: Partial<Tables>, outbox: readonly (Mutat
     if (m) {
       m.counted.push(view)
       m.countedTotal += s.qty
+      if (inCase && (inCase.model?.isRack || inCase.inRack)) m.racked += s.qty
     }
     if (s.placeId) placeViews.get(s.placeId)?.counted.push(view)
     inCase?.counted.push(view)

@@ -10,7 +10,7 @@ import { runMigrations, type Module } from '../migrations.ts'
  * inspections (ADR 0020); what was added by mistake (audit finding 19);
  * what the stock list brings in that items didn't hold before (ADR 0026);
  * counts of places and cases (ADR 0030); and kit read from jobs' notes
- * (ADR 0043).
+ * (ADR 0043); racks and their layouts (ADR 0074); and dry hire stock (ADR 0075).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -239,6 +239,76 @@ const MIGRATIONS: string[] = [
   // Kit from the notes to find it by.
   `
   ALTER TABLE models ADD COLUMN IF NOT EXISTS aliases jsonb NOT NULL DEFAULT '[]';
+  `,
+  // Its id in the list it was brought in from, such as Current RMS's (audit,
+  // 20 October 2026, finding 7), so a second bring-in matches it by that
+  // before its name.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS list_id text NOT NULL DEFAULT '';
+  `,
+  // Racks (ADR 0074): a product that is a rack built up with kit, its own
+  // stock code, and sizes for anything that goes in a rack; and each rack's
+  // layout, a slot for each thing in it. A slot points at products, so a
+  // product in a layout can't be removed.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS is_rack boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS code text NOT NULL DEFAULT '';
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS units integer CHECK (units BETWEEN 1 AND 60);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS depth_mm integer CHECK (depth_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS weight_kg numeric(5, 1) CHECK (weight_kg >= 0);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS power_w integer CHECK (power_w >= 0);
+  ALTER TABLE models ADD CONSTRAINT models_rack_is_case CHECK (is_case OR NOT is_rack);
+  CREATE UNIQUE INDEX IF NOT EXISTS models_code ON models (lower(code)) WHERE code <> '' AND NOT mistake;
+  CREATE TABLE IF NOT EXISTS rack_slots (
+    id        text PRIMARY KEY,
+    rack_id   text NOT NULL REFERENCES models(id),
+    model_id  text NOT NULL REFERENCES models(id),
+    top       integer CHECK (top BETWEEN 1 AND 60),
+    side      text NOT NULL CHECK (side IN ('front', 'rear')),
+    qty       integer NOT NULL CHECK (qty BETWEEN 1 AND 999),
+    notes     text NOT NULL DEFAULT '',
+    CHECK (rack_id <> model_id),
+    CHECK (top IS NULL OR qty = 1)
+  );
+  CREATE INDEX IF NOT EXISTS rack_slots_rack ON rack_slots (rack_id);
+  CREATE INDEX IF NOT EXISTS rack_slots_model ON rack_slots (model_id);
+  `,
+  // Dry hire stock (ADR 0075): a product that isn't ours, hired in from a
+  // supplier at a price a day whenever it's needed. A rack is ours.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS dry_hire boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS supplier text NOT NULL DEFAULT '';
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS hire_day_cents integer CHECK (hire_day_cents >= 0);
+  ALTER TABLE models ADD CONSTRAINT models_rack_is_ours CHECK (NOT (is_rack AND dry_hire));
+  `,
+  // Rack-mount kit and rack cases (ADR 0076): whether a product goes on a
+  // rack's rails and how wide it is; a rack case's outside size, castors and
+  // power. Kit given a height before, or already on a layout's rails, was
+  // rack-mount.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS rack_mount boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS rack_width text NOT NULL DEFAULT 'full' CHECK (rack_width IN ('full', 'half', 'third'));
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_width_mm integer CHECK (case_width_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_height_mm integer CHECK (case_height_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS case_depth_mm integer CHECK (case_depth_mm BETWEEN 1 AND 3000);
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS castors boolean NOT NULL DEFAULT false;
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS power_limit_a integer CHECK (power_limit_a BETWEEN 1 AND 125);
+  UPDATE models SET rack_mount = true
+   WHERE NOT is_rack AND (units IS NOT NULL OR id IN (SELECT model_id FROM rack_slots WHERE top IS NOT NULL));
+  ALTER TABLE models ADD CONSTRAINT models_rack_not_mounted CHECK (NOT (is_rack AND rack_mount));
+  `,
+  // Racks built up further (ADR 0079): rack parts (blanks, vents, shelves,
+  // drawers) as products, and in a layout, where narrower kit sits across
+  // the rails, a label, a group and a tape colour, and loose kit in a shelf
+  // or drawer.
+  `
+  ALTER TABLE models ADD COLUMN IF NOT EXISTS rack_part text CHECK (rack_part IN ('blank', 'vent', 'shelf', 'drawer'));
+  ALTER TABLE models ADD CONSTRAINT models_part_mounted CHECK (rack_part IS NULL OR rack_mount);
+  ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS across text NOT NULL DEFAULT 'left' CHECK (across IN ('left', 'middle', 'right'));
+  ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS label text NOT NULL DEFAULT '';
+  ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS grp text NOT NULL DEFAULT '';
+  ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS colour text CHECK (colour IN ('red', 'orange', 'yellow', 'green', 'blue', 'violet', 'white', 'grey', 'black'));
+  ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS in_slot_id text REFERENCES rack_slots(id) ON DELETE SET NULL;
   `,
 ]
 

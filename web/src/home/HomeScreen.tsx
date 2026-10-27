@@ -9,6 +9,7 @@ import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
+import { arrive } from '../arrival.ts'
 import { useAccess } from '../role.ts'
 import { Chart, type Series } from './Chart.tsx'
 import { Copying, STILL_ARRIVING, useCopying } from './copying.ts'
@@ -92,6 +93,8 @@ export function HomeScreen() {
           ))}
         </div>
 
+        {/* The job steps given to whoever is looking (ADR 0073): their to-do list, on top of whichever view. */}
+        {me && <MySteps view={view} me={me} all={shownFor === 'me'} />}
         {shownFor === 'company' && <ForCompany view={view} today={today} me={me} />}
         {shownFor === 'department' && (
           <ForDepartment view={view} today={today} me={me} departments={departments} department={department} onDepartment={(d) => choose({ for: 'department', department: d })} />
@@ -104,7 +107,7 @@ export function HomeScreen() {
 }
 
 /** The counts that aren't nothing, as tiles; a word when all are. */
-function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string }) {
+function Tiles({ all, keys, title = 'Needs attention', clear, department }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string }) {
   const shown = keys.map((k) => all[k]!).filter((t) => t && t.count > 0)
   const copying = useCopying()
   return (
@@ -118,7 +121,7 @@ function Tiles({ all, keys, title = 'Needs attention', clear }: { all: Record<st
         <ul className="tiles">
           {shown.map((t) => (
             <li key={t.key}>
-              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href}>
+              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
                 <b>{t.count.toLocaleString('en-IE')}</b>
                 <span>{t.label}</span>
               </a>
@@ -199,12 +202,13 @@ function WeekAhead({ view, today }: { view: View; today: string }) {
 }
 
 function ForCompany({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
+  const { can } = useAccess()
   const confirmed = view.jobs.jobs.filter((j) => j.status === 'confirmed' && j.span && j.span.end >= today).length
   const pencilled = view.jobs.jobs.filter((j) => (j.status === 'enquiry' || j.status === 'quoted') && (!j.span || j.span.end >= today)).length
   return (
     <>
       {/* What needs someone first, then what's on (audit finding 22). */}
-      <Tiles all={tiles(view, today, me)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
+      <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
       <Today view={view} today={today} />
       <Chart title="Jobs by week" icon="calendar" series={JOBS} columns={jobsByWeek(view.jobs.jobs, today)} empty="No gigs or hires in the next eight weeks." />
       <CrewChart view={view} today={today} />
@@ -329,6 +333,7 @@ function ForDepartment({
   department: string | undefined
   onDepartment: (d: string) => void
 }) {
+  const { can } = useAccess()
   if (!department)
     return (
       <section className="card">
@@ -361,7 +366,7 @@ function ForDepartment({
           ))}
         </select>
       </label>
-      <Tiles all={tiles(view, today, me, department)} keys={TILES_FOR.department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
+      <Tiles all={tiles(view, today, me, can, department)} keys={TILES_FOR.department} department={department} title={`Needs attention in ${department}`} clear={`Nothing waiting in ${department}.`} />
       <p className="hint">
         {noDepartment > 0 &&
           `${plural(noDepartment, 'call')} still needing crew in the next fortnight ${noDepartment === 1 ? "has no department, so it isn't" : "have no department, so they aren't"} counted here: give ${noDepartment === 1 ? 'it' : 'them'} one on Crew. `}
@@ -421,6 +426,7 @@ function ForDepartment({
 }
 
 function ForWarehouse({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
+  const { can } = useAccess()
   const tomorrow = addDays(today, 1)
   const out = view.moves.soon.filter((p) => p.job.span && p.job.span.start <= addDays(today, 7))
   const word = (start: string) => (start <= today ? 'Today · ' : start === tomorrow ? 'Tomorrow · ' : '')
@@ -453,7 +459,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
           </ul>
         )}
       </section>
-      <Tiles all={tiles(view, today, me)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
+      <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.warehouse} clear="Nothing back late, broken or due a test." />
       <KitChart view={view} today={today} />
       {view.moves.stillOut.length > 0 && (
         <section className="card">
@@ -480,6 +486,7 @@ function ForWarehouse({ view, today, me }: { view: View; today: string; me: Pers
 }
 
 function ForMe({ view, today, me, onPick }: { view: View; today: string; me: PersonView | undefined; onPick: (id: string) => void }) {
+  const { can } = useAccess()
   const [id, setId] = useState('')
   if (!me) {
     const staff = view.leave.staff
@@ -575,8 +582,53 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
           </a>
         </section>
       )}
-      {approver && <Tiles all={tiles(view, today, me)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
+      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
       <Today view={view} today={today} />
     </>
+  )
+}
+
+/**
+ * The job steps given to you (ADR 0073), not done yet: the ones the job is
+ * at first, as they're yours to do now, then by the job's first day. Each
+ * opens the job, whose steps are at the top. On Me, all of them; on the
+ * other views, on top as they're yours whichever you look at, only the
+ * first few to do now. Nothing at all while there are none.
+ */
+const STEPS_ON_TOP = 5
+
+function MySteps({ view, me, all }: { view: View; me: PersonView; all: boolean }) {
+  const steps = view.steps.mine(me.id)
+  const now = steps.filter((s) => s.next)
+  const shown = all ? steps : now.slice(0, STEPS_ON_TOP)
+  if (shown.length === 0) return null
+  const more = steps.length - shown.length
+  return (
+    <section className="card my-steps" aria-labelledby="my-steps-title">
+      <Heading icon="done" id="my-steps-title">{all ? `Your steps (${steps.length})` : `Your steps to do now (${now.length})`}</Heading>
+      <ul className="job-list">
+        {shown.map(({ job, step, next }) => {
+          const at = view.steps.of(job.id)?.current
+          return (
+            <li key={`${job.id}.${step.key}`}>
+              <a className="job-row" href={`#jobs/${encodeURIComponent(job.id)}`}>
+                <div>
+                  <b>{step.label}</b>
+                  <p>
+                    {job.name}
+                    {step.hint && ` · ${step.hint}`}
+                  </p>
+                </div>
+                <div className="side">
+                  {next ? <small className="flag">Now</small> : at && <small>After {at.label}</small>}
+                  {job.span && <small>{dayLabel(job.span.start)}</small>}
+                </div>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+      {!all && more > 0 && <p className="hint">{plural(more, 'more step')} of yours on Me.</p>}
+    </section>
   )
 }

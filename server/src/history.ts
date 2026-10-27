@@ -35,7 +35,10 @@ import { ROLE_LABELS, type Role } from '@sh/shared'
 import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
+import { STEP_LABELS, type JobStep } from '@sh/shared'
+import { PURCHASE_STATUS_LABELS, type PurchaseStatus } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
+import { RACK_PART_LABELS, type RackPart } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
@@ -241,6 +244,7 @@ type Look = (entity: string, id: unknown) => Data | undefined
 
 const REFERENCES = [
   'id',
+  'inSlotId',
   'personId',
   'callId',
   'projectId',
@@ -248,6 +252,8 @@ const REFERENCES = [
   'clientId',
   'venueId',
   'modelId',
+  // Racks' layouts (ADR 0074).
+  'rackId',
   'placeId',
   'caseId',
   'assetId',
@@ -261,6 +267,10 @@ const REFERENCES = [
   // Vans and drivers (ADR 0047).
   'vehicleId',
   'driverId',
+  // A job's steps (ADR 0073).
+  'ownerId',
+  // The purchase list (ADR 0077): a vote's request.
+  'requestId',
   // Jobs made one (ADR 0050): a list of them.
   'from',
 ] as const
@@ -369,6 +379,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
   const numberGiven = (typed: unknown) => (typeof typed === 'string' && normaliseNumber(typed)) || text(left?.number, 'a number')
   const phaseName = (id: unknown) => text(look('phase', id)?.name, 'a phase')
   const vehicle = (id: unknown) => text(look('vehicle', id)?.name, 'a vehicle')
+  const purchase = (id: unknown) => text(look('purchaseRequest', id)?.title, 'a request')
   /** ", 2 subhired from PRG". */
   const subhired = (n: unknown, from: unknown) =>
     typeof n === 'number' && n > 0 ? `, ${n} subhired${typeof from === 'string' && from.trim() ? ` from ${clip(from.trim())}` : ''}` : ''
@@ -615,7 +626,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
     }
     case 'model.create':
-      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isCase ? ', holds other kit' : ''})`
+      return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${a.rackMount ? ', rack-mount' : ''}${typeof a.rackPart === 'string' ? `, ${RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part'}` : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`
     case 'model.update': {
       const parts: string[] = []
       if (a.name !== undefined) parts.push(`name to ${text(a.name, 'a product')}`)
@@ -630,6 +641,21 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
         parts.push(typeof a.liftingMonths === 'number' ? `a thorough examination every ${monthsText(a.liftingMonths)}` : 'no thorough examination')
       if (Array.isArray(a.aliases))
         parts.push(a.aliases.length ? `other names to ${aliasesOf(a.aliases.filter((x) => typeof x === 'string').join(',')).join(', ')}` : 'no other names')
+      // Racks (ADR 0074).
+      if (a.isRack !== undefined) parts.push(a.isRack ? 'a rack' : 'not a rack')
+      if (a.code !== undefined) parts.push(typeof a.code === 'string' && a.code.trim() ? `stock code to ${clip(a.code.trim())}` : 'no stock code')
+      // Rack-mount kit and rack cases (ADR 0076).
+      if (a.rackMount !== undefined) parts.push(a.rackMount ? 'rack-mount' : 'not rack-mount')
+      const sized = (['units', 'depthMm', 'weightKg', 'powerW', 'rackWidth'] as const).filter((k) => a[k] !== undefined)
+      if (sized.length) parts.push('its size')
+      // Rack parts (ADR 0079).
+      if (a.rackPart !== undefined) parts.push(typeof a.rackPart === 'string' ? (RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part') : 'kit, not a rack part')
+      if ((['caseWidthMm', 'caseHeightMm', 'caseDepthMm', 'castors', 'powerLimitA'] as const).some((k) => a[k] !== undefined)) parts.push('its case')
+      // Dry hire stock (ADR 0075).
+      if (a.dryHire !== undefined) parts.push(a.dryHire ? 'dry hire' : 'ours')
+      if (a.supplier !== undefined) parts.push(typeof a.supplier === 'string' && a.supplier.trim() ? `hired from ${clip(a.supplier.trim())}` : 'no supplier')
+      if (a.hireDayCents !== undefined) parts.push(typeof a.hireDayCents === 'number' ? `hire price to ${valueLabel(a.hireDayCents)} a day` : 'no hire price')
+      if (a.listId !== undefined) parts.push(typeof a.listId === 'string' && a.listId ? `its id in the list it came from to ${a.listId}` : 'no id from a list')
       return `Changed the product ${model(a.id)}: ${inWords(parts)}`
     }
     case 'model.remove':
@@ -684,6 +710,20 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'kit.remove': {
       const k = look('kitLine', a.id)
       return k ? `Took ${model(k.modelId)} off the kit for ${job(k.projectId)}` : 'Took some kit off a job'
+    }
+    // Racks' layouts (ADR 0074): "Put Shure ULXD4Q at U3 on the front of Monitor rack".
+    case 'rackSlot.set': {
+      const at = typeof a.top === 'number' ? `at U${a.top} on the ${a.side === 'rear' ? 'back' : 'front'}` : 'loose'
+      const many = typeof a.qty === 'number' && a.qty > 1 ? `${a.qty} × ` : ''
+      // Placing across the rails, labels, groups and shelves (ADR 0079).
+      const across = typeof a.top === 'number' && (a.across === 'middle' || a.across === 'right') ? `, ${a.across === 'middle' ? 'in the middle' : 'on the right'},` : ''
+      const inIt = typeof a.top !== 'number' && typeof a.inSlotId === 'string' ? (look('rackSlot', a.inSlotId) ? ` in the ${model(look('rackSlot', a.inSlotId)!.modelId)}` : ' in a shelf or drawer') : ''
+      const marked = [typeof a.label === 'string' && a.label.trim() && `labelled ${clip(a.label.trim())}`, typeof a.group === 'string' && a.group.trim() && `in the group ${clip(a.group.trim())}`].filter(Boolean)
+      return `Put ${many}${model(a.modelId)} ${at}${across}${inIt} in the layout of ${model(a.rackId)}${marked.length ? `, ${inWords(marked as string[])}` : ''}`
+    }
+    case 'rackSlot.remove': {
+      const was = look('rackSlot', a.id)
+      return was ? `Took ${model(was.modelId)} out of the layout of ${model(was.rackId)}` : 'Took something out of a rack layout'
     }
     case 'kit.fromNotes': {
       // Kit read from jobs' notes (ADR 0043): each line is how many there should be, so it may have added fewer, or none.
@@ -901,6 +941,37 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'vehicleBooking.remove': {
       const b = look('vehicleBooking', a.id)
       return b ? `Took ${vehicle(b.vehicleId)} off ${job(b.projectId)}` : 'Took a vehicle off a job'
+    }
+    // A job's steps (ADR 0073): "Gave Picked on Harbour Lights to Aoife Brennan", "Ticked Back in on Harbour Lights".
+    case 'jobStep.set': {
+      const step = typeof a.step === 'string' && a.step in STEP_LABELS ? `“${STEP_LABELS[a.step as JobStep]}”` : 'a step'
+      const parts: string[] = []
+      if (a.ownerId !== undefined) parts.push(a.ownerId ? `gave ${step} on ${job(a.projectId)} to ${person(a.ownerId)}` : `took whoever had ${step} on ${job(a.projectId)} off it`)
+      if (a.done !== undefined) parts.push(`${a.done ? 'ticked' : 'took the tick off'} ${parts.length ? 'it' : `${step} on ${job(a.projectId)}`}`)
+      const said = parts.join(' and ') || `changed ${step} on ${job(a.projectId)}`
+      return said[0]!.toUpperCase() + said.slice(1)
+    }
+    // The purchase list (ADR 0077): "Asked for NL4T connectors to be bought", "Said Mics is Ordered".
+    case 'purchase.ask':
+      return `Asked for ${text(a.title, 'something')} to be bought`
+    case 'purchase.update': {
+      const r = look('purchaseRequest', a.id)
+      const parts = [a.title !== undefined && 'what it is', a.details !== undefined && 'how many and details', a.link !== undefined && 'the link', a.department !== undefined && 'the department'].filter(
+        (p): p is string => !!p
+      )
+      return `Changed ${parts.length ? inWords(parts) : 'a request'} on the purchase list for ${text(r?.title ?? a.title, 'a request')}`
+    }
+    case 'purchase.status': {
+      const status = typeof a.status === 'string' && a.status in PURCHASE_STATUS_LABELS ? PURCHASE_STATUS_LABELS[a.status as PurchaseStatus] : 'changed'
+      return `Marked ${purchase(a.id)} on the purchase list ${status.toLowerCase()}${a.notes ? ', with a note' : ''}`
+    }
+    case 'purchase.remove':
+      return `Took ${purchase(a.id)} off the purchase list`
+    case 'purchase.vote':
+      return `${a.vote === false ? 'Took back a vote for' : 'Voted for'} ${purchase(a.requestId)} on the purchase list`
+    case 'purchase.bringIn': {
+      const n = Array.isArray(a.requests) ? a.requests.length : 0
+      return `Brought in a purchase list of ${n.toLocaleString('en-IE')} request${n === 1 ? '' : 's'}`
     }
     case EXPORT_COMMAND:
       return `Downloaded everything${a.format === 'json' ? ' as JSON' : ''}${typeof a.rows === 'number' ? ` (${a.rows.toLocaleString('en-IE')} rows)` : ''}`

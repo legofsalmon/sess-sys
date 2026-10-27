@@ -155,6 +155,24 @@ const CASES: Case[] = [
   c('model.update', { id: 'xlr', name: 'XLR 10m', category: 'Cable', valueCents: 1500 }),
   c('model.remove', { id: 'unused' }, { before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('model.mistake', { id: 'unused' }, { before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
+  // Racks (ADR 0074).
+  c('model.create', { id: 'monrack', name: 'Monitor rack', department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, code: 'RK-MON', units: 12, depthMm: 450, weightKg: 18.25, powerW: null, valueCents: null, notes: '' }, { as: 'a rack' }),
+  c('model.update', { id: 'rack', isRack: true, units: 12, depthMm: 500, code: ' RK-AMP ' }, { as: 'made a rack, its kit no longer free on its own' }),
+  c('model.update', { id: 'y10p', units: 2, depthMm: 300, weightKg: 12.4, powerW: 0 }, { as: 'a size' }),
+  c('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 3, side: 'front', qty: 1, notes: ' Top ' }, { as: 'on the rails', before: [m('model.update', { id: 'rack', isRack: true, units: 4 })] }),
+  c('rackSlot.set', { id: 's2', rackId: 'rack', modelId: 'xlr', top: null, side: 'front', qty: 6, notes: '' }, { as: 'loose', before: [m('model.update', { id: 'rack', isRack: true })] }),
+  c('rackSlot.set', { id: 's3', rackId: 'rack', modelId: 'y10p', top: 2, side: 'front', qty: 1, notes: '', across: 'right', label: ' Mon 1 ', group: ' Monitors ', colour: 'green' }, { as: 'labelled across', before: [m('model.update', { id: 'rack', isRack: true, units: 4 }), m('model.update', { id: 'y10p', rackMount: true, units: 1, rackWidth: 'half' })] }),
+  c('rackSlot.set', { id: 's4', rackId: 'rack', modelId: 'xlr', top: null, side: 'front', qty: 4, notes: '', inSlotId: 'dr' }, { as: 'in a drawer', before: [m('model.update', { id: 'rack', isRack: true, units: 4 }), m('model.create', { id: 'drw', name: 'Drawer', department: 'audio', category: 'Rack parts', tracking: 'bulk', isCase: false, valueCents: null, notes: '', rackMount: true, units: 2, rackPart: 'drawer' }), m('rackSlot.set', { id: 'dr', rackId: 'rack', modelId: 'drw', top: 3, side: 'front', qty: 1, notes: '' })] }),
+  c('rackSlot.remove', { id: 's1' }, { before: [m('model.update', { id: 'rack', isRack: true }), m('rackSlot.set', { id: 's1', rackId: 'rack', modelId: 'y10p', top: 1, side: 'rear', qty: 1, notes: '' })] }),
+  // Dry hire stock (ADR 0075).
+  c('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: ' PRG ', hireDayCents: 4500, valueCents: 350000, notes: '' }, { as: 'dry hire' }),
+  c('model.update', { id: 'unused', dryHire: true, supplier: 'Stage Hire Co' }, { as: 'made dry hire', before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
+  c('kit.add', { id: 'hazer', projectId: 'gala', phaseId: null, modelId: 'haze', qty: 2, subhireQty: 0, supplier: '', notes: '' }, { as: 'dry hire, never short', before: [m('model.create', { id: 'haze', name: 'MDG ATMe', department: 'lighting', category: 'Haze', tracking: 'serialised', isCase: false, dryHire: true, supplier: 'PRG', hireDayCents: null, valueCents: null, notes: '' })] }),
+  c('model.create', { id: 'xta', name: 'XTA DP448', department: 'audio', category: 'Processing', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true, units: 1, rackWidth: 'half', depthMm: 300 }, { as: 'rack-mount' }),
+  c('model.create', { id: 'fx', name: 'FX rack', department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '', units: 8, depthMm: 500, caseWidthMm: 600, caseHeightMm: 520, caseDepthMm: 650, castors: true, powerLimitA: 16 }, { as: 'a rack case' }),
+  c('model.create', { id: 'bl', name: '1U blank', department: 'audio', category: 'Rack parts', tracking: 'bulk', isCase: false, valueCents: null, notes: '', rackMount: true, units: 1, rackPart: 'blank' }, { as: 'a rack part' }),
+  c('model.update', { id: 'unused', rackMount: true, units: 1, rackPart: 'vent' }, { as: 'made a rack part', before: [m('model.create', { id: 'unused', name: 'Old vent', department: 'audio', category: 'Rack parts', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
+  c('model.update', { id: 'unused', rackMount: true, units: 2, rackWidth: 'third' }, { as: 'made rack-mount', before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('place.upsert', { id: 'van-shelf', name: 'Van shelf', notes: '' }),
   c('place.remove', { id: 'bay' }),
   c('asset.add', { id: 'a3', modelId: 'y10p', number: 'SH-000004', serial: 'Y3', placeId: 'bay', caseId: null, notes: '', fromCount: false }),
@@ -261,6 +279,25 @@ const CASES: Case[] = [
   c('vehicleBooking.add', { id: 'run2', vehicleId: 'van', projectId: 'gala', phaseId: 'show', start: day(5), end: day(5), driverId: null, notes: '', override: false }),
   c('vehicleBooking.update', { id: 'run', start: day(4), end: day(4), driverId: null, notes: 'Collect from Bay A1' }),
   c('vehicleBooking.remove', { id: 'run' }),
+
+  // A job's steps (ADR 0073).
+  c('jobStep.set', { projectId: 'gala', step: 'deprep', ownerId: 'aoife' }, { as: 'given to someone' }),
+  c('jobStep.set', { projectId: 'gala', step: 'kit', done: true, by: 'cian' }, { as: 'ticked' }),
+  c('jobStep.set', { projectId: 'gala', step: 'kit', done: false, ownerId: null }, { as: 'the tick and the name taken off', before: [m('jobStep.set', { projectId: 'gala', step: 'kit', ownerId: 'cian', done: true })] }),
+
+  // The purchase list (ADR 0077).
+  c('purchase.ask', { id: 'nl4t', title: '  NL4T connectors ', details: '20', link: 'thomann.de/ie/nl4t.htm', department: 'audio', by: 'aoife' }),
+  c('purchase.update', { id: 'nl4t', details: '24, and 4 spare', link: '' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.status', { id: 'nl4t', status: 'ordered', notes: 'From Thomann' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.vote', { requestId: 'nl4t', vote: true, by: 'cian' }, { as: 'a vote', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
+  c('purchase.vote', { requestId: 'nl4t', vote: false, by: 'cian' }, { as: 'a vote taken back', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' }), m('purchase.vote', { requestId: 'nl4t', vote: true, by: 'cian' })] }),
+  c('purchase.remove', { id: 'nl4t' }, { before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' }), m('purchase.vote', { requestId: 'nl4t', vote: true, by: 'aoife' })] }),
+  c('purchase.bringIn', {
+    requests: [
+      { id: 'buy-1', title: 'Mic cable', details: '60 × 10 m', link: '', department: 'Audio', askedBy: 'dara', askedByName: 'Dara', askedOn: day(-180), status: 'ordered', notes: 'On the April order' },
+      { id: 'nl4t', title: 'NL4T', details: '', link: '', department: null, askedBy: null, askedByName: 'Smokey', askedOn: day(-180), status: 'asked', notes: '' },
+    ],
+  }, { as: 'a list, with one already in', before: [m('purchase.ask', { id: 'nl4t', title: 'NL4T connectors', details: '20', link: '', department: 'Audio', by: 'aoife' })] }),
 ]
 
 /**

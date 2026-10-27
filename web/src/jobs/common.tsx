@@ -29,8 +29,8 @@ export function useHash(): string {
  */
 /**
  * The bar at the top of every screen: the company's mark and name, the
- * sync state and dark or light (ADR 0036), and the parts of the screen
- * under it (ADR 0033). Under the name, the area; on the demo copy, whose
+ * sync state and dark or light (ADR 0036); after it, the parts of the
+ * screen (ADR 0033), which put themselves on the parts. Under the name, the area; on the demo copy, whose
  * eyes it's seen through instead, the name taking you back to choose
  * again. On an area's own screen (`root`) the area's name follows as the
  * screen's title, so Jobs, Stock and Crew read as different places; a
@@ -76,9 +76,9 @@ export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: V
         </div>
         {up && <Up {...up} />}
         {notDone.list}
-        <OnThisScreen />
       </header>
       {root && <h1 className="area-title">{title}</h1>}
+      <OnThisScreen />
     </>
   )
 }

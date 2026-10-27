@@ -21,6 +21,7 @@ import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.t
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { StockViews } from '../Views.tsx'
 import { Heading } from '../Icon.tsx'
+import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -214,7 +215,10 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
 
 /** The Stock tab's list of what's failed, overdue or due in the next 30 days, and what's not recorded yet. */
 export function InspectionsDue({ view }: { view: View }) {
-  const { attention, unrecorded } = view.inspections
+  // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
+  const [department, widen] = useNarrowed('#stock/testing')
+  const attention = view.inspections.attention.filter((d) => inKitOf(department)(d.asset.model))
+  const { unrecorded } = view.inspections
   const needed = view.warehouse.models.some((m) => m.patMonths || m.liftingMonths)
   if (!needed) return null
   const stopped = attention.filter((d) => d.state !== 'soon')
@@ -236,6 +240,7 @@ export function InspectionsDue({ view }: { view: View }) {
   return (
     <section className="card inspections-due" aria-label="Inspections due">
       <Heading icon="inspection">Inspections due</Heading>
+      <Narrowed department={department} onWiden={widen} />
       {stopped.length === 0 && soon.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
       {stopped.length > 0 && (
         <>

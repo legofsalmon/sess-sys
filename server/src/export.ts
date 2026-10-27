@@ -222,7 +222,9 @@ const ABOUT: Record<string, string> = {
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
   leave_years: 'The years the office has opened for leave, and when: staff can ask for leave only in an open year.',
   lieu_entries: 'Days staff worked that earn days in lieu, and whether each was approved.',
-  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, and whether one was added by mistake and so hidden from the list.',
+  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code, whether it goes on a rack’s rails and its size (rack units, width, depth, weight, power), a rack case’s outside size, castors and power limit, whether it is a rack part (a blank, vent, shelf or drawer), whether it is ours or dry hired in and from whom at what a day, and whether one was added by mistake and so hidden from the list.',
+  // Racks (ADR 0074).
+  rack_slots: "Each rack's layout: the product that goes in it, at which rack unit from the top and on the front or the back (blank for loose in it), where across the rails narrower kit sits, how many, a note, the label and group it has in that rack and the colour of its tape, and the shelf or drawer loose kit is in.",
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
@@ -242,6 +244,16 @@ const ABOUT: Record<string, string> = {
   timesheets: "Freelancers' timesheets, one for each booking: the days worked at the day rate, extras such as parking or mileage, what was sent and what the office approved.",
   unavailability: "Days people can't work.",
   users: 'Staff who have signed in with Google.',
+  // A job's steps (ADR 0073).
+  // The purchase list (ADR 0077).
+  purchase_requests:
+    "Kit the crew asked to be bought: what, how many and details, a link, the department, who asked (or the name a list brought in gave) and on which day, where it's at (asked for, agreed, ordered, arrived, not buying) and the office's notes.",
+  purchase_votes: 'Who voted for each request on the purchase list, one vote each.',
+  // Current RMS, read through its API (ADR 0078).
+  rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
+  rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",
+  rms_reads: 'Each time Current RMS was read: when, how many opportunities and lines, and what went wrong if it did.',
+  job_steps: "Each job's steps given to someone or ticked by hand: the job, the step (quote, confirmed, crew, kit, prep, show, back, deprep), who it's down to, and when it was ticked and by whom. Steps the app ticks from the job's own records aren't kept.",
   // Vans and drivers (ADR 0047).
   vehicle_bookings: 'Vehicles booked on jobs: the vehicle, the job and the phase (blank for the whole job), the days, who drives, a note, and whether it was booked despite a clash.',
   vehicles:

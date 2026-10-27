@@ -44,6 +44,7 @@ import {
 import { Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { STOCK } from '../Up.tsx'
+import { BuiltRackCheck } from './Racks.tsx'
 
 /**
  * One numbered item: its label, its product, where it's kept, the labels
@@ -84,6 +85,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
         {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
       </FaultsCard>
       <InspectionsCard view={view} a={a} />
+      {a.model?.isRack && a.status === 'active' && <BuiltRackCheck view={view} item={a} />}
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       {a.model?.isCase && a.status === 'active' && <CountsOf view={view} where={{ placeId: null, caseId: a.id }} />}
       <ItemLog view={view} a={a} />
@@ -144,6 +146,20 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
           <div className="wide">
             <dt>Where</dt>
             <dd>{a.inCase ? <WhereLink a={a} /> : a.at ? <a href={`#stock/place/${a.at.id}`}>{a.at.name}</a> : whereLabel(a, w)}</dd>
+          </div>
+        )}
+        {a.inRack && a.inRack.id !== a.caseId && (
+          <div className="wide">
+            <dt>Built into</dt>
+            <dd>
+              <a href={`#stock/item/${a.inRack.id}`}>{numberLabel(a.inRack)}</a> ({a.inRack.model?.name}), and goes out with it
+            </dd>
+          </div>
+        )}
+        {a.inRack && a.inRack.id === a.caseId && (
+          <div className="wide">
+            <dt>Built into</dt>
+            <dd>{a.inRack.model?.name}, and goes out with it</dd>
           </div>
         )}
         {out && (

@@ -1,4 +1,6 @@
 import {
+  dayLabel,
+  daysBetween,
   DEPARTMENT_LABELS,
   DEPARTMENTS,
   holdOf,
@@ -10,25 +12,30 @@ import {
   RETIRED_LABELS,
   spanLabel,
   STATUS_LABELS,
+  vehicleName,
   type AssetView,
   type Department,
   type Direction,
   type JobView,
+  type PickFrom,
+  type PickList,
   type PickRow,
   type View,
 } from '@sh/shared'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
 import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
+import { kitOf } from '../home/standing.ts'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { JobStatusPill, Top } from './common.tsx'
 import { JOBS } from '../Up.tsx'
+import { useUnderTop } from '../useUnderTop.ts'
 
 /**
  * A job's pick list (ADR 0017): what its kit needs from Session Hire's
@@ -48,6 +55,13 @@ interface Said {
   at: number
   /** The item that just came back, so damage to it can be reported. */
   back?: AssetView
+  /** Takes back what was just recorded, by recording the opposite (ADR 0072): nothing is deleted. */
+  undo?: Undo
+}
+/** What to record to take a scan or a count back, and what to say once it's done. */
+interface Undo {
+  run: () => Promise<unknown>
+  said: string
 }
 
 /** "SH-000123 d&b Y10P". */
@@ -95,8 +109,11 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const field = useRef<HTMLInputElement>(null)
   const pick = view.moves.pickList(job.id)!
   // Sending kit out and back is stock's (audit finding 9): a role without it reads the list, and can still report damage or a loss.
-  const mayMove = useAccess().can('stock')
-  const say = (tone: Tone, text: string, back?: AssetView) => setSaid({ tone, text, at: Date.now(), back })
+  const access = useAccess()
+  const mayMove = access.can('stock')
+  const dock = useUnderTop(mayMove)
+  const say: Say = (tone, text, more) => setSaid({ tone, text, at: Date.now(), ...more })
+  useWakeLock(mayMove)
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
   // What's looked up before anything is recorded comes from the view on screen;
@@ -135,7 +152,11 @@ function Pick({ view, job }: { view: View; job: JobView }) {
       if (other) notes.push(`It was out with ${other}; now it's out with ${job.name}.`)
       if (row && row.lines.length === 0 && !a.model?.isCase)
         notes.push(`It isn't on the kit for ${job.name}. Add it to the kit, or scan it back in if it isn't going.`)
-      return say(notes.length || (row && row.out > row.need && row.need > 0) ? 'warn' : 'ok', [text, ...notes].join(' '))
+      // Out with another job before: undoing puts it back out with that one, as it was.
+      const undo: Undo = was
+        ? { run: () => record(was.projectId, 'out', { assetId: a.id, modelId: a.modelId }), said: `${name} is out with ${other} again, as it was.` }
+        : { run: () => record(job.id, 'in', { assetId: a.id, modelId: a.modelId }), said: `${name} isn't out: it's back in stock.` }
+      return say(notes.length || (row && row.out > row.need && row.need > 0) ? 'warn' : 'ok', [text, ...notes].join(' '), { undo })
     }
 
     if (!was) return say(found ? 'warn' : 'quiet', [`${name} isn't out, so there's nothing to bring back.`, ...notes].join(' '))
@@ -144,7 +165,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     let text = `${name} back.`
     if (!other && row) text = `${name} back: ${row.back} of ${row.back + row.out} back.`
     if (other) notes.push(`It went out with ${other}, not ${job.name}, so it's back from there.`)
-    return say(notes.length ? 'warn' : 'ok', [text, ...notes].join(' '), a)
+    const undo: Undo = { run: () => record(was.projectId, 'out', { assetId: a.id, modelId: a.modelId }), said: `${name} is out with ${other ?? job.name} again.` }
+    return say(notes.length ? 'warn' : 'ok', [text, ...notes].join(' '), { back: a, undo })
   }
 
   const read = (code: string) => void onCode(code).catch((err: Error) => setFailed((f) => [...f, `${code.trim()}: ${err.message}`]))
@@ -157,14 +179,18 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   }
 
   const rows = pick.rows
-  const byDepartment = new Map<Department | 'extra', PickRow[]>()
-  for (const r of rows) {
-    const d = r.lines.length === 0 ? 'extra' : (r.model?.department ?? 'other')
-    byDepartment.set(d, [...(byDepartment.get(d) ?? []), r])
-  }
-  const groups: [Department | 'extra', string][] = [...DEPARTMENTS.map((d) => [d, DEPARTMENT_LABELS[d]] as [Department, string]), ['extra', 'Not on the kit']]
   // Going out, the kit and anything out that isn't on it; coming back, whatever went out.
-  const shown = mode === 'in' ? rows.filter((r) => r.out > 0 || r.back > 0 || r.missing > 0) : rows.filter((r) => r.lines.length > 0 || r.out > 0)
+  const inMode = mode === 'in' ? rows.filter((r) => r.out > 0 || r.back > 0 || r.missing > 0) : rows.filter((r) => r.lines.length > 0 || r.out > 0)
+  // Their part of it (ADR 0072): a head of department starts on their own department's kit, and the choice is kept on the phone.
+  const parts = DEPARTMENTS.filter((d) => inMode.some((r) => departmentOfRow(r) === d))
+  const me = access.personId ? view.crew.people.find((p) => p.id === access.personId) : undefined
+  const mine = me?.department ? kitOf(me.department) : undefined
+  const [prefs, setPrefs] = usePickPrefs()
+  const wanted = prefs.part ?? mine ?? 'all'
+  const part: Department | 'all' = parts.length > 1 && wanted !== 'all' && parts.includes(wanted) ? wanted : 'all'
+  const shown = part === 'all' ? inMode : inMode.filter((r) => departmentOfRow(r) === part)
+  const byPlace = mode === 'out' && prefs.order === 'place'
+  const total = totalLine(pick, shown, mode, part)
 
   return (
     <div className="app jobs warehouse pick">
@@ -187,17 +213,15 @@ function Pick({ view, job }: { view: View; job: JobView }) {
             Coming back
           </button>
         </div>
-        <p className="pick-total">
-          {mode === 'out'
-            ? pick.need
-              ? `${pick.out} of ${pick.need} out`
-              : 'Nothing on the kit to go out yet.'
-            : pick.stillOut + pick.back + pick.missing
-              ? `${pick.back} back, ${pick.stillOut} still out${pick.missing ? `, ${pick.missing} missing` : ''}`
-              : 'Nothing has gone out yet.'}
-        </p>
+        <p className={`pick-total${total.done ? ' done' : ''}`}>{total.text}</p>
+        {mode === 'out' && <Brief view={view} job={job} today={today} />}
         {!mayMove && <p className="hint">Whoever keeps the stock scans kit out and back here.</p>}
-        {mayMove && (
+      </section>
+
+      {/* The scan box stays under the top bar while the list scrolls (audit, 20 October 2026, finding 5), as Jobs' week headings
+          do; not while the camera is on, which would cover the list. */}
+      {mayMove && (
+        <section className={`card scan-dock${camera ? '' : ' docked'}`} aria-label="Scan" ref={dock}>
           <form className="scan-row" onSubmit={submit}>
             <input
               ref={field}
@@ -220,52 +244,258 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               Scan
             </button>
           </form>
-        )}
-        {camera && mayMove && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
-        {said && (
-          <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
-            {said.text}
-          </p>
-        )}
-        {failed.length > 0 && (
-          <div className="alert scan-failed" role="alert">
-            <p>{failed.length === 1 ? "1 scan wasn't recorded. Scan it again:" : `${failed.length} scans weren't recorded. Scan them again:`}</p>
-            <ul>
-              {failed.map((f, i) => (
-                <li key={i}>{f}</li>
-              ))}
-            </ul>
-            <button type="button" onClick={() => setFailed([])}>
-              Dismiss
-            </button>
-          </div>
-        )}
-        {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
-      </section>
+          {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
+          {said && (
+            <div className="said-row">
+              <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
+                {said.text}
+              </p>
+              {said.undo && <UndoButton undo={said.undo} say={say} />}
+            </div>
+          )}
+          {failed.length > 0 && (
+            <div className="alert scan-failed" role="alert">
+              <p>{failed.length === 1 ? "1 scan wasn't recorded. Scan it again:" : `${failed.length} scans weren't recorded. Scan them again:`}</p>
+              <ul>
+                {failed.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+              <button type="button" onClick={() => setFailed([])}>
+                Dismiss
+              </button>
+            </div>
+          )}
+          {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
+        </section>
+      )}
 
       <section className="card pick-list" aria-label="Kit">
         <h2>{mode === 'out' ? 'Kit to go out' : 'Kit coming back'}</h2>
+        {(parts.length > 1 || mode === 'out') && rows.length > 0 && (
+          <div className="pick-ways">
+            {parts.length > 1 && (
+              <div className="filters" role="group" aria-label="Whose kit">
+                <button type="button" aria-pressed={part === 'all'} onClick={() => setPrefs({ part: 'all' })}>
+                  All
+                </button>
+                {parts.map((d) => {
+                  const left = inMode.filter((r) => departmentOfRow(r) === d && !rowDone(r, mode)).length
+                  return (
+                    <button key={d} type="button" aria-pressed={part === d} onClick={() => setPrefs({ part: d })}>
+                      {DEPARTMENT_LABELS[d]}
+                      <span className="left">{left ? `${left.toLocaleString('en-IE')} left` : 'done'}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {mode === 'out' && (
+              <div className="filters" role="group" aria-label="In what order">
+                <button type="button" aria-pressed={!byPlace} onClick={() => setPrefs({ order: 'department' })}>
+                  By department
+                </button>
+                <button type="button" aria-pressed={byPlace} onClick={() => setPrefs({ order: 'place' })}>
+                  By where it's kept
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {rows.length === 0 && (
           <Empty>
             Add the job's kit on <a href={`#jobs/${job.id}/kit`}>its page</a>.
           </Empty>
         )}
-        {mode === 'in' && rows.length > 0 && shown.length === 0 && <Empty>Kit shows here once it has gone out with this job.</Empty>}
-        {groups
-          .filter(([d]) => byDepartment.get(d)?.some((r) => shown.includes(r)))
-          .map(([d, label]) => (
-            <div className="kit-group" key={d}>
-              <h3>{label}</h3>
-              {byDepartment
-                .get(d)!
-                .filter((r) => shown.includes(r))
-                .map((r) => (
-                  <Row key={r.modelId} row={r} job={job} mode={mode} say={say} mayMove={mayMove} />
+        {mode === 'in' && rows.length > 0 && inMode.length === 0 && <Empty>Kit shows here once it has gone out with this job.</Empty>}
+        {(() => {
+          const row = (r: PickRow) => <Row key={r.modelId} row={r} job={job} mode={mode} say={say} mayMove={mayMove} />
+          if (byPlace) {
+            // A walk round the warehouse: what's left, under the place most of it is kept; what's done, folded at the end.
+            const done = shown.filter((r) => rowDone(r, mode))
+            return (
+              <>
+                {walk(shown.filter((r) => !rowDone(r, mode))).map(([where, here]) => (
+                  <div className="kit-group" key={where}>
+                    <h3>{where}</h3>
+                    {here.map(row)}
+                  </div>
                 ))}
-            </div>
-          ))}
+                {done.length > 0 && (
+                  <details className="pick-done">
+                    <summary>{done.length === shown.length ? `All ${done.length.toLocaleString('en-IE')} done` : `${done.length.toLocaleString('en-IE')} done`}</summary>
+                    {done.map(row)}
+                  </details>
+                )}
+              </>
+            )
+          }
+          const byDepartment = new Map<Department | 'extra', PickRow[]>()
+          for (const r of shown) {
+            const d = r.lines.length === 0 ? 'extra' : departmentOfRow(r)
+            byDepartment.set(d, [...(byDepartment.get(d) ?? []), r])
+          }
+          const groups: [Department | 'extra', string][] = [...DEPARTMENTS.map((d) => [d, DEPARTMENT_LABELS[d]] as [Department, string]), ['extra', 'Not on the kit']]
+          return groups
+            .filter(([d]) => byDepartment.has(d))
+            .map(([d, label]) => {
+              const here = byDepartment.get(d)!
+              // What's still to do first, and what's done folded under it (audit, 20 October 2026, finding 5).
+              const done = here.filter((r) => rowDone(r, mode))
+              return (
+                <div className="kit-group" key={d}>
+                  <h3>{label}</h3>
+                  {here.filter((r) => !rowDone(r, mode)).map(row)}
+                  {done.length > 0 && (
+                    <details className="pick-done">
+                      <summary>{done.length === here.length ? `All ${done.length.toLocaleString('en-IE')} done` : `${done.length.toLocaleString('en-IE')} done`}</summary>
+                      {done.map(row)}
+                    </details>
+                  )}
+                </div>
+              )
+            })
+        })()}
       </section>
     </div>
+  )
+}
+
+/** The department a row's kit is in; a product since removed is Other. */
+const departmentOfRow = (r: PickRow): Department => r.model?.department ?? 'other'
+
+const PREFS = 'sh.pick'
+interface Prefs {
+  /** Whose kit: a department, or all of it. */
+  part?: Department | 'all'
+  /** Going out, the list by department (the kit's own order) or by where it's kept. */
+  order?: 'department' | 'place'
+}
+
+/** How this phone last read pick lists (ADR 0072): kept for every job, as the person picking is the same from job to job. */
+function usePickPrefs(): [Prefs, (change: Prefs) => void] {
+  const [prefs, setPrefs] = useState<Prefs>(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREFS) ?? 'null') as Prefs | null
+      return {
+        ...(p?.part && (p.part === 'all' || (DEPARTMENTS as readonly string[]).includes(p.part)) ? { part: p.part } : {}),
+        ...(p?.order === 'place' || p?.order === 'department' ? { order: p.order } : {}),
+      }
+    } catch {
+      // Nothing kept, or storage is blocked: start from who they are.
+      return {}
+    }
+  })
+  const change = (c: Prefs) => {
+    const next = { ...prefs, ...c }
+    setPrefs(next)
+    try {
+      localStorage.setItem(PREFS, JSON.stringify(next))
+    } catch {
+      // Private browsing can refuse storage; the choice lasts this visit.
+    }
+  }
+  return [prefs, change]
+}
+
+/** The line under the title: how far along, for the part shown and, when that's one department, for the whole job. */
+function totalLine(pick: PickList, shown: PickRow[], mode: Direction, part: Department | 'all'): { text: string; done: boolean } {
+  const n = (x: number) => x.toLocaleString('en-IE')
+  if (mode === 'out') {
+    if (!pick.need) return { text: 'Nothing on the kit to go out yet.', done: false }
+    const whole = pick.out >= pick.need ? `All ${n(pick.need)} out: ready to load.` : `${n(pick.out)} of ${n(pick.need)} out`
+    if (part === 'all') return { text: whole, done: pick.out >= pick.need }
+    const kit = shown.filter((r) => r.lines.length > 0)
+    const need = kit.reduce((t, r) => t + r.need, 0)
+    const out = kit.reduce((t, r) => t + Math.min(r.out, r.need), 0)
+    const mine = out >= need ? `${DEPARTMENT_LABELS[part]}: all ${n(need)} out` : `${DEPARTMENT_LABELS[part]}: ${n(out)} of ${n(need)} out`
+    return { text: pick.out >= pick.need ? `${mine}. ${whole}` : `${mine} · ${n(pick.out)} of ${n(pick.need)} in all`, done: out >= need }
+  }
+  const sum = (rows: PickRow[]) => rows.reduce((t, r) => ({ back: t.back + r.back, out: t.out + r.out, missing: t.missing + r.missing }), { back: 0, out: 0, missing: 0 })
+  const t = part === 'all' ? { back: pick.back, out: pick.stillOut, missing: pick.missing } : sum(shown)
+  if (!t.back && !t.out && !t.missing) return { text: 'Nothing has gone out yet.', done: false }
+  const text = `${n(t.back)} back, ${n(t.out)} still out${t.missing ? `, ${n(t.missing)} missing` : ''}`
+  return { text: part === 'all' ? text : `${DEPARTMENT_LABELS[part]}: ${text}`, done: t.out === 0 && t.missing === 0 }
+}
+
+/**
+ * Going out, the rows still to pick under the place most of each is kept,
+ * places in the stock list's order, so the list reads as a walk round the
+ * warehouse; a row with nothing left to find goes last.
+ */
+function walk(rows: PickRow[]): [string, PickRow[]][] {
+  const places = new Map<string, PickRow[]>()
+  const nowhere: PickRow[] = []
+  for (const r of rows) {
+    const most = r.from.reduce<PickFrom | undefined>((best, f) => (!best || f.items.length + f.counted > best.items.length + best.counted ? f : best), undefined)
+    if (most) places.set(most.where, [...(places.get(most.where) ?? []), r])
+    else nowhere.push(r)
+  }
+  const out = [...places.entries()].sort(([a], [b]) => byWhere.compare(a, b))
+  if (nowhere.length) out.push(['Nowhere in stock', nowhere])
+  return out
+}
+const byWhere = new Intl.Collator('en-IE', { numeric: true })
+
+/**
+ * What the person picking needs before they start, when they didn't plan
+ * it (ADR 0072): when the kit is first needed and where, and the vans it
+ * goes in. The kit's own notes are on its rows.
+ */
+function Brief({ view, job, today }: { view: View; job: JobView; today: string }) {
+  const next = job.phases.find((p) => p.end >= today)
+  if (!next) return null
+  const days = daysBetween(today, next.start)
+  const when = next.start < today ? 'On now' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days.toLocaleString('en-IE')} days`
+  const vans = view.vehicles.ofJob(job.id).filter((b) => b.end >= today)
+  return (
+    <ul className="pick-brief" aria-label="Before you start">
+      <li>
+        <b>{when}</b>: {next.name}, {dayLabel(next.start)}
+        {next.venue && ` at ${next.venue.name}`}
+      </li>
+      {vans.length > 0 && (
+        <li>
+          <b>Going in</b>: {vans.map((b) => `${b.vehicle ? vehicleName(b.vehicle) : 'a vehicle since removed'}${b.driver ? `, ${b.driver.name} driving` : ''}`).join('; ')}
+        </li>
+      )}
+    </ul>
+  )
+}
+
+/** Keeps the phone's screen on while kit is being picked, so it isn't unlocked again with gloves on between scans. */
+function useWakeLock(on: boolean) {
+  useEffect(() => {
+    const lock = (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> } }).wakeLock
+    if (!on || !lock) return
+    let held: { release(): Promise<void> } | undefined
+    let gone = false
+    const take = () => {
+      if (document.visibilityState !== 'visible') return
+      // Refused (low battery, or a browser that asks): the screen sleeps as it always did.
+      lock.request('screen').then((l) => (gone ? void l.release() : (held = l)), () => undefined)
+    }
+    // The lock goes when the page is hidden; take it again on coming back.
+    document.addEventListener('visibilitychange', take)
+    take()
+    return () => {
+      gone = true
+      document.removeEventListener('visibilitychange', take)
+      void held?.release().catch(() => undefined)
+    }
+  }, [on])
+}
+
+/** Takes back the last scan or count, by recording the opposite: what was recorded stays in the history. */
+function UndoButton({ undo, say }: { undo: Undo; say: Say }) {
+  const { run, error } = useAct()
+  return (
+    <>
+      <button type="button" className="undo" onClick={() => void run(undo.run).then((ok) => ok && say('quiet', `Undone: ${undo.said}`))}>
+        Undo
+      </button>
+      <Refusal error={error} />
+    </>
   )
 }
 
@@ -283,8 +513,11 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
   return <ReportFault kind="damaged" asset={a} model={a.model} projectId={job.id} onDone={() => setOpen(false)} />
 }
 
-/** What a tap on the list did, said in the scan line at the top, where the eye already goes. */
-type Say = (tone: Tone, text: string) => void
+/** What a scan or a tap on the list did, said in the scan line at the top, where the eye already goes. */
+type Say = (tone: Tone, text: string, more?: { back?: AssetView; undo?: Undo }) => void
+
+/** All out that's needed, or all back: nothing left to do on the row. */
+const rowDone = (row: PickRow, mode: Direction) => (mode === 'out' ? row.lines.length > 0 && row.out >= row.need : row.out === 0 && row.missing === 0)
 
 function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mode: Direction; say: Say; mayMove: boolean }) {
   const name = rowName(row)
@@ -300,11 +533,13 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
         : row.missing
           ? `${row.back} back${missing}`
           : `All ${row.back} back`
-  const done = mode === 'out' ? !extra && row.out >= row.need : row.out === 0 && row.missing === 0
+  const done = rowDone(row, mode)
   const [damage, setDamage] = useState(false)
   const { run, error } = useAct()
   const countable = row.model?.tracking === 'bulk' || (row.model?.countedTotal ?? 0) > 0 || row.counted > 0 || row.countedBack > 0
   const lines = row.lines.length > 1 ? row.lines.map((l) => `${l.own} for ${l.phase?.name ?? (l.phaseId ? 'a phase' : 'the whole job')}`).join(', ') : ''
+  // Whoever put the kit on knew why; whoever picks it may not (ADR 0072).
+  const notes = row.lines.filter((l) => l.notes?.trim()).map((l) => (row.lines.length > 1 ? `${l.phase?.name ?? 'Whole job'}: ${l.notes!.trim()}` : l.notes!.trim()))
   return (
     <article className={`pick-row${done ? ' done' : ''}`} aria-label={name}>
       <header>
@@ -314,6 +549,11 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
         </div>
         <span className="count">{count}</span>
       </header>
+      {notes.map((n, i) => (
+        <p className="pick-note" key={i}>
+          <b>Note</b> {n}
+        </p>
+      ))}
       {extra && (
         <p className={`kit-state ${row.model?.isCase ? 'quiet' : 'warn'}`}>
           {row.model?.isCase ? "A case: what's in it counts on its own rows." : `Not on the kit for ${job.name}.`}
@@ -321,11 +561,18 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
       )}
       {mode === 'out' && !extra && row.out < row.need && row.from.length > 0 && (
         <ul className="from" aria-label="Where to find them">
+          {/* One line a place with how many are there; the numbers folded under it (audit, 20 October 2026, finding 5): every
+              number of every item in stock made a 300-line pick list 56,000 px long on a phone. */}
           {row.from.map((f) => (
             <li key={f.where}>
               <b>{f.where}</b>
-              {': '}
-              {[f.items.map((a) => a.number || 'no number yet').join(', '), f.counted > 0 && `${f.counted.toLocaleString('en-IE')} counted`].filter(Boolean).join('; ')}
+              {`: ${(f.items.length + f.counted).toLocaleString('en-IE')} here`}
+              {f.items.length > 0 && (
+                <details>
+                  <summary>{f.items.length === 1 ? 'Its number' : `The ${f.items.length.toLocaleString('en-IE')} numbers`}</summary>
+                  <p>{f.items.map((a) => a.number || 'no number yet').join(', ')}</p>
+                </details>
+              )}
             </li>
           ))}
         </ul>
@@ -341,7 +588,11 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
               {mayMove && (
                 <button type="button" className="link" onClick={() =>
                     void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId })).then(
-                      (ok) => ok && say('ok', mode === 'out' ? `${a.number || name} isn't going: it's back in stock.` : `${a.number || name} back.`)
+                      (ok) =>
+                        ok &&
+                        say('ok', mode === 'out' ? `${a.number || name} isn't going: it's back in stock.` : `${a.number || name} back.`, {
+                          undo: { run: () => record(job.id, 'out', { assetId: a.id, modelId: a.modelId }), said: `${a.number || name} is out with ${job.name} again.` },
+                        })
                     )
                   }
                 >
@@ -391,8 +642,8 @@ function Count({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Dire
   const name = rowName(row)
   const [qty, setQty] = useState('')
   const { run, error, refuse } = useAct()
-  const go = (what: Direction | 'missing') => {
-    const n = Number(qty)
+  const go = (what: Direction | 'missing', all?: number) => {
+    const n = all ?? Number(qty)
     if (!Number.isInteger(n) || n < 1 || n > MAX_QTY) return refuse('How many? A whole number, please.')
     void run(() =>
       what === 'missing'
@@ -402,7 +653,9 @@ function Count({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Dire
       if (!ok) return
       setQty('')
       const many = `${n.toLocaleString('en-IE')} × ${name}`
-      say(what === 'missing' ? 'warn' : 'ok', what === 'missing' ? `${many} marked missing.` : what === 'out' ? `${many} counted out.` : `${many} counted back.`)
+      if (what === 'missing') return say('warn', `${many} marked missing.`)
+      const undo: Undo = { run: () => record(job.id, what === 'out' ? 'in' : 'out', { modelId: row.modelId, qty: n }), said: what === 'out' ? `${many} not counted out.` : `${many} not counted back.` }
+      say('ok', what === 'out' ? `${many} counted out.` : `${many} counted back.`, { undo })
     })
   }
   const submit = (e: FormEvent) => {
@@ -410,6 +663,9 @@ function Count({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Dire
     go(mode)
   }
   const label = mode === 'out' ? 'Count out' : 'Count back'
+  // The rest in one tap, with gloves on (ADR 0072): going out, what the kit still needs and is counted on the shelves; coming back, all counted out.
+  const onShelf = row.from.reduce((n, f) => n + f.counted, 0)
+  const rest = mode === 'out' ? (row.lines.length ? Math.min(Math.max(0, row.need - row.out), onShelf) : 0) : row.counted
   return (
     <form className="count-row" onSubmit={submit} aria-label={`${label} ${name}`}>
       <p>
@@ -426,6 +682,11 @@ function Count({ row, job, mode, say }: { row: PickRow; job: JobView; mode: Dire
       </p>
       <input type="number" inputMode="numeric" min={1} max={MAX_QTY} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="How many" placeholder="How many" />
       <button type="submit">{label}</button>
+      {rest > 1 && (
+        <button type="button" className="all" onClick={() => go(mode, rest)}>
+          {mode === 'out' ? `Count out the ${rest.toLocaleString('en-IE')}` : `Count back all ${rest.toLocaleString('en-IE')}`}
+        </button>
+      )}
       {mode === 'in' && row.counted > 0 && (
         <button type="button" onClick={() => go('missing')}>
           Missing

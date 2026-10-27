@@ -166,6 +166,23 @@ describe('roles', () => {
     expect((await send(app, s, 'person.role', { id: 'sean', role: 'director' })).reason?.code).toBe('forbidden')
   })
 
+  it("let staff crew tick and hand on only the job steps that are theirs (ADR 0073)", async () => {
+    const { app, signIn, c } = await company()
+    const s = { sh_session: await signIn(sean) }
+    expect((await send(app, c, 'project.create', { id: 'j1', name: 'Culture Night', clientId: null, venueId: null, status: 'confirmed', notes: '' })).status).toBe('applied')
+    expect((await send(app, c, 'jobStep.set', { projectId: 'j1', step: 'deprep', ownerId: 'sean' })).status).toBe('applied')
+    expect((await send(app, s, 'jobStep.set', { projectId: 'j1', step: 'deprep', done: true })).status).toBe('applied')
+    expect((await send(app, s, 'jobStep.set', { projectId: 'j1', step: 'kit', done: true })).reason?.message).toBe(
+      'Staff crew can change only a step that is theirs. Ask the office or a head of department to give it to you.'
+    )
+    // Handed on, it isn't his to change any more.
+    expect((await send(app, s, 'jobStep.set', { projectId: 'j1', step: 'deprep', ownerId: 'colly' })).status).toBe('applied')
+    expect((await send(app, s, 'jobStep.set', { projectId: 'j1', step: 'deprep', done: false })).reason?.code).toBe('forbidden')
+    // A freelancer has no steps at all.
+    expect((await send(app, c, 'person.role', { id: 'sean', role: 'freelancer' })).status).toBe('applied')
+    expect((await send(app, s, 'jobStep.set', { projectId: 'j1', step: 'deprep', done: false })).reason?.message).toMatch(/^Only the office, heads of department, staff crew and directors can tick off and give out a job's steps\./)
+  })
+
   it("let a system admin named in the server's settings change everything, whatever their own role (ADR 0060)", async () => {
     const { app, signIn, c } = await company(['sean@sessionhire.com'])
     const s = { sh_session: await signIn(sean) }

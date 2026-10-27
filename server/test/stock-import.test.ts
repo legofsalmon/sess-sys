@@ -366,7 +366,7 @@ describe('bringing the stock in from Current RMS (ADR 0056)', () => {
     const p = await preview(app, colly.cookies, text, WAREHOUSE)
     expect(p.notRead).toEqual([])
     expect(p.counts).toMatchObject({ rows: 4, products: 3, items: 0, counted: 3, problems: 0 })
-    expect(p.rows[3]!.does).toEqual(['Updates Stage deck 2x1: value €300'])
+    expect(p.rows[3]!.does).toEqual(['Updates Stage deck 2x1: its id in the old system kept, 5 and value €300'])
     expect((await bringIn(app, colly.cookies, choices(p), WAREHOUSE)).json()).toEqual({ rows: 4, skipped: 0, products: 3, items: 0, counted: 3, places: 1, changed: 0 })
     const { rows: priced } = await db.query('SELECT m.name, pp.day_cents FROM product_prices pp JOIN models m ON m.id = pp.model_id ORDER BY m.name')
     expect(priced).toEqual([
@@ -386,6 +386,28 @@ describe('bringing the stock in from Current RMS (ADR 0056)', () => {
     expect(again.rows.map((r) => r.does)).toEqual(again.rows.map(() => [UNCHANGED]))
     expect((await bringIn(app, colly.cookies, choices(again), WAREHOUSE)).statusCode).toBe(200)
     expect(await everything(db)).toEqual(before)
+  })
+
+  it('brought in again at another place with a product renamed, moves the counts and renames it rather than doubling them (audit, 20 October 2026, finding 7)', async () => {
+    const { app, db, colly } = await office()
+    const { text } = currentRmsList([rms('products'), rms('stock-levels')]).list!
+    expect((await bringIn(app, colly.cookies, choices(await preview(app, colly.cookies, text, WAREHOUSE)), WAREHOUSE)).statusCode).toBe(200)
+    const renamed = text.replace('Lumo Par 7', 'Lumo Par 7 RGBW')
+    const yard: StockListOptions = { make: true, defaultPlace: 'Yard' }
+    const p = await preview(app, colly.cookies, renamed, yard)
+    expect(p.counts).toMatchObject({ products: 0, problems: 0 })
+    expect(p.rows[2]!.does).toEqual(['Updates Lumo Par 7: renamed Lumo Par 7 RGBW', 'Counts 6 at Yard (new place)', 'Counts none at Warehouse (6 there now): the list counts them all at Yard'])
+    expect((await bringIn(app, colly.cookies, choices(p), yard)).statusCode).toBe(200)
+    const { rows } = await db.query(
+      `SELECT m.name, m.list_id, p.name AS place, s.qty FROM stock s JOIN models m ON m.id = s.model_id JOIN places p ON p.id = s.place_id ORDER BY m.name`
+    )
+    expect(rows).toEqual([
+      { name: '10m XLR cable', list_id: '2', place: 'Yard', qty: 3 },
+      { name: 'Corvo K12', list_id: '1', place: 'Yard', qty: 2 },
+      { name: 'Lumo Par 7 RGBW', list_id: '3', place: 'Yard', qty: 6 },
+    ])
+    const again = await preview(app, colly.cookies, renamed, yard)
+    expect(again.rows.map((r) => r.does)).toEqual(again.rows.map(() => [UNCHANGED]))
   })
 })
 
