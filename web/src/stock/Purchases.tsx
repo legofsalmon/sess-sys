@@ -61,9 +61,7 @@ export function PurchasesScreen({ view }: { view: View }) {
   const settled = shown(list.settled)
   return (
     <div className="app warehouse purchases">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="buy" />
-      <h1 className="area-title">Purchase list</h1>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="buy" />} heading="Purchase list" />
       {access.can('ask') && (
         <section className="card" aria-label="Ask for something">
           <Fold label="Ask for something to be bought" className="primary">

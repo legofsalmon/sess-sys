@@ -297,12 +297,8 @@ export function CountScreen({ view }: { view: View }) {
   if (!d)
     return (
       <div className="app warehouse counting">
-        <Top view={view} title="Stock" />
-        <StockViews view={view} current="count" />
-        <section className="card">
-          <header className="title">
-            <h1>Counting</h1>
-          </header>
+        <Top view={view} title="Stock" views={<StockViews view={view} current="count" />} heading="Counting" />
+        <section className="card plain">
           <p className="empty">No count is under way on this phone. Start one from a place's page or a case's page, or from a place due below.</p>
         </section>
         <CountsCard view={view} />

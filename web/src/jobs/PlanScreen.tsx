@@ -118,8 +118,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
 
   return (
     <div className="app crew jobs plan">
-      <Top view={view} />
-      <JobViews place={place} />
+      <Top view={view} views={<JobViews place={place} />} />
 
       <section className="card">
         <div className="plan-title">
