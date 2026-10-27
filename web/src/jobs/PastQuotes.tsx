@@ -75,7 +75,7 @@ export function PastQuotesScreen({ view }: { view: View }) {
         <h1>Past quotes from Current RMS</h1>
         <p className="hint">
           Every opportunity read from Current RMS, as it was there: quotes, orders, lost and dead ones. Read only. To read them again, go to{' '}
-          <a href="#admin">Admin</a>.
+          <a href="#admin/connections">Admin › Connections</a>.
         </p>
         <input className="search" type="search" placeholder="Find by number, job, client or venue" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find a past quote" />
       </section>

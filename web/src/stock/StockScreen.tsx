@@ -500,7 +500,8 @@ function NewProduct({ view, department }: { view: View; department: Department }
     void run(() => client.mutate('model.create', args)).then((ok) => {
       if (ok) {
         setSize(sizeTypedOf())
-        location.hash = `#stock/product/${id}`
+        // A new product of our own has nothing yet, so it opens where its items and counts go in (ADR 0082).
+        location.hash = args.dryHire ? `#stock/product/${id}` : `#stock/product/${id}/items`
       } else setF((now) => (now === cleared ? f : now))
     })
   }

@@ -90,6 +90,7 @@ export function PersonScreen({
       sub={<WhoLine person={person} />}
     >
       <Reach person={person} />
+      <Warnings person={person} view={view} />
       <Tabs label={`About ${person.name}`} id="person" parts={parts} labels={PERSON_LABELS} current={part} counts={{ worked: person.worked.length || undefined }} onPick={pick} />
       <TabPanel id="person" current={part}>
         {part === 'coming' && (
@@ -153,6 +154,27 @@ function Reach({ person }: { person: PersonView }) {
   )
 }
 
+/** What the office must see whichever part is open (ADR 0082): archived, or brought in twice (ADR 0055). */
+function Warnings({ person, view }: { person: PersonView; view: View }) {
+  const access = useAccess()
+  const twice = useSamePeople(view)
+    .find((g) => g.people.some((p) => p.id === person.id))
+    ?.people.filter((p) => p.id !== person.id)
+  return (
+    <>
+      {person.archived && (
+        <p className="warn-line">Archived: kept for the record, and offered no work. Bring them back from the Archived list on Crew.</p>
+      )}
+      {access.can('crew') && !person.archived && twice && twice.length > 0 && (
+        <p className="warn-line">
+          {twice.map((p) => p.name).join(', ')} {twice.length === 1 ? 'looks' : 'look'} like the same person, brought in twice. Combine them under
+          Details.
+        </p>
+      )}
+    </>
+  )
+}
+
 /** Their photo, what the office keeps about them, and changing it. */
 function Who({ person, view }: { person: PersonView; view: View }) {
   const access = useAccess()
@@ -166,21 +188,9 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   const phone = person.phone?.trim()
   const email = person.email?.trim()
   const kind = person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : 'Freelancer'
-  // Someone who looks brought in twice (ADR 0055), said where the office will see it.
-  const twice = useSamePeople(view)
-    .find((g) => g.people.some((p) => p.id === person.id))
-    ?.people.filter((p) => p.id !== person.id)
   return (
     <section className="card who-card" aria-label="Details">
       <PersonPhoto person={person} />
-      {person.archived && (
-        <p className="warn-line">Archived: kept for the record, and offered no work. Bring them back from the Archived list on Crew.</p>
-      )}
-      {mayEdit && twice && twice.length > 0 && (
-        <p className="warn-line">
-          {twice.map((p) => p.name).join(', ')} {twice.length === 1 ? 'looks' : 'look'} like the same person, brought in twice. Combine them below.
-        </p>
-      )}
 
       {/* Not sent to staff crew or freelancers (ADR 0062): said, so it isn't taken for none. */}
       {person.detailsHidden && (

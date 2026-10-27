@@ -141,7 +141,7 @@ async function speakers(page: Page) {
     { name: 'stock.set', args: { modelId: `m${id}`, placeId: `a${id}`, caseId: null, qty: 4 } },
   ].map((m, i) => ({ ...m, id: `errs${id}${i}`, createdAt }))
   await page.request.post('/api/sync/push', { data: { clientId: `office${id}`, mutations: setUp } })
-  await page.goto(`/#stock/product/m${id}`)
+  await page.goto(`/#stock/product/m${id}/items`)
   const row = page.getByRole('region', { name: 'Counted' }).locator('.count', { hasText: `Bay ${id}` })
   await expect(row).toContainText('4')
   return async () => {

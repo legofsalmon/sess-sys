@@ -56,7 +56,7 @@ test('office offers a job, freelancer answers from their link', async ({ browser
   const quietCard = office.getByRole('region', { name: 'Messages to crew are off: offer for Aoife Byrne' })
   await expect(quietCard).toContainText('Nothing opened to send Aoife Byrne the offer.')
   await expect(office.getByRole('status')).toHaveText('Up to date')
-  await quietCard.getByRole('link', { name: 'Admin' }).click()
+  await quietCard.getByRole('link', { name: 'Admin › Company' }).click()
   const prompt = office.getByRole('region', { name: 'Messages to crew' }).getByRole('switch', { name: 'Prompt messages to crew' })
   await expect(prompt).not.toBeChecked()
   await prompt.click()

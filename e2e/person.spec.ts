@@ -44,21 +44,27 @@ test("a person's name opens their page, with what's ahead for them and the way b
   await people.getByLabel('Find a person').fill(`ciara page ${id}`)
   await people.getByRole('link', { name: new RegExp(`^${name}`) }).click()
 
-  // Her page: who she is and how to reach her, in the heading and the buttons, with nothing folded away.
+  // Her page: who she is and how to reach her, in the heading and the buttons above its parts; Coming up first.
   await expect(office).toHaveURL(new RegExp(`#crew/person/${k('ciara')}$`))
   await expect(office.getByRole('heading', { level: 1 })).toHaveText(name)
   await expect(office.getByRole('link', { name: 'Call 087 123 4567' })).toHaveAttribute('href', 'tel:0871234567')
   await expect(office.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', 'https://wa.me/353871234567')
   await expect(office.getByRole('link', { name: 'Email' })).toHaveAttribute('href', `mailto:ciara.${id}@example.com`)
-  await expect(office.locator('.person-page .notes')).toHaveText('Has her own van')
 
   // What's ahead: the offer waiting on her, opening its job, and her days off.
   const ahead = office.getByRole('region', { name: 'Coming up' })
   await expect(ahead.getByRole('link', { name: new RegExp(`^${job}`) })).toContainText('Offered')
   await expect(ahead).toContainText('Off ')
   await expect(ahead).toContainText('(On tour)')
+  // The other parts, one at a time, each in the address.
+  await office.getByRole('tab', { name: /^Details/ }).click()
+  await expect(office).toHaveURL(new RegExp(`#crew/person/${k('ciara')}/details$`))
+  await expect(office.locator('.person-page .notes')).toHaveText('Has her own van')
+  await office.getByRole('tab', { name: /^Worked/ }).click()
   await expect(office.getByRole('region', { name: `Worked: ${name}` })).toContainText('No jobs worked yet.')
+  await office.getByRole('tab', { name: /^Their link/ }).click()
   await expect(office.getByRole('region', { name: 'Their link' }).getByRole('link', { name: 'Open their page' })).toHaveAttribute('href', /\/f\/[\w-]{24}$/)
+  await office.getByRole('tab', { name: /^Coming up/ }).click()
   // Nothing on it is wider than a phone.
   expect(await office.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneSize.width)
 

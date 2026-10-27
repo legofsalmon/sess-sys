@@ -93,7 +93,7 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(notLabelled.locator('.count', { hasText: bay })).toContainText('4')
   const items = page.getByRole('region', { name: 'Items' })
   await expect(items.locator('.item-row')).toHaveText([new RegExp(`^${sh(first)}${bay}`), new RegExp(`^${sh(first + 1)}${bay}`)])
-  await expect(page.locator('.facts')).toContainText('6: 2 labelled, 4 not yet')
+  await expect(page.locator('.page-sub')).toContainText('2 items · 4 not labelled yet')
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await top(page)
   await page.screenshot(shot('stock-product'))
@@ -101,6 +101,7 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   // The rack gets its label and a place.
   await page.goto('/#stock')
   await page.locator('.job-row', { hasText: rack }).click()
+  await page.getByRole('tab', { name: /^Items/ }).click()
   const addRack = part(page, 'Add an item')
   await addRack.getByLabel('Number', { exact: true }).fill(rackNumber)
   await addRack.getByLabel("Where it's kept").fill(bay)
@@ -238,7 +239,8 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await count.getByLabel('Counted at').fill(bay)
   await count.getByLabel('How many').fill('2')
   await count.getByRole('button', { name: 'Save count' }).click()
-  await expect(page.locator('.facts')).toContainText('3: 1 labelled, 2 not yet')
+  await expect(page.locator('.page-sub')).toContainText('1 item · 2 not labelled yet')
+  await page.getByRole('tab', { name: /^Details/ }).click()
   await expect(page.getByRole('button', { name: 'Remove product' })).toHaveCount(0)
 
   // Asked first, with what goes; then it's gone from the list, the place and the search, but its label still answers.

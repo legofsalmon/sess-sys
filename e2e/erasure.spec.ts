@@ -32,8 +32,10 @@ test('archived, then erased through the question in place: the card says so and 
 
   // Their private link, as it would have gone to them by WhatsApp.
   await people.getByRole('link', { name: new RegExp(`^${name}`) }).click()
+  await office.getByRole('tab', { name: /^Their link/ }).click()
   const link = await office.getByRole('link', { name: 'Open their page' }).getAttribute('href')
   expect(link).toMatch(/\/f\/[\w-]{24}$/)
+  await office.getByRole('tab', { name: /^Coming up/ }).click()
   await office.getByRole('button', { name: 'Archive', exact: true }).click()
   // Back on the list, which says who was archived, with the way back.
   await expect(office).toHaveURL(/#crew\/people$/)

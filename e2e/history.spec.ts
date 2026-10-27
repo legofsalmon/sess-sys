@@ -133,7 +133,7 @@ test('says the history needs signal', async ({ page }) => {
 
 test('downloads everything in one file, and the download shows in the history', async ({ page }) => {
   const code = await deviceCode(page)
-  await page.goto('/#admin')
+  await page.goto('/#admin/data')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download everything' }).click()
   const download = await downloading

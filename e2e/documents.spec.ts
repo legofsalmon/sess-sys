@@ -55,6 +55,7 @@ test('the office adds a document with an expiry and a file on a card, and opens 
   await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
+  await office.getByRole('tab', { name: /^Documents/ }).click()
   const docs = office.getByRole('group', { name: 'Documents: Dara Quinn' })
   // The made-up insurance is there already, running out soon, in the warn tone.
   await expect(docs.locator('.row.doc', { hasText: 'Public liability insurance (Quinn Audio Ltd)' }).locator('.warn')).toHaveText(`Runs out ${dayText(inDays(18))}`)
@@ -134,6 +135,7 @@ test("a renewed card sent from the link is checked by the office, and the certif
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Pádraig Kenny/ }).click()
   const person = office.locator('.person-page')
   await expect(person.getByRole('heading', { level: 1 })).toHaveText('Pádraig Kenny')
+  await office.getByRole('tab', { name: /^Documents/ }).click()
   await expect(person).toContainText(`IPAF 3a, 3b (to ${dayText(inDays(1095))})`)
   const cards = person.getByRole('group', { name: 'Documents: Pádraig Kenny' }).locator('.row.doc', { hasText: 'IPAF card' })
   await expect(cards).toHaveCount(1)
@@ -155,6 +157,7 @@ test("a title typed as one long word wraps on a phone, on the person's card and 
   await office.goto('/#crew/people')
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
+  await office.getByRole('tab', { name: /^Documents/ }).click()
   await expect(office.getByRole('group', { name: 'Documents: Dara Quinn' })).toContainText(title)
   expect(await wide(office)).toBeLessThanOrEqual(phoneSize.width)
 
