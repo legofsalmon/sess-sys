@@ -213,18 +213,19 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
 /* An area's own screen says its name, large, so Home, Jobs, Stock, Crew and Admin read as different places (ADR 0033). */
 .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; margin-top: calc(-1 * var(--space-6)); }
-/* On this screen: the parts of a long screen by name, under the bar, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
-   row of pages, so it doesn't read as the area's row (Views.tsx): plain words on the bar, no box round them, the part in view underlined in ink. */
-.top .on-screen { grid-column: 1 / -1; margin: 0 calc(-1 * var(--space-16)); }
-.top .on-screen ul { list-style: none; margin: 0; padding: var(--space-2) var(--space-16) var(--space-4); display: flex; gap: var(--space-6); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: var(--space-16); }
-.top .on-screen ul::-webkit-scrollbar { display: none; }
-.top .on-screen ul { gap: var(--space-2); border-bottom: 1px solid var(--line); padding-bottom: 0; }
-.top .on-screen button { min-height: 44px; padding: var(--space-4) var(--space-10); border: 0; border-bottom: 2px solid transparent; border-radius: 0; white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--space-6); }
-.top .on-screen button[aria-current] { color: var(--ink); border-bottom-color: var(--ink); }
+/* On this screen: the parts of a long screen by name, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
+   row of pages, so it doesn't read as the area's row (Views.tsx): plain words, no box round them, the part in view underlined in ink. It
+   sits straight above the first part, under the screen's title and its choices, so it belongs to what it lists; scrolled up to the bar it
+   stays there (top set by OnThisScreen.tsx to the bar's height). Its parts never widen the screen: they scroll inside it. */
+.app > .on-screen { position: sticky; z-index: 1; contain: inline-size; margin: 0 calc(-1 * var(--space-16)) calc(-1 * var(--space-4)); background: var(--bg); }
+.on-screen ul { list-style: none; margin: 0; padding: 0 var(--space-16); display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: var(--space-16); border-bottom: 1px solid var(--line); }
+.on-screen ul::-webkit-scrollbar { display: none; }
+.on-screen button { min-height: 44px; padding: var(--space-4) var(--space-10); border: 0; border-bottom: 2px solid transparent; border-radius: 0; white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--space-6); }
+.on-screen button[aria-current] { color: var(--ink); border-bottom-color: var(--ink); }
 @media (hover: hover) {
-  .top .on-screen button:hover { color: var(--ink); background-image: none; }
+  .on-screen button:hover { color: var(--ink); background-image: none; }
 }
-.top .on-screen .count { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink); }
+.on-screen .count { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink); }
 .app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
 .app .facts dt { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .app .facts dd { margin: 0; }

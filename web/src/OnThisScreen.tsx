@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
- * Under the title, the parts of the screen by name, each a tap away
- * (ADR 0033): so a long screen says what's on it before anyone scrolls,
- * and, as it stays at the top while the screen scrolls, which part is in
- * view. Found in the page, as the Shell finds the heading, rather than
+ * The parts of the screen by name, each a tap away (ADR 0033): so a long
+ * screen says what's on it before anyone scrolls, and, as it stays under
+ * the bar while the screen scrolls, which part is in view. It sits on the
+ * parts themselves, straight above the first, under the screen's title and
+ * anything that chooses what the parts show (Home's Company or Me), so it
+ * reads as this page's contents rather than as part of the bar; once
+ * scrolled to the bar it stays there. Found in the page, as the Shell finds the heading, rather than
  * listed by each screen: every card with a heading of its own is a part,
  * so a new card joins without anyone remembering to add it. A heading's
  * "(5)" becomes the part's count. Nothing on a screen of one or two parts,
@@ -35,33 +39,70 @@ function partsIn(app: Element): Part[] {
 const same = (a: readonly Part[], b: readonly Part[]) =>
   a.length === b.length && a.every((p, i) => p.heading === b[i]!.heading && p.label === b[i]!.label && p.count === b[i]!.count)
 
-/** The bottom of the bar that stays at the top, which a part scrolled to has to clear. */
-function barBottom(from: Element): number {
-  return from.closest('.top')?.getBoundingClientRect().bottom ?? 0
+/** Where the strip stops under the bar: the bar's own bottom, wherever the bar is held (lower while a new version is waiting). */
+function underBar(app: Element): number {
+  const bar = app.querySelector<HTMLElement>(':scope > .top')
+  return bar ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight : 0
+}
+
+/** What stays at the top, the bar and the strip under it, which a part scrolled to has to clear. */
+function heldBottom(nav: HTMLElement | null): number {
+  const app = nav?.closest('.app')
+  return app ? underBar(app) + (nav!.hidden ? 0 : nav!.offsetHeight) : 0
+}
+
+/** The screen's own child that holds the first part: the strip goes straight before it. */
+function before(app: Element, first: Part | undefined): Element | null {
+  let at: Element | null = first?.heading.parentElement ?? null
+  while (at && at.parentElement !== app) at = at.parentElement
+  return at
 }
 
 export function OnThisScreen() {
-  const nav = useRef<HTMLElement>(null)
+  // Where Top is: only so the strip can find its screen. The strip itself is put among the screen's own children, by the parts.
+  const anchor = useRef<HTMLSpanElement>(null)
+  const [strip] = useState(() => {
+    const nav = document.createElement('nav')
+    nav.className = 'on-screen'
+    nav.setAttribute('aria-label', 'On this screen')
+    nav.hidden = true
+    return nav
+  })
+  const nav = useRef<HTMLElement>(strip)
   const [parts, setParts] = useState<Part[]>([])
   const [current, setCurrent] = useState(-1)
 
-  // The parts, again whenever the screen changes: a card can come and go as the data does.
+  // The parts, again whenever the screen changes: a card can come and go as the data does, and the strip moves to stay on the first.
   useEffect(() => {
-    const app = nav.current?.closest('.app')
+    const app = anchor.current?.closest('.app')
     if (!app) return
     let frame = 0
     const look = () => {
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => setParts((was) => (same(was, partsIn(app)) ? was : partsIn(app))))
+      frame = requestAnimationFrame(() => {
+        const found = partsIn(app)
+        const next = before(app, found[0])
+        if (next && strip.nextElementSibling !== next) app.insertBefore(strip, next)
+        setParts((was) => (same(was, found) ? was : found))
+      })
     }
+    anchor.current!.after(strip)
     look()
     const watch = new MutationObserver(look)
     watch.observe(app, { childList: true, subtree: true, characterData: true })
+    // It stops under the bar, whose height changes with what it holds (the list of what wasn't done, the way up).
+    const bar = app.querySelector(':scope > .top')
+    const hold = () => (strip.style.top = `${underBar(app)}px`)
+    hold()
+    const sized = new ResizeObserver(hold)
+    if (bar) sized.observe(bar)
     return () => {
       watch.disconnect()
+      sized.disconnect()
       cancelAnimationFrame(frame)
+      strip.remove()
     }
-  }, [])
+  }, [strip])
 
   // Which part is in view: the last whose top has reached the bar.
   useEffect(() => {
@@ -70,7 +111,7 @@ export function OnThisScreen() {
     const look = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const line = (nav.current ? barBottom(nav.current) : 0) + 24
+        const line = heldBottom(nav.current) + 24
         let at = -1
         parts.forEach((p, i) => {
           const card = p.heading.parentElement ?? p.heading
@@ -104,16 +145,20 @@ export function OnThisScreen() {
 
   const go = (p: Part) => {
     const card = p.heading.parentElement ?? p.heading
-    scrollTo({ top: card.getBoundingClientRect().top + scrollY - barBottom(nav.current ?? card) - 8 })
+    scrollTo({ top: card.getBoundingClientRect().top + scrollY - heldBottom(nav.current) - 8 })
     // Focus goes with the eye, so a screen reader and a keyboard carry on from the part, not from the strip.
     p.heading.tabIndex = -1
     p.heading.focus({ preventScroll: true })
   }
 
   const shown = parts.length >= FEWEST
+  useLayoutEffect(() => {
+    strip.hidden = !shown
+  }, [strip, shown])
   return (
-    <nav ref={nav} className="on-screen" aria-label="On this screen" hidden={!shown}>
-      {shown && (
+    <span ref={anchor} hidden>
+      {shown &&
+        createPortal(
         <ul>
           {parts.map((p, i) => (
             <li key={`${i} ${p.label}`}>
@@ -123,8 +168,9 @@ export function OnThisScreen() {
               </button>
             </li>
           ))}
-        </ul>
-      )}
-    </nav>
+        </ul>,
+          strip,
+        )}
+    </span>
   )
 }

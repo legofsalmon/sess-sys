@@ -36,6 +36,14 @@ export const CHANGELOG: readonly Release[] = [
     adrs: [81],
   },
   {
+    version: '1.37.1',
+    date: '2026-10-27',
+    title: '“On this screen” sits with the page',
+    what: 'The row of a screen’s parts (Needs attention, Today, Jobs by week…) now sits just above the first of them, under the screen’s name, instead of up in the bar above it. Scroll down and it still stays at the top, under the bar, showing which part you’re in.',
+    prs: [135],
+    adrs: [33],
+  },
+  {
     version: '1.37.0',
     date: '2026-10-27',
     title: 'An easier quote to put together',
