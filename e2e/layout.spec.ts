@@ -311,7 +311,7 @@ test('on a laptop a job has the whole width and the catalogue sits beside the op
   await product.getByRole('button', { name: 'Add product' }).click()
   const name = laptop.getByRole('heading', { level: 1, name: speaker })
   await expect(name).toBeVisible()
-  const catalogue = laptop.getByRole('region', { name: 'Stock' })
+  const catalogue = laptop.getByRole('region', { name: 'Catalogue' })
   await catalogue.getByLabel('Find').fill(speaker)
   await expect(catalogue.locator('.job-row', { hasText: speaker })).toHaveAttribute('aria-current', 'page')
   const [catalogueBox, nameBox] = [(await catalogue.boundingBox())!, (await name.boundingBox())!]
@@ -321,7 +321,7 @@ test('on a laptop a job has the whole width and the catalogue sits beside the op
   const phone = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await phone.goto(laptop.url())
   await expect(phone.getByRole('heading', { level: 1, name: speaker })).toBeVisible()
-  await expect(phone.getByRole('region', { name: 'Stock' })).toHaveCount(0)
+  await expect(phone.getByRole('region', { name: 'Catalogue' })).toHaveCount(0)
   await expect(phone.getByRole('link', { name: '‹ All stock' })).toBeVisible()
 })
 
