@@ -5,6 +5,8 @@ import { STOPPED } from '../jobs.ts'
 import {
   amount,
   csvText,
+  DEFAULT_VALID_DAYS,
+  QUOTE_SETTINGS_ID,
   moneyMonth,
   quoteTotals,
   roleKey,
@@ -18,6 +20,7 @@ import {
   type ProductPrice,
   type Quote,
   type QuoteEntities,
+  type QuoteSettings,
   type QuoteTotals,
   type RolePrice,
   type VatRate,
@@ -119,6 +122,10 @@ export interface MoneyView {
   costsPaid: CostRow[]
   /** Anything to show at all: a quote, a price or a cost. */
   any: boolean
+  /** What every printed quote says (ADR 0084): the next number, the terms, the bank details. */
+  quoting: QuoteSettings & { pending: boolean }
+  /** The number the next quote sent will get, as the server will give it, unless another device's goes first. */
+  nextNumber: number
 }
 
 type Tables = { [E in keyof QuoteEntities]: Record<string, QuoteEntities[E]> }
@@ -138,7 +145,22 @@ export function moneyView(
   const roles = new Map<string, RolePrice & { pending?: boolean }>(Object.values(entities.rolePrice ?? {}).map((r) => [r.id, r]))
   const discounts = new Map<string, ClientDiscount & { pending?: boolean }>(Object.values(entities.clientDiscount ?? {}).map((d) => [d.id, d]))
   const paid = new Map<string, CostPaid & { pending?: boolean }>(Object.values(entities.costPaid ?? {}).map((c) => [c.id, c]))
+  let quoting: QuoteSettings & { pending: boolean } = {
+    ...{ id: QUOTE_SETTINGS_ID, nextNumber: null, terms: '', bank: '' },
+    ...entities.quoteSettings?.[QUOTE_SETTINGS_ID],
+    pending: false,
+  }
   const gone = { product: new Set<string>(), role: new Set<string>(), client: new Set<string>(), cost: new Set<string>() }
+
+  // The number a quote going out now will have, worked out as the server does (ADR 0084): an earlier version's, or the
+  // next, which moves on. Another device's quote sent first can take it, and then the server's number is shown once it's in.
+  const numberOf = (q: Quote) => {
+    const had = q.number ?? [...quotes.values()].find((v) => v.projectId === q.projectId && v.number)?.number
+    if (had) return had
+    const n = Math.max(quoting.nextNumber ?? 1, Math.max(0, ...[...quotes.values()].map((v) => v.number ?? 0)) + 1)
+    quoting = { ...quoting, nextNumber: n + 1, pending: true }
+    return n
+  }
 
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
@@ -148,7 +170,9 @@ export function moneyView(
         const was = quotes.get(a.id)
         if (was && was.status !== 'draft') break
         if (!was && [...quotes.values()].some((q) => q.projectId === a.projectId && q.status === 'draft')) break
-        const version = was?.version ?? Math.max(0, ...[...quotes.values()].filter((q) => q.projectId === a.projectId).map((q) => q.version)) + 1
+        const versions = [...quotes.values()].filter((q) => q.projectId === a.projectId)
+        const version = was?.version ?? Math.max(0, ...versions.map((q) => q.version)) + 1
+        const before = was ?? versions.sort((x, y) => y.version - x.version)[0]
         quotes.set(a.id, {
           id: a.id,
           projectId: was?.projectId ?? a.projectId,
@@ -164,6 +188,10 @@ export function moneyView(
           invoicedOn: null,
           invoiceRef: '',
           paidOn: null,
+          // Kept from the draft, or the version before, when the save doesn't say them, as the server does.
+          number: was?.number ?? null,
+          validDays: a.validDays ?? before?.validDays ?? DEFAULT_VALID_DAYS,
+          depositPct: a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
           pending: true,
         })
         break
@@ -171,7 +199,7 @@ export function moneyView(
       case 'quote.sent': {
         const a = m.args as CommandArgs<'quote.sent'>
         const was = quotes.get(a.id)
-        if (was?.status === 'draft') quotes.set(a.id, { ...was, status: 'sent', sentOn: a.on, pending: true })
+        if (was?.status === 'draft') quotes.set(a.id, { ...was, status: 'sent', sentOn: a.on, number: numberOf(was), pending: true })
         break
       }
       case 'quote.answer': {
@@ -179,7 +207,7 @@ export function moneyView(
         const was = quotes.get(a.id)
         if (!was || was.invoicedOn) break
         if (a.answer === 'none') quotes.set(a.id, { ...was, status: was.status === 'draft' ? 'draft' : 'sent', answeredOn: null, pending: true })
-        else quotes.set(a.id, { ...was, status: a.answer, answeredOn: a.on, sentOn: was.sentOn ?? a.on, pending: true })
+        else quotes.set(a.id, { ...was, status: a.answer, answeredOn: a.on, sentOn: was.sentOn ?? a.on, number: was.status === 'draft' ? numberOf(was) : (was.number ?? null), pending: true })
         break
       }
       case 'quote.invoiced': {
@@ -214,6 +242,11 @@ export function moneyView(
         if (a.pct === null) discounts.delete(a.clientId)
         else discounts.set(a.clientId, { id: a.clientId, pct: a.pct, pending: true })
         gone.client.add(a.clientId)
+        break
+      }
+      case 'quoting.update': {
+        const a = m.args as CommandArgs<'quoting.update'>
+        quoting = { id: QUOTE_SETTINGS_ID, nextNumber: a.nextNumber, terms: a.terms, bank: a.bank, pending: true }
         break
       }
       case 'cost.paid': {
@@ -362,6 +395,8 @@ export function moneyView(
     costsOwed: approved.filter((c) => !c.paidOn).sort((a, b) => (a.row.timesheet?.approvedAt ?? '').localeCompare(b.row.timesheet?.approvedAt ?? '')),
     costsPaid: approved.filter((c) => c.paidOn).sort((a, b) => b.paidOn!.localeCompare(a.paidOn!)),
     any: quotes.size > 0 || products.size > 0 || roles.size > 0 || approved.length > 0,
+    quoting,
+    nextNumber: Math.max(quoting.nextNumber ?? 1, Math.max(0, ...[...quotes.values()].map((q) => q.number ?? 0)) + 1),
   }
 }
 

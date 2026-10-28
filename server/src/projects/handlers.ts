@@ -106,6 +106,7 @@ export const projectHandlers: { [N in JobCommand]: Handler<N> } = {
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, contacts = EXCLUDED.contacts, notes = EXCLUDED.notes`,
       [a.id, a.name, JSON.stringify(a.contacts), a.notes]
     )
+    if (a.address !== undefined) await ctx.tx.query('UPDATE clients SET address = $2 WHERE id = $1', [a.id, a.address.trim()])
     await emit(ctx, 'client', a.id, await getClient(ctx.tx, a.id))
   },
 

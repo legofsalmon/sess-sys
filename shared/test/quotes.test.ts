@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { changesFromJob, csvText, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
+import { changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { invoicesCsv, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
 import type { JobView } from '../src/sync/jobs-view.ts'
@@ -14,6 +14,38 @@ import type { JobView } from '../src/sync/jobs-view.ts'
  */
 
 const line = (l: Partial<QuoteLine>): QuoteLine => ({ id: 'l', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 10000, vat: '23', ...l })
+
+describe('the printed quote (ADR 0084)', () => {
+  it("is numbered without padding, holds its prices for so many days from the day it's sent, and works out the deposit", () => {
+    expect(quoteNumberLabel({ number: 1115, version: 1 })).toBe('1115')
+    expect(quoteNumberLabel({ number: 1115, version: 2 })).toBe('1115 · version 2')
+    expect(quoteNumberLabel({ number: null, version: 1 })).toBe('')
+    expect(validUntil({ sentOn: '2026-10-28', validDays: 30 }, '2026-11-02')).toBe('2026-11-27')
+    // A draft counts from today, and a quote from before holds for 30.
+    expect(validUntil({ sentOn: null }, '2026-12-20')).toBe('2027-01-19')
+    expect(depositCents(95027, 50)).toBe(47514)
+  })
+
+  it('says what changed since the version before, matching lines by what they are, not their ids', () => {
+    const y10 = line({ id: 'a', kind: 'kit', what: 'd&b Y10P', modelId: 'y10', qty: 8, days: 2, unitCents: 4500 })
+    const was = { discountPct: 0, lines: [y10, line({ id: 'b', what: 'Delivery', per: 'once' }), line({ id: 'c', kind: 'crew', what: 'Audio tech', ref: 'call1', days: 2, unitCents: 40000 })] }
+    const now = {
+      discountPct: 10,
+      lines: [
+        { ...y10, id: 'a2', qty: 10 },
+        // The same, charged once: days don't count.
+        line({ id: 'b2', what: 'delivery ', per: 'once', days: 3 }),
+        line({ id: 'd', what: 'Generator', unitCents: 30000 }),
+      ],
+    }
+    const c = versionChanges(was, now)
+    expect(c.added.map((l) => l.what)).toEqual(['Generator'])
+    expect(c.removed.map((l) => l.what)).toEqual(['Audio tech'])
+    expect(c.changed.map((x) => [x.line.qty, x.was.qty])).toEqual([[10, 8]])
+    expect(c.discount).toEqual({ was: 0, now: 10 })
+    expect(versionChanges(was, { ...was, lines: was.lines.map((l) => ({ ...l, id: `${l.id}2` })) })).toEqual({ added: [], removed: [], changed: [], discount: null })
+  })
+})
 
 describe('what a quote comes to', () => {
   it('takes the discount off each rate and works the VAT out on what is left, so the totals add up', () => {

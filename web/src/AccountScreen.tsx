@@ -9,6 +9,7 @@ import { ListsCard } from './ListsCard.tsx'
 import { Top } from './jobs/common.tsx'
 import { MessagesCard } from './MessagesCard.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
+import { QuotingCard } from './QuotingCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { useAccess } from './role.ts'
 import { TabPanel, Tabs, useTab } from './Tabs.tsx'
@@ -71,6 +72,7 @@ export function AccountScreen() {
             {part === 'company' && (
               <>
                 {settings && <OfficeCard office={view.office} />}
+                {settings && access.can('money') && <QuotingCard money={view.money} />}
                 {settings && <MessagesCard office={view.office} />}
                 {company && !access.rolesOff && <ReadingCard office={view.office} />}
               </>

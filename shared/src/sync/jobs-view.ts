@@ -72,7 +72,9 @@ export function jobsView(
     switch (m.name) {
       case 'client.upsert': {
         const a = m.args as CommandArgs<'client.upsert'>
-        clients.set(a.id, { ...a, pending: true })
+        // A save that doesn't say the address keeps it, as the server does (ADR 0084).
+        const was = clients.get(a.id)?.address
+        clients.set(a.id, { ...a, ...(a.address === undefined && was ? { address: was } : {}), pending: true })
         break
       }
       case 'venue.upsert': {

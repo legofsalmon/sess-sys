@@ -236,7 +236,8 @@ const ABOUT: Record<string, string> = {
   product_prices: "The price list: each product's price for a day, in cents.",
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   quotes:
-    "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, when it was sent, the client's answer, and the invoice and payment the office recorded for it.",
+    "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, how many days its prices hold and any deposit, when it was sent and the quote number it was given then, the client's answer, and the invoice and payment the office recorded for it.",
+  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages, and the VAT number and address printed on quotes; whether heads of department see crew rates; and whether the app prompts messages to crew.",

@@ -113,7 +113,32 @@ export interface Quote {
   invoicedOn: string | null
   invoiceRef: string
   paidOn: string | null
+  /**
+   * The quote's number (ADR 0084): the job's own, the same on every version, given by the server when the first version is
+   * marked sent. None while it's only ever been a draft, and none on a quote sent before numbers.
+   */
+  number?: number | null
+  /** How many days the prices hold from the day it's sent: 30 unless changed. */
+  validDays?: number
+  /** A deposit asked for before the job, as a percentage of the total with VAT; none unless set. */
+  depositPct?: number | null
 }
+
+/** Prices hold this long unless the quote says otherwise. */
+export const DEFAULT_VALID_DAYS = 30
+
+/**
+ * What every printed quote says that isn't about the job (ADR 0084): the number the next one gets, the company's terms
+ * and its bank details. One record, with the id "quoting". Money's, so only those who see money are sent it.
+ */
+export interface QuoteSettings {
+  id: string
+  /** The number the next quote gets; none set means one more than the highest given, or 1. */
+  nextNumber: number | null
+  terms: string
+  bank: string
+}
+export const QUOTE_SETTINGS_ID = 'quoting'
 
 /** A product's price for a day, by the product's id. */
 export interface ProductPrice {
@@ -146,13 +171,14 @@ export interface QuoteEntities {
   rolePrice: RolePrice
   clientDiscount: ClientDiscount
   costPaid: CostPaid
+  quoteSettings: QuoteSettings
 }
 /**
  * Money's records. A role that can't see money (ADR 0042) is sent none of
  * them, so they never reach its phone: the server leaves them out of its
  * change feed.
  */
-export const QUOTE_ENTITY_NAMES = ['quote', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid'] as const
+export const QUOTE_ENTITY_NAMES = ['quote', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid', 'quoteSettings'] as const
 export const MONEY_ENTITY_NAMES: readonly string[] = QUOTE_ENTITY_NAMES
 
 /** The same role however it's typed: "Audio Tech " and "audio tech" are one price. */
@@ -160,6 +186,16 @@ export const roleKey = (role: string) => role.trim().replace(/\s+/g, ' ').toLowe
 
 const lines = z.array(quoteLine).max(MAX_LINES, `A quote has room for ${MAX_LINES} lines.`)
 const answer = z.enum(['accepted', 'declined', 'none'])
+const VALID_HINT = 'Prices hold for a whole number of days from 1 to 365.'
+const validDays = z.number({ invalid_type_error: VALID_HINT }).int(VALID_HINT).min(1, VALID_HINT).max(365, VALID_HINT)
+const DEPOSIT_HINT = 'A deposit is a whole percentage from 1 to 100, such as 25 or 50.'
+const depositPct = z.number({ invalid_type_error: DEPOSIT_HINT }).int(DEPOSIT_HINT).min(1, DEPOSIT_HINT).max(100, DEPOSIT_HINT)
+/** Up to eight figures, as Current RMS's are padded to ten. */
+export const MAX_QUOTE_NUMBER = 99_999_999
+const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMBER.toLocaleString('en-IE')}.`
+const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
+/** The company's terms, printed under every quote. */
+export const TERMS_LENGTH = 4000
 
 export const quoteCommandSchemas = {
   /**
@@ -167,7 +203,16 @@ export const quoteCommandSchemas = {
    * the discount and the notes at once, as the screen has them. The server
    * numbers a new one.
    */
-  'quote.save': z.object({ id, projectId: id, lines, discountPct, notes: text(2000, 'The notes for the client') }),
+  'quote.save': z.object({
+    id,
+    projectId: id,
+    lines,
+    discountPct,
+    notes: text(2000, 'The notes for the client'),
+    // Optional, so a save from an app older than them leaves them as they were (ADR 0084).
+    validDays: validDays.optional(),
+    depositPct: depositPct.nullable().optional(),
+  }),
   /** The office sent it to the client themselves (the app sends nothing): from now on it stays as it is. */
   'quote.sent': z.object({ id, on: day }),
   /** What the client said, as the office heard it, or "none" to take a mistaken answer back. */
@@ -176,6 +221,11 @@ export const quoteCommandSchemas = {
   'quote.invoiced': z.object({ id, on: day.nullable(), ref: text(60, 'The invoice number') }),
   /** The day an invoiced quote was paid, or null to take it back. */
   'quote.paid': z.object({ id, on: day.nullable() }),
+  /**
+   * What every printed quote says (ADR 0084): the number the next quote gets (null to carry on from the highest given),
+   * the company's terms and its bank details.
+   */
+  'quoting.update': z.object({ nextNumber: quoteNumber.nullable(), terms: text(TERMS_LENGTH, 'The terms'), bank: text(500, 'The bank details') }),
   /** A product's day price; null takes it off the price list. */
   'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable() }),
   /** A crew role's day price; null quotes it at its booked rate again. */
@@ -414,3 +464,63 @@ export function csvText(header: readonly string[], rows: readonly (readonly stri
 
 /** Cents as an accountant's spreadsheet wants a sum: 1250.00, with no euro sign. */
 export const amount = (cents: number) => (cents / 100).toFixed(2)
+
+// The printed quote (ADR 0084).
+
+/** "1115", or "1115 · version 2" once there's more than one; nothing for a quote with no number. */
+export function quoteNumberLabel(q: Pick<Quote, 'number' | 'version'>): string {
+  if (!q.number) return ''
+  return q.version > 1 ? `${q.number} · version ${q.version}` : String(q.number)
+}
+
+/** The day after `d` by `n` days, as YYYY-MM-DD. */
+const plusDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+
+/** The last day the prices hold: so many days from the day it went (or, for a draft, from `today`). */
+export const validUntil = (q: Pick<Quote, 'sentOn' | 'validDays'>, today: string) => plusDays(q.sentOn ?? today, q.validDays ?? DEFAULT_VALID_DAYS)
+
+/** "28 October 2026": a day as a letter gives it, for the printed quote. */
+export const letterDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+/** The deposit on a total with VAT, to the cent. */
+export const depositCents = (grossCents: number, pct: number) => Math.round((grossCents * pct) / 100)
+
+/** One line of a version as it compares with the version before. */
+export interface LineChange {
+  line: QuoteLine
+  /** The same line in the version before. */
+  was: QuoteLine
+}
+
+export interface VersionChanges {
+  added: QuoteLine[]
+  removed: QuoteLine[]
+  /** In how many, the days, the price, how it's charged or its VAT. */
+  changed: LineChange[]
+  /** The discount off the whole, before and now, when it changed. */
+  discount: { was: number; now: number } | null
+}
+
+/** Which line of one version is which of the next: its product, else what it was built from, else its words. */
+const lineKey = (l: QuoteLine) => (l.modelId ? `m:${l.modelId}` : l.ref ? `r:${l.ref}` : `w:${l.kind}:${l.what.trim().toLowerCase()}`)
+const sameTerms = (a: QuoteLine, b: QuoteLine) =>
+  a.qty === b.qty && a.unitCents === b.unitCents && a.vat === b.vat && (a.per ?? 'day') === (b.per ?? 'day') && ((a.per ?? 'day') === 'once' || a.days === b.days)
+
+/**
+ * What changed from one version to the next, for "What changed since version 1". A new version's lines get new ids, so
+ * lines are matched by what they are; two of the same are matched in order.
+ */
+export function versionChanges(was: Pick<Quote, 'lines' | 'discountPct'>, now: Pick<Quote, 'lines' | 'discountPct'>): VersionChanges {
+  const left = new Map<string, QuoteLine[]>()
+  for (const l of was.lines) left.set(lineKey(l), [...(left.get(lineKey(l)) ?? []), l])
+  const added: QuoteLine[] = []
+  const changed: LineChange[] = []
+  for (const l of now.lines) {
+    const before = left.get(lineKey(l))?.shift()
+    if (!before) added.push(l)
+    else if (!sameTerms(before, l)) changed.push({ line: l, was: before })
+  }
+  const removed = [...left.values()].flat()
+  const discount = was.discountPct === now.discountPct ? null : { was: was.discountPct, now: now.discountPct }
+  return { added, removed, changed, discount }
+}

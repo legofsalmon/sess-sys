@@ -49,6 +49,19 @@ const MIGRATIONS: string[] = [
     paid_on       date NOT NULL
   );
   `,
+  // The printed quote (ADR 0084): the job's quote number, given when it's first sent and the same on every version; how
+  // long its prices hold; a deposit. And what every quote says: the next number, the company's terms and bank details.
+  `
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS number integer CHECK (number > 0);
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS valid_days integer NOT NULL DEFAULT 30 CHECK (valid_days BETWEEN 1 AND 365);
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS deposit_pct integer CHECK (deposit_pct BETWEEN 1 AND 100);
+  CREATE TABLE IF NOT EXISTS quote_settings (
+    id           text PRIMARY KEY,
+    next_number  integer CHECK (next_number > 0),
+    terms        text NOT NULL DEFAULT '',
+    bank         text NOT NULL DEFAULT ''
+  );
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

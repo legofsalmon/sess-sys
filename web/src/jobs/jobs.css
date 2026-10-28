@@ -343,8 +343,27 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-sheet .quote-totals dt { color: #444; }
   .quote-sheet .quote-totals .total { border-top: 1px solid #000; }
   .quote-sheet .quote-totals .total dt { color: #000; }
+  .quote-sheet .lines { white-space: pre-line; }
+  .quote-sheet .sheet-head { display: flex; justify-content: space-between; gap: 12pt; align-items: flex-start; }
+  .quote-sheet .from { display: grid; font-size: 9pt; color: #444; }
+  .quote-sheet .from .company { font-size: 13pt; font-weight: 700; color: #000; }
+  .quote-sheet .sheet-facts { margin: 0; display: grid; gap: 1pt; font-size: 9.5pt; text-align: right; }
+  .quote-sheet .sheet-facts div { display: flex; justify-content: flex-end; gap: 6pt; }
+  .quote-sheet .sheet-facts dt { color: #444; }
+  .quote-sheet .sheet-facts dd { margin: 0; font-weight: 700; min-width: 8.5em; }
+  .quote-sheet .sheet-to { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12pt; padding: 6pt 0; border-top: 1px solid #999; border-bottom: 1px solid #999; }
+  .quote-sheet .sheet-to .who { font-weight: 700; }
+  .quote-sheet .deposit { font-size: 10.5pt; }
+  .quote-sheet .sheet-terms { break-inside: avoid; font-size: 9pt; }
+  .quote-sheet .sheet-terms h2 { font-size: 10pt; margin: 0 0 2pt; }
   .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
+/* The printed quote's terms on the draft (ADR 0084): two short fields side by side. */
+.quote-terms { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.quote-terms .field { flex: 1 1 14em; }
+.quote-terms .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-terms .with-unit input, .quote-terms input { max-width: 7em; }
+.version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
 .money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 
 /* Kit from the notes (ADR 0043): each line as the notes write it, over what it matched. */

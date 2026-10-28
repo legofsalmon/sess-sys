@@ -1,4 +1,4 @@
-import type { ClientDiscount, CostPaid, ProductPrice, Quote, RolePrice } from '@sh/shared'
+import { QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type ProductPrice, type Quote, type QuoteSettings, type RolePrice } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading money's records back as the entities devices see (ADR 0042). */
@@ -6,7 +6,7 @@ import type { Queryable } from '../db.ts'
 type Row = Record<string, any>
 
 const QUOTE = `id, project_id, version, status, lines, discount_pct, notes, made_at, saved_at,
-  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on`
+  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on, number, valid_days, deposit_pct`
 
 const toQuote = (r: Row): Quote => ({
   id: r.id,
@@ -23,6 +23,9 @@ const toQuote = (r: Row): Quote => ({
   invoicedOn: r.invoiced_on,
   invoiceRef: r.invoice_ref,
   paidOn: r.paid_on,
+  number: r.number ?? null,
+  validDays: r.valid_days,
+  depositPct: r.deposit_pct ?? null,
 })
 
 export async function getQuote(q: Queryable, id: string, lock = false): Promise<Quote | undefined> {
@@ -54,4 +57,19 @@ export async function getClientDiscount(q: Queryable, clientId: string): Promise
 export async function getCostPaid(q: Queryable, timesheetId: string): Promise<CostPaid | undefined> {
   const { rows } = await q.query<{ timesheet_id: string; paid_on: string }>('SELECT timesheet_id, paid_on::text AS paid_on FROM cost_payments WHERE timesheet_id = $1', [timesheetId])
   return rows[0] ? { id: rows[0].timesheet_id, paidOn: rows[0].paid_on } : undefined
+}
+
+/** What every printed quote says (ADR 0084), once anything about it is saved or a number given. */
+export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | undefined> {
+  const { rows } = await q.query<{ id: string; next_number: number | null; terms: string; bank: string }>(
+    'SELECT id, next_number, terms, bank FROM quote_settings WHERE id = $1',
+    [QUOTE_SETTINGS_ID]
+  )
+  return rows[0] ? { id: rows[0].id, nextNumber: rows[0].next_number, terms: rows[0].terms, bank: rows[0].bank } : undefined
+}
+
+/** The highest quote number given so far, or 0. */
+export async function highestNumber(q: Queryable): Promise<number> {
+  const { rows } = await q.query<{ n: number | null }>('SELECT max(number) AS n FROM quotes')
+  return Number(rows[0]?.n ?? 0)
 }

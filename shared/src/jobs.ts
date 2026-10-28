@@ -29,6 +29,11 @@ export const client = z.object({
   name: needed(200, "The client's name", "The client's name"),
   contacts: z.array(contact).max(20, 'Up to 20 contacts, please.'),
   notes: text(2000, 'The notes'),
+  /**
+   * Where their quotes go (ADR 0084): a line each, as on a letter. Optional, so a save from an app older than it leaves
+   * it as it was.
+   */
+  address: text(500, 'The address').optional(),
 })
 export type Client = z.infer<typeof client>
 
