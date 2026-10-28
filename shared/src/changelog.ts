@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.45.0',
+    version: '1.46.0',
     date: '2026-10-28',
     title: 'Quotes has a place of its own',
     what: 'Quotes is now in the sidebar on a computer, after Jobs, and on the Menu on a phone. It has the quotes to follow up and a New quote button, which were on Money, and every quote in one list, to find by job, client, venue, quote number or invoice, or narrow to those not sent, sent, accepted or turned down. Only the office and directors see it.',
     prs: [146],
     adrs: [88],
+  },
+  {
+    version: '1.45.0',
+    date: '2026-10-28',
+    title: 'Crew travel by car, and the fuel price kept up from the AA',
+    what: 'Travel on a quote is now the crew’s own, not the vans’ (whose fuel stays in the transport lines): a car’s fuel there and back for each crew day, or for each car load when crew share, which Admin sets as “Crew to a car”. A car is taken to use 6.5 litres for 100 km unless changed. The fuel price also updates itself each month. The AA’s fuel price survey comes out on the second Monday of the month, and the app looks once a day and takes the new diesel price the day it appears. Admin › Company › Travel and subsistence says which month’s survey the price is from, and has a switch to turn this off and keep a price typed in. A new price a long way from the last is left for someone to check rather than taken.',
+    prs: [144],
+    adrs: [86],
   },
   {
     version: '1.44.0',

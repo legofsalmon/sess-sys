@@ -1,4 +1,4 @@
-import { QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type Department, type Package, type PackageItem, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
+import { DEFAULT_CREW_PER_CAR, QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type Department, type Package, type PackageItem, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading money's records back as the entities devices see (ADR 0042). */
@@ -75,7 +75,7 @@ export async function getCostPaid(q: Queryable, timesheetId: string): Promise<Co
 /** What every printed quote says (ADR 0084), once anything about it is saved or a number given. */
 export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | undefined> {
   const { rows } = await q.query<Row>(
-    `SELECT id, next_number, terms, bank, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on::text AS fuel_set_on
+    `SELECT id, next_number, terms, bank, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on::text AS fuel_set_on, fuel_auto, fuel_month, crew_per_car
      FROM quote_settings WHERE id = $1`,
     [QUOTE_SETTINGS_ID]
   )
@@ -92,6 +92,9 @@ export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | un
     litresPer100Km: Number(r.litres_per_100_km),
     perDiemCents: r.per_diem_cents,
     fuelSetOn: r.fuel_set_on,
+    fuelAuto: r.fuel_auto,
+    fuelMonth: r.fuel_month,
+    crewPerCar: r.crew_per_car ?? DEFAULT_CREW_PER_CAR,
   }
 }
 

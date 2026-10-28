@@ -5,16 +5,18 @@ import { STANDARD_VAT, type LineExtra, type QuoteLine, type QuoteSettings } from
  * Travel and subsistence on a quote (ADR 0086), worked out by the quote
  * itself so nobody has to remember them or do the sums.
  *
- * - **Travel**: a venue further than so many km from Dublin city centre is
- *   charged the fuel its vehicles use there and back: the distance each
- *   way, twice, at what a vehicle uses for 100 km and the fuel price. The
+ * - **Travel**: the crew's own, not the vans' (whose fuel is in the
+ *   transport lines). A venue further than so many km from Dublin city
+ *   centre is charged a car's fuel there and back for each crew day, or
+ *   for each car load when crew share: the distance each way, twice, at
+ *   what a car uses for 100 km and the fuel price. The
  *   distance comes from the venue's pin on the map, as the crow flies and
  *   then a fifth more for the roads, unless the office types the real
  *   one on the quote.
  * - **Subsistence**: a per diem for each of the crew for each day they're
  *   quoted for, unless the job gives them their meals.
  *
- * The office sets the fuel price, what a vehicle uses, where travel starts
+ * The office sets the fuel price, what a car uses, how many share one, where travel starts
  * and the per diem in Admin. A price not set yet charges nothing, and the
  * quote says so, rather than guessing a figure for a client's quote.
  */
@@ -25,9 +27,10 @@ export const DUBLIN_CENTRE: Pin = { lat: 53.3472, lng: -6.2592 }
 /** How much further Irish roads are than a straight line, on the whole: about a fifth (Galway, Cork and Belfast all come close). */
 export const ROAD_FACTOR = 1.2
 
-/** Until the office says otherwise: travel past 50 km, and a van using 10 litres for 100 km. */
+/** Until the office says otherwise: travel past 50 km, each of the crew in their own car, using 6.5 litres for 100 km. */
 export const DEFAULT_TRAVEL_FROM_KM = 50
-export const DEFAULT_LITRES_PER_100_KM = 10
+export const DEFAULT_LITRES_PER_100_KM = 6.5
+export const DEFAULT_CREW_PER_CAR = 1
 
 /** Past this many days the fuel price is worth checking again. */
 export const FUEL_PRICE_FRESH_DAYS = 30
@@ -39,6 +42,10 @@ export interface TravelSettings {
   litresPer100Km: number
   perDiemCents: number | null
   fuelSetOn: string | null
+  fuelAuto: boolean
+  fuelMonth: string | null
+  /** How many of the crew share a car to a job. */
+  crewPerCar: number
 }
 
 export function travelSettingsOf(s: Partial<QuoteSettings> | undefined): TravelSettings {
@@ -48,6 +55,9 @@ export function travelSettingsOf(s: Partial<QuoteSettings> | undefined): TravelS
     litresPer100Km: s?.litresPer100Km ?? DEFAULT_LITRES_PER_100_KM,
     perDiemCents: s?.perDiemCents ?? null,
     fuelSetOn: s?.fuelSetOn ?? null,
+    fuelAuto: s?.fuelAuto ?? true,
+    fuelMonth: s?.fuelMonth ?? null,
+    crewPerCar: s?.crewPerCar ?? DEFAULT_CREW_PER_CAR,
   }
 }
 
@@ -63,7 +73,7 @@ export function kmBetween(a: Pin, b: Pin): number {
 /** About how far a venue is from Dublin city centre by road, each way, in whole km. */
 export const roadKmFromDublin = (pin: Pin) => Math.round(kmBetween(DUBLIN_CENTRE, pin) * ROAD_FACTOR)
 
-/** The fuel for one vehicle there and back, to the cent. */
+/** The fuel for one car there and back, to the cent. */
 export const fuelCents = (kmEachWay: number, s: Pick<TravelSettings, 'fuelCentsPerLitre' | 'litresPer100Km'>) =>
   Math.round(((2 * kmEachWay * s.litresPer100Km) / 100) * (s.fuelCentsPerLitre ?? 0))
 
@@ -82,7 +92,8 @@ export interface Extras {
     from: KmFrom
     /** Why there's no travel line, in words, or null when there is one. */
     none: string | null
-    vehicles: number
+    /** Car trips there and back: the crew days, by however many share a car. */
+    trips: number
   }
   subsistence: {
     crewDays: number
@@ -103,8 +114,6 @@ export function extrasFor(o: {
   pin: Pin | null | undefined
   /** The distance typed on the quote, which wins over the map. */
   typedKm: number | null | undefined
-  /** Vans booked on the job; at least one goes. */
-  vehicles: number
   mealsProvided: boolean
   ids: Partial<Record<LineExtra, string>>
   newId: () => string
@@ -112,27 +121,29 @@ export function extrasFor(o: {
   const s = o.settings
   const km = o.typedKm ?? (o.pin ? roadKmFromDublin(o.pin) : null)
   const from: KmFrom = o.typedKm != null ? 'typed' : o.pin ? 'map' : 'none'
-  const vehicles = Math.max(1, o.vehicles)
+  const days = crewDays(o.lines)
+  const trips = Math.ceil(days / Math.max(1, s.crewPerCar))
   const lines: QuoteLine[] = []
   let travelNone: string | null = null
   if (km === null) travelNone = "The venue isn't on the map, so the distance isn't known: put it on the map, or type the distance."
   else if (km <= s.fromKm) travelNone = `${km} km from Dublin city centre, so within the ${s.fromKm} km travel starts after.`
+  else if (days === 0) travelNone = 'No crew on the quote yet.'
+  else if (trips > 10_000) travelNone = 'More car trips than a line has room for.'
   else if (s.fuelCentsPerLitre === null) travelNone = 'No fuel price set yet: set it in Admin › Company › Travel and subsistence.'
   else
     lines.push({
       id: o.ids.travel ?? o.newId(),
       kind: 'other',
-      what: `Travel, ${km} km each way from Dublin${vehicles > 1 ? `, ${vehicles} vehicles` : ''}`,
+      what: `Crew travel, ${km} km each way from Dublin, ${trips} car trip${trips === 1 ? '' : 's'}`,
       ref: null,
       group: EXTRA_GROUP,
-      qty: vehicles,
+      qty: trips,
       days: 1,
       unitCents: fuelCents(km, s),
       vat: STANDARD_VAT,
       per: 'once',
       extra: 'travel',
     })
-  const days = crewDays(o.lines)
   let subNone: string | null = null
   if (o.mealsProvided) subNone = 'The job gives the crew their meals.'
   else if (days === 0) subNone = 'No crew on the quote yet.'
@@ -153,7 +164,7 @@ export function extrasFor(o: {
       per: 'day',
       extra: 'subsistence',
     })
-  return { lines, travel: { km, from, none: travelNone, vehicles }, subsistence: { crewDays: days, none: subNone } }
+  return { lines, travel: { km, from, none: travelNone, trips }, subsistence: { crewDays: days, none: subNone } }
 }
 
 /** The fuel price read from AA Ireland's monthly survey (ADR 0086), offered to the office to save. */

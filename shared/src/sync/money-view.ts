@@ -2,6 +2,7 @@ import type { CommandArgs, Mutation } from '../commands.ts'
 import { daysBetween, eachDay } from '../crew.ts'
 import { irishToday } from '../day.ts'
 import { STOPPED } from '../jobs.ts'
+import { DEFAULT_CREW_PER_CAR } from '../travel.ts'
 import {
   amount,
   csvText,
@@ -277,7 +278,9 @@ export function moneyView(
       case 'quoting.travel': {
         const a = m.args as CommandArgs<'quoting.travel'>
         // The day the fuel price was set moves only when the price does, as on the server.
-        const fuelSetOn = a.fuelCentsPerLitre === (quoting.fuelCentsPerLitre ?? null) ? (quoting.fuelSetOn ?? null) : a.on
+        const same = a.fuelCentsPerLitre === (quoting.fuelCentsPerLitre ?? null)
+        const fuelSetOn = same ? (quoting.fuelSetOn ?? null) : a.on
+        const fuelMonth = a.fuelMonth !== undefined ? a.fuelMonth : same ? (quoting.fuelMonth ?? null) : null
         quoting = {
           ...quoting,
           id: QUOTE_SETTINGS_ID,
@@ -286,6 +289,9 @@ export function moneyView(
           litresPer100Km: a.litresPer100Km,
           perDiemCents: a.perDiemCents,
           fuelSetOn,
+          fuelAuto: a.fuelAuto ?? quoting.fuelAuto ?? true,
+          fuelMonth,
+          crewPerCar: a.crewPerCar ?? quoting.crewPerCar ?? DEFAULT_CREW_PER_CAR,
           pending: true,
         }
         break
