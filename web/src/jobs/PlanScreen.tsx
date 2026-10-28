@@ -26,6 +26,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 import { personHref } from '../crew/PersonScreen.tsx'
 import { useAccess } from '../role.ts'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
+import { useUnderTop } from '../useUnderTop.ts'
 import { useToday } from '../view.ts'
 import { Top } from './common.tsx'
 import { Views } from '../Views.tsx'
@@ -108,6 +109,8 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
 
   // On a phone the days start at today, so the day that matters most is in view: when the days change, and once there is something to show.
   const scroller = useRef<HTMLDivElement>(null)
+  // The days stay along the top of a long month: the timeline scrolls inside a frame that ends at the foot of the screen, under the bar.
+  const card = useUnderTop<HTMLElement>(true)
   const shown = lanes > 0
   useEffect(() => {
     const el = scroller.current
@@ -118,43 +121,40 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
 
   return (
     <div className="app crew jobs plan">
-      <Top view={view} views={<JobViews place={place} />} />
+      {/* The days shown are the page's name (ADR 0082), what's on them the line under it; moving and what the rows are sit together under that. */}
+      <Top view={view} views={<JobViews place={place} />} heading={title} sub={<p>{summary(p, scale)}</p>} />
 
-      <section className="card">
-        <div className="plan-title">
-          <h1>{title}</h1>
-          <div className="filters" role="group" aria-label="Rows">
-            <button type="button" aria-pressed={rows === 'jobs'} onClick={toggle('jobs')}>
-              Jobs
-            </button>
-            <button type="button" aria-pressed={rows === 'people'} onClick={toggle('people')}>
-              People
-            </button>
-            {/* Only once there are vehicles to plan (ADR 0047). */}
-            {(p.vans.length > 0 || rows === 'vans') && (
-              <button type="button" aria-pressed={rows === 'vans'} onClick={toggle('vans')}>
-                Vans
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="actions">
+      <div className="plan-bar">
+        <div className="steps">
           <a className="button" href={at({ day: step(-1) })} aria-label={`Previous ${scale}`}>
             ‹ Previous
           </a>
-          <a className="button" href={at({ day: now })}>
+          <a className="button" href={at({ day: now })} aria-current={days.includes(now) ? 'date' : undefined}>
             This {scale}
           </a>
           <a className="button" href={at({ day: step(1) })} aria-label={`Next ${scale}`}>
             Next ›
           </a>
         </div>
-        <p className="hint">{summary(p, scale)}</p>
-      </section>
+        <div className="filters" role="group" aria-label="Rows">
+          <button type="button" aria-pressed={rows === 'jobs'} onClick={toggle('jobs')}>
+            Jobs
+          </button>
+          <button type="button" aria-pressed={rows === 'people'} onClick={toggle('people')}>
+            People
+          </button>
+          {/* Only once there are vehicles to plan (ADR 0047). */}
+          {(p.vans.length > 0 || rows === 'vans') && (
+            <button type="button" aria-pressed={rows === 'vans'} onClick={toggle('vans')}>
+              Vans
+            </button>
+          )}
+        </div>
+      </div>
 
       <SortOut problems={p.problems} vanProblems={p.vanProblems} />
 
-      <section className="card">
+      <section className="card timeline-card" ref={card}>
         {lanes === 0 && (
           <p className="empty">
             {rows === 'jobs'
@@ -180,6 +180,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                       {scale === 'week' ? (
                         <>
                           {dayLabel(d)}
+                          {d === now && <small className="today-word">Today</small>}
                           {/* A public holiday (ADR 0024) is named on its day, so nobody counts it as a working day. */}
                           {p.holidays[d] && <small className="holiday-name">{p.holidays[d]}</small>}
                         </>
@@ -195,18 +196,23 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
               </thead>
               <tbody>
                 {rows === 'jobs'
-                  ? p.jobs.map((lane) => (
-                      <tr key={lane.key}>
-                        <JobName lane={lane} />
-                        {days.map((d) => (
-                          <td key={d} className={dayClass(d, now, p.holidays)}>
-                            {lane.days[d] && <JobDay lane={lane} cell={lane.days[d]} scale={scale} />}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
+                  ? p.jobs.map((lane) => {
+                      const joined = joins(days, (d) => lane.days[d] && jobRun(lane.days[d]))
+                      return (
+                        <tr key={lane.key}>
+                          <JobName lane={lane} />
+                          {days.map((d) => (
+                            <td key={d} className={dayClass(d, now, p.holidays)}>
+                              {lane.days[d] && <JobDay lane={lane} cell={lane.days[d]} scale={scale} join={joined[d]} />}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })
                   : rows === 'vans'
-                    ? p.vans.map((lane) => (
+                    ? p.vans.map((lane) => {
+                        const joined = scale === 'month' ? joins(days, (d) => codeRun(lane.days[d], (w) => w.held)) : {}
+                        return (
                         <tr key={lane.vehicle.id}>
                           <th scope="row">
                             <a href={vehicleHref(lane.vehicle.id)}>
@@ -215,11 +221,14 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                             {lane.vehicle.registration && <small>{lane.vehicle.registration}</small>}
                           </th>
                           {days.map((d) => (
-                            <VanDay key={d} lane={lane} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} />
+                            <VanDay key={d} lane={lane} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} join={joined[d]} />
                           ))}
                         </tr>
-                      ))
-                    : people.map((lane) => (
+                        )
+                      })
+                    : people.map((lane) => {
+                      const joined = scale === 'month' ? joins(days, (d) => codeRun(lane.days[d], (w) => w.booked)) : {}
+                      return (
                       <tr key={lane.person.id}>
                         <th scope="row">
                           <a href={personHref(lane.person.id)}>
@@ -228,10 +237,11 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
                           {lane.person.kind === 'staff' && <small>Staff</small>}
                         </th>
                         {days.map((d) => (
-                          <PersonDay key={d} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} />
+                          <PersonDay key={d} cell={lane.days[d]} scale={scale} className={dayClass(d, now, p.holidays)} join={joined[d]} />
                         ))}
                       </tr>
-                    ))}
+                      )
+                    })}
               </tbody>
             </table>
           </div>
@@ -265,6 +275,41 @@ function dayClass(d: string, now: string, holidays: Record<string, string>): str
   return [weekend && 'weekend', d in holidays && 'holiday', d === now && 'today'].filter(Boolean).join(' ') || undefined
 }
 
+/** How a day's block meets the days either side: a phase over several days reads as one bar, as on a wall planner. */
+type Join = 'l' | 'r' | 'lr' | undefined
+
+/**
+ * Days next to each other with the same run join up. A day with nothing on, or something to sort out, says undefined, so a clash or a
+ * check always stands on its own.
+ */
+function joins(days: readonly string[], run: (d: string) => string | undefined): Record<string, Join> {
+  const runs = days.map(run)
+  const out: Record<string, Join> = {}
+  days.forEach((d, i) => {
+    const l = !!runs[i] && runs[i] === runs[i - 1]
+    const r = !!runs[i] && runs[i] === runs[i + 1]
+    out[d] = l && r ? 'lr' : l ? 'l' : r ? 'r' : undefined
+  })
+  return out
+}
+
+/** A job's days join while they're the same phase, looking the same: a build over three days, not the build into the show. */
+function jobRun(cell: JobCell): string | undefined {
+  const phases = cell.phases.map((x) => x.name).join(' + ')
+  if (!phases) return undefined
+  return [phases, tone(cell), cell.stray].join('|')
+}
+
+/** A person's or a vehicle's day in a month joins the next while it's the same job, held the same way, with nothing to sort out. */
+function codeRun<W extends { job: string }>(cell: { work: W[]; severity: unknown } | undefined, held: (w: W) => boolean): string | undefined {
+  if (!cell || cell.severity || cell.work.length !== 1) return undefined
+  const w = cell.work[0]!
+  return `${w.job}|${held(w)}`
+}
+
+const tone = (cell: JobCell) => (cell.needed === 0 ? '' : cell.booked < cell.needed ? 'short' : 'full')
+const joinClass = (join: Join) => (join ? `join-${join}` : undefined)
+
 function JobName({ lane }: { lane: JobLane }) {
   return (
     <th scope="row">
@@ -276,7 +321,7 @@ function JobName({ lane }: { lane: JobLane }) {
 }
 
 /** A job's day: its phase, as the calendar titles it, and its crew. Amber when crew are still to find. */
-function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Scale }) {
+function JobDay({ lane, cell, scale, join }: { lane: JobLane; cell: JobCell; scale: Scale; join: Join }) {
   const phases = cell.phases.map((x) => x.label).join(', ')
   // Crew for a job rather than one of its phases can be on a day with no phase; that's only worth a look when their phase moved.
   const label = phases || (cell.stray ? 'No phase this day' : '')
@@ -284,15 +329,15 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
   const moved = phases && cell.stray ? 'Crew here from a phase that moved' : ''
   const vans = cell.vans?.length ? `Vehicles: ${cell.vans.join(', ')}` : ''
   const words = [label, crew, moved, ...(cell.late ?? []), vans].filter(Boolean).join(', ')
-  const tone = cell.needed === 0 ? '' : cell.booked < cell.needed ? 'short' : 'full'
-  const className = ['blk', lane.tentative ? 'dashed' : 'solid', tone, cell.stray && 'stray', lane.pending && 'pending'].filter(Boolean).join(' ')
+  const className = ['blk', lane.tentative ? 'dashed' : 'solid', tone(cell), cell.stray && 'stray', lane.pending && 'pending', joinClass(join)].filter(Boolean).join(' ')
   // The day opens its job, as the name does; a call from the Crew tab has no job to open.
   const Block = lane.jobId ? 'a' : 'div'
   const href = lane.jobId ? `#jobs/${lane.jobId}` : undefined
   if (scale === 'month')
     return (
       <Block className={className} href={href} title={`${lane.name}: ${words}`}>
-        <span aria-hidden="true">{cell.phases[0] ? phaseCode(cell.phases[0].name) : cell.stray ? '?' : '•'}</span>
+        {/* A run says its code once, on its first day. */}
+        <span aria-hidden="true">{join === 'l' || join === 'lr' ? '' : cell.phases[0] ? phaseCode(cell.phases[0].name) : cell.stray ? '?' : '•'}</span>
         <span className="sr-only">{words}</span>
       </Block>
     )
@@ -314,7 +359,7 @@ function JobDay({ lane, cell, scale }: { lane: JobLane; cell: JobCell; scale: Sc
 }
 
 /** A person's day: where they're booked, offered or unavailable, and a clash or a check to sort out. */
-function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; scale: Scale; className: string | undefined }) {
+function PersonDay({ cell, scale, className, join }: { cell: PersonCell | undefined; scale: Scale; className: string | undefined; join?: Join }) {
   const cls = [className, cell?.severity].filter(Boolean).join(' ') || undefined
   if (!cell) return <td className={cls} />
   const tag = cell.severity === 'clash' ? 'Clash' : cell.severity === 'check' ? 'Check' : ''
@@ -331,8 +376,8 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
     return (
       <td className={cls}>
         {/* Busy in their own calendar and nothing else: hatched and empty, the words for a screen reader and on hover (ADR 0044). */}
-        <div className={`code ${first ? (first.booked ? 'booked' : 'offered') : cell.away !== null ? 'away' : 'busy'}`} title={words}>
-          <span aria-hidden="true">{first ? initials(first.job) : cell.away !== null ? 'Off' : ''}</span>
+        <div className={['code', first ? (first.booked ? 'booked' : 'offered') : cell.away !== null ? 'away' : 'busy', joinClass(join)].filter(Boolean).join(' ')} title={words}>
+          <span aria-hidden="true">{join === 'l' || join === 'lr' ? '' : first ? initials(first.job) : cell.away !== null ? 'Off' : ''}</span>
           <span className="sr-only">{words}</span>
         </div>
       </td>
@@ -366,7 +411,7 @@ function PersonDay({ cell, scale, className }: { cell: PersonCell | undefined; s
 }
 
 /** A vehicle's day: the jobs it's on, with who drives, and off the road; a clash or a check as for a person. */
-function VanDay({ lane, cell, scale, className }: { lane: VanLane; cell: VanCell | undefined; scale: Scale; className: string | undefined }) {
+function VanDay({ lane, cell, scale, className, join }: { lane: VanLane; cell: VanCell | undefined; scale: Scale; className: string | undefined; join?: Join }) {
   const cls = [className, cell?.severity].filter(Boolean).join(' ') || undefined
   if (!cell) return <td className={cls} />
   const tag = cell.severity === 'clash' ? 'Clash' : cell.severity === 'check' ? 'Check' : ''
@@ -382,8 +427,8 @@ function VanDay({ lane, cell, scale, className }: { lane: VanLane; cell: VanCell
       .join('. ')
     return (
       <td className={cls}>
-        <div className={`code ${first ? (first.held ? 'booked' : 'offered') : 'away'}`} title={`${lane.vehicle.name}: ${words}`}>
-          <span aria-hidden="true">{first ? initials(first.job) : 'Off'}</span>
+        <div className={['code', first ? (first.held ? 'booked' : 'offered') : 'away', joinClass(join)].filter(Boolean).join(' ')} title={`${lane.vehicle.name}: ${words}`}>
+          <span aria-hidden="true">{join === 'l' || join === 'lr' ? '' : first ? initials(first.job) : 'Off'}</span>
           <span className="sr-only">{words}</span>
         </div>
       </td>
@@ -423,7 +468,6 @@ function Legend({ rows }: { rows: Rows }) {
       ? [
           ['blk solid', 'Confirmed'],
           ['blk dashed', 'Enquiry or quote'],
-          ['blk solid full', 'All crew found'],
           ['blk solid short', 'Crew still to find'],
           ['blk solid stray', 'Crew on a day their phase moved off'],
           ['swatch holiday', 'Public holiday'],
