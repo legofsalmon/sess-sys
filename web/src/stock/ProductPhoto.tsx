@@ -10,7 +10,7 @@ import { client } from '../sync.ts'
 import { useLate } from '../useLate.ts'
 
 /**
- * A product's photo on its page (ADR 0082): shown at its own shape, and put
+ * A product's photo on its page (ADR 0083): shown at its own shape, and put
  * up, changed or taken down by whoever changes stock. It's made small here
  * before it's sent, keeping its shape, as the best photo for a rack is
  * often of its wide front panel. It shows in the stock lists and on the

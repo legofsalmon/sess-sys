@@ -7,13 +7,13 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0082](adr/0082-product-photos-and-the-rack-sheet.md), part 3 of 3 of
+- [ADR 0083](adr/0083-product-photos-and-the-rack-sheet.md), part 3 of 3 of
   the advanced rack builder. A product can have a photo (`models.photo_*`,
   kept as people's photos are, changed by whoever changes stock, seen by
   everyone signed in), kept at its own shape; it shows on the product's
   page, in the lists, and on its panel in the rack, flat and in 3D. Print
   the rack sheet, on the rack's page and in the designer: front and back,
-  groups, what goes where and what's loose, black on white. App 1.39.0.
+  groups, what goes where and what's loose, black on white. App 1.40.0.
 - Checked: typecheck, unit tests (a product's photo put up, replaced,
   taken down, gone with the product, and who can), browser test
   (racks.spec.ts: a photo from the product's page on its panel, and the

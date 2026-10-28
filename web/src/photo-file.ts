@@ -1,7 +1,7 @@
 import { NOT_A_PHOTO } from '@sh/shared'
 
 /**
- * A photo made small on the device before it's sent (ADR 0065, ADR 0082):
+ * A photo made small on the device before it's sent (ADR 0065, ADR 0083):
  * a phone's photo of several megabytes goes as a few dozen kilobytes, comes
  * out the right way up, and where it was taken (its EXIF) stays behind.
  * A person's is the middle square; a product's keeps its shape, as a rack

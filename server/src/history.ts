@@ -662,7 +662,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Removed the product ${model(a.id)}`
     case 'model.mistake':
       return `Marked the product ${model(a.id)} as added by mistake`
-    // A product's photo (ADR 0082): that it changed, never the picture.
+    // A product's photo (ADR 0083): that it changed, never the picture.
     case PRODUCT_PHOTO_ACTIONS.put:
       return `${a.replaced ? 'Put a new photo' : 'Put a photo'} on the product ${model(a.id)}`
     case PRODUCT_PHOTO_ACTIONS.remove:

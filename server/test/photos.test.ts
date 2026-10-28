@@ -170,7 +170,7 @@ describe("a person's photo", () => {
 })
 
 /**
- * A product's photo (ADR 0082): put up, changed and taken down by whoever
+ * A product's photo (ADR 0083): put up, changed and taken down by whoever
  * changes stock, kept as a person's is, shown to everyone signed in, and
  * gone from the storage when it's replaced, removed or the product is.
  */

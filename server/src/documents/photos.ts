@@ -37,7 +37,7 @@ import { claimFile, queueFile } from './store.ts'
  * photo is sent back to be shown, not downloaded, and its address changes
  * with each new one, so a browser keeps it for as long as it likes.
  *
- * A product's photo (ADR 0082) is kept and sent the same way, put up and
+ * A product's photo (ADR 0083) is kept and sent the same way, put up and
  * taken down by whoever changes stock, and read by everyone signed in.
  */
 
@@ -90,7 +90,7 @@ export function removePhoto(db: Db, id: string, who: Who) {
 
 const NO_PRODUCT = () => new Refused({ code: 'not-found', message: "That product isn't in the stock list any more." })
 
-/** A photo put on a product (ADR 0082), in place of the one it had. */
+/** A photo put on a product (ADR 0083), in place of the one it had. */
 export function putProductPhoto(db: Db, files: DocumentFiles, id: string, data: Buffer, type: PhotoType, who: Who) {
   const args = { id, type, bytes: data.length }
   return withFile(files, data, (key) =>
@@ -197,7 +197,7 @@ export function registerPhotoRoutes(app: FastifyInstance, { db, files, onChange 
       put: (id, data, type, w) => putPhoto(db, files, id, data, type, w),
       remove: (id, w) => removePhoto(db, id, w),
     })
-    // A product's (ADR 0082): nobody's personal data, so whoever is signed in reads it.
+    // A product's (ADR 0083): nobody's personal data, so whoever is signed in reads it.
     routes({
       path: '/api/models/:id/photo',
       table: 'models',

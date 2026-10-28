@@ -91,12 +91,12 @@
 .warehouse .loose-lot h4 { font-size: var(--text-small); color: var(--muted); }
 .warehouse .usual-parts { display: grid; gap: var(--space-6); }
 
-/* A product's photo on its panel (ADR 0082), the name on it kept readable over it. */
+/* A product's photo on its panel (ADR 0083), the name on it kept readable over it. */
 .warehouse .rack-thing.with-photo { background: var(--photo) center / cover no-repeat, var(--panel); }
 .warehouse .rack-thing .thing-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .warehouse .rack-thing.with-photo .thing-name { padding: 0 .3em; border-radius: 3px; background: color-mix(in srgb, var(--panel) 85%, transparent); }
 
-/* The rack sheet on paper (ADR 0082): black on white whatever the theme, front and back side by side, then what goes where. */
+/* The rack sheet on paper (ADR 0083): black on white whatever the theme, front and back side by side, then what goes where. */
 @media print {
   .print-sheet.rack-sheet {
     --panel: #fff; --ink: #000; --muted: #444; --line: #bbb; --ds-line-strong: #555; --ds-surface-inset: #eee; --warn: #000; --accent: #000;

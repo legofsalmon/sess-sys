@@ -7,7 +7,7 @@ import { productPhotoOf } from '../Picture.tsx'
 /** What a thing in the rack is called there, and what's written on it: its label, else its product's name. */
 export const slotName = (s: SlotView) => s.label || s.model?.name || '?'
 
-/** A thing's look on the flat drawing: its tape as a swatch, its part, where it sits across (ADR 0079), and its product's photo (ADR 0082). */
+/** A thing's look on the flat drawing: its tape as a swatch, its part, where it sits across (ADR 0079), and its product's photo (ADR 0083). */
 export function thingStyle(s: SlotView, units: number): CSSProperties {
   const [from, to] = spanAcross(s.model?.rackWidth, s.across)
   const photo = productPhotoOf(s.model)

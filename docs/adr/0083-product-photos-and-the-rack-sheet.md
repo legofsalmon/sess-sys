@@ -1,4 +1,4 @@
-# ADR 0082: Product photos, on their panels in a rack, and the rack sheet
+# ADR 0083: Product photos, on their panels in a rack, and the rack sheet
 
 - **Status:** accepted (part 3 of 3 of a more advanced rack builder)
 - **Date:** 27 October 2026

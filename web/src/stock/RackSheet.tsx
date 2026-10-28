@@ -6,7 +6,7 @@ import { holderName, holdersIn } from './rack-look.ts'
 import { caseLabel, Elevation, LayoutTotals, sizeLabel } from './Racks.tsx'
 
 /**
- * A rack's sheet on paper (ADR 0082): to build it from in the warehouse and
+ * A rack's sheet on paper (ADR 0083): to build it from in the warehouse and
  * to tape inside its lid. The rack front and back as it's laid out, then
  * what goes where in words, top to bottom (label, product, group, tape and
  * notes), what's loose in it and in which drawer, and its weight, power and

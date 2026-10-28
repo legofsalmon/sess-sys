@@ -297,8 +297,8 @@ test("a product's photo on its panel in the rack, and the rack sheet printed", a
   const photo = page.getByRole('img', { name: `${amp}, as it looks` })
   await expect(photo).toHaveAttribute('src', new RegExp(`/api/models/amp-${id}/photo\\?v=`))
   await expect(page.getByText('Change photo')).toBeVisible()
-  const sent = await photo.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight])
-  expect(sent).toEqual([40, 4])
+  // Kept at its own shape, once the browser has it.
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight])).toEqual([40, 4])
 
   // On its panel in the rack, drawn flat, with its label over it.
   await page.goto(`/#stock/racks/rack-${id}`)

@@ -47,7 +47,7 @@ export function mayChangePhoto(role: Role | null | undefined, myPersonId: string
 export const readsPhotoOf = (r: Reading, personId: string) => (r.details ?? 'all') !== 'own' || r.personId === personId
 
 /**
- * A product's photo (ADR 0082), kept as a person's is, on its page, in the
+ * A product's photo (ADR 0083), kept as a person's is, on its page, in the
  * stock lists, and on its panel in a rack drawn flat or in 3D. Not squared:
  * a rack panel is wide, so the device keeps the photo's shape and makes its
  * longer side PRODUCT_PHOTO_SIDE. Nobody's personal data, so everyone signed

@@ -310,7 +310,7 @@ const MIGRATIONS: string[] = [
   ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS colour text CHECK (colour IN ('red', 'orange', 'yellow', 'green', 'blue', 'violet', 'white', 'grey', 'black'));
   ALTER TABLE rack_slots ADD COLUMN IF NOT EXISTS in_slot_id text REFERENCES rack_slots(id) ON DELETE SET NULL;
   `,
-  // A product's photo (ADR 0082), kept in the storage as a person's is (ADR
+  // A product's photo (ADR 0083), kept in the storage as a person's is (ADR
   // 0065), on the same list of files to delete when it's replaced or removed.
   `
   ALTER TABLE models ADD COLUMN IF NOT EXISTS photo_key text UNIQUE;

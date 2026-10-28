@@ -200,7 +200,7 @@ export type Model = z.infer<typeof model> & {
    */
   mistake: boolean
   /**
-   * Its photo (ADR 0082): when it was put up, which makes its address
+   * Its photo (ADR 0083): when it was put up, which makes its address
    * (productPhotoPath). Set by the server, never by an edit; none until
    * someone puts one up.
    */

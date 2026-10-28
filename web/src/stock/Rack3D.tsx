@@ -60,7 +60,7 @@ function roleColour(el: Element, role: string, fallback: string): THREE.Color {
  * A thing's panel: its label or name, a strip of its tape colour at the
  * left (content, as the tape is), and for a rack part (ADR 0079) what
  * makes it one: a vent's slots, a drawer's handle, a shelf's lip. With a
- * photo of the product (ADR 0082), the photo fills the panel and the name
+ * photo of the product (ADR 0083), the photo fills the panel and the name
  * sits on a patch of the panel's colour, so it's read over any photo.
  */
 function labelTexture(
@@ -162,7 +162,7 @@ export default function Rack3D({ r, held, heldModel, mayChange, bad, onHold, onP
     render: () => void
   }>(undefined)
   const [look, setLook] = useState<Look>('angle')
-  // Products' photos (ADR 0082), loaded once each; the rack is drawn again as each one comes in.
+  // Products' photos (ADR 0083), loaded once each; the rack is drawn again as each one comes in.
   const photos = useRef(new Map<string, HTMLImageElement | null>())
   const [photosIn, setPhotosIn] = useState(0)
   const [noGl, setNoGl] = useState(false)
