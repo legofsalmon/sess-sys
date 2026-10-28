@@ -38,7 +38,7 @@ test('is quiet when everything works, and looks again on request', async ({ page
   await page.goto('/#admin/status')
   await expect(page.getByRole('heading', { name: 'Everything is working' })).toBeVisible()
   await expect(page.locator('#status-database').getByText('Working')).toBeVisible()
-  await expect(page.getByText('What to do')).toHaveCount(0)
+  await expect(page.locator('.status-todo')).toHaveCount(0)
   await page.getByRole('button', { name: 'Check again' }).click()
   await expect.poll(() => asked).toBe(2)
 })
