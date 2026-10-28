@@ -325,15 +325,27 @@ const CASES: Case[] = [
  */
 const NOT_LAID_OVER: CommandName[] = ['person.newLink', 'person.erase', 'ownCalendar.stop']
 
-describe('a change shown while it waits, and once the server has it', () => {
-  it('covers every command', async () => {
-    const covered = new Set<string>([...CASES.map((k) => k.name), ...NOT_LAID_OVER])
-    expect(COMMAND_NAMES.filter((n) => !covered.has(n))).toEqual([])
-  })
+/**
+ * Each case builds a company of its own, a few seconds apiece, so the cases
+ * are dealt across parity-1 to parity-4.test.ts, which run side by side
+ * rather than one after another. Part 1 also checks every command is covered.
+ */
+export const PARTS = 4
 
-  for (const k of CASES)
-    it(`${k.name}${k.as ? `, ${k.as}` : ''}`, async () => {
-      const drift = await run(k)
-      expect(drift, drift.join('\n')).toEqual([])
+export function parity(part: number) {
+  describe(`a change shown while it waits, and once the server has it (part ${part} of ${PARTS})`, () => {
+    if (part === 1)
+      it('covers every command', async () => {
+        const covered = new Set<string>([...CASES.map((k) => k.name), ...NOT_LAID_OVER])
+        expect(COMMAND_NAMES.filter((n) => !covered.has(n))).toEqual([])
+      })
+
+    CASES.forEach((k, i) => {
+      if (i % PARTS !== part - 1) return
+      it(`${k.name}${k.as ? `, ${k.as}` : ''}`, async () => {
+        const drift = await run(k)
+        expect(drift, drift.join('\n')).toEqual([])
+      })
     })
-})
+  })
+}

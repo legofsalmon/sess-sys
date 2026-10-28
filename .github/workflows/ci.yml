@@ -12,8 +12,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The server tests and the browser tests run side by side on machines of
+# their own, and the browser tests are split three ways, each third with a
+# server of its own, so a run takes as long as its slowest part rather than
+# all of them end to end.
 jobs:
-  check:
+  server:
+    name: Server tests
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -38,11 +43,39 @@ jobs:
         run: npm test
         env:
           TEST_DATABASE_URL: postgres://sh:sh@localhost:5432/sh_test
+      - name: Blueprint builds
+        run: npm run build:hub
+
+  e2e:
+    name: Browser tests (${{ matrix.shard }} of 3)
+    runs-on: ubuntu-latest
+    strategy:
+      # Every third reports, so one failing doesn't hide another's.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Build the web app
         run: npm run build:web
       - name: Offline end-to-end test
         run: |
           npx playwright install --with-deps chromium
-          npx playwright test
-      - name: Blueprint builds
-        run: npm run build:hub
+          npx playwright test --shard=${{ matrix.shard }}/3
+
+  # The one check that says the run passed, under the name it has always had,
+  # so whatever waits on "check" (merging, Railway's deploys) still does.
+  check:
+    needs: [server, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every part passed
+        run: |
+          echo "server: ${{ needs.server.result }}, browser: ${{ needs.e2e.result }}"
+          test "${{ needs.server.result }}" = success && test "${{ needs.e2e.result }}" = success
