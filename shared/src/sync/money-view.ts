@@ -116,6 +116,11 @@ export interface MoneyView {
   pricePending(kind: 'product' | 'role' | 'client', key: string): boolean
   /** Every role with a price, and every role crew have been asked for, by name. */
   roles: { role: string; cents: number | undefined; booked: number | undefined }[]
+  /**
+   * The day rate a crew line's crew are booked at (ADR 0089): its crew call's, else the rate anyone's been booked at
+   * for its role; undefined when nobody has.
+   */
+  bookedRate(jobId: string, line: { ref: string | null; what: string }): number | undefined
   /** A job's kit and crew, as a new quote is built from them. */
   sourceOf(jobId: string): { kit: KitToQuote[]; crew: CrewToQuote[] }
   /** Each job with a quote or a freelancer's cost, soonest first. */
@@ -407,6 +412,7 @@ export function moneyView(
           ...(l.phase ? { phase: l.phase.name } : {}),
           qty: l.qty,
           days: span(l.span),
+          ...(l.subhireQty ? { subhireQty: l.subhireQty, supplier: l.supplier } : {}),
         })
       ),
       crew: job.calls
@@ -438,6 +444,13 @@ export function moneyView(
     pricePending: (kind, key) => (kind === 'product' ? gone.product.has(key) : kind === 'role' ? gone.role.has(roleKey(key)) : gone.client.has(key)),
     roles: [...roleList.values()].sort((a, b) => a.role.localeCompare(b.role, 'en-IE')),
     sourceOf,
+    bookedRate: (jobId, line) => {
+      const call = line.ref ? jobs.jobs.find((j) => j.id === jobId)?.calls.find((c) => c.id === line.ref) : undefined
+      if (call?.dayRateCents != null) return call.dayRateCents
+      // "Audio tech (Show)": the role, without the phase it's for.
+      const role = (w: string) => roleList.get(roleKey(w))?.booked
+      return role(line.what) ?? role(line.what.replace(/\s*\([^)]*\)$/, ''))
+    },
     jobs: jobList,
     job: (jobId) => jobMoney.get(jobId),
     months: [...months.values()].sort((a, b) => a.key.localeCompare(b.key)),

@@ -253,6 +253,16 @@ describe('a package (ADR 0087)', () => {
   })
 })
 
+describe('the cost side of a line (ADR 0089)', () => {
+  it('keeps how many are hired in, who from and what a line costs, with the supplier trimmed, and refuses a cost below nothing', async () => {
+    const { app, quote } = await gala()
+    await ok(app, save('q1', [line({ qty: 8, subhireQty: 2, supplier: '  Hire Co ', costCents: 15000 })]))
+    expect((await quote('q1')).lines[0]).toMatchObject({ qty: 8, subhireQty: 2, supplier: 'Hire Co', costCents: 15000 })
+    expect(await refused(app, save('q1', [line({ costCents: -5 })]))).toBe("A price can't be less than nothing.")
+    expect(await refused(app, save('q1', [line({ subhireQty: 1.5 })]))).toBe('How many are hired in is a whole number from 0 to 10,000.')
+  })
+})
+
 describe("a freelancer's cost", () => {
   it('is marked paid only once approved, and the timesheet then stays approved', async () => {
     const { app } = await gala()

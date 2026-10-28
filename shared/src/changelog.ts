@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.46.0',
+    version: '1.47.0',
     date: '2026-10-28',
     title: 'Quotes has a place of its own',
     what: 'Quotes is now in the sidebar on a computer, after Jobs, and on the Menu on a phone. It has the quotes to follow up and a New quote button, which were on Money, and every quote in one list, to find by job, client, venue, quote number or invoice, or narrow to those not sent, sent, accepted or turned down. Only the office and directors see it.',
     prs: [146],
     adrs: [88],
+  },
+  {
+    version: '1.46.0',
+    date: '2026-10-28',
+    title: 'Enough kit, hired-in kit, transport and margin on quotes',
+    what: 'Each kit line on a quote now checks there’s enough on the job’s days, against what other jobs have out. A line that’s short says by how many and when, and “Hire in” marks that many as hired in. Kit lines can say how many are hired in and who from, and any line can say what it costs us. “Add transport” adds a van booked on the job, or transport typed, charged once with its cost. The office and directors see what each line makes, and the whole quote’s margin at the top while it’s put together. None of the costs or the margin is printed.',
+    prs: [147],
+    adrs: [89],
   },
   {
     version: '1.45.1',
