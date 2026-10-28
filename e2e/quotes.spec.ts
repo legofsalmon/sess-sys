@@ -217,3 +217,49 @@ test('kit charged by the week, a line discounted, and a total agreed with the cl
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
+
+test("the crew's travel to a venue far from Dublin, and their subsistence unless meals are provided (ADR 0086)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+
+  // Admin says how they're charged: past 50 km, diesel at €1.749, a van using 10 litres for 100 km, €39.08 a day each.
+  await office.goto('/#admin')
+  const travel = office.getByRole('region', { name: 'Travel and subsistence' })
+  await travel.getByLabel('Travel after').fill('50')
+  await travel.getByLabel('Fuel price, € a litre').fill('1.749')
+  await travel.getByLabel('A van uses, litres for 100 km').fill('10')
+  await travel.getByLabel('Per diem, € a day').fill('39.08')
+  await travel.getByRole('button', { name: 'Save travel and subsistence' }).click()
+  await expect(office.locator('.conn')).toHaveText('Up to date')
+  await expect(travel).toContainText('Set today.')
+  await expect(travel).toContainText('So 100 km each way comes to €34.98 of fuel for one van.')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  const extras = draft.getByRole('group', { name: 'Travel and subsistence' })
+
+  // The crew's subsistence comes in by itself; the venue is in Dublin, so there's no travel until it's said to be 200 km.
+  await expect(extras).toContainText(/Crew subsistence, \d+ crew days?/)
+  await expect(extras).toContainText('No travel')
+  await extras.getByLabel('Distance each way from Dublin city centre, km').fill('200')
+  await expect(extras).toContainText('Travel, 200 km each way from Dublin')
+  await expect(extras).toContainText('€69.96')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
+  // The job feeds the crew: no subsistence.
+  await extras.getByRole('switch', { name: /Meals provided/ }).check()
+  await expect(extras).toContainText('No subsistence')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Travel, 200 km each way from Dublin')
+  await expect(printed).not.toContainText('Crew subsistence')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})

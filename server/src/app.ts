@@ -46,6 +46,7 @@ import { registerStockImportRoutes, type StockImportRound } from './stock/import
 import { takeTurns } from './turns.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 import { nominatim, registerPlaceRoutes, type PlaceSearch } from './projects/places.ts'
+import { aaFuel, registerFuelRoutes, type FuelLookup } from './finance/fuel.ts'
 import { RmsApi, type RmsConfig } from './rms/api.ts'
 import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
@@ -130,6 +131,8 @@ export interface AppOptions {
   ownCalendars?: OwnCalendarsOptions
   /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
   places?: PlaceSearch
+  /** The fuel price from AA Ireland's survey (ADR 0086), unless a test stands in for it. */
+  fuel?: FuelLookup
   /** Current RMS's API, read only (ADR 0078): the subdomain and key. Without it Admin says it isn't set up. */
   currentRms?: RmsConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
@@ -569,6 +572,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerItemLogRoutes(app, { db })
   registerNoticeRoutes(app, { db })
   registerPlaceRoutes(app, { search: options.places ?? nominatim() })
+  registerFuelRoutes(app, { lookup: options.fuel ?? aaFuel() })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
   const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)

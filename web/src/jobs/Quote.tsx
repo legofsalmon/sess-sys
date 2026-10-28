@@ -43,6 +43,11 @@ import {
   validUntil,
   versionChanges,
   type QuoteSettings,
+  extrasFor,
+  travelSettingsOf,
+  FUEL_PRICE_FRESH_DAYS,
+  type Extras,
+  type Pin,
 } from '@sh/shared'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -416,7 +421,8 @@ const sameLine = (a: QuoteLine, b: QuoteLine) =>
   (a.modelId ?? null) === (b.modelId ?? null) &&
   (a.rate ?? null) === (b.rate ?? null) &&
   (a.out ?? null) === (b.out ?? null) &&
-  (a.discountPct ?? 0) === (b.discountPct ?? 0)
+  (a.discountPct ?? 0) === (b.discountPct ?? 0) &&
+  (a.extra ?? null) === (b.extra ?? null)
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
 /** What a typed line comes to, or why it can't be saved. */
@@ -493,7 +499,10 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const today = useToday()
   const m = view.money
   const under = useUnderTop<HTMLFormElement>(true)
-  const [lines, setLines] = useState<LineDraft[]>(() => q.lines.map(toDraft))
+  // Travel and subsistence (ADR 0086) aren't typed: they're worked out below from the rest, so they're kept apart.
+  const [lines, setLines] = useState<LineDraft[]>(() => q.lines.filter((l) => !l.extra).map(toDraft))
+  const [meals, setMeals] = useState(q.mealsProvided ?? false)
+  const [kmTyped, setKmTyped] = useState(q.travelKm == null ? '' : String(q.travelKm))
   const [discount, setDiscount] = useState(String(q.discountPct))
   // A price agreed for the whole (ADR 0085) stands in for the discount percentage while it's there.
   const [agreed, setAgreed] = useState(q.agreedCents == null ? '' : euroText(q.agreedCents))
@@ -519,7 +528,20 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const good = read.filter((l): l is QuoteLine => typeof l !== 'string')
   const agreedRead = agreed.trim() ? parseEuro(agreed) : undefined
   const agreedCents = agreedRead?.cents ?? null
-  const totals = quoteTotals({ lines: good, discountPct: pctOk ? pct : 0, agreedCents })
+  const kmRead = kmTyped.trim() ? num(kmTyped) : null
+  const kmOk = kmRead === null || (Number.isInteger(kmRead) && kmRead >= 0 && kmRead <= 2000)
+  const extras = extrasFor({
+    lines: good,
+    settings: travelSettingsOf(m.quoting),
+    pin: pinOf(job),
+    typedKm: kmOk ? kmRead : null,
+    vehicles: new Set(view.vehicles.ofJob(job.id).map((b) => b.vehicleId)).size,
+    mealsProvided: meals,
+    ids: Object.fromEntries(q.lines.filter((l) => l.extra).map((l) => [l.extra!, l.id])),
+    newId: useStableIds(),
+  })
+  const all = [...good, ...extras.lines]
+  const totals = quoteTotals({ lines: all, discountPct: pctOk ? pct : 0, agreedCents })
   const valid = num(validFor)
   const validOk = Number.isInteger(valid) && valid >= 1 && valid <= 365
   const dep = deposit.trim() ? num(deposit) : null
@@ -530,6 +552,8 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
       ? `The price agreed: ${agreedRead.reason}`
       : agreedCents !== null && agreedCents > totals.subtotal
         ? `The price agreed is more than the lines come to (${money(totals.subtotal)}). Agree a lower price, or change the lines.`
+        : !kmOk
+        ? 'The distance is a whole number of km from 0 to 2,000, or nothing to take it from the map.'
         : !pctOk
       ? 'A discount is a percentage from 0 to 100, such as 10 or 12.5.'
       : !validOk
@@ -539,8 +563,11 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
           : undefined)
   // Saved: what's typed comes to what the draft holds.
   const saved =
-    read.length === q.lines.length &&
-    read.every((l, i) => typeof l !== 'string' && sameLine(l, q.lines[i]!)) &&
+    read.length + extras.lines.length === q.lines.length &&
+    read.every((l) => typeof l !== 'string') &&
+    all.every((l, i) => sameLine(l, q.lines[i]!)) &&
+    meals === (q.mealsProvided ?? false) &&
+    kmRead === (q.travelKm ?? null) &&
     pct === q.discountPct &&
     agreedCents === (q.agreedCents ?? null) &&
     q.notes.trim() === notes.trim() &&
@@ -550,7 +577,10 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
 
   // The draft saves itself a moment after typing stops, once it reads as a quote: there's no Save to forget. Leaving
   // the page saves what's waiting at once. Saving goes through the device's queue, so it works with no signal.
-  const payload = !saved && !problem ? { id: q.id, projectId: job.id, lines: good, discountPct: pct, agreedCents, notes, validDays: valid, depositPct: dep } : undefined
+  const payload =
+    !saved && !problem
+      ? { id: q.id, projectId: job.id, lines: all.slice(0, MAX_LINES), discountPct: pct, agreedCents, notes, validDays: valid, depositPct: dep, mealsProvided: meals, travelKm: kmRead }
+      : undefined
   const waiting = useRef(payload)
   waiting.current = payload
   const flush = () => {
@@ -677,6 +707,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
           {g.lines.length > 1 && <GroupDiscount group={g.group} onApply={(off) => groupDiscount(g.group, off)} refuse={refuse} />}
         </fieldset>
       ))}
+      <TravelAndSubsistence extras={extras} meals={meals} setMeals={setMeals} km={kmTyped} setKm={setKmTyped} fuelSetOn={m.quoting.fuelSetOn ?? null} today={today} />
       {removed && (
         <p className="undo-line" aria-live="polite">
           Removed “{removed.line.what || 'a line'}”.{' '}
@@ -799,6 +830,74 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
         </div>
       )}
     </form>
+  )
+}
+
+/** Where a job is on the map: its venue's pin, or else the first of its phases' venues that has one. */
+const pinOf = (job: JobView): Pin | null => job.venue?.pin ?? job.phases.find((p) => p.venue?.pin)?.venue?.pin ?? null
+
+/** New ids that stay the same from one draw to the next, so a line worked out afresh isn't a change each time. */
+function useStableIds() {
+  const made = useRef<string[]>([])
+  let n = 0
+  return () => (made.current[n++] ??= newId())
+}
+
+/** Days since a day, for how old the fuel price is. */
+const daysSince = (from: string, today: string) => Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000)
+
+/**
+ * The crew's travel and subsistence (ADR 0086), worked out by the quote: the lines it comes to, or why there isn't one,
+ * with the two things the office says about this job: the distance, if the map's is wrong, and whether the job gives
+ * the crew their meals.
+ */
+function TravelAndSubsistence(p: { extras: Extras; meals: boolean; setMeals: (b: boolean) => void; km: string; setKm: (s: string) => void; fuelSetOn: string | null; today: string }) {
+  const { travel, subsistence, lines } = p.extras
+  const line = (extra: 'travel' | 'subsistence') => lines.find((l) => l.extra === extra)
+  const t = line('travel')
+  const s = line('subsistence')
+  const old = t && p.fuelSetOn && daysSince(p.fuelSetOn, p.today) > FUEL_PRICE_FRESH_DAYS
+  return (
+    <fieldset className="quote-group quote-extras">
+      <legend>Travel and subsistence</legend>
+      <div className="quote-extra">
+        <div className="extra-line">
+          <span className="what">{t ? t.what : 'No travel'}</span>
+          <span className="how">{t ? `${t.qty === 1 ? '' : `${t.qty} × `}${money(t.unitCents)} of fuel there and back` : travel.none}</span>
+          <span className="amount">{t ? money(lineCents(t)) : '–'}</span>
+        </div>
+        <label className="field extra-km">
+          Distance each way
+          <span className="with-unit">
+            <input inputMode="numeric" value={p.km} onChange={(e) => p.setKm(e.target.value)} placeholder={travel.from === 'none' ? 'km' : String(travel.km)} aria-label="Distance each way from Dublin city centre, km" />
+            km
+          </span>
+          <small>
+            {p.km.trim()
+              ? 'As typed. Clear it to take it from the map again.'
+              : travel.from === 'map'
+                ? "From the venue's pin, a fifth more than a straight line for the roads. Type the real distance if it's out."
+                : 'From Dublin city centre to the venue.'}
+          </small>
+        </label>
+        {old && <p className="warn-line">The fuel price was set {daysSince(p.fuelSetOn!, p.today)} days ago. Check it in Admin › Company.</p>}
+      </div>
+      <div className="quote-extra">
+        <div className="extra-line">
+          <span className="what">{s ? s.what : 'No subsistence'}</span>
+          <span className="how">{s ? `${s.qty} × ${money(s.unitCents)} a day` : subsistence.none}</span>
+          <span className="amount">{s ? money(lineCents(s)) : '–'}</span>
+        </div>
+        <label className="signal">
+          <input type="checkbox" role="switch" checked={p.meals} onChange={(e) => p.setMeals(e.target.checked)} />
+          <span>
+            <b>Meals provided</b>
+            <small>{p.meals ? 'The job gives the crew their meals, so no subsistence is charged.' : 'On if the job gives the crew their meals.'}</small>
+          </span>
+        </label>
+      </div>
+      <p className="hint">Worked out from the crew lines, the venue and Admin's rates, and kept up to date as they change.</p>
+    </fieldset>
   )
 }
 
