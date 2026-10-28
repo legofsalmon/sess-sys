@@ -205,6 +205,12 @@ export interface QuoteSettings {
   perDiemCents?: number | null
   /** The day the fuel price was last set, so the office can see when it wants checking. */
   fuelSetOn?: string | null
+  /** Whether the server takes each new month's price from the AA's survey by itself; on unless turned off. */
+  fuelAuto?: boolean
+  /** The AA survey the fuel price came from, "October 2026"; null for one typed in. */
+  fuelMonth?: string | null
+  /** How many of the crew share a car to a job (ADR 0086): each car load is a trip. One unless set. */
+  crewPerCar?: number
 }
 export const QUOTE_SETTINGS_ID = 'quoting'
 
@@ -266,6 +272,7 @@ const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMB
 const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
 /** A price agreed for the whole quote, before VAT. */
 const agreedCents = euroCents(10_000_000_00, 'The price agreed')
+const CAR_HINT = 'How many share a car is a whole number from 1 to 8.'
 const KM_HINT = 'The distance is a whole number of km from 0 to 2,000.'
 const travelKm = z.number({ invalid_type_error: KM_HINT }).int(KM_HINT).min(0, KM_HINT).max(2000, KM_HINT)
 const FROM_HINT = 'Travel starts at a whole number of km from 0 to 1,000.'
@@ -319,6 +326,11 @@ export const quoteCommandSchemas = {
     litresPer100Km: fuelUse,
     perDiemCents: euroCents(1000_00, 'A per diem').nullable(),
     on: day,
+    // Left as they were by a save from an app older than them.
+    fuelAuto: z.boolean().optional(),
+    /** The AA survey a price read with "Read the AA's price" came from; null for one typed in. */
+    fuelMonth: text(40, "The survey's month").nullable().optional(),
+    crewPerCar: z.number({ invalid_type_error: CAR_HINT }).int(CAR_HINT).min(1, CAR_HINT).max(8, CAR_HINT).optional(),
   }),
   /** A product's day price; null takes it off the price list. */
   'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable(), rate: z.enum(RATE_RULES).optional() }),

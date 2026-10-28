@@ -266,6 +266,8 @@ const CASES: Case[] = [
   c('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }),
   c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: today }),
   c('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: null, on: today }, { as: 'the fuel price the same', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: day(-3) })] }),
+  c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 214.8, litresPer100Km: 10, perDiemCents: null, on: today, fuelMonth: 'October 2026', fuelAuto: false }, { as: 'read from the AA, kept from then on' }),
+  c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 180, litresPer100Km: 10, perDiemCents: null, on: today }, { as: 'a price typed over the AA’s', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 214.8, litresPer100Km: 10, perDiemCents: null, on: today, fuelMonth: 'October 2026' })] }),
   c('quoting.update', { nextNumber: null, terms: '', bank: '' }, { as: 'keeping travel', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: today })] }),
   c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY, { ...DELIVERY, id: 't1', what: 'Travel, 120 km each way from Dublin', group: 'Travel and subsistence', per: 'once', extra: 'travel' }], discountPct: 0, notes: '', mealsProvided: true, travelKm: 120 }, { as: 'with travel, meals provided' }),
   c('quote.answer', { id: 'q1', answer: 'accepted', on: today }, { as: 'accepted' }),

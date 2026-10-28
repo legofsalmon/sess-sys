@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
-import { aaFuel, readAaPage } from '../src/finance/fuel.ts'
+import { irishToday, newId, type QuoteSettings } from '@sh/shared'
+import { aaFuel, FuelUpdates, readAaPage, takeAaPrice, type FuelLookup } from '../src/finance/fuel.ts'
 
 /**
  * The fuel price from AA Ireland's monthly survey (ADR 0086): read from
@@ -52,5 +53,43 @@ describe("the AA's fuel price (ADR 0086)", () => {
     const res = await bad.inject({ url: '/api/fuel-price' })
     expect(res.statusCode).toBe(502)
     expect(res.json().error).toMatch(/type the diesel price in/)
+  })
+
+  it("takes each new month's price by itself, once, unless turned off, and not one far from the last", async () => {
+    const db = await pgliteDb()
+    const app = await buildApp({ db })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    const settings = async (): Promise<QuoteSettings> => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'quoteSettings').at(-1)?.data
+    let found = { centsPerLitre: 214.8, month: 'October 2026', source: 'aa' }
+    const lookup: FuelLookup = async () => found
+
+    // Nothing set yet: the price comes in with travel's defaults, and the history says the server took it.
+    expect(await takeAaPrice(db, lookup)).toBe('October 2026')
+    expect(await settings()).toMatchObject({ fuelCentsPerLitre: 214.8, fuelMonth: 'October 2026', fuelSetOn: irishToday(), fuelAuto: true, travelFromKm: 50, litresPer100Km: 6.5, crewPerCar: 1 })
+    const history = (await app.inject({ url: '/api/history' })).json()
+    expect(history.entries[0].what).toBe("Took the fuel price from the AA's October 2026 survey: 214.8c a litre")
+    // The same month again changes nothing.
+    expect(await takeAaPrice(db, lookup)).toBeUndefined()
+
+    // A month that reads a long way from the last isn't taken without someone looking.
+    found = { centsPerLitre: 99.9, month: 'November 2026', source: 'aa' }
+    await expect(takeAaPrice(db, lookup)).rejects.toThrow(/too far/)
+    found = { centsPerLitre: 209.9, month: 'November 2026', source: 'aa' }
+    // The daily look takes it, once a day.
+    const updates = new FuelUpdates(db, lookup, { changed: () => {} })
+    expect(await updates.run()).toBe('November 2026')
+    expect(await updates.run()).toBeUndefined()
+    expect(await settings()).toMatchObject({ fuelCentsPerLitre: 209.9, fuelMonth: 'November 2026' })
+
+    // Turned off, a typed price stays, and came from no survey.
+    const mutate = (args: object) => app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'office', mutations: [{ id: newId(), name: 'quoting.travel', args, createdAt: new Date().toISOString() }] } })
+    await mutate({ travelFromKm: 50, fuelCentsPerLitre: 180, litresPer100Km: 10, perDiemCents: null, on: irishToday(), fuelAuto: false })
+    expect(await settings()).toMatchObject({ fuelCentsPerLitre: 180, fuelMonth: null, fuelAuto: false })
+    found = { centsPerLitre: 205, month: 'December 2026', source: 'aa' }
+    expect(await takeAaPrice(db, lookup)).toBeUndefined()
+    expect((await settings()).fuelCentsPerLitre).toBe(180)
   })
 })

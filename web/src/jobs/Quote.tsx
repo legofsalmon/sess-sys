@@ -535,7 +535,6 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
     settings: travelSettingsOf(m.quoting),
     pin: pinOf(job),
     typedKm: kmOk ? kmRead : null,
-    vehicles: new Set(view.vehicles.ofJob(job.id).map((b) => b.vehicleId)).size,
     mealsProvided: meals,
     ids: Object.fromEntries(q.lines.filter((l) => l.extra).map((l) => [l.extra!, l.id])),
     newId: useStableIds(),
@@ -863,7 +862,7 @@ function TravelAndSubsistence(p: { extras: Extras; meals: boolean; setMeals: (b:
       <div className="quote-extra">
         <div className="extra-line">
           <span className="what">{t ? t.what : 'No travel'}</span>
-          <span className="how">{t ? `${t.qty === 1 ? '' : `${t.qty} × `}${money(t.unitCents)} of fuel there and back` : travel.none}</span>
+          <span className="how">{t ? `${t.qty} × ${money(t.unitCents)}, a car's fuel there and back` : travel.none}</span>
           <span className="amount">{t ? money(lineCents(t)) : '–'}</span>
         </div>
         <label className="field extra-km">
