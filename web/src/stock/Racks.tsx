@@ -31,7 +31,7 @@ import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
 import { Top } from '../jobs/common.tsx'
-import { Thumb } from '../Picture.tsx'
+import { productPhotoOf, Thumb } from '../Picture.tsx'
 import { ProductPicker } from '../ProductPicker.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
@@ -39,6 +39,7 @@ import { client } from '../sync.ts'
 import { StockViews } from '../Views.tsx'
 import { numberLabel } from './common.tsx'
 import { slotName, thingClass, thingStyle } from './rack-look.ts'
+import { PrintRackSheet } from './RackSheet.tsx'
 import './racks.css'
 
 /**
@@ -118,7 +119,7 @@ function RackRow({ r }: { r: RackView }) {
   return (
     <li>
       <a className="job-row" href={`#stock/product/${m.id}`}>
-        <Thumb icon="case" />
+        <Thumb icon="case" src={productPhotoOf(r.model)} />
         <div>
           <b>{m.name}</b>
           <p>{[m.code, sizeLabel(m), things ? plural(things, 'thing') + ' in its layout' : 'Nothing laid out yet'].filter(Boolean).join(' · ')}</p>
@@ -388,9 +389,12 @@ export function RackCard({ view, r }: { view: View; r: RackView }) {
       ) : (
         <>
           <LayoutTotals r={r} />
-          <a className="button" href={`#stock/racks/${r.model.id}`}>
-            Design it
-          </a>
+          <div className="actions">
+            <a className="button" href={`#stock/racks/${r.model.id}`}>
+              Design it
+            </a>
+            <PrintRackSheet r={r} />
+          </div>
           <div className="rack-sides">
             <Elevation r={r} side="front" />
             <Elevation r={r} side="rear" />
@@ -434,7 +438,7 @@ export function RackCard({ view, r }: { view: View; r: RackView }) {
 }
 
 /** One side of a rack drawn unit by unit, top to bottom, as a rack is numbered. */
-function Elevation({ r, side }: { r: RackView; side: RackSide }) {
+export function Elevation({ r, side }: { r: RackView; side: RackSide }) {
   const placed = r.slots.filter((s) => s.top !== null && s.side === side)
   const lowest = Math.max(r.model.units ?? 0, ...placed.map((s) => s.top! + (s.model?.units ?? 1) - 1), 1)
   const bad = new Set(r.layout.problems.map((p) => p.slotId))
@@ -456,7 +460,7 @@ function Elevation({ r, side }: { r: RackView; side: RackSide }) {
               style={thingStyle(s, units)}
               title={[s.model?.name, s.group].filter(Boolean).join(' · ')}
             >
-              {s.model?.rackPart === 'blank' && !s.label ? '' : slotName(s)}
+              {s.model?.rackPart === 'blank' && !s.label ? '' : <span className="thing-name">{slotName(s)}</span>}
             </span>
           )
         })}

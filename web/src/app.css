@@ -146,6 +146,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .avatar[data-initials]::before { content: attr(data-initials); }
 .avatar:has(> img)::before { display: none; }
 .thumb > img, .avatar > img { width: 100%; height: 100%; object-fit: cover; }
+.thumb > img { object-fit: contain; }
 .thumb > .icon, .avatar > .icon { width: 50%; height: 50%; }
 .thumb-small, .avatar-small { --pic: 32px; }
 .thumb-large, .avatar-large { --pic: 88px; }

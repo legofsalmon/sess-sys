@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.39.1',
+    version: '1.40.1',
     date: '2026-10-28',
     title: 'Long pages in parts',
     what: 'Admin, a person’s page and a product’s page now show one part at a time, picked from a row at the top, as a job’s page already did. Admin is Company, Connections and Data; a person is Coming up, Details, Documents, Worked and Their link; a product is Details, On jobs, Items and Faults. The part you looked at last opens next time, and a new product opens where its items are added. A job’s name, status, client, venue, dates, crew and kit now sit at the top of its page, and its steps open when you press one.',
     prs: [137],
     adrs: [82],
+  },
+  {
+    version: '1.40.0',
+    date: '2026-10-28',
+    title: 'Photos of kit, and the rack sheet',
+    what: 'A product can now have a photo: open it in Stock and press Add a photo. A photo of its front panel shows on it in the rack designer, flat and in 3D, so a rack on screen looks like the one in the truck, and the photo shows in the stock lists and on a job’s kit too. Each rack also prints as a sheet to build it from: Print the rack sheet, on the rack’s page or in the designer, gives the front and back drawn side by side, then what goes where in words, with labels, groups, tape colours and notes, what’s in each drawer, and its weight and power.',
+    prs: [139],
+    adrs: [83],
   },
   {
     version: '1.39.0',

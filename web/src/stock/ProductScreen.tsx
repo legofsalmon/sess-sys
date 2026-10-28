@@ -55,6 +55,7 @@ import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
 import { TabPanel, Tabs, useTab } from '../Tabs.tsx'
 import { kitIcon } from './kitIcon.ts'
+import { ProductPhoto } from './ProductPhoto.tsx'
 import { STOCK } from '../Up.tsx'
 import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
@@ -187,6 +188,7 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   const hidden = [m.items.length > 0 && plural(m.items.length, 'item'), m.countedTotal > 0 && `${m.countedTotal.toLocaleString('en-IE')} counted`].filter(Boolean)
   return (
     <section className="card" aria-label="Details">
+      <ProductPhoto m={m} />
       <dl className="facts">
         {m.aliases.length > 0 && (
           <div>
