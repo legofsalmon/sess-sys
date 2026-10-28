@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- Finding 10 of the [20 October audit](audit-2026-10-20.md) (PR #137, Colly
+- Finding 10 of the [20 October audit](audit-2026-10-20.md) (PR #138, Colly
   chose "Directors only"): a director's email, type, main address and
   combining need a director, and no command gives the sender's own sign-in
   address to another person, so the office can't take a director's account

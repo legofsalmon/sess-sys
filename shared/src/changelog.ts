@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-27',
     title: 'Only a director changes how a director signs in',
     what: "A director's email, type and main address, and combining someone with a director, now need a director: the office can no longer change them. Nobody can give the address they sign in with to someone else on the Crew tab. The office still corrects everyone else's addresses.",
-    prs: [137],
+    prs: [138],
   },
   {
     version: '1.38.1',
