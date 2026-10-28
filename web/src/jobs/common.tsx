@@ -32,13 +32,36 @@ export function useHash(): string {
  * sync state and dark or light (ADR 0036); after it, the parts of the
  * screen (ADR 0033), which put themselves on the parts. Under the name, the area; on the demo copy, whose
  * eyes it's seen through instead, the name taking you back to choose
- * again. On an area's own screen (`root`) the area's name follows as the
- * screen's title, so Jobs, Stock and Crew read as different places; a
- * record's page has its own title instead. `aside` goes top right, before
+ * again. Then the page's head, the same on every screen and outside any
+ * card, so where you are is always in one place: the area's row of pages
+ * (`views`), then the title naming this page (`heading`: Calls, Labels, a
+ * job's name; on an area's own screen with none, `root`, the area's name),
+ * with a line about it under (`sub`). `aside` goes top right, before
  * the sync state: Home's date. Every page under an area's own screen has
  * `up`, the way back up to it (Up.tsx), in the bar so it stays in view.
  */
-export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: View; title?: string; root?: boolean; aside?: ReactNode; up?: Trail }) {
+export function Top({
+  view,
+  title = 'Jobs',
+  root = false,
+  aside,
+  up,
+  views,
+  heading,
+  sub,
+}: {
+  view: View
+  title?: string
+  root?: boolean
+  aside?: ReactNode
+  up?: Trail
+  /** The area's row of pages (Views.tsx), first under the bar. */
+  views?: ReactNode
+  /** This page's own name, as its title: Calls rather than Crew, Labels rather than Stock. An area's own screen without one says the area's name. */
+  heading?: ReactNode
+  /** One line under the title: what matters most about the page or the thing it's of. */
+  sub?: ReactNode
+}) {
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
   const seenAs = useSeenAs()
@@ -77,7 +100,13 @@ export function Top({ view, title = 'Jobs', root = false, aside, up }: { view: V
         {up && <Up {...up} />}
         {notDone.list}
       </header>
-      {root && <h1 className="area-title">{title}</h1>}
+      {views}
+      {(heading ?? root) && (
+        <div className="page-head">
+          <h1 className="page-title">{heading ?? title}</h1>
+          {sub && <p className="page-sub">{sub}</p>}
+        </div>
+      )}
       <OnThisScreen />
     </>
   )
@@ -107,7 +136,21 @@ export function MadeUp({ view }: { view: Pick<View, 'madeUp'> }) {
  * top bar and the way up, or beside its list on a laptop (audit finding
  * 25), where the list's screen draws the bar, so just its cards.
  */
-export function Page({ view, title, className, up, bare, children }: { view: View; title?: string; className: string; up: Trail; bare?: boolean; children: ReactNode }) {
+export function Page({
+  view,
+  title,
+  className,
+  up,
+  bare,
+  children,
+}: {
+  view: View
+  title?: string
+  className: string
+  up: Trail
+  bare?: boolean
+  children: ReactNode
+}) {
   if (bare) return <>{children}</>
   return (
     <div className={`app ${className}`}>
@@ -122,6 +165,8 @@ export function Beside({
   view,
   title,
   className,
+  views,
+  heading,
   head,
   list,
   open,
@@ -131,6 +176,9 @@ export function Beside({
   view: View
   title?: string
   className: string
+  /** The area's row of pages, and the list's own name as the title while no record is open beside it. */
+  views?: ReactNode
+  heading?: ReactNode
   head?: ReactNode
   list: ReactNode
   /** Which record is open, if any: another picked from the list starts at its top. */
@@ -148,7 +196,7 @@ export function Beside({
   }, [open])
   return (
     <div className={`app ${className} beside`}>
-      <Top view={view} title={title} root={!open} up={open ? up : undefined} />
+      <Top view={view} title={title} root={!open} views={views} heading={open ? undefined : heading} up={open ? up : undefined} />
       {head}
       <div className="columns">
         <div className="column list">{list}</div>

@@ -132,7 +132,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .signal { display: flex; gap: var(--space-12); align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-12) var(--space-14); cursor: pointer; }
 .signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--space-2); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-14); display: grid; gap: var(--space-10); }
-.card h2 { margin: 0; font-size: var(--text-heading); text-transform: uppercase; letter-spacing: .05em; }
+.card h2 { margin: 0; font-size: var(--text-heading); font-weight: 700; }
+/* The page's own main thing (its list, its form) stands straight on the page under its title, not in a box of its own: a box is for a part
+   that stands beside it. Two levels of boxes at most, as the design system's navigation page has it. */
+.card.plain { background: none; border: 0; border-radius: 0; padding: 0; }
 /* Icons and pictures, from the shared design system's set and its imagery rules: in the ink they sit in, beside their words. */
 .icon { flex: none; width: 1.25em; height: 1.25em; vertical-align: middle; }
 .card h2.with-icon, .card h1.with-icon { display: flex; align-items: center; gap: var(--space-8); }
@@ -189,9 +192,14 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
 .app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
-/* An area's pages in one row (Views.tsx): the current one filled. Each takes an equal share where they fit; where they don't, as on a phone, the row
-   wraps rather than squeezing a name or hiding a page off the edge with nothing to say it's there (audit P2 23): Stock's seven and Jobs' Money all show. */
-.views { display: flex; flex-wrap: wrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); }
+/* An area's pages in one row (Views.tsx), first under the bar: the current one filled. Each takes an equal share where they fit; where they don't,
+   as on a phone, the row stays one line and scrolls sideways, the current page brought into view, and the edge with more past it fades, so no
+   page is hidden with nothing to say it's there (audit P2 23). It used to wrap: Stock's nine took four lines, a third of a phone, before any stock. */
+.views { display: flex; flex-wrap: nowrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.views::-webkit-scrollbar { display: none; }
+.views[data-more='right'] { mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.views[data-more='left'] { mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+.views[data-more='both'] { mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
 .views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; gap: var(--space-6); min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
 .views a:not([aria-current]):hover { color: var(--ink); }
@@ -212,8 +220,13 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 }
 .app .title { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
-/* An area's own screen says its name, large, so Home, Jobs, Stock, Crew and Admin read as different places (ADR 0033). */
-.app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; margin-top: calc(-1 * var(--space-6)); }
+/* Every page's head, in the same place on every screen and outside any card: its title, large, naming this page (Calls, Labels, Admin), so
+   checking you're in the right place is one look in one place; and a line under it, quieter, saying what matters most about it. */
+.page-head { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+.app .page-head .page-sub { margin: 0; color: var(--muted); }
+/* The page's title, large, so Home, Calls, Catalogue and Admin read as different places (ADR 0033), and the biggest words on the screen. */
+.app h1.page-title, .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; }
+.app h1.area-title { margin-top: calc(-1 * var(--space-6)); }
 /* On this screen: the parts of a long screen by name, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
    row of pages, so it doesn't read as the area's row (Views.tsx): plain words, no box round them, the part in view underlined in ink. It
    sits straight above the first part, under the screen's title and its choices, so it belongs to what it lists; scrolled up to the bar it
@@ -379,9 +392,28 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
   .app { max-width: 760px; }
 }
 @media (min-width: 1200px) {
-  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) { max-width: 1200px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) > :not(.card) { grid-column: 1 / -1; }
+  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) { max-width: 1200px; }
   .menu .places { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  /* Home is a glance at everything, so its cards still stand two across in the order they come. */
+  .app.home { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .app.home > :not(.card) { grid-column: 1 / -1; }
+}
+
+/*
+ * Main and side (Split.tsx): a page says which of its parts is the main thing and which stand beside it. On a phone they read one after the
+ * other, side first where it's what needs doing (answers to check); from 1200px the main is the wide left column and the side a narrow right
+ * one, each reading top to bottom, rather than every card zigzagging left and right in pairs as tall as the taller. A page with nothing for
+ * the side is one column, its lines kept to a readable length.
+ */
+.split { display: grid; gap: var(--space-14); min-width: 0; }
+.split > .main, .split > .side { display: grid; gap: var(--space-14); align-content: start; min-width: 0; }
+.split > .side:empty { display: none; }
+@media (min-width: 1200px) {
+  .app:not(.beside, .plan, .history, .signin, .preview, .job-page, .home):not(:has(> .split)) { max-width: 960px; }
+  .split { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); align-items: start; }
+  .split > .main { grid-column: 1; grid-row: 1; }
+  .split > .side { grid-column: 2; grid-row: 1; }
+  .split:has(> .side:empty) { grid-template-columns: minmax(0, 1fr); max-width: 960px; }
 }
 
 /* Two columns on a laptop (audit finding 25, Beside in jobs/common.tsx): the list down the left, kept in reach as the record beside it scrolls. Below 960px nothing changes: the list and the record are separate pages. */

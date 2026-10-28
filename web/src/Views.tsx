@@ -5,11 +5,15 @@
  * Crew's Calls, People, Leave and Timesheets
  * (crew/CrewViews.tsx, as its counts are the Crew tab's). Moving along the row is lateral, so
  * these pages have no way up: the row is how to get between them, and the
- * current one is marked. A row longer than the screen, as on a phone, wraps
- * onto a second line, so no page is hidden off the edge (audit P2 23).
+ * current one is marked. The row comes first under the bar, before the
+ * page's title (Top's `views`). A row longer than the screen, as on a phone,
+ * stays one line and scrolls sideways: the current page is brought into
+ * view, and the edge with more past it fades, so no page is hidden off the
+ * edge with nothing to say so (audit P2 23).
  */
 
 import type { View } from '@sh/shared'
+import { useLayoutEffect, useRef } from 'react'
 
 export interface AreaPage {
   key: string
@@ -20,8 +24,29 @@ export interface AreaPage {
 }
 
 export function Views({ label, pages, current }: { label: string; pages: readonly AreaPage[]; current: string }) {
+  const row = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const el = row.current
+    if (!el) return
+    // Which edges have more past them, for the fade.
+    const edges = () => {
+      const left = el.scrollLeft > 1
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      el.dataset.more = left && right ? 'both' : left ? 'left' : right ? 'right' : ''
+    }
+    const at = el.querySelector<HTMLElement>('[aria-current]')
+    if (at && (at.offsetLeft < el.scrollLeft || at.offsetLeft + at.offsetWidth > el.scrollLeft + el.clientWidth))
+      el.scrollLeft = at.offsetLeft - (el.clientWidth - at.offsetWidth) / 2
+    edges()
+    el.addEventListener('scroll', edges, { passive: true })
+    addEventListener('resize', edges)
+    return () => {
+      el.removeEventListener('scroll', edges)
+      removeEventListener('resize', edges)
+    }
+  }, [current])
   return (
-    <nav className="views" aria-label={label}>
+    <nav className="views" aria-label={label} ref={row}>
       {pages.map((p) => (
         <a key={p.key} href={p.href} aria-current={p.key === current ? 'page' : undefined}>
           {p.label}

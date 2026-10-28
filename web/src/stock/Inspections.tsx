@@ -20,6 +20,7 @@ import { useToday } from '../view.ts'
 import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { StockViews } from '../Views.tsx'
+import { Split } from '../Split.tsx'
 import { Heading } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
@@ -74,7 +75,15 @@ const whenDone = (day: string, today: string) => (day === today ? new Date().toI
 
 /** One test as a change; whoever asks for it runs it through act(). */
 const record = (a: { assetId: string; kind: InspectionKind; passed: boolean; day: string; today: string; by: string; note: string }) =>
-  client.mutate('inspection.record', { id: newId(), assetId: a.assetId, kind: a.kind, passed: a.passed, at: whenDone(a.day, a.today), by: a.by, note: a.note })
+  client.mutate('inspection.record', {
+    id: newId(),
+    assetId: a.assetId,
+    kind: a.kind,
+    passed: a.passed,
+    at: whenDone(a.day, a.today),
+    by: a.by,
+    note: a.note,
+  })
 
 /** An item's inspections: where it stands on each its product needs, the record, and recording one. */
 export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
@@ -196,7 +205,13 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
         By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who tested it" maxLength={200} />
       </label>
       <label className="wide">
-        Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={passed === false ? 'e.g. Earth fault on the IEC inlet' : 'e.g. Earth 0.08 Ω'} maxLength={2000} />
+        Note{' '}
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={passed === false ? 'e.g. Earth fault on the IEC inlet' : 'e.g. Earth 0.08 Ω'}
+          maxLength={2000}
+        />
       </label>
       <Refusal error={error} className="wide" />
       <div className="actions wide">
@@ -256,11 +271,8 @@ export function InspectionsDue({ view }: { view: View }) {
       )}
       {unrecorded.length > 0 && (
         <p className="hint">
-          Not recorded yet:{' '}
-          {[...byProduct]
-            .map(([name, n]) => `${n} × ${name}`)
-            .join(', ')}
-          . They can still go out; record their last test when you have it.
+          Not recorded yet: {[...byProduct].map(([name, n]) => `${n} × ${name}`).join(', ')}. They can still go out; record their last test when you
+          have it.
         </p>
       )}
     </section>
@@ -344,18 +356,25 @@ export function TestingScreen({ view }: { view: View }) {
       return missed(`${name}: not recorded. ${(err as Error).message}`)
     }
     setDone((d) => [{ a: h.a, passed: true, at: Date.now() }, ...d])
-    const due = client.view().inspections.dueOf(h.a.id).find((d) => d.kind === h.kind)
+    const due = client
+      .view()
+      .inspections.dueOf(h.a.id)
+      .find((d) => d.kind === h.kind)
     const last = { a: h.a, kind: h.kind, by: h.by, day: h.day, today: h.today }
-    if (!due) return say('warn', `${name}: passed. Its product doesn't say how often it needs one, so it's never due; set it on the product's page.`, last)
+    if (!due)
+      return say('warn', `${name}: passed. Its product doesn't say how often it needs one, so it's never due; set it on the product's page.`, last)
     return say('ok', `${name}: passed, next due ${dateLabel(due.due!)}.`, last)
   }
 
   // Counting down while one is held, and recorded when its time is up, unless it's been undone or recorded since.
   useEffect(() => {
     if (!held) return
-    const timer = setTimeout(() => {
-      if (heldRef.current === held) void commit(take()!)
-    }, Math.max(0, held.until - Date.now()))
+    const timer = setTimeout(
+      () => {
+        if (heldRef.current === held) void commit(take()!)
+      },
+      Math.max(0, held.until - Date.now()),
+    )
     const tick = setInterval(() => setNow(Date.now()), 250)
     return () => {
       clearTimeout(timer)
@@ -413,7 +432,7 @@ export function TestingScreen({ view }: { view: View }) {
         setDone((d) => [{ a: last.a, passed: false, at: Date.now() }, ...d])
         say('warn', `${itemName(last.a)}: failed. It can't go out until it passes. Report what's wrong on its page.`)
       },
-      (err: Error) => missed(`${itemName(last.a)}: the fail wasn't recorded. ${err.message}`)
+      (err: Error) => missed(`${itemName(last.a)}: the fail wasn't recorded. ${err.message}`),
     )
   // Failed while held: the fail is recorded in place of the pass.
   const failedHeld = () => {
@@ -426,101 +445,104 @@ export function TestingScreen({ view }: { view: View }) {
 
   return (
     <div className="app warehouse pick">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="testing" />
-      {mayTest && (
-        <section className="card" aria-label="Testing">
-          <header className="title">
-            <h1>Test a batch</h1>
-          </header>
-          <p className="hint">
-            Scan each item as it passes. Each pass waits five seconds with Undo, then it's recorded, with no signal too. If one fails, press It failed.
-          </p>
-          {held && (
-            <div className="held" role="status" aria-label="Held">
-              <p>
-                <b>Passed: {numberLabel(held.a)}</b>
-                {/* Not read out every second; the help line says how long. */}
-                <span aria-hidden="true"> · recorded in {left} s</span>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="testing" />} heading="Testing" />
+      <Split
+        side={
+          mayTest && (
+            <section className="card" aria-label="Test a batch">
+              <h2>Test a batch</h2>
+              <p className="hint">
+                Scan each item as it passes. Each pass waits five seconds with Undo, then it's recorded, with no signal too. If one fails, press It
+                failed.
               </p>
-              <div className="actions">
-                <button type="button" onClick={undo}>
-                  Undo
-                </button>
-                <button type="button" onClick={failedHeld}>
-                  It failed
-                </button>
+              {held && (
+                <div className="held" role="status" aria-label="Held">
+                  <p>
+                    <b>Passed: {numberLabel(held.a)}</b>
+                    {/* Not read out every second; the help line says how long. */}
+                    <span aria-hidden="true"> · recorded in {left} s</span>
+                  </p>
+                  <div className="actions">
+                    <button type="button" onClick={undo}>
+                      Undo
+                    </button>
+                    <button type="button" onClick={failedHeld}>
+                      It failed
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="filters" role="group" aria-label="Which test">
+                {INSPECTION_KINDS.map((k) => (
+                  <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
+                    {k === 'pat' ? 'PAT' : 'Thorough examination'}
+                  </button>
+                ))}
               </div>
-            </div>
-          )}
-          <div className="filters" role="group" aria-label="Which test">
-            {INSPECTION_KINDS.map((k) => (
-              <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
-                {k === 'pat' ? 'PAT' : 'Thorough examination'}
-              </button>
-            ))}
-          </div>
-          <div className="grid-form">
-            <label>
-              By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
-            </label>
-            <label>
-              When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
-            </label>
-          </div>
-          <form className="scan-row" onSubmit={submit}>
-            <input
-              type="search"
-              enterKeyHint="go"
-              autoComplete="off"
-              placeholder="Scan or type a number"
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              aria-label="Number or serial"
-            />
-            <button
-              type="button"
-              aria-pressed={camera}
-              onClick={() => {
-                if (!camera) primeSound()
-                setCamera(!camera)
-              }}
-            >
-              Scan
-            </button>
-          </form>
-          {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
-          {said && (
-            <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
-              {said.text}
-            </p>
-          )}
-          <ScanMisses misses={misses} onDismiss={dismiss} />
-          {said?.last && !held && (
-            <div className="actions">
-              <button type="button" onClick={() => failed(said.last!)}>
-                It failed
-              </button>
-            </div>
-          )}
-        </section>
-      )}
-      {done.length > 0 && (
-        <section className="card" aria-label="Tested">
-          <h2>Tested here: {done.length}</h2>
-          <ul className="numbers">
-            {done.map((d) => (
-              <li key={`${d.at}-${d.a.id}-${d.passed}`}>
-                <a href={`#stock/item/${d.a.id}`} className={d.passed ? '' : 'failed'}>
-                  {numberLabel(d.a)}
-                  {d.passed ? '' : ' failed'}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <InspectionsDue view={view} />
+              <div className="grid-form">
+                <label>
+                  By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
+                </label>
+                <label>
+                  When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
+                </label>
+              </div>
+              <form className="scan-row" onSubmit={submit}>
+                <input
+                  type="search"
+                  enterKeyHint="go"
+                  autoComplete="off"
+                  placeholder="Scan or type a number"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  aria-label="Number or serial"
+                />
+                <button
+                  type="button"
+                  aria-pressed={camera}
+                  onClick={() => {
+                    if (!camera) primeSound()
+                    setCamera(!camera)
+                  }}
+                >
+                  Scan
+                </button>
+              </form>
+              {camera && <CameraScanner onRead={read} onStop={() => setCamera(false)} small />}
+              {said && (
+                <p key={said.at} className={`said ${said.tone}`} role="status" aria-label="Last scan">
+                  {said.text}
+                </p>
+              )}
+              <ScanMisses misses={misses} onDismiss={dismiss} />
+              {said?.last && !held && (
+                <div className="actions">
+                  <button type="button" onClick={() => failed(said.last!)}>
+                    It failed
+                  </button>
+                </div>
+              )}
+            </section>
+          )
+        }
+      >
+        {done.length > 0 && (
+          <section className="card" aria-label="Tested">
+            <h2>Tested here: {done.length}</h2>
+            <ul className="numbers">
+              {done.map((d) => (
+                <li key={`${d.at}-${d.a.id}-${d.passed}`}>
+                  <a href={`#stock/item/${d.a.id}`} className={d.passed ? '' : 'failed'}>
+                    {numberLabel(d.a)}
+                    {d.passed ? '' : ' failed'}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <InspectionsDue view={view} />
+      </Split>
     </div>
   )
 }

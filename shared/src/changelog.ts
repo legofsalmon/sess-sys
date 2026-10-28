@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.40.0',
-    date: '2026-10-27',
+    version: '1.39.0',
+    date: '2026-10-28',
     title: 'Photos of kit, and the rack sheet',
     what: 'A product can now have a photo: open it in Stock and press Add a photo. A photo of its front panel shows on it in the rack designer, flat and in 3D, so a rack on screen looks like the one in the truck, and the photo shows in the stock lists and on a job’s kit too. Each rack also prints as a sheet to build it from: Print the rack sheet, on the rack’s page or in the designer, gives the front and back drawn side by side, then what goes where in words, with labels, groups, tape colours and notes, what’s in each drawer, and its weight and power.',
-    prs: [136],
+    prs: [139],
     adrs: [83],
+  },
+  {
+    version: '1.38.1',
+    date: '2026-10-27',
+    title: 'Every page says where you are, in the same place',
+    what: 'Each page now has the same top: the area’s pages in one row (one line on a phone, sliding sideways), then the page’s own name in large letters, such as Calls, Catalogue or Labels, rather than just Crew or Stock. A page’s main list is no longer boxed, card headings are quieter, and on a wide screen a page has a main column with the things beside it on the right, instead of cards zigzagging in pairs.',
+    prs: [136],
+    adrs: [82],
   },
   {
     version: '1.38.0',

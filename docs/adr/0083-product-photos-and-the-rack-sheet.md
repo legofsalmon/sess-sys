@@ -1,7 +1,7 @@
 # ADR 0083: Product photos, on their panels in a rack, and the rack sheet
 
 - **Status:** accepted (part 3 of 3 of a more advanced rack builder)
-- **Date:** 27 October 2026
+- **Date:** 28 October 2026
 - **Asked for by:** Colly, 23 October 2026, "a more advanced rack builder",
   planned in three parts in the Claude Doc "A more advanced rack builder:
   survey and plan". This is the third part.

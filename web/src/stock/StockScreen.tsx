@@ -109,6 +109,8 @@ export function StockScreen() {
         view={view}
         title="Stock"
         className="warehouse"
+        views={<StockViews view={view} current="catalogue" />}
+        heading="Catalogue"
         list={<StockCard view={view} current={product} />}
         open={kind && `${kind}/${open}`}
         up={recordTrail(view, kind, open)}
@@ -134,8 +136,7 @@ function recordTrail(view: View, kind: string | undefined, id: string): Trail {
 function Catalogue({ view }: { view: View }) {
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" root />
-      <StockViews view={view} current="catalogue" />
+      <Top view={view} title="Stock" views={<StockViews view={view} current="catalogue" />} heading="Catalogue" />
 
       <StockCard view={view} />
 
@@ -159,8 +160,7 @@ function StockRest({ view }: { view: View }) {
 function PlacesScreen({ view }: { view: View }) {
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="places" />
+      <Top view={view} title="Stock" views={<StockViews view={view} current="places" />} heading="Places" />
       <Places view={view} />
     </div>
   )
@@ -170,9 +170,7 @@ function PlacesScreen({ view }: { view: View }) {
 function RepairsScreen({ view }: { view: View }) {
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="repairs" />
-      <h1 className="area-title">Repairs</h1>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="repairs" />} heading="Repairs" />
       {view.faults.open.length === 0 ? (
         <section className="card">
           <Empty>Nothing is waiting to be repaired or found. Faults and missing kit are reported from an item's or a product's page.</Empty>
@@ -257,8 +255,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   }
 
   return (
-    <section className="card" aria-label="Stock">
-      <Heading icon="warehouse">Stock</Heading>
+    <section className="card plain" aria-label="Catalogue">
       <form role="search" className="scan-row" onSubmit={go}>
         <input
           ref={searchField}
@@ -574,11 +571,7 @@ function Places({ view }: { view: View }) {
     })
   }
   return (
-    <section className="card">
-      <h1 className="with-icon">
-        <Icon name="warehouse" />
-        <span>Places</span>
-      </h1>
+    <section className="card plain" aria-label="Places">
       {w.places.length === 0 && <Empty>Where kit is kept: the warehouse, its bays and shelves, the vans. Places are also added as you type them in.</Empty>}
       <ShowAll items={w.places} limit={50} what="places">
         {(rows) => (

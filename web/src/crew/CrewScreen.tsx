@@ -39,6 +39,7 @@ import { LeaveScreen } from './Leave.tsx'
 import { PersonScreen } from './PersonScreen.tsx'
 import { TimesheetScreen, TimesheetsCard } from './Timesheets.tsx'
 import { CrewViews } from './CrewViews.tsx'
+import { Split } from '../Split.tsx'
 import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
 import { CallCard, NewCall, OfferForm } from './Calls.tsx'
@@ -109,7 +110,11 @@ function groupCalls(calls: readonly CallView[], inJobs: readonly JobView[]) {
     // A call made on the Crew tab has no job; its project's name stands in.
     const key = c.projectId ?? `~${c.project.trim().toLowerCase()}`
     let job = jobs.get(key)
-    if (!job) jobs.set(key, (job = { key, project: c.project, venue: (c.projectId && venueOf.get(c.projectId)) ?? c.venue, projectId: c.projectId, dates: new Map() }))
+    if (!job)
+      jobs.set(
+        key,
+        (job = { key, project: c.project, venue: (c.projectId && venueOf.get(c.projectId)) ?? c.venue, projectId: c.projectId, dates: new Map() }),
+      )
     // A phase somewhere other than the job's venue says where, beside its days.
     const when = [daysLabel(c.days), c.venue !== job.venue && c.venue].filter(Boolean).join(' · ')
     job.dates.set(when, [...(job.dates.get(when) ?? []), c])
@@ -131,7 +136,7 @@ export function calendarAnswersToSortOut(view: View, today: string) {
         .flatMap((o) => {
           const cal = offerOnCalendar(o, view.calendar.days, today)
           return cal?.warning ? [{ c, o, text: o.status === 'confirmed' ? cal.warning : `${cal.line} ${cal.warning}` }] : []
-        })
+        }),
     )
 }
 
@@ -154,14 +159,22 @@ export function CrewScreen() {
   departments.sort((a, b) => a.localeCompare(b))
   // A department whose last person was edited or archived away narrows to nobody, so it's no filter at all until it's back.
   const chosen =
-    department === NO_DEPARTMENT ? (active.some((p) => !p.department) ? department : '') : departments.some((d) => d.toLowerCase() === department.toLowerCase()) ? department : ''
+    department === NO_DEPARTMENT
+      ? active.some((p) => !p.department)
+        ? department
+        : ''
+      : departments.some((d) => d.toLowerCase() === department.toLowerCase())
+        ? department
+        : ''
   // Found as in the picker, and folded to the first ten (audit finding 16). Whoever is added stays in view, whatever the
   // search, filter or fold, until the tab is next opened: on a phone the form pushes the list out of sight, so it says so too.
   const [find, setFind] = useState('')
   const [added, setAdded] = useState<readonly { id: string; name: string }[]>([])
   const justAdded = (p: PersonView) => added.some((a) => a.id === p.id)
   const words = wordsOf(find)
-  const shown = active.filter((p) => justAdded(p) || ((!chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase())) && found(p, words)))
+  const shown = active.filter(
+    (p) => justAdded(p) || ((!chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase())) && found(p, words)),
+  )
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   // Crew needed narrowed to a department (ADR 0046). A head of department starts on their own, everyone else on all.
   const access = useAccess()
@@ -178,7 +191,7 @@ export function CrewScreen() {
   const wanted = narrowedTo ?? myDepartment
   // A department no call is in any more is no filter at all until it's back, as for people.
   const callsFor =
-    wanted === NO_DEPARTMENT ? (upcoming.some((c) => !departmentOf(c)) ? wanted : '') : callDepts.find((d) => sameDepartment(d, wanted)) ?? ''
+    wanted === NO_DEPARTMENT ? (upcoming.some((c) => !departmentOf(c)) ? wanted : '') : (callDepts.find((d) => sameDepartment(d, wanted)) ?? '')
   const shownCalls = upcoming.filter((c) => !callsFor || (callsFor === NO_DEPARTMENT ? !departmentOf(c) : sameDepartment(departmentOf(c), callsFor)))
   const onCalendar = (o: OfferView) => offerOnCalendar(o, view.calendar.days, today)
   // A yes or a counter until Confirm or Withdraw; a decline or a pull-out until Noted. The Crew tab's count is the same list.
@@ -233,7 +246,8 @@ export function CrewScreen() {
   // something to act on stays out too, as ShowAll keeps a line to act on: someone short of a certificate it needs, or running
   // late, or the day itself, when someone who rings to say they're late is noted on its line (ADR 0028).
   const short = shownCalls.filter((c) => c.openDays.length > 0)
-  const atHand = (c: CallView) => c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
+  const atHand = (c: CallView) =>
+    c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
   const inView = shownCalls.filter(atHand)
   const filled = shownCalls.filter((c) => !atHand(c))
   // A long list (audit finding 11, ADR 0050): only the jobs' groups near the screen are drawn, and Back finds its place by them (places.ts).
@@ -256,7 +270,15 @@ export function CrewScreen() {
             <div className="call-date" key={when}>
               <h3>{when}</h3>
               {calls.map((c) => (
-                <CallCard key={c.id} call={c} crew={crew} calendar={view.calendar} late={view.late} onShare={(person) => setShare({ kind: 'offer', person, call: c })} onTell={setShare} />
+                <CallCard
+                  key={c.id}
+                  call={c}
+                  crew={crew}
+                  calendar={view.calendar}
+                  late={view.late}
+                  onShare={(person) => setShare({ kind: 'offer', person, call: c })}
+                  onTell={setShare}
+                />
               ))}
             </div>
           ))}
@@ -267,10 +289,13 @@ export function CrewScreen() {
 
   return (
     <div className="app crew">
-      {/* Calls is Crew's own screen; People and Timesheets are titled by themselves, as every other page is (audit of 18 October). */}
-      <Top view={view} title="Crew" root={page === 'calls'} />
-      <CrewViews view={view} current={page} />
-      {page !== 'calls' && <h1 className="area-title">{page === 'people' ? 'People' : 'Timesheets'}</h1>}
+      {/* Each page along the row is titled by itself, Calls too, so the title says which page this is and the row which area. */}
+      <Top
+        view={view}
+        title="Crew"
+        views={<CrewViews view={view} current={page} />}
+        heading={page === 'calls' ? 'Calls' : page === 'people' ? 'People' : 'Timesheets'}
+      />
 
       {page === 'timesheets' &&
         (view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
@@ -281,242 +306,290 @@ export function CrewScreen() {
           </section>
         ))}
 
-      {page === 'calls' && (toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
-        <section className="card">
-          {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
-          <Heading icon="message">Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</Heading>
-          <Narrowed department={answersFor} onWiden={allAnswers} />
-          <Refusal error={answers.error} />
-          <ShowAll
-            items={[
-              ...late.map((l) => (
-                <LateRow key={l.id} note={l} today={today} onNoted={mayCrew ? () => void answers.run(() => client.mutate('late.seen', { id: l.id, offerId: l.offerId, day: l.day })) : undefined} />
-              )),
-              ...docs.map((d) => <DocumentToCheck key={d.id} doc={d} />),
-              ...toSortOut.map(({ c, o, text }) => (
-                <div className="row" key={o.id}>
-                  <div>
-                    <b>{o.person?.name ?? 'Someone'}</b> answered on Google Calendar
-                    <p>
-                      {c.project} · {c.role} · {o.status === 'confirmed' ? 'booked' : 'offered'} {daysLabel(o.days)}
-                      <br />
-                      {text}
-                    </p>
-                  </div>
-                  {c.projectId && (
-                    <div className="actions">
-                      <a className="link" href={`#jobs/${c.projectId}/crew`}>
-                        Open job
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )),
-              ...toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
-                <div className="row" key={o.id}>
-                  <div>
-                    <b>{o.person?.name ?? 'Someone'}</b>{' '}
-                    {kind === 'accepted'
-                      ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
-                      : kind === 'countered'
-                        ? o.rateHidden
-                          ? 'asks for a different rate'
-                          : `asks ${euro(o.counterRateCents)} a day (offered ${rateText(c.dayRateCents, c.rateHidden)})`
-                        : kind === 'declined'
-                          ? 'declined'
-                          : "can't make it any more"}
-                    <p>
-                      {c.project} · {c.role} · {daysLabel(o.days)}
-                      {(kind === 'declined' || kind === 'pulled-out') && <><br />{whatItNeeds(kind, o, short)}</>}
-                      {o.note && <><br />“{o.note}”</>}
-                      {warning && <><br />{warning}</>}
-                    </p>
-                  </div>
-                  {/* Settling an answer is crew's (audit finding 9): a role without it sees the answer, and nothing to press. */}
-                  {!mayCrew ? null : (kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
-                    <Confirm
-                      question={
-                        kind === 'countered'
-                          ? `Say no to ${o.person?.name ?? 'them'}${o.rateHidden ? '' : ` at ${euro(o.counterRateCents)}`}? The offer is withdrawn, and their link says so at once.`
-                          : `Release ${o.person?.name ?? 'them'} from ${c.project}? Their place goes back to the call, and their link says so at once.`
-                      }
-                      yes={kind === 'countered' ? 'Withdraw the offer' : `Release ${o.person ? firstName(o.person) : 'them'}`}
-                      no={kind === 'countered' ? 'Keep it open' : 'Keep them'}
-                      onYes={() => {
-                        setTurningDown(undefined)
-                        settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')
-                      }}
-                      onNo={() => setTurningDown(undefined)}
-                    />
-                  ) : kind === 'countered' && o.rateHidden ? (
-                    // Agreeing a rate is for someone who sees it (ADR 0046): said here, with Say no still to hand.
-                    <div className="actions">
-                      <p className="hint">The office agrees rates: your role doesn't see them.</p>
-                      <button type="button" onClick={() => setTurningDown(o.id)}>
-                        Say no
-                      </button>
-                    </div>
-                  ) : kind === 'accepted' || kind === 'countered' ? (
-                    <div className="actions">
-                      <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
-                        {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
-                      </button>
-                      <button type="button" onClick={() => setTurningDown(o.id)}>
-                        {kind === 'countered' ? 'Say no' : 'Release'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="actions">
-                      <button type="button" onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))} aria-label={`Noted: ${o.person?.name ?? 'someone'}`}>
-                        Noted
-                      </button>
-                      {c.openDays.length > 0 && (
-                        <Fold label="Offer…">
-                          <OfferForm
-                            call={c}
-                            crew={crew}
-                            onShare={(person) => {
-                              // Offering the call to someone else is acting on the answer, so it's noted without another tap.
-                              void answers.run(() => client.mutate('offer.seen', { id: o.id }))
-                              setShare({ kind: 'offer', person, call: c })
-                            }}
-                          />
-                        </Fold>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )),
-            ]}
-            limit={3}
-            what="answers"
-          >
-            {(rows) => rows}
-          </ShowAll>
-        </section>
-      )}
-
+      {/* What waits on someone first, beside the calls on a desk (Split): the answers to check, and the crew still needed. */}
       {page === 'calls' && (
-        <section className="card">
-          <Heading icon="calendar">Crew needed</Heading>
-          {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
-          {/* Narrowed to a department (ADR 0046), the ones calls are in, and "No department" for the calls nobody has given one. */}
-          {upcoming.length > 0 && (callDepts.length > 0 || upcoming.some((c) => !departmentOf(c))) && (
-            <select className="dept-filter" value={callsFor} onChange={(e) => setCallsFor(e.target.value)} aria-label="Calls for department">
-              <option value="">All departments</option>
-              {callDepts.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-              {upcoming.some((c) => !departmentOf(c)) && <option value={NO_DEPARTMENT}>No department</option>}
-            </select>
+        <Split
+          side={
+            (toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
+              <section className="card">
+                {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}
+                <Heading icon="message">Answers to check ({late.length + docs.length + toSortOut.length + toCheck.length})</Heading>
+                <Narrowed department={answersFor} onWiden={allAnswers} />
+                <Refusal error={answers.error} />
+                <ShowAll
+                  items={[
+                    ...late.map((l) => (
+                      <LateRow
+                        key={l.id}
+                        note={l}
+                        today={today}
+                        onNoted={
+                          mayCrew ? () => void answers.run(() => client.mutate('late.seen', { id: l.id, offerId: l.offerId, day: l.day })) : undefined
+                        }
+                      />
+                    )),
+                    ...docs.map((d) => <DocumentToCheck key={d.id} doc={d} />),
+                    ...toSortOut.map(({ c, o, text }) => (
+                      <div className="row" key={o.id}>
+                        <div>
+                          <b>{o.person?.name ?? 'Someone'}</b> answered on Google Calendar
+                          <p>
+                            {c.project} · {c.role} · {o.status === 'confirmed' ? 'booked' : 'offered'} {daysLabel(o.days)}
+                            <br />
+                            {text}
+                          </p>
+                        </div>
+                        {c.projectId && (
+                          <div className="actions">
+                            <a className="link" href={`#jobs/${c.projectId}/crew`}>
+                              Open job
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )),
+                    ...toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
+                      <div className="row" key={o.id}>
+                        <div>
+                          <b>{o.person?.name ?? 'Someone'}</b>{' '}
+                          {kind === 'accepted'
+                            ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
+                            : kind === 'countered'
+                              ? o.rateHidden
+                                ? 'asks for a different rate'
+                                : `asks ${euro(o.counterRateCents)} a day (offered ${rateText(c.dayRateCents, c.rateHidden)})`
+                              : kind === 'declined'
+                                ? 'declined'
+                                : "can't make it any more"}
+                          <p>
+                            {c.project} · {c.role} · {daysLabel(o.days)}
+                            {(kind === 'declined' || kind === 'pulled-out') && (
+                              <>
+                                <br />
+                                {whatItNeeds(kind, o, short)}
+                              </>
+                            )}
+                            {o.note && (
+                              <>
+                                <br />“{o.note}”
+                              </>
+                            )}
+                            {warning && (
+                              <>
+                                <br />
+                                {warning}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        {/* Settling an answer is crew's (audit finding 9): a role without it sees the answer, and nothing to press. */}
+                        {!mayCrew ? null : (kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
+                          <Confirm
+                            question={
+                              kind === 'countered'
+                                ? `Say no to ${o.person?.name ?? 'them'}${o.rateHidden ? '' : ` at ${euro(o.counterRateCents)}`}? The offer is withdrawn, and their link says so at once.`
+                                : `Release ${o.person?.name ?? 'them'} from ${c.project}? Their place goes back to the call, and their link says so at once.`
+                            }
+                            yes={kind === 'countered' ? 'Withdraw the offer' : `Release ${o.person ? firstName(o.person) : 'them'}`}
+                            no={kind === 'countered' ? 'Keep it open' : 'Keep them'}
+                            onYes={() => {
+                              setTurningDown(undefined)
+                              settle(o, c, 'offer.cancel', kind === 'countered' ? 'withdrawn' : 'released')
+                            }}
+                            onNo={() => setTurningDown(undefined)}
+                          />
+                        ) : kind === 'countered' && o.rateHidden ? (
+                          // Agreeing a rate is for someone who sees it (ADR 0046): said here, with Say no still to hand.
+                          <div className="actions">
+                            <p className="hint">The office agrees rates: your role doesn't see them.</p>
+                            <button type="button" onClick={() => setTurningDown(o.id)}>
+                              Say no
+                            </button>
+                          </div>
+                        ) : kind === 'accepted' || kind === 'countered' ? (
+                          <div className="actions">
+                            <button type="button" className="primary" onClick={() => settle(o, c, 'offer.confirm', 'confirmed')}>
+                              {kind === 'countered' ? `Agree ${euro(o.counterRateCents)}` : 'Confirm'}
+                            </button>
+                            <button type="button" onClick={() => setTurningDown(o.id)}>
+                              {kind === 'countered' ? 'Say no' : 'Release'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="actions">
+                            <button
+                              type="button"
+                              onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))}
+                              aria-label={`Noted: ${o.person?.name ?? 'someone'}`}
+                            >
+                              Noted
+                            </button>
+                            {c.openDays.length > 0 && (
+                              <Fold label="Offer…">
+                                <OfferForm
+                                  call={c}
+                                  crew={crew}
+                                  onShare={(person) => {
+                                    // Offering the call to someone else is acting on the answer, so it's noted without another tap.
+                                    void answers.run(() => client.mutate('offer.seen', { id: o.id }))
+                                    setShare({ kind: 'offer', person, call: c })
+                                  }}
+                                />
+                              </Fold>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )),
+                  ]}
+                  limit={3}
+                  what="answers"
+                >
+                  {(rows) => rows}
+                </ShowAll>
+              </section>
+            )
+          }
+        >
+          <section className="card">
+            <Heading icon="calendar">Crew needed</Heading>
+            {upcoming.length === 0 && <Empty>Ask for crew from a job in Jobs, or below.</Empty>}
+            {/* Narrowed to a department (ADR 0046), the ones calls are in, and "No department" for the calls nobody has given one. */}
+            {upcoming.length > 0 && (callDepts.length > 0 || upcoming.some((c) => !departmentOf(c))) && (
+              <select className="dept-filter" value={callsFor} onChange={(e) => setCallsFor(e.target.value)} aria-label="Calls for department">
+                <option value="">All departments</option>
+                {callDepts.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+                {upcoming.some((c) => !departmentOf(c)) && <option value={NO_DEPARTMENT}>No department</option>}
+              </select>
+            )}
+            <div aria-live="polite">{gave && <p className="added">{gave}</p>}</div>
+            {callsFor === NO_DEPARTMENT && mayCrew && shownCalls.length > 0 && (
+              <GiveDepartment
+                view={view}
+                calls={shownCalls}
+                onGiven={(said, department) => {
+                  setNarrowedTo(department)
+                  setGave(said)
+                }}
+              />
+            )}
+            {upcoming.length > 0 && shownCalls.length === 0 && (
+              <p className="empty">No calls for {callsFor === NO_DEPARTMENT ? 'no department' : callsFor} still to come.</p>
+            )}
+            {shownCalls.length > 0 && short.length === 0 && (
+              <p className="empty">
+                No calls{callsFor ? ` for ${callsFor === NO_DEPARTMENT ? 'no department' : callsFor}` : ''} are short of people: every one still to
+                come is filled.
+              </p>
+            )}
+            {callGroups(inView, 'short')}
+            {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
+            {filled.length > 0 && (
+              <details className="filled-calls" open={filledOpen} onToggle={(e) => setFilledOpen(e.currentTarget.open)}>
+                <summary>
+                  Show {filled.length} filled {filled.length === 1 ? 'call' : 'calls'}
+                </summary>
+                {/* Built only once opened: folded, they'd be built for nothing, and a window can't tell what's on a screen it isn't on. */}
+                {filledOpen && callGroups(filled, 'filled')}
+              </details>
+            )}
+          </section>
+
+          {mayCrew && (
+            <section className="card">
+              <h2>Crew for something not in Jobs</h2>
+              <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
+              <Fold label="Ask for crew">
+                <NewCall />
+              </Fold>
+            </section>
           )}
-          <div aria-live="polite">{gave && <p className="added">{gave}</p>}</div>
-          {callsFor === NO_DEPARTMENT && mayCrew && shownCalls.length > 0 && (
-            <GiveDepartment
-              view={view}
-              calls={shownCalls}
-              onGiven={(said, department) => {
-                setNarrowedTo(department)
-                setGave(said)
-              }}
-            />
-          )}
-          {upcoming.length > 0 && shownCalls.length === 0 && <p className="empty">No calls for {callsFor === NO_DEPARTMENT ? 'no department' : callsFor} still to come.</p>}
-          {shownCalls.length > 0 && short.length === 0 && (
-            <p className="empty">No calls{callsFor ? ` for ${callsFor === NO_DEPARTMENT ? 'no department' : callsFor}` : ''} are short of people: every one still to come is filled.</p>
-          )}
-          {callGroups(inView, 'short')}
-          {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
-          {filled.length > 0 && (
-            <details className="filled-calls" open={filledOpen} onToggle={(e) => setFilledOpen(e.currentTarget.open)}>
-              <summary>
-                Show {filled.length} filled {filled.length === 1 ? 'call' : 'calls'}
-              </summary>
-              {/* Built only once opened: folded, they'd be built for nothing, and a window can't tell what's on a screen it isn't on. */}
-              {filledOpen && callGroups(filled, 'filled')}
-            </details>
-          )}
-        </section>
+        </Split>
       )}
 
       {share && <SharePanelFor share={share} onClose={() => setShare(undefined)} />}
 
-      {page === 'calls' && mayCrew && (
-        <section className="card">
-          <h2>Crew for something not in Jobs</h2>
-          <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
-          <Fold label="Ask for crew">
-            <NewCall />
-          </Fold>
-        </section>
-      )}
-
-      {page === 'people' && <CertificateReminders view={view} />}
-      {/* Vehicles' checks running out, listed beside the crew's certificates and documents (ADR 0047). */}
-      {page === 'people' && <VehicleReminders view={view} />}
-
+      {/* Certificates and documents running out, and vehicles' checks (ADR 0047), beside the people on a desk. */}
       {page === 'people' && (
-        <section className="card" aria-label="People">
-          <Heading icon="people">People</Heading>
-          <NamedFromAddress view={view} />
-          <Refusal error={roster.error} />
-          {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
-          <div aria-live="polite">
-            {archivedNow && people.get(archivedNow.id)?.archived && (
-              <p className="added">
-                Archived {archivedNow.name}.{' '}
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => {
-                    const { id } = archivedNow
-                    setArchivedNow(undefined)
-                    bringBack(id)
-                  }}
-                >
-                  Bring {archivedNow.name} back
-                </button>
-              </p>
+        <Split
+          side={
+            <>
+              <CertificateReminders view={view} />
+              <VehicleReminders view={view} />
+            </>
+          }
+        >
+          <section className="card" aria-label="People">
+            <Heading icon="people">People</Heading>
+            <NamedFromAddress view={view} />
+            <Refusal error={roster.error} />
+            {/* Said where their row was, as the row goes into "Archived" out of sight, with the way back (rule 10). There before it has words, so it's read out. */}
+            <div aria-live="polite">
+              {archivedNow && people.get(archivedNow.id)?.archived && (
+                <p className="added">
+                  Archived {archivedNow.name}.{' '}
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => {
+                      const { id } = archivedNow
+                      setArchivedNow(undefined)
+                      bringBack(id)
+                    }}
+                  >
+                    Bring {archivedNow.name} back
+                  </button>
+                </p>
+              )}
+            </div>
+            {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
+            {active.length > 0 && (
+              <input
+                className="search"
+                type="search"
+                placeholder="Name, department or skill"
+                value={find}
+                onChange={(e) => setFind(e.target.value)}
+                aria-label="Find a person"
+              />
             )}
-          </div>
-          {active.length === 0 && archived.length === 0 && <Empty>Add your crew below.</Empty>}
-          {active.length > 0 && (
-            <input className="search" type="search" placeholder="Name, department or skill" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a person" />
-          )}
-          {departments.length > 0 && (
-            <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
-              <option value="">All departments</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-              {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
-            </select>
-          )}
-          {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
-          <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
-            {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
-          </ShowAll>
-          {archived.length > 0 && (
-            <details className="archived">
-              <summary>Archived ({archived.length})</summary>
-              {/* Each with "Erase details…" for when they ask (ADR 0027). */}
-              {archived.map((p) => (
-                <ArchivedPerson key={p.id} person={p} onBringBack={() => bringBack(p.id)} />
-              ))}
-            </details>
-          )}
-          {mayCrew && (
-            <Fold label="Add person">
-              <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
-              {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
-              <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
-            </Fold>
-          )}
-        </section>
+            {departments.length > 0 && (
+              <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
+                <option value="">All departments</option>
+                {departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+                {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
+              </select>
+            )}
+            {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
+            <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
+              {(rows) => rows.map((p) => <PersonRow key={p.id} person={p} crew={crew} />)}
+            </ShowAll>
+            {archived.length > 0 && (
+              <details className="archived">
+                <summary>Archived ({archived.length})</summary>
+                {/* Each with "Erase details…" for when they ask (ADR 0027). */}
+                {archived.map((p) => (
+                  <ArchivedPerson key={p.id} person={p} onBringBack={() => bringBack(p.id)} />
+                ))}
+              </details>
+            )}
+            {mayCrew && (
+              <Fold label="Add person">
+                <NewPerson onAdded={(p) => setAdded((was) => [...was, p])} />
+                {/* Read out as it changes, as it's there from the form's opening; not a second "status", which is the top bar's. */}
+                <div aria-live="polite">{added.length > 0 && <p className="added">Added {added.at(-1)!.name}.</p>}</div>
+              </Fold>
+            )}
+          </section>
+        </Split>
       )}
 
       {page === 'people' && (
@@ -569,7 +642,11 @@ function GiveDepartment({ view, calls, onGiven }: { view: View; calls: readonly 
             </label>
           ))}
           {calls.length > 1 && (
-            <button type="button" className="link start" onClick={() => setTicked(new Set(chosen.length === calls.length ? [] : calls.map((c) => c.id)))}>
+            <button
+              type="button"
+              className="link start"
+              onClick={() => setTicked(new Set(chosen.length === calls.length ? [] : calls.map((c) => c.id)))}
+            >
               {chosen.length === calls.length ? 'Untick all' : 'Tick all'}
             </button>
           )}
@@ -577,7 +654,11 @@ function GiveDepartment({ view, calls, onGiven }: { view: View; calls: readonly 
         <DepartmentField view={view} value={department} onChange={setDepartment} />
         <Refusal error={error} className="wide" />
         <button type="submit" className="primary wide" disabled={!chosen.length || !department}>
-          {!chosen.length ? 'Tick the calls to give it' : !department ? 'Pick a department' : `Give ${chosen.length === 1 ? '1 call' : `${chosen.length} calls`} ${department}`}
+          {!chosen.length
+            ? 'Tick the calls to give it'
+            : !department
+              ? 'Pick a department'
+              : `Give ${chosen.length === 1 ? '1 call' : `${chosen.length} calls`} ${department}`}
         </button>
       </form>
     </Fold>
