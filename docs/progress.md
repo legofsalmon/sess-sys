@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: every page the same width
+
+**Done**
+
+- [ADR 0091](adr/0091-one-page-width.md), at Colly's ask: every page in the
+  app is one width at a given window size (full width to 640px on a phone,
+  up to 1200px beside the sidebar from 900px), planner, job page and the
+  catalogue beside a record included. Before, Stock's pages alone were
+  960, 1072 or 1400px. Only sign-in keeps the phone's width. A card's
+  paragraphs stop at about 75 characters instead. App 1.45.1.
+- Checked: a browser test walks every area's pages, Admin, You and Home on
+  a phone, a laptop and a 1680px screen and fails on any difference (it
+  failed on main as it should).
+
 ## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
 
 **Done**

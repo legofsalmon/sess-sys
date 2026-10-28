@@ -50,8 +50,7 @@
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
 
-/* The planner: the one screen that uses a laptop's full width. */
-.app.plan { max-width: 1400px; }
+/* The planner: the same width as every other page (ADR 0091), so List, Week and Month don't jump. */
 .plan .plan-title { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
 .plan .actions .button { flex: 1 1 auto; max-width: 180px; }
 .plan .checks { border-color: var(--warn); }
@@ -439,7 +438,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  * A job's page (JobScreen): the whole width, with no list beside it, its
  * parts one at a time under tabs (the design system's tabs: the open one
  * underlined in the accent, the rest muted). One column, as its forms and
- * calls read down; from 1200px a little wider than other pages.
+ * calls read down, at the same width as every other page (ADR 0091).
  */
 .part-tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .part-tabs::-webkit-scrollbar { display: none; }
@@ -449,9 +448,6 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .part-count { font-weight: 600; font-variant-numeric: tabular-nums; opacity: .8; }
 .job-part { display: grid; gap: var(--space-14); min-width: 0; }
 .jobs .phase-crew { margin: 0; }
-@media (min-width: 1200px) {
-  .app.job-page { max-width: 960px; }
-}
 /* A person's first and last name side by side (ADR 0066), wrapping to two lines on a narrow phone. */
 :is(.import, .tidy) .names { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); }
 :is(.import, .tidy) .names .name { flex: 1 1 8rem; width: auto; min-width: 0; }

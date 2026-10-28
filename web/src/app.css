@@ -387,15 +387,19 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 .history .older { display: grid; gap: var(--space-10); justify-items: start; }
 
 /*
- * A desk's width (ADR 0036): from 900px the places are a sidebar (crew.css) and a screen's cards stand two
- * across from 1200px, in the order they come, each pair as tall as the taller; the bar, titles, ways back,
- * filters and anything that isn't a card keep the full width. History reads down the days, so stays one.
+ * One page width (ADR 0091): every screen in the app is as wide as every other at the same window size, so moving
+ * along an area's row (Stock's Catalogue, Places, Labels…), between areas or into a record never makes the page
+ * jump wider or narrower. A phone or a tablet has the full width up to 640px; from 900px, with the places in a
+ * sidebar (crew.css), the page takes what's left up to 1200px. What changes from page to page is only how the
+ * width is shared out inside it: one column, a main and a side (Split), the list beside a record (Beside), or
+ * Home's cards two across. Lines of words keep a readable length inside their cards, not by narrowing the page.
+ * Signing in stands alone, outside the app's pages, so it keeps the phone's width.
  */
 @media (min-width: 900px) {
-  .app { max-width: 760px; }
+  .app:not(.signin) { max-width: 1200px; }
 }
+.app .card > p { max-width: 75ch; }
 @media (min-width: 1200px) {
-  .app:not(.beside, .plan, .history, .signin, .preview, .job-page) { max-width: 1200px; }
   .menu .places { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   /* Home is a glance at everything, so its cards still stand two across in the order they come. */
   .app.home { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
@@ -406,21 +410,19 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
  * Main and side (Split.tsx): a page says which of its parts is the main thing and which stand beside it. On a phone they read one after the
  * other, side first where it's what needs doing (answers to check); from 1200px the main is the wide left column and the side a narrow right
  * one, each reading top to bottom, rather than every card zigzagging left and right in pairs as tall as the taller. A page with nothing for
- * the side is one column, its lines kept to a readable length.
+ * the side is one column, the page's full width (ADR 0091).
  */
 .split { display: grid; gap: var(--space-14); min-width: 0; }
 .split > .main, .split > .side { display: grid; gap: var(--space-14); align-content: start; min-width: 0; }
 .split > .side:empty { display: none; }
 @media (min-width: 1200px) {
-  .app:not(.beside, .plan, .history, .signin, .preview, .job-page, .home):not(:has(> .split)) { max-width: 960px; }
   .split { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); align-items: start; }
   .split > .main { grid-column: 1; grid-row: 1; }
   .split > .side { grid-column: 2; grid-row: 1; }
-  .split:has(> .side:empty) { grid-template-columns: minmax(0, 1fr); max-width: 960px; }
+  .split:has(> .side:empty) { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Two columns on a laptop (audit finding 25, Beside in jobs/common.tsx): the list down the left, kept in reach as the record beside it scrolls. Below 960px nothing changes: the list and the record are separate pages. */
-.app.beside { max-width: 1400px; }
 .app.beside .columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--space-16); align-items: start; }
 .app.beside .column { display: grid; gap: var(--space-14); min-width: 0; }
 /* 64px is the top bar's height and 80px the tab bar's with a margin, so the whole list scrolls between the two; with the sidebar there's no bar under it. */
