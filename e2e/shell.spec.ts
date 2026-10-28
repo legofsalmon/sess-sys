@@ -104,10 +104,10 @@ test('offline on a phone the company keeps its name, and print is white round th
 })
 
 test('an empty list that says so in its own words says it once', async ({ browser, request }) => {
-  // Proves: on a server with nothing on it, Money's empty quotes read "No quote is waiting on anyone…" alone, while a list with only what to do still starts "Nothing here yet.".
+  // Proves: on a server with nothing on it, the quotes to follow up read "No quote is waiting on anyone…" alone, while a list with only what to do still starts "Nothing here yet.".
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await ready(page, '#jobs/money')
+  await ready(page, '#quotes')
   await expect(page.locator('.empty', { hasText: /^No quote is waiting on anyone\./ })).toHaveCount(1)
   await expect(page.locator('.empty', { hasText: /^Nothing here yet\. (No|Nothing|Nobody)\b/ })).toHaveCount(0)
   await ready(page, '#jobs/clients')

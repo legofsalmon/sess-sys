@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.45.0',
+    date: '2026-10-28',
+    title: 'Quotes has a place of its own',
+    what: 'Quotes is now in the sidebar on a computer, after Jobs, and on the Menu on a phone. It has the quotes to follow up and a New quote button, which were on Money, and every quote in one list, to find by job, client, venue, quote number or invoice, or narrow to those not sent, sent, accepted or turned down. Only the office and directors see it.',
+    prs: [145],
+    adrs: [88],
+  },
+  {
     version: '1.44.0',
     date: '2026-10-28',
     title: 'Packages on quotes',

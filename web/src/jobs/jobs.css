@@ -473,6 +473,12 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quotes-to-follow .warn { color: var(--warn); }
 .quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
+/* Every quote (ADR 0088): a row a job, its quote's state on the right, as the rows to follow up. */
+.quote-list .filters { margin: var(--space-8) 0; }
+.quote-list ul.plain { list-style: none; margin: 0; padding: 0; }
+.quote-list li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quote-list li a { font-weight: 600; }
+.quote-list li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
 .quote-screen .in-step p { margin: 0; }
 

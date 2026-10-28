@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: Quotes, a place of its own
+
+**Done**
+
+- [ADR 0088](adr/0088-quotes-in-the-sidebar.md). Quotes (`#quotes`) is a
+  sixth place in the desk sidebar, after Jobs, for those who see money; on a
+  phone it's on the Menu, which keeps its tab. The page has "To follow up"
+  (moved from Money, with New quote) and "All quotes": each job's quote, the
+  last changed first, found by job, client, venue, number or invoice and
+  narrowed by what it is. Money keeps the figures and links to it. App
+  1.45.0.
+- Checked: typecheck, unit tests (the list, its order, a draft over a sent
+  version, narrowing and finding), browser tests (quotes-page.spec.ts: the
+  sidebar on a desk, the Menu on a phone; quote-follow-up.spec.ts moved to
+  Quotes).
+
 ## 28 October 2026: packages
 
 **Done**
