@@ -15,7 +15,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   expect((await request.post('/api/data/start-fresh', { data: { confirm: 'delete everything' } })).ok()).toBe(true)
 
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#admin')
+  await office.goto('/#admin/data')
   const card = office.locator('section.data')
   await expect(card.getByRole('heading', { name: 'Try it with made-up data' })).toBeVisible()
   await card.getByRole('button', { name: 'Put in made-up data' }).click()
@@ -43,7 +43,7 @@ test('puts in made-up data, then starts fresh on every phone', async ({ browser,
   await expect(other.getByText('Harbour Lights Festival')).toBeVisible()
 
   // Deleting everything takes the words typed.
-  await office.goto('/#admin')
+  await office.goto('/#admin/data')
   await expect(card.getByText('Backups are off, so it can\'t be undone. Download everything first, above, to keep a copy.')).toBeVisible()
   const remove = card.getByRole('button', { name: 'Delete everything' })
   await card.getByLabel('Type “delete everything” to confirm').fill('delete')

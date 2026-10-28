@@ -119,7 +119,7 @@ export function QuietPanel({ names, what, onLink = true, onClose }: { names: rea
       <h2>Messages to crew are off</h2>
       <p className="empty">
         Nothing opened to send {who} the {what}.{onLink ? ` ${names.length === 1 ? 'Their link' : 'Their links'} already say${names.length === 1 ? 's' : ''} so.` : ''} Messages
-        are turned on under {admin ? <a href="#admin">Admin</a> : 'Admin, by the office'}.
+        are turned on under {admin ? <a href="#admin/company">Admin › Company</a> : 'Admin, by the office'}.
       </p>
       <button type="button" onClick={onClose}>
         Done

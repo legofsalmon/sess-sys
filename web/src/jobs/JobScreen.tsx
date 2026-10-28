@@ -40,6 +40,7 @@ import { Empty } from '../Empty.tsx'
 import { Fold } from '../Fold.tsx'
 import { Pending } from '../StatusPill.tsx'
 import { DepartmentField } from '../crew/Department.tsx'
+import { Tabs } from '../Tabs.tsx'
 import { useAccess, useSeesRates } from '../role.ts'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
@@ -125,13 +126,20 @@ export function JobScreen({ view, id, part: asked }: { view: View; id: string; p
   }
 
   return (
-    <Page view={view} className="crew jobs job-page" up={up}>
+    <Page
+      view={view}
+      className="crew jobs job-page"
+      up={up}
+      heading={job.name}
+      badge={<JobStatusPill status={job.status} pending={job.pending} />}
+      sub={<JobLines job={job} view={view} />}
+    >
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
       {/* The way the job goes, from the quote to the kit put away, and who each step is down to (ADR 0073). */}
       <StepsCard job={job} view={view} onPart={pick} />
 
-      <PartTabs parts={parts} current={part} counts={counts} onPick={pick} />
+      <Tabs label="Parts of the job" id="job" parts={parts} labels={PART_LABELS} current={part} counts={counts} onPick={pick} />
       <div className="job-part" role="tabpanel" id="job-part" aria-labelledby={`job-tab-${part}`}>
         {part === 'phases' && (
           <section className="card" aria-label="Phases">
@@ -172,63 +180,6 @@ export function JobScreen({ view, id, part: asked }: { view: View; id: string; p
         {part === 'money' && seesMoney && <QuoteCard job={job} view={view} />}
       </div>
     </Page>
-  )
-}
-
-/**
- * The job's parts as tabs (the design system's tabs): one Tab stop, Left
- * and Right move and open, Home and End go to the ends. A count after a
- * part's name: its phases, its crew booked of those needed.
- */
-function PartTabs({
-  parts,
-  current,
-  counts,
-  onPick,
-}: {
-  parts: readonly JobPart[]
-  current: JobPart
-  counts: Partial<Record<JobPart, string>>
-  onPick: (p: JobPart) => void
-}) {
-  const row = useRef<HTMLDivElement>(null)
-  // The current part in view, where the row is wider than the phone.
-  useEffect(() => {
-    row.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-  }, [current])
-  const key = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const at = parts.indexOf(current)
-    const to =
-      e.key === 'ArrowRight' ? (at + 1) % parts.length : e.key === 'ArrowLeft' ? (at - 1 + parts.length) % parts.length : e.key === 'Home' ? 0 : e.key === 'End' ? parts.length - 1 : -1
-    if (to < 0) return
-    e.preventDefault()
-    onPick(parts[to]!)
-    row.current?.querySelector<HTMLElement>(`#job-tab-${parts[to]}`)?.focus()
-  }
-  return (
-    <div className="part-tabs" role="tablist" aria-label="Parts of the job" ref={row}>
-      {parts.map((p) => (
-        <button
-          key={p}
-          type="button"
-          role="tab"
-          id={`job-tab-${p}`}
-          aria-selected={p === current}
-          aria-controls="job-part"
-          tabIndex={p === current ? 0 : -1}
-          onClick={() => onPick(p)}
-          onKeyDown={key}
-        >
-          {PART_LABELS[p]}
-          {counts[p] && (
-            <>
-              {' '}
-              <span className="part-count">{counts[p]}</span>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -322,66 +273,55 @@ function CrewPart({
   )
 }
 
+/**
+ * Under the job's name, in two lines rather than a card of facts (ADR 0082),
+ * so its parts are on the first screen: who it's for, where and when; then
+ * how its crew and kit stand.
+ */
+function JobLines({ job, view }: { job: JobView; view: View }) {
+  const crew = crewFill(job.calls)
+  const kit = kitSummary(job, view.kit.byJob.get(job.id) ?? [])
+  const dot = (
+    <span className="muted" aria-hidden="true">
+      {' · '}
+    </span>
+  )
+  const second = [
+    kindOf(job) !== 'gig' && KIND_LABELS[kindOf(job)],
+    crew.needed > 0 && `Crew ${crew.booked} of ${crew.needed} booked${crew.toConfirm > 0 ? `, ${crew.toConfirm} to confirm` : ''}`,
+    kit && `Kit: ${kit}`,
+  ].filter(Boolean)
+  return (
+    <>
+      <p className="job-line">
+        {job.client ? <a href={`#jobs/clients/${encodeURIComponent(job.client.id)}`}>{job.client.name}</a> : 'No client yet'}
+        {dot}
+        {job.venue ? (
+          <>
+            <a href={`#jobs/venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a> (
+            <a href={mapLink(job.venue)} target="_blank" rel="noreferrer">
+              map
+            </a>
+            )
+          </>
+        ) : (
+          'No venue yet'
+        )}
+        {dot}
+        {job.span ? spanLabel(job.span) : 'No dates yet'}
+      </p>
+      {second.length > 0 && <p className="job-line">{second.join(' · ')}</p>}
+    </>
+  )
+}
+
+/** The job's notes and the venue's, and changing its details, under its name. */
 function Summary({ job, view, onTell }: { job: JobView; view: View; onTell: (share: Share | undefined) => void }) {
   const [editing, setEditing] = useState(false)
   const mayChange = useAccess().can('jobs')
-  const crew = crewFill(job.calls)
-  const kit = kitSummary(job, view.kit.byJob.get(job.id) ?? [])
+  if (!editing && !job.notes && !job.venue?.notes && !mayChange) return null
   return (
-    <section className="card">
-      <header className="title">
-        <h1>{job.name}</h1>
-        <JobStatusPill status={job.status} pending={job.pending} />
-      </header>
-      <dl className="facts">
-        <div>
-          <dt>Client</dt>
-          <dd>{job.client ? <a href={`#jobs/clients/${encodeURIComponent(job.client.id)}`}>{job.client.name}</a> : 'None yet'}</dd>
-        </div>
-        <div>
-          <dt>Venue</dt>
-          <dd>
-            {job.venue ? (
-              <>
-                <a href={`#jobs/venues/${encodeURIComponent(job.venue.id)}`}>{venueLabel(job.venue)}</a>
-                <span className="muted" aria-hidden="true">
-                  {' · '}
-                </span>
-                <a href={mapLink(job.venue)} target="_blank" rel="noreferrer">
-                  Map
-                </a>
-              </>
-            ) : (
-              'None yet'
-            )}
-          </dd>
-        </div>
-        {kindOf(job) !== 'gig' && (
-          <div>
-            <dt>Kind</dt>
-            <dd>{KIND_LABELS[kindOf(job)]}</dd>
-          </div>
-        )}
-        <div>
-          <dt>When</dt>
-          <dd>{job.span ? spanLabel(job.span) : 'No dates yet'}</dd>
-        </div>
-        {crew.needed > 0 && (
-          <div>
-            <dt>Crew</dt>
-            <dd>
-              {crew.booked} of {crew.needed} booked
-              {crew.toConfirm > 0 && `, ${crew.toConfirm} to confirm`}
-            </dd>
-          </div>
-        )}
-        {kit && (
-          <div>
-            <dt>Kit</dt>
-            <dd>{kit}</dd>
-          </div>
-        )}
-      </dl>
+    <section className={editing ? 'card' : 'job-notes'} aria-label="Details">
       {job.notes && <p className="notes">{job.notes}</p>}
       {job.venue?.notes && <p className="notes">At the venue: {job.venue.notes}</p>}
       {editing ? (

@@ -48,7 +48,9 @@ export function Top({
   up,
   views,
   heading,
+  badge,
   sub,
+  picture,
 }: {
   view: View
   title?: string
@@ -59,7 +61,11 @@ export function Top({
   views?: ReactNode
   /** This page's own name, as its title: Calls rather than Crew, Labels rather than Stock. An area's own screen without one says the area's name. */
   heading?: ReactNode
-  /** One line under the title: what matters most about the page or the thing it's of. */
+  /** Beside the title: a record's state, as a job's status. */
+  badge?: ReactNode
+  /** Before the title: a person's photo or initials. */
+  picture?: ReactNode
+  /** A line or two under the title: what matters most about the page or the thing it's of. */
   sub?: ReactNode
 }) {
   const waiting = view.pendingCount
@@ -101,12 +107,7 @@ export function Top({
         {notDone.list}
       </header>
       {views}
-      {(heading ?? root) && (
-        <div className="page-head">
-          <h1 className="page-title">{heading ?? title}</h1>
-          {sub && <p className="page-sub">{sub}</p>}
-        </div>
-      )}
+      {(heading ?? root) && <PageHead heading={heading ?? title} badge={badge} sub={sub} picture={picture} />}
       <OnThisScreen />
     </>
   )
@@ -142,6 +143,10 @@ export function Page({
   className,
   up,
   bare,
+  heading,
+  badge,
+  sub,
+  picture,
   children,
 }: {
   view: View
@@ -149,13 +154,49 @@ export function Page({
   className: string
   up: Trail
   bare?: boolean
+  /** The record's name as the page's title, its state beside it and what matters about it under (Top). Beside its list, they head its column. */
+  heading?: ReactNode
+  badge?: ReactNode
+  sub?: ReactNode
+  picture?: ReactNode
   children: ReactNode
 }) {
-  if (bare) return <>{children}</>
+  if (bare)
+    return (
+      <>
+        {heading && <PageHead heading={heading} badge={badge} sub={sub} picture={picture} />}
+        {children}
+      </>
+    )
   return (
     <div className={`app ${className}`}>
-      <Top view={view} title={title} up={up} />
+      <Top view={view} title={title} up={up} heading={heading} badge={badge} sub={sub} picture={picture} />
       {children}
+    </div>
+  )
+}
+
+/** The page's title, outside any card: the one h1, the biggest words on the screen (ADR 0082). */
+function PageHead({ heading, badge, sub, picture }: { heading: ReactNode; badge?: ReactNode; sub?: ReactNode; picture?: ReactNode }) {
+  const words = (
+    <div className="page-words">
+      <div className="page-title-row">
+        <h1 className="page-title">{heading}</h1>
+        {badge}
+      </div>
+      {sub && <div className="page-sub">{sub}</div>}
+    </div>
+  )
+  return (
+    <div className="page-head">
+      {picture ? (
+        <div className="pictured">
+          {picture}
+          {words}
+        </div>
+      ) : (
+        words
+      )}
     </div>
   )
 }

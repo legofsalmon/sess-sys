@@ -69,8 +69,31 @@ Part one (this record's first PR):
    one column of a readable width. Home keeps its two across: it is a
    glance at everything.
 
-Part two (the second PR): tabs on Admin, a person and a product, and a
-compact head on a job's page so its tabs are on the first screen.
+Part two (the second PR):
+
+6. **A record's name is the page's title**, outside its cards: a job's
+   name with its status beside it, a person's with their photo or initials
+   before it, a product's with its picture. Beside the catalogue on a desk,
+   the product's head tops its column.
+7. **A job's head is two lines, not a card**: client, venue (and its map)
+   and dates; then its crew and kit. Its notes and Change details follow,
+   unboxed. Its steps are a slim strip (ADR 0073) that says where the job is
+   at; a step opens when pressed, and closes when pressed again. So the
+   Phases, Crew, Kit and vans, Show pack and Quote tabs are on the first
+   screen.
+8. **Tabs on the pages that are really several pages** (`Tabs.tsx`, the
+   job's tabs made shared): **Admin**: Company (office details, messages to
+   crew, what heads of department see) · Connections (Google Calendar,
+   Current RMS) · Data (backups, your data, bringing lists in, made-up data
+   and starting fresh); the warnings about sign-in stay above the tabs and
+   the version below them. **A person**: Coming up (with their own
+   calendar) · Details · Documents · Worked · Their link; the ways to reach
+   them stay under their name whichever is open. **A product**: Details ·
+   On jobs · Items (and what's counted) · Faults. As on a job, the part is
+   in the address (`#admin/data`, `#crew/person/<id>/worked`,
+   `#stock/product/<id>/items`) without a step in the history, and the last
+   one looked at opens next time on this device (`sh.adminPart`,
+   `sh.personPart`, `sh.productPart`).
 
 ## Consequences
 

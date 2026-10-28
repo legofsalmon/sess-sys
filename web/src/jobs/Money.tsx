@@ -485,7 +485,7 @@ function ForTheAccountant({ m }: { m: MoneyView }) {
       </div>
       <p className="hint">
         Spreadsheets made on this device: each invoice by VAT rate, by the day it was invoiced; the VAT on them by Revenue's two-month period and rate; and
-        freelancers' approved timesheets, by the day approved. Every table is also in Download everything, on <a href="#admin">Admin</a>.
+        freelancers' approved timesheets, by the day approved. Every table is also in Download everything, on <a href="#admin/data">Admin › Data</a>.
       </p>
     </section>
   )

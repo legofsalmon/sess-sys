@@ -20,6 +20,7 @@ import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { Heading, Icon } from '../Icon.tsx'
 import { Page } from '../jobs/common.tsx'
+import { TabPanel, Tabs, useTab } from '../Tabs.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
 import { Pending, StatusPill } from '../StatusPill.tsx'
 import { useAccess } from '../role.ts'
@@ -49,9 +50,26 @@ export const personHref = (id: string) => `#crew/person/${encodeURIComponent(id)
 /** "Fri 3 Oct 2027": a certificate's expiry wants its year. */
 const dateLabel = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
 
-export function PersonScreen({ view, id, onArchived }: { view: View; id: string; onArchived: (p: { id: string; name: string }) => void }) {
+/** A person's page in parts (ADR 0082), one at a time under their name. */
+export type PersonPart = 'coming' | 'details' | 'documents' | 'worked' | 'link'
+const PERSON_PARTS: readonly PersonPart[] = ['coming', 'details', 'documents', 'worked', 'link']
+const PERSON_LABELS: Record<PersonPart, string> = { coming: 'Coming up', details: 'Details', documents: 'Documents', worked: 'Worked', link: 'Their link' }
+
+export function PersonScreen({
+  view,
+  id,
+  part: asked,
+  onArchived,
+}: {
+  view: View
+  id: string
+  part?: string
+  onArchived: (p: { id: string; name: string }) => void
+}) {
   const person = view.crew.people.find((p) => p.id === id)
   const up = { steps: [CREW, PEOPLE], here: person?.name }
+  const parts = PERSON_PARTS.filter((p) => p !== 'link' || (person && !person.archived))
+  const [part, pick] = useTab({ parts, asked, remember: 'sh.personPart', address: (p) => `${personHref(id)}/${p}` })
   if (!person)
     return (
       <Page view={view} title="Crew" className="crew person-page" up={up}>
@@ -61,63 +79,59 @@ export function PersonScreen({ view, id, onArchived }: { view: View; id: string;
       </Page>
     )
   return (
-    <Page view={view} title="Crew" className="crew person-page" up={up}>
-      <Who person={person} view={view} />
-      <ComingUp person={person} view={view} onArchived={onArchived} />
-      <OwnCalendarCard person={person} view={view} />
-      <section className="card" aria-label="Certificates and documents">
-        <Heading icon="certificate">Certificates and documents</Heading>
-        <CertificateLines person={person} />
-        <Documents person={person} />
-      </section>
-      <Worked person={person} />
-      {!person.archived && <TheirLink person={person} />}
+    <Page
+      view={view}
+      title="Crew"
+      className="crew person-page"
+      up={up}
+      picture={<Avatar name={person.name} src={photoOf(person)} size="large" />}
+      heading={person.name}
+      badge={<Pending pending={person.pending} />}
+      sub={<WhoLine person={person} />}
+    >
+      <Reach person={person} />
+      <Warnings person={person} view={view} />
+      <Tabs label={`About ${person.name}`} id="person" parts={parts} labels={PERSON_LABELS} current={part} counts={{ worked: person.worked.length || undefined }} onPick={pick} />
+      <TabPanel id="person" current={part}>
+        {part === 'coming' && (
+          <>
+            <ComingUp person={person} view={view} onArchived={onArchived} />
+            <OwnCalendarCard person={person} view={view} />
+          </>
+        )}
+        {part === 'details' && <Who person={person} view={view} />}
+        {part === 'documents' && (
+          <section className="card" aria-label="Certificates and documents">
+            <Heading icon="certificate">Certificates and documents</Heading>
+            <CertificateLines person={person} />
+            <Documents person={person} />
+          </section>
+        )}
+        {part === 'worked' && <Worked person={person} />}
+        {part === 'link' && <TheirLink person={person} />}
+      </TabPanel>
     </Page>
   )
 }
 
-/** Their name and picture, how to reach them, and what the office keeps about them. */
-function Who({ person, view }: { person: PersonView; view: View }) {
-  const access = useAccess()
-  // Someone whose role doesn't cover crew sees a person as they are, with nothing to change (ADR 0034).
-  const mayEdit = access.can('crew') && !person.archived
-  const role = roleOfPerson(person)
-  // Their main email is how they're written to; for someone with a role, only who changes settings changes it, as with the email itself.
-  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can('settings'))
-  const [editing, setEditing] = useState(false)
-  const { run, error } = useAct()
+/** Under their name: staff or freelancer, department and level, and the name they go by. */
+function WhoLine({ person }: { person: PersonView }) {
+  const kind = person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : 'Freelancer'
+  return (
+    <>
+      <p>{[kind, person.department, levelLine(person.level)].filter(Boolean).join(' · ')}</p>
+      {person.knownAs && <p>Goes by {person.knownAs}</p>}
+    </>
+  )
+}
+
+/** Ringing, messaging or emailing them, under their name whichever part is open. */
+function Reach({ person }: { person: PersonView }) {
   const phone = person.phone?.trim()
   const email = person.email?.trim()
-  const kind = person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : 'Freelancer'
-  // Someone who looks brought in twice (ADR 0055), said where the office will see it.
-  const twice = useSamePeople(view)
-    .find((g) => g.people.some((p) => p.id === person.id))
-    ?.people.filter((p) => p.id !== person.id)
+  if (!phone && !email) return null
   return (
-    <section className="card who-card" aria-label={person.name}>
-      <header className="title">
-        {/* Their picture before their name (ADR 0038): their photo once there is one (ADR 0065), their initials until then. */}
-        <div className="pictured">
-          <Avatar name={person.name} src={photoOf(person)} size="large" />
-          <div className="who-name">
-            <h1>{person.name}</h1>
-            <p className="muted">{[kind, person.department, levelLine(person.level)].filter(Boolean).join(' · ')}</p>
-            {person.knownAs && <p className="muted">Goes by {person.knownAs}</p>}
-          </div>
-        </div>
-        <Pending pending={person.pending} />
-      </header>
-      <PersonPhoto person={person} />
-      {person.archived && (
-        <p className="warn-line">Archived: kept for the record, and offered no work. Bring them back from the Archived list on Crew.</p>
-      )}
-      {mayEdit && twice && twice.length > 0 && (
-        <p className="warn-line">
-          {twice.map((p) => p.name).join(', ')} {twice.length === 1 ? 'looks' : 'look'} like the same person, brought in twice. Combine them below.
-        </p>
-      )}
-      {(phone || email) && (
-        <div className="actions">
+        <div className="actions reach">
           {phone && (
             <a className="button" href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
               <Icon name="phone" />
@@ -137,7 +151,47 @@ function Who({ person, view }: { person: PersonView; view: View }) {
             </a>
           )}
         </div>
+  )
+}
+
+/** What the office must see whichever part is open (ADR 0082): archived, or brought in twice (ADR 0055). */
+function Warnings({ person, view }: { person: PersonView; view: View }) {
+  const access = useAccess()
+  const twice = useSamePeople(view)
+    .find((g) => g.people.some((p) => p.id === person.id))
+    ?.people.filter((p) => p.id !== person.id)
+  return (
+    <>
+      {person.archived && (
+        <p className="warn-line">Archived: kept for the record, and offered no work. Bring them back from the Archived list on Crew.</p>
       )}
+      {access.can('crew') && !person.archived && twice && twice.length > 0 && (
+        <p className="warn-line">
+          {twice.map((p) => p.name).join(', ')} {twice.length === 1 ? 'looks' : 'look'} like the same person, brought in twice. Combine them under
+          Details.
+        </p>
+      )}
+    </>
+  )
+}
+
+/** Their photo, what the office keeps about them, and changing it. */
+function Who({ person, view }: { person: PersonView; view: View }) {
+  const access = useAccess()
+  // Someone whose role doesn't cover crew sees a person as they are, with nothing to change (ADR 0034).
+  const mayEdit = access.can('crew') && !person.archived
+  const role = roleOfPerson(person)
+  // Their main email is how they're written to; for someone with a role, only who changes settings changes it, as with the email itself.
+  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can('settings'))
+  const [editing, setEditing] = useState(false)
+  const { run, error } = useAct()
+  const phone = person.phone?.trim()
+  const email = person.email?.trim()
+  const kind = person.kind === 'staff' ? (person.role ? ROLE_LABELS[person.role] : 'Staff') : 'Freelancer'
+  return (
+    <section className="card who-card" aria-label="Details">
+      <PersonPhoto person={person} />
+
       {/* Not sent to staff crew or freelancers (ADR 0062): said, so it isn't taken for none. */}
       {person.detailsHidden && (
         <p className="hint">

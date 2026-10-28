@@ -42,12 +42,12 @@ test('two devices, one offline, the same four speakers', async ({ browser, reque
   }
 
   const office = await (await browser.newContext()).newPage()
-  await ready(office, `#stock/product/${model}`)
+  await ready(office, `#stock/product/${model}/items`)
   await expect(counted(office, bay)).toContainText('4')
 
   const phoneContext = await browser.newContext()
   const phone = await phoneContext.newPage()
-  await ready(phone, `#stock/product/${model}`)
+  await ready(phone, `#stock/product/${model}/items`)
   await expect(counted(phone, bay)).toContainText('4')
   // Let the service worker take control so the app loads with no network.
   await phone.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 }).catch(() => phone.reload())

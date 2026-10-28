@@ -142,9 +142,9 @@ test('connecting Google Calendar, choosing its calendar, checking and disconnect
   const card = page.getByRole('region', { name: 'Google Calendar' })
 
   // Back from Google with a permission left unticked: the app says so, and tidies the address.
-  await page.goto('/?calendar=missing#admin')
+  await page.goto('/?calendar=missing#admin/connections')
   await expect(card.getByRole('alert')).toContainText("a permission was left unticked on Google's page")
-  await expect(page).toHaveURL(/\/#admin$/)
+  await expect(page).toHaveURL(/\/#admin\/connections$/)
   await expect(card.getByRole('link', { name: 'Connect Google Calendar' })).toHaveAttribute('href', /^\/api\/calendar\/connect\?client=[a-z0-9]+$/)
 
   // Connected this time: the app asks which of the account's calendars the jobs go on.
@@ -165,7 +165,7 @@ test('connecting Google Calendar, choosing its calendar, checking and disconnect
     server.otherDays = ['2030-10-07', '2030-10-08', '2030-10-09', '2031-01-01']
     return route.fulfill({ json: server.link })
   })
-  await page.goto('/?calendar=connected#admin')
+  await page.goto('/?calendar=connected#admin/connections')
   await expect(card.getByRole('status')).toHaveText('Connected to Google.')
   await expect(card.getByRole('heading', { name: 'Choose the calendar' })).toBeVisible()
   await expect(card).toContainText('Connected as ops@sessionhire.com.')
@@ -339,7 +339,7 @@ test('crew invites: turned on from the Account tab, with answers from Google on 
     server.link = connected({ invites: route.request().postDataJSON().on })
     return route.fulfill({ json: server.link })
   })
-  await page.goto('/#admin')
+  await page.goto('/#admin/connections')
   const card = page.getByRole('region', { name: 'Google Calendar' })
   const invites = card.getByRole('group', { name: 'Crew invites', exact: true })
   await expect(invites.getByRole('heading')).toHaveText('Crew invites: off')

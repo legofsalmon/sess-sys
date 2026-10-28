@@ -29,7 +29,8 @@ test("a photo goes on a person's page in place of their initials, and comes off 
   const page = await context.newPage()
   await page.goto(`/#crew/person/orla-${id}`)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
-  const face = page.locator('.who-card .avatar-large')
+  await page.getByRole('tab', { name: /^Details/ }).click()
+  const face = page.locator('.page-head .avatar-large')
   await expect(face).toHaveAttribute('data-initials', /^O/)
   await expect(face.locator('img')).toHaveCount(0)
 

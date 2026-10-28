@@ -91,6 +91,7 @@ test('brings the made-up stock list in, fixing a row in place, and shows its ite
   await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(stock.getByRole('button', { name: 'Show all 9 products' })).toBeVisible()
   await stock.getByRole('link', { name: /^Corvo K12/ }).click()
+  await office.getByRole('tab', { name: /^Items/ }).click()
   const items = office.getByRole('region', { name: 'Items' })
   await expect(items.locator('.item-row')).toHaveCount(4)
   await expect(items.locator('.item-row').first()).toContainText('SH-000505')

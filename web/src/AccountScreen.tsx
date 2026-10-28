@@ -12,15 +12,26 @@ import { OfficeCard } from './OfficeCard.tsx'
 import { QuotingCard } from './QuotingCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { useAccess } from './role.ts'
+import { TabPanel, Tabs, useTab } from './Tabs.tsx'
 import { useView } from './view.ts'
 import { MENU } from './Up.tsx'
 
 /** The company's settings, at #admin from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, Current RMS (ADR 0078), the way to where each list is brought in (ADR 0041), and the app's version with what changed in it (ADR 0071). A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
 
+/** Admin in three parts (ADR 0082), one at a time: the company, what it's connected to, and its data. */
+type AdminPart = 'company' | 'connections' | 'data'
+const ADMIN_LABELS: Record<AdminPart, string> = { company: 'Company', connections: 'Connections', data: 'Data' }
+
 export function AccountScreen() {
   const auth = useAuth()
   const view = useView()
   const access = useAccess()
+  const [, asked] = /^#admin\/([a-z]+)$/.exec(location.hash) ?? []
+  const settings = access.can('settings')
+  const company = access.can('company')
+  const shown = auth.status === 'signed-in' || auth.status === 'open'
+  const parts: AdminPart[] = !shown ? [] : settings ? ['company', 'connections', 'data'] : company ? ['company', 'data'] : []
+  const [part, pick] = useTab({ parts: parts.length ? parts : (['company'] as AdminPart[]), asked, remember: 'sh.adminPart', address: (p) => `#admin/${p}` })
 
   return (
     <div className="app account">
@@ -54,22 +65,33 @@ export function AccountScreen() {
       )}
 
       {/* Settings are for the office and directors, and the data's own switches for directors (ADR 0034); a role without them doesn't see them. */}
-      {(auth.status === 'signed-in' || auth.status === 'open') && (
+      {parts.length > 0 && (
         <>
-          {access.can('settings') && (
-            <>
-              <OfficeCard office={view.office} />
-              {access.can('money') && <QuotingCard money={view.money} />}
-              <MessagesCard office={view.office} />
-              <CalendarCard view={view} available={auth.status === 'signed-in'} />
-              <BackupsCard />
-              <ExportCard />
-            </>
-          )}
-          {access.can('company') && <DataCard view={view} />}
-          {access.can('company') && !access.rolesOff && <ReadingCard office={view.office} />}
-          {access.can('settings') && <ListsCard calendar={access.can('jobs')} />}
-          {access.can('settings') && access.can('money') && <CurrentRmsCard />}
+          <Tabs label="Parts of Admin" id="admin" parts={parts} labels={ADMIN_LABELS} current={part} onPick={pick} />
+          <TabPanel id="admin" current={part}>
+            {part === 'company' && (
+              <>
+                {settings && <OfficeCard office={view.office} />}
+                {settings && access.can('money') && <QuotingCard money={view.money} />}
+                {settings && <MessagesCard office={view.office} />}
+                {company && !access.rolesOff && <ReadingCard office={view.office} />}
+              </>
+            )}
+            {part === 'connections' && (
+              <>
+                <CalendarCard view={view} available={auth.status === 'signed-in'} />
+                {access.can('money') && <CurrentRmsCard />}
+              </>
+            )}
+            {part === 'data' && (
+              <>
+                {settings && <BackupsCard />}
+                {settings && <ExportCard />}
+                {settings && <ListsCard calendar={access.can('jobs')} />}
+                {company && <DataCard view={view} />}
+              </>
+            )}
+          </TabPanel>
         </>
       )}
 

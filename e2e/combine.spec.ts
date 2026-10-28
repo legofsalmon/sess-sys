@@ -47,7 +47,8 @@ test('the same person under two addresses is combined from her page, and another
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await expect(office.getByText(`${name} looks like the same person, brought in twice.`)).toBeVisible()
 
-  // The other her is ticked to start with; combining asks first, and says what happens.
+  // The other her is ticked to start with, under Details; combining asks first, and says what happens.
+  await office.getByRole('tab', { name: /^Details/ }).click()
   await office.getByRole('button', { name: 'Combine with…' }).click()
   await expect(office.getByRole('checkbox', { name: new RegExp(`aoife\\.${id}@example\\.net`) })).toBeChecked()
   await office.getByRole('button', { name: 'Combine 2 people' }).click()
@@ -59,6 +60,7 @@ test('the same person under two addresses is combined from her page, and another
 
   // One person, with both her offers and both her addresses.
   await expect(office.locator('.facts')).toContainText(`aoife.${id}@example.net`)
+  await office.getByRole('tab', { name: /^Coming up/ }).click()
   const ahead = office.getByRole('region', { name: 'Coming up' })
   await expect(ahead.getByText(`Picnic ${id}`)).toBeVisible()
   await expect(ahead.getByText(`Arena ${id}`)).toBeVisible()
@@ -74,5 +76,6 @@ test('the same person under two addresses is combined from her page, and another
   await group.getByRole('button', { name: 'Combine them' }).click()
   await expect(twice.getByText(`${pair} is one person now.`)).toBeVisible()
   await twice.getByRole('link', { name: 'Open their page' }).click()
+  await office.getByRole('tab', { name: /^Details/ }).click()
   await expect(office.locator('.facts')).toContainText(/brian\..*@example\.(com|net)/)
 })
