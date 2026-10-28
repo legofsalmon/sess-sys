@@ -13,13 +13,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The server tests and the browser tests run side by side on machines of
-# their own, and the browser tests are split three ways, each third with a
-# server of its own, so a run takes as long as its slowest part rather than
-# all of them end to end.
+# their own, each split three ways (the browser thirds each with a server of
+# their own), so a run takes as long as its slowest part rather than all of
+# them end to end. The server tests are near half an hour of work in all,
+# more than one machine's few cores get through quickly.
 jobs:
   server:
-    name: Server tests
+    name: Server tests (${{ matrix.shard }} of 3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:16
@@ -37,14 +42,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The quick checks once, with the first third.
       - name: Typecheck
+        if: matrix.shard == 1
         run: npm run typecheck
+      - name: Shared tests
+        if: matrix.shard == 1
+        run: npm test -w shared
+      - name: Blueprint builds
+        if: matrix.shard == 1
+        run: npm run build:hub
       - name: Unit and sync tests (PGlite and real Postgres)
-        run: npm test
+        run: npm test -w server -- --shard=${{ matrix.shard }}/3
         env:
           TEST_DATABASE_URL: postgres://sh:sh@localhost:5432/sh_test
-      - name: Blueprint builds
-        run: npm run build:hub
 
   e2e:
     name: Browser tests (${{ matrix.shard }} of 3)
