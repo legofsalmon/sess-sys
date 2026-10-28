@@ -12,7 +12,7 @@ waiting on someone.
   up to 1200px beside the sidebar from 900px), planner, job page and the
   catalogue beside a record included. Before, Stock's pages alone were
   960, 1072 or 1400px. Only sign-in keeps the phone's width. A card's
-  paragraphs stop at about 75 characters instead. App 1.45.1.
+  paragraphs stop at about 75 characters instead. App 1.45.2.
 - Checked: a browser test walks every area's pages, Admin, You and Home on
   a phone, a laptop and a 1680px screen and fails on any difference (it
   failed on main as it should).

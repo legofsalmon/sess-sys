@@ -84,3 +84,14 @@ are only known to the person doing them (the kit list settled, the deprep).
 - Not done, for later if wanted: steps per company (adding or renaming
   them), due dates on steps, and a list of every step by owner for the
   office.
+
+## Tidied, 28 October 2026
+
+At Colly's ask (the "steps" visual showing the whole job and the step it's
+at): the rule between steps now runs from dot to dot and never through a
+number; the way already come, up to the step the job is at, is drawn
+thicker in the done tone, so how far along a job is reads at a glance (none
+on a stopped job); the step it's at has its name in the heaviest weight; on
+a phone the dots are a little smaller so the rule between them still shows.
+The step opened below puts its name first and largest. Your steps on Home
+say "step 3 of 8" beside the job's name.
