@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-28',
     title: 'Old quotes from Current RMS, matched to jobs and used when pricing',
     what: 'Past quotes has a new page, Match to jobs, that puts each old quote from Current RMS beside the job it looks like, so the office can link them, all the sure ones in one press. A job’s quote then shows its old quotes and how often that client went ahead and at what discount, and a line being priced shows what it was last charged to the client and to anyone, with a button to use that price. Past quotes also shows each client’s record. Nothing changes in Current RMS, and old quotes with no job of ours stay as past quotes.',
-    prs: [0],
+    prs: [151],
     adrs: [92],
   },
   {
