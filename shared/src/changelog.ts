@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.48.1',
+    date: '2026-10-28',
+    title: 'Every page the same width',
+    what: 'Moving between pages no longer makes the page jump wider or narrower. Stock’s pages, Jobs’ list, week and month, Crew, Admin, a job and everything else are now one width on a computer, and the full width on a phone, so the top bar, the row of pages and the title stay still as you go from one to the next. Only how each page shares out its room inside changes.',
+    prs: [149],
+    adrs: [91],
+  },
+  {
     version: '1.48.0',
     date: '2026-10-28',
     title: 'Timesheets can be turned off, and start off',
