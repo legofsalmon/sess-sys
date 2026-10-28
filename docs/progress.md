@@ -39,6 +39,27 @@ turns bad could follow.
   a phone, a laptop and a 1680px screen and fails on any difference (it
   failed on main as it should).
 
+## 28 October 2026: Current RMS's history on quotes
+
+**Done**
+
+- [ADR 0092](adr/0092-current-rms-history-on-quotes.md), part 4 of the
+  quoting plan. Match to jobs (`#jobs/money/current-rms/match`): each
+  opportunity beside its likeliest job by days, client and name; link one,
+  link all the sure ones, unlink. Links kept in `rms_matches` (server only).
+  A job's quote has an "In Current RMS" card (linked past quotes, the
+  client's record); a line being priced shows what it was last charged to
+  the client and to anyone, with "Use €X". Past quotes has a By client card
+  (went ahead of those decided, usual discount, last). Colly chose "Link and
+  look up only": no jobs made from old quotes. App 1.50.0.
+- Checked: typecheck, shared tests (outcomes, client names, matching, client
+  records), server tests (matches, link and unlink, a job's past quotes,
+  last charged, by client), browser tests (rms-history.spec.ts and the
+  quotes tests).
+
+**Waiting on** Colly: read Current RMS again from Admin › Connections if it
+has been a while, then link the sure ones on Match to jobs.
+
 ## 28 October 2026: timesheets can be turned off, and start off
 
 **Done**

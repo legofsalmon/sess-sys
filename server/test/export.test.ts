@@ -145,6 +145,7 @@ describe('download everything', () => {
       'quotes',
       'rack_slots',
       'rms_lines',
+      'rms_matches',
       'rms_opportunities',
       'rms_reads',
       'role_prices',

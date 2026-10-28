@@ -5,7 +5,8 @@ import type { Module } from '../migrations.ts'
  * opportunity and its lines, kept by Current RMS's own ids, and a row for
  * each time it was read. Versioned on its own (rms_schema_version), and
  * backed up and exported like every module's tables. Nothing here refers
- * to the app's own records: matching the history to jobs comes later.
+ * to the app's own records but rms_matches, the office's links from an
+ * opportunity to its job (ADR 0092).
  *
  * The copy is never sent to devices; the server answers the office and
  * directors' screens from it, since it is all prices. A client's contacts
@@ -74,6 +75,17 @@ const MIGRATIONS: string[] = [
     error           text,
     stopped         boolean NOT NULL DEFAULT false
   );
+  `,
+  // Each opportunity linked to the job it was for (ADR 0092), by the office, so the job's quote can show it. One job can
+  // have several (a quote and its revisions), an opportunity one job. Left when the job goes, and skipped.
+  `
+  CREATE TABLE IF NOT EXISTS rms_matches (
+    opportunity_id  integer PRIMARY KEY REFERENCES rms_opportunities(id) ON DELETE CASCADE,
+    project_id      text NOT NULL,
+    linked_by       text NOT NULL DEFAULT '',
+    linked_at       timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS rms_matches_project ON rms_matches (project_id);
   `,
 ]
 

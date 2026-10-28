@@ -59,6 +59,9 @@ import {
   VEHICLE_KIND_LABELS,
   type QuoteKitCheck,
   type QuoteMargin,
+  MOST_LAST_CHARGED_NAMES,
+  type RmsCharge,
+  type RmsLastCharged,
 } from '@sh/shared'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -74,6 +77,7 @@ import { useLate } from '../useLate.ts'
 import { useToday } from '../view.ts'
 import { useUnderTop } from '../useUnderTop.ts'
 import { Top } from './common.tsx'
+import { clientWords, getJson, useAsked, useLastCharged, type RmsJob } from './rms.ts'
 
 /**
  * A job's quote (ADR 0042), #jobs/<id>/quote, for the office and directors:
@@ -283,6 +287,8 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
           {q.id === current?.id && <Records q={q} job={job} />}
         </>
       )}
+
+      <InCurrentRms jobId={job.id} />
 
       {printing &&
         q &&
@@ -631,6 +637,9 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const boss = useAccess().can('money')
   const costOf = (l: QuoteLine) => lineCostOf(l, l.kind === 'crew' ? m.bookedRate(job.id, l) : undefined)
   const margin = quoteMargin(totals.net, all.map(costOf))
+  // What each line was last charged in Current RMS (ADR 0092), by the names it goes by there.
+  const namesOf = (l: LineDraft) => rmsNames(l, (id) => view.warehouse.models.find((x) => x.id === id))
+  const last = useLastCharged(boss, job.id, lines.flatMap(namesOf).slice(0, MOST_LAST_CHARGED_NAMES))
 
   // The draft saves itself a moment after typing stops, once it reads as a quote: there's no Save to forget. Leaving
   // the page saves what's waiting at once. Saving goes through the device's queue, so it works with no signal.
@@ -800,6 +809,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
                 }}
                 kit={kit}
                 cost={<CostFields l={l} n={n} r={done} cost={cost} boss={boss} suppliers={view.kit.suppliers} set={(c) => set(l.id, c)} />}
+                last={<LastCharged found={lastOf(last, namesOf(l))} n={n} price={l.price} onUse={(cents) => set(l.id, { price: euroText(cents) })} />}
               />
             )
           })}
@@ -1185,6 +1195,7 @@ function LineEditor(p: {
   onDone: () => void
   kit: ReactNode
   cost: ReactNode
+  last: ReactNode
 }) {
   const { l, n, r, set, onRemove, onDone } = p
   const [vatOpen, setVatOpen] = useState(false)
@@ -1270,6 +1281,7 @@ function LineEditor(p: {
       </span>
       {p.kit}
       {p.cost}
+      {p.last}
       {typeof r === 'string' && l.what.trim() !== '' && <p className="line-problem">{r}</p>}
       <span className="line-actions">
         <button type="button" className="link" onClick={onRemove} aria-label={`Remove line ${n}`}>
@@ -1280,6 +1292,100 @@ function LineEditor(p: {
         </button>
       </span>
     </div>
+  )
+}
+
+/** The names a line goes by in Current RMS (ADR 0092): a product's own and its other names, a crew role without the phase, or what it says. */
+function rmsNames(l: Pick<LineDraft, 'kind' | 'what' | 'modelId'>, model: (id: string) => { name: string; aliases: readonly string[] } | undefined): string[] {
+  const found = l.modelId ? model(l.modelId) : undefined
+  if (found) return [found.name, ...found.aliases]
+  const what = l.kind === 'crew' ? l.what.replace(/\s*\([^)]*\)\s*$/, '') : l.what
+  return what.trim() ? [what] : []
+}
+
+const lastOf = (last: RmsLastCharged, names: readonly string[]) => {
+  for (const n of names) {
+    const hit = last[n.trim().toLowerCase()]
+    if (hit) return hit
+  }
+  return undefined
+}
+
+/** A day in Current RMS's past, with its year, since it may be years back. */
+const pastDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Dublin' })
+
+const chargeLine = (c: RmsCharge) =>
+  [
+    `${money(c.priceCents)}${c.rate ? ` on the ${c.rate.toLowerCase()}` : ''}`,
+    c.discountPct ? `${c.discountPct.toLocaleString('en-IE')}% off` : '',
+    c.on ? pastDay(c.on) : '',
+    `quote ${c.number}`,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+/** What a line was last charged in Current RMS (ADR 0092), to this client and to anyone, with a press to use the price. A hint only: nothing without signal. */
+function LastCharged({ found, n, price, onUse }: { found: RmsLastCharged[string] | undefined; n: number; price: string; onUse: (cents: number) => void }) {
+  if (!found || (!found.client && !found.any)) return null
+  const use = found.client ?? found.any!
+  const already = parseEuro(price).cents === use.priceCents
+  return (
+    <div className="last-charged" aria-label={`Line ${n}: last charged in Current RMS`}>
+      {found.client && (
+        <p>
+          Last charged to {found.client.client}: {chargeLine(found.client)}.
+        </p>
+      )}
+      {found.any && found.any.opportunityId !== found.client?.opportunityId && (
+        <p className="hint">
+          {found.client ? 'Last to anyone' : 'Last charged'}: {chargeLine(found.any)}, {found.any.client}.
+        </p>
+      )}
+      {!already && (
+        <button type="button" className="link" onClick={() => onUse(use.priceCents)}>
+          Use {money(use.priceCents)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** The job's past quotes in Current RMS, once linked (ADR 0092), and how its client's quotes went there. Needs signal; shows nothing without it. */
+function InCurrentRms({ jobId }: { jobId: string }) {
+  const loaded = useAsked<RmsJob>(useAccess().can('money'), jobId, () => getJson(`/api/rms/jobs/${encodeURIComponent(jobId)}`))
+  if (loaded.state !== 'ready' || (!loaded.data.opportunities.length && !loaded.data.client)) return null
+  const { opportunities, client } = loaded.data
+  return (
+    <section className="card" aria-label="In Current RMS">
+      <h2>In Current RMS</h2>
+      {client && (
+        <p>
+          {client.client}: {clientWords(client)}.
+        </p>
+      )}
+      {opportunities.length ? (
+        <ul className="job-list">
+          {opportunities.map((o) => (
+            <li key={o.id}>
+              <a className="job-row" href={`#jobs/money/current-rms/${o.id}`}>
+                <div>
+                  <b>{o.subject || o.number}</b>
+                  <p className="hint">{[o.number, [o.state, o.status].filter(Boolean).join(', '), o.startsAt ? pastDay(o.startsAt.slice(0, 10)) : ''].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="side">
+                  {money(o.netCents)}
+                  <span aria-hidden="true"> ›</span>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">
+          No past quote is linked to this job. <a href="#jobs/money/current-rms/match">Match past quotes to jobs</a>
+        </p>
+      )}
+    </section>
   )
 }
 

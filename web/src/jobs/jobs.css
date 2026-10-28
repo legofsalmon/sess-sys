@@ -286,6 +286,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
 .quote-screen .quote-line .amount small { display: block; font-weight: 400; }
 .quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
+.quote-screen .quote-line .last-charged { grid-column: 1 / -1; font-size: var(--text-small); }
+.quote-screen .quote-line .last-charged p { margin: 0; }
 .quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
 .quote-screen .quote-line.unpriced input[aria-invalid] { border-color: var(--warn); }
 .quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
@@ -295,6 +297,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
   /* Under the cost side (ADR 0089), Remove and Done end the line on a row of their own. */
   .quote-screen .quote-line .line-cost ~ .line-actions { grid-column: 1 / -1; justify-self: end; }
+  .quote-screen .quote-line .last-charged { grid-column: 1 / -1; }
 }
 /* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
 .quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
@@ -539,3 +542,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .money .package-item > span { flex: 1 1 6em; }
 .money .package-item label { display: inline-flex; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
 .money .package-item input { width: 4.5em; color: var(--ink); }
+
+/* Matching past quotes to jobs (ADR 0092). */
+.rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
+.rms-match .match-row select { flex: 1 1 18em; min-width: 0; }
