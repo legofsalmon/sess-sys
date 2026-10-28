@@ -13,6 +13,7 @@ import { QuotingCard } from './QuotingCard.tsx'
 import { TimesheetsUseCard } from './TimesheetsUseCard.tsx'
 import { TravelCard } from './TravelCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
+import { StatusPanel } from './StatusPanel.tsx'
 import { useAccess } from './role.ts'
 import { TabPanel, Tabs, useTab } from './Tabs.tsx'
 import { useView } from './view.ts'
@@ -20,9 +21,9 @@ import { MENU } from './Up.tsx'
 
 /** The company's settings, at #admin from the Menu: how sign-in stands, the office, Google Calendar, backups and data, made-up data and starting fresh, Current RMS (ADR 0078), the way to where each list is brought in (ADR 0041), and the app's version with what changed in it (ADR 0071). A person's own things (their role, signing out, their feed, this device) are under You (YouScreen.tsx). */
 
-/** Admin in three parts (ADR 0082), one at a time: the company, what it's connected to, and its data. */
-type AdminPart = 'company' | 'connections' | 'data'
-const ADMIN_LABELS: Record<AdminPart, string> = { company: 'Company', connections: 'Connections', data: 'Data' }
+/** Admin in parts (ADR 0082), one at a time: the company, what it's connected to, its data, and how everything it relies on stands (ADR 0093). */
+type AdminPart = 'company' | 'connections' | 'data' | 'status'
+const ADMIN_LABELS: Record<AdminPart, string> = { company: 'Company', connections: 'Connections', data: 'Data', status: 'Status' }
 
 export function AccountScreen() {
   const auth = useAuth()
@@ -32,7 +33,7 @@ export function AccountScreen() {
   const settings = access.can('settings')
   const company = access.can('company')
   const shown = auth.status === 'signed-in' || auth.status === 'open'
-  const parts: AdminPart[] = !shown ? [] : settings ? ['company', 'connections', 'data'] : company ? ['company', 'data'] : []
+  const parts: AdminPart[] = !shown ? [] : settings ? ['company', 'connections', 'data', 'status'] : company ? ['company', 'data'] : []
   const [part, pick] = useTab({ parts: parts.length ? parts : (['company'] as AdminPart[]), asked, remember: 'sh.adminPart', address: (p) => `#admin/${p}` })
 
   return (
@@ -95,6 +96,7 @@ export function AccountScreen() {
                 {company && <DataCard view={view} />}
               </>
             )}
+            {part === 'status' && <StatusPanel />}
           </TabPanel>
         </>
       )}
