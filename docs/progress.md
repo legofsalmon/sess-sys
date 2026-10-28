@@ -11,7 +11,7 @@ waiting on someone.
   the price list (`packages`): a name, the department it's listed under, a
   price and rate rule, the products it holds and anything else it includes.
   "Add a package" on a quote puts it on as one line, with what it holds
-  written on the line (`includes`) and printed under it. App 1.44.0.
+  written on the line (`includes`) and printed under it. App 1.43.0.
 - Checked: typecheck, unit tests (what a package prints, saved, changed and
   taken off, only products in the stock list), parity, browser test
   (quotes.spec.ts: a package made on the price list, added to a quote and
