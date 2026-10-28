@@ -616,6 +616,8 @@ function MySteps({ view, me, all }: { view: View; me: PersonView; all: boolean }
                   <b>{step.label}</b>
                   <p>
                     {job.name}
+                    {/* Where the step sits in the job's way, so the list says how far along each job is (ADR 0073). */}
+                    {` · step ${step.number} of ${view.steps.of(job.id)?.steps.length ?? 8}`}
                     {step.hint && ` · ${step.hint}`}
                   </p>
                 </div>
