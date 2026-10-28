@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.39.0',
+    version: '1.40.0',
     date: '2026-10-28',
     title: 'Photos of kit, and the rack sheet',
     what: 'A product can now have a photo: open it in Stock and press Add a photo. A photo of its front panel shows on it in the rack designer, flat and in 3D, so a rack on screen looks like the one in the truck, and the photo shows in the stock lists and on a job’s kit too. Each rack also prints as a sheet to build it from: Print the rack sheet, on the rack’s page or in the designer, gives the front and back drawn side by side, then what goes where in words, with labels, groups, tape colours and notes, what’s in each drawer, and its weight and power.',
     prs: [139],
     adrs: [83],
+  },
+  {
+    version: '1.39.0',
+    date: '2026-10-27',
+    title: 'Start a quote in a few words, and know which to chase',
+    what: 'Money has a New quote button: give the job a name, the client and the days, and its quote opens, with the job added as an enquiry. Marking a quote sent now moves the job to quoted. When the client says yes or no, the quote offers to confirm the job or mark it lost in one press. Money lists every quote waiting on the office: answered, waiting for an answer (with a nudge after a week) and not sent yet, and Notifications shows the ones worth a call. The app still contacts nobody.',
+    prs: [134],
+    adrs: [81],
   },
   {
     version: '1.38.1',

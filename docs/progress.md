@@ -13,7 +13,7 @@ waiting on someone.
   everyone signed in), kept at its own shape; it shows on the product's
   page, in the lists, and on its panel in the rack, flat and in 3D. Print
   the rack sheet, on the rack's page and in the designer: front and back,
-  groups, what goes where and what's loose, black on white. App 1.39.0.
+  groups, what goes where and what's loose, black on white. App 1.40.0.
 - Checked: typecheck, unit tests (a product's photo put up, replaced,
   taken down, gone with the product, and who can), browser test
   (racks.spec.ts: a photo from the product's page on its panel, and the
@@ -23,6 +23,23 @@ waiting on someone.
 
 - Nothing more planned for racks. Sizes from a list of known models were
   left out (see the ADR).
+
+## 27 October 2026: starting a quote and following it up
+
+**Done**
+
+- [ADR 0081](adr/0081-starting-a-quote-and-following-it-up.md), part 1b of
+  the quoting plan. New quote on Money (an enquiry and its draft from a
+  name, client and days); marking a quote sent makes the job quoted; an
+  answer offers to confirm the job or mark it lost; Money lists quotes
+  waiting on the office, and Notifications the ones worth a call. App
+  1.39.0.
+- Checked: typecheck, unit tests (`quotesToFollow`), a new e2e test from New
+  quote to confirming the job, and the quotes e2e test.
+
+**Next**
+
+- 1c: the printed quote (number, valid until, terms, deposit).
 
 ## 27 October 2026: building a rack up
 

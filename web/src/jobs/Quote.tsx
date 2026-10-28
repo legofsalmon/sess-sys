@@ -18,6 +18,7 @@ import {
   QUOTE_STATUS_LABELS,
   quoteTotals,
   spanLabel,
+  STOPPED,
   STANDARD_VAT,
   VAT_LABELS,
   VAT_RATES,
@@ -66,6 +67,40 @@ export function QuotePill({ q }: { q: QuoteView }) {
     <StatusPill tone={q.paidOn ? 'confirmed' : TONE[q.status]} pending={q.pending}>
       {q.paidOn ? 'Paid' : q.invoicedOn ? 'Invoiced' : QUOTE_STATUS_LABELS[q.status]}
     </StatusPill>
+  )
+}
+
+/**
+ * Sent to the client, and so the job is quoted (ADR 0081): an enquiry moves on by itself, since that's all "quoted"
+ * means. A job already confirmed, or stopped, stays as it is.
+ */
+async function markSent(id: string, job: JobView, on: string) {
+  await client.mutate('quote.sent', { id, on })
+  if (job.status === 'enquiry') await client.mutate('project.update', { id: job.id, status: 'quoted' })
+}
+
+/**
+ * The client has answered, and the job doesn't say so yet (ADR 0081): confirm it, or mark it lost, with one press.
+ * Offered, not done by itself: confirming puts the job on the calendar and holds its kit, and losing it cancels its
+ * crew calls, which the office should see happen.
+ */
+export function InStep({ job, want, compact }: { job: JobView; want: 'confirmed' | 'lost'; compact?: boolean }) {
+  const { run, error } = useAct()
+  const go = () => void run(() => client.mutate('project.update', { id: job.id, status: want }))
+  return (
+    <div className="in-step">
+      {!compact && (
+        <p>
+          {want === 'confirmed'
+            ? `The client accepted, and the job is still ${job.status === 'enquiry' ? 'an enquiry' : 'quoted'}. Confirming it puts it on the jobs calendar and holds its kit.`
+            : `The client turned it down, and the job is still ${job.status === 'enquiry' ? 'an enquiry' : 'quoted'}. Marking it lost cancels any crew calls on it.`}
+        </p>
+      )}
+      <button type="button" className={want === 'confirmed' ? 'primary' : undefined} onClick={go} disabled={job.pending}>
+        {want === 'confirmed' ? 'Confirm the job' : 'Mark the job lost'}
+      </button>
+      <Refusal error={error} />
+    </div>
   )
 }
 
@@ -204,7 +239,7 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
             </div>
             {settled && q.latest && <p className="hint">The quote is invoiced, so it's settled: no new version.</p>}
           </section>
-          {q.id === current?.id && <Records q={q} />}
+          {q.id === current?.id && <Records q={q} job={job} />}
         </>
       )}
 
@@ -537,7 +572,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
             Sent to the client on
             <input type="date" value={sentOn} max={irishToday()} onChange={(e) => setSentOn(e.target.value)} />
           </label>
-          <button type="button" className="primary" onClick={() => void run(() => client.mutate('quote.sent', { id: q.id, on: sentOn || today }))}>
+          <button type="button" className="primary" onClick={() => void run(() => markSent(q.id, job, sentOn || today))}>
             Mark as sent
           </button>
           {!answering ? (
@@ -765,7 +800,7 @@ function NewVersion({ q, onMade }: { q: QuoteView; onMade: (id: string) => void 
 }
 
 /** The office's records of what happened outside the app: the client's answer, the invoice, the payment. */
-function Records({ q }: { q: QuoteView }) {
+function Records({ q, job }: { q: QuoteView; job: JobView }) {
   const today = useToday()
   const [on, setOn] = useState(today)
   const [ref, setRef] = useState('')
@@ -804,6 +839,8 @@ function Records({ q }: { q: QuoteView }) {
         )}
       </dl>
       <Refusal error={error} />
+      {q.status === 'accepted' && !STOPPED.includes(job.status) && job.status !== 'confirmed' && <InStep job={job} want="confirmed" />}
+      {q.status === 'declined' && !STOPPED.includes(job.status) && <InStep job={job} want="lost" />}
       {q.status === 'sent' && (
         <div className="quote-send">
           {when}

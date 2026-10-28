@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
 import { changesFromJob, csvText, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
-import { invoicesCsv, vatSummaryCsv } from '../src/sync/money-view.ts'
+import { invoicesCsv, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
+import type { JobView } from '../src/sync/jobs-view.ts'
 
 /**
  * Quotes and money (ADR 0042): what a quote comes to, VAT by rate after the
@@ -235,5 +236,44 @@ describe('money on the device', () => {
     await phone.sync()
     expect(phone.view().money.quotesOf('gala')).toHaveLength(1)
     expect(phone.view().money.productPrice('y10p')).toBe(4500)
+  })
+})
+
+describe('quotes to follow up (ADR 0081)', () => {
+  const job = (id: string, status: JobView['status']) => ({ id, name: id, status }) as JobView
+  let n = 0
+  const quote = (over: Partial<QuoteView>) =>
+    ({ id: `q${++n}`, status: 'sent', sentOn: null, answeredOn: null, invoicedOn: null, savedAt: '2026-10-20T10:00:00Z', ...over }) as QuoteView
+  const today = '2026-10-27'
+
+  it('sorts each job by what it is waiting on, the longest waiting first', () => {
+    const drafts = new Map<string, QuoteView>()
+    const rows: { job: JobView; current: QuoteView | undefined }[] = [
+      { job: job('Draft only', 'enquiry'), current: undefined },
+      { job: job('Sent lately', 'quoted'), current: quote({ sentOn: '2026-10-25' }) },
+      { job: job('Sent long ago', 'quoted'), current: quote({ sentOn: '2026-10-10' }) },
+      { job: job('Said yes', 'quoted'), current: quote({ status: 'accepted', sentOn: '2026-10-10', answeredOn: '2026-10-20' }) },
+      { job: job('Said yes, confirmed, invoiced', 'confirmed'), current: quote({ status: 'accepted', answeredOn: '2026-10-20', invoicedOn: '2026-10-21' }) },
+      { job: job('Said no', 'quoted'), current: quote({ status: 'declined', answeredOn: '2026-10-26' }) },
+      { job: job('Lost', 'lost'), current: quote({ sentOn: '2026-10-01' }) },
+    ]
+    drafts.set('Draft only', quote({ status: 'draft', savedAt: '2026-10-24T09:00:00Z' }))
+    const f = quotesToFollow({ jobs: rows as never, draftOf: (id) => drafts.get(id) }, today)
+    expect(f.drafts.map((x) => [x.job.name, x.days])).toEqual([['Draft only', 3]])
+    expect(f.waiting.map((x) => [x.job.name, x.days])).toEqual([
+      ['Sent long ago', 17],
+      ['Sent lately', 2],
+    ])
+    expect(f.outOfStep.map((x) => [x.job.name, x.want])).toEqual([
+      ['Said yes', 'confirmed'],
+      ['Said no', 'lost'],
+    ])
+  })
+
+  it('leaves a sent quote out of waiting while a new version is being drafted', () => {
+    const rows = [{ job: job('Second go', 'quoted'), current: quote({ sentOn: '2026-10-01' }) }]
+    const f = quotesToFollow({ jobs: rows as never, draftOf: () => quote({ status: 'draft' }) }, today)
+    expect(f.waiting).toEqual([])
+    expect(f.drafts).toHaveLength(1)
   })
 })
