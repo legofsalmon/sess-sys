@@ -251,7 +251,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
       const { code, state } = google.consent(start.headers.location as string)
       const attempt = start.cookies.find((c) => c.name === 'sh_calendar')!.value
       const back = await app.inject({ url: `/api/calendar/callback?code=${code}&state=${state}`, cookies: { ...colly.cookies, sh_calendar: attempt } })
-      expect(back.headers.location).toBe('/?calendar=connected#admin')
+      expect(back.headers.location).toBe('/?calendar=connected#admin/connections')
       const cal = 'test-cal@group.calendar.google.com'
       expect((await app.inject({ method: 'POST', url: '/api/calendar/use?client=phonec0ffee', cookies: colly.cookies, payload: { calendarId: cal } })).statusCode).toBe(200)
 
