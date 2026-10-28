@@ -8,7 +8,7 @@ import { documentsSection } from '../documents/page.ts'
 import { documentsOf } from '../documents/store.ts'
 import { publicOrigin } from '../http.ts'
 import { reportError } from '../monitoring.ts'
-import { officeFor } from '../office/store.ts'
+import { officeFor, usesTimesheets } from '../office/store.ts'
 import { getPhase } from '../projects/store.ts'
 import { sendFeed, type Feeds } from './feeds.ts'
 import { getLate, lateFor, lateOf } from './late.ts'
@@ -80,6 +80,8 @@ const SAID = {
   // A timesheet.
   'timesheet-sent': { ok: true, text: "Thanks, it's gone to the office. You can change it until they approve it." },
   'not-your-booking': { ok: false, text: "That booking isn't one of yours." },
+  // The company doesn't use timesheets (ADR 0090): what they worked goes to the office as before.
+  'no-timesheets': { ok: false, text: "Timesheets aren't used here just now. The office keeps your days; ask them if anything's not right." },
   'tick-a-day-worked': { ok: false, text: 'Tick at least one day you worked.' },
   'say-what-for': { ok: false, text: 'Say what each extra is for.' },
   'extra-amount': { ok: false, text: 'Put in the amount for each extra, in euro.' },
@@ -215,6 +217,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       today: now,
       ended: await endedOn(db, rows.map((r) => r.offer)),
       timesheets: await timesheetsFor(db, person.id),
+      noTimesheets: !(await usesTimesheets(db)),
       office: await officeFor(db),
       onTheDay,
       demo,
@@ -256,11 +259,12 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     })
   }
 
-  // A booking's timesheet (ADR 0022): the person's own, from its first day.
+  // A booking's timesheet (ADR 0022): the person's own, from its first day. None while the company doesn't use them (ADR 0090).
   app.get('/f/:token/timesheet/:id', async (req: Req, reply) => {
     noStore(reply)
     const person = await personByToken(db, req.params.token)
     if (!person) return gone(reply)
+    if (!(await usesTimesheets(db))) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken), 'timesheet'))
     const offer = await getOffer(db, req.params.id ?? '')
     const call = offer && offer.personId === person.id ? await getCall(db, offer.callId) : undefined
     if (!offer || !call) return reply.code(404).type('text/html').send(renderNoSheet(base(req, person.linkToken), 'timesheet'))
@@ -272,6 +276,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     if (!person) return gone(reply)
     const offer = await getOffer(db, req.params.id ?? '')
     if (!offer || offer.personId !== person.id) return back(reply, person.linkToken, 'not-your-booking')
+    if (!(await usesTimesheets(db))) return back(reply, person.linkToken, 'no-timesheets')
     const again = (what: Said | Refusal) => reply.redirect(`/f/${person.linkToken}/timesheet/${encodeURIComponent(offer.id)}?${new URLSearchParams(told(what))}`, 303)
     const form = (req.body ?? new URLSearchParams()) as Form
     // A refusal keeps the days, extras and note as they were typed (rule 11).

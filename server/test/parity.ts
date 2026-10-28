@@ -232,6 +232,7 @@ const CASES: Case[] = [
   c('office.update', { name: 'Session Hire', phone: '+35315551234', email: 'office@sessionhire.com' }),
   c('reading.heads', { rates: true }),
   c('messages.prompt', { on: false }),
+  c('timesheets.use', { on: true }),
 
   // Leave and time in lieu.
   c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(40), note: 'Family' }),
