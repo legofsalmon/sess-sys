@@ -1,4 +1,4 @@
-import { QUOTE_SETTINGS_ID, roleKey, type CommandArgs, type Quote } from '@sh/shared'
+import { QUOTE_SETTINGS_ID, roleKey, type CommandArgs, type Quote, type RateRule } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getTimesheet } from '../crew/timesheets.ts'
 import { getClient, getProject } from '../projects/store.ts'
@@ -21,7 +21,7 @@ import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getQuoteSett
  * Sending the same change twice, as a phone may, changes nothing.
  */
 
-type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.role' | 'price.client' | 'cost.paid'
+type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'price.role' | 'price.client' | 'cost.paid'
 type Handler<N extends FinanceCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const emitQuote = async (ctx: Ctx, id: string) => emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
@@ -78,6 +78,7 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
       // Left as they were by a save that doesn't say them, as one from an app older than them doesn't.
       if (a.validDays !== undefined) await ctx.tx.query('UPDATE quotes SET valid_days = $2 WHERE id = $1', [a.id, a.validDays])
       if (a.depositPct !== undefined) await ctx.tx.query('UPDATE quotes SET deposit_pct = $2 WHERE id = $1', [a.id, a.depositPct])
+      if (a.agreedCents !== undefined) await ctx.tx.query('UPDATE quotes SET agreed_cents = $2 WHERE id = $1', [a.id, a.agreedCents])
       return emitQuote(ctx, a.id)
     }
     const versions = await quotesOf(ctx.tx, a.projectId)
@@ -88,7 +89,8 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     // A new version holds its prices as long as the one before, and asks the same deposit, unless it says otherwise.
     const before = versions[0]
     await ctx.tx.query(
-      `INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes, valid_days, deposit_pct) VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8)`,
+      `INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes, valid_days, deposit_pct, agreed_cents)
+       VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9)`,
       [
         a.id,
         a.projectId,
@@ -98,6 +100,8 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
         a.notes.trim(),
         a.validDays ?? before?.validDays ?? 30,
         a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
+        // A price agreed is for the lines it was agreed on, so a new version starts without one unless it says.
+        a.agreedCents ?? null,
       ]
     )
     await emitQuote(ctx, a.id)
@@ -175,7 +179,38 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
       return
     }
     await ctx.tx.query(`INSERT INTO product_prices (model_id, day_cents) VALUES ($1, $2) ON CONFLICT (model_id) DO UPDATE SET day_cents = EXCLUDED.day_cents`, [a.modelId, a.dayCents])
+    // Left as it was by a change that doesn't say it, as one from an app older than rules doesn't (ADR 0085).
+    if (a.rate !== undefined) await ctx.tx.query('UPDATE product_prices SET rate = $2 WHERE model_id = $1', [a.modelId, a.rate])
     await emit(ctx, 'productPrice', a.modelId, await getProductPrice(ctx.tx, a.modelId))
+  },
+
+  /**
+   * Each priced product's rule from the quotes read from Current RMS (ADR 0085): the rate definition its lines were
+   * charged by most, matched by the product's name or one of its other names. Unless asked for all, only those with no
+   * rule chosen yet, so one the office chose stays.
+   */
+  async 'price.rulesFromRms'(ctx, a) {
+    const { rows } = await ctx.tx.query<{ model_id: string; rule: string }>(
+      `WITH names AS (
+         SELECT m.id, lower(m.name) AS name FROM models m JOIN product_prices pp ON pp.model_id = m.id
+         UNION SELECT m.id, lower(alias) FROM models m JOIN product_prices pp ON pp.model_id = m.id, jsonb_array_elements_text(m.aliases) AS alias
+       ),
+       counted AS (
+         SELECT n.id, l.rate_definition, count(*) AS c,
+                row_number() OVER (PARTITION BY n.id ORDER BY count(*) DESC, l.rate_definition) AS rank
+         FROM names n JOIN rms_lines l ON lower(l.name) = n.name
+         WHERE l.rate_definition IN ('Daily Rate', '3 Day Week Rate', 'Weekly Rate')
+         GROUP BY n.id, l.rate_definition
+       )
+       SELECT c.id AS model_id, c.rate_definition AS rule FROM counted c JOIN product_prices pp ON pp.model_id = c.id
+       WHERE c.rank = 1 ${a.all ? '' : 'AND pp.rate IS NULL'}`
+    )
+    const RULE: Record<string, RateRule> = { 'Daily Rate': 'daily', '3 Day Week Rate': 'week3', 'Weekly Rate': 'weekly' }
+    for (const r of rows) {
+      const rule = RULE[r.rule]!
+      const { rows: changed } = await ctx.tx.query('UPDATE product_prices SET rate = $2 WHERE model_id = $1 AND rate IS DISTINCT FROM $2 RETURNING 1', [r.model_id, rule])
+      if (changed.length) await emit(ctx, 'productPrice', r.model_id, await getProductPrice(ctx.tx, r.model_id))
+    }
   },
 
   async 'price.role'(ctx, a) {

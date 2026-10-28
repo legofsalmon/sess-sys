@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.42.0',
+    date: '2026-10-28',
+    title: 'Weekly and 3 Day Week prices, discounts and an agreed total',
+    what: 'Each kit price can now be charged Daily, 3 Day Week (never more than three days in any week) or Weekly, as Current RMS did, and one press on the price list takes each product’s from Current RMS. On a quote, a kit line charged that way takes the days out and works out what is charged. Any line can have its own discount, a department can be given one in a press, and “Agree a total” sets the price before VAT the client agreed, with the discount worked out to come to it.',
+    prs: [141],
+    adrs: [85],
+  },
+  {
     version: '1.41.0',
     date: '2026-10-28',
     title: 'A proper printed quote, with its number',

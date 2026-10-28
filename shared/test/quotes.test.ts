@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
+import { chargedFor, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { invoicesCsv, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
 import type { JobView } from '../src/sync/jobs-view.ts'
@@ -43,7 +43,7 @@ describe('the printed quote (ADR 0084)', () => {
     expect(c.removed.map((l) => l.what)).toEqual(['Audio tech'])
     expect(c.changed.map((x) => [x.line.qty, x.was.qty])).toEqual([[10, 8]])
     expect(c.discount).toEqual({ was: 0, now: 10 })
-    expect(versionChanges(was, { ...was, lines: was.lines.map((l) => ({ ...l, id: `${l.id}2` })) })).toEqual({ added: [], removed: [], changed: [], discount: null })
+    expect(versionChanges(was, { ...was, lines: was.lines.map((l) => ({ ...l, id: `${l.id}2` })) })).toEqual({ added: [], removed: [], changed: [], discount: null, agreed: null })
   })
 })
 
@@ -82,6 +82,42 @@ describe('what a quote comes to', () => {
   it('writes euros as a quote does', () => {
     expect(money(125000)).toBe('€1,250.00')
     expect(money(5)).toBe('€0.05')
+  })
+})
+
+describe('rate rules, line discounts and an agreed price (ADR 0085)', () => {
+  it('charges a week as one, a 3 Day Week as no more than three days in any seven, and Daily by the day, as Current RMS did', () => {
+    // Proves: the counts Current RMS charged on its lines, read from its history.
+    expect([1, 3, 7, 8, 14, 15].map((d) => chargedFor('weekly', d))).toEqual([1, 1, 1, 2, 2, 3])
+    expect([1, 2, 3, 4, 7, 8, 10, 11, 14, 0.5].map((d) => chargedFor('week3', d))).toEqual([1, 2, 3, 3, 3, 4, 6, 6, 6, 1])
+    expect([1, 2.5, 9].map((d) => chargedFor('daily', d))).toEqual([1, 2.5, 9])
+  })
+
+  it("takes a line's own discount off it before the whole quote's", () => {
+    expect(lineCents(line({ qty: 2, days: 3, unitCents: 10000, discountPct: 30 }))).toBe(42000)
+    expect(lineCents(line({ qty: 1, days: 1, unitCents: 333, discountPct: 12.5 }))).toBe(291)
+    const t = quoteTotals({ lines: [line({ unitCents: 10000, discountPct: 50 }), line({ unitCents: 10000 })], discountPct: 10 })
+    expect(t).toMatchObject({ subtotal: 15000, discount: 1500, net: 13500 })
+    expect(quoteLine.safeParse(line({ discountPct: 101 })).success).toBe(false)
+    expect(quoteLine.safeParse(line({ rate: 'week3', out: 10, days: 6 })).success).toBe(true)
+  })
+
+  it('makes the discount whatever brings the lines to a price agreed, shared across the VAT rates so the totals still add up', () => {
+    const lines = [line({ qty: 8, days: 2, unitCents: 4500 }), line({ unitCents: 15000, vat: '13.5' })]
+    const t = quoteTotals({ lines, discountPct: 10, agreedCents: 80000 })
+    expect(t).toMatchObject({ subtotal: 87000, discount: 7000, net: 80000, discountPct: 8 })
+    expect(t.rates.reduce((n, r) => n + r.discount, 0)).toBe(7000)
+    expect(t.gross).toBe(t.net + t.vat)
+    // None agreed: the percentage, as before.
+    expect(quoteTotals({ lines, discountPct: 10, agreedCents: null })).toMatchObject({ discount: 8700, discountPct: 10 })
+    const was = { lines, discountPct: 0, agreedCents: null }
+    expect(versionChanges(was, { ...was, agreedCents: 80000, discountPct: 8 })).toMatchObject({ agreed: { was: null, now: 80000 }, discount: null })
+  })
+
+  it("counts a kit line's days by its product's rule, keeping the days out", () => {
+    const [l] = linesFor([{ id: 'k1', modelId: 'y10p', name: 'd&b Y10P', group: 'Audio', qty: 4, days: 10 }], [], { product: () => 5500, role: () => undefined, rate: () => 'week3' }, () => 'n1')
+    expect(l).toMatchObject({ rate: 'week3', out: 10, days: 6, unitCents: 5500 })
+    expect(lineCents(l!)).toBe(4 * 6 * 5500)
   })
 })
 

@@ -29,6 +29,7 @@ import {
   type ProjectStatus,
   type RetiredReason,
 } from '@sh/shared'
+import { RATE_LABELS, type RateRule } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
@@ -908,7 +909,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'quoting.update':
       return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
     case 'price.product':
-      return a.dayCents === null ? `Took ${model(a.modelId)} off the price list` : `Set the day price of ${model(a.modelId)}`
+      return a.dayCents === null
+        ? `Took ${model(a.modelId)} off the price list`
+        : `Set the price of ${model(a.modelId)}${typeof a.rate === 'string' && a.rate in RATE_LABELS ? `, charged ${RATE_LABELS[a.rate as RateRule]}` : ''}`
+    case 'price.rulesFromRms':
+      return a.all === true ? "Set every product's rate rule from Current RMS's quotes" : "Set the rate rule of products with none from Current RMS's quotes"
     case 'price.role':
       return a.dayCents === null ? `Took ${text(a.role, 'a role')} off the price list, to quote it at its booked rate` : `Set the day price for ${text(a.role, 'a role')}`
     case 'price.client':

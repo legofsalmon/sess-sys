@@ -259,6 +259,8 @@ const CASES: Case[] = [
   // Money.
   c('quote.save', { id: 'q2', projectId: 'gala', lines: [{ id: 'l1', kind: 'kit', what: 'd&b Y10P', ref: 'y10p', group: 'Audio', qty: 4, days: 3, unitCents: 4500, vat: '23' }, { id: 'l2', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '13.5' }], discountPct: 5, notes: 'Second go' }, { as: 'a new version' }),
   c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' }, { as: 'a first draft' }),
+  c('quote.save', { id: 'q3', projectId: 'enq', lines: [{ ...DELIVERY, discountPct: 20 }], discountPct: 0, agreedCents: 10000, notes: '' }, { as: 'a price agreed' }),
+  c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' }, { as: 'keeping the price agreed', before: [m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, agreedCents: 10000, notes: '' })] }),
   c('quote.sent', { id: 'q3', on: today }, { before: [m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' })] }),
   c('quote.sent', { id: 'q3', on: today }, { as: 'numbered after the next number set', before: [m('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }), m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '', validDays: 14, depositPct: 50 })] }),
   c('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }),
@@ -269,6 +271,9 @@ const CASES: Case[] = [
   c('quote.paid', { id: 'q1', on: today }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today }), m('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' })] }),
   c('price.product', { modelId: 'xlr', dayCents: 300 }),
   c('price.product', { modelId: 'y10p', dayCents: null }, { as: 'taken off' }),
+  c('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'weekly' }, { as: 'charged by the week' }),
+  c('price.product', { modelId: 'xlr', dayCents: 1500 }, { as: 'keeping its rule', before: [m('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'week3' })] }),
+  c('price.rulesFromRms', { all: false }),
   c('price.role', { role: '  Sound   No.1 ', dayCents: 35000 }),
   c('price.client', { clientId: 'bw', pct: 10 }),
   c('cost.paid', { id: 'dara-then', on: today }, { before: [m('timesheet.approve', { id: 'dara-then', days: [day(-3), day(-2)], dayRateCents: 32000, extras: [], officeNote: '' })] }),

@@ -166,6 +166,47 @@ describe('the price list', () => {
   })
 })
 
+describe('rate rules and an agreed price (ADR 0085)', () => {
+  it("keeps a product's rule through a price change that doesn't say one, as from an older app", async () => {
+    const { app } = await gala()
+    await ok(app, m('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' }))
+    await ok(app, m('price.product', { modelId: 'y10p', dayCents: 4500, rate: 'week3' }), m('price.product', { modelId: 'y10p', dayCents: 5000 }))
+    const prices = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'productPrice')
+    expect(prices.at(-1).data).toEqual({ id: 'y10p', dayCents: 5000, rate: 'week3' })
+  })
+
+  it("takes each priced product's rule from the lines read from Current RMS, by name or other name, leaving one chosen alone", async () => {
+    const { app, db } = await gala()
+    const model = (id: string, name: string, aliases: string[] = []) =>
+      m('model.create', { id, name, aliases, department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' })
+    await ok(app, model('y10p', 'd&b Y10P'), model('sm58', 'Shure SM58', ['SM58']), model('di', 'DI box'), model('unpriced', 'Hazer'))
+    await ok(app, m('price.product', { modelId: 'y10p', dayCents: 4500 }), m('price.product', { modelId: 'sm58', dayCents: 500 }), m('price.product', { modelId: 'di', dayCents: 300, rate: 'daily' }))
+    await db.query(`INSERT INTO rms_opportunities (id) VALUES (1)`)
+    const rows: [string, string][] = [
+      ['D&B Y10P', 'Weekly Rate'], ['d&b Y10P', 'Weekly Rate'], ['d&b Y10P', '3 Day Week Rate'],
+      ['SM58', '3 Day Week Rate'], ['DI box', 'Weekly Rate'], ['Hazer', 'Weekly Rate'], ['d&b Y10P', 'Sale'],
+    ]
+    for (const [i, [name, rate]] of rows.entries()) await db.query(`INSERT INTO rms_lines (id, opportunity_id, name, rate_definition) VALUES ($1, 1, $2, $3)`, [i + 1, name, rate])
+    await ok(app, m('price.rulesFromRms', { all: false }))
+    const pulled = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes as { entity: string; id: string; data: { rate?: string } }[]
+    const rule = (id: string) => pulled.filter((c) => c.entity === 'productPrice' && c.id === id).at(-1)!.data.rate
+    expect([rule('y10p'), rule('sm58'), rule('di')]).toEqual(['weekly', 'week3', 'daily'])
+    expect(pulled.some((c) => c.entity === 'productPrice' && c.id === 'unpriced')).toBe(false)
+  })
+
+  it('holds a price agreed on its draft until it is cleared', async () => {
+    const { app, quote } = await gala()
+    await ok(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: 60000, notes: '' }))
+    expect((await quote('q1')).agreedCents).toBe(60000)
+    // A save from an older app says nothing of it, and it stays.
+    await ok(app, save('q1'))
+    expect((await quote('q1')).agreedCents).toBe(60000)
+    await ok(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: null, notes: '' }))
+    expect((await quote('q1')).agreedCents).toBeNull()
+    expect(await refused(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: -1, notes: '' }))).toBe("A price can't be less than nothing.")
+  })
+})
+
 describe("a freelancer's cost", () => {
   it('is marked paid only once approved, and the timesheet then stays approved', async () => {
     const { app } = await gala()

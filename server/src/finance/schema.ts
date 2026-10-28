@@ -62,6 +62,12 @@ const MIGRATIONS: string[] = [
     bank         text NOT NULL DEFAULT ''
   );
   `,
+  // Pricing the way Current RMS did (ADR 0085): each product's rate rule (Daily, 3 Day Week or Weekly), and a price
+  // agreed for a whole quote in place of a discount percentage.
+  `
+  ALTER TABLE product_prices ADD COLUMN IF NOT EXISTS rate text CHECK (rate IN ('daily', 'week3', 'weekly'));
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS agreed_cents bigint CHECK (agreed_cents >= 0);
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

@@ -266,7 +266,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
 /* Where the draft has the room, a line is one row, like the table it prints as. */
 @container (min-width: 860px) {
-  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(6em, 1.1fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
+  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(8em, 1.3fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
   .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
 }
 /* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
@@ -286,6 +286,10 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all input { width: 4.5em; }
+.quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .group-discount label { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-screen .group-discount input { width: 4.5em; color: var(--ink); }
+.quote-screen .agreed-note { margin: var(--space-2) 0 0; color: var(--ink); }
 .quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
 .quote-screen .quote-send label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-send .hint { flex-basis: 100%; }
@@ -301,7 +305,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-totals { margin: var(--space-10) 0 0 auto; display: grid; gap: var(--space-2); max-width: 22em; font-variant-numeric: tabular-nums; }
 .quote-totals div { display: flex; justify-content: space-between; gap: var(--space-12); }
 .quote-totals dt { color: var(--muted); }
-.quote-totals dd { margin: 0; }
+.quote-totals dd { margin: 0; white-space: nowrap; }
 .quote-totals .total { border-top: 1px solid var(--line); padding-top: var(--space-4); font-weight: 700; }
 .quote-totals .total dt { color: var(--ink); }
 .jobs .margin-line { margin: 0; }
@@ -330,6 +334,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .money .price-row .euro { display: inline-flex; align-items: center; gap: var(--space-4); }
 .money .price-row .euro input { width: 6.5em; }
 .money .price-row .alert { flex-basis: 100%; }
+.money .rate-rules { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-12); }
+.money .rate-rules .hint { margin: 0; }
 @media print {
   .print-sheet.quote-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
   .quote-sheet h1 { font-size: 17pt; margin: 2pt 0; }
