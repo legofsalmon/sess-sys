@@ -3,6 +3,24 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: timesheets can be turned off, and start off
+
+**Done**
+
+- [ADR 0089](adr/0089-timesheets-off-until-used.md). A "Timesheets" switch
+  under Admin › Company, off by default (Colly won't use them on day one).
+  While off: no Timesheets page in Crew's row or the Menu, no Home count, no
+  notifications of them, nothing on freelancers' links (their timesheet page
+  is 404 and a post is turned down), and Money's "Owed to freelancers" only
+  if some approved are still to pay. Nothing deleted. Made-up data turns
+  them on. App 1.46.0.
+- Checked: typecheck, shared and server tests (off by default, link page and
+  post refused while off, kept and back when on, the history entry), browser
+  tests (timesheets-switch.spec.ts, and the timesheet, crew row, home,
+  departments and access tests).
+
+**Waiting on** nobody. Colly turns them on under Admin › Company when needed.
+
 ## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
 
 **Done**

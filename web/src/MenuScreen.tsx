@@ -1,4 +1,4 @@
-import type { Ability } from '@sh/shared'
+import type { Ability, View } from '@sh/shared'
 import { Top } from './jobs/common.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
@@ -23,6 +23,8 @@ export interface Place {
   about: string
   /** Shown only to a role that can make one of these kinds of change. */
   needs?: readonly Ability[]
+  /** Shown only while this holds, such as timesheets being used (ADR 0089). */
+  when?: (view: View) => boolean
 }
 
 export interface PlaceGroup {
@@ -206,6 +208,7 @@ export const MENU: PlaceGroup[] = [
         href: '#crew/timesheets',
         label: 'Timesheets',
         about: 'To approve, and not in yet',
+        when: (view) => view.office.useTimesheets,
       },
       {
         key: 'import-crew',
@@ -263,7 +266,7 @@ export const MENU: PlaceGroup[] = [
 export function MenuScreen() {
   const view = useView()
   const { can } = useAccess()
-  const show = (place: Place) => !place.needs || place.needs.some(can)
+  const show = (place: Place) => (!place.needs || place.needs.some(can)) && (!place.when || place.when(view))
   return (
     <div className="app menu">
       <Top view={view} title="Menu" root />

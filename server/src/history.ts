@@ -527,6 +527,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
     case 'messages.prompt':
       return a.on === true ? 'Turned on messages to crew' : 'Turned off messages to crew'
+    case 'timesheets.use':
+      return a.on === true ? 'Turned on timesheets' : 'Turned off timesheets'
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`

@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.46.0',
+    date: '2026-10-28',
+    title: 'Timesheets can be turned off, and start off',
+    what: 'Admin › Company has a switch for timesheets, which starts off. While off, there is no Timesheets page under Crew or in the Menu, Home doesn’t count timesheets to approve, notifications leave them out, and crew aren’t asked for one on their own link. Nothing is deleted: turning them on brings back every timesheet already sent, as it was.',
+    prs: [0],
+    adrs: [89],
+  },
+  {
     version: '1.45.0',
     date: '2026-10-28',
     title: 'Crew travel by car, and the fuel price kept up from the AA',

@@ -86,6 +86,8 @@ export interface PageData {
   ended: ReadonlyMap<string, string>
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
+  /** The company doesn't use timesheets (ADR 0089): none asked for, none shown. */
+  noTimesheets?: boolean
   /** The office's phone and email, once set. */
   office?: OfficeDetails | null
   /** Bookings on today, or tomorrow from 6pm, for "Running late?" (ADR 0028). */
@@ -293,6 +295,7 @@ const APPROVED_SHOWN_DAYS = 60
 
 /** Bookings whose timesheet is to send, sent, or lately approved: to send first. */
 function timesheets(d: PageData): string {
+  if (d.noTimesheets) return ''
   const since = new Date(Date.now() - APPROVED_SHOWN_DAYS * 86_400_000).toISOString()
   const rows = d.jobs
     .map((j) => ({ ...j, t: d.timesheets.get(j.offer.id) }))
@@ -317,7 +320,7 @@ function timesheets(d: PageData): string {
  * anyone scrolls. Nothing when there's nothing to say.
  */
 function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']): string {
-  const toSend = d.jobs.filter((j) => !d.timesheets.get(j.offer.id) && noTimesheetReason(j.offer, j.call, d.person, d.today) === null).length
+  const toSend = d.noTimesheets ? 0 : d.jobs.filter((j) => !d.timesheets.get(j.offer.id) && noTimesheetReason(j.offer, j.call, d.person, d.today) === null).length
   const firstDay = (j: PageData['jobs'][number]) => j.offer.days.find((x) => x >= d.today) ?? j.call.start
   const next = [...booked].sort((a, b) => firstDay(a).localeCompare(firstDay(b)))[0]
   const parts = [

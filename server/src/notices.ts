@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { HAS_EMAIL } from './crew/store.ts'
 import type { Db, Queryable } from './db.ts'
 import { SELECT, toEntries, type Row } from './history.ts'
+import { usesTimesheets } from './office/store.ts'
 import { readingOf } from './reading.ts'
 
 /**
@@ -39,6 +40,8 @@ export const NOTICE_DAYS = 30
 export const NOTICE_LIMIT = 100
 /** Changes that are housekeeping, never news. */
 const QUIET = ['offer.seen']
+/** Timesheets' changes, which aren't news while the company doesn't use timesheets (ADR 0089). */
+const TIMESHEET_CHANGES = ['timesheet.send', 'timesheet.approve', 'timesheet.reopen']
 
 export interface NoticeReader {
   /** The signed-in account; none on a demo copy or while sign-in is off. */
@@ -59,7 +62,7 @@ interface Hit {
 }
 
 /** The changes, newest first, that others made to what's this reader's own. */
-export async function readNotices(q: Queryable, reader: NoticeReader, rates = true, notes = true): Promise<Notice[]> {
+export async function readNotices(q: Queryable, reader: NoticeReader, rates = true, notes = true, timesheets = true): Promise<Notice[]> {
   const user = reader.userId ?? null
   const person = reader.personId ?? null
   // What they did themselves, wherever they did it.
@@ -111,7 +114,7 @@ export async function readNotices(q: Queryable, reader: NoticeReader, rates = tr
         AND m.name <> ALL($6::text[])
       ORDER BY m.received_at DESC, m.id DESC
       LIMIT ${NOTICE_LIMIT}`,
-    [user, person, LIVE, own, NOTICE_DAYS, QUIET, reader.clientId ?? null],
+    [user, person, LIVE, own, NOTICE_DAYS, timesheets ? QUIET : [...QUIET, ...TIMESHEET_CHANGES], reader.clientId ?? null],
   )
   if (hits.length === 0) return []
   const { rows } = await q.query<Row>(`${SELECT} WHERE m.id = ANY($1::text[]) ORDER BY m.received_at DESC, m.id DESC`, [hits.map((h) => h.id)])
@@ -168,7 +171,11 @@ export function registerNoticeRoutes(app: FastifyInstance, { db }: { db: Db }) {
     const reader = await readerOf(db, req, req.query.client)
     // In the history's words, without crew pay for a role that doesn't see every rate (ADR 0046, ADR 0062).
     const reading = await readingOf(db.reads, req.role, req.reader ?? {})
-    const [notices, upTo] = await Promise.all([readNotices(db.reads, reader, readsEveryRate(reading), (reading.details ?? 'all') === 'all'), readUpTo(db.reads, reader)])
+    const timesheets = await usesTimesheets(db.reads)
+    const [notices, upTo] = await Promise.all([
+      readNotices(db.reads, reader, readsEveryRate(reading), (reading.details ?? 'all') === 'all', timesheets),
+      readUpTo(db.reads, reader),
+    ])
     return { notices, readUpTo: upTo, found: reader.personId !== undefined }
   })
 

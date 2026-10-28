@@ -103,7 +103,8 @@ export function MoneyScreen({ view }: { view: View }) {
       </section>
       <Quotes view={view} />
       <ByMonth m={m} />
-      <Owed m={m} />
+      {/* What's owed comes from approved timesheets: not shown while they're off (ADR 0089), unless some approved are still to pay. */}
+      {(view.office.useTimesheets || m.costsOwed.length > 0) && <Owed m={m} />}
       <Freelancers m={m} />
       <Margins m={m} />
       <ForTheAccountant m={m} />

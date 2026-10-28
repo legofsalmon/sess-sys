@@ -11,7 +11,8 @@ import { useMe } from './Leave.tsx'
  * staff leave and timesheets. Calls and Leave count what the Crew tab's
  * badge counts between them, so the badge says which page to open;
  * Timesheets counts those to approve. Calls and Timesheets count only for
- * a role that can act on them (audit of 18 October).
+ * a role that can act on them (audit of 18 October). Timesheets is left
+ * off the row while the company doesn't use them (ADR 0089).
  */
 export function CrewViews({ view, current }: { view: View; current: string }) {
   const today = useToday()
@@ -27,7 +28,7 @@ export function CrewViews({ view, current }: { view: View; current: string }) {
         { key: 'calls', href: '#crew', label: 'Calls', count: calls },
         { key: 'people', href: '#crew/people', label: 'People' },
         { key: 'leave', href: '#crew/leave', label: 'Leave', count: leave },
-        { key: 'timesheets', href: '#crew/timesheets', label: 'Timesheets', count: mayCrew ? view.timesheets.toApprove.length : 0 },
+        ...(view.office.useTimesheets ? [{ key: 'timesheets', href: '#crew/timesheets', label: 'Timesheets', count: mayCrew ? view.timesheets.toApprove.length : 0 }] : []),
       ]}
     />
   )
