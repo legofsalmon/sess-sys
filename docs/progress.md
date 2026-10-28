@@ -3,6 +3,23 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: availability, subhire and margin on quotes
+
+**Done**
+
+- [ADR 0089](adr/0089-availability-subhire-and-margin-on-quotes.md), part 3
+  of the quoting plan. Each kit line is checked against the job's days by
+  the kit's hold rules, leaving out the job's own kit. Short lines say so
+  and offer "Hire in". Lines carry how many are hired in, the supplier and
+  what they cost us (`subhireQty`, `supplier`, `costCents`), with crew
+  costed at booked rates when left empty. "Add transport" adds the job's
+  vans. The office and directors see each line's margin and the quote's,
+  never printed.
+  App 1.46.0.
+- Checked: typecheck, unit tests (enough kit, what's wanted, line costs,
+  margin), server (cost side kept, supplier trimmed), browser test
+  (quotes.spec.ts: short, hired in, transport, nothing printed).
+
 ## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
 
 **Done**
