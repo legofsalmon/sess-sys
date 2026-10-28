@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.38.2',
+    version: '1.39.1',
     date: '2026-10-28',
     title: 'Long pages in parts',
     what: 'Admin, a person’s page and a product’s page now show one part at a time, picked from a row at the top, as a job’s page already did. Admin is Company, Connections and Data; a person is Coming up, Details, Documents, Worked and Their link; a product is Details, On jobs, Items and Faults. The part you looked at last opens next time, and a new product opens where its items are added. A job’s name, status, client, venue, dates, crew and kit now sit at the top of its page, and its steps open when you press one.',
     prs: [137],
     adrs: [82],
+  },
+  {
+    version: '1.39.0',
+    date: '2026-10-27',
+    title: 'Start a quote in a few words, and know which to chase',
+    what: 'Money has a New quote button: give the job a name, the client and the days, and its quote opens, with the job added as an enquiry. Marking a quote sent now moves the job to quoted. When the client says yes or no, the quote offers to confirm the job or mark it lost in one press. Money lists every quote waiting on the office: answered, waiting for an answer (with a nudge after a week) and not sent yet, and Notifications shows the ones worth a call. The app still contacts nobody.',
+    prs: [134],
+    adrs: [81],
   },
   {
     version: '1.38.1',

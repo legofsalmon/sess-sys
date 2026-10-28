@@ -431,3 +431,13 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .job-page .job-line + .job-line { color: var(--muted); }
 .job-page .job-notes { display: grid; gap: var(--space-6); justify-items: start; }
 .job-page .job-notes .notes { margin: 0; color: var(--muted); }
+
+/* Quotes to follow up (ADR 0081): on Money and Notifications, each group a short list, the oldest waiting first. */
+.quotes-to-follow .follow-group h3 { margin: var(--space-12) 0 var(--space-4); font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .follow-group li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quotes-to-follow .follow-group li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .warn { color: var(--warn); }
+.quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
+.quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
+.quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
+.quote-screen .in-step p { margin: 0; }
