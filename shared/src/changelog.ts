@@ -36,6 +36,14 @@ export const CHANGELOG: readonly Release[] = [
     adrs: [86],
   },
   {
+    version: '1.44.0',
+    date: '2026-10-28',
+    title: 'Packages on quotes',
+    what: 'The price list now has packages: kit quoted together at one price, such as a mic package, with its price, how it’s charged and what it holds. On a quote, “Add a package” puts it on as one line, with what it holds printed under it.',
+    prs: [143],
+    adrs: [87],
+  },
+  {
     version: '1.43.0',
     date: '2026-10-28',
     title: 'Travel and subsistence for the crew on quotes',

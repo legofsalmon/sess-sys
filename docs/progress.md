@@ -18,6 +18,20 @@ waiting on someone.
 - Checked: typecheck, server (taken once a month, not when off, not a far
   jump, the history entry), parity, browser test (quotes.spec.ts).
 
+## 28 October 2026: packages
+
+**Done**
+
+- [ADR 0087](adr/0087-packages.md), part 2b of the quoting plan. Packages on
+  the price list (`packages`): a name, the department it's listed under, a
+  price and rate rule, the products it holds and anything else it includes.
+  "Add a package" on a quote puts it on as one line, with what it holds
+  written on the line (`includes`) and printed under it. App 1.44.0.
+- Checked: typecheck, unit tests (what a package prints, saved, changed and
+  taken off, only products in the stock list), parity, browser test
+  (quotes.spec.ts: a package made on the price list, added to a quote and
+  printed).
+
 ## 28 October 2026: travel and subsistence on quotes
 
 **Done**

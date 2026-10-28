@@ -280,6 +280,8 @@ const CASES: Case[] = [
   c('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'weekly' }, { as: 'charged by the week' }),
   c('price.product', { modelId: 'xlr', dayCents: 1500 }, { as: 'keeping its rule', before: [m('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'week3' })] }),
   c('price.rulesFromRms', { all: false }),
+  c('package.save', { id: 'mics', name: 'Mic package', department: 'audio', dayCents: 10000, rate: 'weekly', items: [{ modelId: 'xlr', qty: 4 }], notes: 'with clips' }),
+  c('package.remove', { id: 'mics' }, { before: [m('package.save', { id: 'mics', name: 'Mic package', department: 'audio', dayCents: 10000, rate: 'daily', items: [], notes: '' })] }),
   c('price.role', { role: '  Sound   No.1 ', dayCents: 35000 }),
   c('price.client', { clientId: 'bw', pct: 10 }),
   c('cost.paid', { id: 'dara-then', on: today }, { before: [m('timesheet.approve', { id: 'dara-then', days: [day(-3), day(-2)], dayRateCents: 32000, extras: [], officeNote: '' })] }),

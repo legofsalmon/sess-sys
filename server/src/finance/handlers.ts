@@ -3,7 +3,7 @@ import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getTimesheet } from '../crew/timesheets.ts'
 import { getClient, getProject } from '../projects/store.ts'
 import { getModel } from '../stock/store.ts'
-import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getQuoteSettings, getRolePrice, highestNumber, quotesOf } from './store.ts'
+import { getClientDiscount, getCostPaid, getPackage, getProductPrice, getQuote, getQuoteSettings, getRolePrice, highestNumber, quotesOf } from './store.ts'
 
 /**
  * Light finance (ADR 0042). The rules, wherever a change comes from:
@@ -21,7 +21,7 @@ import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getQuoteSett
  * Sending the same change twice, as a phone may, changes nothing.
  */
 
-type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quoting.travel' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'price.role' | 'price.client' | 'cost.paid'
+type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quoting.travel' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'package.save' | 'package.remove' | 'price.role' | 'price.client' | 'cost.paid'
 type Handler<N extends FinanceCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const emitQuote = async (ctx: Ctx, id: string) => emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
@@ -237,6 +237,23 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
       const { rows: changed } = await ctx.tx.query('UPDATE product_prices SET rate = $2 WHERE model_id = $1 AND rate IS DISTINCT FROM $2 RETURNING 1', [r.model_id, rule])
       if (changed.length) await emit(ctx, 'productPrice', r.model_id, await getProductPrice(ctx.tx, r.model_id))
     }
+  },
+
+  async 'package.save'(ctx, a) {
+    for (const i of a.items)
+      if (!(await getModel(ctx.tx, i.modelId))) throw new Refused({ code: 'not-found', message: 'One of the products in the package is no longer in the stock list.' })
+    await ctx.tx.query(
+      `INSERT INTO packages (id, name, department, day_cents, rate, items, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, department = EXCLUDED.department, day_cents = EXCLUDED.day_cents,
+         rate = EXCLUDED.rate, items = EXCLUDED.items, notes = EXCLUDED.notes`,
+      [a.id, a.name.trim(), a.department, a.dayCents, a.rate, JSON.stringify(a.items), a.notes.trim()]
+    )
+    await emit(ctx, 'package', a.id, await getPackage(ctx.tx, a.id))
+  },
+
+  async 'package.remove'(ctx, a) {
+    const { rows } = await ctx.tx.query('DELETE FROM packages WHERE id = $1 RETURNING 1', [a.id])
+    if (rows.length) await emitRemoved(ctx, 'package', a.id)
   },
 
   async 'price.role'(ctx, a) {

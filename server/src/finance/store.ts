@@ -1,4 +1,4 @@
-import { DEFAULT_CREW_PER_CAR, QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
+import { DEFAULT_CREW_PER_CAR, QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type Department, type Package, type PackageItem, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading money's records back as the entities devices see (ADR 0042). */
@@ -46,6 +46,15 @@ export async function getProductPrice(q: Queryable, modelId: string): Promise<Pr
   const { rows } = await q.query<{ model_id: string; day_cents: number; rate: RateRule | null }>('SELECT model_id, day_cents, rate FROM product_prices WHERE model_id = $1', [modelId])
   // The rule only once set, so a device or a test that knows nothing of rules sees the price as before.
   return rows[0] ? { id: rows[0].model_id, dayCents: rows[0].day_cents, ...(rows[0].rate ? { rate: rows[0].rate } : {}) } : undefined
+}
+
+export async function getPackage(q: Queryable, id: string): Promise<Package | undefined> {
+  const { rows } = await q.query<{ id: string; name: string; department: Department; day_cents: number; rate: RateRule; items: PackageItem[]; notes: string }>(
+    'SELECT id, name, department, day_cents, rate, items, notes FROM packages WHERE id = $1',
+    [id]
+  )
+  const r = rows[0]
+  return r ? { id: r.id, name: r.name, department: r.department, dayCents: r.day_cents, rate: r.rate, items: r.items, notes: r.notes } : undefined
 }
 
 export async function getRolePrice(q: Queryable, id: string): Promise<RolePrice | undefined> {

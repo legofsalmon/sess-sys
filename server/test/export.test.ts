@@ -132,6 +132,7 @@ describe('download everything', () => {
       'notices_read',
       'offers',
       'own_calendars',
+      'packages',
       'people',
       'person_merges',
       'phases',

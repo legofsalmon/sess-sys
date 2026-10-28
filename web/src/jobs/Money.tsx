@@ -38,6 +38,7 @@ import { client } from '../sync.ts'
 import { JOBS, MONEY } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
+import { PackagesCard } from './Packages.tsx'
 import { JobViews } from './PlanScreen.tsx'
 import { InStep, QuotePill } from './Quote.tsx'
 
@@ -546,6 +547,8 @@ export function PricesScreen({ view }: { view: View }) {
         })}
         {view.warehouse.models.length === 0 && <Empty>No products yet: they come from the Stock tab.</Empty>}
       </section>
+
+      <PackagesCard view={view} />
 
       <section className="card" aria-label="Crew">
         <Heading icon="people">Crew</Heading>
