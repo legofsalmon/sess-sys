@@ -23,7 +23,7 @@ import { pgliteDb } from '../src/db.ts'
  * A company with a bit of everything on a server of its own, and a phone
  * signed in to it whose signal can be switched off: for the tests of what a
  * device shows (device-views.test.ts) and of the device and the server
- * agreeing (parity.test.ts).
+ * agreeing (parity.ts).
  */
 
 let cleanup: (() => Promise<void>)[] = []
