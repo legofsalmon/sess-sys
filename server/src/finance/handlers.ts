@@ -146,9 +146,14 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
          fuel_set_on = CASE WHEN quote_settings.fuel_cents_per_litre IS NOT DISTINCT FROM EXCLUDED.fuel_cents_per_litre THEN quote_settings.fuel_set_on ELSE $6::date END,
          fuel_cents_per_litre = EXCLUDED.fuel_cents_per_litre,
          litres_per_100_km = EXCLUDED.litres_per_100_km,
-         per_diem_cents = EXCLUDED.per_diem_cents`,
+         per_diem_cents = EXCLUDED.per_diem_cents,
+         fuel_month = CASE WHEN quote_settings.fuel_cents_per_litre IS NOT DISTINCT FROM EXCLUDED.fuel_cents_per_litre THEN quote_settings.fuel_month ELSE NULL END`,
       [QUOTE_SETTINGS_ID, a.travelFromKm, a.fuelCentsPerLitre, a.litresPer100Km, a.perDiemCents, a.on]
     )
+    // A price typed in came from no survey; one read from the AA's says which (ADR 0086). Left as they were unless said.
+    if (a.fuelMonth !== undefined) await ctx.tx.query('UPDATE quote_settings SET fuel_month = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.fuelMonth])
+    if (a.fuelAuto !== undefined) await ctx.tx.query('UPDATE quote_settings SET fuel_auto = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.fuelAuto])
+    if (a.crewPerCar !== undefined) await ctx.tx.query('UPDATE quote_settings SET crew_per_car = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.crewPerCar])
     await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
   },
 

@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
+
+**Done**
+
+- Travel on quotes is the crew's own, not the vans': a car trip there and
+  back for each crew day, or each car load ("Crew to a car" in Admin), at
+  6.5 litres for 100 km unless set. Van fuel stays in the transport lines.
+- [ADR 0086](adr/0086-travel-and-subsistence-on-quotes.md), added to. The
+  server looks at the AA's survey once a day and takes a new month's diesel
+  price the day it appears (it comes out on the second Monday), unless
+  Admin's switch is off; a price more than 30% from the last waits for
+  someone. Admin says which survey the price is from. App 1.45.0.
+- Checked: typecheck, server (taken once a month, not when off, not a far
+  jump, the history entry), parity, browser test (quotes.spec.ts).
+
 ## 28 October 2026: packages
 
 **Done**

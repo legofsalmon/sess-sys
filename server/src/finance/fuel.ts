@@ -1,13 +1,18 @@
-import { AA_FUEL_PAGE, type FuelPriceFound } from '@sh/shared'
+import { AA_FUEL_PAGE, DEFAULT_LITRES_PER_100_KM, DEFAULT_TRAVEL_FROM_KM, irishToday, QUOTE_SETTINGS_ID, type FuelPriceFound } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
+import type { Db } from '../db.ts'
+import { emit, serverChange } from '../kernel.ts'
+import { FUEL_FROM_AA_ACTION } from '../history.ts'
+import { getQuoteSettings } from './store.ts'
 
 /**
- * The fuel price from AA Ireland's monthly survey (ADR 0086), for Admin's
- * "Read the AA's price". There's no feed, so the server reads the survey's
- * page and takes the diesel pump price from its table. What it reads is
- * only ever offered: the office sees the figure and the month and saves it
- * themselves, so a page that changes shape can't put a wrong price on a
- * client's quote. Read at most once an hour, however often it's pressed.
+ * The fuel price from AA Ireland's monthly survey (ADR 0086). There's no
+ * feed, so the server reads the survey's page and takes the diesel pump
+ * price and the month from its table: each new month's by itself, unless
+ * the office turns that off, and for Admin's "Read the AA's price". A page
+ * that doesn't read as the survey offers nothing, and a price a long way
+ * from the last isn't taken without someone looking. Read at most once an
+ * hour, however often it's asked.
  */
 
 export type FuelLookup = () => Promise<FuelPriceFound>
@@ -60,4 +65,97 @@ export function registerFuelRoutes(app: FastifyInstance, { lookup }: { lookup: F
       return reply.code(502).send({ error: "The AA's fuel prices couldn't be read just now. Open their page and type the diesel price in." })
     }
   })
+}
+
+
+/** A new survey's price further than this from the one before reads more like a page that changed shape than the pumps. */
+const MOST_CHANGE = 0.3
+
+/**
+ * Takes the AA survey's price if it's a month not taken yet and the office hasn't turned it off, as a change of its own
+ * recorded in the history as the server's. Answers the month taken, or undefined for nothing to do.
+ */
+export async function takeAaPrice(db: Db, lookup: FuelLookup, today = irishToday()): Promise<string | undefined> {
+  const now = await getQuoteSettings(db)
+  if (now?.fuelAuto === false) return undefined
+  const found = await lookup()
+  if (now?.fuelMonth === found.month) return undefined
+  const was = now?.fuelCentsPerLitre ?? null
+  if (was !== null && Math.abs(found.centsPerLitre - was) / was > MOST_CHANGE)
+    throw new Error(`The AA's ${found.month} price, ${found.centsPerLitre}c, is too far from ${was}c to take without someone looking.`)
+  return serverChange(db, { name: FUEL_FROM_AA_ACTION, args: { centsPerLitre: found.centsPerLitre, month: found.month } }, async (ctx) => {
+    await ctx.tx.query(
+      `INSERT INTO quote_settings (id, travel_from_km, litres_per_100_km) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET travel_from_km = coalesce(quote_settings.travel_from_km, EXCLUDED.travel_from_km),
+         litres_per_100_km = coalesce(quote_settings.litres_per_100_km, EXCLUDED.litres_per_100_km)`,
+      [QUOTE_SETTINGS_ID, DEFAULT_TRAVEL_FROM_KM, DEFAULT_LITRES_PER_100_KM]
+    )
+    // Looked at again under the lock, so a second copy of the server running at once takes it only once.
+    const { rows } = await ctx.tx.query<{ fuel_month: string | null; fuel_auto: boolean }>('SELECT fuel_month, fuel_auto FROM quote_settings WHERE id = $1', [QUOTE_SETTINGS_ID])
+    if (!rows[0]?.fuel_auto || rows[0].fuel_month === found.month) throw new NothingNew()
+    await ctx.tx.query('UPDATE quote_settings SET fuel_cents_per_litre = $2, fuel_month = $3, fuel_set_on = $4 WHERE id = $1', [QUOTE_SETTINGS_ID, found.centsPerLitre, found.month, today])
+    await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
+    return found.month
+  }).catch((err) => {
+    if (err instanceof NothingNew) return undefined
+    throw err
+  })
+}
+
+class NothingNew extends Error {}
+
+interface Log {
+  info(obj: object, msg: string): void
+  warn(obj: object, msg: string): void
+}
+
+/**
+ * Keeps the fuel price up with the AA's survey (ADR 0086). The survey comes out on the second Monday of each month, so
+ * the server looks once a day in Ireland (every hour it checks whether the day has turned) and takes a new month's
+ * price the day it appears. A day the page can't be read is tried again the next day; Admin says which survey the
+ * price is from, so a month missed shows.
+ */
+export class FuelUpdates {
+  private timer: NodeJS.Timeout | undefined
+  private doneFor: string | undefined
+  private running: Promise<string | undefined> = Promise.resolve(undefined)
+
+  constructor(
+    private readonly db: Db,
+    private readonly lookup: FuelLookup,
+    private readonly options: { changed: () => void; log?: Log }
+  ) {}
+
+  start(): Promise<string | undefined> {
+    if (!this.timer) {
+      this.timer = setInterval(() => void this.run(), HOUR)
+      this.timer.unref()
+    }
+    return this.run()
+  }
+
+  stop() {
+    clearInterval(this.timer)
+    this.timer = undefined
+  }
+
+  run(): Promise<string | undefined> {
+    this.running = this.running.then(async () => {
+      const today = irishToday()
+      if (this.doneFor === today) return undefined
+      this.doneFor = today
+      try {
+        const month = await takeAaPrice(this.db, this.lookup, today)
+        if (month) {
+          this.options.changed()
+          this.options.log?.info({ month }, "Took the fuel price from the AA's survey")
+        }
+        return month
+      } catch (err) {
+        this.options.log?.warn({ err }, "Could not take the fuel price from the AA's survey; trying again tomorrow")
+        return undefined
+      }
+    })
+    return this.running
+  }
 }

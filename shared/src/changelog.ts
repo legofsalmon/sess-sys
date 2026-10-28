@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.44.1',
+    version: '1.45.1',
     date: '2026-10-28',
     title: 'A tidier planner, and clearer job steps',
     what: 'The Week and Month planner is easier to read. A phase over several days is one bar, as on a wall planner. The days stay along the top and the names down the side however far you scroll, today is marked all the way down, and a whole month fits on a laptop. Days with all their crew found are no longer green, so the days still short of crew stand out. The dates are the page’s title, with moving week to week and Jobs or People together under it. On a job’s page, the line of steps shows how far the job has come: the way already come is drawn thicker up to the step it’s at, and the line no longer runs through the numbers. Your steps on Home say which step of the job each one is.',
     prs: [145],
     adrs: [10, 73],
+  },
+  {
+    version: '1.45.0',
+    date: '2026-10-28',
+    title: 'Crew travel by car, and the fuel price kept up from the AA',
+    what: 'Travel on a quote is now the crew’s own, not the vans’ (whose fuel stays in the transport lines): a car’s fuel there and back for each crew day, or for each car load when crew share, which Admin sets as “Crew to a car”. A car is taken to use 6.5 litres for 100 km unless changed. The fuel price also updates itself each month. The AA’s fuel price survey comes out on the second Monday of the month, and the app looks once a day and takes the new diesel price the day it appears. Admin › Company › Travel and subsistence says which month’s survey the price is from, and has a switch to turn this off and keep a price typed in. A new price a long way from the last is left for someone to check rather than taken.',
+    prs: [144],
+    adrs: [86],
   },
   {
     version: '1.44.0',

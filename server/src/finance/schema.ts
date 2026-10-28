@@ -91,6 +91,13 @@ const MIGRATIONS: string[] = [
     notes       text NOT NULL DEFAULT ''
   );
   `,
+  // The fuel price kept up from the AA's monthly survey (ADR 0086): on unless the office turns it off, and the survey
+  // the price came from, so each new one is taken once.
+  `
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_auto boolean NOT NULL DEFAULT true;
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_month text;
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS crew_per_car integer CHECK (crew_per_car BETWEEN 1 AND 8);
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

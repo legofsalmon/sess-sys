@@ -227,17 +227,24 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await noPrintDialog(office)
 
-  // Admin says how they're charged: past 50 km, diesel at €1.749, a van using 10 litres for 100 km, €39.08 a day each.
+  // Admin says how they're charged: past 50 km, diesel at €1.749, a car using 10 litres for 100 km, €39.08 a day each.
   await office.goto('/#admin')
   const travel = office.getByRole('region', { name: 'Travel and subsistence' })
   await travel.getByLabel('Travel after').fill('50')
   await travel.getByLabel('Fuel price, € a litre').fill('1.749')
-  await travel.getByLabel('A van uses, litres for 100 km').fill('10')
+  await travel.getByLabel('A car uses, litres for 100 km').fill('10')
   await travel.getByLabel('Per diem, € a day').fill('39.08')
   await travel.getByRole('button', { name: 'Save travel and subsistence' }).click()
   await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(travel).toContainText('Set today.')
-  await expect(travel).toContainText('So 100 km each way comes to €34.98 of fuel for one van.')
+  await expect(travel).toContainText('So 100 km each way comes to €34.98 of fuel for one car.')
+  // The price keeps up with the AA's survey unless turned off, to keep one typed in.
+  const auto = travel.getByRole('switch', { name: /Update the fuel price from the AA each month/ })
+  await expect(auto).toBeChecked()
+  await auto.click()
+  await expect(auto).not.toBeChecked()
+  await expect(travel).toContainText('Off: the fuel price stays as saved here')
+  await expect(travel.getByLabel('Fuel price, € a litre')).toHaveValue('1.749')
 
   await office.goto('/#jobs')
   await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
@@ -251,7 +258,7 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   await expect(extras).toContainText(/Crew subsistence, \d+ crew days?/)
   await expect(extras).toContainText('No travel')
   await extras.getByLabel('Distance each way from Dublin city centre, km').fill('200')
-  await expect(extras).toContainText('Travel, 200 km each way from Dublin')
+  await expect(extras).toContainText(/Crew travel, 200 km each way from Dublin, \d+ car trips?/)
   await expect(extras).toContainText('€69.96')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
@@ -261,7 +268,7 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   await expect(draft.locator('.save-state')).toHaveText('Saved')
   await draft.getByRole('button', { name: 'Print a draft' }).click()
   const printed = office.locator('.print-sheet.quote-sheet')
-  await expect(printed).toContainText('Travel, 200 km each way from Dublin')
+  await expect(printed).toContainText('Crew travel, 200 km each way from Dublin')
   await expect(printed).not.toContainText('Crew subsistence')
   await office.evaluate(() => dispatchEvent(new Event('afterprint')))
 

@@ -63,6 +63,8 @@ export const ERASED_AGAIN_ACTION = 'person.erase-again'
 export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
 /** And clearing running late 30 days after its day (ADR 0028). */
 export const LATE_CLEARED_ACTION = 'late.clear-old'
+/** And taking the fuel price from a new month of the AA's survey (ADR 0086). */
+export const FUEL_FROM_AA_ACTION = 'quoting.fuel-from-aa'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -908,6 +910,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'quoting.update':
       return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
+    case FUEL_FROM_AA_ACTION:
+      return `Took the fuel price from the AA's ${text(a.month, 'latest')} survey: ${typeof a.centsPerLitre === 'number' ? `${a.centsPerLitre}c a litre` : 'a new price'}`
     case 'quoting.travel':
       return `Set how travel and subsistence are charged: travel past ${typeof a.travelFromKm === 'number' ? a.travelFromKm : '?'} km from Dublin, ${
         typeof a.fuelCentsPerLitre === 'number' ? `fuel at ${a.fuelCentsPerLitre}c a litre` : 'no fuel price'
