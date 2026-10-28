@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.49.0',
+    version: '1.50.0',
     date: '2026-10-28',
     title: 'Old quotes from Current RMS, matched to jobs and used when pricing',
     what: 'Past quotes has a new page, Match to jobs, that puts each old quote from Current RMS beside the job it looks like, so the office can link them, all the sure ones in one press. A job’s quote then shows its old quotes and how often that client went ahead and at what discount, and a line being priced shows what it was last charged to the client and to anyone, with a button to use that price. Past quotes also shows each client’s record. Nothing changes in Current RMS, and old quotes with no job of ours stay as past quotes.',
     prs: [151],
     adrs: [92],
+  },
+  {
+    version: '1.49.0',
+    date: '2026-10-28',
+    title: 'A status page for everything the app relies on',
+    what: 'Admin has a new Status page for the office and directors. It checks everything the app depends on, all at once: the server and which version it runs, the database, sign-in, error reports, the nightly backups and where they’re kept, Google Calendar, crew’s own calendars, Current RMS, the AA’s fuel price and the map search. Each says in a sentence whether it’s working, and if not, what to do about it. It also says when a newer version has been finished but isn’t live yet. Nothing is written anywhere and nobody is contacted while it checks.',
+    prs: [152],
+    adrs: [93],
   },
   {
     version: '1.48.1',
