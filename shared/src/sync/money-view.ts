@@ -503,6 +503,52 @@ export function quotesToFollow(m: Pick<MoneyView, 'jobs' | 'draftOf'>, today: st
   return out
 }
 
+// Every quote in one list (ADR 0088), for the Quotes page: a job's latest, found by its job, client, venue or number.
+
+/** What the Quotes page can narrow to. An invoiced or paid quote is accepted. */
+export type QuoteShow = 'all' | 'draft' | 'sent' | 'accepted' | 'declined'
+export const QUOTE_SHOWS: [QuoteShow, string][] = [
+  ['all', 'All'],
+  ['draft', 'Not sent'],
+  ['sent', 'Sent'],
+  ['accepted', 'Accepted'],
+  ['declined', 'Turned down'],
+]
+
+export interface QuoteRow {
+  job: JobView
+  /** The version being put together if there is one, or else the one that counts. */
+  quote: QuoteView
+  /** The one that counts, when a newer version is being drafted over it. */
+  behind: QuoteView | undefined
+  /** The last day anything happened to it: saved, sent, answered, invoiced or paid. */
+  changed: string
+}
+
+/** Each job's quote, the last changed first. */
+export function quoteRows(m: Pick<MoneyView, 'jobs' | 'draftOf'>): QuoteRow[] {
+  const rows: QuoteRow[] = []
+  for (const { job, current } of m.jobs) {
+    const draft = m.draftOf(job.id)
+    const quote = draft ?? current
+    if (!quote) continue
+    const days = [draft, current].flatMap((q) => (q ? [irishToday(new Date(q.savedAt)), q.sentOn, q.answeredOn, q.invoicedOn, q.paidOn] : []))
+    const changed = days.filter((d): d is string => !!d).sort().at(-1) ?? ''
+    rows.push({ job, quote, behind: draft && current ? current : undefined, changed })
+  }
+  return rows.sort((a, b) => b.changed.localeCompare(a.changed) || a.job.name.localeCompare(b.job.name, 'en-IE'))
+}
+
+/** Whether a row is one of those shown, and has every word typed somewhere in its job's name, client, venue, number or invoice. */
+export function quoteRowShown(r: QuoteRow, show: QuoteShow, search: string): boolean {
+  if (show !== 'all' && r.quote.status !== show) return false
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const q = r.behind ?? r.quote
+  const text = [r.job.name, r.job.client?.name, r.job.venue?.name, q.number ? String(q.number) : '', q.invoiceRef].filter(Boolean).join(' ').toLowerCase()
+  return words.every((w) => text.includes(w))
+}
+
 // The accountant's files (ADR 0042): made on the device from what it holds, for a period.
 
 export interface Period {
