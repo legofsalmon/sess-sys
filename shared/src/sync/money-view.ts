@@ -21,6 +21,7 @@ import {
   type Quote,
   type QuoteEntities,
   type QuoteSettings,
+  type RateRule,
   type QuoteTotals,
   type RolePrice,
   type VatRate,
@@ -102,6 +103,8 @@ export interface MoneyView {
   quote(id: string): QuoteView | undefined
   /** A product's day price, a role's, a client's discount: undefined for none set. */
   productPrice(modelId: string): number | undefined
+  /** A product's rate rule (ADR 0085): undefined for none set, which charges it by the day. */
+  productRate(modelId: string): RateRule | undefined
   rolePrice(role: string): number | undefined
   discountOf(clientId: string | null | undefined): number | undefined
   /** Whether this device's own change to a price is still on its way. */
@@ -192,6 +195,7 @@ export function moneyView(
           number: was?.number ?? null,
           validDays: a.validDays ?? before?.validDays ?? DEFAULT_VALID_DAYS,
           depositPct: a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
+          agreedCents: a.agreedCents !== undefined ? a.agreedCents : (was?.agreedCents ?? null),
           pending: true,
         })
         break
@@ -225,7 +229,11 @@ export function moneyView(
       case 'price.product': {
         const a = m.args as CommandArgs<'price.product'>
         if (a.dayCents === null) products.delete(a.modelId)
-        else products.set(a.modelId, { id: a.modelId, dayCents: a.dayCents, pending: true })
+        else {
+          // A change that doesn't say the rule keeps it, as the server does (ADR 0085).
+          const rate = a.rate ?? products.get(a.modelId)?.rate
+          products.set(a.modelId, { id: a.modelId, dayCents: a.dayCents, ...(rate ? { rate } : {}), pending: true })
+        }
         gone.product.add(a.modelId)
         break
       }
@@ -383,6 +391,7 @@ export function moneyView(
     currentOf,
     quote: (id) => views.get(id),
     productPrice: (modelId) => products.get(modelId)?.dayCents,
+    productRate: (modelId) => products.get(modelId)?.rate,
     rolePrice: (role) => roles.get(roleKey(role))?.dayCents,
     discountOf: (clientId) => (clientId ? discounts.get(clientId)?.pct : undefined),
     pricePending: (kind, key) => (kind === 'product' ? gone.product.has(key) : kind === 'role' ? gone.role.has(roleKey(key)) : gone.client.has(key)),

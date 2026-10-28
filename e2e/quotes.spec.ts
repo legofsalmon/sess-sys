@@ -78,7 +78,7 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   // A deposit of half, and the prices held for 14 days.
   await draft.getByLabel('Prices hold for, days').fill('14')
   await draft.getByLabel('Deposit, %').fill('50')
-  await expect(draft.locator('.quote-terms')).toContainText('€933.83 before the job')
+  await expect(draft.locator('.quote-terms:not(.quote-discount)')).toContainText('€933.83 before the job')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
   await expect(draft).toContainText('Marked sent, it becomes quote 1115')
 
@@ -165,6 +165,55 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await kit.getByRole('button', { name: 'Save' }).click()
   await expect(kit.getByRole('button', { name: 'Save' })).toHaveCount(0)
   await expect(office.getByRole('region', { name: 'Crew' })).toContainText('LX op')
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test('kit charged by the week, a line discounted, and a total agreed with the client (ADR 0085)', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+
+  // The Spiiders are hired by the week: the price list says so beside the price.
+  await office.goto('/#jobs/money/prices')
+  const kit = office.getByRole('region', { name: 'Kit' })
+  await kit.getByLabel('Robe Spiider: charged').selectOption('weekly')
+  await kit.getByLabel('Robe Spiider: price a week').fill('150')
+  await kit.getByRole('button', { name: 'Save' }).click()
+  await expect(kit.getByRole('button', { name: 'Save' })).toHaveCount(0)
+  await expect(office.locator('.rate-rules')).toContainText('1 Weekly')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  // Two days out is one week charged.
+  await expect(draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' })).toContainText('12 × €150.00 a week × 1 week')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €2,520.00')
+
+  // Half off the Spiiders, then a 3 Day Week for ten days out: six days charged.
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  await draft.getByLabel('Line 1: discount, %').fill('50')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €1,620.00')
+  await draft.getByLabel('Line 1: charged').selectOption('week3')
+  await draft.getByLabel('Line 1: days out').fill('10')
+  await expect(draft).toContainText('Charged 6 days')
+  await draft.getByLabel('Line 1: charged').selectOption('weekly')
+  await draft.getByLabel('Line 1: days out').fill('2')
+
+  // The client agreed €1,500 before VAT: the discount is whatever comes to it.
+  await draft.getByLabel('Agreed price before VAT, €').fill('1500')
+  await expect(draft.getByLabel('Discount, %', { exact: true })).toHaveCount(0)
+  await expect(draft.locator('.quote-totals')).toContainText('Agreed discount, 7.4%−€120.00')
+  await expect(draft.locator('.quote-totals')).toContainText('Before VAT€1,500.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('less 50%')
+  await expect(printed).toContainText('Agreed discount, 7.4%')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })

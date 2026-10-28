@@ -3,6 +3,28 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: rate rules, discounts and an agreed price
+
+**Done**
+
+- [ADR 0085](adr/0085-rate-rules-discounts-and-an-agreed-price.md), part 2a
+  of the quoting plan. Each product price is charged Daily, 3 Day Week or
+  Weekly (`product_prices.rate`), and "Take the rules from Current RMS" on
+  the price list gives each priced product the one its Current RMS lines
+  were charged by most. A kit line charged by a rule keeps its days out and
+  works out its days charged. Lines have their own discount, a department
+  can be given one at once, and "Agree a total" (`quotes.agreed_cents`) makes
+  the discount whatever comes to the price agreed. App 1.42.0.
+- Checked: typecheck, unit tests (the three rules against Current RMS's
+  counts, a line's discount, an agreed price across VAT rates, a rule kept
+  through an older app's change, rules taken from Current RMS lines by name
+  and other name), parity, browser test (quotes.spec.ts).
+
+**Waiting on**
+
+- Colly: read Current RMS's quotes if not already, then press "Take the
+  rules from Current RMS" on the price list.
+
 ## 28 October 2026: product photos and the rack sheet
 
 **Done**

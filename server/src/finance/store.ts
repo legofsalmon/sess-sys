@@ -1,4 +1,4 @@
-import { QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type ProductPrice, type Quote, type QuoteSettings, type RolePrice } from '@sh/shared'
+import { QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading money's records back as the entities devices see (ADR 0042). */
@@ -6,7 +6,7 @@ import type { Queryable } from '../db.ts'
 type Row = Record<string, any>
 
 const QUOTE = `id, project_id, version, status, lines, discount_pct, notes, made_at, saved_at,
-  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on, number, valid_days, deposit_pct`
+  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on, number, valid_days, deposit_pct, agreed_cents`
 
 const toQuote = (r: Row): Quote => ({
   id: r.id,
@@ -26,6 +26,7 @@ const toQuote = (r: Row): Quote => ({
   number: r.number ?? null,
   validDays: r.valid_days,
   depositPct: r.deposit_pct ?? null,
+  agreedCents: r.agreed_cents === null || r.agreed_cents === undefined ? null : Number(r.agreed_cents),
 })
 
 export async function getQuote(q: Queryable, id: string, lock = false): Promise<Quote | undefined> {
@@ -40,8 +41,9 @@ export async function quotesOf(q: Queryable, projectId: string): Promise<Quote[]
 }
 
 export async function getProductPrice(q: Queryable, modelId: string): Promise<ProductPrice | undefined> {
-  const { rows } = await q.query<{ model_id: string; day_cents: number }>('SELECT model_id, day_cents FROM product_prices WHERE model_id = $1', [modelId])
-  return rows[0] ? { id: rows[0].model_id, dayCents: rows[0].day_cents } : undefined
+  const { rows } = await q.query<{ model_id: string; day_cents: number; rate: RateRule | null }>('SELECT model_id, day_cents, rate FROM product_prices WHERE model_id = $1', [modelId])
+  // The rule only once set, so a device or a test that knows nothing of rules sees the price as before.
+  return rows[0] ? { id: rows[0].model_id, dayCents: rows[0].day_cents, ...(rows[0].rate ? { rate: rows[0].rate } : {}) } : undefined
 }
 
 export async function getRolePrice(q: Queryable, id: string): Promise<RolePrice | undefined> {

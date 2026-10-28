@@ -195,6 +195,7 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'quote.paid': 'money',
   'quoting.update': 'money',
   'price.product': 'money',
+  'price.rulesFromRms': 'money',
   'price.role': 'money',
   'price.client': 'money',
   'cost.paid': 'money',

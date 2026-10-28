@@ -15,12 +15,16 @@ import {
   pctWord,
   plural,
   quotesToFollow,
+  RATE_LABELS,
+  RATE_RULES,
+  RATE_UNIT,
   vatPeriodOf,
   vatSummaryCsv,
   type CostRow,
   type MoneyView,
   type Period,
   type QuoteToFollow,
+  type RateRule,
   type View,
 } from '@sh/shared'
 import { useState, type FormEvent, type ReactNode } from 'react'
@@ -506,7 +510,7 @@ export function PricesScreen({ view }: { view: View }) {
       <section className="card">
         <h1>Price list</h1>
         <p className="hint">
-          Day prices before VAT, which a new quote is built from. Changing one here changes no quote already made: open a quote's draft to change its lines.
+          Prices before VAT, which a new quote is built from. Changing one here changes no quote already made: open a quote's draft to change its lines.
         </p>
       </section>
 
@@ -515,6 +519,7 @@ export function PricesScreen({ view }: { view: View }) {
         <p className="hint">
           {priced} of {plural(view.warehouse.models.length, 'product')} priced. A product with no price goes on a quote at nothing, for you to price there.
         </p>
+        <RateRules view={view} />
         <input className="search" type="search" placeholder="Find a product" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find a product" />
         {DEPARTMENTS.map((d) => {
           const here = models.filter((x) => x.department === d)
@@ -526,11 +531,12 @@ export function PricesScreen({ view }: { view: View }) {
                 {(rows) =>
                   rows.map((x) => (
                     <PriceRow
-                      key={`${x.id} ${m.productPrice(x.id)}`}
+                      key={`${x.id} ${m.productPrice(x.id)} ${m.productRate(x.id)}`}
                       label={x.name}
                       cents={m.productPrice(x.id)}
+                      rule={m.productRate(x.id) ?? 'daily'}
                       pending={m.pricePending('product', x.id)}
-                      onSave={(cents) => client.mutate('price.product', { modelId: x.id, dayCents: cents })}
+                      onSave={(cents, rate) => client.mutate('price.product', { modelId: x.id, dayCents: cents, rate })}
                     />
                   ))
                 }
@@ -570,16 +576,56 @@ export function PricesScreen({ view }: { view: View }) {
   )
 }
 
-/** One price, changed in place: nothing typed takes it off the list. */
-function PriceRow({ label, sub, cents, pending, onSave }: { label: string; sub?: string; cents: number | undefined; pending: boolean; onSave: (cents: number | null) => Promise<unknown> }) {
+/**
+ * How each product is charged (ADR 0085): the three rate rules Current RMS used, and one press to give every priced
+ * product the rule its quotes there were charged by most.
+ */
+function RateRules({ view }: { view: View }) {
+  const m = view.money
+  const { run, error } = useAct()
+  const priced = view.warehouse.models.filter((x) => m.productPrice(x.id) !== undefined)
+  const by = (r: RateRule) => priced.filter((x) => (m.productRate(x.id) ?? 'daily') === r).length
+  return (
+    <div className="rate-rules">
+      <p className="hint">
+        Each price is charged by its rule: <b>Daily</b>, by the day; <b>3 Day Week</b>, by the day but never more than three days a week; <b>Weekly</b>, the
+        price is for a week, and up to seven days out is charged once. Now: {RATE_RULES.map((r) => `${by(r)} ${RATE_LABELS[r]}`).join(', ')}.
+      </p>
+      <button type="button" onClick={() => void run(() => client.mutate('price.rulesFromRms', { all: false }))}>
+        Take the rules from Current RMS
+      </button>
+      <p className="hint">Gives each priced product with no rule the one its quotes in Current RMS were charged by most, once Admin has read them.</p>
+      <Refusal error={error} />
+    </div>
+  )
+}
+
+/** One price, changed in place: nothing typed takes it off the list. A product's has its rate rule beside it. */
+function PriceRow({
+  label,
+  sub,
+  cents,
+  rule,
+  pending,
+  onSave,
+}: {
+  label: string
+  sub?: string
+  cents: number | undefined
+  rule?: RateRule
+  pending: boolean
+  onSave: (cents: number | null, rate?: RateRule) => Promise<unknown>
+}) {
   const [text, setText] = useState(cents === undefined ? '' : euroText(cents))
+  const [ruleNow, setRule] = useState(rule)
   const { run, error, refuse } = useAct()
   const was = cents === undefined ? '' : euroText(cents)
   const save = (e: FormEvent) => {
     e.preventDefault()
     const p = parseEuro(text)
     if (p.reason) return refuse(p.reason)
-    void run(() => onSave(p.cents ?? null))
+    // The rule goes only once it's chosen, so a price changed alone leaves one still to come from Current RMS.
+    void run(() => onSave(p.cents ?? null, ruleNow !== rule ? ruleNow : undefined))
   }
   return (
     <form className="row price-row" onSubmit={save}>
@@ -590,11 +636,26 @@ function PriceRow({ label, sub, cents, pending, onSave }: { label: string; sub?:
       <div className="actions">
         <label className="euro">
           <span>€</span>
-          <input inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} placeholder="No price" aria-label={`${label}: price a day`} />
-          <span className="muted">a day</span>
+          <input
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="No price"
+            aria-label={`${label}: price a ${ruleNow ? RATE_UNIT[ruleNow] : 'day'}`}
+          />
+          <span className="muted">a {ruleNow ? RATE_UNIT[ruleNow] : 'day'}</span>
         </label>
+        {ruleNow && (
+          <select value={ruleNow} onChange={(e) => setRule(e.target.value as RateRule)} aria-label={`${label}: charged`} disabled={!text.trim()}>
+            {RATE_RULES.map((r) => (
+              <option key={r} value={r}>
+                {RATE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        )}
         <Pending pending={pending} />
-        {text.trim() !== was && (
+        {(text.trim() !== was || ruleNow !== rule) && (
           <button type="submit" className="primary">
             Save
           </button>

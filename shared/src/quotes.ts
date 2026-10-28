@@ -41,6 +41,25 @@ export type LineKind = (typeof LINE_KINDS)[number]
 export const LINE_PER = ['day', 'once'] as const
 export type LinePer = (typeof LINE_PER)[number]
 
+/**
+ * How a product's price turns the days it's out into what's charged (ADR 0085), as Current RMS's three rate
+ * definitions do: by the day; a "3 Day Week", where a week out is charged as three days at most; or by the week,
+ * where the price is for a week and anything up to seven days is charged once.
+ */
+export const RATE_RULES = ['daily', 'week3', 'weekly'] as const
+export type RateRule = (typeof RATE_RULES)[number]
+export const RATE_LABELS: Record<RateRule, string> = { daily: 'Daily', week3: '3 Day Week', weekly: 'Weekly' }
+/** What the price is for, as a line says it: "€55.00 a day", "€120.00 a week". */
+export const RATE_UNIT: Record<RateRule, 'day' | 'week'> = { daily: 'day', week3: 'day', weekly: 'week' }
+
+/** What's charged for so many days out under a rule: days for Daily and 3 Day Week, weeks for Weekly. */
+export function chargedFor(rule: RateRule, out: number): number {
+  const days = Math.max(0.5, out)
+  if (rule === 'weekly') return Math.ceil(days / 7)
+  if (rule === 'week3') return 3 * Math.floor(days / 7) + Math.min(3, Math.ceil(days % 7))
+  return days
+}
+
 /** A quote has room for this many lines: more than any job's kit and crew. */
 export const MAX_LINES = 300
 
@@ -60,6 +79,18 @@ export const discountPct = z
   .refine((n) => Number.isInteger(n * 10), DISCOUNT_HINT)
 /** A day price, up to what any one thing could cost a day. */
 const dayPrice = euroCents(100_000_00, 'A day price')
+const LINE_DISCOUNT_HINT = 'A line’s discount is a percentage from 0 to 100, such as 30 or 12.5.'
+const lineDiscount = z
+  .number({ invalid_type_error: LINE_DISCOUNT_HINT })
+  .min(0, LINE_DISCOUNT_HINT)
+  .max(100, LINE_DISCOUNT_HINT)
+  .refine((n) => Number.isInteger(n * 10), LINE_DISCOUNT_HINT)
+const OUT_HINT = 'Days out is a number of days, in halves, from 0.5 to 365.'
+const lineOut = z
+  .number({ invalid_type_error: OUT_HINT })
+  .min(0.5, OUT_HINT)
+  .max(365, OUT_HINT)
+  .refine((n) => Number.isInteger(n * 2), OUT_HINT)
 
 export const quoteLine = z.object({
   id,
@@ -83,6 +114,14 @@ export const quoteLine = z.object({
   per: z.enum(LINE_PER).optional(),
   /** The product a kit line is for, when it's one from the stock list: built from the job or picked on the quote. */
   modelId: id.nullable().optional(),
+  /**
+   * The product's rate rule (ADR 0085), for a line charged by it: `days` is then what the rule makes of `out`, the days
+   * it's out, unless changed by hand. Under Weekly, `days` counts weeks and the price is for a week.
+   */
+  rate: z.enum(RATE_RULES).optional(),
+  out: lineOut.optional(),
+  /** Off this line alone, as a percentage, before any discount off the whole quote. */
+  discountPct: lineDiscount.optional(),
 })
 export type QuoteLine = z.infer<typeof quoteLine>
 
@@ -122,6 +161,11 @@ export interface Quote {
   validDays?: number
   /** A deposit asked for before the job, as a percentage of the total with VAT; none unless set. */
   depositPct?: number | null
+  /**
+   * The price agreed before VAT, in cents (ADR 0085), in place of a discount percentage: the discount off the whole is
+   * then whatever brings the lines to it. None unless agreed.
+   */
+  agreedCents?: number | null
 }
 
 /** Prices hold this long unless the quote says otherwise. */
@@ -144,6 +188,8 @@ export const QUOTE_SETTINGS_ID = 'quoting'
 export interface ProductPrice {
   id: string
   dayCents: number
+  /** How the price is charged (ADR 0085); Daily unless set. Under Weekly, `dayCents` is the price for a week. */
+  rate?: RateRule
 }
 
 /** A crew role's price for a day, by the role as `roleKey` writes it, with the role as it was typed. */
@@ -194,6 +240,8 @@ const depositPct = z.number({ invalid_type_error: DEPOSIT_HINT }).int(DEPOSIT_HI
 export const MAX_QUOTE_NUMBER = 99_999_999
 const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMBER.toLocaleString('en-IE')}.`
 const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
+/** A price agreed for the whole quote, before VAT. */
+const agreedCents = euroCents(10_000_000_00, 'The price agreed')
 /** The company's terms, printed under every quote. */
 export const TERMS_LENGTH = 4000
 
@@ -212,6 +260,7 @@ export const quoteCommandSchemas = {
     // Optional, so a save from an app older than them leaves them as they were (ADR 0084).
     validDays: validDays.optional(),
     depositPct: depositPct.nullable().optional(),
+    agreedCents: agreedCents.nullable().optional(),
   }),
   /** The office sent it to the client themselves (the app sends nothing): from now on it stays as it is. */
   'quote.sent': z.object({ id, on: day }),
@@ -227,7 +276,12 @@ export const quoteCommandSchemas = {
    */
   'quoting.update': z.object({ nextNumber: quoteNumber.nullable(), terms: text(TERMS_LENGTH, 'The terms'), bank: text(500, 'The bank details') }),
   /** A product's day price; null takes it off the price list. */
-  'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable() }),
+  'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable(), rate: z.enum(RATE_RULES).optional() }),
+  /**
+   * Give each product on the price list the rate rule Current RMS charged it by most (ADR 0085), from the quotes read
+   * from it. Products with a rule already set keep it unless `all`.
+   */
+  'price.rulesFromRms': z.object({ all: z.boolean() }),
   /** A crew role's day price; null quotes it at its booked rate again. */
   'price.role': z.object({ role: needed(100, 'The role', 'A role'), dayCents: dayPrice.nullable() }),
   /** A client's usual discount; null for none. */
@@ -239,7 +293,8 @@ export const quoteCommandSchemas = {
 // The sums.
 
 /** A line's amount: how many, for how many days, at the price for one a day, to the cent. */
-export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'per'>) => Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * l.unitCents)
+export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'per' | 'discountPct'>) =>
+  Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * l.unitCents * (1 - (l.discountPct ?? 0) / 100))
 
 export interface RateTotal {
   rate: VatRate
@@ -252,9 +307,11 @@ export interface RateTotal {
 }
 
 export interface QuoteTotals {
-  /** Every line, before the discount. */
+  /** Every line, after its own discount and before the discount off the whole. */
   subtotal: number
   discount: number
+  /** The discount off the whole as a percentage: the one set, or what an agreed price comes to, to one place. */
+  discountPct: number
   net: number
   vat: number
   gross: number
@@ -267,19 +324,35 @@ export interface QuoteTotals {
  * VAT is worked out on what's left at that rate, each to the cent, as an
  * invoice has it; the totals are the sums of those, so they always add up.
  */
-export function quoteTotals(q: { lines: readonly Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'vat' | 'per'>[]; discountPct: number }): QuoteTotals {
-  const rates: RateTotal[] = []
-  for (const rate of VAT_RATES) {
-    const at = q.lines.filter((l) => l.vat === rate)
-    if (!at.length) continue
-    const before = at.reduce((sum, l) => sum + lineCents(l), 0)
-    const discount = Math.round((before * q.discountPct) / 100)
+export function quoteTotals(q: {
+  lines: readonly Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'vat' | 'per' | 'discountPct'>[]
+  discountPct: number
+  agreedCents?: number | null
+}): QuoteTotals {
+  const at = VAT_RATES.map((rate) => ({ rate, lines: q.lines.filter((l) => l.vat === rate) })).filter((r) => r.lines.length)
+  const befores = at.map((r) => r.lines.reduce((sum, l) => sum + lineCents(l), 0))
+  const subtotal = befores.reduce((a, b) => a + b, 0)
+  // An agreed price (ADR 0085) is a discount of whatever brings the lines to it, shared across the rates by their part
+  // of the whole, the last taking what rounding leaves so it comes to the cent.
+  const agreed = q.agreedCents ?? null
+  const off = agreed === null ? null : Math.max(0, subtotal - agreed)
+  let left = off ?? 0
+  const rates: RateTotal[] = at.map((r, i) => {
+    const before = befores[i]!
+    let discount: number
+    if (off === null) discount = Math.round((before * q.discountPct) / 100)
+    else {
+      discount = i === at.length - 1 ? left : subtotal ? Math.round((off * before) / subtotal) : 0
+      left -= discount
+    }
     const net = before - discount
-    const vat = Math.round((net * PERCENT[rate]) / 100)
-    rates.push({ rate, before, discount, net, vat, gross: net + vat })
-  }
+    const vat = Math.round((net * PERCENT[r.rate]) / 100)
+    return { rate: r.rate, before, discount, net, vat, gross: net + vat }
+  })
   const sum = (k: keyof Omit<RateTotal, 'rate'>) => rates.reduce((s, r) => s + r[k], 0)
-  return { subtotal: sum('before'), discount: sum('discount'), net: sum('net'), vat: sum('vat'), gross: sum('gross'), rates }
+  const discount = sum('discount')
+  const discountPct = off === null ? q.discountPct : subtotal ? Math.round((discount / subtotal) * 1000) / 10 : 0
+  return { subtotal, discount, discountPct, net: sum('net'), vat: sum('vat'), gross: sum('gross'), rates }
 }
 
 /** "€1,250.00": always to the cent, as a quote and an invoice write it. */
@@ -324,6 +397,8 @@ export interface CrewToQuote {
 export interface PriceList {
   product(modelId: string): number | undefined
   role(role: string): number | undefined
+  /** A product's rate rule (ADR 0085); Daily when none is set. */
+  rate?(modelId: string): RateRule | undefined
 }
 
 /**
@@ -332,6 +407,12 @@ export interface PriceList {
  * price is put in at nothing, for the office to price: the quote shows it,
  * rather than leaving it out. A role with no price is at its booked rate.
  */
+/** The days a kit line is charged for so many days out: by its product's rule when it has one (ADR 0085). */
+export function daysBy(rule: RateRule | undefined, out: number): Pick<QuoteLine, 'days' | 'rate' | 'out'> {
+  const days = Math.max(1, out)
+  return rule && rule !== 'daily' ? { days: chargedFor(rule, days), rate: rule, out: days } : { days }
+}
+
 export function linesFor(kit: readonly KitToQuote[], crew: readonly CrewToQuote[], prices: PriceList, newId: () => string): QuoteLine[] {
   const what = (name: string, phase?: string) => (phase ? `${name} (${phase})` : name)
   return [
@@ -343,7 +424,7 @@ export function linesFor(kit: readonly KitToQuote[], crew: readonly CrewToQuote[
         ref: k.id,
         group: k.group,
         qty: k.qty,
-        days: Math.max(1, k.days),
+        ...daysBy(prices.rate?.(k.modelId), k.days),
         unitCents: prices.product(k.modelId) ?? 0,
         vat: STANDARD_VAT,
         per: 'day',
@@ -499,18 +580,25 @@ export interface VersionChanges {
   changed: LineChange[]
   /** The discount off the whole, before and now, when it changed. */
   discount: { was: number; now: number } | null
+  /** The price agreed before VAT, before and now (null for none), when it changed. */
+  agreed: { was: number | null; now: number | null } | null
 }
 
 /** Which line of one version is which of the next: its product, else what it was built from, else its words. */
 const lineKey = (l: QuoteLine) => (l.modelId ? `m:${l.modelId}` : l.ref ? `r:${l.ref}` : `w:${l.kind}:${l.what.trim().toLowerCase()}`)
 const sameTerms = (a: QuoteLine, b: QuoteLine) =>
-  a.qty === b.qty && a.unitCents === b.unitCents && a.vat === b.vat && (a.per ?? 'day') === (b.per ?? 'day') && ((a.per ?? 'day') === 'once' || a.days === b.days)
+  a.qty === b.qty &&
+  a.unitCents === b.unitCents &&
+  a.vat === b.vat &&
+  (a.discountPct ?? 0) === (b.discountPct ?? 0) &&
+  (a.per ?? 'day') === (b.per ?? 'day') &&
+  ((a.per ?? 'day') === 'once' || a.days === b.days)
 
 /**
  * What changed from one version to the next, for "What changed since version 1". A new version's lines get new ids, so
  * lines are matched by what they are; two of the same are matched in order.
  */
-export function versionChanges(was: Pick<Quote, 'lines' | 'discountPct'>, now: Pick<Quote, 'lines' | 'discountPct'>): VersionChanges {
+export function versionChanges(was: Pick<Quote, 'lines' | 'discountPct' | 'agreedCents'>, now: Pick<Quote, 'lines' | 'discountPct' | 'agreedCents'>): VersionChanges {
   const left = new Map<string, QuoteLine[]>()
   for (const l of was.lines) left.set(lineKey(l), [...(left.get(lineKey(l)) ?? []), l])
   const added: QuoteLine[] = []
@@ -521,6 +609,10 @@ export function versionChanges(was: Pick<Quote, 'lines' | 'discountPct'>, now: P
     else if (!sameTerms(before, l)) changed.push({ line: l, was: before })
   }
   const removed = [...left.values()].flat()
-  const discount = was.discountPct === now.discountPct ? null : { was: was.discountPct, now: now.discountPct }
-  return { added, removed, changed, discount }
+  const agreedWas = was.agreedCents ?? null
+  const agreedNow = now.agreedCents ?? null
+  const agreed = agreedWas === agreedNow ? null : { was: agreedWas, now: agreedNow }
+  // With a price agreed on either, the percentage is only what it came to, so the agreed price says the change.
+  const discount = agreed || was.discountPct === now.discountPct ? null : { was: was.discountPct, now: now.discountPct }
+  return { added, removed, changed, discount, agreed }
 }
