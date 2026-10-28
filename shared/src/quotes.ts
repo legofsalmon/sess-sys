@@ -97,6 +97,12 @@ const lineOut = z
   .max(365, OUT_HINT)
   .refine((n) => Number.isInteger(n * 2), OUT_HINT)
 
+const SUBHIRE_HINT = 'How many are hired in is a whole number from 0 to 10,000.'
+const subhireQty = z.number({ invalid_type_error: SUBHIRE_HINT }).int(SUBHIRE_HINT).min(0, SUBHIRE_HINT).max(10_000, SUBHIRE_HINT)
+/** What a line costs, up to what a whole quote could come to. */
+const lineCost = euroCents(10_000_000_00, 'What a line costs')
+export const SUPPLIER_LENGTH = 200
+
 /** Room for what a package holds, as printed under its line. */
 export const PACKAGE_INCLUDES_LENGTH = 1000
 
@@ -138,6 +144,14 @@ export const quoteLine = z.object({
   /** The package a line was added from (ADR 0087), and what it held then, printed under it: "4 × Shure SM58, 2 × DI box". */
   packageId: id.optional(),
   includes: text(PACKAGE_INCLUDES_LENGTH, 'What a package includes').optional(),
+  /**
+   * The cost side (ADR 0089), never printed: how many of a kit line are hired in from another company, and who from,
+   * as a job's kit line has it (ADR 0014); and what the whole line costs Session Hire, before VAT. Left out, a crew line
+   * costs its booked rate and our own kit nothing.
+   */
+  subhireQty: subhireQty.optional(),
+  supplier: text(SUPPLIER_LENGTH, 'The supplier').optional(),
+  costCents: lineCost.optional(),
 })
 export type QuoteLine = z.infer<typeof quoteLine>
 
@@ -400,6 +414,37 @@ export const quoteCommandSchemas = {
 export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'per' | 'discountPct'>) =>
   Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * l.unitCents * (1 - (l.discountPct ?? 0) / 100))
 
+/**
+ * What a line costs Session Hire (ADR 0089), before VAT: what's typed on it, or else, for crew, what they're booked
+ * at for the days charged, and for our own kit nothing. Undefined while it isn't known: kit hired in, or anything
+ * else, with no cost typed yet, or crew at a role nobody's been booked at.
+ */
+export function lineCostOf(l: Pick<QuoteLine, 'kind' | 'qty' | 'days' | 'unitCents' | 'per' | 'discountPct' | 'subhireQty' | 'costCents' | 'extra'>, bookedCents?: number): number | undefined {
+  if (l.costCents !== undefined) return l.costCents
+  if (l.kind === 'crew') return bookedCents === undefined ? undefined : Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * bookedCents)
+  if (l.kind === 'kit') return l.subhireQty ? undefined : 0
+  // Travel and subsistence go on to the crew as they're charged (ADR 0086): fuel and their per diem.
+  return l.extra ? lineCents(l) : undefined
+}
+
+export interface QuoteMargin {
+  /** What the lines with a cost known come to costing. */
+  cost: number
+  /** Before VAT, after every discount, less the cost. */
+  margin: number
+  /** The margin as a part of what's charged before VAT, to one place; null when nothing is charged. */
+  pct: number | null
+  /** Lines whose cost isn't known yet, left out of the cost. */
+  unknown: number
+}
+
+/** What a quote makes (ADR 0089): what it's charged before VAT, after every discount, less what its lines cost. */
+export function quoteMargin(net: number, costs: readonly (number | undefined)[]): QuoteMargin {
+  const cost = costs.reduce<number>((sum, c) => sum + (c ?? 0), 0)
+  const margin = net - cost
+  return { cost, margin, pct: net ? Math.round((margin / net) * 1000) / 10 : null, unknown: costs.filter((c) => c === undefined).length }
+}
+
 /** What a package holds, as printed under its line: "4 × Shure SM58, 2 × DI box, with clips and stands". */
 export function packageIncludes(p: Pick<Package, 'items' | 'notes'>, nameOf: (modelId: string) => string | undefined): string {
   const items = p.items.map((i) => `${i.qty} × ${nameOf(i.modelId) ?? 'a product no longer listed'}`).join(', ')
@@ -492,6 +537,9 @@ export interface KitToQuote {
   qty: number
   /** The days it's out on: its phase's, or the whole job's. */
   days: number
+  /** How many of them the job hires in, and who from (ADR 0014), which the quote's line starts with (ADR 0089). */
+  subhireQty?: number
+  supplier?: string
 }
 
 /** A crew call as a quote needs it. */
@@ -540,6 +588,7 @@ export function linesFor(kit: readonly KitToQuote[], crew: readonly CrewToQuote[
         vat: STANDARD_VAT,
         per: 'day',
         modelId: k.modelId,
+        ...(k.subhireQty ? { subhireQty: Math.min(k.subhireQty, k.qty), ...(k.supplier?.trim() ? { supplier: k.supplier.trim().slice(0, SUPPLIER_LENGTH) } : {}) } : {}),
       })
     ),
     ...crew.map(

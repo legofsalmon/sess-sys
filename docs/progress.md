@@ -13,13 +13,30 @@ waiting on someone.
   notifications of them, nothing on freelancers' links (their timesheet page
   is 404 and a post is turned down), and Money's "Owed to freelancers" only
   if some approved are still to pay. Nothing deleted. Made-up data turns
-  them on. App 1.46.0.
+  them on. App 1.47.0.
 - Checked: typecheck, shared and server tests (off by default, link page and
   post refused while off, kept and back when on, the history entry), browser
   tests (timesheets-switch.spec.ts, and the timesheet, crew row, home,
   departments and access tests).
 
 **Waiting on** nobody. Colly turns them on under Admin › Company when needed.
+
+## 28 October 2026: availability, subhire and margin on quotes
+
+**Done**
+
+- [ADR 0089](adr/0089-availability-subhire-and-margin-on-quotes.md), part 3
+  of the quoting plan. Each kit line is checked against the job's days by
+  the kit's hold rules, leaving out the job's own kit. Short lines say so
+  and offer "Hire in". Lines carry how many are hired in, the supplier and
+  what they cost us (`subhireQty`, `supplier`, `costCents`), with crew
+  costed at booked rates when left empty. "Add transport" adds the job's
+  vans. The office and directors see each line's margin and the quote's,
+  never printed.
+  App 1.46.0.
+- Checked: typecheck, unit tests (enough kit, what's wanted, line costs,
+  margin), server (cost side kept, supplier trimmed), browser test
+  (quotes.spec.ts: short, hired in, transport, nothing printed).
 
 ## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
 
