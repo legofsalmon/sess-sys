@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.39.0',
+    date: '2026-10-27',
+    title: 'Start a quote in a few words, and know which to chase',
+    what: 'Money has a New quote button: give the job a name, the client and the days, and its quote opens, with the job added as an enquiry. Marking a quote sent now moves the job to quoted. When the client says yes or no, the quote offers to confirm the job or mark it lost in one press. Money lists every quote waiting on the office: answered, waiting for an answer (with a nudge after a week) and not sent yet, and Notifications shows the ones worth a call. The app still contacts nobody.',
+    prs: [134],
+    adrs: [81],
+  },
+  {
     version: '1.38.1',
     date: '2026-10-27',
     title: 'Every page says where you are, in the same place',

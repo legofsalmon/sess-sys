@@ -1,5 +1,5 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { eachDay } from '../crew.ts'
+import { daysBetween, eachDay } from '../crew.ts'
 import { irishToday } from '../day.ts'
 import { STOPPED } from '../jobs.ts'
 import {
@@ -363,6 +363,46 @@ export function moneyView(
     costsPaid: approved.filter((c) => c.paidOn).sort((a, b) => b.paidOn!.localeCompare(a.paidOn!)),
     any: quotes.size > 0 || products.size > 0 || roles.size > 0 || approved.length > 0,
   }
+}
+
+// Quotes to follow up (ADR 0081): what's waiting on the office, so nothing quoted is forgotten.
+
+/** A quote sent this many days ago with no answer is worth a call to the client. */
+export const CHASE_AFTER_DAYS = 7
+
+export interface QuoteToFollow {
+  job: JobView
+  quote: QuoteView
+  /** Days since it was last saved (a draft), sent (waiting) or answered (out of step). */
+  days: number
+}
+
+export interface QuotesToFollow {
+  /** Being put together, not sent yet. */
+  drafts: QuoteToFollow[]
+  /** Sent, with no answer yet: the longest waiting first. */
+  waiting: QuoteToFollow[]
+  /** Answered, but the job doesn't say so yet: accepted and not confirmed, or turned down and not marked lost. */
+  outOfStep: (QuoteToFollow & { want: 'confirmed' | 'lost' })[]
+}
+
+export function quotesToFollow(m: Pick<MoneyView, 'jobs' | 'draftOf'>, today: string): QuotesToFollow {
+  const out: QuotesToFollow = { drafts: [], waiting: [], outOfStep: [] }
+  const since = (d: string | null | undefined) => (d ? Math.max(0, daysBetween(d, today)) : 0)
+  for (const { job, current } of m.jobs) {
+    const stopped = STOPPED.includes(job.status)
+    const draft = m.draftOf(job.id)
+    if (draft && !stopped) out.drafts.push({ job, quote: draft, days: since(irishToday(new Date(draft.savedAt))) })
+    if (!current) continue
+    if (current.status === 'sent' && !stopped && !draft) out.waiting.push({ job, quote: current, days: since(current.sentOn) })
+    if (current.status === 'accepted' && !stopped && job.status !== 'confirmed') out.outOfStep.push({ job, quote: current, days: since(current.answeredOn), want: 'confirmed' })
+    if (current.status === 'declined' && !stopped && !draft) out.outOfStep.push({ job, quote: current, days: since(current.answeredOn), want: 'lost' })
+  }
+  const longest = (a: QuoteToFollow, b: QuoteToFollow) => b.days - a.days || a.job.name.localeCompare(b.job.name, 'en-IE')
+  out.drafts.sort(longest)
+  out.waiting.sort(longest)
+  out.outOfStep.sort(longest)
+  return out
 }
 
 // The accountant's files (ADR 0042): made on the device from what it holds, for a period.
