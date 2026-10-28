@@ -13,13 +13,29 @@ waiting on someone.
   notifications of them, nothing on freelancers' links (their timesheet page
   is 404 and a post is turned down), and Money's "Owed to freelancers" only
   if some approved are still to pay. Nothing deleted. Made-up data turns
-  them on. App 1.47.0.
+  them on. App 1.48.0.
 - Checked: typecheck, shared and server tests (off by default, link page and
   post refused while off, kept and back when on, the history entry), browser
   tests (timesheets-switch.spec.ts, and the timesheet, crew row, home,
   departments and access tests).
 
 **Waiting on** nobody. Colly turns them on under Admin › Company when needed.
+
+## 28 October 2026: Quotes, a place of its own
+
+**Done**
+
+- [ADR 0088](adr/0088-quotes-in-the-sidebar.md). Quotes (`#quotes`) is a
+  sixth place in the desk sidebar, after Jobs, for those who see money; on a
+  phone it's on the Menu, which keeps its tab. The page has "To follow up"
+  (moved from Money, with New quote) and "All quotes": each job's quote, the
+  last changed first, found by job, client, venue, number or invoice and
+  narrowed by what it is. Money keeps the figures and links to it. App
+  1.47.0.
+- Checked: typecheck, unit tests (the list, its order, a draft over a sent
+  version, narrowing and finding), browser tests (quotes-page.spec.ts: the
+  sidebar on a desk, the Menu on a phone; quote-follow-up.spec.ts moved to
+  Quotes).
 
 ## 28 October 2026: availability, subhire and margin on quotes
 

@@ -67,11 +67,19 @@ export const MENU: PlaceGroup[] = [
         about: 'Where the jobs are, their specs and documents',
       },
       {
-        key: 'money',
+        key: 'quotes',
         icon: 'document',
+        href: '#quotes',
+        label: 'Quotes',
+        about: 'Every quote, what needs following up, and a new one',
+        needs: ['money'],
+      },
+      {
+        key: 'money',
+        icon: 'chart',
         href: '#jobs/money',
         label: 'Money',
-        about: "Quotes, what's owed, and files for the accountant",
+        about: "What's quoted and owed, margins, and files for the accountant",
         needs: ['money'],
       },
       {
