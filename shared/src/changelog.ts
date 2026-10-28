@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-28',
     title: 'A status page for everything the app relies on',
     what: 'Admin has a new Status page for the office and directors. It checks everything the app depends on, all at once: the server and which version it runs, the database, sign-in, error reports, the nightly backups and where they’re kept, Google Calendar, crew’s own calendars, Current RMS, the AA’s fuel price and the map search. Each says in a sentence whether it’s working, and if not, what to do about it. It also says when a newer version has been finished but isn’t live yet. Nothing is written anywhere and nobody is contacted while it checks.',
-    prs: [0],
+    prs: [152],
     adrs: [93],
   },
   {
