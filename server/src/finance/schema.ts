@@ -79,6 +79,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS per_diem_cents integer CHECK (per_diem_cents >= 0);
   ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_set_on date;
   `,
+  // Packages (ADR 0087): kit quoted together at one price, with what each holds.
+  `
+  CREATE TABLE IF NOT EXISTS packages (
+    id          text PRIMARY KEY,
+    name        text NOT NULL,
+    department  text NOT NULL,
+    day_cents   integer NOT NULL CHECK (day_cents >= 0),
+    rate        text NOT NULL DEFAULT 'daily' CHECK (rate IN ('daily', 'week3', 'weekly')),
+    items       jsonb NOT NULL DEFAULT '[]',
+    notes       text NOT NULL DEFAULT ''
+  );
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

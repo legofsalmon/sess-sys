@@ -475,3 +475,19 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
 .quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
 .quote-screen .in-step p { margin: 0; }
+
+/* Packages (ADR 0087): what one holds, under its line and on the price list. */
+.quote-screen .includes, .quote-sheet .includes { display: block; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
+.money .package-row { align-items: center; }
+.money .package-row > div:first-child { flex: 1 1 14em; }
+.money .package-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.money .package-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.money .package-editor { display: grid; gap: var(--space-12); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
+.money .package-fields { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.money .package-fields .field { flex: 1 1 10em; }
+.money .package-items { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
+.money .package-items legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
+.money .package-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.money .package-item > span { flex: 1 1 6em; }
+.money .package-item label { display: inline-flex; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
+.money .package-item input { width: 4.5em; color: var(--ink); }

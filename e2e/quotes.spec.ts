@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 /**
  * Quotes and money (ADR 0042): the office builds a quote from a job's kit
@@ -14,6 +14,8 @@ import { expect, test } from '@playwright/test'
 
 const phoneSize = { width: 390, height: 844 }
 const fresh = { data: { confirm: 'delete everything' } }
+/** The browser's own print dialog would end printing at once and take the sheet away before it's read, so it's left out. */
+const noPrintDialog = (page: Page) => page.addInitScript(() => void (window.print = () => undefined))
 
 test('the office quotes a job, records the answer and the invoice, and sees who owes', async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
@@ -173,6 +175,7 @@ test('kit charged by the week, a line discounted, and a total agreed with the cl
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
 
   // The Spiiders are hired by the week: the price list says so beside the price.
   await office.goto('/#jobs/money/prices')
@@ -222,6 +225,7 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
 
   // Admin says how they're charged: past 50 km, diesel at €1.749, a van using 10 litres for 100 km, €39.08 a day each.
   await office.goto('/#admin')
@@ -259,6 +263,46 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   const printed = office.locator('.print-sheet.quote-sheet')
   await expect(printed).toContainText('Travel, 200 km each way from Dublin')
   await expect(printed).not.toContainText('Crew subsistence')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test('a package made on the price list goes on a quote as one line, with what it holds under it (ADR 0087)', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  await office.goto('/#jobs/money/prices')
+  const packages = office.getByRole('region', { name: 'Packages' })
+  await packages.getByRole('button', { name: 'Add a package' }).click()
+  const editor = packages.getByRole('form', { name: 'New package' })
+  await editor.getByLabel('Name').fill('Mic package')
+  await editor.getByLabel('Add a product to it').fill('SM58')
+  await editor.getByRole('option', { name: /Shure SM58/ }).click()
+  await editor.getByLabel('How many Shure SM58').fill('4')
+  await editor.getByLabel('Charged').selectOption('weekly')
+  await editor.getByLabel('Price, € a week').fill('100')
+  await editor.getByLabel('Anything else it includes').fill('with clips and stands')
+  await editor.getByRole('button', { name: 'Add the package' }).click()
+  await expect(packages).toContainText('4 × Shure SM58, with clips and stands')
+  await expect(packages).toContainText('€100.00 a week')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  await draft.getByRole('button', { name: 'Add a package' }).click()
+  await draft.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(draft.getByLabel('Line 3: includes')).toHaveValue('4 × Shure SM58, with clips and stands')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €2,140.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Mic package4 × Shure SM58, with clips and stands')
   await office.evaluate(() => dispatchEvent(new Event('afterprint')))
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)

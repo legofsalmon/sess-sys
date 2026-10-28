@@ -17,6 +17,7 @@ import {
   type CostPaid,
   type CrewToQuote,
   type KitToQuote,
+  type Package,
   type ProductPrice,
   type Quote,
   type QuoteEntities,
@@ -107,6 +108,9 @@ export interface MoneyView {
   productRate(modelId: string): RateRule | undefined
   rolePrice(role: string): number | undefined
   discountOf(clientId: string | null | undefined): number | undefined
+  /** The packages on the price list (ADR 0087), by name, each marked while this device's change is on its way. */
+  packages: (Package & { pending: boolean })[]
+  package(id: string): (Package & { pending: boolean }) | undefined
   /** Whether this device's own change to a price is still on its way. */
   pricePending(kind: 'product' | 'role' | 'client', key: string): boolean
   /** Every role with a price, and every role crew have been asked for, by name. */
@@ -147,6 +151,7 @@ export function moneyView(
   const products = new Map<string, ProductPrice & { pending?: boolean }>(Object.values(entities.productPrice ?? {}).map((p) => [p.id, p]))
   const roles = new Map<string, RolePrice & { pending?: boolean }>(Object.values(entities.rolePrice ?? {}).map((r) => [r.id, r]))
   const discounts = new Map<string, ClientDiscount & { pending?: boolean }>(Object.values(entities.clientDiscount ?? {}).map((d) => [d.id, d]))
+  const packages = new Map<string, Package & { pending: boolean }>(Object.values(entities.package ?? {}).map((p) => [p.id, { ...p, pending: false }]))
   const paid = new Map<string, CostPaid & { pending?: boolean }>(Object.values(entities.costPaid ?? {}).map((c) => [c.id, c]))
   let quoting: QuoteSettings & { pending: boolean } = {
     ...{ id: QUOTE_SETTINGS_ID, nextNumber: null, terms: '', bank: '' },
@@ -237,6 +242,16 @@ export function moneyView(
           products.set(a.modelId, { id: a.modelId, dayCents: a.dayCents, ...(rate ? { rate } : {}), pending: true })
         }
         gone.product.add(a.modelId)
+        break
+      }
+      case 'package.save': {
+        const a = m.args as CommandArgs<'package.save'>
+        packages.set(a.id, { ...a, name: a.name.trim(), notes: a.notes.trim(), pending: true })
+        break
+      }
+      case 'package.remove': {
+        const a = m.args as CommandArgs<'package.remove'>
+        packages.delete(a.id)
         break
       }
       case 'price.role': {
@@ -410,6 +425,8 @@ export function moneyView(
     quote: (id) => views.get(id),
     productPrice: (modelId) => products.get(modelId)?.dayCents,
     productRate: (modelId) => products.get(modelId)?.rate,
+    packages: [...packages.values()].sort((a, b) => a.name.localeCompare(b.name, 'en-IE')),
+    package: (id) => packages.get(id),
     rolePrice: (role) => roles.get(roleKey(role))?.dayCents,
     discountOf: (clientId) => (clientId ? discounts.get(clientId)?.pct : undefined),
     pricePending: (kind, key) => (kind === 'product' ? gone.product.has(key) : kind === 'role' ? gone.role.has(roleKey(key)) : gone.client.has(key)),
@@ -421,7 +438,7 @@ export function moneyView(
     owed: [...owed.values()].sort((a, b) => b.cents - a.cents || a.client.localeCompare(b.client)),
     costsOwed: approved.filter((c) => !c.paidOn).sort((a, b) => (a.row.timesheet?.approvedAt ?? '').localeCompare(b.row.timesheet?.approvedAt ?? '')),
     costsPaid: approved.filter((c) => c.paidOn).sort((a, b) => b.paidOn!.localeCompare(a.paidOn!)),
-    any: quotes.size > 0 || products.size > 0 || roles.size > 0 || approved.length > 0,
+    any: quotes.size > 0 || products.size > 0 || packages.size > 0 || roles.size > 0 || approved.length > 0,
     quoting,
     nextNumber: Math.max(quoting.nextNumber ?? 1, Math.max(0, ...[...quotes.values()].map((q) => q.number ?? 0)) + 1),
   }
