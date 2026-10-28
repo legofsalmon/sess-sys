@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
 import { chargedFor, packageIncludes, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
-import { invoicesCsv, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
+import { invoicesCsv, quoteRows, quoteRowShown, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
 import type { JobView } from '../src/sync/jobs-view.ts'
 
 /**
@@ -354,5 +354,37 @@ describe('quotes to follow up (ADR 0081)', () => {
     const f = quotesToFollow({ jobs: rows as never, draftOf: () => quote({ status: 'draft' }) }, today)
     expect(f.waiting).toEqual([])
     expect(f.drafts).toHaveLength(1)
+  })
+})
+
+describe('every quote in one list (ADR 0088)', () => {
+  const job = (id: string, client?: string) => ({ id, name: id, status: 'quoted', client: client ? { name: client } : undefined }) as JobView
+  const quote = (over: Partial<QuoteView>) =>
+    ({ id: over.id ?? 'q', status: 'sent', sentOn: null, answeredOn: null, invoicedOn: null, paidOn: null, invoiceRef: '', number: null, savedAt: '2026-10-20T10:00:00Z', ...over }) as QuoteView
+
+  it("lists each job's draft, or else the quote that counts, the last changed first", () => {
+    const drafts = new Map([['Second go', quote({ id: 'd', status: 'draft', savedAt: '2026-10-26T09:00:00Z' })]])
+    const rows = quoteRows({
+      jobs: [
+        { job: job('Paid lately', 'Liffey Brands'), current: quote({ status: 'accepted', number: 1115, invoicedOn: '2026-10-22', paidOn: '2026-10-27', invoiceRef: 'SH-1050' }) },
+        { job: job('Second go'), current: quote({ id: 'v1', number: 1116, sentOn: '2026-10-01' }) },
+        { job: job('Costs only'), current: undefined },
+        { job: job('Sent'), current: quote({ sentOn: '2026-10-21' }) },
+      ] as never,
+      draftOf: (id) => drafts.get(id),
+    })
+    expect(rows.map((r) => [r.job.name, r.quote.status, r.changed])).toEqual([
+      ['Paid lately', 'accepted', '2026-10-27'],
+      ['Second go', 'draft', '2026-10-26'],
+      ['Sent', 'sent', '2026-10-21'],
+    ])
+    expect(rows[1]!.behind?.id).toBe('v1')
+
+    // Narrowed by what it is, and found by the client, the number of the version sent, or the invoice.
+    expect(rows.filter((r) => quoteRowShown(r, 'accepted', '')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', 'liffey')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', '1116')).map((r) => r.job.name)).toEqual(['Second go'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', 'sh-1050')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'sent', 'liffey'))).toEqual([])
   })
 })

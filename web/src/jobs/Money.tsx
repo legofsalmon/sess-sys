@@ -98,12 +98,13 @@ export function MoneyScreen({ view }: { view: View }) {
           </div>
         </dl>
         <p className="hint">
-          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#jobs/money/prices">Price list</a> · <a href="#jobs/money/current-rms">Past quotes from Current RMS</a>
+          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#quotes">Quotes</a> · <a href="#jobs/money/prices">Price list</a> ·{' '}
+          <a href="#jobs/money/current-rms">Past quotes from Current RMS</a>
         </p>
       </section>
-      <Quotes view={view} />
       <ByMonth m={m} />
-      <Owed m={m} />
+      {/* What's owed comes from approved timesheets: not shown while they're off (ADR 0090), unless some approved are still to pay. */}
+      {(view.office.useTimesheets || m.costsOwed.length > 0) && <Owed m={m} />}
       <Freelancers m={m} />
       <Margins m={m} />
       <ForTheAccountant m={m} />
@@ -135,18 +136,18 @@ function FollowRow({ f, what, chase, children }: { f: QuoteToFollow; what: strin
 }
 
 /**
- * Quotes (ADR 0081), at the top of Money: a new one in a few words, and every quote waiting on the office, the
- * longest waiting first: answered but the job not yet in step, sent with no answer (a call after a week), and drafts
- * not sent. Nothing here is sent to anyone: the office rings or emails the client themselves.
+ * To follow up (ADR 0081), at the top of Quotes (ADR 0088, at first on Money): a new one in a few words, and every quote
+ * waiting on the office, the longest waiting first: answered but the job not yet in step, sent with no answer (a call
+ * after a week), and drafts not sent. Nothing here is sent to anyone: the office rings or emails the client themselves.
  */
-function Quotes({ view }: { view: View }) {
+export function ToFollowUp({ view }: { view: View }) {
   const today = useToday()
   const [starting, setStarting] = useState(false)
   const f = quotesToFollow(view.money, today)
   const none = f.drafts.length + f.waiting.length + f.outOfStep.length === 0
   return (
-    <section className="card quotes-to-follow" aria-label="Quotes">
-      <Heading icon="document">Quotes</Heading>
+    <section className="card quotes-to-follow" aria-label="To follow up">
+      <Heading icon="document">To follow up</Heading>
       {!starting && (
         <button type="button" className="primary" onClick={() => setStarting(true)}>
           New quote
@@ -213,7 +214,7 @@ export function QuotesToChase({ view }: { view: View }) {
       <Heading icon="document">Quotes to follow up</Heading>
       <p className="hint">
         Sent over a week ago with no answer, or answered with the job not yet in step. The app contacts nobody: ring or email the client yourself. All
-        quotes are on <a href="#jobs/money">Money</a>.
+        quotes are on <a href="#quotes">Quotes</a>.
       </p>
       <QuoteGroups f={f} chaseOnly />
     </section>

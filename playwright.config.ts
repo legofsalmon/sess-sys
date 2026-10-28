@@ -18,6 +18,7 @@ const standIn = `127.0.0.1:${Number(port) + 1000}`
 export default defineConfig({
   testDir: 'e2e',
   // One at a time: the tests share one server, and some check the next free number it gives out.
+  // CI splits the files three ways (--shard), each third with a server of its own.
   workers: 1,
   timeout: 60_000,
   use: {

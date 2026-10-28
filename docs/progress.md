@@ -12,10 +12,61 @@ waiting on someone.
   up to 1200px beside the sidebar from 900px), planner, job page and the
   catalogue beside a record included. Before, Stock's pages alone were
   960, 1072 or 1400px. Only sign-in keeps the phone's width. A card's
-  paragraphs stop at about 75 characters instead. App 1.45.2.
+  paragraphs stop at about 75 characters instead. App 1.48.1.
 - Checked: a browser test walks every area's pages, Admin, You and Home on
   a phone, a laptop and a 1680px screen and fails on any difference (it
   failed on main as it should).
+
+## 28 October 2026: timesheets can be turned off, and start off
+
+**Done**
+
+- [ADR 0090](adr/0090-timesheets-off-until-used.md). A "Timesheets" switch
+  under Admin › Company, off by default (Colly won't use them on day one).
+  While off: no Timesheets page in Crew's row or the Menu, no Home count, no
+  notifications of them, nothing on freelancers' links (their timesheet page
+  is 404 and a post is turned down), and Money's "Owed to freelancers" only
+  if some approved are still to pay. Nothing deleted. Made-up data turns
+  them on. App 1.48.0.
+- Checked: typecheck, shared and server tests (off by default, link page and
+  post refused while off, kept and back when on, the history entry), browser
+  tests (timesheets-switch.spec.ts, and the timesheet, crew row, home,
+  departments and access tests).
+
+**Waiting on** nobody. Colly turns them on under Admin › Company when needed.
+
+## 28 October 2026: Quotes, a place of its own
+
+**Done**
+
+- [ADR 0088](adr/0088-quotes-in-the-sidebar.md). Quotes (`#quotes`) is a
+  sixth place in the desk sidebar, after Jobs, for those who see money; on a
+  phone it's on the Menu, which keeps its tab. The page has "To follow up"
+  (moved from Money, with New quote) and "All quotes": each job's quote, the
+  last changed first, found by job, client, venue, number or invoice and
+  narrowed by what it is. Money keeps the figures and links to it. App
+  1.47.0.
+- Checked: typecheck, unit tests (the list, its order, a draft over a sent
+  version, narrowing and finding), browser tests (quotes-page.spec.ts: the
+  sidebar on a desk, the Menu on a phone; quote-follow-up.spec.ts moved to
+  Quotes).
+
+## 28 October 2026: availability, subhire and margin on quotes
+
+**Done**
+
+- [ADR 0089](adr/0089-availability-subhire-and-margin-on-quotes.md), part 3
+  of the quoting plan. Each kit line is checked against the job's days by
+  the kit's hold rules, leaving out the job's own kit. Short lines say so
+  and offer "Hire in". Lines carry how many are hired in, the supplier and
+  what they cost us (`subhireQty`, `supplier`, `costCents`), with crew
+  costed at booked rates when left empty. "Add transport" adds the job's
+  vans. The office and directors see each line's margin and the quote's,
+  never printed.
+  App 1.46.0.
+- Checked: typecheck, unit tests (enough kit, what's wanted, line costs,
+  margin), server (cost side kept, supplier trimmed), browser test
+  (quotes.spec.ts: short, hired in, transport, nothing printed).
 
 ## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
 

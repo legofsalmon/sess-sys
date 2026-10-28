@@ -28,12 +28,36 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.45.2',
+    version: '1.48.1',
     date: '2026-10-28',
     title: 'Every page the same width',
     what: 'Moving between pages no longer makes the page jump wider or narrower. Stock’s pages, Jobs’ list, week and month, Crew, Admin, a job and everything else are now one width on a computer, and the full width on a phone, so the top bar, the row of pages and the title stay still as you go from one to the next. Only how each page shares out its room inside changes.',
     prs: [149],
     adrs: [91],
+  },
+  {
+    version: '1.48.0',
+    date: '2026-10-28',
+    title: 'Timesheets can be turned off, and start off',
+    what: 'Admin › Company has a switch for timesheets, which starts off. While off, there is no Timesheets page under Crew or in the Menu, Home doesn’t count timesheets to approve, notifications leave them out, and crew aren’t asked for one on their own link. Nothing is deleted: turning them on brings back every timesheet already sent, as it was.',
+    prs: [148],
+    adrs: [90],
+  },
+  {
+    version: '1.47.0',
+    date: '2026-10-28',
+    title: 'Quotes has a place of its own',
+    what: 'Quotes is now in the sidebar on a computer, after Jobs, and on the Menu on a phone. It has the quotes to follow up and a New quote button, which were on Money, and every quote in one list, to find by job, client, venue, quote number or invoice, or narrow to those not sent, sent, accepted or turned down. Only the office and directors see it.',
+    prs: [146],
+    adrs: [88],
+  },
+  {
+    version: '1.46.0',
+    date: '2026-10-28',
+    title: 'Enough kit, hired-in kit, transport and margin on quotes',
+    what: 'Each kit line on a quote now checks there’s enough on the job’s days, against what other jobs have out. A line that’s short says by how many and when, and “Hire in” marks that many as hired in. Kit lines can say how many are hired in and who from, and any line can say what it costs us. “Add transport” adds a van booked on the job, or transport typed, charged once with its cost. The office and directors see what each line makes, and the whole quote’s margin at the top while it’s put together. None of the costs or the margin is printed.',
+    prs: [147],
+    adrs: [89],
   },
   {
     version: '1.45.1',

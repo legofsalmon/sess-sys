@@ -24,6 +24,8 @@ test('a big call says how many it holds in words, and names the first eight acro
   const k = (key: string) => `${key}-${id}`
   const people = Array.from({ length: 25 }, (_, i) => ({ id: k(`p${i}`), name: `Stagehand${String.fromCharCode(65 + i)} Volume${id}` }))
   await push(request, id, [
+    // Timesheets are a page of Crew's row only while the company uses them (ADR 0090).
+    ['timesheets.use', { on: true }],
     ...people.map((p): [string, Record<string, unknown>] => ['person.upsert', { ...p, kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '' }]),
     ['call.create', { id: k('call'), project: `Volume Fest ${id}`, phase: '', venue: '', role: 'Stagehand', start: '2031-06-14', end: '2031-06-15', callTime: null, needed: 40, dayRateCents: null, details: '', replyBy: null }],
     ...people.map((p, i): [string, Record<string, unknown>] => ['offer.send', { id: k(`o${i}`), callId: k('call'), personId: p.id, override: false }]),

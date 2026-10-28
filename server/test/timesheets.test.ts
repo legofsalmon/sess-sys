@@ -70,6 +70,8 @@ async function gala() {
   })
   await ok(
     app,
+    // Off until the office says (ADR 0090); 'are off until the office turns them on' below starts from off.
+    m('timesheets.use', { on: true }),
     m('project.create', { id: 'gala', name: 'Autumn Gala', clientId: null, venueId: null, status: 'confirmed', notes: '' }),
     m('phase.add', { id: 'show', projectId: 'gala', name: 'Show', start: day(-3), end: day(-1), venueId: null, notes: '' }),
     person('dara', 'Dara Quinn'),
@@ -110,6 +112,42 @@ async function post(app: FastifyInstance, url: string, fields: [string, string][
   // The message is read from the page: the address carries only a code (audit finding 21).
   return { ...flashOf(back.html), back }
 }
+
+describe('timesheets switched off (ADR 0090)', () => {
+  it('are off until the office turns them on: nothing on the link, no page, no post, and what was sent is kept', async () => {
+    const { app, token, timesheet } = await gala()
+    const dara = await token('dara')
+    await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-2)], ['note', '']])
+    expect(await timesheet('dara-sound')).toBe('sent')
+
+    await ok(app, m('timesheets.use', { on: false }))
+    const home = await page(app, `/f/${dara}`)
+    expect(home.html).not.toContain('<h2>Timesheets</h2>')
+    expect(home.html).not.toContain('to send</a>')
+    expect(home.html).not.toContain(`/timesheet/`)
+    expect((await page(app, `/f/${dara}/timesheet/dara-sound`)).status).toBe(404)
+    const refused = await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['note', 'Again']])
+    expect(refused).toMatchObject({ ok: false, message: expect.stringContaining("Timesheets aren't used here") })
+    // Kept as it was, and back on the page when they're turned on again.
+    expect(await timesheet('dara-sound')).toBe('sent')
+    const history: HistoryPage = (await app.inject({ url: '/api/history' })).json()
+    expect(history.entries[0]).toMatchObject({ what: 'Turned off timesheets' })
+    await ok(app, m('timesheets.use', { on: true }))
+    expect((await page(app, `/f/${dara}`)).html).toContain('<h2>Timesheets</h2>')
+  })
+
+  it('are off on a fresh company', async () => {
+    const db = await pgliteDb()
+    const app = await buildApp({ db })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    await ok(app, person('dara', 'Dara Quinn'))
+    const t = (await db.query<{ t: string }>(`SELECT link_token AS t FROM people WHERE id = 'dara'`)).rows[0]!.t
+    expect((await page(app, `/f/${t}/timesheet/anything`)).status).toBe(404)
+  })
+})
 
 describe('a timesheet from a private link', () => {
   it('is sent with the days worked and the extras, and shows on the freelancer\'s page', async () => {

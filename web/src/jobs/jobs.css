@@ -293,11 +293,31 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @container (min-width: 860px) {
   .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(8em, 1.3fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
   .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
+  /* Under the cost side (ADR 0089), Remove and Done end the line on a row of their own. */
+  .quote-screen .quote-line .line-cost ~ .line-actions { grid-column: 1 / -1; justify-self: end; }
 }
 /* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
 .quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
 .quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The cost side (ADR 0089): whether there's kit enough, under a line; hired in and what it costs, never printed; and a director's margin. */
+.quote-screen .quote-line-row { display: grid; gap: var(--space-4); }
+.quote-screen .quote-line-row .kit-note { margin: 0 0 var(--space-6); }
+.quote-screen .kit-note { font-size: var(--text-hint); }
+.quote-screen .kit-note .link { font-weight: 600; }
+.quote-screen .quote-line .kit-note, .quote-screen .quote-line .line-cost { grid-column: 1 / -1; }
+.quote-screen .line-cost { border: 0; border-top: 1px dashed var(--line); margin: 0; padding: var(--space-8) 0 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8) var(--space-12); }
+.quote-screen .line-cost legend { float: left; width: 100%; padding: 0; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .line-cost label { flex: 0 1 9em; }
+.quote-screen .line-cost label.supplier { flex: 1 1 14em; }
+.quote-screen .line-cost label:last-of-type { flex: 0 1 16em; }
+.quote-screen .line-cost .line-margin { margin-left: auto; align-self: center; }
+.quote-screen .line-cost small { color: var(--muted); }
+.quote-screen .line-margin { margin: 0; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
+.quote-screen .line-margin.bad, .quote-screen .margin-words.bad b { color: var(--bad); }
+.quote-screen .quote-line-shut .amount .line-margin { display: block; text-align: right; }
+.quote-screen .margin-words small { color: var(--muted); }
+.quote-screen .quote-margin { margin: 0; }
 /* Travel and subsistence (ADR 0086): worked out, not typed, so each reads as a shut line, with what the office says about the job under it. */
 .quote-screen .quote-extra { display: grid; gap: var(--space-8); padding-bottom: var(--space-8); }
 .quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); padding: var(--space-8) 0; border-top: 1px solid var(--line); min-height: 44px; }
@@ -495,6 +515,12 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quotes-to-follow .warn { color: var(--warn); }
 .quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
+/* Every quote (ADR 0088): a row a job, its quote's state on the right, as the rows to follow up. */
+.quote-list .filters { margin: var(--space-8) 0; }
+.quote-list ul.plain { list-style: none; margin: 0; padding: 0; }
+.quote-list li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quote-list li a { font-weight: 600; }
+.quote-list li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
 .quote-screen .in-step p { margin: 0; }
 

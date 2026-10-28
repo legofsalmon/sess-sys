@@ -5,21 +5,21 @@ import { expect, test } from '@playwright/test'
  * from Money with the job in a few words, which makes an enquiry and opens
  * its draft; marking it sent makes the job quoted and lists it as waiting
  * for an answer; the client accepting it offers to confirm the job, from the
- * quote and from Money. Uses the made-up data (ADR 0019), so it starts fresh
+ * quote and from Quotes. Uses the made-up data (ADR 0019), so it starts fresh
  * before and after.
  */
 
 const phoneSize = { width: 390, height: 844 }
 const fresh = { data: { confirm: 'delete everything' } }
 
-test('the office starts a quote from Money, sends it, and puts the job in step when the client says yes', async ({ browser, request }) => {
+test('the office starts a quote from Quotes, sends it, and puts the job in step when the client says yes', async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
 
   // Corrib Arts Week's quote went three days ago, so it's waiting, but not yet worth a call.
-  await office.goto('/#jobs/money')
-  const quotes = office.getByRole('region', { name: 'Quotes' })
+  await office.goto('/#quotes')
+  const quotes = office.getByRole('region', { name: 'To follow up' })
   await expect(quotes).toContainText('Waiting for an answer')
   await expect(quotes).toContainText('Sent 3 days ago')
   await expect(quotes).not.toContainText('worth a call')
@@ -38,11 +38,11 @@ test('the office starts a quote from Money, sends it, and puts the job in step w
   await draft.getByLabel('Line 1: price').fill('900')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
-  // Sent: the job is quoted now, and Money lists it as waiting.
+  // Sent: the job is quoted now, and Quotes lists it as waiting.
   await draft.getByRole('button', { name: 'Mark as sent' }).click()
   const records = office.getByRole('region', { name: 'What happened' })
   await expect(records).toBeVisible()
-  await office.goto('/#jobs/money')
+  await office.goto('/#quotes')
   await expect(quotes.getByRole('listitem').filter({ hasText: 'Docklands Awards' })).toContainText('Sent today')
   await office.goto('/#jobs')
   await expect(office.locator('.job-row', { hasText: 'Docklands Awards' })).toContainText('Quoted')
@@ -54,8 +54,8 @@ test('the office starts a quote from Money, sends it, and puts the job in step w
   await records.getByRole('button', { name: 'Client accepted' }).click()
   await expect(records).toContainText('The client accepted, and the job is still quoted.')
 
-  // Money lists it to put in step too, and confirming it from there takes it off.
-  await office.goto('/#jobs/money')
+  // Quotes lists it to put in step too, and confirming it from there takes it off.
+  await office.goto('/#quotes')
   const answered = quotes.getByRole('listitem').filter({ hasText: 'Docklands Awards' })
   await expect(answered).toContainText('Accepted today')
   await answered.getByRole('button', { name: 'Confirm the job' }).click()

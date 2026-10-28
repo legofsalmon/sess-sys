@@ -63,6 +63,8 @@ const settled = (q: Quote) =>
 
 export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
   async 'quote.save'(ctx, a) {
+    // Kept trimmed, as the job's kit keeps its supplier (ADR 0089).
+    a = { ...a, lines: a.lines.map((l) => (l.supplier === undefined ? l : { ...l, supplier: l.supplier.trim() })) }
     const job = await getProject(ctx.tx, a.projectId, true)
     if (!job) throw new Refused({ code: 'not-found', message: 'That job no longer exists.' })
     const was = await getQuote(ctx.tx, a.id, true)

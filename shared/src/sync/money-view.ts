@@ -116,6 +116,11 @@ export interface MoneyView {
   pricePending(kind: 'product' | 'role' | 'client', key: string): boolean
   /** Every role with a price, and every role crew have been asked for, by name. */
   roles: { role: string; cents: number | undefined; booked: number | undefined }[]
+  /**
+   * The day rate a crew line's crew are booked at (ADR 0089): its crew call's, else the rate anyone's been booked at
+   * for its role; undefined when nobody has.
+   */
+  bookedRate(jobId: string, line: { ref: string | null; what: string }): number | undefined
   /** A job's kit and crew, as a new quote is built from them. */
   sourceOf(jobId: string): { kit: KitToQuote[]; crew: CrewToQuote[] }
   /** Each job with a quote or a freelancer's cost, soonest first. */
@@ -407,6 +412,7 @@ export function moneyView(
           ...(l.phase ? { phase: l.phase.name } : {}),
           qty: l.qty,
           days: span(l.span),
+          ...(l.subhireQty ? { subhireQty: l.subhireQty, supplier: l.supplier } : {}),
         })
       ),
       crew: job.calls
@@ -438,6 +444,13 @@ export function moneyView(
     pricePending: (kind, key) => (kind === 'product' ? gone.product.has(key) : kind === 'role' ? gone.role.has(roleKey(key)) : gone.client.has(key)),
     roles: [...roleList.values()].sort((a, b) => a.role.localeCompare(b.role, 'en-IE')),
     sourceOf,
+    bookedRate: (jobId, line) => {
+      const call = line.ref ? jobs.jobs.find((j) => j.id === jobId)?.calls.find((c) => c.id === line.ref) : undefined
+      if (call?.dayRateCents != null) return call.dayRateCents
+      // "Audio tech (Show)": the role, without the phase it's for.
+      const role = (w: string) => roleList.get(roleKey(w))?.booked
+      return role(line.what) ?? role(line.what.replace(/\s*\([^)]*\)$/, ''))
+    },
     jobs: jobList,
     job: (jobId) => jobMoney.get(jobId),
     months: [...months.values()].sort((a, b) => a.key.localeCompare(b.key)),
@@ -488,6 +501,52 @@ export function quotesToFollow(m: Pick<MoneyView, 'jobs' | 'draftOf'>, today: st
   out.waiting.sort(longest)
   out.outOfStep.sort(longest)
   return out
+}
+
+// Every quote in one list (ADR 0088), for the Quotes page: a job's latest, found by its job, client, venue or number.
+
+/** What the Quotes page can narrow to. An invoiced or paid quote is accepted. */
+export type QuoteShow = 'all' | 'draft' | 'sent' | 'accepted' | 'declined'
+export const QUOTE_SHOWS: [QuoteShow, string][] = [
+  ['all', 'All'],
+  ['draft', 'Not sent'],
+  ['sent', 'Sent'],
+  ['accepted', 'Accepted'],
+  ['declined', 'Turned down'],
+]
+
+export interface QuoteRow {
+  job: JobView
+  /** The version being put together if there is one, or else the one that counts. */
+  quote: QuoteView
+  /** The one that counts, when a newer version is being drafted over it. */
+  behind: QuoteView | undefined
+  /** The last day anything happened to it: saved, sent, answered, invoiced or paid. */
+  changed: string
+}
+
+/** Each job's quote, the last changed first. */
+export function quoteRows(m: Pick<MoneyView, 'jobs' | 'draftOf'>): QuoteRow[] {
+  const rows: QuoteRow[] = []
+  for (const { job, current } of m.jobs) {
+    const draft = m.draftOf(job.id)
+    const quote = draft ?? current
+    if (!quote) continue
+    const days = [draft, current].flatMap((q) => (q ? [irishToday(new Date(q.savedAt)), q.sentOn, q.answeredOn, q.invoicedOn, q.paidOn] : []))
+    const changed = days.filter((d): d is string => !!d).sort().at(-1) ?? ''
+    rows.push({ job, quote, behind: draft && current ? current : undefined, changed })
+  }
+  return rows.sort((a, b) => b.changed.localeCompare(a.changed) || a.job.name.localeCompare(b.job.name, 'en-IE'))
+}
+
+/** Whether a row is one of those shown, and has every word typed somewhere in its job's name, client, venue, number or invoice. */
+export function quoteRowShown(r: QuoteRow, show: QuoteShow, search: string): boolean {
+  if (show !== 'all' && r.quote.status !== show) return false
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const q = r.behind ?? r.quote
+  const text = [r.job.name, r.job.client?.name, r.job.venue?.name, q.number ? String(q.number) : '', q.invoiceRef].filter(Boolean).join(' ').toLowerCase()
+  return words.every((w) => text.includes(w))
 }
 
 // The accountant's files (ADR 0042): made on the device from what it holds, for a period.
