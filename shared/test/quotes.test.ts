@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { chargedFor, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
+import { chargedFor, packageIncludes, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
 import { invoicesCsv, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
 import type { JobView } from '../src/sync/jobs-view.ts'
@@ -118,6 +118,17 @@ describe('rate rules, line discounts and an agreed price (ADR 0085)', () => {
     const [l] = linesFor([{ id: 'k1', modelId: 'y10p', name: 'd&b Y10P', group: 'Audio', qty: 4, days: 10 }], [], { product: () => 5500, role: () => undefined, rate: () => 'week3' }, () => 'n1')
     expect(l).toMatchObject({ rate: 'week3', out: 10, days: 6, unitCents: 5500 })
     expect(lineCents(l!)).toBe(4 * 6 * 5500)
+  })
+})
+
+describe('a package (ADR 0087)', () => {
+  it('prints what it holds, and anything else it includes, after its line', () => {
+    const names: Record<string, string> = { sm58: 'Shure SM58', di: 'DI box' }
+    const items = [{ modelId: 'sm58', qty: 4 }, { modelId: 'di', qty: 2 }]
+    expect(packageIncludes({ items, notes: 'with clips' }, (id) => names[id])).toBe('4 × Shure SM58, 2 × DI box, with clips')
+    expect(packageIncludes({ items: [{ modelId: 'gone', qty: 1 }], notes: '' }, (id) => names[id])).toBe('1 × a product no longer listed')
+    expect(packageIncludes({ items: [], notes: ' Stands and clips ' }, () => undefined)).toBe('Stands and clips')
+    expect(quoteLine.safeParse(line({ kind: 'kit', what: 'Mic package', packageId: 'p1', includes: '4 × Shure SM58' })).success).toBe(true)
   })
 })
 

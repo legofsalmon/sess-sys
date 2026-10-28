@@ -207,6 +207,21 @@ describe('rate rules and an agreed price (ADR 0085)', () => {
   })
 })
 
+describe('a package (ADR 0087)', () => {
+  it('is saved with what it holds, changed, and taken off the price list, and holds only products in the stock list', async () => {
+    const { app } = await gala()
+    await ok(app, m('model.create', { id: 'sm58', name: 'Shure SM58', department: 'audio', category: 'Mics', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' }))
+    const pkg = { id: 'mics', name: '  Mic package ', department: 'audio' as const, dayCents: 10000, rate: 'weekly' as const, items: [{ modelId: 'sm58', qty: 4 }], notes: 'with clips' }
+    await ok(app, m('package.save', pkg), m('package.save', { ...pkg, dayCents: 12000 }))
+    const pulled = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'package')
+    expect((await pulled()).at(-1).data).toEqual({ id: 'mics', name: 'Mic package', department: 'audio', dayCents: 12000, rate: 'weekly', items: [{ modelId: 'sm58', qty: 4 }], notes: 'with clips' })
+    expect(await refused(app, m('package.save', { ...pkg, items: [{ modelId: 'gone', qty: 1 }] }))).toBe('One of the products in the package is no longer in the stock list.')
+    expect(await refused(app, m('package.save', { ...pkg, items: [{ modelId: 'sm58', qty: 1 }, { modelId: 'sm58', qty: 2 }] }))).toBe('Each product is in a package once, with how many.')
+    await ok(app, m('package.remove', { id: 'mics' }))
+    expect((await pulled()).at(-1).op).toBe('delete')
+  })
+})
+
 describe("a freelancer's cost", () => {
   it('is marked paid only once approved, and the timesheet then stays approved', async () => {
     const { app } = await gala()

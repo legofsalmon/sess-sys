@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { day } from './day.ts'
 import { euroCents, needed, text } from './plain.ts'
+import { DEPARTMENTS, type Department } from './stock.ts'
 
 /**
  * Light finance (ADR 0042): a price list, quotes built from a job's kit and
@@ -92,6 +93,9 @@ const lineOut = z
   .max(365, OUT_HINT)
   .refine((n) => Number.isInteger(n * 2), OUT_HINT)
 
+/** Room for what a package holds, as printed under its line. */
+export const PACKAGE_INCLUDES_LENGTH = 1000
+
 export const quoteLine = z.object({
   id,
   kind: z.enum(LINE_KINDS),
@@ -122,6 +126,9 @@ export const quoteLine = z.object({
   out: lineOut.optional(),
   /** Off this line alone, as a percentage, before any discount off the whole quote. */
   discountPct: lineDiscount.optional(),
+  /** The package a line was added from (ADR 0087), and what it held then, printed under it: "4 × Shure SM58, 2 × DI box". */
+  packageId: id.optional(),
+  includes: text(PACKAGE_INCLUDES_LENGTH, 'What a package includes').optional(),
 })
 export type QuoteLine = z.infer<typeof quoteLine>
 
@@ -211,7 +218,30 @@ export interface CostPaid {
   paidOn: string
 }
 
+/**
+ * A package (ADR 0087): kit quoted together at one price, as Current RMS's "Mic package" lines were. It goes on a quote
+ * as one line, with what it holds printed under it.
+ */
+export interface Package {
+  id: string
+  name: string
+  /** Where its line is listed on a quote, as kit is. */
+  department: Department
+  /** The price for the package, for a day, or a week under Weekly. */
+  dayCents: number
+  rate?: RateRule
+  /** What it holds, from the stock list. */
+  items: PackageItem[]
+  /** Anything else it includes, printed after the items: "with clips and stands". */
+  notes: string
+}
+export interface PackageItem {
+  modelId: string
+  qty: number
+}
+
 export interface QuoteEntities {
+  package: Package
   quote: Quote
   productPrice: ProductPrice
   rolePrice: RolePrice
@@ -224,7 +254,7 @@ export interface QuoteEntities {
  * them, so they never reach its phone: the server leaves them out of its
  * change feed.
  */
-export const QUOTE_ENTITY_NAMES = ['quote', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid', 'quoteSettings'] as const
+export const QUOTE_ENTITY_NAMES = ['quote', 'package', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid', 'quoteSettings'] as const
 export const MONEY_ENTITY_NAMES: readonly string[] = QUOTE_ENTITY_NAMES
 
 /** The same role however it's typed: "Audio Tech " and "audio tech" are one price. */
@@ -242,6 +272,8 @@ const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMB
 const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
 /** A price agreed for the whole quote, before VAT. */
 const agreedCents = euroCents(10_000_000_00, 'The price agreed')
+/** Different products in one package. */
+export const MOST_PACKAGE_ITEMS = 40
 /** The company's terms, printed under every quote. */
 export const TERMS_LENGTH = 4000
 
@@ -282,6 +314,21 @@ export const quoteCommandSchemas = {
    * from it. Products with a rule already set keep it unless `all`.
    */
   'price.rulesFromRms': z.object({ all: z.boolean() }),
+  /** Add or change a package (ADR 0087): its name, where it's listed, its price and rule, and what it holds. */
+  'package.save': z.object({
+    id,
+    name: needed(200, 'The package’s name', 'A name for the package'),
+    department: z.enum(DEPARTMENTS),
+    dayCents: dayPrice,
+    rate: z.enum(RATE_RULES),
+    items: z
+      .array(z.object({ modelId: id, qty: lineQty }))
+      .max(MOST_PACKAGE_ITEMS, `A package holds up to ${MOST_PACKAGE_ITEMS} different products.`)
+      .refine((items) => new Set(items.map((i) => i.modelId)).size === items.length, 'Each product is in a package once, with how many.'),
+    notes: text(300, 'What else it includes'),
+  }),
+  /** Take a package off the price list. Quotes it's on keep their line as it was. */
+  'package.remove': z.object({ id }),
   /** A crew role's day price; null quotes it at its booked rate again. */
   'price.role': z.object({ role: needed(100, 'The role', 'A role'), dayCents: dayPrice.nullable() }),
   /** A client's usual discount; null for none. */
@@ -295,6 +342,13 @@ export const quoteCommandSchemas = {
 /** A line's amount: how many, for how many days, at the price for one a day, to the cent. */
 export const lineCents = (l: Pick<QuoteLine, 'qty' | 'days' | 'unitCents' | 'per' | 'discountPct'>) =>
   Math.round(l.qty * (l.per === 'once' ? 1 : l.days) * l.unitCents * (1 - (l.discountPct ?? 0) / 100))
+
+/** What a package holds, as printed under its line: "4 × Shure SM58, 2 × DI box, with clips and stands". */
+export function packageIncludes(p: Pick<Package, 'items' | 'notes'>, nameOf: (modelId: string) => string | undefined): string {
+  const items = p.items.map((i) => `${i.qty} × ${nameOf(i.modelId) ?? 'a product no longer listed'}`).join(', ')
+  const notes = p.notes.trim()
+  return (items && notes ? `${items}, ${notes}` : items || notes).slice(0, PACKAGE_INCLUDES_LENGTH)
+}
 
 export interface RateTotal {
   rate: VatRate

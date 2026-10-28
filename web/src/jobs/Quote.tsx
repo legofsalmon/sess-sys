@@ -43,6 +43,9 @@ import {
   validUntil,
   versionChanges,
   type QuoteSettings,
+  packageIncludes,
+  PACKAGE_INCLUDES_LENGTH,
+  type Package,
 } from '@sh/shared'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -384,6 +387,9 @@ interface LineDraft {
   rate: RateRule | null
   out: string
   discount: string
+  /** The package it was added from (ADR 0087), and what it held then. */
+  packageId: string | null
+  includes: string
 }
 const toDraft = (l: QuoteLine): LineDraft => ({
   id: l.id,
@@ -400,6 +406,8 @@ const toDraft = (l: QuoteLine): LineDraft => ({
   rate: l.rate && l.rate !== 'daily' ? l.rate : null,
   out: String(l.out ?? l.days),
   discount: l.discountPct ? String(l.discountPct) : '',
+  packageId: l.packageId ?? null,
+  includes: l.includes ?? '',
 })
 /** The same line, saved as what's typed reads: a field the app before this didn't write counts as its default. */
 const sameLine = (a: QuoteLine, b: QuoteLine) =>
@@ -416,7 +424,9 @@ const sameLine = (a: QuoteLine, b: QuoteLine) =>
   (a.modelId ?? null) === (b.modelId ?? null) &&
   (a.rate ?? null) === (b.rate ?? null) &&
   (a.out ?? null) === (b.out ?? null) &&
-  (a.discountPct ?? 0) === (b.discountPct ?? 0)
+  (a.discountPct ?? 0) === (b.discountPct ?? 0) &&
+  (a.packageId ?? null) === (b.packageId ?? null) &&
+  (a.includes ?? '') === (b.includes ?? '')
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
 /** What a typed line comes to, or why it can't be saved. */
@@ -450,6 +460,8 @@ function readLine(d: LineDraft, n: number): QuoteLine | string {
     modelId: d.modelId,
     ...(ruled ? { rate: d.rate!, out } : {}),
     ...(off ? { discountPct: off } : {}),
+    ...(d.packageId ? { packageId: d.packageId } : {}),
+    ...(d.includes ? { includes: d.includes } : {}),
   }
 }
 
@@ -508,7 +520,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   // The line just shut, which keeps the focus so the keyboard carries on from it.
   const [shut, setShut] = useState<string>()
   const [removed, setRemoved] = useState<{ line: LineDraft; at: number }>()
-  const [adding, setAdding] = useState<'kit' | 'crew'>()
+  const [adding, setAdding] = useState<'kit' | 'crew' | 'package'>()
   const { run, error, refuse } = useAct()
   const set = (id: string, changes: Partial<LineDraft>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...changes } : l)))
 
@@ -569,9 +581,9 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const late = useLate(!!payload)
 
   const days = jobDays(job)
-  const addLine = (l: Omit<LineDraft, 'id' | 'rate' | 'out' | 'discount'> & Partial<Pick<LineDraft, 'rate'>>) => {
+  const addLine = (l: Omit<LineDraft, 'id' | 'rate' | 'out' | 'discount' | 'packageId' | 'includes'> & Partial<Pick<LineDraft, 'rate' | 'packageId' | 'includes'>>) => {
     const id = newId()
-    setLines((ls) => [...ls, { rate: null, out: l.days, discount: '', id, ...l }])
+    setLines((ls) => [...ls, { rate: null, out: l.days, discount: '', packageId: null, includes: '', id, ...l }])
     setOpen(id)
     setAdding(undefined)
   }
@@ -593,6 +605,27 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
       vat: STANDARD_VAT,
       per: 'day',
       rate: rate && rate !== 'daily' ? rate : null,
+    })
+  }
+  // A package (ADR 0087) goes on as one line at its price and rule, with what it holds now written on the line, so the
+  // quote prints as it was made however the package changes after.
+  const addPackage = (packageId: string) => {
+    const p = m.package(packageId)
+    if (!p) return
+    addLine({
+      kind: 'kit',
+      what: p.name,
+      ref: null,
+      modelId: null,
+      group: DEPARTMENT_LABELS[p.department],
+      qty: '1',
+      days: String(days),
+      price: euroText(p.dayCents),
+      vat: STANDARD_VAT,
+      per: 'day',
+      rate: p.rate && p.rate !== 'daily' ? p.rate : null,
+      packageId: p.id,
+      includes: packageIncludes(p, (id) => view.warehouse.models.find((x) => x.id === id)?.name),
     })
   }
   const addCrew = (role: string) => {
@@ -694,6 +727,8 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
               Cancel
             </button>
           </div>
+        ) : adding === 'package' ? (
+          <AddPackage packages={m.packages} onAdd={addPackage} onCancel={() => setAdding(undefined)} />
         ) : adding === 'crew' ? (
           <AddCrew roles={m.roles.map((r) => r.role)} onAdd={addCrew} onCancel={() => setAdding(undefined)} />
         ) : (
@@ -701,6 +736,11 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
             <button type="button" onClick={() => setAdding('kit')} disabled={lines.length >= MAX_LINES}>
               Add kit
             </button>
+            {m.packages.length > 0 && (
+              <button type="button" onClick={() => setAdding('package')} disabled={lines.length >= MAX_LINES}>
+                Add a package
+              </button>
+            )}
             <button type="button" onClick={() => setAdding('crew')} disabled={lines.length >= MAX_LINES}>
               Add crew
             </button>
@@ -824,7 +864,10 @@ function LineSummary({ l, n, r, onOpen, focus }: { l: LineDraft; n: number; r: Q
   const unpriced = !bad && r.unitCents === 0
   return (
     <button type="button" className={`quote-line-shut${bad || unpriced ? ' needs' : ''}`} onClick={onOpen} autoFocus={focus} aria-label={`Line ${n}: ${l.what || 'not named yet'}, change it`}>
-      <span className="what">{l.what || 'Not named yet'}</span>
+      <span className="what">
+        {l.what || 'Not named yet'}
+        {l.includes && <small className="includes">{l.includes}</small>}
+      </span>
       <span className="how">{unpriced ? `${lineWords(l, r)}: needs a price` : lineWords(l, r)}</span>
       <span className="amount">{bad ? '–' : money(lineCents(r))}</span>
     </button>
@@ -840,6 +883,12 @@ function LineEditor({ l, n, r, set, onRemove, onDone }: { l: LineDraft; n: numbe
         What
         <input value={l.what} onChange={(e) => set({ what: e.target.value })} maxLength={200} aria-label={`Line ${n}: what`} autoFocus />
       </label>
+      {l.packageId !== null && (
+        <label className="what">
+          It includes
+          <input value={l.includes} onChange={(e) => set({ includes: e.target.value })} maxLength={PACKAGE_INCLUDES_LENGTH} aria-label={`Line ${n}: includes`} />
+        </label>
+      )}
       <label>
         How many
         <input inputMode="numeric" value={l.qty} onChange={(e) => set({ qty: e.target.value })} aria-label={`Line ${n}: how many`} />
@@ -916,6 +965,32 @@ function LineEditor({ l, n, r, set, onRemove, onDone }: { l: LineDraft; n: numbe
           Done
         </button>
       </span>
+    </div>
+  )
+}
+
+/** A package from the price list to add (ADR 0087). */
+function AddPackage({ packages, onAdd, onCancel }: { packages: readonly Package[]; onAdd: (id: string) => void; onCancel: () => void }) {
+  const [chosen, setChosen] = useState(packages[0]?.id ?? '')
+  return (
+    <div className="adding">
+      <label className="field">
+        Package to add
+        <select value={chosen} onChange={(e) => setChosen(e.target.value)} autoFocus>
+          {packages.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}, {money(p.dayCents)} a {RATE_UNIT[p.rate ?? 'daily']}
+            </option>
+          ))}
+        </select>
+        <small>At its price on the price list, for the job's days, with what it holds printed under it.</small>
+      </label>
+      <button type="button" onClick={() => onAdd(chosen)} disabled={!chosen}>
+        Add
+      </button>
+      <button type="button" className="link" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   )
 }
@@ -1171,7 +1246,10 @@ function Lines({ lines }: { lines: readonly QuoteLine[] }) {
             </tr>
             {g.lines.map((l) => (
               <tr key={l.id}>
-                <td>{l.what}</td>
+                <td>
+                  {l.what}
+                  {l.includes && <small className="includes">{l.includes}</small>}
+                </td>
                 <td className="n">{l.qty}</td>
                 <td className="n">{l.per === 'once' ? '' : l.rate === 'weekly' ? `${l.days} wk` : l.days.toLocaleString('en-IE')}</td>
                 <td className="n">

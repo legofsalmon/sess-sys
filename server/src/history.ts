@@ -914,6 +914,12 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
         : `Set the price of ${model(a.modelId)}${typeof a.rate === 'string' && a.rate in RATE_LABELS ? `, charged ${RATE_LABELS[a.rate as RateRule]}` : ''}`
     case 'price.rulesFromRms':
       return a.all === true ? "Set every product's rate rule from Current RMS's quotes" : "Set the rate rule of products with none from Current RMS's quotes"
+    case 'package.save':
+      return `Saved the package ${text(a.name, 'a package')}`
+    case 'package.remove': {
+      const p = look('package', a.id)
+      return `Took the package ${text(p?.name, 'a package')} off the price list`
+    }
     case 'price.role':
       return a.dayCents === null ? `Took ${text(a.role, 'a role')} off the price list, to quote it at its booked rate` : `Set the day price for ${text(a.role, 'a role')}`
     case 'price.client':
