@@ -23,7 +23,7 @@ export interface Place {
   about: string
   /** Shown only to a role that can make one of these kinds of change. */
   needs?: readonly Ability[]
-  /** Shown only while this holds, such as timesheets being used (ADR 0089). */
+  /** Shown only while this holds, such as timesheets being used (ADR 0090). */
   when?: (view: View) => boolean
 }
 

@@ -148,7 +148,7 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
     { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut, part: 'Vehicle checks running out' },
     { key: 'counts', count: counts, label: counts === 1 ? 'place to count this week' : 'places to count this week', href: '#stock/count' },
   ]
-  // Timesheets only while the company uses them (ADR 0089).
+  // Timesheets only while the company uses them (ADR 0090).
   const offered = (t: Tile) => (t.key !== 'timesheets' || view.office.useTimesheets) && (NEEDS[t.key] === 'approve-leave' ? approver : can(NEEDS[t.key] as Ability))
   return Object.fromEntries(all.filter(offered).map((t) => [t.key, t]))
 }

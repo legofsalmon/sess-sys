@@ -89,7 +89,7 @@ export function madeUpData(today: string): Mutation[] {
   add('office.update', { name: 'Session Hire office', phone: '+44 20 7946 0999', email: 'office@example.com' })
   // Made-up people can be messaged: the demo shows the Send panel, which a real company turns on under Admin (ADR 0048).
   add('messages.prompt', { on: true })
-  // And the demo shows timesheets, which a real company turns on under Admin when it uses them (ADR 0089).
+  // And the demo shows timesheets, which a real company turns on under Admin when it uses them (ADR 0090).
   add('timesheets.use', { on: true })
 
   // Clients and venues.

@@ -18,7 +18,7 @@ export interface OfficeView {
   promptMessages: boolean
   /** That choice changed on this device and not yet on the server. */
   messagesPending: boolean
-  /** The company uses timesheets (ADR 0089): the Timesheets page, its counts and the freelancers' own. Off unless the office said. */
+  /** The company uses timesheets (ADR 0090): the Timesheets page, its counts and the freelancers' own. Off unless the office said. */
   useTimesheets: boolean
   /** That choice changed on this device and not yet on the server. */
   timesheetsPending: boolean

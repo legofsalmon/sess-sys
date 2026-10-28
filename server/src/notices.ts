@@ -40,7 +40,7 @@ export const NOTICE_DAYS = 30
 export const NOTICE_LIMIT = 100
 /** Changes that are housekeeping, never news. */
 const QUIET = ['offer.seen']
-/** Timesheets' changes, which aren't news while the company doesn't use timesheets (ADR 0089). */
+/** Timesheets' changes, which aren't news while the company doesn't use timesheets (ADR 0090). */
 const TIMESHEET_CHANGES = ['timesheet.send', 'timesheet.approve', 'timesheet.reopen']
 
 export interface NoticeReader {

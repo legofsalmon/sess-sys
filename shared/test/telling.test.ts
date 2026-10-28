@@ -238,7 +238,7 @@ describe('the office’s details', () => {
     expect(officeView(entities, [m('messages.prompt', { on: false })], 0)).toMatchObject({ promptMessages: false, messagesPending: true, headsPending: false, pending: false })
   })
 
-  it('uses timesheets only once the office said so (ADR 0089)', () => {
+  it('uses timesheets only once the office said so (ADR 0090)', () => {
     expect(officeView({}, [], 0)).toMatchObject({ useTimesheets: false, timesheetsPending: false })
     const entities = { setting: { timesheets: { id: 'timesheets', name: '', phone: null, email: null, useTimesheets: true } } }
     expect(officeView(entities, [], 0)).toMatchObject({ useTimesheets: true, timesheetsPending: false })

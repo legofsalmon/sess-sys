@@ -80,7 +80,7 @@ const SAID = {
   // A timesheet.
   'timesheet-sent': { ok: true, text: "Thanks, it's gone to the office. You can change it until they approve it." },
   'not-your-booking': { ok: false, text: "That booking isn't one of yours." },
-  // The company doesn't use timesheets (ADR 0089): what they worked goes to the office as before.
+  // The company doesn't use timesheets (ADR 0090): what they worked goes to the office as before.
   'no-timesheets': { ok: false, text: "Timesheets aren't used here just now. The office keeps your days; ask them if anything's not right." },
   'tick-a-day-worked': { ok: false, text: 'Tick at least one day you worked.' },
   'say-what-for': { ok: false, text: 'Say what each extra is for.' },
@@ -259,7 +259,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     })
   }
 
-  // A booking's timesheet (ADR 0022): the person's own, from its first day. None while the company doesn't use them (ADR 0089).
+  // A booking's timesheet (ADR 0022): the person's own, from its first day. None while the company doesn't use them (ADR 0090).
   app.get('/f/:token/timesheet/:id', async (req: Req, reply) => {
     noStore(reply)
     const person = await personByToken(db, req.params.token)

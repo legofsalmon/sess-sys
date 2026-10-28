@@ -235,7 +235,7 @@ export function CrewScreen() {
   if (hash === '#crew/import') return <ImportPeopleScreen view={view} />
 
   // Crew's row (ADR 0041): the calls and answers here, the people at #crew/people, the timesheets at #crew/timesheets.
-  // A timesheet's address while they're not used (ADR 0089) opens their page, which says so.
+  // A timesheet's address while they're not used (ADR 0090) opens their page, which says so.
   const page = hash === '#crew/people' ? 'people' : hash === '#crew/timesheets' || timesheet ? 'timesheets' : 'calls'
 
   /** Settle a yes or a counter, then tell them. */
@@ -613,7 +613,7 @@ export function CrewScreen() {
  * is rarely right; "Tick all" is there when it is. One command for them all,
  * so the history says it once.
  */
-/** Crew › Timesheets while the company doesn't use them (ADR 0089): what's kept is kept, and where they're turned on. */
+/** Crew › Timesheets while the company doesn't use them (ADR 0090): what's kept is kept, and where they're turned on. */
 function TimesheetsOff() {
   const admin = useAccess().can('settings')
   return (

@@ -23,7 +23,7 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS prompt_messages boolean;`,
   // The company's VAT number and address, on the "office" row, for the printed quote (ADR 0042's open item).
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS vat_number text, ADD COLUMN IF NOT EXISTS address text;`,
-  // Whether the company uses timesheets (ADR 0089): on the "timesheets" row, off until the office says.
+  // Whether the company uses timesheets (ADR 0090): on the "timesheets" row, off until the office says.
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS use_timesheets boolean;`,
 ]
 

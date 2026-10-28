@@ -70,7 +70,7 @@ async function gala() {
   })
   await ok(
     app,
-    // Off until the office says (ADR 0089); 'are off until the office turns them on' below starts from off.
+    // Off until the office says (ADR 0090); 'are off until the office turns them on' below starts from off.
     m('timesheets.use', { on: true }),
     m('project.create', { id: 'gala', name: 'Autumn Gala', clientId: null, venueId: null, status: 'confirmed', notes: '' }),
     m('phase.add', { id: 'show', projectId: 'gala', name: 'Show', start: day(-3), end: day(-1), venueId: null, notes: '' }),
@@ -113,7 +113,7 @@ async function post(app: FastifyInstance, url: string, fields: [string, string][
   return { ...flashOf(back.html), back }
 }
 
-describe('timesheets switched off (ADR 0089)', () => {
+describe('timesheets switched off (ADR 0090)', () => {
   it('are off until the office turns them on: nothing on the link, no page, no post, and what was sent is kept', async () => {
     const { app, token, timesheet } = await gala()
     const dara = await token('dara')

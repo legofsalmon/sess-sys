@@ -33,7 +33,15 @@ export const CHANGELOG: readonly Release[] = [
     title: 'Timesheets can be turned off, and start off',
     what: 'Admin › Company has a switch for timesheets, which starts off. While off, there is no Timesheets page under Crew or in the Menu, Home doesn’t count timesheets to approve, notifications leave them out, and crew aren’t asked for one on their own link. Nothing is deleted: turning them on brings back every timesheet already sent, as it was.',
     prs: [148],
-    adrs: [89],
+    adrs: [90],
+  },
+  {
+    version: '1.45.1',
+    date: '2026-10-28',
+    title: 'A tidier planner, and clearer job steps',
+    what: 'The Week and Month planner is easier to read. A phase over several days is one bar, as on a wall planner. The days stay along the top and the names down the side however far you scroll, today is marked all the way down, and a whole month fits on a laptop. Days with all their crew found are no longer green, so the days still short of crew stand out. The dates are the page’s title, with moving week to week and Jobs or People together under it. On a job’s page, the line of steps shows how far the job has come: the way already come is drawn thicker up to the step it’s at, and the line no longer runs through the numbers. Your steps on Home say which step of the job each one is.',
+    prs: [145],
+    adrs: [10, 73],
   },
   {
     version: '1.45.0',

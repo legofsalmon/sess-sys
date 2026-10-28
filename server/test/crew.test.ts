@@ -473,7 +473,7 @@ describe('the freelancer page (audit finding 21)', () => {
     expect(await answer(app, orla.linkToken, paid.id, { answer: 'counter', rate: '300' })).toMatchObject({ ok: false, message: 'Tap Accept or Decline.' })
     expect(await entity<Offer>(app, 'offer', paid.id)).toMatchObject({ status: 'offered', counterRateCents: null })
 
-    // Nor on the timesheet page, which says why there's none, once the company uses timesheets (ADR 0089).
+    // Nor on the timesheet page, which says why there's none, once the company uses timesheets (ADR 0090).
     await send(app, 'timesheets.use', { on: true })
     await answer(app, orla.linkToken, paid.id, { answer: 'accept' })
     await send(app, 'offer.confirm', { id: paid.id })

@@ -86,7 +86,7 @@ export interface PageData {
   ended: ReadonlyMap<string, string>
   /** Their timesheets (ADR 0022), by booking. */
   timesheets: ReadonlyMap<string, Timesheet>
-  /** The company doesn't use timesheets (ADR 0089): none asked for, none shown. */
+  /** The company doesn't use timesheets (ADR 0090): none asked for, none shown. */
   noTimesheets?: boolean
   /** The office's phone and email, once set. */
   office?: OfficeDetails | null

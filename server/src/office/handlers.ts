@@ -47,7 +47,7 @@ export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
     await emit(ctx, 'setting', MESSAGES_SETTING_ID, await getSetting(ctx.tx, MESSAGES_SETTING_ID))
   },
 
-  /** Whether the company uses timesheets (ADR 0089). Only shows or hides them: every timesheet kept stays as it was. */
+  /** Whether the company uses timesheets (ADR 0090). Only shows or hides them: every timesheet kept stays as it was. */
   async 'timesheets.use'(ctx, a) {
     await ctx.tx.query(
       `INSERT INTO settings (id, use_timesheets) VALUES ($1, $2)

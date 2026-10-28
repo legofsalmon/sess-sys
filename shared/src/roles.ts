@@ -208,7 +208,7 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'reading.heads': 'company',
   // Whether the app prompts messages to crew (ADR 0048): a setting, so the office's as much as a director's.
   'messages.prompt': 'settings',
-  // Whether the company uses timesheets (ADR 0089): a setting like messages to crew.
+  // Whether the company uses timesheets (ADR 0090): a setting like messages to crew.
   'timesheets.use': 'settings',
 
   'person.role': 'company',

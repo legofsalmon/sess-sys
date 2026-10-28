@@ -7,7 +7,7 @@
   it, how the office checks and approves it, and what the freelancer sees
   afterwards.
 - **Since 28 October 2026:** timesheets are off until the company turns them
-  on under Admin › Company ([ADR 0089](0089-timesheets-off-until-used.md)).
+  on under Admin › Company ([ADR 0090](0090-timesheets-off-until-used.md)).
 
 ## Context
 

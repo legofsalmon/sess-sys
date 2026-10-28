@@ -4,7 +4,7 @@ import { Pending } from './StatusPill.tsx'
 import { client } from './sync.ts'
 
 /**
- * Timesheets (ADR 0089), for the office. A company that pays crew from its
+ * Timesheets (ADR 0090), for the office. A company that pays crew from its
  * own records has no use for them on day one, so they start off: no
  * Timesheets page, count or notification, and no freelancer is asked to
  * send one from their link. Turning them on brings back every timesheet

@@ -59,7 +59,7 @@ async function company() {
   )
   for (const r of results) expect(r).toMatchObject({ status: 'applied' })
   const token = (await db.query<{ t: string }>(`SELECT link_token AS t FROM people WHERE id = 'aoife'`)).rows[0]!.t
-  // Her timesheet page is one of her pages only while the company uses timesheets (ADR 0089).
+  // Her timesheet page is one of her pages only while the company uses timesheets (ADR 0090).
   const pages = async () => {
     await send(app, m('timesheets.use', { on: true }))
     const out: Record<string, string> = {}

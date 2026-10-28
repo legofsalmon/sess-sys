@@ -29,7 +29,7 @@ export async function headsSeeRates(q: Queryable): Promise<boolean> {
   return rows[0]?.heads_see_rates === true
 }
 
-/** Whether the company uses timesheets (ADR 0089); off unless the office said. */
+/** Whether the company uses timesheets (ADR 0090); off unless the office said. */
 export async function usesTimesheets(q: Queryable): Promise<boolean> {
   const { rows } = await q.query<{ use_timesheets: boolean | null }>(`SELECT use_timesheets FROM settings WHERE id = $1`, [TIMESHEETS_SETTING_ID])
   return rows[0]?.use_timesheets === true
