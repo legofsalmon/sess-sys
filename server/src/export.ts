@@ -214,6 +214,10 @@ const ABOUT: Record<string, string> = {
   faults: 'Faults and missing kit: the item, or the product and how many, damaged or missing, the job it came back from, what was wrong, the repair notes, and how it ended.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',
+  // Certificates on items (ADR 0094): the details here, the files in the storage.
+  item_certificate_items: 'Which items each certificate on items covers.',
+  item_certificates:
+    'Certificates kept on numbered items: a PAT certificate, a report of a thorough examination, or another such as a declaration of conformity; the title, the day on it, the day another runs out, the link to where it is shared, and the file\'s type and size. The files stay in the storage: see Left out on purpose.',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
   kit_names: 'Names that jobs\' notes use for kit, as chosen once in Kit from the notes: the product each means, or blank for not kit.',
   kit_notes_read: 'Jobs whose notes have been turned into kit lines, with a fingerprint of the notes as they were, so a job comes back to the list only when its notes change.',
@@ -302,7 +306,8 @@ Left out on purpose
   the storage beside the backups, and each opens from the person's card on
   the Crew tab. documents lists their details. The same goes for files
   on venues and clients, which open from their pages; attachments lists
-  their details. And photos of people and products, which show on their
+  their details, and certificates on items, which open from the item's
+  page; item_certificates lists their details. And photos of people and products, which show on their
   pages: people and models say when each was put up.
 
 Good to know

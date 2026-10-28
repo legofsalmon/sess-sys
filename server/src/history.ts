@@ -41,6 +41,7 @@ import { PURCHASE_STATUS_LABELS, type PurchaseStatus } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
 import { RACK_PART_LABELS, type RackPart } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
+import { ITEM_CERTIFICATE_FILE_ACTION, ITEM_CERTIFICATE_KINDS, ITEM_CERTIFICATE_LABELS } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -260,6 +261,8 @@ const REFERENCES = [
   'placeId',
   'caseId',
   'assetId',
+  // Certificates on items (ADR 0094): the items each covers.
+  'assetIds',
   'fromPlaceId',
   'fromCaseId',
   'toPlaceId',
@@ -892,6 +895,21 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'attachment.remove') return d ? `Removed ${whose}` : 'Removed a document'
       if (command === 'attachment.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
       return a.added ? `Added ${whose}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
+    }
+    // Certificates on items (ADR 0094): "Saved the PAT certificate for SH-000123 (CM Lodestar) and 11 more items, as a link".
+    case 'itemCertificate.save':
+    case 'itemCertificate.remove':
+    case ITEM_CERTIFICATE_FILE_ACTION: {
+      const c = look('itemCertificate', a.id)
+      const kind = ITEM_CERTIFICATE_KINDS.find((k) => k === (a.kind ?? c?.kind))
+      const title = kind === 'other' || !kind ? text(a.title ?? c?.title, 'a certificate') : ITEM_CERTIFICATE_LABELS[kind]
+      const ids: unknown[] = Array.isArray(a.assetIds) ? a.assetIds : Array.isArray(c?.assetIds) ? c.assetIds : []
+      const more = ids.length > 1 ? ` and ${ids.length - 1} more ${ids.length === 2 ? 'item' : 'items'}` : ''
+      const what = `${kind === 'other' ? `“${clip(title)}”` : `the ${title.charAt(0).toLowerCase()}${title.slice(1)}`} for ${ids.length ? item(ids[0]) : 'an item'}${more}`
+      const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
+      if (command === 'itemCertificate.remove') return c ? `Removed ${what}` : 'Removed a certificate'
+      if (command === 'itemCertificate.save') return `Saved ${what}${typeof a.link === 'string' ? ', as a link' : ''}`
+      return a.added ? `Added ${what}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${what}${file}`
     }
     // Money (ADR 0042), in words with no amounts: every member of staff reads the history, and only some see money.
     case 'quote.save':

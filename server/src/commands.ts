@@ -42,6 +42,7 @@ import { notesKitHandlers } from './stock/notes-kit.ts'
 import { labelHandlers } from './stock/labels.ts'
 import { faultHandlers } from './stock/faults.ts'
 import { inspectionHandlers } from './stock/inspections.ts'
+import { itemCertificateHandlers } from './stock/certificates.ts'
 import { moveHandlers } from './stock/moves.ts'
 import { countHandlers } from './stock/counts.ts'
 import { financeHandlers } from './finance/handlers.ts'
@@ -72,6 +73,7 @@ const handlers: { [N in CommandName]: Handler<N> } = {
   ...moveHandlers,
   ...faultHandlers,
   ...inspectionHandlers,
+  ...itemCertificateHandlers,
   ...timesheetHandlers,
   ...officeHandlers,
   ...leaveHandlers,

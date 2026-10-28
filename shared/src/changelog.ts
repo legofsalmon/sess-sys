@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.51.0',
+    date: '2026-10-28',
+    title: 'Certificates on stock items',
+    what: 'Each numbered item can now keep its certificates: the PAT certificate, the report of thorough examination for motors and other lifting gear, or another such as a declaration of conformity, as a file or a link. Each test on an item’s page shows its certificate to open, or Add certificate beside it, and a new Certificates card lists them all. After testing a round on the Testing page, one report goes on every item that passed in one go. Inspections due lists certificates that have run out or soon will, and how many tests have no certificate yet. Kit still only stops going out for a failed or overdue test, as before.',
+    prs: [153],
+    adrs: [94],
+  },
+  {
     version: '1.50.0',
     date: '2026-10-28',
     title: 'Old quotes from Current RMS, matched to jobs and used when pricing',

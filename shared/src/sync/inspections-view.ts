@@ -1,6 +1,15 @@
 import { irishToday } from '../calendar.ts'
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { DUE_SOON_DAYS, INSPECTION_KINDS, monthsLater, type Inspection, type InspectionEntities, type InspectionKind } from '../inspections.ts'
+import {
+  DUE_SOON_DAYS,
+  INSPECTION_KINDS,
+  ITEM_CERTIFICATE_KINDS,
+  monthsLater,
+  type Inspection,
+  type InspectionEntities,
+  type InspectionKind,
+  type ItemCertificate,
+} from '../inspections.ts'
 import type { Model } from '../stock.ts'
 import { addDays } from './plan.ts'
 import type { AssetView, WarehouseView } from './stock-view.ts'
@@ -11,7 +20,19 @@ import type { AssetView, WarehouseView } from './stock-view.ts'
  * product needs, when it's next due. An item whose last one failed, or
  * that's overdue, can't go out; one never recorded here is listed, but not
  * stopped, since its last test may be on paper.
+ *
+ * Certificates (ADR 0094) are laid over the same way: each test's is the
+ * one of its kind covering its item, dated the day it was done. A test
+ * with none is listed, never stopped, as a test not recorded is: the
+ * certificate may be in the tester's post.
  */
+
+export interface ItemCertificateView extends ItemCertificate {
+  pending: boolean
+}
+
+/** Another certificate's standing: `ok`, `soon` (runs out within 30 days), `expired`, or `open` (never runs out). */
+export type ItemCertificateState = 'ok' | 'soon' | 'expired' | 'open'
 
 export interface InspectionView extends Inspection {
   pending: boolean
@@ -36,6 +57,15 @@ export interface Due {
   state: DueState
   /** Due on the day the stock list gave, with no test recorded here yet (ADR 0026). */
   fromList?: boolean
+  /** The last one's certificate, when one is kept (ADR 0094). */
+  certificate?: ItemCertificateView
+}
+
+/** A certificate that runs out, on an item in stock, within 30 days or already. */
+export interface CertificateDue {
+  asset: AssetView
+  certificate: ItemCertificateView
+  state: 'soon' | 'expired'
 }
 
 export interface InspectionsView {
@@ -49,6 +79,16 @@ export interface InspectionsView {
   attention: Due[]
   /** Items in stock needing an inspection with none recorded here yet. */
   unrecorded: Due[]
+  /** An item's certificates, the newest day first (ADR 0094). */
+  certificatesOf(assetId: string): ItemCertificateView[]
+  /** The certificate kept for one test: of its kind, on its item, dated its day. */
+  certificateFor(i: Pick<Inspection, 'assetId' | 'kind'> & { day: string }): ItemCertificateView | undefined
+  /** Where another certificate stands today. */
+  certificateState(c: ItemCertificate): ItemCertificateState
+  /** Items in stock whose last test passed with no certificate kept for it, the oldest test first. */
+  uncertified: Due[]
+  /** Other certificates on items in stock that ran out, or run out within 30 days, soonest first. */
+  certificatesDue: CertificateDue[]
 }
 
 type Tables = { [E in keyof InspectionEntities]: Record<string, InspectionEntities[E]> }
@@ -85,6 +125,29 @@ export function inspectionsView(
     if (!records.has(a.id)) records.set(a.id, view({ ...a, at: new Date(a.at).toISOString() }, true))
   }
 
+  const certs = new Map<string, ItemCertificateView>()
+  for (const c of Object.values(entities.itemCertificate ?? {})) certs.set(c.id, { ...c, pending: false })
+  for (const m of outbox) {
+    if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
+    if (m.name === 'itemCertificate.save') {
+      const a = m.args as CommandArgs<'itemCertificate.save'>
+      const was = certs.get(a.id)
+      certs.set(a.id, { ...a, assetIds: [...new Set(a.assetIds)], file: was?.file ?? null, addedAt: was?.addedAt ?? m.createdAt, pending: true })
+    } else if (m.name === 'itemCertificate.remove') certs.delete((m.args as CommandArgs<'itemCertificate.remove'>).id)
+  }
+  const certsOf = new Map<string, ItemCertificateView[]>()
+  // Every order ends on the id, so two devices agree.
+  const certOrder = (a: ItemCertificate, b: ItemCertificate) =>
+    b.day.localeCompare(a.day) || ITEM_CERTIFICATE_KINDS.indexOf(a.kind) - ITEM_CERTIFICATE_KINDS.indexOf(b.kind) || a.id.localeCompare(b.id)
+  for (const c of [...certs.values()].sort(certOrder))
+    for (const assetId of c.assetIds) {
+      const list = certsOf.get(assetId) ?? []
+      list.push(c)
+      certsOf.set(assetId, list)
+    }
+  const certificateFor = (i: Pick<Inspection, 'assetId' | 'kind'> & { day: string }) =>
+    certsOf.get(i.assetId)?.find((c) => c.kind === i.kind && c.day === i.day)
+
   const byAsset = new Map<string, InspectionView[]>()
   for (const i of records.values()) {
     const list = byAsset.get(i.assetId) ?? []
@@ -109,7 +172,8 @@ export function inspectionsView(
         const listed = !last && kind === 'pat' ? (asset.patDue ?? undefined) : undefined
         const due = last?.passed ? monthsLater(last.day, months) : listed
         const state: DueState = !last && !listed ? 'unrecorded' : last && !last.passed ? 'failed' : due! < today ? 'overdue' : due! <= soon ? 'soon' : 'ok'
-        list.push({ asset, kind, months, last, due, state, ...(listed ? { fromList: true } : {}) })
+        const certificate = last && certificateFor(last)
+        list.push({ asset, kind, months, last, due, state, ...(listed ? { fromList: true } : {}), ...(certificate ? { certificate } : {}) })
       }
     }
     dues.set(assetId, list)
@@ -127,6 +191,35 @@ export function inspectionsView(
         a.asset.number.localeCompare(b.asset.number)
     )
   const unrecorded = all.filter((d) => d.state === 'unrecorded')
+  const uncertified = all
+    .filter((d) => d.last?.passed && !d.certificate)
+    .sort((a, b) => a.last!.day.localeCompare(b.last!.day) || a.asset.number.localeCompare(b.asset.number) || a.kind.localeCompare(b.kind))
 
-  return { ofAsset: (id) => byAsset.get(id) ?? [], dueOf, blocks, attention, unrecorded }
+  const certificateState = (c: ItemCertificate): ItemCertificateState =>
+    !c.expires ? 'open' : c.expires < today ? 'expired' : c.expires <= soon ? 'soon' : 'ok'
+  const certificatesDue: CertificateDue[] = []
+  for (const c of certs.values()) {
+    const state = certificateState(c)
+    if (state !== 'expired' && state !== 'soon') continue
+    for (const assetId of c.assetIds) {
+      const asset = warehouse.assets.get(assetId)
+      // Only the newest of a title counts: a renewed certificate leaves the old one as the record.
+      const newer = certsOf.get(assetId)?.some((o) => o.kind === 'other' && o.id !== c.id && o.title.toLowerCase() === c.title.toLowerCase() && o.day > c.day)
+      if (asset?.status === 'active' && !newer) certificatesDue.push({ asset, certificate: c, state })
+    }
+  }
+  certificatesDue.sort((a, b) => a.certificate.expires!.localeCompare(b.certificate.expires!) || a.asset.number.localeCompare(b.asset.number) || a.certificate.id.localeCompare(b.certificate.id))
+
+  return {
+    ofAsset: (id) => byAsset.get(id) ?? [],
+    dueOf,
+    blocks,
+    attention,
+    unrecorded,
+    certificatesOf: (id) => certsOf.get(id) ?? [],
+    certificateFor,
+    certificateState,
+    uncertified,
+    certificatesDue,
+  }
 }

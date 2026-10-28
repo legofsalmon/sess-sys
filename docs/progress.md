@@ -3,6 +3,31 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: certificates on stock items
+
+**Done**
+
+- [ADR 0094](adr/0094-certificates-on-items.md), at Colly's ask: numbered
+  items keep their certificates, a PAT certificate, a report of thorough
+  examination (motors and other lifting gear) or another (a declaration of
+  conformity, an FR certificate), each a file, a link, or both, kept as
+  venues' documents are. One certificate covers a whole round. A test's
+  certificate is the one of its kind on its item dated its day, so the
+  tests stay as recorded. On an item's page each test has its certificate
+  to open, or Add certificate beside a pass, and a Certificates card lists
+  them all; after a round on the Testing page one report goes on every item
+  that passed; Inspections due lists other certificates running out and
+  how many tests have none yet. Nothing new stops kit going out: failed or
+  overdue tests still do. App 1.51.0.
+- Checked: typecheck, server tests (item-certificates.test.ts: links,
+  files, a round, refusals, history words, strays, starting fresh, no
+  bucket), device tests (which test a certificate is for, running out,
+  waiting changes), browser tests (item-certificates.spec.ts, inspections
+  and scanning).
+
+**Waiting on** the storage bucket on the live server for files; links work
+meanwhile. Emailing certificates to a venue from a job could follow.
+
 ## 28 October 2026: a status page for everything the app relies on
 
 **Done**

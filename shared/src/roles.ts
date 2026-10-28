@@ -158,6 +158,9 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'fault.update': 'stock',
   'fault.close': 'stock',
   'inspection.record': 'stock',
+  // Certificates on items (ADR 0094), as the tests they're for.
+  'itemCertificate.save': 'stock',
+  'itemCertificate.remove': 'stock',
   'count.record': 'stock',
   // The vehicles themselves and their checks (ADR 0047), kept by whoever keeps the stock.
   'vehicle.save': 'stock',
