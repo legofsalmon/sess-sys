@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-28',
     title: 'Travel and subsistence for the crew on quotes',
     what: 'A quote now adds the crew’s travel and subsistence by itself. Travel is charged when the venue is further from Dublin city centre than the distance set in Admin: the fuel there and back for each van on the job, at the fuel price and what a van uses. The distance comes from the venue’s pin on the map, or can be typed on the quote. Subsistence is the per diem for each of the crew for each day, unless “Meals provided” is turned on for that quote. Admin › Company › Travel and subsistence sets the distance, the fuel price (one press reads it from the AA’s monthly survey), what a van uses and the per diem.',
-    prs: [0],
+    prs: [142],
     adrs: [86],
   },
   {
