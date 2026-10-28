@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 /**
  * Quotes and money (ADR 0042): the office builds a quote from a job's kit
@@ -14,6 +14,8 @@ import { expect, test } from '@playwright/test'
 
 const phoneSize = { width: 390, height: 844 }
 const fresh = { data: { confirm: 'delete everything' } }
+/** The browser's own print dialog would end printing at once and take the sheet away before it's read, so it's left out. */
+const noPrintDialog = (page: Page) => page.addInitScript(() => void (window.print = () => undefined))
 
 test('the office quotes a job, records the answer and the invoice, and sees who owes', async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
@@ -173,6 +175,7 @@ test('kit charged by the week, a line discounted, and a total agreed with the cl
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
 
   // The Spiiders are hired by the week: the price list says so beside the price.
   await office.goto('/#jobs/money/prices')
@@ -222,6 +225,7 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
 
   // Admin says how they're charged: past 50 km, diesel at €1.749, a van using 10 litres for 100 km, €39.08 a day each.
   await office.goto('/#admin')
@@ -268,6 +272,7 @@ test('a package made on the price list goes on a quote as one line, with what it
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
 
   await office.goto('/#jobs/money/prices')
   const packages = office.getByRole('region', { name: 'Packages' })
