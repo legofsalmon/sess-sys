@@ -201,6 +201,8 @@ export function moneyView(
           validDays: a.validDays ?? before?.validDays ?? DEFAULT_VALID_DAYS,
           depositPct: a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
           agreedCents: a.agreedCents !== undefined ? a.agreedCents : (was?.agreedCents ?? null),
+          mealsProvided: a.mealsProvided ?? before?.mealsProvided ?? false,
+          travelKm: a.travelKm !== undefined ? a.travelKm : (before?.travelKm ?? null),
           pending: true,
         })
         break
@@ -269,7 +271,23 @@ export function moneyView(
       }
       case 'quoting.update': {
         const a = m.args as CommandArgs<'quoting.update'>
-        quoting = { id: QUOTE_SETTINGS_ID, nextNumber: a.nextNumber, terms: a.terms, bank: a.bank, pending: true }
+        quoting = { ...quoting, id: QUOTE_SETTINGS_ID, nextNumber: a.nextNumber, terms: a.terms, bank: a.bank, pending: true }
+        break
+      }
+      case 'quoting.travel': {
+        const a = m.args as CommandArgs<'quoting.travel'>
+        // The day the fuel price was set moves only when the price does, as on the server.
+        const fuelSetOn = a.fuelCentsPerLitre === (quoting.fuelCentsPerLitre ?? null) ? (quoting.fuelSetOn ?? null) : a.on
+        quoting = {
+          ...quoting,
+          id: QUOTE_SETTINGS_ID,
+          travelFromKm: a.travelFromKm,
+          fuelCentsPerLitre: a.fuelCentsPerLitre,
+          litresPer100Km: a.litresPer100Km,
+          perDiemCents: a.perDiemCents,
+          fuelSetOn,
+          pending: true,
+        }
         break
       }
       case 'cost.paid': {

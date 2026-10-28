@@ -148,6 +148,37 @@ describe('a quote number (ADR 0084)', () => {
   })
 })
 
+describe('travel and subsistence (ADR 0086)', () => {
+  it('keeps how they are charged, moving the day the fuel price was set only when it changes', async () => {
+    const { app } = await gala()
+    const settings = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'quoteSettings').at(-1)?.data
+    // Printed quotes saved first leave travel to its defaults, and travel saved after leaves the printed quote's.
+    await ok(app, m('quoting.update', { nextNumber: 1115, terms: 'Terms', bank: 'Bank' }))
+    expect(await settings()).not.toHaveProperty('travelFromKm')
+    await ok(app, m('quoting.travel', { travelFromKm: 60, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: 3908, on: day(-40) }))
+    expect(await settings()).toMatchObject({ nextNumber: 1115, terms: 'Terms', travelFromKm: 60, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: 3908, fuelSetOn: day(-40) })
+    await ok(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))
+    expect(await settings()).toMatchObject({ travelFromKm: 80, perDiemCents: null, fuelSetOn: day(-40) })
+    await ok(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 169.5, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))
+    expect(await settings()).toMatchObject({ fuelCentsPerLitre: 169.5, fuelSetOn: day(0) })
+    await ok(app, m('quoting.update', { nextNumber: null, terms: '', bank: '' }))
+    expect(await settings()).toMatchObject({ travelFromKm: 80, fuelCentsPerLitre: 169.5 })
+    expect(await refused(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.95, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))).toMatch(/fuel price/)
+  })
+
+  it('keeps meals provided and the distance on a quote, and on its next version, and a save from an older app leaves them', async () => {
+    const { app, quote } = await gala()
+    await ok(app, m('quote.save', { id: 'v1', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', mealsProvided: true, travelKm: 210 }))
+    expect(await quote('v1')).toMatchObject({ mealsProvided: true, travelKm: 210 })
+    await ok(app, save('v1', [line({ qty: 4 })]))
+    expect(await quote('v1')).toMatchObject({ mealsProvided: true, travelKm: 210 })
+    await ok(app, m('quote.sent', { id: 'v1', on: today }), save('v2'))
+    expect(await quote('v2')).toMatchObject({ version: 2, mealsProvided: true, travelKm: 210 })
+    await ok(app, m('quote.save', { id: 'v2', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', mealsProvided: false, travelKm: null }))
+    expect(await quote('v2')).toMatchObject({ mealsProvided: false, travelKm: null })
+  })
+})
+
 describe('the price list', () => {
   it('sets and clears a day price for a product, a role and a discount for a client', async () => {
     const { app } = await gala()

@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.43.0',
+    version: '1.44.0',
     date: '2026-10-28',
     title: 'Packages on quotes',
     what: 'The price list now has packages: kit quoted together at one price, such as a mic package, with its price, how it’s charged and what it holds. On a quote, “Add a package” puts it on as one line, with what it holds printed under it.',
     prs: [143],
     adrs: [87],
+  },
+  {
+    version: '1.43.0',
+    date: '2026-10-28',
+    title: 'Travel and subsistence for the crew on quotes',
+    what: 'A quote now adds the crew’s travel and subsistence by itself. Travel is charged when the venue is further from Dublin city centre than the distance set in Admin: the fuel there and back for each van on the job, at the fuel price and what a van uses. The distance comes from the venue’s pin on the map, or can be typed on the quote. Subsistence is the per diem for each of the crew for each day, unless “Meals provided” is turned on for that quote. Admin › Company › Travel and subsistence sets the distance, the fuel price (one press reads it from the AA’s monthly survey), what a van uses and the per diem.',
+    prs: [142],
+    adrs: [86],
   },
   {
     version: '1.42.0',

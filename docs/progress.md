@@ -11,11 +11,31 @@ waiting on someone.
   the price list (`packages`): a name, the department it's listed under, a
   price and rate rule, the products it holds and anything else it includes.
   "Add a package" on a quote puts it on as one line, with what it holds
-  written on the line (`includes`) and printed under it. App 1.43.0.
+  written on the line (`includes`) and printed under it. App 1.44.0.
 - Checked: typecheck, unit tests (what a package prints, saved, changed and
   taken off, only products in the stock list), parity, browser test
   (quotes.spec.ts: a package made on the price list, added to a quote and
   printed).
+
+## 28 October 2026: travel and subsistence on quotes
+
+**Done**
+
+- [ADR 0086](adr/0086-travel-and-subsistence-on-quotes.md). A quote works
+  out the crew's travel (past a distance from Dublin city centre, the fuel
+  there and back for each van) and subsistence (a per diem for each crew
+  day, off when "Meals provided" is on) as two lines of its own. Admin ›
+  Company › Travel and subsistence sets the distance, the fuel price (read
+  from the AA's monthly survey in one press), what a van uses and the per
+  diem. App 1.43.0.
+- Checked: typecheck, unit tests (distance, fuel, crew days, the lines and
+  why there's none), server (settings, quote fields, the AA's page read and
+  refused), parity, browser test (quotes.spec.ts).
+
+**Waiting on**
+
+- Colly: set the fuel price (Read the AA's price, then Save) and the per diem
+  in Admin › Company › Travel and subsistence.
 
 ## 28 October 2026: rate rules, discounts and an agreed price
 

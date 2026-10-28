@@ -273,6 +273,15 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
 .quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Travel and subsistence (ADR 0086): worked out, not typed, so each reads as a shut line, with what the office says about the job under it. */
+.quote-screen .quote-extra { display: grid; gap: var(--space-8); padding-bottom: var(--space-8); }
+.quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); padding: var(--space-8) 0; border-top: 1px solid var(--line); min-height: 44px; }
+.quote-screen .quote-extra .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-extra .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quote-screen .quote-extra .signal b, .quote-screen .quote-extra .signal small { display: block; }
+.quote-screen .quote-extra .extra-km { max-width: 22em; }
+.office-form .fuel-field { display: grid; gap: var(--space-8); align-content: start; }
+.office-form .fuel-field button { justify-self: start; }
 /* What it comes to stays in view under the top bar while the lines are changed. */
 .quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
@@ -367,8 +376,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* The printed quote's terms on the draft (ADR 0084): two short fields side by side. */
 .quote-terms { display: flex; flex-wrap: wrap; gap: var(--space-12); }
 .quote-terms .field { flex: 1 1 14em; }
-.quote-terms .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
-.quote-terms .with-unit input, .quote-terms input { max-width: 7em; }
+.quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-terms .with-unit input, .quote-terms input, .quote-extra .with-unit input, .office-form .with-unit input { max-width: 7em; }
 .version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
 .money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 

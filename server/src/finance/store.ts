@@ -6,7 +6,7 @@ import type { Queryable } from '../db.ts'
 type Row = Record<string, any>
 
 const QUOTE = `id, project_id, version, status, lines, discount_pct, notes, made_at, saved_at,
-  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on, number, valid_days, deposit_pct, agreed_cents`
+  sent_on::text AS sent_on, answered_on::text AS answered_on, invoiced_on::text AS invoiced_on, invoice_ref, paid_on::text AS paid_on, number, valid_days, deposit_pct, agreed_cents, meals_provided, travel_km`
 
 const toQuote = (r: Row): Quote => ({
   id: r.id,
@@ -27,6 +27,8 @@ const toQuote = (r: Row): Quote => ({
   validDays: r.valid_days,
   depositPct: r.deposit_pct ?? null,
   agreedCents: r.agreed_cents === null || r.agreed_cents === undefined ? null : Number(r.agreed_cents),
+  mealsProvided: r.meals_provided,
+  travelKm: r.travel_km ?? null,
 })
 
 export async function getQuote(q: Queryable, id: string, lock = false): Promise<Quote | undefined> {
@@ -72,11 +74,25 @@ export async function getCostPaid(q: Queryable, timesheetId: string): Promise<Co
 
 /** What every printed quote says (ADR 0084), once anything about it is saved or a number given. */
 export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | undefined> {
-  const { rows } = await q.query<{ id: string; next_number: number | null; terms: string; bank: string }>(
-    'SELECT id, next_number, terms, bank FROM quote_settings WHERE id = $1',
+  const { rows } = await q.query<Row>(
+    `SELECT id, next_number, terms, bank, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on::text AS fuel_set_on
+     FROM quote_settings WHERE id = $1`,
     [QUOTE_SETTINGS_ID]
   )
-  return rows[0] ? { id: rows[0].id, nextNumber: rows[0].next_number, terms: rows[0].terms, bank: rows[0].bank } : undefined
+  const r = rows[0]
+  if (!r) return undefined
+  const settings: QuoteSettings = { id: r.id, nextNumber: r.next_number, terms: r.terms, bank: r.bank }
+  // Travel and subsistence (ADR 0086) once they've been set, which sets them all: until then each takes its default.
+  if (r.travel_from_km === null) return settings
+  const n = (v: unknown) => (v === null ? null : Number(v))
+  return {
+    ...settings,
+    travelFromKm: r.travel_from_km,
+    fuelCentsPerLitre: n(r.fuel_cents_per_litre),
+    litresPer100Km: Number(r.litres_per_100_km),
+    perDiemCents: r.per_diem_cents,
+    fuelSetOn: r.fuel_set_on,
+  }
 }
 
 /** The highest quote number given so far, or 0. */

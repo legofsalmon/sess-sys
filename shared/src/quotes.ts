@@ -61,6 +61,10 @@ export function chargedFor(rule: RateRule, out: number): number {
   return days
 }
 
+/** The lines a quote works out for itself (ADR 0086). */
+export const LINE_EXTRAS = ['travel', 'subsistence'] as const
+export type LineExtra = (typeof LINE_EXTRAS)[number]
+
 /** A quote has room for this many lines: more than any job's kit and crew. */
 export const MAX_LINES = 300
 
@@ -126,6 +130,11 @@ export const quoteLine = z.object({
   out: lineOut.optional(),
   /** Off this line alone, as a percentage, before any discount off the whole quote. */
   discountPct: lineDiscount.optional(),
+  /**
+   * A line the quote works out for itself (ADR 0086): the crew's travel to a venue far from Dublin, or their
+   * subsistence. Worked out again on a draft whenever what it comes from changes, so it's never typed.
+   */
+  extra: z.enum(LINE_EXTRAS).optional(),
   /** The package a line was added from (ADR 0087), and what it held then, printed under it: "4 × Shure SM58, 2 × DI box". */
   packageId: id.optional(),
   includes: text(PACKAGE_INCLUDES_LENGTH, 'What a package includes').optional(),
@@ -173,6 +182,10 @@ export interface Quote {
    * then whatever brings the lines to it. None unless agreed.
    */
   agreedCents?: number | null
+  /** The job gives the crew their meals (ADR 0086), so no subsistence is charged. */
+  mealsProvided?: boolean
+  /** How far the venue is from Dublin city centre by road, each way, in km, as the office typed it; none takes it from the map. */
+  travelKm?: number | null
 }
 
 /** Prices hold this long unless the quote says otherwise. */
@@ -188,6 +201,17 @@ export interface QuoteSettings {
   nextNumber: number | null
   terms: string
   bank: string
+  /**
+   * Travel and subsistence (ADR 0086): travel is charged on a job further than `travelFromKm` from Dublin city centre,
+   * at the fuel a vehicle uses there and back; subsistence is so much a day for each of the crew. Left out by a
+   * server from before them; a price not set yet is null, and that line isn't charged until it is.
+   */
+  travelFromKm?: number
+  fuelCentsPerLitre?: number | null
+  litresPer100Km?: number
+  perDiemCents?: number | null
+  /** The day the fuel price was last set, so the office can see when it wants checking. */
+  fuelSetOn?: string | null
 }
 export const QUOTE_SETTINGS_ID = 'quoting'
 
@@ -272,6 +296,13 @@ const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMB
 const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
 /** A price agreed for the whole quote, before VAT. */
 const agreedCents = euroCents(10_000_000_00, 'The price agreed')
+const KM_HINT = 'The distance is a whole number of km from 0 to 2,000.'
+const travelKm = z.number({ invalid_type_error: KM_HINT }).int(KM_HINT).min(0, KM_HINT).max(2000, KM_HINT)
+const FROM_HINT = 'Travel starts at a whole number of km from 0 to 1,000.'
+const FUEL_HINT = 'The fuel price is in cent a litre, from 50 to 500, such as 174.9.'
+const fuelPrice = z.number({ invalid_type_error: FUEL_HINT }).min(50, FUEL_HINT).max(500, FUEL_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), FUEL_HINT)
+const USE_HINT = 'What a vehicle uses is in litres for 100 km, from 1 to 40, such as 9.5.'
+const fuelUse = z.number({ invalid_type_error: USE_HINT }).min(1, USE_HINT).max(40, USE_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), USE_HINT)
 /** Different products in one package. */
 export const MOST_PACKAGE_ITEMS = 40
 /** The company's terms, printed under every quote. */
@@ -293,6 +324,9 @@ export const quoteCommandSchemas = {
     validDays: validDays.optional(),
     depositPct: depositPct.nullable().optional(),
     agreedCents: agreedCents.nullable().optional(),
+    // Travel and subsistence (ADR 0086), left as they were by a save from an app older than them.
+    mealsProvided: z.boolean().optional(),
+    travelKm: travelKm.nullable().optional(),
   }),
   /** The office sent it to the client themselves (the app sends nothing): from now on it stays as it is. */
   'quote.sent': z.object({ id, on: day }),
@@ -307,6 +341,17 @@ export const quoteCommandSchemas = {
    * the company's terms and its bank details.
    */
   'quoting.update': z.object({ nextNumber: quoteNumber.nullable(), terms: text(TERMS_LENGTH, 'The terms'), bank: text(500, 'The bank details') }),
+  /**
+   * How travel and subsistence are charged (ADR 0086): how far from Dublin city centre before travel is, the fuel
+   * price and what a vehicle uses, and the per diem for each of the crew a day. Null for a price not set.
+   */
+  'quoting.travel': z.object({
+    travelFromKm: z.number({ invalid_type_error: FROM_HINT }).int(FROM_HINT).min(0, FROM_HINT).max(1000, FROM_HINT),
+    fuelCentsPerLitre: fuelPrice.nullable(),
+    litresPer100Km: fuelUse,
+    perDiemCents: euroCents(1000_00, 'A per diem').nullable(),
+    on: day,
+  }),
   /** A product's day price; null takes it off the price list. */
   'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable(), rate: z.enum(RATE_RULES).optional() }),
   /**
@@ -639,7 +684,7 @@ export interface VersionChanges {
 }
 
 /** Which line of one version is which of the next: its product, else what it was built from, else its words. */
-const lineKey = (l: QuoteLine) => (l.modelId ? `m:${l.modelId}` : l.ref ? `r:${l.ref}` : `w:${l.kind}:${l.what.trim().toLowerCase()}`)
+const lineKey = (l: QuoteLine) => (l.extra ? `x:${l.extra}` : l.modelId ? `m:${l.modelId}` : l.ref ? `r:${l.ref}` : `w:${l.kind}:${l.what.trim().toLowerCase()}`)
 const sameTerms = (a: QuoteLine, b: QuoteLine) =>
   a.qty === b.qty &&
   a.unitCents === b.unitCents &&

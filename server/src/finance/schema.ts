@@ -68,6 +68,17 @@ const MIGRATIONS: string[] = [
   ALTER TABLE product_prices ADD COLUMN IF NOT EXISTS rate text CHECK (rate IN ('daily', 'week3', 'weekly'));
   ALTER TABLE quotes ADD COLUMN IF NOT EXISTS agreed_cents bigint CHECK (agreed_cents >= 0);
   `,
+  // Travel and subsistence (ADR 0086): on each quote, whether the job gives the crew their meals and the distance typed
+  // in place of the map's; and how they're charged, set once for every quote. A price not set is null and charges nothing.
+  `
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS meals_provided boolean NOT NULL DEFAULT false;
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS travel_km integer CHECK (travel_km BETWEEN 0 AND 2000);
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS travel_from_km integer CHECK (travel_from_km BETWEEN 0 AND 1000);
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_cents_per_litre numeric(4, 1) CHECK (fuel_cents_per_litre > 0);
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS litres_per_100_km numeric(3, 1) CHECK (litres_per_100_km > 0);
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS per_diem_cents integer CHECK (per_diem_cents >= 0);
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_set_on date;
+  `,
   // Packages (ADR 0087): kit quoted together at one price, with what each holds.
   `
   CREATE TABLE IF NOT EXISTS packages (
