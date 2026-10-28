@@ -51,8 +51,16 @@ import {
   FUEL_PRICE_FRESH_DAYS,
   type Extras,
   type Pin,
+  lineCostOf,
+  quoteKit,
+  quoteMargin,
+  quoteWants,
+  SUPPLIER_LENGTH,
+  VEHICLE_KIND_LABELS,
+  type QuoteKitCheck,
+  type QuoteMargin,
 } from '@sh/shared'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -179,7 +187,10 @@ function MarginLine({ margin, costs }: { margin: number; costs: number }) {
 
 export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
   const job = view.jobs.jobs.find((j) => j.id === jobId)
-  const sees = useAccess().can('money')
+  const access = useAccess()
+  const sees = access.can('money')
+  // What a quote makes (ADR 0089) is a director's to see.
+  const boss = access.can('company')
   const m = view.money
   const versions = m.quotesOf(jobId)
   const [picked, setPicked] = useState<string>()
@@ -255,6 +266,12 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
             </p>
             <Lines lines={q.lines} />
             <Totals totals={q.totals} agreed={q.agreedCents != null} />
+            {boss && (
+              <p className="quote-margin">
+                <MarginWords margin={quoteMargin(q.totals.net, q.lines.map((l) => lineCostOf(l, l.kind === 'crew' ? m.bookedRate(job.id, l) : undefined)))} />
+                <small> Not printed.</small>
+              </p>
+            )}
             {q.notes && <p className="notes">{q.notes}</p>}
             <div className="actions">
               <button type="button" className="primary" onClick={() => setPrinting(true)} disabled={printing}>
@@ -395,6 +412,10 @@ interface LineDraft {
   /** The package it was added from (ADR 0087), and what it held then. */
   packageId: string | null
   includes: string
+  /** The cost side (ADR 0089): how many are hired in and who from, and what the line costs us, as typed. */
+  subhire: string
+  supplier: string
+  cost: string
 }
 const toDraft = (l: QuoteLine): LineDraft => ({
   id: l.id,
@@ -413,6 +434,9 @@ const toDraft = (l: QuoteLine): LineDraft => ({
   discount: l.discountPct ? String(l.discountPct) : '',
   packageId: l.packageId ?? null,
   includes: l.includes ?? '',
+  subhire: l.subhireQty ? String(l.subhireQty) : '',
+  supplier: l.supplier ?? '',
+  cost: l.costCents === undefined ? '' : euroText(l.costCents),
 })
 /** The same line, saved as what's typed reads: a field the app before this didn't write counts as its default. */
 const sameLine = (a: QuoteLine, b: QuoteLine) =>
@@ -432,6 +456,9 @@ const sameLine = (a: QuoteLine, b: QuoteLine) =>
   (a.discountPct ?? 0) === (b.discountPct ?? 0) &&
   (a.packageId ?? null) === (b.packageId ?? null) &&
   (a.includes ?? '') === (b.includes ?? '') &&
+  (a.subhireQty ?? 0) === (b.subhireQty ?? 0) &&
+  (a.supplier ?? '') === (b.supplier ?? '') &&
+  (a.costCents ?? null) === (b.costCents ?? null) &&
   (a.extra ?? null) === (b.extra ?? null)
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
@@ -452,6 +479,11 @@ function readLine(d: LineDraft, n: number): QuoteLine | string {
   if (!(days >= 0.5 && days <= 365 && Number.isInteger(days * 2))) return `${where}: days charged is a number of days, in halves, from 0.5 to 365.`
   const off = d.discount.trim() ? num(d.discount.replace(/%$/, '')) : 0
   if (!(off >= 0 && off <= 100 && Number.isInteger(off * 10))) return `${where}: a line's discount is a percentage from 0 to 100, such as 30 or 12.5.`
+  const hired = d.kind === 'kit' && d.subhire.trim() ? num(d.subhire) : 0
+  if (!(Number.isInteger(hired) && hired >= 0 && hired <= qty)) return `${where}: how many are hired in is a whole number, no more than the ${qty} on the line.`
+  const cost = d.cost.trim() ? parseEuro(d.cost) : undefined
+  if (cost?.reason) return `${where}: what it costs us: ${cost.reason}`
+  const supplier = hired ? d.supplier.trim().slice(0, SUPPLIER_LENGTH) : ''
   return {
     id: d.id,
     kind: d.kind,
@@ -468,6 +500,9 @@ function readLine(d: LineDraft, n: number): QuoteLine | string {
     ...(off ? { discountPct: off } : {}),
     ...(d.packageId ? { packageId: d.packageId } : {}),
     ...(d.includes ? { includes: d.includes } : {}),
+    ...(hired ? { subhireQty: hired } : {}),
+    ...(supplier ? { supplier } : {}),
+    ...(cost?.cents != null ? { costCents: cost.cents } : {}),
   }
 }
 
@@ -529,7 +564,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   // The line just shut, which keeps the focus so the keyboard carries on from it.
   const [shut, setShut] = useState<string>()
   const [removed, setRemoved] = useState<{ line: LineDraft; at: number }>()
-  const [adding, setAdding] = useState<'kit' | 'crew' | 'package'>()
+  const [adding, setAdding] = useState<'kit' | 'crew' | 'package' | 'transport'>()
   const { run, error, refuse } = useAct()
   const set = (id: string, changes: Partial<LineDraft>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...changes } : l)))
 
@@ -585,6 +620,18 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
     valid === (q.validDays ?? DEFAULT_VALID_DAYS) &&
     dep === (q.depositPct ?? null)
   const unpriced = good.filter((l) => l.unitCents === 0).length
+  // Whether there's enough of each product on the job's days (ADR 0089), as the job's kit is checked.
+  const checks = quoteKit(job, quoteWants(good, (id) => m.package(id)?.items), today, {
+    kit: view.kit,
+    models: (id) => view.warehouse.models.find((x) => x.id === id),
+    unusable: view.faults.unusable,
+    lateOut: view.moves.lateOut,
+  })
+  const shortLines = good.filter((l) => linesShort(l, checks, m.package(l.packageId ?? '')?.items).length > 0).length
+  // What it makes (ADR 0089), for a director's eyes only.
+  const boss = useAccess().can('company')
+  const costOf = (l: QuoteLine) => lineCostOf(l, l.kind === 'crew' ? m.bookedRate(job.id, l) : undefined)
+  const margin = quoteMargin(totals.net, all.map(costOf))
 
   // The draft saves itself a moment after typing stops, once it reads as a quote: there's no Save to forget. Leaving
   // the page saves what's waiting at once. Saving goes through the device's queue, so it works with no signal.
@@ -610,9 +657,11 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const late = useLate(!!payload)
 
   const days = jobDays(job)
-  const addLine = (l: Omit<LineDraft, 'id' | 'rate' | 'out' | 'discount' | 'packageId' | 'includes'> & Partial<Pick<LineDraft, 'rate' | 'packageId' | 'includes'>>) => {
+  const addLine = (
+    l: Omit<LineDraft, 'id' | 'rate' | 'out' | 'discount' | 'packageId' | 'includes' | 'subhire' | 'supplier' | 'cost'> & Partial<Pick<LineDraft, 'rate' | 'packageId' | 'includes' | 'cost'>>
+  ) => {
     const id = newId()
-    setLines((ls) => [...ls, { rate: null, out: l.days, discount: '', packageId: null, includes: '', id, ...l }])
+    setLines((ls) => [...ls, { rate: null, out: l.days, discount: '', packageId: null, includes: '', subhire: '', supplier: '', cost: '', id, ...l }])
     setOpen(id)
     setAdding(undefined)
   }
@@ -663,10 +712,19 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
     addLine({ kind: 'crew', what: role, ref: null, modelId: null, group: 'Crew', qty: '1', days: String(days), price: cents === undefined ? '' : euroText(cents), vat: STANDARD_VAT, per: 'day' })
   }
   const addOther = () => addLine({ kind: 'other', what: '', ref: null, modelId: null, group: '', qty: '1', days: '1', price: '', vat: STANDARD_VAT, per: 'once' })
+  // Transport (ADR 0089): charged once, with what it costs us beside it; named for a van booked on the job when there is one.
+  const addTransport = (what: string, ref: string | null) =>
+    addLine({ kind: 'other', what, ref, modelId: null, group: 'Transport', qty: '1', days: '1', price: '', vat: STANDARD_VAT, per: 'once' })
+  const vans = view.vehicles.ofJob(job.id).filter((b) => b.vehicle && !lines.some((l) => l.ref === b.id))
   const remove = (l: LineDraft) => {
     setRemoved({ line: l, at: lines.indexOf(l) })
     setLines((ls) => ls.filter((x) => x.id !== l.id))
     if (open === l.id) setOpen(undefined)
+  }
+  // A short line hires in what it's short of (ADR 0089), then opens for who from and what it costs.
+  const hireIn = (l: LineDraft, n: number) => {
+    set(l.id, { subhire: String(Math.min(num(l.qty), (num(l.subhire) || 0) + n)) })
+    setOpen(l.id)
   }
   const undoRemove = () => {
     if (!removed) return
@@ -712,6 +770,8 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
           Total <b>{money(totals.gross)}</b>
         </span>
         {unpriced > 0 && <span className="warn">{plural(unpriced, 'line')} with no price</span>}
+        {shortLines > 0 && <span className="warn">{plural(shortLines, 'line')} short of kit</span>}
+        {boss && <MarginWords margin={margin} />}
         <span className="save-state" aria-live="polite">
           {problem ? 'Not saved yet' : payload ? (late ? 'Saving…' : '') : q.pending ? 'Saved on this device' : 'Saved'}
         </span>
@@ -726,13 +786,21 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
           {g.lines.map((l) => {
             const n = lines.indexOf(l) + 1
             const r = read[n - 1]
+            const done = r !== undefined && typeof r !== 'string' ? r : undefined
+            const kit = done && <KitNote l={done} checks={checks} items={m.package(l.packageId ?? '')?.items} names={(id) => view.warehouse.models.find((x) => x.id === id)?.name} onHire={l.modelId ? (k) => hireIn(l, k) : undefined} full={open === l.id} />
+            const cost = done ? costOf(done) : undefined
             return open !== l.id ? (
-              <LineSummary key={l.id} l={l} n={n} r={r} onOpen={() => setOpen(l.id)} focus={shut === l.id} />
+              <div key={l.id} className="quote-line-row">
+                <LineSummary l={l} n={n} r={r} onOpen={() => setOpen(l.id)} focus={shut === l.id} margin={boss && done ? lineMargin(done, cost) : undefined} />
+                {kit}
+              </div>
             ) : (
               <LineEditor key={l.id} l={l} n={n} r={r} set={(c) => set(l.id, c)} onRemove={() => remove(l)} onDone={() => {
                   setShut(l.id)
                   setOpen(undefined)
                 }}
+                kit={kit}
+                cost={<CostFields l={l} n={n} r={done} cost={cost} boss={boss} suppliers={view.kit.suppliers} set={(c) => set(l.id, c)} />}
               />
             )
           })}
@@ -759,6 +827,12 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
           </div>
         ) : adding === 'package' ? (
           <AddPackage packages={m.packages} onAdd={addPackage} onCancel={() => setAdding(undefined)} />
+        ) : adding === 'transport' ? (
+          <AddTransport
+            vans={vans.map((b) => ({ id: b.id, what: transportWords(b.vehicle!.kind, !!b.driver), name: `${b.vehicle!.name}${b.driver ? `, ${b.driver.name} driving` : ''}` }))}
+            onAdd={addTransport}
+            onCancel={() => setAdding(undefined)}
+          />
         ) : adding === 'crew' ? (
           <AddCrew roles={m.roles.map((r) => r.role)} onAdd={addCrew} onCancel={() => setAdding(undefined)} />
         ) : (
@@ -773,6 +847,9 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
             )}
             <button type="button" onClick={() => setAdding('crew')} disabled={lines.length >= MAX_LINES}>
               Add crew
+            </button>
+            <button type="button" onClick={() => setAdding('transport')} disabled={lines.length >= MAX_LINES}>
+              Add transport
             </button>
             <button type="button" onClick={addOther} disabled={lines.length >= MAX_LINES}>
               Add something else
@@ -956,8 +1033,130 @@ function chargeWords(r: QuoteLine) {
   return `${r.qty} × ${each} a day × ${daysWord(r.days)}${rule}${off}`
 }
 
+/** A line's margin (ADR 0089): what it's charged, after its own discount, less what it costs; undefined while its cost isn't known. */
+const lineMargin = (l: QuoteLine, cost: number | undefined) => (cost === undefined ? undefined : lineCents(l) - cost)
+
+/** "Margin €3,400.00, 62%", with the lines whose cost isn't known yet: a director's, on the screen only. */
+function MarginWords({ margin }: { margin: QuoteMargin }) {
+  return (
+    <span className={`margin-words${margin.margin < 0 ? ' bad' : ''}`}>
+      Margin <b>{money(margin.margin)}</b>
+      {margin.pct !== null && `, ${pctWord(margin.pct)}`}
+      {margin.unknown > 0 && <small> ({plural(margin.unknown, 'line')} with no cost yet)</small>}
+    </span>
+  )
+}
+
+/** What a line wants that there isn't enough of on the job's days: the product itself, or a package's pieces. */
+function linesShort(l: QuoteLine, checks: ReadonlyMap<string, QuoteKitCheck>, items: readonly { modelId: string }[] | undefined): QuoteKitCheck[] {
+  if (l.kind !== 'kit') return []
+  const ids = l.modelId ? [l.modelId] : l.packageId ? (items ?? []).map((i) => i.modelId) : []
+  return ids.map((id) => checks.get(id)).filter((c): c is QuoteKitCheck => !!c && c.short > 0)
+}
+
+/**
+ * Whether there's enough of a kit line's product on the job's days (ADR 0089), under the line: said only when it's
+ * short, or would be if pencilled jobs went ahead, unless the line is open. Short, it offers to hire in what's short.
+ */
+function KitNote(p: {
+  l: QuoteLine
+  checks: ReadonlyMap<string, QuoteKitCheck>
+  items: readonly { modelId: string; qty: number }[] | undefined
+  names: (modelId: string) => string | undefined
+  onHire?: (n: number) => void
+  full: boolean
+}) {
+  const { l, checks } = p
+  if (l.kind !== 'kit') return null
+  if (!l.modelId) {
+    const short = linesShort(l, checks, p.items)
+    if (!short.length) return null
+    return (
+      <p className="kit-note warn-line">
+        Short on the job's days: {short.map((c) => `${c.short} × ${p.names(c.modelId) ?? 'a product'} on ${dayLabel(c.shortDay!)}`).join(', ')}. Hire them in, or quote fewer.
+      </p>
+    )
+  }
+  const c = checks.get(l.modelId)
+  if (!c) return null
+  const others = (o: QuoteKitCheck['others']) => o.slice(0, 2).map((x) => `${x.name} has ${x.qty}`).join(', ')
+  if (c.short > 0) {
+    const own = l.qty - (l.subhireQty ?? 0)
+    return (
+      <p className="kit-note warn-line">
+        Short by {c.short} on {dayLabel(c.shortDay!)}
+        {c.wanted > own ? `, across the quote's ${c.wanted}` : ''}
+        {c.others.length ? `: ${others(c.others)} out` : ''}.{' '}
+        {p.onHire && own > 0 && (
+          <button type="button" className="link" onClick={() => p.onHire!(Math.min(c.short, own))}>
+            Hire {Math.min(c.short, own)} in
+          </button>
+        )}
+      </p>
+    )
+  }
+  if (c.ifPencilled > 0)
+    return (
+      <p className="kit-note hint">
+        Enough for now. If {c.others.filter((o) => !o.held).map((o) => o.name).slice(0, 2).join(' and ') || 'the jobs pencilled in'} went ahead, {c.ifPencilled} short on {dayLabel(c.pencilledDay!)}.
+      </p>
+    )
+  return p.full ? <p className="kit-note hint">Enough on the job's days: {c.wanted} of the {c.owned} we have.</p> : null
+}
+
+/**
+ * The cost side of a line (ADR 0089), never printed: how many are hired in and who from for kit, and what the line
+ * costs us, which a director sees set against its price.
+ */
+function CostFields({ l, n, r, cost, boss, suppliers, set }: { l: LineDraft; n: number; r: QuoteLine | undefined; cost: number | undefined; boss: boolean; suppliers: readonly string[]; set: (c: Partial<LineDraft>) => void }) {
+  const listId = useId()
+  const typed = l.cost.trim() !== ''
+  const worked = r && !typed ? cost : undefined
+  const hint =
+    l.kind === 'crew'
+      ? worked !== undefined
+        ? `${money(worked)} at their booked rate`
+        : "Nobody's booked at a rate for this role yet"
+      : l.kind === 'kit'
+        ? r?.subhireQty
+          ? 'What the hire company charges us'
+          : 'Nothing: our own kit'
+        : 'What it costs us, a van and driver, say'
+  const m = r && boss ? lineMargin(r, cost) : undefined
+  return (
+    <fieldset className="line-cost">
+      <legend>Not printed</legend>
+      {l.kind === 'kit' && (
+        <>
+          <label>
+            Hired in
+            <input inputMode="numeric" value={l.subhire} onChange={(e) => set({ subhire: e.target.value })} placeholder="None" aria-label={`Line ${n}: hired in`} />
+          </label>
+          {l.subhire.trim() !== '' && l.subhire.trim() !== '0' && (
+            <label className="supplier">
+              From
+              <input list={listId} value={l.supplier} onChange={(e) => set({ supplier: e.target.value })} maxLength={SUPPLIER_LENGTH} placeholder="Who we hire them from" aria-label={`Line ${n}: supplier`} />
+              <datalist id={listId}>
+                {suppliers.map((x) => (
+                  <option key={x} value={x} />
+                ))}
+              </datalist>
+            </label>
+          )}
+        </>
+      )}
+      <label>
+        Costs us, €
+        <input inputMode="decimal" value={l.cost} onChange={(e) => set({ cost: e.target.value })} placeholder={worked !== undefined ? euroText(worked) : ''} aria-label={`Line ${n}: costs us`} />
+        <small>{typed ? 'As typed. Clear it to work it out again.' : hint}</small>
+      </label>
+      {boss && <p className={`line-margin${m !== undefined && m < 0 ? ' bad' : ''}`}>{m === undefined ? 'Margin: not known until it has a cost' : `Margin ${money(m)}`}</p>}
+    </fieldset>
+  )
+}
+
 /** A line, shut: what it is, how it's charged and what it comes to; pressing it opens it to change. */
-function LineSummary({ l, n, r, onOpen, focus }: { l: LineDraft; n: number; r: QuoteLine | string | undefined; onOpen: () => void; focus: boolean }) {
+function LineSummary({ l, n, r, onOpen, focus, margin }: { l: LineDraft; n: number; r: QuoteLine | string | undefined; onOpen: () => void; focus: boolean; margin?: number | undefined }) {
   const bad = r === undefined || typeof r === 'string'
   const unpriced = !bad && r.unitCents === 0
   return (
@@ -966,13 +1165,29 @@ function LineSummary({ l, n, r, onOpen, focus }: { l: LineDraft; n: number; r: Q
         {l.what || 'Not named yet'}
         {l.includes && <small className="includes">{l.includes}</small>}
       </span>
-      <span className="how">{unpriced ? `${lineWords(l, r)}: needs a price` : lineWords(l, r)}</span>
-      <span className="amount">{bad ? '–' : money(lineCents(r))}</span>
+      <span className="how">
+        {unpriced ? `${lineWords(l, r)}: needs a price` : lineWords(l, r)}
+        {!bad && r.subhireQty ? `, ${r.subhireQty} hired in${r.supplier ? ` from ${r.supplier}` : ''}` : ''}
+      </span>
+      <span className="amount">
+        {bad ? '–' : money(lineCents(r))}
+        {margin !== undefined && <small className={`line-margin${margin < 0 ? ' bad' : ''}`}>makes {money(margin)}</small>}
+      </span>
     </button>
   )
 }
 
-function LineEditor({ l, n, r, set, onRemove, onDone }: { l: LineDraft; n: number; r: QuoteLine | string | undefined; set: (c: Partial<LineDraft>) => void; onRemove: () => void; onDone: () => void }) {
+function LineEditor(p: {
+  l: LineDraft
+  n: number
+  r: QuoteLine | string | undefined
+  set: (c: Partial<LineDraft>) => void
+  onRemove: () => void
+  onDone: () => void
+  kit: ReactNode
+  cost: ReactNode
+}) {
+  const { l, n, r, set, onRemove, onDone } = p
   const [vatOpen, setVatOpen] = useState(false)
   const unpriced = r !== undefined && typeof r !== 'string' && r.unitCents === 0
   return (
@@ -1054,6 +1269,8 @@ function LineEditor({ l, n, r, set, onRemove, onDone }: { l: LineDraft; n: numbe
           <small>Charged {l.rate === 'weekly' ? `${r.days} week${r.days === 1 ? '' : 's'}` : daysWord(r.days)}</small>
         )}
       </span>
+      {p.kit}
+      {p.cost}
       {typeof r === 'string' && l.what.trim() !== '' && <p className="line-problem">{r}</p>}
       <span className="line-actions">
         <button type="button" className="link" onClick={onRemove} aria-label={`Remove line ${n}`}>
@@ -1063,6 +1280,37 @@ function LineEditor({ l, n, r, set, onRemove, onDone }: { l: LineDraft; n: numbe
           Done
         </button>
       </span>
+    </div>
+  )
+}
+
+/** "Van and driver", "Luton": how a vehicle reads on a quote. */
+const transportWords = (kind: keyof typeof VEHICLE_KIND_LABELS, driver: boolean) => `${kind === 'luton' ? 'Luton van' : VEHICLE_KIND_LABELS[kind]}${driver ? ' and driver' : ''}`
+
+/** Transport to add (ADR 0089): one of the vans booked on the job, or transport typed. */
+function AddTransport({ vans, onAdd, onCancel }: { vans: { id: string; what: string; name: string }[]; onAdd: (what: string, ref: string | null) => void; onCancel: () => void }) {
+  const [chosen, setChosen] = useState(vans[0]?.id ?? '')
+  const van = vans.find((v) => v.id === chosen)
+  return (
+    <div className="adding">
+      <label className="field">
+        Transport to add
+        <select value={chosen} onChange={(e) => setChosen(e.target.value)} autoFocus>
+          {vans.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.what}: {v.name}
+            </option>
+          ))}
+          <option value="">Transport, typed</option>
+        </select>
+        <small>Charged once, with what it costs us beside it, which isn't printed.</small>
+      </label>
+      <button type="button" onClick={() => onAdd(van ? van.what : 'Transport', van ? van.id : null)}>
+        Add
+      </button>
+      <button type="button" className="link" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   )
 }

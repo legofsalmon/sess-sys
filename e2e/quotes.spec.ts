@@ -314,3 +314,52 @@ test('a package made on the price list goes on a quote as one line, with what it
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
+
+test("a line short of kit hires in what it's short of, transport is added at a cost, and a director sees the margin, none of it printed (ADR 0089)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  const summary = draft.getByRole('group', { name: 'What it comes to' })
+  await expect(summary).toContainText('Margin')
+
+  // Far more Spiiders than there are: the line says it's short, and hires in what it's short of.
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  await draft.getByLabel('Line 1: how many').fill('500')
+  await expect(draft.locator('.kit-note')).toContainText('Short by')
+  await expect(summary).toContainText('1 line short of kit')
+  await draft.getByRole('button', { name: /^Hire \d+ in$/ }).click()
+  await expect(draft.getByLabel('Line 1: hired in')).not.toHaveValue('')
+  await expect(summary).not.toContainText('short of kit')
+  await expect(summary).toContainText('1 line with no cost yet')
+  await draft.getByLabel('Line 1: supplier').fill('  Hire Co ')
+  await draft.getByLabel('Line 1: costs us').fill('2000')
+  await expect(summary).not.toContainText('no cost yet')
+  await draft.getByRole('button', { name: 'Done' }).click()
+  await expect(draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' })).toContainText('hired in from Hire Co')
+
+  // Transport, charged once, and what it costs us: the job's Luton is booked with a driver, so it's offered first.
+  await draft.getByRole('button', { name: 'Add transport' }).click()
+  await draft.getByRole('button', { name: 'Add', exact: true }).click()
+  await draft.getByLabel('Line 3: price').fill('180')
+  await draft.getByLabel('Line 3: costs us').fill('120')
+  await draft.getByRole('button', { name: 'Done' }).click()
+  await expect(draft.getByRole('button', { name: 'Line 3: Luton van and driver, change it' })).toContainText('makes €60.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
+  // The client's copy has none of it.
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Luton van and driver')
+  for (const word of ['Hire Co', 'hired in', 'Margin', 'makes', '€2,000.00', '€120.00']) await expect(printed).not.toContainText(word)
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
