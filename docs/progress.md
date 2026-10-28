@@ -24,6 +24,31 @@ waiting on someone.
 - Nothing more planned for racks. Sizes from a list of known models were
   left out (see the ADR).
 
+## 28 October 2026: the printed quote
+
+**Done**
+
+- [ADR 0084](adr/0084-the-printed-quote.md), part 1c of the quoting plan.
+  Quote numbers given when a quote is first sent, kept on every version,
+  carrying on from Admin's "next quote number" (1115, after Current RMS);
+  valid until (30 days unless changed) and a deposit on each quote; terms
+  and bank details in Admin; a client address for quotes; the printed page
+  laid out as a letter; "What changed since version 1". App 1.41.0.
+- Checked: typecheck, unit tests (numbers, valid until, deposit, version
+  changes), server tests (numbering, the next number refused below one
+  given, the address kept by an older save), parity, and the quotes e2e
+  test extended through printing, numbering and a second version.
+
+**Waiting on Colly**
+
+- In Admin › Printed quotes: set the next quote number to 1115, and type
+  the terms and bank details.
+
+**Next**
+
+- Part 2: the three rate rules, line and department discounts, "Agree a
+  total", packages.
+
 ## 27 October 2026: starting a quote and following it up
 
 **Done**
