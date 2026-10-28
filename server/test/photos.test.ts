@@ -175,7 +175,7 @@ describe("a person's photo", () => {
  * gone from the storage when it's replaced, removed or the product is.
  */
 describe("a product's photo", () => {
-  const AD4D = { id: 'ad4d', name: 'Shure AD4D', department: 'audio', category: 'RF', tracking: 'serialised', isCase: false, valueCents: null, notes: '' }
+  const AD4D = { id: 'ad4d', name: 'Shure AD4D', department: 'audio', category: 'RF', tracking: 'serialised', isCase: false, valueCents: null, notes: '' } as const
   const productPhotoAt = async (app: FastifyInstance, cookies: Record<string, string>, id: string): Promise<string | undefined> => {
     const res = await app.inject({ url: '/api/sync/pull?after=0', cookies })
     const copies = res.json().changes.filter((c: { entity: string; id: string }) => c.entity === 'model' && c.id === id)
