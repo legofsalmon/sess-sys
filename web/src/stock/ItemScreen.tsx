@@ -41,7 +41,7 @@ import {
   WhereChoices,
   whereNamed,
 } from './common.tsx'
-import { Thumb } from '../Picture.tsx'
+import { productPhotoOf, Thumb } from '../Picture.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { STOCK } from '../Up.tsx'
 import { BuiltRackCheck } from './Racks.tsx'
@@ -114,7 +114,7 @@ function Summary({ a, w, view }: { a: AssetView; w: WarehouseView; view: View })
     <section className="card">
       <header className="title">
         <div className="pictured">
-          <Thumb icon={kitIcon(a.model)} size="large" />
+          <Thumb icon={kitIcon(a.model)} src={productPhotoOf(a.model)} size="large" />
           <h1 className="number">{numberLabel(a)}</h1>
         </div>
         {a.pending ? <Pending pending /> : retired && <StatusPill tone="cancelled">Retired</StatusPill>}

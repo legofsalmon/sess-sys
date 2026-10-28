@@ -45,3 +45,24 @@ export function mayChangePhoto(role: Role | null | undefined, myPersonId: string
 
 /** Whether this reader is sent someone's photo: everyone but a freelancer signed in, who reads nobody's details but their own (ADR 0062). */
 export const readsPhotoOf = (r: Reading, personId: string) => (r.details ?? 'all') !== 'own' || r.personId === personId
+
+/**
+ * A product's photo (ADR 0083), kept as a person's is, on its page, in the
+ * stock lists, and on its panel in a rack drawn flat or in 3D. Not squared:
+ * a rack panel is wide, so the device keeps the photo's shape and makes its
+ * longer side PRODUCT_PHOTO_SIDE. Nobody's personal data, so everyone signed
+ * in sees it; whoever changes stock puts one up or takes it down.
+ */
+export const PRODUCT_PHOTO_ACTIONS = { put: 'model.photo', remove: 'model.photoRemove' } as const
+export type ProductPhotoAction = (typeof PRODUCT_PHOTO_ACTIONS)[keyof typeof PRODUCT_PHOTO_ACTIONS]
+
+/** The longer side of a product's photo as the device sends it: wide enough for a 19-inch panel on a large screen. */
+export const PRODUCT_PHOTO_SIDE = 1280
+
+export const PRODUCT_PHOTO_REFUSAL = 'Only the office, directors and heads of department can change the photo of a product.'
+
+/** The address of a product's photo: a new one is a new address. */
+export const productPhotoPath = (modelId: string, at: string) => `/api/models/${encodeURIComponent(modelId)}/photo?v=${encodeURIComponent(at)}`
+
+/** Whether someone can put up or take down a product's photo: whoever changes stock. No role is held to nothing. */
+export const mayChangeProductPhoto = (role: Role | null | undefined) => !role || roleCan(role, 'stock')

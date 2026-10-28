@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { NOT_A_PHOTO, PHOTO_REFUSAL, PHOTOS_WAIT, photoPath, type Person } from '@sh/shared'
+import { NOT_A_PHOTO, PHOTO_REFUSAL, PHOTOS_WAIT, photoPath, PRODUCT_PHOTO_REFUSAL, productPhotoPath, type Person } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { dirStore } from '../src/backup/store.ts'
@@ -166,5 +166,66 @@ describe("a person's photo", () => {
     expect(await colly.send('person.merge', { id: 'dara', from: ['dara3'] })).toMatchObject({ status: 'applied' })
     expect(await keyOf(db, 'dara')).toBe(key)
     expect(await files()).toHaveLength(1)
+  })
+})
+
+/**
+ * A product's photo (ADR 0083): put up, changed and taken down by whoever
+ * changes stock, kept as a person's is, shown to everyone signed in, and
+ * gone from the storage when it's replaced, removed or the product is.
+ */
+describe("a product's photo", () => {
+  const AD4D = { id: 'ad4d', name: 'Shure AD4D', department: 'audio', category: 'RF', tracking: 'serialised', isCase: false, valueCents: null, notes: '' } as const
+  const productPhotoAt = async (app: FastifyInstance, cookies: Record<string, string>, id: string): Promise<string | undefined> => {
+    const res = await app.inject({ url: '/api/sync/pull?after=0', cookies })
+    const copies = res.json().changes.filter((c: { entity: string; id: string }) => c.entity === 'model' && c.id === id)
+    return copies[copies.length - 1]?.data?.photo?.at
+  }
+
+  it('is put up, shown, replaced, taken down and goes with the product, leaving nothing in the storage', async () => {
+    const { app, colly, files } = await company()
+    expect(await colly.send('model.create', AD4D)).toMatchObject({ status: 'applied' })
+    const put = (data: Buffer) =>
+      app.inject({ method: 'POST', url: '/api/models/ad4d/photo?client=phonec0ffee', headers: { 'content-type': 'application/octet-stream', 'user-agent': IPHONE }, cookies: colly.cookies, payload: data })
+    expect((await put(JPEG)).statusCode).toBe(200)
+    const at = (await productPhotoAt(app, colly.cookies, 'ad4d'))!
+    expect(at).toBeTruthy()
+    const seen = await app.inject({ url: productPhotoPath('ad4d', at), cookies: colly.cookies })
+    expect(seen.statusCode).toBe(200)
+    expect(seen.headers['content-type']).toBe('image/jpeg')
+    expect(seen.rawPayload.equals(JPEG)).toBe(true)
+    expect((await put(PDF)).statusCode).toBe(415)
+
+    expect((await put(PNG)).statusCode).toBe(200)
+    expect(await files()).toHaveLength(1)
+    // An edit from a device keeps the photo, which only the server sets.
+    expect(await colly.send('model.update', { id: 'ad4d', notes: 'Two in each RF rack' })).toMatchObject({ status: 'applied' })
+    expect(await productPhotoAt(app, colly.cookies, 'ad4d')).toBeTruthy()
+
+    expect((await app.inject({ method: 'DELETE', url: '/api/models/ad4d/photo', cookies: colly.cookies })).statusCode).toBe(200)
+    expect(await productPhotoAt(app, colly.cookies, 'ad4d')).toBeUndefined()
+    expect(await files()).toHaveLength(0)
+
+    expect((await put(JPEG2)).statusCode).toBe(200)
+    expect(await colly.send('model.remove', { id: 'ad4d' })).toMatchObject({ status: 'applied' })
+    expect(await files()).toHaveLength(0)
+
+    const said = (await colly.history()).entries.map((e) => e.what)
+    expect(said).toEqual(expect.arrayContaining(['Put a photo on the product Shure AD4D', 'Put a new photo on the product Shure AD4D', 'Took the photo off the product Shure AD4D']))
+  })
+
+  it('is changed by whoever changes stock, and seen by everyone signed in', async () => {
+    const { app, colly, sean } = await company()
+    expect(await colly.send('model.create', AD4D)).toMatchObject({ status: 'applied' })
+    expect(await colly.send('person.role', { id: 'colly', role: 'director' })).toMatchObject({ status: 'applied' })
+    const put = (cookies: Record<string, string>) =>
+      app.inject({ method: 'POST', url: '/api/models/ad4d/photo', headers: { 'content-type': 'application/octet-stream' }, cookies, payload: JPEG })
+    const crew = await put(sean.cookies)
+    expect(crew.statusCode).toBe(403)
+    expect(crew.json().error).toBe(PRODUCT_PHOTO_REFUSAL)
+    expect((await put(colly.cookies)).statusCode).toBe(200)
+    expect(await colly.send('person.role', { id: 'sean', role: 'freelancer' })).toMatchObject({ status: 'applied' })
+    const at = (await productPhotoAt(app, sean.cookies, 'ad4d'))!
+    expect((await app.inject({ url: productPhotoPath('ad4d', at), cookies: sean.cookies })).statusCode).toBe(200)
   })
 })

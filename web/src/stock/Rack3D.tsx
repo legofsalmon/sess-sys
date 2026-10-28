@@ -2,6 +2,7 @@ import { acrossAt, acrossFor, RACK_SIDE_LABELS, spanAcross, TAPE_COLOUR_SWATCHES
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { productPhotoOf } from '../Picture.tsx'
 import { DRAG_TYPE, heldOf, type Held } from './rack-drag.ts'
 import { GUESS_KIT_DEPTH, RACK_U as U, rackSize } from './rack-size.ts'
 
@@ -58,9 +59,20 @@ function roleColour(el: Element, role: string, fallback: string): THREE.Color {
 /**
  * A thing's panel: its label or name, a strip of its tape colour at the
  * left (content, as the tape is), and for a rack part (ADR 0079) what
- * makes it one: a vent's slots, a drawer's handle, a shelf's lip.
+ * makes it one: a vent's slots, a drawer's handle, a shelf's lip. With a
+ * photo of the product (ADR 0083), the photo fills the panel and the name
+ * sits on a patch of the panel's colour, so it's read over any photo.
  */
-function labelTexture(text: string, units: number, parts: number, ink: THREE.Color, face: THREE.Color, tape: string | null, part: RackPart | null | undefined): THREE.CanvasTexture {
+function labelTexture(
+  text: string,
+  units: number,
+  parts: number,
+  ink: THREE.Color,
+  face: THREE.Color,
+  tape: string | null,
+  part: RackPart | null | undefined,
+  photo?: HTMLImageElement
+): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(1024 / parts)
   canvas.height = Math.round(1024 * ((units * U) / PANEL))
@@ -68,6 +80,13 @@ function labelTexture(text: string, units: number, parts: number, ink: THREE.Col
   const inkHex = `#${ink.getHexString(THREE.SRGBColorSpace)}`
   c.fillStyle = `#${face.getHexString(THREE.SRGBColorSpace)}`
   c.fillRect(0, 0, canvas.width, canvas.height)
+  if (photo) {
+    // As much of the photo as fills the panel, from its middle.
+    const scale = Math.max(canvas.width / photo.naturalWidth, canvas.height / photo.naturalHeight)
+    const w = photo.naturalWidth * scale
+    const h = photo.naturalHeight * scale
+    c.drawImage(photo, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h)
+  }
   c.strokeStyle = inkHex
   c.globalAlpha = 0.35
   c.lineWidth = 6
@@ -88,10 +107,18 @@ function labelTexture(text: string, units: number, parts: number, ink: THREE.Col
     c.fillStyle = tape
     c.fillRect(0, 0, 28, canvas.height)
   }
-  c.fillStyle = inkHex
   c.font = `600 ${Math.min(64, canvas.height * (part === 'drawer' ? 0.3 : 0.45))}px system-ui, sans-serif`
   c.textBaseline = 'middle'
-  c.fillText(text, 48, part === 'drawer' ? canvas.height * 0.3 : canvas.height / 2, canvas.width - 96)
+  const y = part === 'drawer' ? canvas.height * 0.3 : canvas.height / 2
+  if (photo && text) {
+    const size = Math.min(64, canvas.height * 0.45)
+    c.globalAlpha = 0.85
+    c.fillStyle = `#${face.getHexString(THREE.SRGBColorSpace)}`
+    c.fillRect(40, y - size * 0.7, Math.min(c.measureText(text).width, canvas.width - 96) + 16, size * 1.4)
+    c.globalAlpha = 1
+  }
+  c.fillStyle = inkHex
+  c.fillText(text, 48, y, canvas.width - 96)
   const t = new THREE.CanvasTexture(canvas)
   t.colorSpace = THREE.SRGBColorSpace
   return t
@@ -135,6 +162,9 @@ export default function Rack3D({ r, held, heldModel, mayChange, bad, onHold, onP
     render: () => void
   }>(undefined)
   const [look, setLook] = useState<Look>('angle')
+  // Products' photos (ADR 0083), loaded once each; the rack is drawn again as each one comes in.
+  const photos = useRef(new Map<string, HTMLImageElement | null>())
+  const [photosIn, setPhotosIn] = useState(0)
   const [noGl, setNoGl] = useState(false)
   const size = rackSize(r)
   // Kept current for the pointer handlers set up once.
@@ -265,7 +295,18 @@ export default function Rack3D({ r, held, heldModel, mayChange, bad, onHold, onP
       )
       body.position.set(b.x, part === 'shelf' ? b.y - b.h / 2 + 2 : b.y, b.bodyZ)
       const named = part === 'blank' && !s.label ? '' : `${s.label || s.model?.name || '?'}${s.model?.dryHire ? ' · dry hire' : ''}`
-      const label = labelTexture(named, b.units, b.parts, wrong ? warn : ink, panel, s.colour ? TAPE_COLOUR_SWATCHES[s.colour] : null, part)
+      const src = productPhotoOf(s.model)
+      if (src && !photos.current.has(src)) {
+        const img = new Image()
+        photos.current.set(src, null)
+        img.onload = () => {
+          photos.current.set(src, img)
+          setPhotosIn((n) => n + 1)
+        }
+        img.src = src
+      }
+      const photo = src ? (photos.current.get(src) ?? undefined) : undefined
+      const label = labelTexture(named, b.units, b.parts, wrong ? warn : ink, panel, s.colour ? TAPE_COLOUR_SWATCHES[s.colour] : null, part, photo)
       const plain = new THREE.MeshStandardMaterial({ color: panel, roughness: 0.6 })
       const faces = [plain, plain, plain, plain, plain, plain].map((m) => m.clone())
       // A box's faces run +x, -x, +y, -y, +z, -z: the name goes on the one towards whoever faces that rail.
@@ -280,7 +321,7 @@ export default function Rack3D({ r, held, heldModel, mayChange, bad, onHold, onP
     }
     t.ghost.visible = false
     t.render()
-  }, [r, held, bad, size.height, size.depth, size.outside.w, size.outside.h, size.outside.d])
+  }, [r, held, bad, photosIn, size.height, size.depth, size.outside.w, size.outside.h, size.outside.d])
 
   // Square to a face, or at an angle.
   useEffect(() => {
