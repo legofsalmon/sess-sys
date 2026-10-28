@@ -207,6 +207,9 @@ const CASES: Case[] = [
   c('fault.close', { id: 'f1', outcome: 'fixed', at: new Date().toISOString() }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: true, at: new Date().toISOString(), by: 'Cian', note: '' }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: false, at: new Date().toISOString(), by: 'Cian', note: 'Earth fault' }, { as: 'failed' }),
+  // Certificates on items (ADR 0094).
+  c('itemCertificate.save', { id: 'pat-cert', kind: 'pat', title: 'PAT certificate', day: today, expires: null, assetIds: ['a1'], link: 'https://example.com/pat' }),
+  c('itemCertificate.remove', { id: 'pat-cert' }, { before: [m('itemCertificate.save', { id: 'pat-cert', kind: 'pat', title: 'PAT certificate', day: today, expires: null, assetIds: ['a1'], link: 'https://example.com/pat' })] }),
   c('count.record', {
     id: newId(),
     placeId: 'wh',

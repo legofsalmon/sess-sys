@@ -20,6 +20,7 @@ import { Pending, StatusPill } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText, InspectionsCard } from './Inspections.tsx'
+import { CertificatesCard } from './Certificates.tsx'
 import { ItemLog } from './ItemLog.tsx'
 import { CountsOf } from './Counts.tsx'
 import { PrintLabels } from './Labels.tsx'
@@ -85,6 +86,7 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
         {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
       </FaultsCard>
       <InspectionsCard view={view} a={a} />
+      <CertificatesCard view={view} a={a} />
       {a.model?.isRack && a.status === 'active' && <BuiltRackCheck view={view} item={a} />}
       {a.model?.isCase && a.status === 'active' && <Inside c={a} w={w} />}
       {a.model?.isCase && a.status === 'active' && <CountsOf view={view} where={{ placeId: null, caseId: a.id }} />}

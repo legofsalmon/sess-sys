@@ -123,7 +123,9 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await page.goto('/#stock/testing')
   await expect(due.locator('li', { hasText: speakers[0]! })).toHaveCount(0)
   await expect(due.locator('li', { hasText: speakers[1]! })).toContainText('PAT failed on')
-  await expect(due).not.toContainText(`× ${speaker}`)
+  await expect(due).not.toContainText('Not recorded yet')
+  // Both that passed have no certificate kept yet (ADR 0094): listed, never stopped.
+  await expect(due).toContainText(`No certificate kept yet for the last test of 2 × ${speaker}`)
   await due.getByRole('link', { name: `${speakers[1]} ${speaker}` }).click()
   await expect(card.locator('.due')).toContainText('PAT failed on')
   await expect(card.locator('summary')).toHaveText('2 recorded')

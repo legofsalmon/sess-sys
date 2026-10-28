@@ -20,6 +20,7 @@ import {
   type FileType,
   type Person,
   attachmentDetails,
+  itemCertificateDetails,
 } from '@sh/shared'
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { renderGone } from '../crew/page.ts'
@@ -34,6 +35,7 @@ import { NotAForm, readForm } from './form.ts'
 import { renderNoFile } from './page.ts'
 import { fileKeyOf, getDocument } from './store.ts'
 import { attachmentFile, attachmentFileKeyOf, getAttachment, ownerName } from './attachments.ts'
+import { certificateItemName, getItemCertificate, itemCertificateFile, itemCertificateFileKeyOf } from '../stock/certificates.ts'
 
 /**
  * Documents' files (ADR 0029), read and written only through the server:
@@ -53,6 +55,10 @@ type Said = 'doc-sent' | 'doc-no-file' | 'doc-too-big' | 'doc-web-page' | 'doc-n
 
 type OfficeReq = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string; personId?: string; kind?: string; title?: string; expires?: string } }>
 type AttachmentReq = FastifyRequest<{ Params: { id: string }; Querystring: { client?: string; owner?: string; ownerId?: string; kind?: string; title?: string; link?: string } }>
+type CertificateReq = FastifyRequest<{
+  Params: { id: string }
+  Querystring: { client?: string; kind?: string; title?: string; day?: string; expires?: string; link?: string; assets?: string }
+}>
 type LinkReq = FastifyRequest<{ Params: { token: string; id?: string } }>
 
 /**
@@ -158,6 +164,56 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
       if (!files.on) return reply.code(409).send({ error: "The file is in the storage bucket, which isn't set up on this server." })
       try {
         return sendFile(reply, await files.read(key), doc.file.type, documentFileName((await ownerName(db, doc.owner, doc.ownerId)) ?? '', doc.title, doc.file.type))
+      } catch (err) {
+        if (err instanceof FileGone) return reply.code(404).send({ error: err.message })
+        if (err instanceof FileLocked) return reply.code(409).send({ error: err.message })
+        throw err
+      }
+    })
+
+    /**
+     * A file put on an item's certificate (ADR 0094), with its details, as
+     * for a venue's document. The items it covers come comma-separated and
+     * are added to the ones it has: a round too long for one address sends
+     * the rest with the details afterwards.
+     */
+    scope.post('/api/item-certificates/:id/file', { bodyLimit: ROUTE_LIMIT, config: { needs: 'stock' } }, async (req: CertificateReq, reply) => {
+      if (!files.on) return reply.code(409).send({ error: FILES_WAIT_LINK })
+      const body = req.body
+      if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: NO_FILE })
+      if (body.length > MAX_FILE_BYTES) return reply.code(413).send({ error: FILE_TOO_BIG })
+      const found = fileTypeOf(body.subarray(0, FILE_HEAD_BYTES))
+      if ('refused' in found) return reply.code(415).send({ error: found.refused })
+      const q = req.query
+      const details = itemCertificateDetails.safeParse({
+        id: req.params.id,
+        kind: q.kind,
+        title: q.title,
+        day: q.day,
+        expires: q.expires || null,
+        assetIds: (q.assets ?? '').split(',').filter(Boolean),
+        link: q.link || null,
+      })
+      if (!details.success) return reply.code(400).send({ error: details.error.issues[0]?.message ?? 'Check the details and try again.' })
+      try {
+        await itemCertificateFile(db, files, details.data, body, found.type, { clientId: q.client, userId: req.user?.id, device: describeDevice(req.headers['user-agent']) })
+      } catch (err) {
+        if (err instanceof Refused) return reply.code(409).send({ error: err.reason.message })
+        if (err instanceof NotKept) return reply.code(502).send({ error: err.message })
+        throw err
+      }
+      onChange()
+      return { ok: true }
+    })
+
+    scope.get('/api/item-certificates/:id/file', async (req: CertificateReq, reply) => {
+      const cert = await getItemCertificate(db, req.params.id)
+      if (!cert) return reply.code(404).send({ error: 'That certificate is no longer there.' })
+      const key = await itemCertificateFileKeyOf(db, cert.id)
+      if (!key || !cert.file) return reply.code(404).send({ error: "There's no file for this certificate." })
+      if (!files.on) return reply.code(409).send({ error: "The file is in the storage bucket, which isn't set up on this server." })
+      try {
+        return sendFile(reply, await files.read(key), cert.file.type, documentFileName(await certificateItemName(db, cert), cert.title, cert.file.type))
       } catch (err) {
         if (err instanceof FileGone) return reply.code(404).send({ error: err.message })
         if (err instanceof FileLocked) return reply.code(409).send({ error: err.message })

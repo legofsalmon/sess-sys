@@ -136,6 +136,17 @@
 .warehouse .inspections .inspection { display: flex; justify-content: space-between; gap: var(--space-8); padding: var(--space-8) 0; border-top: 1px dashed var(--line); }
 .warehouse .inspections .inspection p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .85rem; }
 .warehouse .inspections-due h3 { margin: var(--space-12) 0 var(--space-6); }
+/* Certificates on items (ADR 0094): a line each, as a venue's documents are, in the warn tone when another runs out soon and the bad tone once it has; a test's own opens from its line. */
+.warehouse .certificates { display: grid; gap: var(--space-6); }
+.warehouse .certificates .row.doc > div:first-child { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
+.warehouse .certificates .row.doc .warn { color: var(--warn); font-weight: 600; }
+.warehouse .certificates .row.doc .bad { color: var(--bad); font-weight: 600; }
+.warehouse .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.warehouse .doc-form small { color: var(--muted); }
+.warehouse .inspections .inspection { flex-wrap: wrap; }
+.warehouse .inspections .inspection > div:first-child { flex: 1 1 12em; min-width: 0; }
+.warehouse .inspections .inspection .actions { display: flex; gap: var(--space-6); align-items: center; }
+.warehouse .inspections .inspection form { flex: 1 1 100%; }
 .warehouse .numbers a.failed { border-color: var(--bad); color: var(--bad); }
 
 /* Audit round three (findings 17 to 19): a pass held before it's recorded, what the last scan did under the camera, zoom, and the address to open elsewhere. */

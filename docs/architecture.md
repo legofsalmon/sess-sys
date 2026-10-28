@@ -360,7 +360,10 @@ says product and item; the code says model and asset.
   examination recorded on an item, passed or failed, kept for good; a
   product says how many months apart its items need each, and each
   device works out when it's next due. Failed or overdue kit is warned
-  about when scanned out, the same way.
+  about when scanned out, the same way. Each test's certificate, and
+  others such as a declaration of conformity, are kept on the items they
+  cover as a file or a link, one for a whole round
+  ([ADR 0094](adr/0094-certificates-on-items.md)).
 - **Count**: a place or a case checked against the record, kept as what
   it found of each item and product, with who and when. Built
   ([ADR 0030](adr/0030-stocktakes-and-rolling-counts.md)): counted on a

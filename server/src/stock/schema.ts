@@ -10,7 +10,8 @@ import { runMigrations, type Module } from '../migrations.ts'
  * inspections (ADR 0020); what was added by mistake (audit finding 19);
  * what the stock list brings in that items didn't hold before (ADR 0026);
  * counts of places and cases (ADR 0030); and kit read from jobs' notes
- * (ADR 0043); racks and their layouts (ADR 0074); and dry hire stock (ADR 0075).
+ * (ADR 0043); racks and their layouts (ADR 0074); dry hire stock (ADR 0075);
+ * and certificates on items (ADR 0094).
  * Versioned on its own (stock_schema_version), like the other modules.
  *
  * Items and their labels are never deleted, so a number is never used
@@ -317,6 +318,32 @@ const MIGRATIONS: string[] = [
   ALTER TABLE models ADD COLUMN IF NOT EXISTS photo_type text CHECK (photo_type IN ('jpeg', 'png', 'webp'));
   ALTER TABLE models ADD COLUMN IF NOT EXISTS photo_bytes integer;
   ALTER TABLE models ADD COLUMN IF NOT EXISTS photo_at timestamptz;
+  `,
+  // Certificates on items (ADR 0094): a test's certificate or another, a
+  // file kept in the storage as a venue's documents are, or a link, or
+  // both, covering one item or a whole round of them.
+  `
+  CREATE TABLE IF NOT EXISTS item_certificates (
+    id          text PRIMARY KEY,
+    kind        text NOT NULL CHECK (kind IN ('pat', 'lifting', 'other')),
+    title       text NOT NULL,
+    day         date NOT NULL,
+    expires     date,
+    link        text,
+    file_key    text UNIQUE,
+    file_type   text CHECK (file_type IN ('pdf', 'jpeg', 'png', 'webp', 'heic')),
+    file_bytes  integer,
+    file_at     timestamptz,
+    added_at    timestamptz NOT NULL,
+    CHECK (expires IS NULL OR kind = 'other')
+  );
+  CREATE TABLE IF NOT EXISTS item_certificate_items (
+    certificate_id  text NOT NULL REFERENCES item_certificates(id) ON DELETE CASCADE,
+    asset_id        text NOT NULL REFERENCES assets(id),
+    place           integer NOT NULL,
+    PRIMARY KEY (certificate_id, asset_id)
+  );
+  CREATE INDEX IF NOT EXISTS item_certificate_items_asset ON item_certificate_items (asset_id);
   `,
 ]
 

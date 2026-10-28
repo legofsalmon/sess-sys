@@ -292,6 +292,11 @@ function describer(view: View): (m: Mutation) => string {
           : `Mark ${faultOn(a.id)} as ${a.outcome === 'found' ? 'found' : a.outcome === 'not-faulty' ? 'not faulty' : 'fixed'}`
       case 'inspection.record':
         return `Record ${item(a.assetId)} ${a.passed ? 'passing' : 'failing'} its ${a.kind === 'lifting' ? 'thorough examination' : 'PAT'}`
+      // Certificates on items (ADR 0094): a file goes straight to the server, so only links and details wait here.
+      case 'itemCertificate.save':
+        return `Save ${str(a.title, 'a certificate')} for ${Array.isArray(a.assetIds) && a.assetIds.length ? item(a.assetIds[0]) : 'an item'}${Array.isArray(a.assetIds) && a.assetIds.length > 1 ? ` and ${a.assetIds.length - 1} more` : ''}`
+      case 'itemCertificate.remove':
+        return 'Remove a certificate'
       case 'timesheet.send':
         return `Send ${offer(a.id).who}'s timesheet for ${offer(a.id).what}`
       case 'timesheet.approve':
