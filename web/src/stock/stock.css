@@ -230,3 +230,10 @@
 .warehouse .count-due .count-link { flex: 1; border-top: 0; min-width: 55%; }
 .warehouse .count-due .confirm { flex-basis: 100%; padding-bottom: var(--space-10); }
 .warehouse .counts > button { justify-self: start; }
+
+/* A product's photo on its page (ADR 0083), at its own shape: often a rack panel, wide and short. */
+.warehouse .product-photo { display: grid; gap: var(--space-6); justify-items: start; }
+.warehouse .product-photo img { max-width: 100%; max-height: 16rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
+.warehouse .product-photo label.button { gap: var(--space-6); cursor: pointer; }
+.warehouse .product-photo label.button:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.warehouse .product-photo label.button[aria-busy="true"] { cursor: progress; }

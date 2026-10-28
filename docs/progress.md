@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: product photos and the rack sheet
+
+**Done**
+
+- [ADR 0083](adr/0083-product-photos-and-the-rack-sheet.md), part 3 of 3 of
+  the advanced rack builder. A product can have a photo (`models.photo_*`,
+  kept as people's photos are, changed by whoever changes stock, seen by
+  everyone signed in), kept at its own shape; it shows on the product's
+  page, in the lists, and on its panel in the rack, flat and in 3D. Print
+  the rack sheet, on the rack's page and in the designer: front and back,
+  groups, what goes where and what's loose, black on white. App 1.40.0.
+- Checked: typecheck, unit tests (a product's photo put up, replaced,
+  taken down, gone with the product, and who can), browser test
+  (racks.spec.ts: a photo from the product's page on its panel, and the
+  sheet as it prints).
+
+**Next**
+
+- Nothing more planned for racks. Sizes from a list of known models were
+  left out (see the ADR).
+
 ## 27 October 2026: starting a quote and following it up
 
 **Done**

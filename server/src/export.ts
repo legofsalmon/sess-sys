@@ -222,7 +222,7 @@ const ABOUT: Record<string, string> = {
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
   leave_years: 'The years the office has opened for leave, and when: staff can ask for leave only in an open year.',
   lieu_entries: 'Days staff worked that earn days in lieu, and whether each was approved.',
-  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code, whether it goes on a rack’s rails and its size (rack units, width, depth, weight, power), a rack case’s outside size, castors and power limit, whether it is a rack part (a blank, vent, shelf or drawer), whether it is ours or dry hired in and from whom at what a day, and whether one was added by mistake and so hidden from the list.',
+  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code, whether it goes on a rack’s rails and its size (rack units, width, depth, weight, power), a rack case’s outside size, castors and power limit, whether it is a rack part (a blank, vent, shelf or drawer), whether it is ours or dry hired in and from whom at what a day, whether one was added by mistake and so hidden from the list, and when its photo was put up.',
   // Racks (ADR 0074).
   rack_slots: "Each rack's layout: the product that goes in it, at which rack unit from the top and on the front or the back (blank for loose in it), where across the rails narrower kit sits, how many, a note, the label and group it has in that rack and the colour of its tape, and the shelf or drawer loose kit is in.",
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
@@ -298,7 +298,8 @@ Left out on purpose
   the storage beside the backups, and each opens from the person's card on
   the Crew tab. documents lists their details. The same goes for files
   on venues and clients, which open from their pages; attachments lists
-  their details.
+  their details. And photos of people and products, which show on their
+  pages: people and models say when each was put up.
 
 Good to know
 ------------

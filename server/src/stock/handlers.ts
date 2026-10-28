@@ -13,6 +13,7 @@ import {
   type RetiredReason,
   type Where,
 } from '@sh/shared'
+import { queueFile } from '../documents/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
@@ -367,6 +368,9 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       throw new Refused({ code: 'conflict', message: `${m.name} has been out on jobs, which is kept for the record, so it can't be removed.` })
     if ((await faultsOf(ctx.tx, a.id)) > 0)
       throw new Refused({ code: 'conflict', message: `${m.name} has had faults reported, which are kept for the record, so it can't be removed.` })
+    // Its photo (ADR 0083) goes on the list of files to delete with it.
+    const { rows: photo } = await ctx.tx.query<{ photo_key: string | null }>('SELECT photo_key FROM models WHERE id = $1', [a.id])
+    if (photo[0]?.photo_key) await queueFile(ctx.tx, photo[0].photo_key, true)
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },
