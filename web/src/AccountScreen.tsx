@@ -9,6 +9,7 @@ import { ListsCard } from './ListsCard.tsx'
 import { Top } from './jobs/common.tsx'
 import { MessagesCard } from './MessagesCard.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
+import { QuotingCard } from './QuotingCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { useAccess } from './role.ts'
 import { useView } from './view.ts'
@@ -58,6 +59,7 @@ export function AccountScreen() {
           {access.can('settings') && (
             <>
               <OfficeCard office={view.office} />
+              {access.can('money') && <QuotingCard money={view.money} />}
               <MessagesCard office={view.office} />
               <CalendarCard view={view} available={auth.status === 'signed-in'} />
               <BackupsCard />

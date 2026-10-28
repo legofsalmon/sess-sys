@@ -260,6 +260,8 @@ const CASES: Case[] = [
   c('quote.save', { id: 'q2', projectId: 'gala', lines: [{ id: 'l1', kind: 'kit', what: 'd&b Y10P', ref: 'y10p', group: 'Audio', qty: 4, days: 3, unitCents: 4500, vat: '23' }, { id: 'l2', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '13.5' }], discountPct: 5, notes: 'Second go' }, { as: 'a new version' }),
   c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' }, { as: 'a first draft' }),
   c('quote.sent', { id: 'q3', on: today }, { before: [m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' })] }),
+  c('quote.sent', { id: 'q3', on: today }, { as: 'numbered after the next number set', before: [m('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }), m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '', validDays: 14, depositPct: 50 })] }),
+  c('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }),
   c('quote.answer', { id: 'q1', answer: 'accepted', on: today }, { as: 'accepted' }),
   c('quote.answer', { id: 'q1', answer: 'declined', on: today }, { as: 'declined' }),
   c('quote.answer', { id: 'q1', answer: 'none', on: today }, { as: 'taken back', before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),

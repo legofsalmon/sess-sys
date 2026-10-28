@@ -110,6 +110,44 @@ describe('a quote', () => {
   })
 })
 
+describe('a quote number (ADR 0084)', () => {
+  it('is given when a quote first goes, kept on every version, and carries on from the number Admin sets', async () => {
+    const { app, quote } = await gala()
+    await ok(
+      app,
+      m('project.create', { id: 'ball', name: 'Winter Ball', clientId: 'bw', venueId: null, status: 'enquiry', notes: '' }),
+      m('quoting.update', { nextNumber: 1115, terms: 'Half up front, the rest within 30 days.', bank: 'IBAN IE00 BANK 0000 0000 0000 00' }),
+      save('v1')
+    )
+    expect(await quote('v1')).toMatchObject({ number: null, validDays: 30, depositPct: null })
+    await ok(app, m('quote.save', { id: 'v1', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', validDays: 14, depositPct: 50 }), m('quote.sent', { id: 'v1', on: today }))
+    expect(await quote('v1')).toMatchObject({ number: 1115, validDays: 14, depositPct: 50 })
+
+    // A second version keeps the number, and the days and deposit unless it says otherwise; a save that doesn't say them leaves them.
+    await ok(app, save('v2', [line({ qty: 9 })]), save('v2', [line({ qty: 10 })]), m('quote.sent', { id: 'v2', on: today }))
+    expect(await quote('v2')).toMatchObject({ version: 2, number: 1115, validDays: 14, depositPct: 50 })
+
+    // Another job's, answered straight from its draft, takes the next.
+    await ok(app, m('quote.save', { id: 'b1', projectId: 'ball', lines: [line()], discountPct: 0, notes: '' }), m('quote.answer', { id: 'b1', answer: 'accepted', on: today }))
+    expect(await quote('b1')).toMatchObject({ number: 1116 })
+
+    // The next number can't go back over one given.
+    expect(await refused(app, m('quoting.update', { nextNumber: 1116, terms: '', bank: '' }))).toBe('Quote 1116 has been given already, so the next number is 1117 or more.')
+    await ok(app, m('quoting.update', { nextNumber: null, terms: '', bank: '' }))
+  })
+
+  it("goes to the client's address, which a save from an older app leaves as it was", async () => {
+    const { app } = await gala()
+    const client = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string; id: string }) => c.entity === 'client' && c.id === 'bw').at(-1).data
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events', contacts: [], notes: '', address: '1 Quay Street\nGalway' }))
+    expect(await client()).toMatchObject({ address: '1 Quay Street\nGalway' })
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events Ltd', contacts: [], notes: '' }))
+    expect(await client()).toMatchObject({ name: 'Brightwater Events Ltd', address: '1 Quay Street\nGalway' })
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events Ltd', contacts: [], notes: '', address: '' }))
+    expect(await client()).not.toHaveProperty('address')
+  })
+})
+
 describe('the price list', () => {
   it('sets and clears a day price for a product, a role and a discount for a client', async () => {
     const { app } = await gala()

@@ -33,6 +33,13 @@ import {
   type QuoteView,
   type VatRate,
   type View,
+  DEFAULT_VALID_DAYS,
+  depositCents,
+  letterDay,
+  quoteNumberLabel,
+  validUntil,
+  versionChanges,
+  type QuoteSettings,
 } from '@sh/shared'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -176,6 +183,7 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
       removeEventListener('afterprint', done)
     }
   }, [printing])
+  const today = useToday()
   const up = { steps: job ? [JOBS, { href: `#jobs/${encodeURIComponent(job.id)}`, label: job.name }] : [JOBS], here: 'Quote' }
 
   if (!job || !sees)
@@ -217,6 +225,8 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
         {jm && jm.margin !== null && q?.id === current?.id && <MarginLine margin={jm.margin} costs={jm.costs + jm.toCome} />}
       </section>
 
+      {q && <SinceBefore q={q} versions={versions} />}
+
       {!q ? (
         <FirstQuote view={view} job={job} />
       ) : q.status === 'draft' ? (
@@ -228,6 +238,10 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
               <h2>Version {q.version}</h2>
               <QuotePill q={q} />
             </header>
+            <p className="quote-facts">
+              {q.number ? `Quote ${q.number}` : 'Sent before quotes had numbers'} · Valid until {dayLabel(validUntil(q, today))}
+              {q.depositPct ? ` · A deposit of ${pctWord(q.depositPct)}, ${money(depositCents(q.totals.gross, q.depositPct))}` : ''}
+            </p>
             <Lines lines={q.lines} />
             <Totals totals={q.totals} discountPct={q.discountPct} />
             {q.notes && <p className="notes">{q.notes}</p>}
@@ -248,11 +262,56 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
         createPortal(
           <div className="print-sheet quote-sheet">
             <style>{'@page { size: A4; margin: 14mm; }'}</style>
-            <QuoteSheet q={q} job={job} office={view.office} />
+            <QuoteSheet q={q} job={job} office={view.office} quoting={m.quoting} />
           </div>,
           document.body
         )}
     </div>
+  )
+}
+
+/** What changed since the version before (ADR 0084), so the office can tell the client in a sentence. */
+function SinceBefore({ q, versions }: { q: QuoteView; versions: QuoteView[] }) {
+  const before = versions.find((v) => v.version < q.version)
+  if (!before) return null
+  const c = versionChanges(before, q)
+  const gross = q.totals.gross - before.totals.gross
+  const terms = (l: QuoteLine) => (l.per === 'once' ? `${l.qty} at ${money(l.unitCents)} once` : `${l.qty} for ${daysWord(l.days)} at ${money(l.unitCents)} a day`)
+  const none = c.added.length + c.removed.length + c.changed.length === 0 && !c.discount
+  return (
+    <section className="card version-changes" aria-label={`What changed since version ${before.version}`}>
+      <h2>What changed since version {before.version}</h2>
+      {none ? (
+        <p>Nothing in the lines or the discount: the same {money(q.totals.gross)}.</p>
+      ) : (
+        <>
+          <ul>
+            {c.added.map((l) => (
+              <li key={l.id}>
+                Added {l.what}: {terms(l)}
+              </li>
+            ))}
+            {c.removed.map((l) => (
+              <li key={l.id}>Took off {l.what}</li>
+            ))}
+            {c.changed.map(({ line, was }) => (
+              <li key={line.id}>
+                {line.what}: {terms(line)}, was {terms(was)}
+              </li>
+            ))}
+            {c.discount && (
+              <li>
+                Discount {pctWord(c.discount.now)}, was {pctWord(c.discount.was)}
+              </li>
+            )}
+          </ul>
+          <p>
+            The total is <b>{money(q.totals.gross)}</b>,{' '}
+            {gross === 0 ? 'the same as before' : `${money(Math.abs(gross))} ${gross > 0 ? 'more' : 'less'} than version ${before.version}'s ${money(before.totals.gross)}`}.
+          </p>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -369,6 +428,8 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const [lines, setLines] = useState<LineDraft[]>(() => q.lines.map(toDraft))
   const [discount, setDiscount] = useState(String(q.discountPct))
   const [notes, setNotes] = useState(q.notes)
+  const [validFor, setValidFor] = useState(String(q.validDays ?? DEFAULT_VALID_DAYS))
+  const [deposit, setDeposit] = useState(q.depositPct ? String(q.depositPct) : '')
   const [kitDays, setKitDays] = useState('')
   const [sentOn, setSentOn] = useState(today)
   const [answering, setAnswering] = useState(false)
@@ -387,14 +448,32 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const pctOk = pct >= 0 && pct <= 100 && Number.isInteger(pct * 10)
   const good = read.filter((l): l is QuoteLine => typeof l !== 'string')
   const totals = quoteTotals({ lines: good, discountPct: pctOk ? pct : 0 })
-  const problem = read.find((l): l is string => typeof l === 'string') ?? (pctOk ? undefined : 'A discount is a percentage from 0 to 100, such as 10 or 12.5.')
+  const valid = num(validFor)
+  const validOk = Number.isInteger(valid) && valid >= 1 && valid <= 365
+  const dep = deposit.trim() ? num(deposit) : null
+  const depOk = dep === null || (Number.isInteger(dep) && dep >= 1 && dep <= 100)
+  const problem =
+    read.find((l): l is string => typeof l === 'string') ??
+    (!pctOk
+      ? 'A discount is a percentage from 0 to 100, such as 10 or 12.5.'
+      : !validOk
+        ? 'Prices hold for a whole number of days from 1 to 365.'
+        : !depOk
+          ? 'A deposit is a whole percentage from 1 to 100, such as 25 or 50, or nothing for none.'
+          : undefined)
   // Saved: what's typed comes to what the draft holds.
-  const saved = read.length === q.lines.length && read.every((l, i) => typeof l !== 'string' && sameLine(l, q.lines[i]!)) && pct === q.discountPct && q.notes.trim() === notes.trim()
+  const saved =
+    read.length === q.lines.length &&
+    read.every((l, i) => typeof l !== 'string' && sameLine(l, q.lines[i]!)) &&
+    pct === q.discountPct &&
+    q.notes.trim() === notes.trim() &&
+    valid === (q.validDays ?? DEFAULT_VALID_DAYS) &&
+    dep === (q.depositPct ?? null)
   const unpriced = good.filter((l) => l.unitCents === 0).length
 
   // The draft saves itself a moment after typing stops, once it reads as a quote: there's no Save to forget. Leaving
   // the page saves what's waiting at once. Saving goes through the device's queue, so it works with no signal.
-  const payload = !saved && !problem ? { id: q.id, projectId: job.id, lines: good, discountPct: pct, notes } : undefined
+  const payload = !saved && !problem ? { id: q.id, projectId: job.id, lines: good, discountPct: pct, notes, validDays: valid, depositPct: dep } : undefined
   const waiting = useRef(payload)
   waiting.current = payload
   const flush = () => {
@@ -558,11 +637,26 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
         Notes for the client
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={3} placeholder="Load in from 8am. Prices include delivery to the venue." />
       </label>
+      <div className="quote-terms">
+        <label className="field">
+          Prices hold for
+          <span className="with-unit">
+            <input inputMode="numeric" value={validFor} onChange={(e) => setValidFor(e.target.value)} aria-label="Prices hold for, days" />
+            days
+          </span>
+          <small>Printed as “Valid until” {dayLabel(validUntil({ sentOn: null, validDays: validOk ? valid : DEFAULT_VALID_DAYS }, today))}, counted from the day it's sent.</small>
+        </label>
+        <label className="field">
+          Deposit, %
+          <input inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="None" aria-label="Deposit, %" />
+          {dep !== null && depOk && <small>{money(depositCents(totals.gross, dep))} before the job, of {money(totals.gross)}.</small>}
+        </label>
+      </div>
       <Totals totals={totals} discountPct={pctOk ? pct : 0} />
       <Refusal error={error} />
       <div className="actions">
         <button type="button" onClick={onPrint} disabled={!saved}>
-          Print or save as PDF
+          Print a draft
         </button>
       </div>
       {!saved && problem && <p className="warn-line">{problem} It saves once that's put right.</p>}
@@ -584,7 +678,10 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
               Record it as accepted
             </button>
           )}
-          <p className="hint">The app sends nothing: print it as a PDF and send it yourself, then mark it as sent here.</p>
+          <p className="hint">
+            Marked sent, it becomes quote {m.quotesOf(job.id).find((v) => v.number)?.number ?? m.nextNumber} and stays as it is. Then print it as a PDF and send it yourself: the app sends
+            nothing.
+          </p>
         </div>
       )}
     </form>
@@ -981,33 +1078,76 @@ function Totals({ totals, discountPct }: { totals: QuoteTotals; discountPct: num
 }
 
 /** The A4 page: what the client is sent, as a PDF the office saves from the browser. */
-function QuoteSheet({ q, job, office }: { q: QuoteView; job: JobView; office: View['office'] }) {
+function QuoteSheet({ q, job, office, quoting }: { q: QuoteView; job: JobView; office: View['office']; quoting: QuoteSettings }) {
+  const today = irishToday()
   const made = q.sentOn ?? irishToday(new Date(q.savedAt))
   const reach = [office.details?.phone, office.details?.email].filter(Boolean).join(' · ')
   // Who it's from, once Admin's office details have them: the company's address, a line each as typed, and its VAT number.
   const address = office.details?.address?.trim()
   const vat = office.details?.vatNumber?.trim()
+  const to = job.client
+  const contact = to?.contacts[0]
+  const number = quoteNumberLabel(q)
+  const draft = q.status === 'draft'
   return (
     <>
-      <header>
-        <p className="kicker">Session Hire · quote</p>
-        {(address || vat) && (
-          <p className="from muted">
-            {address && <span className="lines">{address}</span>}
-            {vat && <span>VAT number {vat}</span>}
-          </p>
-        )}
-        <h1>{job.name}</h1>
-        <p>
-          {[job.client && `For ${job.client.name}`, job.span && spanLabel(job.span), job.venue && venueLabel(job.venue)].filter(Boolean).join(' · ')}
-        </p>
-        <p className="muted">
-          Version {q.version} · {dayLabel(made)}
-        </p>
+      <header className="sheet-head">
+        <div className="from">
+          <p className="company">Session Hire</p>
+          {address && <p className="lines">{address}</p>}
+          {reach && <p>{reach}</p>}
+          {vat && <p>VAT number {vat}</p>}
+        </div>
+        <dl className="sheet-facts">
+          <div>
+            <dt>{draft ? 'Draft quote' : 'Quote'}</dt>
+            <dd>{number || (draft ? 'Not sent yet' : '')}</dd>
+          </div>
+          <div>
+            <dt>Date</dt>
+            <dd>{letterDay(made)}</dd>
+          </div>
+          <div>
+            <dt>Valid until</dt>
+            <dd>{letterDay(validUntil(q, today))}</dd>
+          </div>
+        </dl>
       </header>
+      <section className="sheet-to" aria-label="For">
+        {to && (
+          <div>
+            <p className="muted">For</p>
+            <p className="who">{to.name}</p>
+            {contact && <p>{contact.name}</p>}
+            {to.address?.trim() && <p className="lines">{to.address.trim()}</p>}
+          </div>
+        )}
+        <div>
+          <h1>{job.name}</h1>
+          <p>{[job.span && spanLabel(job.span), job.venue && venueLabel(job.venue)].filter(Boolean).join(' · ')}</p>
+        </div>
+      </section>
       <Lines lines={q.lines} />
       <Totals totals={q.totals} discountPct={q.discountPct} />
+      {q.depositPct ? (
+        <p className="deposit">
+          A deposit of {pctWord(q.depositPct)}, <b>{money(depositCents(q.totals.gross, q.depositPct))}</b>, confirms the booking.
+        </p>
+      ) : null}
       {q.notes && <p className="notes">{q.notes}</p>}
+      {quoting.terms.trim() && (
+        <section className="sheet-terms">
+          <h2>Terms</h2>
+          <p className="lines">{quoting.terms.trim()}</p>
+        </section>
+      )}
+      {quoting.bank.trim() && (
+        <section className="sheet-terms">
+          <h2>Paying by bank transfer</h2>
+          <p className="lines">{quoting.bank.trim()}</p>
+          {q.number && <p>Please give quote {q.number} as the reference.</p>}
+        </section>
+      )}
       <footer>
         Prices are in euro: each line is how many, at its price, for the days charged or once.
         {reach && ` Questions: ${reach}.`}

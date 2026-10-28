@@ -900,6 +900,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'quote.invoiced') return a.on === null ? `Took back the invoice for ${of}` : `Marked ${of} invoiced${on}${typeof a.ref === 'string' && a.ref.trim() ? `, as ${clip(a.ref.trim())}` : ''}`
       return a.on === null ? `Took back the payment for ${of}` : `Marked ${of} paid${on}`
     }
+    case 'quoting.update':
+      return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
     case 'price.product':
       return a.dayCents === null ? `Took ${model(a.modelId)} off the price list` : `Set the day price of ${model(a.modelId)}`
     case 'price.role':

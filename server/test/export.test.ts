@@ -140,6 +140,7 @@ describe('download everything', () => {
       'projects',
       'purchase_requests',
       'purchase_votes',
+      'quote_settings',
       'quotes',
       'rack_slots',
       'rms_lines',

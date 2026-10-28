@@ -72,6 +72,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE phases ADD COLUMN IF NOT EXISTS local_crew integer NOT NULL DEFAULT 0 CHECK (local_crew BETWEEN 0 AND 999);
   `,
+  // Where a client's quotes go (ADR 0084): their address, as on a letter.
+  `
+  ALTER TABLE clients ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
+  `,
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }

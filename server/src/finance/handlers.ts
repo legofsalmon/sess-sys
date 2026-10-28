@@ -1,9 +1,9 @@
-import { roleKey, type CommandArgs, type Quote } from '@sh/shared'
+import { QUOTE_SETTINGS_ID, roleKey, type CommandArgs, type Quote } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getTimesheet } from '../crew/timesheets.ts'
 import { getClient, getProject } from '../projects/store.ts'
 import { getModel } from '../stock/store.ts'
-import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getRolePrice, quotesOf } from './store.ts'
+import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getQuoteSettings, getRolePrice, highestNumber, quotesOf } from './store.ts'
 
 /**
  * Light finance (ADR 0042). The rules, wherever a change comes from:
@@ -21,7 +21,7 @@ import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getRolePrice
  * Sending the same change twice, as a phone may, changes nothing.
  */
 
-type FinanceCommand = 'quote.save' | 'quote.sent' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.role' | 'price.client' | 'cost.paid'
+type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.role' | 'price.client' | 'cost.paid'
 type Handler<N extends FinanceCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const emitQuote = async (ctx: Ctx, id: string) => emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
@@ -38,6 +38,24 @@ async function refuseIfReplaced(ctx: Ctx, q: Quote) {
   const current = versions.find((v) => v.invoicedOn) ?? versions.find((v) => v.status !== 'draft') ?? versions[0]
   if (current && current.id !== q.id && !(q.status === 'draft' && q.version > current.version))
     throw new Refused({ code: 'conflict', message: `Version ${q.version} has been replaced by version ${current.version}, so this goes on that one.` })
+}
+
+/**
+ * Give a job's quote its number as a version first goes to the client (ADR 0084): the number an earlier version had,
+ * or else the next one, which moves on by one. The settings row is locked, so two quotes sent at once get two numbers.
+ */
+async function numberIt(ctx: Ctx, q: Quote) {
+  if (q.number) return
+  const had = (await quotesOf(ctx.tx, q.projectId)).find((v) => v.number)?.number
+  let n = had ?? 0
+  if (!n) {
+    await ctx.tx.query('INSERT INTO quote_settings (id) VALUES ($1) ON CONFLICT (id) DO NOTHING', [QUOTE_SETTINGS_ID])
+    const { rows } = await ctx.tx.query<{ next_number: number | null }>('SELECT next_number FROM quote_settings WHERE id = $1 FOR UPDATE', [QUOTE_SETTINGS_ID])
+    n = Math.max(rows[0]?.next_number ?? 1, (await highestNumber(ctx.tx)) + 1)
+    await ctx.tx.query('UPDATE quote_settings SET next_number = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, n + 1])
+    await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
+  }
+  await ctx.tx.query('UPDATE quotes SET number = $2 WHERE id = $1', [q.id, n])
 }
 
 const settled = (q: Quote) =>
@@ -57,6 +75,9 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
         a.discountPct,
         a.notes.trim(),
       ])
+      // Left as they were by a save that doesn't say them, as one from an app older than them doesn't.
+      if (a.validDays !== undefined) await ctx.tx.query('UPDATE quotes SET valid_days = $2 WHERE id = $1', [a.id, a.validDays])
+      if (a.depositPct !== undefined) await ctx.tx.query('UPDATE quotes SET deposit_pct = $2 WHERE id = $1', [a.id, a.depositPct])
       return emitQuote(ctx, a.id)
     }
     const versions = await quotesOf(ctx.tx, a.projectId)
@@ -64,14 +85,21 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     if (invoiced) throw new Refused({ code: 'conflict', message: `Version ${invoiced.version} is invoiced, so the quote for ${job.name} is settled.` })
     const draft = versions.find((v) => v.status === 'draft')
     if (draft) throw new Refused({ code: 'conflict', message: `There's already a draft of this quote, version ${draft.version}: change that one.` })
-    await ctx.tx.query(`INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes) VALUES ($1, $2, $3, 'draft', $4, $5, $6)`, [
-      a.id,
-      a.projectId,
-      (versions[0]?.version ?? 0) + 1,
-      JSON.stringify(a.lines),
-      a.discountPct,
-      a.notes.trim(),
-    ])
+    // A new version holds its prices as long as the one before, and asks the same deposit, unless it says otherwise.
+    const before = versions[0]
+    await ctx.tx.query(
+      `INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes, valid_days, deposit_pct) VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8)`,
+      [
+        a.id,
+        a.projectId,
+        (before?.version ?? 0) + 1,
+        JSON.stringify(a.lines),
+        a.discountPct,
+        a.notes.trim(),
+        a.validDays ?? before?.validDays ?? 30,
+        a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
+      ]
+    )
     await emitQuote(ctx, a.id)
   },
 
@@ -80,7 +108,23 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     if (q.status !== 'draft') return
     if (q.lines.length === 0) throw new Refused({ code: 'invalid', message: 'This quote has no lines yet. Add what it is for first.' })
     await ctx.tx.query(`UPDATE quotes SET status = 'sent', sent_on = $2 WHERE id = $1`, [a.id, a.on])
+    await numberIt(ctx, q)
     await emitQuote(ctx, a.id)
+  },
+
+  /** What every printed quote says (ADR 0084). The next number can't go back to one already given. */
+  async 'quoting.update'(ctx, a) {
+    if (a.nextNumber !== null) {
+      const top = await highestNumber(ctx.tx)
+      if (a.nextNumber <= top)
+        throw new Refused({ code: 'conflict', message: `Quote ${top} has been given already, so the next number is ${top + 1} or more.` })
+    }
+    await ctx.tx.query(
+      `INSERT INTO quote_settings (id, next_number, terms, bank) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET next_number = EXCLUDED.next_number, terms = EXCLUDED.terms, bank = EXCLUDED.bank`,
+      [QUOTE_SETTINGS_ID, a.nextNumber, a.terms.trim(), a.bank.trim()]
+    )
+    await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
   },
 
   async 'quote.answer'(ctx, a) {
@@ -95,6 +139,8 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     await refuseIfReplaced(ctx, q)
     if (q.status === 'draft' && q.lines.length === 0) throw new Refused({ code: 'invalid', message: 'This quote has no lines yet. Add what it is for first.' })
     await ctx.tx.query(`UPDATE quotes SET status = $2, answered_on = $3, sent_on = coalesce(sent_on, $3) WHERE id = $1`, [a.id, a.answer, a.on])
+    // Answered straight from a draft, it went to the client all the same, so it's numbered as if marked sent.
+    if (q.status === 'draft') await numberIt(ctx, q)
     await emitQuote(ctx, a.id)
   },
 
