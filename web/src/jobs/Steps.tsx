@@ -38,6 +38,8 @@ export function StepsCard({ job, view, onPart }: { job: JobView; view: View; onP
   // A slim strip until a step is opened (ADR 0082), so the job's parts are on the first screen; the hint says where it's at meanwhile.
   const shown = steps.steps.find((s) => s.key === open)
   const at = steps.current
+  // The way already come: every step before the one the job is at, all of them once it's through, none on a stopped job.
+  const reached = at ? steps.steps.indexOf(at) : steps.stopped ? 0 : steps.steps.length
   return (
     <section className="card job-steps" aria-labelledby="job-steps-title">
       <header className="steps-head">
@@ -50,8 +52,8 @@ export function StepsCard({ job, view, onPart }: { job: JobView; view: View; onP
         </p>
       </header>
       <ol className="steps-flow" data-stopped={steps.stopped ? 'true' : undefined}>
-        {steps.steps.map((s) => (
-          <li key={s.key} data-state={s.state} aria-current={s.state === 'now' && !steps.stopped ? 'step' : undefined}>
+        {steps.steps.map((s, i) => (
+          <li key={s.key} data-state={s.state} data-come={i < reached ? 'true' : undefined} aria-current={s.state === 'now' && !steps.stopped ? 'step' : undefined}>
             <button type="button" aria-expanded={s.key === shown?.key} aria-controls="job-step-open" aria-label={stepName(s, steps.stopped !== undefined)} onClick={() => setOpen((was) => (was === s.key ? undefined : s.key))}>
               <span className="step-dot" aria-hidden="true">
                 {s.done ? <Icon name="done" /> : s.number}

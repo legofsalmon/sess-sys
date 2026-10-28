@@ -81,3 +81,28 @@ flagged".
   a row per product, with what is booked out and what is left.
 - The planner isn't in the Figma design system yet; the code is the
   reference until it is added.
+
+## Tidied, 28 October 2026
+
+At Colly's ask ("tidy up and polish the jobs timeline"), with no change to
+what the planner works out:
+
+- **The dates are the page's title** (ADR 0082's page head), the counts the
+  line under it, and Previous, This week, Next and Jobs or People sit
+  together under that.
+- **A phase over several days is one bar.** Days next to each other with the
+  same phase, looking the same, join up; a month says its code once, on the
+  first day, and keeps the words on every day for a screen reader. A
+  person's or a van's month joins the same way, but a day with a clash or a
+  check always stands on its own.
+- **The days stay along the top and the names down the side.** The timeline
+  scrolls inside a frame that ends at the foot of the screen, so a month of
+  ninety jobs keeps its dates in view. The row under the pointer is lit on a
+  desk, today's column is shaded all the way down, and a week says "Today"
+  under its date.
+- **Healthy is quiet.** Crew all found, and a person booked, were green; they
+  are now plain (the design system's grammar: green only where working has to
+  be told apart from off). Amber, still to find, is the one colour a job's
+  day can have.
+- **Room for names on a desk** (12rem, from 900px), and a month's days
+  narrow enough that 31 fit a laptop without scrolling sideways.

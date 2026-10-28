@@ -52,22 +52,37 @@
 
 /* The planner: the one screen that uses a laptop's full width. */
 .app.plan { max-width: 1400px; }
-.plan .plan-title { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
-.plan .actions .button { flex: 1 1 auto; max-width: 180px; }
+.plan .plan-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
+.plan .plan-bar .steps { display: flex; gap: var(--space-6); flex: 1 1 18rem; max-width: 30rem; }
+.plan .plan-bar .steps .button { flex: 1 1 0; white-space: nowrap; }
+/* On the days that hold today, This week is where you are already: said, and quieter. */
+.plan .plan-bar .steps [aria-current] { color: var(--muted); }
 .plan .checks { border-color: var(--warn); }
 .plan .checks h2 { color: var(--warn); }
 .plan .problem > div { flex: 1; min-width: 60%; }
 .plan .problem p { color: var(--ink); }
-/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. */
-.plan .scroller { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. It ends at the foot of the
+   screen (under the bar, over the phone's tabs), so a long month scrolls inside it with its days and names kept in view. */
+.plan .scroller { position: relative; overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - 96px - env(safe-area-inset-bottom)); border: 1px solid var(--line); border-radius: 10px; }
+@media (min-width: 900px) { .plan .scroller { max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
 .plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plan .timeline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
-.plan .timeline.week { min-width: calc(8rem + 7 * 6.5rem); }
-.plan .timeline.month { min-width: calc(8rem + var(--days) * 2.2rem); }
-.plan .timeline col.names { width: 8rem; }
-.plan .timeline th, .plan .timeline td { padding: var(--space-4); text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.plan .timeline thead th { border-top: 0; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.plan .timeline { --names: 7rem; --pad: var(--space-4); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
+/* A desk has room for a job's name on one line; a month's days then fit a laptop without scrolling sideways. */
+@media (min-width: 900px) { .plan .timeline { --names: 12rem; } }
+.plan .timeline.week { min-width: calc(var(--names) + 7 * 6.5rem); }
+.plan .timeline.month { --pad: var(--space-2); min-width: calc(var(--names) + var(--days) * 1.9rem); }
+.plan .timeline col.names { width: var(--names); }
+.plan .timeline th, .plan .timeline td { padding: var(--pad); text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+/* Lets a day's block fill its row, so the days of a run line up. */
+.plan .timeline.week td { height: 1px; }
+.plan .timeline thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); border-top: 0; border-bottom: 1px solid var(--line); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.plan .timeline tbody tr:first-child > * { border-top: 0; }
 .plan .timeline tr > :first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); border-left: 0; border-right: 1px solid var(--line); }
+.plan .timeline thead tr > :first-child { z-index: 3; }
+/* The row under the pointer, so a day can be followed back to its job across a wide week. */
+@media (hover: hover) {
+  .plan .timeline tbody tr:hover > * { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); }
+}
 .plan .timeline tr > :nth-child(2) { border-left: 0; }
 .plan .timeline th[scope='row'] { font-weight: 700; overflow-wrap: anywhere; }
 .plan .timeline th[scope='row'] a { color: inherit; text-decoration: none; }
@@ -77,22 +92,26 @@
 .plan .timeline th[scope='row'] a:focus-visible { outline: none; }
 .plan .timeline th[scope='row'] a:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .plan .timeline th[scope='row'] small { display: block; color: var(--muted); font-weight: 500; }
-.plan .timeline .weekend { background: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
+.plan .timeline .weekend { background-color: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
 /* A public holiday (ADR 0024): a faint band in the off tone, a shade deeper than a weekend, named under its date. */
-.plan .timeline .holiday { background: color-mix(in srgb, var(--line) 55%, var(--panel)); }
+.plan .timeline .holiday { background-color: color-mix(in srgb, var(--line) 55%, var(--panel)); }
 .plan .timeline thead th.holiday { color: var(--ink); }
 .plan .timeline .holiday-name { display: block; font-size: .7rem; font-weight: 600; color: var(--muted); white-space: normal; line-height: 1.2; }
 .plan .legend .swatch.holiday { background: color-mix(in srgb, var(--line) 55%, var(--panel)); box-shadow: inset 0 0 0 1px var(--line); }
 .plan .timeline th.today { color: var(--ink); box-shadow: inset 0 -3px 0 var(--ink); }
-.plan .timeline.month th, .plan .timeline.month td { padding: var(--space-2); text-align: center; }
+/* Today's column, faintly, all the way down, so it can be found in the middle of a long month. */
+.plan .timeline td.today { background-color: color-mix(in srgb, var(--ink) 5%, var(--panel)); }
+.plan .timeline .today-word { display: block; font-size: .7rem; font-weight: 700; }
+.plan .timeline.month th, .plan .timeline.month td { text-align: center; vertical-align: middle; }
 .plan .timeline.month tr > :first-child { text-align: left; padding: var(--space-4) var(--space-6); }
 .plan .timeline.month thead a { display: grid; min-height: 44px; place-content: center; color: inherit; text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .plan .timeline.month thead a:hover { background: var(--bg); }
 .plan .timeline.month thead small { font-size: .7rem; font-weight: 500; }
-/* A job's day: solid when confirmed, dashed when pencilled in; green when its crew are booked, amber while some are still to find. */
-.plan .blk { display: grid; gap: 1px; padding: var(--space-4) var(--space-6); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--panel); }
-.plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; }
-.plan .blk.full { background: var(--good-soft); }
+/* A job's day: solid when confirmed, dashed when pencilled in; amber while crew are still to find. Crew all found is the quiet case
+   and has no colour of its own (healthy is quiet), so the amber days stand out. */
+.plan .blk { display: grid; align-content: start; gap: 1px; padding: var(--space-4) var(--space-6); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--ds-surface-raised); }
+.plan .week .blk { height: 100%; }
+.plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; background: var(--panel); }
 .plan .blk.short { background: var(--warn-soft); }
 .plan .blk.stray { border: 2px solid var(--warn); box-shadow: none; }
 .plan .blk.pending { opacity: .75; }
@@ -101,17 +120,24 @@ a.blk:hover { border-color: var(--ink); filter: brightness(.96); }
 a.blk:hover b { text-decoration: underline; }
 a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .blk small { color: var(--muted); }
-.plan .blk.full small { color: var(--good); }
 .plan .blk.short small, .plan .blk.stray small { color: var(--warn); }
-.plan .month .blk { padding: 3px 0; place-items: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
+.plan .month .blk { padding: 3px 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
 .plan .month .blk.solid:not(.stray) { border-width: 1px 1px 1px 3px; }
-/* A person's day: green where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
+/* The days of one phase, or of one job for a person or a van, join into one bar over the lines between them: square where they meet,
+   the start marked once. */
+.plan .timeline :is(.blk, .code):is(.join-r, .join-lr) { margin-right: calc(-1 * var(--pad)); border-right-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.plan .timeline :is(.blk, .code):is(.join-l, .join-lr) { position: relative; margin-left: calc(-1 * var(--pad) - 1px); border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; box-shadow: none; }
+.plan .month .blk.solid:not(.stray):is(.join-l, .join-lr) { border-left-width: 0; }
+.plan .month .blk.solid:not(.stray):is(.join-r, .join-lr) { border-right-width: 0; }
+/* A person's day: solid where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
 .plan .item { display: grid; padding: 3px var(--space-6); border-radius: 6px; }
 .plan .item + .item { margin-top: 3px; }
 .plan .item a { color: inherit; font-weight: 700; text-decoration: none; }
 .plan .item a:hover { text-decoration: underline; }
 .plan .item small { color: var(--muted); }
-.plan .item.booked, .plan .code.booked { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
+.plan .item.booked, .plan .code.booked { background: var(--ds-surface-raised); box-shadow: inset 3px 0 0 var(--ink), inset 0 0 0 1px var(--line); }
+.plan .code.booked:is(.join-l, .join-lr) { box-shadow: inset 0 1px 0 var(--line), inset 0 -1px 0 var(--line); }
+.plan .code.booked.join-r { box-shadow: inset 3px 0 0 var(--ink), inset 0 1px 0 var(--line), inset 0 -1px 0 var(--line); }
 .plan .item.offered, .plan .code.offered { border: 1px dashed var(--muted); }
 .plan .item.away, .plan .code.away { background: var(--line); color: var(--on-line); }
 /* Busy in their own calendar (ADR 0044): neutral and hatched, like time blocked out in a calendar, so it reads apart from "unavailable" and is never mistaken for a clash. */
