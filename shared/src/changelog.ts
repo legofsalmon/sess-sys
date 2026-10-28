@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-28',
     title: 'A proper printed quote, with its number',
     what: 'A quote gets its number when it’s first marked sent, carrying on from the number set in Admin › Printed quotes (1115, after Current RMS’s last), and keeps it on every version. The printed page now reads like a letter: the company’s address, phone and VAT number, the quote number, date and the day the prices hold until, who it’s for with their address, the lines and totals, any deposit, and the terms and bank details from Admin. Each quote says how long its prices hold (30 days unless changed) and can ask for a deposit. A client’s page has an address for quotes. A second version shows what changed since the first, and by how much.',
-    prs: [0],
+    prs: [140],
     adrs: [84],
   },
   {
