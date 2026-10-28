@@ -15,7 +15,7 @@
   position: relative; display: grid; justify-items: center; align-content: start; gap: var(--space-4); width: 100%; min-height: 44px;
   padding: var(--space-4) var(--space-2) var(--space-8); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); text-align: center;
 }
-.app .steps-flow button[aria-pressed='true'] { border-bottom-color: var(--accent); color: var(--ink); }
+.app .steps-flow button[aria-expanded='true'] { border-bottom-color: var(--accent); color: var(--ink); }
 @media (hover: hover) {
   .app .steps-flow button:hover { color: var(--ink); }
 }

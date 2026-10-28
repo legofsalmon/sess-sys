@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.40.1',
+    date: '2026-10-28',
+    title: 'Long pages in parts',
+    what: 'Admin, a person’s page and a product’s page now show one part at a time, picked from a row at the top, as a job’s page already did. Admin is Company, Connections and Data; a person is Coming up, Details, Documents, Worked and Their link; a product is Details, On jobs, Items and Faults. The part you looked at last opens next time, and a new product opens where its items are added. A job’s name, status, client, venue, dates, crew and kit now sit at the top of its page, and its steps open when you press one.',
+    prs: [137],
+    adrs: [82],
+  },
+  {
     version: '1.40.0',
     date: '2026-10-28',
     title: 'Photos of kit, and the rack sheet',

@@ -90,12 +90,12 @@ export function StockScreen() {
   if (count) return <CountPage key={count} view={view} id={decodeURIComponent(count)} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
   if (run) return <RunScreen key={run} view={view} id={decodeURIComponent(run)} />
-  const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
+  const [, kind, id, part] = /^#stock\/(product|item|place)\/([^/]+)(?:\/([a-z]+))?$/.exec(hash) ?? []
   const open = id ? decodeURIComponent(id) : ''
   // Keyed by the record, so a form left open on one page isn't still open on the next.
   const record =
     kind === 'product' ? (
-      <ProductScreen key={open} view={view} id={open} bare={wide} />
+      <ProductScreen key={open} view={view} id={open} part={part} bare={wide} />
     ) : kind === 'item' ? (
       <ItemScreen key={open} view={view} id={open} bare={wide} />
     ) : kind === 'place' ? (
@@ -500,7 +500,8 @@ function NewProduct({ view, department }: { view: View; department: Department }
     void run(() => client.mutate('model.create', args)).then((ok) => {
       if (ok) {
         setSize(sizeTypedOf())
-        location.hash = `#stock/product/${id}`
+        // A new product of our own has nothing yet, so it opens where its items and counts go in (ADR 0082).
+        location.hash = args.dryHire ? `#stock/product/${id}` : `#stock/product/${id}/items`
       } else setF((now) => (now === cleared ? f : now))
     })
   }

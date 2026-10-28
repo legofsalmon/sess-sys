@@ -63,6 +63,7 @@ test('on a desk the way up is breadcrumbs, from the area down to the page', asyn
 
   // A product with numbered items, and the first of them.
   await page.locator('a[href^="#stock/product/"]', { hasText: 'd&b Y10P' }).first().click()
+  await page.getByRole('tab', { name: /^Items/ }).click()
   await page.locator('a[href^="#stock/item/"]').first().click()
   const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' })
   await expect(crumbs.getByRole('listitem')).toHaveCount(3)

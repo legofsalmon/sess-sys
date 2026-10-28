@@ -46,6 +46,8 @@ test("a job's steps, given out on its page and ticked from the list on Home", as
   // Confirmed, so the quote and the yes are done; it's at the crew, which the app ticks once every call is booked.
   await expect(steps.getByText('2 of 8 done · at Crew booked')).toBeVisible()
   await expect(steps.locator('li[aria-current="step"] button')).toHaveAccessibleName('3. Crew booked, the step the job is at')
+  // A slim strip until a step is opened (ADR 0082).
+  await steps.locator('li[aria-current="step"] button').click()
   await expect(steps.getByRole('heading', { name: '3. Crew booked' })).toBeVisible()
   await expect(steps.getByText('0 of 2 booked. This is the step the job is at.')).toBeVisible()
   // The app ticks this one itself once every call is booked; until then it can be ticked by hand, and given to someone.

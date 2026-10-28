@@ -125,7 +125,7 @@ async function use(s: Setup, calendarId: string) {
 }
 
 async function connectTo(s: Setup, calendarId = TEST_CAL) {
-  expect((await connect(s)).headers.location).toBe('/?calendar=connected#admin')
+  expect((await connect(s)).headers.location).toBe('/?calendar=connected#admin/connections')
   expect((await use(s, calendarId)).statusCode).toBe(200)
   await s.sync()
 }
@@ -232,7 +232,7 @@ describe('connecting a calendar', () => {
       return ''
     })
     expect(back.statusCode).toBe(303)
-    expect(back.headers.location).toBe('/?calendar=connected#admin')
+    expect(back.headers.location).toBe('/?calendar=connected#admin/connections')
 
     const { link } = await feed(s)
     expect(link).toMatchObject({ state: 'choosing', account: 'ops@sessionhire.com', calendarId: null, connectedBy: 'Colly Hewson', problem: null })
@@ -273,22 +273,22 @@ describe('connecting a calendar', () => {
   it('says why when connecting goes wrong, and connects nothing', async () => {
     const s = await setup()
     const cancelled = await connect(s, () => 'error=access_denied')
-    expect(cancelled.headers.location).toBe('/?calendar=cancelled#admin')
+    expect(cancelled.headers.location).toBe('/?calendar=cancelled#admin/connections')
 
     const forged = await connect(s, (url) => {
       const { code } = s.google.consent(url)
       return `code=${code}&state=someone-elses`
     })
-    expect(forged.headers.location).toBe('/?calendar=failed#admin')
+    expect(forged.headers.location).toBe('/?calendar=failed#admin/connections')
 
     // Without a lasting key the app could only write for an hour.
     s.google.grant.refresh = false
-    expect((await connect(s)).headers.location).toBe('/?calendar=failed#admin')
+    expect((await connect(s)).headers.location).toBe('/?calendar=failed#admin/connections')
     s.google.grant.refresh = true
 
     // Google lets people untick the calendar on its consent page.
     s.google.grant.scopes = 'openid https://www.googleapis.com/auth/userinfo.email'
-    expect((await connect(s)).headers.location).toBe('/?calendar=missing#admin')
+    expect((await connect(s)).headers.location).toBe('/?calendar=missing#admin/connections')
     expect(s.google.revokedFor('ops@sessionhire.com')).toBe(true)
     expect((await feed(s)).link).toBeUndefined()
   })
@@ -296,7 +296,7 @@ describe('connecting a calendar', () => {
   it('without the Google key, says the calendar needs it', async () => {
     const s = await setup({ calendar: false })
     const start = await s.app.inject({ url: '/api/calendar/connect', cookies: s.colly.cookies })
-    expect(start.headers.location).toBe('/?calendar=off#admin')
+    expect(start.headers.location).toBe('/?calendar=off#admin/connections')
     const list = await s.app.inject({ url: '/api/calendar/calendars', cookies: s.colly.cookies })
     expect(list.statusCode).toBe(409)
     expect(s.app.calendar).toBeUndefined()
@@ -599,7 +599,7 @@ describe('when access goes wrong', () => {
     expect(phaseOnCalendar(f.get<Project>('project', job.jobId), f.get<Phase>('phase', job.phases.build), f.link, f.days, TODAY)).toEqual({ state: 'paused' })
 
     // The same account again: the calendar is kept, and the calendar catches up.
-    expect((await connect(s)).headers.location).toBe('/?calendar=connected#admin')
+    expect((await connect(s)).headers.location).toBe('/?calendar=connected#admin/connections')
     expect((await feed(s)).link).toMatchObject({ state: 'on', calendarId: TEST_CAL })
     await s.sync()
     expect(titles(s.google)).toEqual(['2030-03-02 Nissan Leaf - Build 1/2', '2030-03-03 Nissan Leaf - Build 2/2', '2030-03-04 Nissan Leaf - Show'])

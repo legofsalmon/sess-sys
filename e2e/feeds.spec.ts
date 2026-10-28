@@ -25,6 +25,7 @@ test('the office copies a freelancer their calendar address, the same one their 
   await form.getByRole('button', { name: 'Add person' }).click()
   await expect(office.getByRole('status')).toHaveText('Up to date')
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Orla Murphy/ }).click()
+  await office.getByRole('tab', { name: /^Their link/ }).click()
 
   const row = office.getByRole('region', { name: 'Their link' })
   await row.getByRole('button', { name: 'Copy calendar address' }).click()

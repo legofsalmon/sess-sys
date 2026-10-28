@@ -84,5 +84,6 @@ test('the Skills field offers the skills in use and takes new ones as chips', as
   const people = page.getByRole('region', { name: 'People' })
   await people.getByLabel('Find a person').fill(`dara spark ${id}`)
   await people.getByRole('link', { name: new RegExp(`^${name}`) }).click()
+  await page.getByRole('tab', { name: /^Details/ }).click()
   await expect(page.locator('dd').filter({ hasText: 'Forklift' })).toHaveText(`Forklift ${id}, Rigger`)
 })

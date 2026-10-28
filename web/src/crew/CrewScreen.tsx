@@ -227,8 +227,8 @@ export function CrewScreen() {
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
   if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
   // Each person has a page of their own (#crew/person/<id>); the People list is one line each that opens it.
-  const [, personId] = /^#crew\/person\/(.+)$/.exec(hash) ?? []
-  if (personId) return <PersonScreen view={view} id={decodeURIComponent(personId)} onArchived={setArchivedNow} />
+  const [, personId, personPart] = /^#crew\/person\/([^/]+)(?:\/([a-z]+))?$/.exec(hash) ?? []
+  if (personId) return <PersonScreen key={personId} view={view} id={decodeURIComponent(personId)} part={personPart} onArchived={setArchivedNow} />
   // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
   if (hash === '#crew/leave') return <LeaveScreen view={view} />
   // Bringing in the crew list (ADR 0025), under Crew where the list lives (ADR 0041).

@@ -85,6 +85,7 @@ test('the Crew tab lists certificates running out, soonest first, each with a me
 
   // His card says it too, in the warn tone, with his card's categories.
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Pádraig Kenny/ }).click()
+  await office.getByRole('tab', { name: /^Documents/ }).click()
   const card = office.locator('.person-page')
   await expect(card).toContainText('IPAF 3a, 3b (to')
   await expect(card.locator('.warn-line')).toHaveText(/^IPAF runs out on/)
