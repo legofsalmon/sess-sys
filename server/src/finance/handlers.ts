@@ -21,7 +21,7 @@ import { getClientDiscount, getCostPaid, getProductPrice, getQuote, getQuoteSett
  * Sending the same change twice, as a phone may, changes nothing.
  */
 
-type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'price.role' | 'price.client' | 'cost.paid'
+type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quoting.travel' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'price.role' | 'price.client' | 'cost.paid'
 type Handler<N extends FinanceCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const emitQuote = async (ctx: Ctx, id: string) => emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
@@ -79,6 +79,8 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
       if (a.validDays !== undefined) await ctx.tx.query('UPDATE quotes SET valid_days = $2 WHERE id = $1', [a.id, a.validDays])
       if (a.depositPct !== undefined) await ctx.tx.query('UPDATE quotes SET deposit_pct = $2 WHERE id = $1', [a.id, a.depositPct])
       if (a.agreedCents !== undefined) await ctx.tx.query('UPDATE quotes SET agreed_cents = $2 WHERE id = $1', [a.id, a.agreedCents])
+      if (a.mealsProvided !== undefined) await ctx.tx.query('UPDATE quotes SET meals_provided = $2 WHERE id = $1', [a.id, a.mealsProvided])
+      if (a.travelKm !== undefined) await ctx.tx.query('UPDATE quotes SET travel_km = $2 WHERE id = $1', [a.id, a.travelKm])
       return emitQuote(ctx, a.id)
     }
     const versions = await quotesOf(ctx.tx, a.projectId)
@@ -89,8 +91,8 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     // A new version holds its prices as long as the one before, and asks the same deposit, unless it says otherwise.
     const before = versions[0]
     await ctx.tx.query(
-      `INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes, valid_days, deposit_pct, agreed_cents)
-       VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO quotes (id, project_id, version, status, lines, discount_pct, notes, valid_days, deposit_pct, agreed_cents, meals_provided, travel_km)
+       VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         a.id,
         a.projectId,
@@ -102,6 +104,9 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
         a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
         // A price agreed is for the lines it was agreed on, so a new version starts without one unless it says.
         a.agreedCents ?? null,
+        // The job's meals and the distance are the job's, so a new version keeps them unless it says.
+        a.mealsProvided ?? before?.mealsProvided ?? false,
+        a.travelKm !== undefined ? a.travelKm : (before?.travelKm ?? null),
       ]
     )
     await emitQuote(ctx, a.id)
@@ -127,6 +132,22 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
       `INSERT INTO quote_settings (id, next_number, terms, bank) VALUES ($1, $2, $3, $4)
        ON CONFLICT (id) DO UPDATE SET next_number = EXCLUDED.next_number, terms = EXCLUDED.terms, bank = EXCLUDED.bank`,
       [QUOTE_SETTINGS_ID, a.nextNumber, a.terms.trim(), a.bank.trim()]
+    )
+    await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
+  },
+
+  /** How travel and subsistence are charged (ADR 0086). The day the fuel price was set moves only when it changes. */
+  async 'quoting.travel'(ctx, a) {
+    await ctx.tx.query(
+      `INSERT INTO quote_settings (id, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $3::numeric IS NULL THEN NULL ELSE $6::date END)
+       ON CONFLICT (id) DO UPDATE SET
+         travel_from_km = EXCLUDED.travel_from_km,
+         fuel_set_on = CASE WHEN quote_settings.fuel_cents_per_litre IS NOT DISTINCT FROM EXCLUDED.fuel_cents_per_litre THEN quote_settings.fuel_set_on ELSE $6::date END,
+         fuel_cents_per_litre = EXCLUDED.fuel_cents_per_litre,
+         litres_per_100_km = EXCLUDED.litres_per_100_km,
+         per_diem_cents = EXCLUDED.per_diem_cents`,
+      [QUOTE_SETTINGS_ID, a.travelFromKm, a.fuelCentsPerLitre, a.litresPer100Km, a.perDiemCents, a.on]
     )
     await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
   },

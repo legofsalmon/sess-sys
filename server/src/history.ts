@@ -908,6 +908,10 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     }
     case 'quoting.update':
       return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
+    case 'quoting.travel':
+      return `Set how travel and subsistence are charged: travel past ${typeof a.travelFromKm === 'number' ? a.travelFromKm : '?'} km from Dublin, ${
+        typeof a.fuelCentsPerLitre === 'number' ? `fuel at ${a.fuelCentsPerLitre}c a litre` : 'no fuel price'
+      }, ${typeof a.perDiemCents === 'number' ? `a per diem of ${euro(a.perDiemCents)}` : 'no per diem'}`
     case 'price.product':
       return a.dayCents === null
         ? `Took ${model(a.modelId)} off the price list`
