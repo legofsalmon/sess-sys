@@ -51,5 +51,6 @@ own address go, then give it to the director, or combine someone holding
 it into them. Now a director's email, type, main address and combining
 need a director (the company ability), and no command gives the address
 the sender signs in with to another person already on the Crew tab, even
-in the same push that let it go. The office still corrects everyone
-else's addresses.
+in the same push that let it go. A director may still combine her own
+two records, as she may change anyone's addresses. The office still
+corrects everyone else's addresses.

@@ -3,6 +3,18 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 27 October 2026: a director's sign-in is the directors' to change
+
+**Done**
+
+- Finding 10 of the [20 October audit](audit-2026-10-20.md) (PR #137, Colly
+  chose "Directors only"): a director's email, type, main address and
+  combining need a director, and no command gives the sender's own sign-in
+  address to another person, so the office can't take a director's account
+  in two steps. A director may still combine her own two records. ADR 0064
+  notes it. App 1.38.2. All ten P1s of the audit are now fixed.
+- Checked: typecheck, shared and server tests.
+
 ## 27 October 2026: building a rack up
 
 **Done**
