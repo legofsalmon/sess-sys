@@ -1,7 +1,8 @@
 import { csvText, type RmsLine, type RmsOpportunity, type RmsOpportunityPage, type RmsOpportunityWithLines, type RmsStatus } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import type { Queryable } from '../db.ts'
+import type { Db, Queryable } from '../db.ts'
 import { RmsRefused } from './api.ts'
+import { registerRmsHistoryRoutes } from './history.ts'
 import type { RmsReader } from './reader.ts'
 
 /**
@@ -88,7 +89,9 @@ export async function findOpportunities(q: Queryable, search: string, page: numb
   return { opportunities: rows.map(toOpportunity), total: Number(count[0]?.n ?? 0) }
 }
 
-export function registerRmsRoutes(app: FastifyInstance, { db, reader }: { db: { reads: Queryable }; reader: RmsReader }) {
+export function registerRmsRoutes(app: FastifyInstance, { db, reader }: { db: Db; reader: RmsReader }) {
+  registerRmsHistoryRoutes(app, { db })
+
   app.get('/api/rms', { config: { needs: 'money' } }, async (_req, reply): Promise<RmsStatus> => {
     reply.header('cache-control', 'no-store')
     return reader.status()
@@ -127,7 +130,8 @@ export function registerRmsRoutes(app: FastifyInstance, { db, reader }: { db: { 
     const { rows } = await db.reads.query<Row>(`SELECT ${OPPORTUNITY} FROM rms_opportunities WHERE id = $1`, [id])
     if (!rows[0]) return reply.code(404).send({ error: 'There’s no such opportunity. It may not have been read from Current RMS yet.' })
     const { rows: lines } = await db.reads.query<Row>(`SELECT ${LINE} FROM rms_lines WHERE opportunity_id = $1 ORDER BY path COLLATE "C", id`, [id])
-    return { opportunity: toOpportunity(rows[0]), lines: lines.map(toLine) }
+    const { rows: job } = await db.reads.query<Row>('SELECT p.id, p.name FROM rms_matches m JOIN projects p ON p.id = m.project_id WHERE m.opportunity_id = $1', [id])
+    return { opportunity: toOpportunity(rows[0]), lines: lines.map(toLine), job: job[0] ? { id: job[0].id, name: job[0].name } : null }
   })
 
   /** What came in, as two spreadsheets: one row an opportunity, and one row a line. */

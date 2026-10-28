@@ -122,6 +122,8 @@ export interface RmsOpportunityPage {
 export interface RmsOpportunityWithLines {
   opportunity: RmsOpportunity
   lines: RmsLine[]
+  /** The job the office linked it to (ADR 0092), when it's still here. */
+  job?: { id: string; name: string } | null
 }
 
 /** Lines indented by how deep their path is: four digits a level. */

@@ -255,6 +255,7 @@ const ABOUT: Record<string, string> = {
   // Current RMS, read through its API (ADR 0078).
   rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
   rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",
+  rms_matches: 'Each opportunity read from Current RMS that the office linked to its job: the job, who linked it and when.',
   rms_reads: 'Each time Current RMS was read: when, how many opportunities and lines, and what went wrong if it did.',
   job_steps: "Each job's steps given to someone or ticked by hand: the job, the step (quote, confirmed, crew, kit, prep, show, back, deprep), who it's down to, and when it was ticked and by whom. Steps the app ticks from the job's own records aren't kept.",
   // Vans and drivers (ADR 0047).
