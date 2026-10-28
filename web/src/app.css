@@ -532,3 +532,12 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 
 /* A page's parts as tabs (Tabs.tsx, ADR 0082): the open part's cards one after another under the row, as a job's (jobs.css draws the row). */
 .tab-part { display: grid; gap: var(--space-14); min-width: 0; }
+
+/* Admin › Status (ADR 0093): one row a check, its name and word on a line, then what it says and what to do. */
+.status-checks, .status-wrong { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-14); }
+.status-wrong { gap: var(--space-4); }
+.status-check { display: grid; gap: var(--space-4); }
+.status-check + .status-check { border-top: 1px solid var(--line); padding-top: var(--space-14); }
+.status-check-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
+.status-check p { margin: 0; }
+.status-todo { font-size: var(--text-small); }

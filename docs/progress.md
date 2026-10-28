@@ -3,6 +3,28 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 28 October 2026: a status page for everything the app relies on
+
+**Done**
+
+- [ADR 0093](adr/0093-system-status.md), at Colly's ask: Admin › Status
+  (office, directors, system admins) checks thirteen things at once and says
+  in a sentence how each stands and what to do when one needs someone: the
+  server and its version, whether main has a newer version Railway hasn't
+  deployed, the database (speed and size), sign-in, error reports, live
+  updates, nightly backups, the bucket, Google Calendar, crew's own
+  calendars, Current RMS, the AA fuel price and the map search. Read only:
+  nothing is written to Google and nobody is contacted. Kept for a minute;
+  Check again asks afresh. `/api/health` now gives the version and commit.
+  App 1.49.0.
+- Checked: typecheck, server tests (status.test.ts: every check's words and
+  what to do, a newer version on main, services down, the minute's keep, a
+  real backup and bucket; crew refused), browser tests (status.spec.ts, and
+  the layout, access and backups tests).
+
+**Waiting on** nobody. Telling the office in Notifications when a check
+turns bad could follow.
+
 ## 28 October 2026: every page the same width
 
 **Done**

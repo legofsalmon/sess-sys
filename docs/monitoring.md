@@ -112,6 +112,13 @@ code's variables, or an IP address. An error's own text can quote a value,
 so email addresses and anything shaped like a freelancer's private link
 are replaced in it by `[email]` and `[secret]`.
 
+## In the app
+
+Admin › Status ([ADR 0093](adr/0093-system-status.md)) shows how error
+reports, backups and every other connection stand, with what to do about
+each, and whether the server runs the newest version merged into main.
+`/api/health` also gives the running `version` and `commit`.
+
 ## Good to know
 
 - Phones with no signal keep their reports, up to 30, and send them when

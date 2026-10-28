@@ -1,7 +1,7 @@
 import compress from '@fastify/compress'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { APP_VERSION, FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { LogController, type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import { readFileSync } from 'node:fs'
 import { join, sep } from 'node:path'
@@ -50,6 +50,7 @@ import { aaFuel, FuelUpdates, registerFuelRoutes, type FuelLookup } from './fina
 import { RmsApi, type RmsConfig } from './rms/api.ts'
 import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
+import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
@@ -137,6 +138,8 @@ export interface AppOptions {
   currentRms?: RmsConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
+  /** Admin › Status's looks outside the server (ADR 0093): the map search and GitHub. Without them, those two say so. */
+  outside?: OutsideLooks
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -382,6 +385,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const backup = backups.status()
     return {
       ok: true,
+      // Which version is live, so a merge Railway hasn't deployed yet shows (ADR 0093).
+      version: APP_VERSION,
+      commit: commit ?? null,
       db: db.kind,
       auth: auth ? 'google' : passcode ? 'passcode' : 'off',
       errors: errorReporting ? 'sentry' : 'off',
@@ -583,6 +589,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)
   app.decorate('rms', rms)
   registerRmsRoutes(app, { db, reader: rms })
+  registerStatusRoutes(
+    app,
+    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
+  )
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
