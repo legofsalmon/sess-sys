@@ -45,8 +45,7 @@ export function ChangesScreen() {
   const view = useView()
   return (
     <div className="app account changes">
-      <Top view={view} title="What's changed" up={{ steps: [MENU, ADMIN], here: "What's changed" }} />
-      <h1>What's changed</h1>
+      <Top view={view} title="What's changed" up={{ steps: [MENU, ADMIN], here: "What's changed" }} heading="What's changed" />
       <p className="hint">You're on version {APP_VERSION}. Newest first. The middle number goes up for something new, the last for a fix.</p>
       <section className="card">
         {CHANGELOG.map((r) => (

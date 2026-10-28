@@ -93,11 +93,8 @@ export function RacksScreen({ view }: { view: View }) {
   const racks = view.racks.racks
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="racks" />
-      <h1 className="area-title">Racks</h1>
-      <section className="card" aria-label="Racks">
-        <Heading icon="case">Racks</Heading>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="racks" />} heading="Racks" />
+      <section className="card plain" aria-label="Racks">
         {racks.length === 0 && <Empty>Add a rack, then lay out what goes in it. Each one built of it goes out and comes back as one.</Empty>}
         <ul className="job-list">
           {racks.map((r) => (

@@ -49,8 +49,12 @@ import { InStep, QuotePill } from './Quote.tsx'
 export function NotYours({ view, here }: { view: View; here?: string }) {
   return (
     <div className="app crew jobs money">
-      <Top view={view} up={here ? { steps: [JOBS, MONEY], here } : undefined} />
-      {!here && <JobViews current="money" />}
+      <Top
+        view={view}
+        up={here ? { steps: [JOBS, MONEY], here } : undefined}
+        views={!here && <JobViews current="money" />}
+        heading={here ?? 'Money'}
+      />
       <section className="card">
         <p className="empty">Money is for the office and directors. A director can change your role on the Crew tab.</p>
       </section>
@@ -68,12 +72,8 @@ export function MoneyScreen({ view }: { view: View }) {
   const toFreelancers = m.costsOwed.reduce((s, c) => s + c.cents, 0)
   return (
     <div className="app crew jobs money">
-      <Top view={view} />
-      <JobViews current="money" />
-      <section className="card">
-        <h1 className="with-icon">
-          <span>Money</span>
-        </h1>
+      <Top view={view} views={<JobViews current="money" />} heading="Money" />
+      <section className="card plain">
         <dl className="facts money-facts">
           <div>
             <dt>Quoted for {month.label}</dt>

@@ -30,19 +30,23 @@ async function ready(page: Page, hash: string) {
   await expect(page.locator('.conn')).toHaveText('Up to date')
 }
 
-test('on a phone every page in an area row shows, counts stand apart, and the strip is a thumb high', async ({ browser }) => {
-  // Proves: Stock's seven pages and Jobs' Money are all on screen at 390px with nothing off the edge; a count has a gap before it ("Calls 4", not "Calls4"); the "On this screen" parts are 44px tall and drawn without the row's box.
+test('on a phone an area row is one line that scrolls, counts stand apart, and the strip is a thumb high', async ({ browser }) => {
+  // Proves: Stock's nine pages, Jobs' six and Crew's four stay one line at 390px (ADR 0082): the current page is in view, the row scrolls to the last, and the edge with more past it fades, so no page is hidden with nothing to say so (audit P2 23); a count has a gap before it ("Calls 4", not "Calls4"); the "On this screen" parts are 44px tall and drawn without the row's box.
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  for (const [hash, label, last] of [
-    ['#stock', 'Stock pages', /^Vehicles/],
-    ['#jobs', 'Jobs pages', 'Money'],
-    ['#crew', 'Crew pages', /^Timesheets/],
+  for (const [hash, label, current, last] of [
+    ['#stock/vehicles', 'Stock pages', /^Vehicles/, 'Purchase list'],
+    ['#jobs', 'Jobs pages', 'List', 'Money'],
+    ['#crew', 'Crew pages', /^Calls/, /^Timesheets/],
   ] as const) {
     await ready(page, hash)
     const row = page.getByRole('navigation', { name: label })
+    const tops = await row.evaluate((nav) => new Set([...nav.querySelectorAll('a')].map((a) => Math.round(a.getBoundingClientRect().top))).size)
+    expect(tops, `${label} on one line`).toBe(1)
+    await expect(row.getByRole('link', { name: current })).toBeInViewport({ ratio: 1 })
+    const more = await row.evaluate((nav) => nav.scrollWidth > nav.clientWidth)
+    if (more) expect(await row.getAttribute('data-more')).not.toBe('')
+    await row.getByRole('link', { name: last }).scrollIntoViewIfNeeded()
     await expect(row.getByRole('link', { name: last })).toBeInViewport({ ratio: 1 })
-    const out = await row.evaluate((nav) => [...nav.querySelectorAll('a')].filter((a) => a.getBoundingClientRect().right > innerWidth).map((a) => a.textContent))
-    expect(out, `${label} off the edge`).toEqual([])
   }
   // The Calls count, apart from its word.
   const calls = page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ })
@@ -76,7 +80,7 @@ test('on a desk a keyboard meets Skip to content, then the places, then the scre
   await expect(page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Home' })).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { level: 1, name: 'Stock' })).toBeFocused()
+  await expect(page.getByRole('heading', { level: 1, name: 'Catalogue' })).toBeFocused()
   await expect(page).toHaveURL(/#stock$/)
 })
 

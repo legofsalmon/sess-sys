@@ -30,7 +30,7 @@ const part = (page: Page, heading: string) => page.locator('form').filter({ has:
 
 /** Every product and place on the Stock tab, past the first five of each it shows (audit finding 16), so one missing from either is missing. */
 async function showAll(page: Page) {
-  await expect(page.getByRole('region', { name: 'Stock', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Catalogue', exact: true })).toBeVisible()
   for (const what of ['products', 'places']) {
     const all = page.getByRole('button', { name: new RegExp(`^Show all \\d+ ${what}$`) })
     if (await all.count()) await all.click()

@@ -90,7 +90,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await expect(due).toContainText(`2 × ${speaker}`)
 
   // A batch tested by scanning; the last with no signal.
-  await expect(page.getByRole('heading', { level: 1, name: 'Test a batch' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Test a batch' })).toBeVisible()
   await page.getByLabel('By', { exact: true }).fill('Volt Testing Ltd')
   const said = page.getByRole('status', { name: 'Last scan' })
   const typeIn = async (number: string) => {

@@ -151,8 +151,8 @@ test('each move lands on the heading and names the tab, inside one main landmark
 
   // A tab: the screen's name in the top bar takes focus and names the tab.
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
-  await expect(page).toHaveTitle('Crew · Session Hire')
-  expect(await page.evaluate(() => document.activeElement?.textContent?.trim())).toMatch(/^Crew/)
+  await expect(page).toHaveTitle('Calls · Session Hire')
+  expect(await page.evaluate(() => document.activeElement?.textContent?.trim())).toMatch(/^Calls/)
   await expect(page.getByRole('main')).toHaveCount(1)
 
   // A record: its heading takes focus and names the tab after the job.
@@ -205,14 +205,14 @@ test('someone already typing on the new screen keeps the focus', async ({ browse
   })
   await page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Stock' }).click()
   // Stock's own search: for a moment the Jobs screen, with a search of its own, is still there.
-  const find = page.getByRole('region', { name: 'Stock' }).getByLabel('Find')
+  const find = page.getByRole('region', { name: 'Catalogue' }).getByLabel('Find')
   await find.fill('SH-000001')
   await page.evaluate(() => {
     const w = window as unknown as Held
     window.requestAnimationFrame = w.raf
     for (const cb of w.held.splice(0)) cb(performance.now())
   })
-  await expect(page).toHaveTitle('Stock · Session Hire')
+  await expect(page).toHaveTitle('Catalogue · Session Hire')
   await expect(find).toBeFocused()
   await find.press('Enter')
   await expect(page.getByRole('heading', { level: 1, name: 'SH-000001' })).toBeVisible()

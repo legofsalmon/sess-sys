@@ -26,6 +26,7 @@ import { client } from '../sync.ts'
 import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNamed, whereProblem } from './common.tsx'
 import { LABELS, STOCK } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
+import { Split } from '../Split.tsx'
 import { Heading } from '../Icon.tsx'
 
 /**
@@ -210,40 +211,44 @@ export function LabelsScreen({ view }: { view: View }) {
   const mayReserve = useAccess().can('stock')
   return (
     <div className="app warehouse">
-      <Top view={view} title="Stock" />
-      <StockViews view={view} current="labels" />
-      <section className="card">
-        <h1>Labels</h1>
-        <p className="hint">
-          Numbers are set aside before their labels are printed, here or by a label maker, so no other item gets them. Once a label is stuck on, scan
-          or type it in the Stock search to put it on its item.
-        </p>
-        {mayReserve && <SetAside labels={view.labels} />}
-      </section>
-      <section className="card" aria-label="Set aside">
-        <h2>Set aside</h2>
-        {runs.length === 0 && <Empty />}
-        <ul className="job-list">
-          {runs.map((r) => (
-            <li key={r.id}>
-              <a className="job-row" href={`#stock/labels/${r.id}`}>
-                <div>
-                  <b>
-                    <Range r={r} />
-                  </b>
-                  <p>{[r.name, `set aside ${when(r.createdAt)}`].filter(Boolean).join(' · ')}</p>
-                </div>
-                <div className="side">
-                  <Pending pending={r.pending} />
-                  <small>
-                    {r.used.toLocaleString('en-IE')} of {r.count.toLocaleString('en-IE')} on items
-                  </small>
-                </div>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Top view={view} title="Stock" views={<StockViews view={view} current="labels" />} heading="Labels" />
+      <Split
+        side={
+          <section className="card" aria-label="Set numbers aside">
+            <h2>Set numbers aside</h2>
+            <p className="hint">
+              Numbers are set aside before their labels are printed, here or by a label maker, so no other item gets them. Once a label is stuck on,
+              scan or type it in the Stock search to put it on its item.
+            </p>
+            {mayReserve && <SetAside labels={view.labels} />}
+          </section>
+        }
+      >
+        <section className="card" aria-label="Set aside">
+          <h2>Set aside</h2>
+          {runs.length === 0 && <Empty />}
+          <ul className="job-list">
+            {runs.map((r) => (
+              <li key={r.id}>
+                <a className="job-row" href={`#stock/labels/${r.id}`}>
+                  <div>
+                    <b>
+                      <Range r={r} />
+                    </b>
+                    <p>{[r.name, `set aside ${when(r.createdAt)}`].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <div className="side">
+                    <Pending pending={r.pending} />
+                    <small>
+                      {r.used.toLocaleString('en-IE')} of {r.count.toLocaleString('en-IE')} on items
+                    </small>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </Split>
     </div>
   )
 }
