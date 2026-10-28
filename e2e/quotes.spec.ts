@@ -315,7 +315,7 @@ test('a package made on the price list goes on a quote as one line, with what it
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
 
-test("a line short of kit hires in what it's short of, transport is added at a cost, and a director sees the margin, none of it printed (ADR 0089)", async ({ browser, request }) => {
+test("a line short of kit hires in what it's short of, transport is added at a cost, and the office sees the margin, none of it printed (ADR 0089)", async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()

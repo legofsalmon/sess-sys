@@ -187,10 +187,9 @@ function MarginLine({ margin, costs }: { margin: number; costs: number }) {
 
 export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
   const job = view.jobs.jobs.find((j) => j.id === jobId)
-  const access = useAccess()
-  const sees = access.can('money')
-  // What a quote makes (ADR 0089) is a director's to see.
-  const boss = access.can('company')
+  const sees = useAccess().can('money')
+  // What a quote makes (ADR 0089) is seen by all who see quotes: the office and directors.
+  const boss = sees
   const m = view.money
   const versions = m.quotesOf(jobId)
   const [picked, setPicked] = useState<string>()
@@ -628,8 +627,8 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
     lateOut: view.moves.lateOut,
   })
   const shortLines = good.filter((l) => linesShort(l, checks, m.package(l.packageId ?? '')?.items).length > 0).length
-  // What it makes (ADR 0089), for a director's eyes only.
-  const boss = useAccess().can('company')
+  // What it makes (ADR 0089), for the office and directors, who see quotes at all.
+  const boss = useAccess().can('money')
   const costOf = (l: QuoteLine) => lineCostOf(l, l.kind === 'crew' ? m.bookedRate(job.id, l) : undefined)
   const margin = quoteMargin(totals.net, all.map(costOf))
 
@@ -1036,7 +1035,7 @@ function chargeWords(r: QuoteLine) {
 /** A line's margin (ADR 0089): what it's charged, after its own discount, less what it costs; undefined while its cost isn't known. */
 const lineMargin = (l: QuoteLine, cost: number | undefined) => (cost === undefined ? undefined : lineCents(l) - cost)
 
-/** "Margin €3,400.00, 62%", with the lines whose cost isn't known yet: a director's, on the screen only. */
+/** "Margin €3,400.00, 62%", with the lines whose cost isn't known yet: on the screen only, never printed. */
 function MarginWords({ margin }: { margin: QuoteMargin }) {
   return (
     <span className={`margin-words${margin.margin < 0 ? ' bad' : ''}`}>
@@ -1106,7 +1105,7 @@ function KitNote(p: {
 
 /**
  * The cost side of a line (ADR 0089), never printed: how many are hired in and who from for kit, and what the line
- * costs us, which a director sees set against its price.
+ * costs us, set against its price.
  */
 function CostFields({ l, n, r, cost, boss, suppliers, set }: { l: LineDraft; n: number; r: QuoteLine | undefined; cost: number | undefined; boss: boolean; suppliers: readonly string[]; set: (c: Partial<LineDraft>) => void }) {
   const listId = useId()

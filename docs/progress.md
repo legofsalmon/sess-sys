@@ -13,7 +13,8 @@ waiting on someone.
   and offer "Hire in". Lines carry how many are hired in, the supplier and
   what they cost us (`subhireQty`, `supplier`, `costCents`), with crew
   costed at booked rates when left empty. "Add transport" adds the job's
-  vans. Directors see each line's margin and the quote's, never printed.
+  vans. The office and directors see each line's margin and the quote's,
+  never printed.
   App 1.46.0.
 - Checked: typecheck, unit tests (enough kit, what's wanted, line costs,
   margin), server (cost side kept, supplier trimmed), browser test

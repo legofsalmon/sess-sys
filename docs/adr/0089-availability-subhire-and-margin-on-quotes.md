@@ -50,12 +50,12 @@ either part before it went out.
 4. **Transport has its own Add.** "Add transport" offers each van booked on
    the job ("Luton van and driver"), or transport typed. Either way it's
    charged once, under Transport, with its cost beside it.
-5. **The margin is a director's.** Directors (and system admins) see each
-   line's margin, and the whole quote's in the summary that stays in view
-   ("Margin €3,400.00, 62%"), counting lines with no cost yet. They also see
-   it on a version that has gone out. It is never printed. The office types
-   costs, as it arranges the subhire, but sees no margin, as the plan said:
-   "cost and margin to the boss only".
+5. **The margin is for everyone who sees quotes**: the office, directors
+   and system admins (Colly, 28 October 2026: "Office and directors can see
+   all of this"). They see each line's margin, and the whole quote's in the
+   summary that stays in view ("Margin €3,400.00, 62%"), counting lines
+   with no cost yet, and on a version that has gone out. It is never
+   printed. The plan had said "to the boss only"; Colly widened it.
 
 ## Consequences
 
