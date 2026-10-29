@@ -1,9 +1,9 @@
 import { addDays, ADDRESS_WORDS, BUSY_AHEAD_DAYS, busyByDay, irishToday, redact, type HistoryPage, type OwnCalendar } from '@sh/shared'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { dublinWallTime, NotACalendar, readBusy, readBusyApart, TooMuch } from '../src/crew/busy.ts'
 import { fetchCalendar, isPublic, NotRead, READ_WORDS } from '../src/crew/calendar-fetch.ts'
 import { calendarFeed } from '../src/crew/ical.ts'
-import { NOT_A_CALENDAR, TOO_MUCH, type OwnCalendarsOptions } from '../src/crew/own-calendars.ts'
+import { NOT_A_CALENDAR, OwnCalendars, TOO_MUCH, type OwnCalendarsOptions } from '../src/crew/own-calendars.ts'
 import { everythingJson, readEverything } from '../src/export.ts'
 import { fakeCalendar, ics, type FakeCalendar } from './fake-calendar.ts'
 import { ANDROID, flashOf, IPHONE, server, staff } from './people.ts'
@@ -467,6 +467,31 @@ describe('sharing their own calendar', () => {
     // Archived, their link stops, so their calendar stops with it: they couldn't stop it themselves.
     expect(await colly.send('person.archive', { id: 'aoife', archived: true })).toMatchObject({ status: 'applied' })
     expect((await db.query(`SELECT 1 FROM own_calendars`)).rows).toHaveLength(0)
+  })
+
+  it('looks again on the next tick, not in three hours, after a read the server itself fell over on', async () => {
+    // Proves (audit, 20 October 2026, finding 86): a fault inside the server before or during a read leaves the calendar
+    // due, and the schedule tries it again a quarter of an hour on (here, scaled down), not at the next full interval.
+    const { db, cal, post } = await office()
+    cal.set(SECRET_PATH, { ics: ics([]) })
+    expect((await post('/calendar', { address: cal.url(SECRET_PATH) })).statusCode).toBe(303)
+    expect(cal.asked(SECRET_PATH)).toBe(1)
+    await db.query(`UPDATE own_calendars SET tried_at = now() - interval '4 hours'`)
+    const faults: unknown[] = []
+    const reader = new OwnCalendars(db, { testHosts: [cal.host], lookMs: 40, onChange: () => {}, report: (err) => faults.push(err) })
+    const readNow = reader.readNow.bind(reader)
+    let tries = 0
+    reader.readNow = async (personId) => {
+      if (tries++ === 0) throw new Error('The reading worker would not start')
+      return readNow(personId)
+    }
+    reader.start()
+    try {
+      await vi.waitFor(() => expect(cal.asked(SECRET_PATH)).toBe(2), { timeout: 2000, interval: 20 })
+    } finally {
+      reader.stop()
+    }
+    expect(faults).toHaveLength(1)
   })
 
   it('needs the right to change crew in the app', async () => {
