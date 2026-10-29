@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: a freelancer's own page
+
+**Done**
+
+- Findings 47 to 50, 86 and 89 to 92 of the [20 October
+  audit](audit-2026-10-20.md) (PR #166): link pages compressed, the next
+  three bookings in full and the rest a line each, a refusal that names
+  the job, checked days off that merge and warn over a booking, own
+  calendars tried again after a failed read, years on dates, mistakes said
+  beside their field, one sent line on a timesheet, and a plain Share
+  button. ADRs 0002, 0033 and 0049 note it. App 1.57.0.
+- Not built: the invoice details finding 89 defers to ADR 0022's invoice
+  step, which waits on Colly.
+- Checked: typecheck, shared, server and real-Postgres tests, and 35
+  browser tests.
+
 ## 29 October 2026: the office's crew day
 
 **Done**
