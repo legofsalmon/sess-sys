@@ -108,7 +108,8 @@ export function Chart({
                     // One stop in the tab order; the arrows move along the columns.
                     tabIndex={i === at ? 0 : -1}
                     onClick={() => setPicked(i)}
-                    onPointerEnter={(e) => e.pointerType === 'mouse' && setPicked(i)}
+                    // On a move, not on entering: a column drawn under a still pointer, as the next week's are, isn't one the pointer went to.
+                    onPointerMove={(e) => e.pointerType === 'mouse' && setPicked(i)}
                     onKeyDown={(e) => {
                       const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: columns.length - 1 }[e.key]
                       if (to === undefined) return
