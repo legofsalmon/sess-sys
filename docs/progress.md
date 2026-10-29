@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: heavy jobs that held everyone up
+
+**Done**
+
+- Findings 17, 18, 19, 54 and 110 of the [20 October
+  audit](audit-2026-10-20.md) (PR #162): a calendar bring-in saves new
+  people and venues a few hundred at a time and plans once, a big calendar
+  off the main thread; the export and backup read each table in one go and
+  build the zip a slice at a time; a deploy waits for a backup in progress
+  and the next server makes up one it stopped; slow backup tests given
+  room. ADRs 0004, 0006 and 0011 note it. App 1.55.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and 11
+  browser tests.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**
