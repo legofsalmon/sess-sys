@@ -319,6 +319,14 @@ faults reported on site are waiting in the warehouse repair queue on return.
 - Client portal (view quotes, sign, pay deposit).
 - RFID, native app store builds if the PWA falls short.
 - Turn off calendar-led mode once no live projects use it.
+- Claude inside the app, planned 29 October 2026 ([plan](https://claude.ai/artifact/6z9f5bSSAMGtZRvqmckD3h)):
+  Colly chose inside the app only, no mailbox for now: Claude reads an
+  enquiry into a suggested job and quote, suggests changes to a quote, and
+  keeps a to-do list and notifications for the office and directors.
+  Claude suggests and a person accepts; nothing is sent. A weekly business
+  report and the mailbox wait for later. Enquiries and quote changes built
+  29 October 2026 ([ADR 0096](adr/0096-claude-inside-the-app.md)); the
+  to-do list next.
 
 ## Decisions to make before the build starts
 

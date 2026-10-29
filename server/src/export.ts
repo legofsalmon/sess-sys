@@ -322,6 +322,7 @@ const ABOUT: Record<string, string> = {
     "Kit the crew asked to be bought: what, how many and details, a link, the department, who asked (or the name a list brought in gave) and on which day, where it's at (asked for, agreed, ordered, arrived, not buying) and the office's notes.",
   purchase_votes: 'Who voted for each request on the purchase list, one vote each.',
   // Current RMS, read through its API (ADR 0078).
+  assistant_uses: 'Each time Claude was asked (ADR 0096): when, what for, the model, how many tokens went in and out, and what it cost in US cents. Not the words asked or answered, and not who asked.',
   rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
   rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",
   rms_matches: 'Each opportunity read from Current RMS that the office linked to its job: the job, who linked it and when.',

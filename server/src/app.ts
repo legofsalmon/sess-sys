@@ -50,6 +50,8 @@ import { aaFuel, FuelUpdates, registerFuelRoutes, type FuelLookup } from './fina
 import { RmsApi, type RmsConfig } from './rms/api.ts'
 import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
+import type { ClaudeConfig } from './assistant/claude.ts'
+import { Assistant, registerAssistantRoutes } from './assistant/routes.ts'
 import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
@@ -136,6 +138,8 @@ export interface AppOptions {
   fuel?: FuelLookup
   /** Current RMS's API, read only (ADR 0078): the subdomain and key. Without it Admin says it isn't set up. */
   currentRms?: RmsConfig
+  /** Claude inside the app (ADR 0096): Anthropic's key, the model and the monthly limit. Without it, Admin says it isn't set up. */
+  claude?: ClaudeConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
   /** Admin › Status's looks outside the server (ADR 0093): the map search and GitHub. Without them, those two say so. */
@@ -615,9 +619,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)
   app.decorate('rms', rms)
   registerRmsRoutes(app, { db, reader: rms })
+  const assistant = new Assistant(db, options.claude)
+  registerAssistantRoutes(app, { assistant })
   registerStatusRoutes(
     app,
-    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
+    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
   )
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.

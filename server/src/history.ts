@@ -540,6 +540,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return a.on === true ? 'Turned on messages to crew' : 'Turned off messages to crew'
     case 'timesheets.use':
       return a.on === true ? 'Turned on timesheets' : 'Turned off timesheets'
+    case 'assistant.use':
+      return a.on === true ? 'Turned on Claude' : 'Turned off Claude'
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`
