@@ -13,7 +13,7 @@ waiting on someone.
   XLR", in big type on a wrap-round (50 × 25 mm), flag (100 × 25 mm, both
   ends) or bag label, two by default, with the stock code as a Code 128
   barcode, a QR code, or none. A stock code scanned or typed in the Stock
-  search opens its product. App 1.57.0.
+  search opens its product. App 1.58.0.
 - Checked: typecheck, shared tests (the barcode's widths; decoded by
   zxing-cpp when written), e2e cable-labels.spec.ts plus the labels, stock
   and scan specs.
@@ -23,6 +23,23 @@ waiting on someone.
 - iPhones read only QR codes in the app's camera for now; Code 128 needs a
   1D reader in the fallback. One-tap printing to the ZT411 (no print
   dialog) waits on Colly's pick of the options in that thread.
+
+## 29 October 2026: a freelancer's own page
+
+**Done**
+
+- Findings 47 to 50, 86 and 89 to 92 of the [20 October
+  audit](audit-2026-10-20.md) (PR #166): link pages compressed, the next
+  three bookings in full and the rest a line each, a refusal that names
+  the job, checked days off that merge and warn over a booking, own
+  calendars tried again after a failed read, years on dates, mistakes said
+  beside their field, one sent line on a timesheet, and a plain Share
+  button. ADRs 0002, 0033 and 0049 note it. App 1.57.0.
+- Not built: the invoice details finding 89 defers to ADR 0022's invoice
+  step, which waits on Colly.
+- Checked: typecheck, shared, server and real-Postgres tests, and 35
+  browser tests.
+
 
 ## 29 October 2026: Stock puts today's work first
 

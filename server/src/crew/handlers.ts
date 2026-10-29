@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto'
-import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, namesAfter, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, emailBackRefusal, hasEmail, holdsARole, mayChangeWhoSignsIn, ownAddressRefusal, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
+import { certificateRefusal, certificatesAfter, daysBetween, daysLabel, DEFAULT_LEVEL, departmentForRole, eachDay, RATES_REFUSAL, tidyDepartment, HOLDING, irishToday, LIVE, movedCallSpan, namesAfter, needsOf, offerDaysAfter, REPLY_BY_AFTER, STOPPED, tidyNeeds, roleCan, ROLE_LABELS, emailInUseRefusal, emailBackRefusal, hasEmail, holdsARole, MAX_PHASE_DAYS, mayChangeWhoSignsIn, ownAddressRefusal, sameEmail, whoSignsInRefusal, type CommandArgs, type CrewCall, type Offer, type Person, type Role } from '@sh/shared'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { getPhase, getProject, namesForCall } from '../projects/store.ts'
 import { stopOwnCalendar } from './own-calendars.ts'
-import { awayOn, getAway, getCall, getCalls, getOffer, getPerson, HAS_EMAIL, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
+import { awayFor, awayOn, getAway, getCall, getCalls, getOffer, getPerson, HAS_EMAIL, heldElsewhere, holdsFrom, offersForCall, openCallsFor } from './store.ts'
 
 /**
  * The crew rules the server enforces, whatever device or link a request
@@ -93,7 +93,7 @@ async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string
       code: 'filled',
       message: open.length
         ? `Sorry, ${daysLabel(full)} ${full.length === 1 ? 'has' : 'have'} just been filled. Still open: ${daysLabel(open)}.`
-        : 'Sorry, this has just been filled by someone else.',
+        : `Sorry, ${jobNamed(call, days)} has just been filled by someone else.`,
     })
   }
   const twice = offers.find((o) => o.id !== offer.id && o.personId === offer.personId && HOLDING.includes(o.status))
@@ -106,6 +106,12 @@ async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string
     })
   }
 }
+
+/**
+ * The job a refusal is about, by name ("Harbour Lights Festival, Driver, Thu 19 Nov"): with two or three offers waiting,
+ * "this" doesn't say which one went, and its card has already moved down the page (audit, 20 October 2026, finding 49).
+ */
+const jobNamed = (call: CrewCall, days: string[]) => `${call.project}, ${call.role}, ${daysLabel(days.length ? days : eachDay(call.start, call.end))}`
 
 /** Once every day of a call is covered, tell everyone still waiting. */
 async function closeIfFull(ctx: Ctx, call: CrewCall) {
@@ -433,9 +439,24 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
   async 'unavailability.add'(ctx, a) {
     if (!(await getPerson(ctx.tx, a.personId))) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
     if (await getAway(ctx.tx, a.id)) return
+    // From the link, nothing in the past and nothing past a year, as a phase is capped: a slip of the year marked them off
+    // for good, and every offer to them was refused until someone saw it. The office can still backdate (audit,
+    // 20 October 2026, finding 50).
+    if (ctx.via === 'link' && a.start < irishToday()) throw new Refused({ code: 'invalid', message: "The first day off has gone by. Pick today or a day after it." })
+    if (daysBetween(a.start, a.end) + 1 > MAX_PHASE_DAYS) throw new Refused({ code: 'invalid', message: `Days off can be at most ${MAX_PHASE_DAYS} days at a time.` })
+    // Days off that overlap ones already marked become one row, not two saying the same days (finding 50). Approved leave
+    // stays as it is: it is cancelled as leave (ADR 0024). The new row takes the span of all of them, under its own id.
+    const overlapping = (await awayFor(ctx.tx, a.personId)).filter((u) => u.source !== 'leave' && u.start <= a.end && u.end >= a.start)
+    const start = [a.start, ...overlapping.map((u) => u.start)].sort()[0]!
+    const end = [a.end, ...overlapping.map((u) => u.end)].sort().at(-1)!
+    const note = [...new Set([...overlapping.map((u) => u.note), a.note].map((n) => n.trim()).filter(Boolean))].join('; ').slice(0, 500)
+    for (const u of overlapping) {
+      await ctx.tx.query('DELETE FROM unavailability WHERE id = $1', [u.id])
+      await emitRemoved(ctx, 'unavailability', u.id)
+    }
     await ctx.tx.query(
       'INSERT INTO unavailability (id, person_id, start_day, end_day, note, source) VALUES ($1, $2, $3, $4, $5, $6)',
-      [a.id, a.personId, a.start, a.end, a.note, ctx.via === 'link' ? 'self' : 'ops']
+      [a.id, a.personId, start, end, note, ctx.via === 'link' ? 'self' : 'ops']
     )
     await emit(ctx, 'unavailability', a.id, await getAway(ctx.tx, a.id))
   },
@@ -545,8 +566,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       await setOffer(ctx, offer.id, { ...answered, status: 'pulled-out' })
       return
     }
-    if (offer.status === 'filled') throw new Refused({ code: 'filled', message: 'Sorry, this has already been filled by someone else.' })
-    if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: 'This offer was withdrawn.' })
+    if (offer.status === 'filled') throw new Refused({ code: 'filled', message: `Sorry, ${jobNamed(call, offer.days)} has just been filled by someone else.` })
+    if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: `Sorry, the office has withdrawn ${jobNamed(call, offer.days)}.` })
     // Pulled out is over: the office offers it afresh if they can do it after all.
     if (offer.status === 'pulled-out') throw new Refused({ code: 'conflict', message: "You've pulled out of this one. Ask the office if you can do it after all." })
     if (offer.status === 'confirmed')
