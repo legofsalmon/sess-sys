@@ -155,7 +155,7 @@ export function leaveView(
       case 'leave.allowance': {
         const a = m.args as CommandArgs<'leave.allowance'>
         const id = allowanceId(a.personId, a.year)
-        allowances.set(id, { id, personId: a.personId, year: a.year, days: a.days, carriedOver: a.carriedOver, note: a.note, pending: true })
+        allowances.set(id, { id, personId: a.personId, year: a.year, days: a.days, carriedOver: a.carriedOver, note: a.note, ...(a.by === a.personId ? { selfSet: true } : {}), pending: true })
         break
       }
       case 'leave.open': {

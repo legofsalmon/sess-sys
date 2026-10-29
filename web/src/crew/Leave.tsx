@@ -680,6 +680,7 @@ function AllowanceRow({ person, year, view, me, fixed }: { person: PersonView; y
         <b>{person.name}</b>
         <p>
           {days(b.annual.taken + b.annual.booked)} approved, {days(b.annual.left)} left
+          {set?.selfSet && ' · set by themselves'}
           {set?.pending && ' · waiting to sync'}
         </p>
       </div>

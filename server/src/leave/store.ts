@@ -3,7 +3,7 @@ import type { Queryable } from '../db.ts'
 
 /** Reading leave rows back as the entities devices see (ADR 0024). */
 
-const ALLOWANCE = 'id, person_id, year, days, carried_over, note'
+const ALLOWANCE = 'id, person_id, year, days, carried_over, note, self_set'
 const REQUEST = 'id, person_id, type, start_day::text, end_day::text, days, note, status, requested_at, decided_by, decided_at, reason'
 const ENTRY = 'id, person_id, day::text, days, note, status, logged_at, decided_by, decided_at, reason'
 
@@ -11,7 +11,7 @@ type Row = Record<string, any>
 
 const at = (v: unknown) => (v ? new Date(v as string).toISOString() : null)
 
-export const toAllowance = (r: Row): LeaveAllowance => ({ id: r.id, personId: r.person_id, year: r.year, days: r.days, carriedOver: r.carried_over, note: r.note })
+export const toAllowance = (r: Row): LeaveAllowance => ({ id: r.id, personId: r.person_id, year: r.year, days: r.days, carriedOver: r.carried_over, note: r.note, ...(r.self_set ? { selfSet: true } : {}) })
 export const toRequest = (r: Row): LeaveRequest => ({
   id: r.id,
   personId: r.person_id,
