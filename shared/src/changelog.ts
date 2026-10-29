@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.59.3',
+    date: '2026-10-29',
+    title: 'Tidying behind the scenes',
+    what: 'Tidying behind the scenes: the help pages describe the app as it is now, unused parts are gone, the put-away form is shared by places and cases, and some security updates. Joining two jobs with no signal now shows the joined days under their new names straight away.',
+    prs: [171],
+  },
+  {
     version: '1.58.0',
     date: '2026-10-29',
     title: 'Money says what its figures are',
