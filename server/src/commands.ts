@@ -169,7 +169,7 @@ export function refusedOnSight(m: Mutation, from: From = {}): MutationResult | u
   // A role that can't make this kind of change is told so, whatever is in it (ADR 0034).
   if (from.role && !roleMayRun(from.role, m.name))
     return { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
-  const parsed = commandSchemas[m.name].safeParse(m.args)
+  const parsed = commandSchemas[m.name].safeParse(m.args, { reportInput: true })
   if (!parsed.success) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: invalidMessage(parsed.error.issues[0]) } }
   return undefined
 }
@@ -327,12 +327,13 @@ const UNKNOWN = "The app doesn't do this any more, so it wasn't made."
 export const OLDER_APP = 'This was made on an older version of the app, which left out something it now needs, so it wasn\'t made. Close the app and open it again to update it, then make the change again.'
 
 /**
- * Why a change's contents are turned down, in words. A field missing altogether, which zod says only as "Required", is
- * what an older version of the app sends when a command has gained one, so it says that.
+ * Why a change's contents are turned down, in words. A field missing altogether, which zod says only as the wrong type
+ * with nothing given, is what an older version of the app sends when a command has gained one, so it says that. The
+ * parse reports what it was given (reportInput) so a missing field can be told from one that's there but wrong.
  */
-function invalidMessage(issue: { code: string; message: string; received?: unknown } | undefined): string {
+function invalidMessage(issue: { code: string; message: string; input?: unknown } | undefined): string {
   if (!issue) return 'Invalid request.'
-  if (issue.code === 'invalid_type' && issue.received === 'undefined') return OLDER_APP
+  if (issue.code === 'invalid_type' && issue.input === undefined) return OLDER_APP
   return issue.message
 }
 

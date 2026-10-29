@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { day } from './day.ts'
 import { months } from './inspections.ts'
-import { euroCents, needed, text, whole } from './plain.ts'
+import { euroCents, needed, text, whole, wrongType } from './plain.ts'
 
 /**
  * The warehouse catalogue (ADR 0013): products, the numbered items of them,
@@ -36,7 +36,7 @@ export type RackPart = (typeof RACK_PARTS)[number]
 export const RACK_PART_LABELS: Record<RackPart, string> = { blank: 'A blank panel', vent: 'A vent panel', shelf: 'A shelf', drawer: 'A drawer' }
 /** Kilos to a tenth, as typed: "12.5". */
 const kilos = z
-  .number({ invalid_type_error: 'The weight is a number of kilos, such as 12.5.' })
+  .number(wrongType('The weight is a number of kilos, such as 12.5.'))
   .min(0, 'The weight is a number of kilos, such as 12.5.')
   .max(5000, 'The weight can be up to 5,000 kg.')
   .transform((n) => Math.round(n * 10) / 10)

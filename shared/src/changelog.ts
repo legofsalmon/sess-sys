@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.63.5',
+    date: '2026-10-29',
+    title: 'A security update',
+    what: 'A security update behind the scenes: the part that checks every change sent to the server is on its newest version, which closes a known weakness where a very large change could tie up the server. Nothing you see is different, and the messages about a wrong number read as before.',
+    prs: [177],
+  },
+  {
     version: '1.63.4',
     date: '2026-10-29',
     title: 'Tidying behind the scenes',
@@ -68,7 +75,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-29',
     title: "The app's code now lives under Session Hire's own account",
     what: "The app's code moved to Session Hire's own GitHub account. The links on What's changed, the System status check for the newest version, and the name the app gives when it looks up addresses and fuel prices now point there.",
-    prs: [174],
+    prs: [177],
   },
   {
     version: '1.62.0',

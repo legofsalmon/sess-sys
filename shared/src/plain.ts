@@ -3,7 +3,7 @@ import { EURO_HINT } from './money.ts'
 
 /**
  * Plain words for what the shared schemas turn down (audit finding 11).
- * Zod's own wording ("Number must be less than or equal to 100") is for
+ * Zod's own wording ("Too big: expected number to be <=100") is for
  * programmers; the app and the server show these instead, said for the
  * field as a person knows it. Fields nobody types, such as ids, keep zod's
  * wording, which only a bug could reach.
@@ -41,8 +41,14 @@ export const text = (max: number, what: string) => z.string().transform(typed).p
 export const needed = (max: number, what: string, which: string) => z.string().transform(typed).pipe(upTo(max, what).min(1, `${which} is needed.`))
 
 /** A whole number from `min` to `max`, said the same way whichever way it's wrong. */
+/**
+ * A number's message for anything but a number. A field left out altogether keeps zod's own issue, which the server
+ * reads as a change from an older version of the app (server/src/commands.ts, invalidMessage).
+ */
+export const wrongType = (message: string) => ({ error: (issue: { input?: unknown }) => (issue.input === undefined ? undefined : message) })
+
 export function whole(min: number, max: number, what: string, said = `${what} is a whole number from ${min.toLocaleString('en-IE')} to ${max.toLocaleString('en-IE')}.`) {
-  return z.number({ invalid_type_error: said, required_error: said }).int(said).min(min, said).max(max, said)
+  return z.number({ error: said }).int(said).min(min, said).max(max, said)
 }
 
 /** A year, said as years are written: "from 2000 to 2999", never "2,000". */
@@ -51,7 +57,7 @@ export const wholeYear = (min: number, max: number, what: string) => whole(min, 
 /** Money in euro cents, so sums never drift, up to `maxCents`: "A day rate can be up to €100,000." */
 export function euroCents(maxCents: number, what: string) {
   return z
-    .number({ invalid_type_error: EURO_HINT, required_error: EURO_HINT })
+    .number({ error: EURO_HINT })
     .int(EURO_HINT)
     .min(0, "A price can't be less than nothing.")
     .max(maxCents, `${what} can be up to €${(maxCents / 100).toLocaleString('en-IE')}.`)
