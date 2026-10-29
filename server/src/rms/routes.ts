@@ -1,4 +1,4 @@
-import { csvText, type RmsLine, type RmsOpportunity, type RmsOpportunityPage, type RmsOpportunityWithLines, type RmsStatus } from '@sh/shared'
+import { csvText, irishToday, type RmsLine, type RmsOutcome, type RmsOpportunity, type RmsOpportunityPage, type RmsOpportunityWithLines, type RmsStatus } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import type { Db, Queryable } from '../db.ts'
 import { RmsRefused } from './api.ts'
@@ -77,16 +77,30 @@ const toLine = (r: Row): RmsLine => ({
 const euro = (cents: number) => (cents / 100).toFixed(2)
 const day = (at: string | null) => (at ? at.slice(0, 10) : '')
 
-/** Opportunities matching a search over number, subject, client and venue, newest first. */
-export async function findOpportunities(q: Queryable, search: string, page: number): Promise<RmsOpportunityPage> {
+// Whether each went ahead (ADR 0092), as rmsOutcome in shared/src/rms-history.ts says it, for asking by it.
+const STOPPED = `lower(status) IN ('lost', 'dead', 'cancelled')`
+const OUTCOME: Record<RmsOutcome, string> = {
+  not: `(${STOPPED} OR (lower(state) <> 'order' AND COALESCE(ends_at, starts_at) IS NOT NULL AND (COALESCE(ends_at, starts_at) AT TIME ZONE 'Europe/Dublin')::date < $2::date))`,
+  ahead: `(NOT ${STOPPED} AND lower(state) = 'order')`,
+  open: `(NOT ${STOPPED} AND lower(state) <> 'order' AND (COALESCE(ends_at, starts_at) IS NULL OR (COALESCE(ends_at, starts_at) AT TIME ZONE 'Europe/Dublin')::date >= $2::date))`,
+}
+
+/** Opportunities matching a search over number, subject, client and venue, and whether they went ahead, newest first. */
+export async function findOpportunities(q: Queryable, search: string, page: number, outcome?: RmsOutcome): Promise<RmsOpportunityPage> {
   const like = `%${search.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`
-  const where = `WHERE ($1 = '%%' OR number ILIKE $1 OR subject ILIKE $1 OR client ILIKE $1 OR venue ILIKE $1)`
+  const where = `WHERE ($1 = '%%' OR number ILIKE $1 OR subject ILIKE $1 OR client ILIKE $1 OR venue ILIKE $1)${outcome ? ` AND ${OUTCOME[outcome]}` : ''}`
+  // Only those asked by their days need today.
+  const params = outcome && outcome !== 'ahead' ? [like, irishToday()] : [like]
   const { rows } = await q.query<Row>(
-    `SELECT ${OPPORTUNITY} FROM rms_opportunities ${where} ORDER BY starts_at DESC NULLS LAST, id DESC LIMIT ${PAGE} OFFSET $2`,
-    [like, (page - 1) * PAGE]
+    `SELECT ${OPPORTUNITY} FROM rms_opportunities ${where} ORDER BY starts_at DESC NULLS LAST, id DESC LIMIT ${PAGE} OFFSET $${params.length + 1}`,
+    [...params, (page - 1) * PAGE]
   )
-  const { rows: count } = await q.query<{ n: string }>(`SELECT count(*) AS n FROM rms_opportunities ${where}`, [like])
-  return { opportunities: rows.map(toOpportunity), total: Number(count[0]?.n ?? 0) }
+  const { rows: count } = await q.query<{ n: string }>(`SELECT count(*) AS n FROM rms_opportunities ${where}`, params)
+  const ids = rows.map((r) => r.id as number)
+  const { rows: linked } = ids.length
+    ? await q.query<Row>('SELECT m.opportunity_id, m.project_id FROM rms_matches m JOIN projects p ON p.id = m.project_id WHERE m.opportunity_id = ANY($1)', [ids])
+    : { rows: [] as Row[] }
+  return { opportunities: rows.map(toOpportunity), total: Number(count[0]?.n ?? 0), links: Object.fromEntries(linked.map((r) => [r.opportunity_id, r.project_id])) }
 }
 
 export function registerRmsRoutes(app: FastifyInstance, { db, reader }: { db: Db; reader: RmsReader }) {
@@ -117,10 +131,11 @@ export function registerRmsRoutes(app: FastifyInstance, { db, reader }: { db: Db
     return reply.send(await reader.status())
   })
 
-  app.get<{ Querystring: { q?: string; page?: string } }>('/api/rms/opportunities', { config: { needs: 'money' } }, async (req, reply) => {
+  app.get<{ Querystring: { q?: string; page?: string; went?: string } }>('/api/rms/opportunities', { config: { needs: 'money' } }, async (req, reply) => {
     reply.header('cache-control', 'no-store')
     const page = Math.max(1, Math.min(10_000, Number.parseInt(req.query.page ?? '1', 10) || 1))
-    return findOpportunities(db.reads, (req.query.q ?? '').slice(0, 100), page)
+    const went = req.query.went === 'ahead' || req.query.went === 'not' || req.query.went === 'open' ? req.query.went : undefined
+    return findOpportunities(db.reads, (req.query.q ?? '').slice(0, 100), page, went)
   })
 
   app.get<{ Params: { id: string } }>('/api/rms/opportunities/:id', { config: { needs: 'money' } }, async (req, reply): Promise<RmsOpportunityWithLines | void> => {

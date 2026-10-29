@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Current RMS quotes in the quote history
+
+**Done**
+
+- Colly asked for the Current RMS quotes to be in the quote history rather
+  than hidden. Quotes now lists them under the app's own ("Before this
+  app, from Current RMS"), found by the same search, narrowed by the same
+  choices (Accepted = went ahead, Turned down = didn't, Sent = still to
+  come), each with how it went and its linked job's quote. Note 8 on
+  [ADR 0092](adr/0092-current-rms-history-on-quotes.md). App 1.52.0.
+- Checked: typecheck, server tests (the went filter and links), browser
+  tests (rms-history.spec.ts, quotes-page.spec.ts, quote-follow-up.spec.ts).
+
+**Waiting on** nobody.
+
 ## 28 October 2026: certificates on stock items
 
 **Done**

@@ -546,3 +546,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Matching past quotes to jobs (ADR 0092). */
 .rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
 .rms-match .match-row select { flex: 1 1 18em; min-width: 0; }
+
+/* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
+.quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
+.quotes .from-rms h3 { margin: 0 0 var(--space-8); }
