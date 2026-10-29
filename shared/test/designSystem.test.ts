@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ownColours } from '../src/own-colours.ts'
 
@@ -9,52 +9,29 @@ import { ownColours } from '../src/own-colours.ts'
  * for the red accent and the bad tone, which stay Session Hire's own.
  *
  * shared/src/ds/ holds only what the design system's scripts/sync.mjs
- * vendored. Whether a copy is behind the design system needs a checkout of
- * that private repository beside this one (`npm run ds:check`); whether it
- * was edited here, or is read wrongly, does not, so these hold that half.
+ * vendored, with the design system's own checker among it. Whether a copy is
+ * behind the published system is `npm run ds:check`, which warns; whether it
+ * was edited here, or is read wrongly, fails these.
  */
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const DS = join(ROOT, 'shared', 'src', 'ds')
-const FILES = ['icons.d.ts', 'icons.js', 'tokens.css', 'tokens.d.ts', 'tokens.js']
-
-function* sources(dir: string): Generator<string> {
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name)
-    if (path === DS) continue
-    if (statSync(path).isDirectory()) yield* sources(path)
-    else if (/\.(css|tsx?|html)$/.test(name)) yield path
-  }
-}
-const appSources = () => [...sources(join(ROOT, 'web', 'src')), ...sources(join(ROOT, 'server', 'src')), join(ROOT, 'web', 'index.html')]
+const FILES = ['ds-check.mjs', 'icons.d.ts', 'icons.js', 'tokens.css', 'tokens.d.ts', 'tokens.js']
 
 describe('the vendored design system', () => {
   it('holds the tokens and the icons', () => {
     expect(readdirSync(DS).sort()).toEqual(FILES)
   })
 
-  for (const file of FILES) {
-    it(`${file} is unedited since it was vendored`, () => {
-      // A hand edit here is a fix the design-system repo should get; the next `npm run ds:sync` would refuse to run over it.
-      const text = readFileSync(join(DS, file), 'utf8')
-      const newline = text.indexOf('\n')
-      const stamp = /@letissier\/design-system \S+ · (\S+) · sha256-([0-9a-f]{16}) · /.exec(text.slice(0, newline))
-      expect(stamp?.[1]).toBe(file)
-      expect(createHash('sha256').update(text.slice(newline + 1)).digest('hex').slice(0, 16)).toBe(stamp?.[2])
+  it('is unedited since it was vendored, and defines every --ds- role the app reads', () => {
+    // A hand edit here is a fix the design-system repo should get, and the next `npm run ds:sync` would drop it; a misspelt role computes to nothing, silently. The design system's checker holds both.
+    const run = spawnSync(process.execPath, [join(DS, 'ds-check.mjs'), 'shared/src/ds', '--reads', 'web/src', 'server/src', 'web/index.html', '--offline'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH },
     })
-  }
-
-  it('defines every --ds- role the app reads', () => {
-    // A misspelt role computes to nothing, silently: no colour at all.
-    const css = readFileSync(join(DS, 'tokens.css'), 'utf8')
-    const defined = new Set([...css.matchAll(/^\s*(--ds-[a-z0-9-]+)\s*:/gm)].map((m) => m[1]))
-    const unknown: string[] = []
-    for (const file of appSources()) {
-      for (const m of readFileSync(file, 'utf8').matchAll(/var\((--ds-[a-z0-9-]+)/g)) {
-        if (!defined.has(m[1])) unknown.push(`${relative(ROOT, file)}: ${m[1]}`)
-      }
-    }
-    expect(unknown).toEqual([])
+    expect(run.stderr).toBe('')
+    expect(run.status).toBe(0)
   })
 
   it("declares Session Hire's own colours in app.css as own-colours.ts has them", () => {
