@@ -2,7 +2,7 @@ import { type HistoryPage, type Person } from '@sh/shared'
 import { unzipSync } from 'fflate'
 import type { FastifyInstance } from 'fastify'
 import { describe, expect, it } from 'vitest'
-import { irishTime, spreadsheetSafe } from '../src/export.ts'
+import { everythingJson, everythingZip, irishTime, readEverything, spreadsheetSafe } from '../src/export.ts'
 import { IPHONE, onLink, server, staff } from './people.ts'
 
 /**
@@ -46,7 +46,7 @@ async function company() {
   await colly.send('offer.send', { id: 'o1', callId: 'c1', personId: 'p1', override: false })
   // Text a freelancer typed, which Excel would run as a formula.
   await onLink(app, `/f/${seán.linkToken}/offers/o1`, { answer: 'accept', note: '=HYPERLINK("http://evil.example","Click")' })
-  return { app, colly, links: [firstLink, seán.linkToken] }
+  return { app, db, colly, links: [firstLink, seán.linkToken] }
 }
 
 async function download(app: FastifyInstance, cookies: Record<string, string>) {
@@ -293,6 +293,37 @@ describe('download everything', () => {
 
     await app.inject({ method: 'POST', url: '/api/export/record', cookies: colly.cookies, payload: { format: 'json' } })
     expect((await colly.history()).entries[0]!.what).toMatch(/^Downloaded everything as JSON \(\d+ rows\)$/)
+  })
+
+  it('reads every table in a few trips, and makes the file a slice at a time, the same as it was', async () => {
+    // Proves (audit, 20 October 2026, finding 19): each table's columns, keys and size are asked for once for them all,
+    // a small table is read in one go and a big one a few thousand rows at a time, and the zip lets the server answer
+    // others while it's made; everything.json is still exactly JSON.stringify(everything, null, 1).
+    const { app, db } = await company()
+    await db.query(`INSERT INTO places (id, name, notes) SELECT 'pl' || lpad(g::text, 5, '0'), 'Bay ' || g, CASE WHEN g % 2 = 0 THEN '=1+' || g ELSE '' END FROM generate_series(1, 12000) g`)
+    let statements = 0
+    const transaction = db.transaction.bind(db)
+    db.transaction = (fn) => transaction((tx) => fn({ ...tx, query: (sql, params) => (statements++, tx.query(sql, params)) }))
+    const everything = await readEverything(db)
+    // One for each table, a few for the moment it's read at, the list of tables and their layout, the big table's cursor
+    // and the history: about 80, where it was five or six for each table, over 300.
+    expect(statements).toBeLessThan(everything.tables.length + 20)
+    const expected = JSON.stringify(everythingJson(everything), null, 1)
+    const places = everything.tables.find((t) => t.name === 'places')!.rows.length
+
+    let between = false
+    setImmediate(() => (between = true))
+    const zipped = unzipSync(await everythingZip(everything))
+    expect(between).toBe(true)
+    const text = new TextDecoder('utf-8', { ignoreBOM: true })
+    expect(text.decode(zipped['everything.json'])).toBe(expected)
+    const sheet = text.decode(zipped['tables/places.csv']).split('\r\n')
+    expect(sheet).toHaveLength(places + 2)
+    expect(sheet[0]).toBe('\uFEFFid,name,notes')
+    expect(sheet.at(-2)).toBe("pl12000,Bay 12000,'=1+12000")
+    // Its rows are let go as it goes.
+    expect(everything.tables.every((t) => t.rows.length === 0)).toBe(true)
+    void app
   })
 
   it('is for signed-in staff only', async () => {

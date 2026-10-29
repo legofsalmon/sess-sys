@@ -294,6 +294,18 @@ describe('products and places', () => {
     expect((await all(app, 'place')).size).toBe(0)
   })
 
+  it('removes a priced product, or marks one a mistake, with its price, and tells the devices the price is gone', async () => {
+    // Proves: a price no longer holds a removal back with a bare server error, nor is left behind (audit, 20 October 2026, finding 46).
+    const { app, xlr, rack } = await warehouse()
+    await ok(app, 'price.product', { modelId: xlr.id, dayCents: 300 })
+    await ok(app, 'price.product', { modelId: rack.id, dayCents: 2500 })
+    expect((await all(app, 'productPrice')).size).toBe(2)
+    await ok(app, 'model.remove', { id: xlr.id })
+    await ok(app, 'model.mistake', { id: rack.id })
+    expect((await all(app, 'model')).has(xlr.id)).toBe(false)
+    expect((await all(app, 'productPrice')).size).toBe(0)
+  })
+
   it('switches between numbered and counted only while nothing is numbered', async () => {
     const { app, y10p, xlr } = await warehouse()
     await ok(app, 'asset.add', item(y10p.id))

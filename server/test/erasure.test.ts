@@ -26,11 +26,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { restoreFrom } from '../src/backup/service.ts'
 import { dirStore, type BackupStore } from '../src/backup/store.ts'
-import { pgliteDb, type Db } from '../src/db.ts'
+import type { Db } from '../src/db.ts'
 import { describe as inWords, ERASED_AGAIN_ACTION, ERASED_WHEN_DUE_ACTION } from '../src/history.ts'
 import { DueErasures, eraseWhatIsDue } from '../src/erasure/due.ts'
 import { LIST_KEY } from '../src/erasure/list.ts'
 import { flashOf, IPHONE, server as signedIn, staff, typedOnly, WINDOWS } from './people.ts'
+import { scratchDb } from './scratch-db.ts'
+
+// A test restore boots a process and a database of its own, two or three a test: alone these take 10 to 18 s, and with
+// the whole suite and the browser tests beside them they came near 30 s and timed out (audit, 20 October 2026, finding
+// 110). This file's tests get 90 s; the rest of the suite keeps 30.
+vi.setConfig({ testTimeout: 90_000 })
 
 /**
  * Erasing a person's details on request (ADR 0027): everywhere they live
@@ -48,8 +54,9 @@ afterEach(async () => {
 const today = irishToday()
 const day = (n: number) => addDays(today, n)
 
+/** One of the file's databases, emptied (scratch-db.ts): booting one for each test was most of its time (finding 110). */
 async function database() {
-  const db = await pgliteDb()
+  const db = await scratchDb()
   cleanup.push(() => db.close())
   return db
 }

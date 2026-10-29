@@ -158,9 +158,11 @@ function cameraProblem(err: unknown): string {
   const name = err instanceof DOMException || err instanceof Error ? err.name : ''
   if (name === 'NotAllowedError' || name === 'SecurityError')
     return "The camera is blocked for this app. Allow the camera for this site in the browser's settings, then turn it on again."
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'There is no camera on this device. A scanner that types the number works in the search instead.'
+  // Every screen with a camera has a field beside it, not always a search (audit, 20 October 2026, finding 94).
+  if (name === 'NotFoundError' || name === 'OverconstrainedError')
+    return 'There is no camera on this device. A scanner that types, or typing the number in the field above, works instead.'
   if (name === 'NotReadableError' || name === 'AbortError') return 'Another app is using the camera. Close it, then turn the camera on again.'
-  return "The camera didn't start. Turn it on again, or type the number in the search."
+  return "The camera didn't start. Turn it on again, or type the number in the field above."
 }
 
 /**

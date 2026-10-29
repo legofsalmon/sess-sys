@@ -15,6 +15,7 @@
   "deploy": {
     "startCommand": "node --import tsx server/src/index.ts",
     "healthcheckPath": "/api/health",
+    "drainingSeconds": 30,
     "restartPolicyType": "ON_FAILURE"
   }
 }

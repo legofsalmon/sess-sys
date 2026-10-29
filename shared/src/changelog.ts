@@ -28,6 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.55.1',
+    date: '2026-10-29',
+    title: 'Heavy jobs no longer hold everyone up',
+    what: "Bringing a season in from Google Calendar and downloading everything no longer hold up everyone else's phones for seconds. A deploy during the nightly backup no longer loses that night's backup or blocks Back up now for half an hour: the server makes it up a minute after it starts again.",
+    prs: [162],
+  },
+  {
+    version: '1.55.0',
+    date: '2026-10-29',
+    title: 'The warehouse screens are easier on a busy day',
+    what: "Back and Missing on the pick list are harder to mis-tap, and Missing can be undone. Reporting damage now says it worked. Repairs shows what can't go out first and can be narrowed to a department. Long counts and test lists fold, with Finish always in reach. A product with a price can now be removed. A job no longer stays under Coming back for good when an item lost on site is retired.",
+    prs: [161],
+  },
+  {
     version: '1.54.0',
     date: '2026-10-29',
     title: 'Crew needed shows the next fortnight, and unanswered offers wait to be chased',

@@ -18,10 +18,42 @@ waiting on someone.
 - Recommended order: enquiries into quotes first, then the mailbox, then
   the weekly report.
 
-**Waiting on Colly**
+**Colly's pick**
 
-- Which role to start with, and whether Claude runs on Anthropic's own
-  service or through Google Cloud in an EU region.
+- Claude stays inside the app only: no mailbox and no email for now. It
+  acts as a PA for the office and directors with a to-do list and
+  notifications in the app, and helps start, change and update quotes in
+  this early phase. Building that next.
+
+## 29 October 2026: heavy jobs that held everyone up
+
+**Done**
+
+- Findings 17, 18, 19, 54 and 110 of the [20 October
+  audit](audit-2026-10-20.md) (PR #162): a calendar bring-in saves new
+  people and venues a few hundred at a time and plans once, a big calendar
+  off the main thread; the export and backup read each table in one go and
+  build the zip a slice at a time; a deploy waits for a backup in progress
+  and the next server makes up one it stopped; slow backup tests given
+  room. ADRs 0004, 0006 and 0011 note it. App 1.55.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and 11
+  browser tests.
+
+
+## 29 October 2026: the warehouse's small hurts
+
+**Done**
+
+- Findings 40 to 46 and 93 to 96 of the [20 October
+  audit](audit-2026-10-20.md) (PR #161): Back and Missing apart with Undo,
+  numbers that don't break, damage reports confirmed, counts and Testing
+  folded with Finish in reach, Repairs grouped by what can't go out with a
+  department filter, clearer scan answers, a retired item off Coming back,
+  two missing reports as one loss, and a priced product removable. ADRs
+  0017, 0018 and 0042 note it. App 1.55.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 32
+  browser tests.
+
 
 ## 29 October 2026: the office's crew day
 
