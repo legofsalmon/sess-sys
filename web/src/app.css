@@ -283,7 +283,8 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .app .job-row .kit-note { font-size: var(--text-hint); }
 .app .job-row .kit-note.bad, .app .job-row small.flag.bad { color: var(--bad); }
 .app .job-row .kit-note.warn, .app .job-row small.flag.warn { color: var(--warn); }
-.app .job-row .kit-note.ok, .app .job-row small.flag.ok { color: var(--good); }
+/* Enough is the quiet case (healthy is quiet; audit, 20 October 2026, finding 59), so the short lines beside it stand out. */
+.app .job-row .kit-note.ok, .app .job-row small.flag.ok { color: var(--muted); }
 .app .job-row small.flag { font-weight: 700; }
 .app .kit-short { border-color: var(--warn); }
 .app .kit-short h2 { color: var(--warn); }
@@ -309,6 +310,9 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .skill-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding-inline-start: var(--space-8); border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--panel); color: var(--ink); font-size: var(--text-small); }
 .skill-chip button { display: grid; place-items: center; width: 34px; height: 34px; min-height: 0; padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--muted); }
 .skill-chip button:hover { color: var(--ink); background: var(--line); }
+/* Drawn at 34px, as a chip's own control is, but a finger's 44px to hit (audit, 20 October 2026, finding 58). */
+.skill-chip button { position: relative; }
+.skill-chip button::after { content: ''; position: absolute; inset: -5px; }
 .skill-chip .icon { width: 16px; height: 16px; }
 .skill-options { position: absolute; z-index: 5; top: calc(100% + var(--space-4)); left: 0; right: 0; max-height: 16em; overflow-y: auto; list-style: none; margin: 0; padding: var(--space-4); border: 1px solid var(--ds-line-strong); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); box-shadow: var(--ds-elevation-menu); }
 .skill-options[hidden] { display: none; }

@@ -133,7 +133,7 @@ export function renderSheet(s: CallSheet, base: string, office?: OfficeDetails |
   ${
     s.venue
       ? `<section><h2>Where</h2><p><b>${h(s.venue.name)}</b>${s.venue.address ? `<br>${lines(s.venue.address)}` : ''}</p>
-    <p><a href="${h(s.venue.map)}">Open the map</a></p>${s.venue.notes ? `<p class="details">${lines(s.venue.notes)}</p>` : ''}</section>`
+    <p><a class="map" href="${h(s.venue.map)}">Open the map</a></p>${s.venue.notes ? `<p class="details">${lines(s.venue.notes)}</p>` : ''}</section>`
       : ''
   }
 
@@ -196,12 +196,13 @@ export const SHEET_CSS = `
 .sheet section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;gap:8px}
 .sheet section.head{background:none;border:0;padding:0}
 .sheet section p{margin:0}.sheet h2{margin:0}
-.you{border-left:4px solid var(--good)!important}.contact{border-left:4px solid var(--accent)!important}
+.you{border-left:4px solid var(--ink)!important}.contact{border-left:4px solid var(--accent)!important}
 .call{display:grid;gap:4px;padding-top:8px;border-top:1px solid var(--line)}.call:first-of-type{border-top:0;padding-top:0}
 .call ul{margin:0;padding-left:1.1em;display:grid;gap:2px}.call small,.head small{color:var(--muted)}
 .call li.me{font-weight:600}
 .sheet section.late{border-left:4px solid var(--warn)!important}.sheet section.late ul{margin:0;padding-left:1.1em;display:grid;gap:2px}.call small.late{color:var(--warn);font-weight:600}
 a[href^="tel:"]{white-space:nowrap}
+.map{display:inline-flex;align-items:center;min-height:44px}
 @media print{
   :root{--bg:#fff;--panel:#fff;color-scheme:light}
   .back,footer span:last-child{display:none}

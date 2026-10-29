@@ -28,7 +28,7 @@
 .jobs .kit-state { margin: 0; font-size: .85rem; }
 .jobs .kit-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
 .jobs .kit-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
-.jobs .kit-state.ok { color: var(--good); }
+.jobs .kit-state.ok { color: var(--ink); }
 .jobs .kit-state.quiet { color: var(--muted); }
 /* What's short, said once above the lines, with one way to subhire it (audit finding 21); with many short, each line says its own in a few words, without the box. */
 .jobs .short-kit { display: grid; gap: var(--space-8); justify-items: start; }
@@ -216,7 +216,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .pick-row > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .pick .pick-row > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
 .pick .pick-row .count { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pick .pick-row.done .count { color: var(--good); }
+.pick .pick-row.done .count { color: var(--ink); }
 .pick .from { margin: 0; padding-left: var(--space-16); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .pick .out-items li { display: flex; align-items: center; gap: var(--space-2); }
 .pick .count-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; }
@@ -224,7 +224,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .count-row input { width: 7.5rem; }
 .pick .count-row .alert { flex: 1 0 100%; }
 /* Picking on the phone (ADR 0072): whose kit and in what order, what to know before starting, the kit's own notes, and Undo beside the answer. */
-.pick .pick-total.done { color: var(--good); }
+/* Done is settled, so it's ink: green stays for a scan that read (audit, 20 October 2026, finding 59). */
+.pick .pick-total.done { color: var(--ink); }
 .pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: .9rem; }
 .pick .pick-ways { display: grid; gap: var(--space-8); }
 .pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: .85rem; }
@@ -246,7 +247,9 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sheet-screen .sheet-call ul, .sheet-screen .sheet-kit ul, .sheet-screen .sheet-contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
 .sheet-screen .sheet-call li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-8); }
 .sheet-screen .sheet-call li > span:first-child { flex: 1 1 10em; }
-.sheet-screen .sheet-call button.link { min-height: 36px; padding: var(--space-2) var(--space-6); }
+/* Send and a crew phone number, a finger's 44px to hit (audit, 20 October 2026, finding 58). */
+.sheet-screen .sheet-call button.link { min-height: 44px; min-width: 44px; padding: var(--space-2) var(--space-6); }
+.sheet-screen .sheet-call li a[href^='tel:'] { display: inline-flex; align-items: center; min-height: 44px; }
 .sheet-screen .card a:not(.button) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 .sheet-screen a[href^='tel:'] { white-space: nowrap; }
 @media print {

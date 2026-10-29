@@ -1,5 +1,5 @@
 import type { Column } from '@sh/shared'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Heading, type IconName } from '../Icon.tsx'
 import { STILL_ARRIVING, useCopying } from './copying.ts'
 
@@ -11,6 +11,23 @@ import { STILL_ARRIVING, useCopying } from './copying.ts'
  * only what's short is amber, so a healthy week is quiet. The line above
  * the chart says, in words, the column under the finger or the pointer.
  */
+
+/**
+ * Too narrow for a fortnight's columns at a finger's width: a phone shows a week of them, the other behind a tap, as Your weeks fits
+ * with fewer (audit, 20 October 2026, finding 58: fourteen columns were 22 px wide on a phone).
+ */
+const narrow = typeof matchMedia === 'function' ? matchMedia('(max-width: 719px)') : undefined
+function useNarrow(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      narrow?.addEventListener('change', onChange)
+      return () => narrow?.removeEventListener('change', onChange)
+    },
+    () => narrow?.matches ?? false
+  )
+}
+const WEEK = 7
+const WEEKS = ['First week', 'Second week', 'Third week', 'Fourth week', 'Fifth week']
 
 /** What a part means, which picks its colour: settled ink, not-yet grey, short amber. */
 export type Tone = 'settled' | 'pending' | 'short'
@@ -48,10 +65,20 @@ export function Chart({
     const said = c.parts.flatMap((n, i) => (n > 0 ? [`${format(n)} ${series[i]!.name}`] : []))
     return `${c.name}: ${said.length > 0 ? said.join(', ') : 'nothing'}`
   }
-  const move = (to: number, el: HTMLElement) => {
-    const next = Math.max(0, Math.min(columns.length - 1, to))
-    setPicked(next)
-    ;(el.parentElement?.children[next] as HTMLElement | undefined)?.focus()
+  // A week at a time on a phone, the one holding the column being read; the scale stays the fortnight's, so the weeks compare.
+  const paged = useNarrow() && columns.length > WEEK + 1
+  const from = paged ? Math.floor(at / WEEK) * WEEK : 0
+  const shown = paged ? columns.slice(from, from + WEEK) : columns
+  const group = useRef<HTMLDivElement>(null)
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    group.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus()
+  })
+  const move = (to: number) => {
+    setPicked(Math.max(0, Math.min(columns.length - 1, to)))
+    refocus.current = true
   }
 
   return (
@@ -68,37 +95,49 @@ export function Chart({
             <span className="chart-max" aria-hidden="true">
               {format(max)}
             </span>
-            <div className="chart-columns" role="group" aria-label={title} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
-              {columns.map((c, i) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  className={`chart-col${c.now ? ' now' : ''}`}
-                  aria-label={words(c)}
-                  aria-pressed={i === at}
-                  // One stop in the tab order; the arrows move along the columns.
-                  tabIndex={i === at ? 0 : -1}
-                  onClick={() => setPicked(i)}
-                  onPointerEnter={(e) => e.pointerType === 'mouse' && setPicked(i)}
-                  onKeyDown={(e) => {
-                    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: columns.length - 1 }[e.key]
-                    if (to === undefined) return
-                    e.preventDefault()
-                    move(to, e.currentTarget)
-                  }}
-                >
-                  <span className="chart-bar">
-                    <span className="chart-stack" style={{ height: `${(totals[i]! / max) * 100}%` }}>
-                      {c.parts.map((n, p) => (n > 0 ? <span key={p} className={`chart-part ${series[p]!.tone}`} style={{ flexGrow: n }} /> : null))}
+            <div className="chart-columns" role="group" aria-label={title} ref={group} style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
+              {shown.map((c, k) => {
+                const i = from + k
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    className={`chart-col${c.now ? ' now' : ''}`}
+                    aria-label={words(c)}
+                    aria-pressed={i === at}
+                    // One stop in the tab order; the arrows move along the columns.
+                    tabIndex={i === at ? 0 : -1}
+                    onClick={() => setPicked(i)}
+                    onPointerEnter={(e) => e.pointerType === 'mouse' && setPicked(i)}
+                    onKeyDown={(e) => {
+                      const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: columns.length - 1 }[e.key]
+                      if (to === undefined) return
+                      e.preventDefault()
+                      move(to)
+                    }}
+                  >
+                    <span className="chart-bar">
+                      <span className="chart-stack" style={{ height: `${(totals[i]! / max) * 100}%` }}>
+                        {c.parts.map((n, p) => (n > 0 ? <span key={p} className={`chart-part ${series[p]!.tone}`} style={{ flexGrow: n }} /> : null))}
+                      </span>
                     </span>
-                  </span>
-                  <span className="chart-tick" aria-hidden="true">
-                    {c.tick}
-                  </span>
+                    <span className="chart-tick" aria-hidden="true">
+                      {c.tick}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          {paged && (
+            <div className="filters chart-weeks" role="group" aria-label="Which week">
+              {WEEKS.slice(0, Math.ceil(columns.length / WEEK)).map((name, w) => (
+                <button key={name} type="button" aria-pressed={from === w * WEEK} onClick={() => setPicked(w * WEEK)}>
+                  {name}
                 </button>
               ))}
             </div>
-          </div>
+          )}
           {series.length > 1 && (
             <ul className="chart-key">
               {series.map((s) => (
