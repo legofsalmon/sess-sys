@@ -138,7 +138,7 @@ describe('what each role reads', () => {
 
   it('is everything for the office, directors and with roles off; for others, rates and links are narrowed', () => {
     for (const role of ['director', 'office', null] as const) expect(readsEverything(readingFor(role))).toBe(true)
-    expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio', clientDocuments: false })
+    expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio' })
     expect(readingFor('head', { department: 'Audio', headsSeeRates: true })).toMatchObject({ rates: true, ratesBy: 'department' })
     expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own', details: 'own', documents: 'own', clientDocuments: false })
     expect(crew).toEqual({ rates: false, links: 'own', personId: own, details: 'phones', documents: 'own', clientDocuments: false })
@@ -241,9 +241,9 @@ describe('what staff crew and freelancers read of other people', () => {
     expect(personAsRead(someone, head).detailsHidden).toBeUndefined()
   })
 
-  it("sends a client's documents only to the office and directors, and a venue's to everyone (audit, 20 October 2026, finding 39)", () => {
+  it("sends a client's documents only to the office, directors and heads, and a venue's to everyone (audit, 20 October 2026, finding 39)", () => {
     expect(readsAttachmentOf(crew, { owner: 'client' })).toBe(false)
-    expect(readsAttachmentOf(head, { owner: 'client' })).toBe(false)
+    expect(readsAttachmentOf(head, { owner: 'client' })).toBe(true)
     expect(readsAttachmentOf(crew, { owner: 'venue' })).toBe(true)
     expect(readsAttachmentOf(READS_EVERYTHING, { owner: 'client' })).toBe(true)
     expect(documentsRead(crew)).toBe(own)

@@ -58,10 +58,10 @@ export interface Reading {
   /** Other people's documents, certificates and insurance, and their files (ADR 0062). Absent is all. */
   documents?: 'all' | 'own'
   /**
-   * Clients' documents (ADR 0032): false for a role with neither jobs nor
-   * money, as a client's contract or purchase order carries the prices kept
-   * from them (audit, 20 October 2026, finding 39). Venues' are everyone's.
-   * Absent is all.
+   * Clients' documents (ADR 0032): false for staff crew and freelancers, as
+   * a client's contract or purchase order carries the prices kept from them
+   * (audit, 20 October 2026, finding 39). Heads see them, by Colly's choice
+   * on 29 October. Venues' are everyone's. Absent is all.
    */
   clientDocuments?: false
 }
@@ -86,7 +86,7 @@ export function readingFor(role: Role | null | undefined, who: ReaderOf = {}): R
   const own = who.personId ? { personId: who.personId } : {}
   if (role === 'head') {
     const rates = who.headsSeeRates === true
-    return { rates, ...(rates ? { ratesBy: 'department' as const } : {}), links: 'department', ...own, department: who.department?.trim() || null, clientDocuments: false }
+    return { rates, ...(rates ? { ratesBy: 'department' as const } : {}), links: 'department', ...own, department: who.department?.trim() || null }
   }
   return { rates: false, links: 'own', ...own, details: role === 'crew' ? 'phones' : 'own', documents: 'own', clientDocuments: false }
 }
@@ -169,7 +169,7 @@ export const documentsRead = (r: Reading): true | string | null => ((r.documents
 export const readsAttachmentOf = (r: Reading, doc: { owner: string }) => doc.owner !== 'client' || r.clientDocuments !== false
 
 /** Why someone can't open a client's document, and who can. */
-export const CLIENT_DOCUMENTS_REFUSAL = "Only the office and directors see clients' documents, as they can carry the prices agreed. Venues' are open to everyone."
+export const CLIENT_DOCUMENTS_REFUSAL = "Only the office, directors and heads of department see clients' documents, as they can carry the prices agreed. Venues' are open to everyone."
 
 /** Why someone can't open another person's document, and who can. */
 export const DOCUMENTS_REFUSAL = "Only the office, directors and heads of department see other people's certificates and insurance. Your own are on your page."
