@@ -221,3 +221,42 @@ test('Crew needed lists only the calls short of people, with the filled ones fol
   }
   expect(found, 'a department with every call filled').toBe(true)
 })
+
+test('Crew needed shows the next fortnight at rest, and every call still to come a tap away, kept while the tab is open', async ({ browser, request }) => {
+  // Proves: at rest the short calls are the next fortnight's; "Show all N calls still to come" says how many and shows them all; it stays
+  // shown after going to another Crew page and back (audit, 20 October 2026, finding 23).
+  const later = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
+  const res = await request.post('/api/sync/push', {
+    data: {
+      clientId: 'screens-fortnight',
+      mutations: [
+        {
+          id: `fortnight-${Date.now()}`,
+          name: 'call.create',
+          args: { id: `fortnight-call-${Date.now()}`, project: 'Far Off Fest', phase: '', venue: '', role: 'Rigger', start: later, end: later, callTime: null, needed: 2, dayRateCents: null, details: '', replyBy: null },
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    },
+  })
+  expect(((await res.json()) as { results: { status: string }[] }).results[0]!.status).toBe('applied')
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/#crew/calls')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  const needed = page.locator('section.card', { has: page.getByRole('heading', { name: 'Crew needed' }) })
+  const shortCalls = needed.locator(':scope > .call-groups > .call-group article.call').filter({ hasNot: page.locator(':scope > .pill', { hasText: /^Filled/ }) })
+  const showAll = needed.getByRole('button', { name: /^Show all \d+ calls still to come$/ })
+  await expect(showAll).toBeVisible()
+  const total = Number((await showAll.textContent())!.match(/\d+/)![0])
+  const atRest = await shortCalls.count()
+  expect(atRest).toBeLessThan(total)
+  await expect(needed.locator('.call-group', { hasText: 'Far Off Fest' })).toHaveCount(0)
+  await showAll.click()
+  await expect(showAll).toHaveCount(0)
+  // The list is drawn in a window, so not every call is built at once: more than at rest is enough to say they're there.
+  await expect.poll(() => shortCalls.count()).toBeGreaterThan(atRest)
+  await page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^People/ }).click()
+  await page.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
+  await expect(needed.getByRole('heading', { name: 'Crew needed' })).toBeVisible()
+  await expect(showAll).toHaveCount(0)
+})

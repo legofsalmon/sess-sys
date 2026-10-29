@@ -135,6 +135,8 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
 
   // The applicant is out of the Offer to… picker until asked for, on Calls.
   await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: /^Calls/ }).click()
+  // The call is past the fortnight Crew needed shows at rest (audit, 20 October 2026, finding 23).
+  await office.getByRole('button', { name: /^Show all \d+ calls still to come$/ }).click()
   const call = office.locator('.call-group', { hasText: `Import check ${id}` }).getByRole('article', { name: 'Stagehand' })
   await call.getByRole('button', { name: 'Offer…' }).click()
   const picker = call.getByLabel('Offer to')

@@ -287,6 +287,22 @@ describe('allowances', () => {
   })
 })
 
+describe('an approver\'s own allowance', () => {
+  it('is set by another approver where there is one, and marked when they had to set it themselves', async () => {
+    // Proves: the only approver may set their own allowance, and the record and the history say so; once another approver
+    // exists, setting your own is refused, and the other approver's setting it clears the mark (audit, 20 October 2026, finding 84).
+    const { app, aoife, colly } = await company()
+    const next = Number(today.slice(0, 4)) + 1
+    expect(await colly.send('leave.allowance', { personId: 'colly', year: next, days: 25, carriedOver: 3, note: '', by: 'colly' })).toMatchObject({ status: 'applied' })
+    expect(await colly.record<LeaveAllowance>('leaveAllowance', `colly-${next}`)).toMatchObject({ days: 25, selfSet: true })
+    expect((await colly.history()).entries[0]).toMatchObject({ what: `Colly Hewson set their own ${next} allowance to 25 days, 3 carried over` })
+    expect(await colly.send('person.upsert', { id: 'aoife', name: 'Aoife Byrne', kind: 'staff', email: aoife.email, phone: null, skills: [], dayRateCents: null, notes: '', approvesLeave: true })).toMatchObject({ status: 'applied' })
+    expect(refused(await colly.send('leave.allowance', { personId: 'colly', year: next, days: 200, carriedOver: 100, note: '', by: 'colly' }))).toBe("You can't set your own allowance; another approver has to.")
+    expect(await aoife.send('leave.allowance', { personId: 'colly', year: next, days: 25, carriedOver: 3, note: '', by: 'aoife' })).toMatchObject({ status: 'applied' })
+    expect((await colly.record<LeaveAllowance>('leaveAllowance', `colly-${next}`)).selfSet).toBeUndefined()
+  })
+})
+
 describe('while sign-in is off', () => {
   it('takes the device at its word about who is deciding, and still needs the flag', async () => {
     const db = await pgliteDb()
