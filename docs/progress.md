@@ -15,7 +15,7 @@ waiting on someone.
   backups and Sentry keys were all set on 19 October; the field test no
   longer says Start fresh now real data is live; the design system's files
   are at 0.9.0; nine unused parts deleted; one put-away form for places and
-  cases; and the security updates that need no major version. App 1.60.3.
+  cases; and the security updates that need no major version. App 1.63.4.
 - Left open: splitting the six files over 900 lines (when next touched),
   and the major upgrades (zod 4, now first since zod 3 has a high advisory
   on oversized arrays; vitest 5; PGlite 0.5), as one dependency afternoon.
