@@ -197,9 +197,13 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
    page is hidden with nothing to say it's there (audit P2 23). It used to wrap: Stock's nine took four lines, a third of a phone, before any stock. */
 .views { display: flex; flex-wrap: nowrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
 .views::-webkit-scrollbar { display: none; }
-.views[data-more='right'] { mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
-.views[data-more='left'] { mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
-.views[data-more='both'] { mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+/* More this way (more.tsx): wherever a row or a table scrolls sideways, the edge with more past it fades, the same on every screen (audit P2 23;
+   20 October 2026, finding 13). A fade, not a shadow, so it reads the same on any surface. --more-from keeps a column that stays put (the
+   planner's names) out of the left fade. */
+.more-edges { --more-at: var(--more-from, 0px); }
+.more-edges[data-more='right'] { mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.more-edges[data-more='left'] { mask-image: linear-gradient(to right, #000 var(--more-at), transparent var(--more-at), #000 calc(var(--more-at) + 48px)); }
+.more-edges[data-more='both'] { mask-image: linear-gradient(to right, #000 var(--more-at), transparent var(--more-at), #000 calc(var(--more-at) + 48px), #000 calc(100% - 48px), transparent); }
 .views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; gap: var(--space-6); min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
 .views a:not([aria-current]):hover { color: var(--ink); }

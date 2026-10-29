@@ -68,6 +68,7 @@ import { createPortal } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Heading } from '../Icon.tsx'
+import { Sideways } from '../more.tsx'
 import { ProductPicker } from '../ProductPicker.tsx'
 import { useAccess } from '../role.ts'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
@@ -1676,7 +1677,7 @@ function Records({ q, job }: { q: QuoteView; job: JobView }) {
 function Lines({ lines }: { lines: readonly QuoteLine[] }) {
   if (!lines.length) return <Empty>No lines.</Empty>
   return (
-    <div className="quote-table-wrap">
+    <Sideways className="quote-table-wrap">
       <table className="quote-table">
         <thead>
           <tr>
@@ -1716,7 +1717,7 @@ function Lines({ lines }: { lines: readonly QuoteLine[] }) {
           </tbody>
         ))}
       </table>
-    </div>
+    </Sideways>
   )
 }
 

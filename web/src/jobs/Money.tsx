@@ -32,6 +32,7 @@ import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
+import { Sideways } from '../more.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
@@ -280,7 +281,7 @@ function ByMonth({ m }: { m: MoneyView }) {
   return (
     <section className="card" aria-label="By month">
       <Heading icon="calendar">By month</Heading>
-      <div className="quote-table-wrap">
+      <Sideways className="quote-table-wrap">
         <table className="quote-table money-months">
           <thead>
             <tr>
@@ -303,7 +304,7 @@ function ByMonth({ m }: { m: MoneyView }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Sideways>
       <p className="hint">Quoted counts the quote that stands on each job, sent or accepted; confirmed, the accepted ones. A job turned down or cancelled isn't counted.</p>
     </section>
   )
@@ -403,7 +404,7 @@ function Margins({ m }: { m: MoneyView }) {
   return (
     <section className="card" aria-label="Margin by job">
       <Heading icon="calendar">Margin by job</Heading>
-      <div className="quote-table-wrap">
+      <Sideways className="quote-table-wrap">
         <table className="quote-table money-margins">
           <thead>
             <tr>
@@ -430,7 +431,7 @@ function Margins({ m }: { m: MoneyView }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Sideways>
       <p className="hint">The quote that stands, before VAT, less freelancers' approved timesheets and those booked and still to come at their booked rate. Staff and subhire aren't in it.</p>
     </section>
   )

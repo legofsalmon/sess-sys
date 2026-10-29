@@ -64,6 +64,9 @@
    screen (under the bar, over the phone's tabs), so a long month scrolls inside it with its days and names kept in view. */
 .plan .scroller { position: relative; overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - 96px - env(safe-area-inset-bottom)); border: 1px solid var(--line); border-radius: 10px; }
 @media (min-width: 900px) { .plan .scroller { max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
+/* The names stay put as the days scroll, so the left fade starts past them (more.tsx). */
+.plan .scroller { --more-from: 7rem; }
+@media (min-width: 900px) { .plan .scroller { --more-from: 12rem; } }
 .plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .plan .timeline { --names: 7rem; --pad: var(--space-4); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
 /* A desk has room for a job's name on one line; a month's days then fit a laptop without scrolling sideways. */
@@ -367,17 +370,6 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-totals .total dt { color: var(--ink); }
 .jobs .margin-line { margin: 0; }
 .jobs .margin-line.bad b { color: var(--bad); }
-/*
- * Money's tables on a phone scroll sideways (audit finding 23): a shade at the edge that has more, gone once scrolled to the
- * end. The covers move with the table and the shades stay with the box, so a shade shows only where a cover has gone.
- */
-.money .quote-table-wrap {
-  background:
-    linear-gradient(to right, var(--panel) 40%, transparent) left / 2.5rem 100% no-repeat local,
-    linear-gradient(to left, var(--panel) 40%, transparent) right / 2.5rem 100% no-repeat local,
-    linear-gradient(to right, color-mix(in srgb, var(--ink) 18%, transparent), transparent) left / .9rem 100% no-repeat scroll,
-    linear-gradient(to left, color-mix(in srgb, var(--ink) 18%, transparent), transparent) right / .9rem 100% no-repeat scroll;
-}
 .money .money-facts { grid-template-columns: repeat(auto-fit, minmax(9em, 1fr)); }
 .money .money-facts dd { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .money .owed { display: grid; gap: var(--space-6); padding-top: var(--space-8); }
