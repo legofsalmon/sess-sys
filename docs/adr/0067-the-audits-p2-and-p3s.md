@@ -117,3 +117,13 @@ obvious from the code.
 - Colly: clear the start command in Railway's dashboard on both services
   (finding 25), and decide when a demo passcode under 12 characters is
   refused.
+
+Later (29 October 2026): the 20 October audit's findings 13 and 77 found
+the strip and the job's parts still clipped with no cue, and Money's shade
+on Money alone. One fade now means "more this way" everywhere a row or a
+table scrolls sideways (`web/src/more.tsx`): an area's row, On this
+screen, a page's tabs, the quote and Money tables and the planner, whose
+names column stays out of it. It is a mask rather than Money's shadow, so it
+reads the same on any surface. A page's tabs also keep the part either side
+of the open one in view. Settled things (planner blocks, enough kit, done
+counts, confirmed offers) are drawn ink or muted, not green (finding 59).

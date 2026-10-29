@@ -1,5 +1,5 @@
 import { addSkills, firstPick, MOST_SKILLS, skillsInUse, suggestSkills } from '@sh/shared'
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Icon } from '../Icon.tsx'
 import { useView } from '../view.ts'
 
@@ -47,6 +47,24 @@ export function SkillsField({
   const options = [...offered.map((s) => ({ skill: s, label: s })), ...(isNew ? [{ skill: typed, label: `Add “${typed}” as a new skill` }] : [])]
   const shown = open && !full && options.length > 0
   const active = shown ? (moved ?? firstPick(offered, text, value, isNew)) : -1
+
+  // Low on a phone's screen there's no room for the offers under the box before the tabs along the foot: they open above it instead,
+  // where there's more room there (audit, 20 October 2026, finding 74).
+  const anchor = useRef<HTMLDivElement>(null)
+  const [up, setUp] = useState(false)
+  useLayoutEffect(() => {
+    const box = anchor.current?.getBoundingClientRect()
+    const menu = list.current
+    if (!shown || !box || !menu) return
+    const tabs = document.querySelector<HTMLElement>('nav.tabs')
+    const tabsTop = tabs?.getBoundingClientRect().top ?? innerHeight
+    // The tabs are along the foot on a phone; on a desk they're down the side and start at the top.
+    const foot = tabsTop > innerHeight / 2 ? Math.min(tabsTop, innerHeight) : innerHeight
+    const head = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top-bar')) || 0
+    const below = foot - box.bottom
+    const above = box.top - head
+    setUp(menu.offsetHeight > below && above > below)
+  }, [shown, options.length])
 
   // A highlight moved past the bottom of the list's scroll is brought into view, so what Enter will take can be seen.
   useEffect(() => {
@@ -120,7 +138,7 @@ export function SkillsField({
   return (
     <div className={`skills-field${className ? ` ${className}` : ''}`}>
       <span id={`${id}-label`}>Skills</span>
-      <div className="skills-anchor">
+      <div className="skills-anchor" ref={anchor}>
         <div className="skills-box" onClick={(e) => e.target === e.currentTarget && input.current?.focus()}>
           {value.length > 0 && (
             <ul className="skill-chips" aria-label="Chosen">
@@ -146,7 +164,11 @@ export function SkillsField({
             value={text}
             onChange={(e) => type(e.target.value)}
             onKeyDown={key}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              setOpen(true)
+              // Clear of the tabs along a phone's foot, with the page's scroll padding (app.css), rather than half under them.
+              anchor.current?.scrollIntoView?.({ block: 'nearest' })
+            }}
             // What's still typed stays in the field, as typed, and goes with the form (withTyped): adding it here would move
             // the button under a press that has already begun.
             onBlur={() => {
@@ -158,7 +180,9 @@ export function SkillsField({
             autoComplete="off"
           />
         </div>
-        <ul ref={list} className="skill-options" id={`${id}-list`} role="listbox" aria-label="In use" hidden={!shown}>
+        {/* Out of the Tab order: a list that scrolls is a Tab stop of its own, and the field's blur then hid it, so Tab landed on nothing
+            (finding 75). Up and Down move through it from the field. */}
+        <ul ref={list} className={`skill-options${up ? ' up' : ''}`} id={`${id}-list`} role="listbox" aria-label="In use" hidden={!shown} tabIndex={-1}>
           {options.map((o, i) => (
             <li
               key={`${o.skill}-${i}`}

@@ -114,6 +114,8 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .ts-group .row:first-of-type { border-top: 0; padding-top: 0; }
 .crew .ts-row > div:first-child { flex: 1 1 14em; }
 .crew .ts-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Fill in, Open and Ask, each a finger's 44px wide as well as tall (audit, 20 October 2026, finding 58). */
+.crew .ts-row .actions :is(a.link, button) { min-width: 44px; justify-content: center; }
 .timesheet-screen .ts-days { display: flex; flex-wrap: wrap; gap: var(--space-6); }
 .timesheet-screen .ts-days label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
 .timesheet-screen .ts-days label.extra-day { border-style: dashed; }
@@ -165,7 +167,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .call > .warn-line { margin-top: calc(-1 * var(--space-4)); }
 /* Running late on a call's line: the warn tone while they're on their way, and quiet once they're there. */
 .crew .late-line { margin: 0; font-size: var(--text-hint); font-weight: 600; color: var(--warn); }
-.crew .late-line.there { color: var(--good); font-weight: 500; }
+.crew .late-line.there { color: var(--muted); font-weight: 500; }
 .crew .reminders .reminder p { font-weight: 600; }
 .crew .reminders .reminder.soon p { color: var(--warn); }
 .crew .reminders .reminder.ran-out p { color: var(--bad); }

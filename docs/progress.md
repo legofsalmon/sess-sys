@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Easier on a phone, and printing any screen
+
+**Done**
+
+- Findings 13, 58 to 61, 63 and 74 to 78 of the [20 October
+  audit](audit-2026-10-20.md) (PR #170): one fade wherever a row or table
+  runs off the edge, 44 px taps on links, folds and small buttons, the
+  fortnight charts a week at a time on a phone, settled things quiet
+  rather than green, plainer words and a lasting bad-email line, any
+  screen printable in light, text trimmed on the phone as on the server,
+  the skills offers clear of the tab bar and out of the Tab order, a find
+  box on Venues, and rows focused with Tab kept clear of both bars. ADR
+  0067 notes it. App 1.63.3.
+- Checked: typecheck, shared, server and real-Postgres tests, and 26
+  browser test files including a new one for the fades.
+
 ## 29 October 2026: Current RMS quotes in the quote history
 
 **Done**

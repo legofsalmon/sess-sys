@@ -96,12 +96,14 @@
 .warehouse .cable-labels .layouts small { display: block; color: var(--muted); font-size: .8rem; }
 .warehouse .cable-labels .preview { overflow-x: auto; }
 
-/* Printing: only the labels, a label to a page on a label printer or 65 to an A4 sheet. */
+/* Printing: only the print sheet, where its Print button has drawn one (labels a label to a page on a label printer or 65 to an A4 sheet, a
+   call sheet, a quote, a rack sheet). Any other screen prints as it is: hiding everything on every screen printed Cmd-P on a job as a blank
+   page (audit, 20 October 2026, finding 61). */
 .print-sheet { display: none; }
 @media print {
-  body > :not(.print-sheet) { display: none !important; }
+  body:has(> .print-sheet) > :not(.print-sheet) { display: none !important; }
   /* Not the room the tab bar leaves at the bottom, which would print a blank page after the last label. */
-  body { background: #fff; padding: 0 !important; }
+  body:has(> .print-sheet) { background: #fff; padding: 0 !important; }
   .print-sheet { display: block; }
   .print-sheet .page { break-after: page; }
   .print-sheet .page:last-child { break-after: auto; }
@@ -173,7 +175,7 @@
 .warehouse .numbers a.failed { border-color: var(--bad); color: var(--bad); }
 
 /* Audit round three (findings 17 to 19): a pass held before it's recorded, what the last scan did under the camera, zoom, and the address to open elsewhere. */
-.warehouse .held { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); border: 1px solid var(--good); border-radius: var(--radius-control); background: var(--good-soft); color: var(--good); }
+.warehouse .held { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--ink); }
 .warehouse .held p { margin: 0; font-variant-numeric: tabular-nums; }
 .warehouse .held .actions { margin: 0; }
 .warehouse .scan-result { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: center; }
@@ -194,7 +196,7 @@
 .import-stock .stock-rows .skip { display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
 .import-stock .stock-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .import-stock .stock-rows p.does { color: var(--ink); }
-.import-stock .stock-rows p.same { color: var(--good); }
+.import-stock .stock-rows p.same { color: var(--muted); }
 .import-stock .fix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-8); align-items: start; padding-top: var(--space-4); }
 .import-stock .fix label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
 .import-stock .fix input { width: 100%; }
@@ -245,13 +247,14 @@
 .warehouse .count-line a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .count-line p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .warehouse .count-line .alert { flex-basis: 100%; }
-.warehouse .count-line .done { color: var(--good); font-weight: 600; font-size: var(--text-small); }
+/* Done, held and the same as before are settled: ink or muted, so green is left for a scan that read (audit, 20 October 2026, finding 59). */
+.warehouse .count-line .done { color: var(--ink); font-weight: 600; font-size: var(--text-small); }
 /* A number no item has can be a long web address from a maker's QR code: it wraps rather than widening the page. */
 .warehouse .said-list li, .warehouse.counting .said, .warehouse .count-line > div:first-child { overflow-wrap: anywhere; }
 .warehouse .count-fixes > button.all { justify-self: start; }
 .warehouse .counts h3 { margin: var(--space-4) 0 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .warehouse .counts .last-counted { margin: 0; }
-.warehouse .counts .done-line { margin: 0; color: var(--good); font-weight: 600; }
+.warehouse .counts .done-line { margin: 0; color: var(--ink); font-weight: 600; }
 .warehouse .counts .under-way { display: grid; gap: var(--space-8); padding: var(--space-10) var(--space-12); border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-soft); color: var(--warn); }
 .warehouse .counts .under-way p { margin: 0; }
 .warehouse .counts .under-way .button { justify-self: start; }

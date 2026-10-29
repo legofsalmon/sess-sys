@@ -128,7 +128,9 @@ test('Home draws the weeks, days and months ahead as charts, each column said in
   // Crew: today first, then a finger on another day says that day's crew in the line above.
   const crew = page.locator('section', { has: page.getByRole('heading', { name: 'Crew, the next fortnight' }) })
   const days = crew.getByRole('group', { name: 'Crew, the next fortnight' }).getByRole('button')
-  await expect(days).toHaveCount(14)
+  // A week at a time on a phone, each column a finger wide, the other week behind a tap (audit, 20 October 2026, finding 58).
+  await expect(days).toHaveCount(7)
+  expect((await days.first().boundingBox())!.width).toBeGreaterThanOrEqual(40)
   await expect(days.first()).toHaveAttribute('aria-pressed', 'true')
   await expect(crew.locator('.chart-readout')).toHaveText(/^Today: /)
   await days.nth(3).click()
@@ -143,6 +145,16 @@ test('Home draws the weeks, days and months ahead as charts, each column said in
   await expect(days.nth(4)).toHaveAttribute('aria-pressed', 'true')
   await expect(days.nth(4)).toHaveAttribute('tabindex', '0')
   await expect(days.nth(3)).toHaveAttribute('tabindex', '-1')
+  // Past the week's end the arrow carries on into the second week, which the tap above it shows too.
+  const weeks = crew.getByRole('group', { name: 'Which week' })
+  await expect(weeks.getByRole('button', { name: 'First week' })).toHaveAttribute('aria-pressed', 'true')
+  await days.nth(6).click()
+  await page.keyboard.press('ArrowRight')
+  await expect(weeks.getByRole('button', { name: 'Second week' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(days.first()).toBeFocused()
+  await expect(days.first()).toHaveAttribute('aria-pressed', 'true')
+  await weeks.getByRole('button', { name: 'First week' }).click()
+  await expect(crew.locator('.chart-readout')).toHaveText(/^Today: /)
 
   await expect(page.getByRole('heading', { name: 'Jobs by week' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'The season' })).toBeVisible()
@@ -151,7 +163,7 @@ test('Home draws the weeks, days and months ahead as charts, each column said in
   // The warehouse: kit booked out each day.
   await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Warehouse' }).click()
   const kit = page.locator('section', { has: page.getByRole('heading', { name: 'Kit booked out, the next fortnight' }) })
-  await expect(kit.getByRole('button').filter({ hasText: /./ })).toHaveCount(14)
+  await expect(kit.locator('.chart-col')).toHaveCount(7)
   await expect(kit.getByRole('button', { name: /for confirmed jobs/ }).first()).toBeVisible()
 })
 
@@ -184,7 +196,7 @@ test("Home at a phone's size: the soon over the housekeeping, the week ahead a l
     await expect(errands.locator('.job-row').first()).toBeVisible()
   }
 
-  const crewCalls = page.getByRole('link', { name: 'Crew calls', exact: true })
+  const crewCalls = page.getByRole('link', { name: 'Calls', exact: true })
   await expect(crewCalls).toHaveClass(/\blink\b/)
   expect((await crewCalls.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
