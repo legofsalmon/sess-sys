@@ -1,5 +1,5 @@
 import type { RmsLine, RmsOpportunity, RmsProgress, RmsRun, RmsStatus } from '@sh/shared'
-import type { Db, Queryable } from '../db.ts'
+import { faultForLog, type Db, type Queryable } from '../db.ts'
 import { RmsApi, RmsRefused } from './api.ts'
 
 /**
@@ -310,7 +310,7 @@ export class RmsReader {
       if (err instanceof Stopped) error = null
       else {
         error = err instanceof RmsRefused ? err.message : 'Something went wrong reading Current RMS; what was read so far is kept.'
-        this.log?.warn({ err }, 'Reading Current RMS failed')
+        this.log?.warn({ err: faultForLog(err) }, 'Reading Current RMS failed')
       }
     } finally {
       await this.db

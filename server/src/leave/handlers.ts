@@ -33,7 +33,8 @@ import { balanceFor, entriesFor, getAllowance, getEntry, getRequest, getYear, re
  * - a request can't overlap the person's own waiting or approved ones,
  *   nor ask for more days than are left this year, and a day in lieu is
  *   logged once, for a day that has happened;
- * - deciding takes "Can approve time off", nobody decides their own,
+ * - deciding takes "Can approve time off", nobody decides their own, nor
+ *   sets their own allowance while another approver can,
  *   nothing is approved for someone archived since they asked, and only
  *   an approver sets an allowance;
  * - approved leave is days off under the request's own id, so the planner
@@ -244,18 +245,24 @@ export const leaveHandlers: { [N in LeaveCommand]: Handler<N> } = {
   },
 
   async 'leave.allowance'(ctx, a) {
-    await approver(ctx, a.by)
+    const who = await approver(ctx, a.by)
     const person = await getPerson(ctx.tx, a.personId)
     if (!person) throw new Refused({ code: 'not-found', message: 'That person no longer exists.' })
+    // Nobody sets their own while another approver can; with nobody else, it's allowed and marked (audit, 20 October 2026, finding 84).
+    const self = who.id === person.id
+    if (self) {
+      const { rows } = await ctx.tx.query(`SELECT 1 FROM people WHERE approves_leave AND kind = 'staff' AND NOT archived AND id <> $1 LIMIT 1`, [who.id])
+      if (rows.length) throw new Refused({ code: 'forbidden', message: "You can't set your own allowance; another approver has to." })
+    }
     if (person.kind !== 'staff') throw new Refused({ code: 'conflict', message: `Only staff have an allowance; ${person.name} is a freelancer.` })
     // Next year's can be set before it opens, so it's ready on the day.
     const far = noAllowanceReason(a.year, irishToday())
     if (far) throw new Refused({ code: 'invalid', message: far })
     const id = allowanceId(person.id, a.year)
     await ctx.tx.query(
-      `INSERT INTO leave_allowances (id, person_id, year, days, carried_over, note) VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (id) DO UPDATE SET days = EXCLUDED.days, carried_over = EXCLUDED.carried_over, note = EXCLUDED.note`,
-      [id, person.id, a.year, a.days, a.carriedOver, a.note.trim()]
+      `INSERT INTO leave_allowances (id, person_id, year, days, carried_over, note, self_set) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET days = EXCLUDED.days, carried_over = EXCLUDED.carried_over, note = EXCLUDED.note, self_set = EXCLUDED.self_set`,
+      [id, person.id, a.year, a.days, a.carriedOver, a.note.trim(), self]
     )
     await emit(ctx, 'leaveAllowance', id, await getAllowance(ctx.tx, person.id, a.year))
   },

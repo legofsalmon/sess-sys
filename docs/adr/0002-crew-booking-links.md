@@ -67,6 +67,15 @@ freelancers to sign up for anything.
   step; days off are marked by the freelancer on their link or by ops for now.
   *Built 17 October 2026: [ADR 0044](0044-freelancers-own-calendars-read-only.md).*
 
+Later (29 October 2026): nobody holds two jobs on the same day stands,
+override or not. "Offer anyway" over someone's booking still sends the
+offer, but they can only take the days not on the other job unless they
+pull out of it first, and the office's checkbox now says so in those
+words, where before it read the same as for days off (audit, 20 October
+2026, finding 81). So the clashes ADR 0010's planner lists come from days
+off, marked after a booking or overridden; an overridden offer over a
+booking shows there as "check" while it waits.
+
 ## Later: days off over a booking, and checked dates (29 October 2026)
 
 The rule stays one-way: an offer over marked days is refused, and days off

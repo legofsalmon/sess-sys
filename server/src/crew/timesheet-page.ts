@@ -107,7 +107,7 @@ function form(d: TimesheetPage, action: string): string {
   }
   <form method="post" action="${action}" class="timesheet">
     <input type="hidden" name="picker" value="1">
-    <fieldset class="days"><legend>Days you worked</legend>${[...d.offer.days]
+    <fieldset class="days"><legend>Days you worked</legend>${[...new Set([...d.offer.days, ...(t?.days ?? [])])]
       .sort()
       .map((day) => `<label><input type="checkbox" name="days" value="${day}"${ticked.has(day) ? ' checked' : ''}> ${h(dayLabel(day, irishToday()))}</label>`)
       .join('')}</fieldset>

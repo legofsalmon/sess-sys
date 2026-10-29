@@ -72,3 +72,12 @@ into the search like any scanner. Freelancers use their own phones.
   app a label's QR code, and once with Chromium's own test camera; still
   to try on real phones in the warehouse, Android and iPhone, in the
   phone field test.
+
+## Later: the QR code reader stays with the app (29 October 2026)
+
+The 20 October audit (finding 65) asked whether the QR code reader should be
+fetched the first time it's used, as the map and the rack in 3D now are
+(ADR 0057). It stays in the files every phone fetches with the app, about
+27 kB on the wire: an iPhone in the warehouse with no signal must be able to
+scan from the first time, including just after a deploy, and a scan that
+fails there costs far more than the download.

@@ -64,15 +64,19 @@ async function setOffer(ctx: Ctx, id: string, fields: Partial<Record<string, unk
   await emitOffer(ctx, id)
 }
 
-/** People holding each day of a call, not counting one offer. */
+/**
+ * People holding each day of a call, not counting one offer. People, not
+ * offers: two offers to one person never take two places (audit, 20
+ * October 2026, finding 25).
+ */
 function heldByDay(call: CrewCall, offers: Offer[], exceptOfferId?: string) {
-  const held: Record<string, number> = {}
-  for (const d of eachDay(call.start, call.end)) held[d] = 0
+  const who: Record<string, Set<string>> = {}
+  for (const d of eachDay(call.start, call.end)) who[d] = new Set()
   for (const o of offers) {
-    if (o.id === exceptOfferId || (o.status !== 'accepted' && o.status !== 'confirmed')) continue
-    for (const d of o.days) if (d in held) held[d]!++
+    if (o.id === exceptOfferId || !HOLDING.includes(o.status)) continue
+    for (const d of o.days) who[d]?.add(o.personId)
   }
-  return held
+  return Object.fromEntries(Object.entries(who).map(([d, s]) => [d, s.size]))
 }
 
 /**
@@ -80,7 +84,8 @@ function heldByDay(call: CrewCall, offers: Offer[], exceptOfferId?: string) {
  * call has filled, and with the other job when the person is booked.
  */
 async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string[]) {
-  const held = heldByDay(call, await offersForCall(ctx.tx, call.id), offer.id)
+  const offers = await offersForCall(ctx.tx, call.id)
+  const held = heldByDay(call, offers, offer.id)
   const full = days.filter((d) => held[d]! >= call.needed)
   if (full.length) {
     const open = Object.keys(held).filter((d) => held[d]! < call.needed)
@@ -91,6 +96,8 @@ async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string
         : `Sorry, ${jobNamed(call, days)} has just been filled by someone else.`,
     })
   }
+  const twice = offers.find((o) => o.id !== offer.id && o.personId === offer.personId && HOLDING.includes(o.status))
+  if (twice) throw new Refused({ code: 'conflict', message: "You're already booked on this job. Ask the office to change your days." })
   const clash = await heldElsewhere(ctx.tx, offer.personId, days, call.id)
   if (clash.length) {
     throw new Refused({
@@ -565,6 +572,9 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
     if (offer.status === 'pulled-out') throw new Refused({ code: 'conflict', message: "You've pulled out of this one. Ask the office if you can do it after all." })
     if (offer.status === 'confirmed')
       throw new Refused({ code: 'conflict', message: 'You are confirmed for this job. Please contact the office to change it.' })
+    // Declined is over, as the page promises: an old tab's Accept can't bring it back (audit, 20 October 2026, finding 25).
+    if (offer.status === 'declined')
+      throw new Refused({ code: 'conflict', message: "You declined this one, so it's off your page: only the office can offer it to you again." })
 
     if (a.answer === 'decline') {
       await setOffer(ctx, offer.id, { ...answered, status: 'declined' })

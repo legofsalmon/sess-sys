@@ -647,6 +647,41 @@ describe('booking rules', () => {
     expect(b.result).toMatchObject({ status: 'rejected', reason: { code: 'clash' } })
   })
 
+  it('keeps a declined offer declined, and one person to one place', async () => {
+    // Proves: an Accept or a counter from an old tab on a declined offer is refused in the page's own words, so a re-offer can't book the same person twice (audit, 20 October 2026, finding 25).
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const c = await call(app, { needed: 2, start: '2026-10-10', end: '2026-10-10' })
+    const old = await offer(app, c, aoife.id)
+    expect(await answer(app, aoife.linkToken, old.id, { answer: 'decline' })).toMatchObject({ ok: true })
+    const again = await offer(app, c, aoife.id)
+    expect(again.result.status).toBe('applied')
+    const stale = await send(app, 'offer.respond', { id: old.id, answer: 'accept', days: null, note: '' })
+    expect(stale).toMatchObject({ status: 'rejected', reason: { message: expect.stringContaining('only the office can offer it to you again') } })
+    const counter = await send(app, 'offer.respond', { id: old.id, answer: 'counter', counterRateCents: 30000, days: null, note: '' })
+    expect(counter.status).toBe('rejected')
+    expect((await entity<Offer>(app, 'offer', old.id)).status).toBe('declined')
+    expect(await answer(app, aoife.linkToken, again.id, { answer: 'accept' })).toMatchObject({ ok: true })
+    // The second place is still Niall's to take.
+    const n = await offer(app, c, niall.id)
+    expect(await answer(app, niall.linkToken, n.id, { answer: 'accept' })).toMatchObject({ ok: true })
+  })
+
+  it('counts people, not offers, on a day', async () => {
+    // Proves: two offers held by one person, however they came about, take one place, and a second accept by the same person is refused (audit, 20 October 2026, finding 25).
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app, { needed: 2, start: '2026-10-10', end: '2026-10-10' })
+    const a = await offer(app, c, aoife.id)
+    expect(await answer(app, aoife.linkToken, a.id, { answer: 'accept' })).toMatchObject({ ok: true })
+    // An offer row made by hand, as an old bug might have left: the same person offered twice.
+    const b = newId()
+    await lastDb.query(`INSERT INTO offers (id, call_id, person_id, status, days, day_rate_cents, override) VALUES ($1, $2, $3, 'offered', $4, 25000, false)`, [b, c, aoife.id, JSON.stringify(['2026-10-10'])])
+    const twice = await send(app, 'offer.respond', { id: b, answer: 'accept', days: null, note: '' })
+    expect(twice).toMatchObject({ status: 'rejected', reason: { message: expect.stringContaining('already booked on this job') } })
+  })
+
   it('withdraws every open offer when a job is cancelled', async () => {
     const app = await server()
     const aoife = await person(app, 'Aoife Byrne')

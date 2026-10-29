@@ -287,6 +287,26 @@ describe('the office and timesheets', () => {
     expect(history.entries.map((e) => e.what)).toContain("Approved Dara Quinn's timesheet for Sound No.1 on Autumn Gala: 1 day at €320, and €18.10 of extras: €338.10")
   })
 
+  it('keeps the office\'s rate and added day when the freelancer resends after a reopen', async () => {
+    // Proves: after a reopen, a resend from the link sends the booking's rate, so the page still says the office changed it, and keeps a day the office added beyond the booking (audit, 20 October 2026, findings 82 and 83).
+    const { app, token } = await gala()
+    const dara = await token('dara')
+    await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-2)], ['days', day(-1)]])
+    await ok(app, m('timesheet.approve', { id: 'dara-sound', days: [day(-3), day(-2), day(-1)], dayRateCents: 30000, extras: [], officeNote: 'Came in for the build too.' }))
+    await ok(app, m('timesheet.reopen', { id: 'dara-sound' }))
+    const form = (await page(app, `/f/${dara}/timesheet/dara-sound`)).html
+    expect(form).toContain(`value="${day(-3)}" checked`)
+    const again = await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-3)], ['days', day(-2)], ['days', day(-1)], ['what', 'Parking'], ['euro', '10']])
+    expect(again.ok).toBe(true)
+    const pulled = (await app.inject({ url: '/api/sync/pull?after=0' })).json()
+    const t = pulled.changes.filter((c: { entity: string }) => c.entity === 'timesheet').at(-1).data as Timesheet
+    expect(t).toMatchObject({ status: 'sent', days: [day(-3), day(-2), day(-1)], dayRateCents: 30000, sent: { days: [day(-3), day(-2), day(-1)], dayRateCents: 32000 } })
+    // A day neither booked nor put on by the office is still refused.
+    expect((await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-4)]])).message).toContain("wasn't one of your booked days")
+    await ok(app, m('timesheet.approve', { id: 'dara-sound', days: [day(-3), day(-2), day(-1)], dayRateCents: 30000, extras: [{ what: 'Parking', cents: 1000 }], officeNote: '' }))
+    expect((await page(app, `/f/${dara}/timesheet/dara-sound`)).html).toContain('Day rate: €300, not €320')
+  })
+
   it('puts one in for a freelancer, with any of the job\'s days, and needs one before approving', async () => {
     const { app, timesheet } = await gala()
     const [early] = await send(app, m('timesheet.approve', { id: 'dara-sound', days: [day(-1)], dayRateCents: 32000, extras: [], officeNote: '' }))

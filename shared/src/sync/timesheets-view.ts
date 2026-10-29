@@ -63,12 +63,15 @@ export function timesheetsView(
         const a = m.args as CommandArgs<'timesheet.send'>
         const was = sheets.get(a.id)
         if (was?.status === 'approved') break
-        const rate = was?.dayRateCents ?? offers.get(a.id)?.offer.dayRateCents ?? null
-        const sent = { days: [...a.days].sort(), dayRateCents: rate, extras: a.extras }
+        const booking = offers.get(a.id)?.offer
+        const rate = was ? was.dayRateCents : (booking?.dayRateCents ?? null)
+        // What was sent is at the booking's rate; only approval changes the record's (audit, 20 October 2026, finding 82).
+        const sent = { days: [...new Set(a.days)].sort(), dayRateCents: booking ? booking.dayRateCents : rate, extras: a.extras }
         sheets.set(a.id, {
           id: a.id,
           status: 'sent',
           ...sent,
+          dayRateCents: rate,
           sent,
           note: a.note,
           officeNote: was?.officeNote ?? '',

@@ -28,8 +28,8 @@ test.afterEach(async ({ request }) => {
 })
 
 /** The office on a phone, with the map's pictures and its search stood in for. */
-async function office(browser: import('@playwright/test').Browser, places: (url: URL) => { status: number; body: unknown }) {
-  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+async function office(browser: import('@playwright/test').Browser, places: (url: URL) => { status: number; body: unknown }, serviceWorkers: 'allow' | 'block' = 'allow') {
+  const page = await (await browser.newContext({ viewport: phoneSize, serviceWorkers })).newPage()
   // The blueprint's screenshots show the real map.
   if (!process.env.SHOTS) await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: TILE, headers: { 'access-control-allow-origin': '*' } }))
   await page.route('**/api/places?**', (r) => {
@@ -108,4 +108,22 @@ test("a venue's own map gives directions, and its pin is moved by a pasted link 
   await placing.getByRole('button', { name: 'Save the pin' }).click()
   await expect(card.getByRole('link', { name: 'Directions' })).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=53.3478,-6.237')
   await expect(page.getByRole('status')).toHaveText('Up to date')
+})
+
+test('a map first opened with no signal says it comes with signal, and comes when it does', async ({ browser }) => {
+  // Proves: the map's code isn't in every phone's download (audit, 20 October 2026, finding 65), so a phone that never opened a map and has no signal is told so where the map would be, the rest of the page still works, and the map arrives on its own once the signal is back.
+  // The browser's no-signal switch doesn't reach what the app's service worker fetches, and whether the worker has taken
+  // the page yet is a race: with it left out, the map's code is fetched by the page, as it is on a phone whose worker
+  // has no copy, and fails as it does there.
+  const page = await office(browser, () => ({ status: 200, body: { found: [] } }), 'block')
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.context().setOffline(true)
+  await page.goto('/#jobs/venues')
+  const map = page.getByRole('region', { name: 'Map of 4 venues' })
+  await expect(map).toContainText("The map comes with signal: it hasn't been opened on this phone before.")
+  await expect(page.getByRole('link', { name: /^Clonmore House/ })).toBeVisible()
+  await page.context().setOffline(false)
+  await expect(pins(page)).toHaveCount(4)
+  await expect(page.locator('.map-missing')).toHaveCount(0)
 })

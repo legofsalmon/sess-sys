@@ -110,6 +110,24 @@ describe('answers to check', () => {
   })
 })
 
+describe('offers nobody has answered', () => {
+  it('wait in the queue once their reply-by day has passed, until the office notes them or an answer comes', () => {
+    // Proves: an offer still unanswered after its call's reply-by day is in "Answers to check" until Noted, and an answer
+    // after that brings it back as the answer (audit, 20 October 2026, finding 24).
+    const entities = {
+      person: { aoife: person('aoife', 'Aoife Byrne'), niall: person('niall', 'Niall Kerr') },
+      crewCall: { late: { ...call('late', '2026-10-10', '2026-10-11'), replyBy: '2026-09-30' }, soon: { ...call('soon', '2026-10-10', '2026-10-11'), replyBy: '2026-10-01' } },
+      offer: { quiet: offer('quiet', 'late', 'aoife', 'offered'), waiting: offer('waiting', 'soon', 'niall', 'offered') },
+    }
+    // Reply by yesterday is past; reply by today still has the day to run.
+    expect(answersToCheck(crewView(entities, [], 0), today).map((a) => [a.offer.id, a.kind, a.short])).toEqual([['quiet', 'no-reply', 2]])
+    const noted = crewView(entities, [m('offer.seen', { id: 'quiet' })], 0)
+    expect(answersToCheck(noted, today)).toEqual([])
+    const answered = crewView(entities, [m('offer.seen', { id: 'quiet' }), m('offer.respond', { id: 'quiet', answer: 'decline', note: '' })], 0)
+    expect(answersToCheck(answered, today).map((a) => [a.offer.id, a.kind])).toEqual([['quiet', 'declined']])
+  })
+})
+
 describe('the message after what the office did', () => {
   const aoife = person('aoife', 'Aoife Byrne')
   const show = call('show', '2026-10-10', '2026-10-11')

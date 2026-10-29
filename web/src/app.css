@@ -541,3 +541,16 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .status-check-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
 .status-check p { margin: 0; }
 .status-todo { font-size: var(--text-small); }
+
+/*
+ * While the app opens (Opening.tsx; audit, 20 October 2026, finding 11): the screen's shape in the design system's skeleton,
+ * a line, a row or a block, pulsing in place, so reduced motion keeps it (its components.md). The region holding it is busy.
+ */
+.opening-shape { display: grid; gap: var(--space-14); }
+.skeleton { display: block; height: 1rem; border-radius: var(--radius-control); background: var(--ds-surface-inset); animation: skeleton-pulse var(--ds-motion-cycle-pulse) var(--ds-ease-standard) infinite; }
+.skeleton.row { height: 44px; }
+.skeleton.block { height: 132px; border-radius: var(--radius-card); }
+.opening .top .skeleton { height: 1.4rem; }
+/* The line that says what it's doing keeps its room before it's said, so the shape under it never jumps. */
+.opening > .hint { margin: 0; min-height: 1.5em; }
+@keyframes skeleton-pulse { 50% { opacity: .4; } }
