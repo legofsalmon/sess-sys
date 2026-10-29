@@ -137,6 +137,12 @@ test('Home draws the weeks, days and months ahead as charts, each column said in
   await expect(days.nth(3)).toHaveAttribute('aria-pressed', 'true')
   await expect(crew.locator('.chart-readout')).toHaveText(/still needed/)
   await expect(crew.getByRole('listitem')).toHaveText(['booked', 'waiting to confirm', 'still needed'])
+  // The same numbers as a table, one press away under the chart (charts.md).
+  await crew.getByText('Show as table').click()
+  const table = crew.getByRole('table', { name: 'Crew, the next fortnight' })
+  await expect(table.getByRole('columnheader')).toHaveText(['booked', 'waiting to confirm', 'still needed'])
+  await expect(table.getByRole('rowheader').first()).toHaveText('Today')
+  await crew.getByText('Show as table').click()
 
   // One stop for the keyboard; the arrows move along.
   await days.nth(3).focus()
