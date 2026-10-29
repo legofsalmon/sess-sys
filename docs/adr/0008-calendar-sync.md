@@ -121,3 +121,9 @@ finishes and hands the key back; reading calendars to bring jobs in
 `writing`, `read-only` or `off`. It is a server setting rather than a switch
 on Admin so that nobody can turn writing on from a phone by mistake.
 
+The sync itself is off unless told to write, too (audit, 20 October 2026,
+finding 107): before, only the server's own start-up turned it off, so any
+other way of building the app (a script, a test, a second entry point) would
+have written to the real calendar. Now `writes` has to be `true`, and the
+tests that write to the stand-in calendar ask for it.
+
