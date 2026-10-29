@@ -36,6 +36,13 @@ export const CHANGELOG: readonly Release[] = [
     adrs: [92],
   },
   {
+    version: '1.62.1',
+    date: '2026-10-29',
+    title: "The app's code now lives under Session Hire's own account",
+    what: "The app's code moved to Session Hire's own GitHub account. The links on What's changed, the System status check for the newest version, and the name the app gives when it looks up addresses and fuel prices now point there.",
+    prs: [174],
+  },
+  {
     version: '1.62.0',
     date: '2026-10-29',
     title: 'A to-do list from Claude each weekday morning',
