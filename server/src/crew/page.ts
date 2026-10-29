@@ -329,7 +329,8 @@ function timesheets(d: PageData): string {
 /**
  * What's waiting on them and what's next, in one line at the top, each part
  * a link down the page (ADR 0033): a long page says what matters before
- * anyone scrolls. Nothing when there's nothing to say.
+ * anyone scrolls, and it stays at the top of the screen while they do
+ * (audit, 20 October 2026, finding 48). Nothing when there's nothing to say.
  */
 function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']): string {
   const toSend = d.noTimesheets ? 0 : d.jobs.filter((j) => !d.timesheets.get(j.offer.id) && noTimesheetReason(j.offer, j.call, d.person, d.today) === null).length
@@ -490,6 +491,30 @@ function ownCalendarBlock(d: PageData): string {
   </section>`
 }
 
+/** How many of the next bookings are drawn as full cards; the rest are a line each, opening in place. */
+const BOOKINGS_IN_FULL = 3
+
+/**
+ * Their bookings, soonest first (audit, 20 October 2026, finding 48): the next few as full cards, and the rest folded to
+ * one line each, the job, the role, the days and where it stands, opening in place with no script. Forty bookings drawn
+ * in full was a thirty-five-screen scroll. One a message or a refused post is about opens, so the page lands on it.
+ */
+function bookings(d: PageData, booked: PageData['jobs']): string {
+  const firstDay = (j: PageData['jobs'][number]) => j.offer.days.find((x) => x >= d.today) ?? j.call.start
+  const sorted = [...booked].sort((a, b) => firstDay(a).localeCompare(firstDay(b)))
+  const later = sorted.slice(BOOKINGS_IN_FULL)
+  return `${sorted.slice(0, BOOKINGS_IN_FULL).map((j) => offerCard(d, j)).join('')}${
+    later.length
+      ? `<p class="small">${later.length === 1 ? 'One more booking' : `${later.length} more bookings`} after these, a line each: tap one to open it.</p>${later
+          .map((j) => {
+            const about = d.flash?.offer === j.offer.id || d.kept?.form === `offer:${j.offer.id}`
+            return `<details class="later"${about ? ' open' : ''}><summary><b>${h(j.call.project)}</b> · ${h(j.call.role)} · ${h(daysLabel(j.offer.days, d.today))} <span class="tag ${j.offer.status}">${STATUS_TEXT[j.offer.status]}</span></summary>${offerCard(d, j)}</details>`
+          })
+          .join('')}`
+      : ''
+  }`
+}
+
 /**
  * Days off marked over a booking they hold (audit, 20 October 2026, finding 50): said beside the row, since marking
  * themselves away doesn't take them off the job, and the way that does is on the booking. Nothing for approved leave,
@@ -553,7 +578,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
 
   <section id="bookings">
     <h2>Your bookings</h2>
-    ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
+    ${booked.length ? bookings(d, booked) : '<p class="empty">No upcoming bookings.</p>'}
     ${feedBlock(d.feed)}
   </section>
 
@@ -704,7 +729,9 @@ fieldset.days input{width:20px}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}
 .demo-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;padding:8px 16px;background:var(--ink);color:var(--bg);font-size:.9rem}
 .demo-bar a{color:inherit;font-weight:700;white-space:nowrap}
-.glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem}
+.glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem;position:sticky;top:0;z-index:1;margin:0 -16px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--line)}
+details.later{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}details.later[open]{padding-bottom:12px}
+details.later summary{color:var(--ink);font-size:.95rem;padding:12px 0}details.later summary .tag{margin-left:4px}details.later .offer{border:0;padding:0;background:none}
 .glance a{color:inherit}
 .feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}
 .feed-buttons{display:flex;gap:8px}.feed-buttons>*{flex:1}.feed-buttons .copy[hidden]{display:none}

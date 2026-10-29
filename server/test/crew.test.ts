@@ -372,6 +372,32 @@ describe('freelancer link', () => {
     expect(page).toContain('<dt>Dates</dt><dd>Fri 2 Oct to Sun 4 Oct</dd>')
   })
 
+  it('draws the next three bookings in full and the rest as a line each, opening in place (audit, 20 October 2026, finding 48)', async () => {
+    // Proves: at volume the page doesn't draw every booking as a full card; the soonest three are, and the rest fold to
+    // the job, role, days and status, opening with no script; one a refused post is about opens by itself.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const booked: string[] = []
+    // Made out of order, so the page has to put them soonest first.
+    for (const n of [9, 3, 7, 1, 5]) {
+      const dayOf = `2026-10-${String(10 + n).padStart(2, '0')}`
+      const o = await offer(app, await call(app, { project: `Gig ${n}`, start: dayOf, end: dayOf }), aoife.id)
+      await answer(app, aoife.linkToken, o.id, { answer: 'accept' })
+      await send(app, 'offer.confirm', { id: o.id })
+      booked[n] = o.id
+    }
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    const section = page.slice(page.indexOf('<section id="bookings">'), page.indexOf('<section id="away">'))
+    const full = [...section.matchAll(/<article class="offer confirmed" id="o-(\w+)">/g)].map((m) => m[1])
+    expect(full.slice(0, 3)).toEqual([booked[1], booked[3], booked[5]])
+    expect(section).toContain('2 more bookings after these, a line each: tap one to open it.')
+    expect(section.match(/<details class="later">/g)).toHaveLength(2)
+    expect(section).toContain('<summary><b>Gig 7</b> · Audio tech · Sat 17 Oct <span class="tag confirmed">Confirmed</span></summary>')
+    expect(section.indexOf('Gig 7')).toBeLessThan(section.indexOf('Gig 9'))
+    // The glance line stays in view as the page scrolls.
+    expect(page).toMatch(/\.glance\{[^}]*position:sticky/)
+  })
+
   it('publishes bookings as a calendar feed any calendar app can subscribe to', async () => {
     const app = await server()
     const aoife = await person(app, 'Aoife Byrne')
