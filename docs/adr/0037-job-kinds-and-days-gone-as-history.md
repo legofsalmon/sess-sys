@@ -128,3 +128,21 @@ again from the start of the season.
 - Any job can have its kind changed afterwards like any other field, and
   the phase names are the office's to rename, so a wrong guess costs one
   edit.
+
+Later (29 October 2026), from the audit of 20 October 2026:
+
+- Taking it all back refuses in words for a quote, or crew running late, on
+  a job brought in, as for kit (finding 51). A person added from the
+  invites stays when they have a leave allowance, their own calendar, a
+  count they made or a leave decision they took; and anything added later
+  that still refers to the jobs or people is said in words ("Something in
+  the app still refers to these jobs or people") rather than as a fault.
+- A person added from the invites whom anyone has changed since (named on
+  Tidy up, a phone or rate typed, a level set) stays too, as the history
+  shows a change to them by something other than a bring-in; the card and
+  the question say how many stay (finding 53).
+- A job on the import screen is known by its first event as it was looked
+  at, not its first day, so a job that gained an earlier day before the
+  bring-in still comes in. A job chosen that is in the app already, as
+  when a bring-in is sent twice after a dropped connection, is said to be
+  "in the app already", apart from one gone from the calendar (finding 52).

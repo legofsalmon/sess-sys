@@ -57,6 +57,8 @@ const NAMES = [
   'Erased person',
   'Eoin O Neill',
   'DÓNAL Ó SÉ',
+  'Pádraig Mac an tSaoi',
+  'Seosamh Mac na Mara',
 ]
 
 describe('first and last names', () => {
@@ -81,6 +83,35 @@ describe('first and last names', () => {
     // Nothing else of theirs changes, and the function that split them is gone.
     expect((await db.query(`SELECT name FROM people WHERE id = 'p5'`)).rows).toEqual([{ name: '  Dara   Quinn  ' }])
     expect((await db.query(`SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'sh_split_name'`)).rows).toEqual([{ n: 0 }])
+  })
+
+  it('split before "an" and "na" were known are mended on deploy, and only those (audit, 20 October 2026, finding 85)', async () => {
+    const db = await pgliteDb()
+    cleanup.push(() => db.close())
+    await migrateAll(db)
+    const resplit = CREW.migrations.findIndex((m) => m.includes('sh_resplit_name'))
+    expect(resplit).toBeGreaterThan(0)
+    await db.query('UPDATE crew_schema_version SET version = $1', [resplit])
+    const held: [string, string, string][] = [
+      ['Pádraig Mac an', 'tSaoi'], // as the first split left him
+      ['Seosamh Ó Mac na', 'Mara'], // with a word before that starts a last name too
+      ['Ana na', 'Smith'], // "na" alone is no last name's start
+      ['Pádraig', 'Mac an tSaoi'], // as the office corrected him
+      ['Mac an', 'tSaoi'], // nothing would be left of the first name
+    ].map(([f, l], i) => [`q${i}`, f!, l!])
+    for (const [id, f, l] of held) {
+      await db.query(`INSERT INTO people (id, name, first_name, last_name, kind, link_token) VALUES ($1, $2, $3, $4, 'freelancer', $1)`, [id, `${f} ${l}`, f, l])
+    }
+    await migrateCrew(db)
+    const { rows } = await db.query<{ first_name: string; last_name: string }>('SELECT first_name, last_name FROM people ORDER BY id')
+    expect(rows).toEqual([
+      { first_name: 'Pádraig', last_name: 'Mac an tSaoi' },
+      { first_name: 'Seosamh', last_name: 'Ó Mac na Mara' },
+      { first_name: 'Ana na', last_name: 'Smith' },
+      { first_name: 'Pádraig', last_name: 'Mac an tSaoi' },
+      { first_name: 'Mac an', last_name: 'tSaoi' },
+    ])
+    expect((await db.query(`SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'sh_resplit_name'`)).rows).toEqual([{ n: 0 }])
   })
 
   it('once checked in Tidy up, stay checked (ADR 0068)', async () => {

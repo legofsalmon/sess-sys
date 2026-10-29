@@ -119,6 +119,8 @@ export interface ImportBrought {
   crew: number
   /** People added from the invites that nothing else in the app refers to: they go too. */
   people: number
+  /** People added from the invites who stay: named or changed since, or referred to by something else (audit, 20 October 2026, finding 53). */
+  kept: number
   calendars: string[]
   /** Why it can't be taken back, when it can't: someone has acted on it in the app since. */
   blocked: string | null
@@ -138,6 +140,8 @@ export interface ImportResult {
   crew: number
   /** Jobs chosen that weren't there when the calendar was read again, by name. */
   missing: string[]
+  /** Jobs chosen that are in the app already, brought in by a bring-in sent before, by name (audit, 20 October 2026, finding 52). */
+  already: string[]
 }
 
 /** Lowercase, without accents, punctuation or extra spaces: how job names are compared. */
