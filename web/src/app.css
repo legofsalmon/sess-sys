@@ -197,6 +197,10 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
    page is hidden with nothing to say it's there (audit P2 23). It used to wrap: Stock's nine took four lines, a third of a phone, before any stock. */
 .views { display: flex; flex-wrap: nowrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
 .views::-webkit-scrollbar { display: none; }
+/* Where Tab or a link brings something into view: clear of the bar at the top (its height kept by useUnderTop.ts) and of the tabs along the
+   foot of a phone, not half under either (audit, 20 October 2026, finding 78). A desk's tabs are down the side. */
+html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-padding-bottom: calc(68px + env(safe-area-inset-bottom) + var(--space-8)); }
+@media (min-width: 900px) { html { scroll-padding-bottom: var(--space-8); } }
 /* More this way (more.tsx): wherever a row or a table scrolls sideways, the edge with more past it fades, the same on every screen (audit P2 23;
    20 October 2026, finding 13). A fade, not a shadow, so it reads the same on any surface. --more-from keeps a column that stays put (the
    planner's names) out of the left fade. */
