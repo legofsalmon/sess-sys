@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.62.0',
+    date: '2026-10-29',
+    title: 'A to-do list from Claude each weekday morning',
+    what: "With Claude turned on, Home and Notifications show a To do list for the office and directors: quotes to chase, enquiries with no quote sent, crew still to book for the next fortnight, accepted jobs not invoiced, and dates in jobs' notes, most pressing first. Claude writes it each weekday from 7am, and again whenever you press Write it now. Each thing opens its job, and ticking it done ticks it for everyone. It contacts nobody.",
+    prs: [172],
+    adrs: [97],
+  },
+  {
     version: '1.61.0',
     date: '2026-10-29',
     title: 'Claude reads enquiries into quotes, and changes a quote when asked',

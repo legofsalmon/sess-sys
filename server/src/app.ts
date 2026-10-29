@@ -52,6 +52,7 @@ import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
 import type { ClaudeConfig } from './assistant/claude.ts'
 import { Assistant, registerAssistantRoutes } from './assistant/routes.ts'
+import { Todo } from './assistant/todo.ts'
 import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
@@ -171,6 +172,8 @@ declare module 'fastify' {
     ownCalendars: OwnCalendars
     /** Reading Current RMS (ADR 0078), run from Admin. */
     rms: RmsReader
+    /** Claude's to-do list each weekday morning (ADR 0097); the caller starts it once the server is listening. */
+    assistantTodo: Todo
   }
 }
 
@@ -620,7 +623,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.decorate('rms', rms)
   registerRmsRoutes(app, { db, reader: rms })
   const assistant = new Assistant(db, options.claude)
-  registerAssistantRoutes(app, { assistant })
+  const todo = new Todo(db, assistant, app.log)
+  app.decorate('assistantTodo', todo)
+  registerAssistantRoutes(app, { assistant, todo })
   registerStatusRoutes(
     app,
     new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
@@ -713,6 +718,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     await backups.close()
     app.dueErasures.stop()
     app.fuelUpdates.stop()
+    app.assistantTodo.stop()
     documents.stop()
     calendarSync?.stop()
     ownCalendars.stop()

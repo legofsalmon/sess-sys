@@ -578,3 +578,10 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .app .claude-lines label.take small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .app .claude-line.left b { color: var(--muted); font-weight: normal; }
 .app .claude-line .grid-form { margin: 0 0 var(--space-8) calc(22px + var(--space-10)); }
+
+/* Claude's to-do list (ADR 0097): the shared tick's 44px rows, the box beside a link to the job. */
+.app .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+.app .todo-item { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; }
+.app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .todo-item small { display: block; color: var(--muted); font-size: var(--text-hint); }
+.app .todo-item.done a { color: var(--muted); text-decoration: line-through; }

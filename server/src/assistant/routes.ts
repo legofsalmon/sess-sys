@@ -12,11 +12,13 @@ import {
   type AssistantStatus,
   type EnquiryReading,
   type QuoteAdvice,
+  type TodoList,
 } from '@sh/shared'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { z } from 'zod'
 import type { Db, Queryable } from '../db.ts'
 import { usesAssistant } from '../office/store.ts'
+import type { Todo } from './todo.ts'
 import { anthropicAsk, NoAnswer, type Answer, type Ask, type ClaudeConfig } from './claude.ts'
 
 /**
@@ -158,7 +160,7 @@ const unsent = (reply: FastifyReply, err: unknown) => {
   throw err
 }
 
-export function registerAssistantRoutes(app: FastifyInstance, { assistant }: { assistant: Assistant }) {
+export function registerAssistantRoutes(app: FastifyInstance, { assistant, todo }: { assistant: Assistant; todo: Todo }) {
   app.get('/api/assistant', { config: { needs: 'money' } }, async (_req, reply): Promise<AssistantStatus> => {
     reply.header('cache-control', 'no-store')
     return assistant.status()
@@ -192,5 +194,30 @@ export function registerAssistantRoutes(app: FastifyInstance, { assistant }: { a
     } catch (err) {
       return unsent(reply, err)
     }
+  })
+
+  // Claude's to-do list (ADR 0097): the latest, a new one on request, and ticking a thing done.
+  app.get('/api/assistant/todo', { config: { needs: 'money' } }, async (_req, reply): Promise<{ list: TodoList | null }> => {
+    reply.header('cache-control', 'no-store')
+    return { list: await todo.latest() }
+  })
+
+  app.post('/api/assistant/todo', { config: { needs: 'money' } }, async (_req, reply): Promise<{ list: TodoList } | void> => {
+    reply.header('cache-control', 'no-store')
+    const no = await assistant.refusal()
+    if (no) return reply.code(no.code).send({ error: no.error })
+    try {
+      return { list: await todo.make('asked') }
+    } catch (err) {
+      return unsent(reply, err)
+    }
+  })
+
+  app.post<{ Body: { listId?: unknown; key?: unknown; done?: unknown } }>('/api/assistant/todo/done', { config: { needs: 'money' } }, async (req, reply) => {
+    const { listId, key, done } = req.body ?? {}
+    if (!Number.isSafeInteger(listId) || typeof key !== 'string' || key.length > 8 || typeof done !== 'boolean') return reply.code(400).send({ error: 'Say which list, which thing, and whether it’s done.' })
+    const list = await todo.done(listId as number, key, done)
+    if (!list) return reply.code(404).send({ error: 'That list has gone: there’s a newer one.' })
+    return { list }
   })
 }

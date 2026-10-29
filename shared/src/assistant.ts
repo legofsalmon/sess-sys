@@ -322,3 +322,59 @@ export function costCents(model: string, inputTokens: number, outputTokens: numb
   const p = PRICES[model] ?? PRICES[DEFAULT_MODEL]!
   return Math.ceil((inputTokens * p.input + outputTokens * p.output) / 10_000)
 }
+
+// --- Claude's to-do list (ADR 0097) ------------------------------------------------
+
+/** Where an item on the to-do list opens: the job, its quote, its crew or its kit. */
+export const TODO_WHERE = ['job', 'quote', 'crew', 'kit'] as const
+export type TodoWhere = (typeof TODO_WHERE)[number]
+/** At most this many things on one list: a morning's work, not everything there is. */
+export const MOST_TODO = 12
+
+export interface TodoItem {
+  /** Steady within the list, for ticking it done. */
+  key: string
+  title: string
+  why: string
+  /** The job it's about, when it's about one the app has. */
+  jobId: string | null
+  where: TodoWhere
+  /** When someone ticked it done, or null. */
+  doneAt: string | null
+}
+
+/** One list Claude wrote: each weekday morning, or when someone asked. */
+export interface TodoList {
+  id: number
+  madeAt: string
+  how: 'morning' | 'asked'
+  summary: string
+  items: TodoItem[]
+}
+
+/** Where an item opens in the app. */
+export function todoHref(i: Pick<TodoItem, 'jobId' | 'where'>): string {
+  if (!i.jobId) return '#quotes'
+  const job = `#jobs/${encodeURIComponent(i.jobId)}`
+  return i.where === 'job' ? job : `${job}/${i.where}`
+}
+
+/** The list as Claude wrote it, read leniently like the rest. */
+export const todoAnswer = z.object({
+  summary: text(400),
+  items: some(
+    z.object({
+      jobId: z.preprocess((v) => (typeof v === 'string' ? v.trim().slice(0, 64) : ''), z.string()),
+      where: z.preprocess((v) => (TODO_WHERE.includes(v as TodoWhere) ? v : 'job'), z.enum(TODO_WHERE)),
+      title: words(160),
+      why: words(400),
+    }),
+    MOST_TODO
+  ),
+})
+export type TodoAnswer = z.infer<typeof todoAnswer>
+
+export const TODO_SCHEMA = obj({
+  summary: str,
+  items: list(obj({ jobId: { type: 'string', description: 'the id of the job it is about, from the facts, or ""' }, where: { type: 'string', enum: [...TODO_WHERE] }, title: str, why: str })),
+})

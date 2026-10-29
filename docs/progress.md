@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Claude's to-do list
+
+**Done**
+
+- [ADR 0097](adr/0097-claudes-to-do-list.md), the second part of Colly's
+  pick (PR #172), coming "each weekday morning, and on request": with Claude on,
+  Home and the top of Notifications show a To do list for the office and
+  directors. Claude puts in order the quotes to chase, enquiries with no
+  quote sent, crew short in the next fortnight, accepted jobs not invoiced,
+  and dates in jobs' notes; each thing links to its job and ticks done for
+  everyone. Lists are kept two weeks; erasing anyone deletes them all.
+- Checked: typecheck, server tests for the list (written and ticked,
+  refused while off, due on weekdays from 7am), erasure and export, and the
+  browser test with the stand-in.
+
+**Waiting on**
+
+- Colly: the Anthropic key in Railway's shserver, then Claude turned on
+  under Admin › Company. The first morning list comes the weekday after.
+
 ## 29 October 2026: Claude reads enquiries into quotes
 
 **Done**
@@ -50,8 +70,8 @@ waiting on someone.
   acts as a PA for the office and directors with a to-do list and
   notifications in the app, and helps start, change and update quotes in
   this early phase. Building that next.
-## 29 October 2026: Taking back a bring-in, safely
 
+## 29 October 2026: Taking back a bring-in, safely
 
 **Done**
 
