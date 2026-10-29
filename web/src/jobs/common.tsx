@@ -102,7 +102,7 @@ export function Top({
           <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting || view.copying ? 'syncing' : 'online'}`} role="status">
             {connWords(view)}
           </span>
-          <NoticesButton />
+          <NoticesButton view={view} />
           <ThemeButton />
         </div>
         {up && <Up {...up} />}

@@ -84,3 +84,18 @@ open.
   left out.
 - The design system gained the `notifications` icon (0.5.1). A list of
   notifications is a part it doesn't have yet, sent back as a learning.
+
+## Later: lines, not changes (29 October 2026)
+
+The audit of 20 October (finding 68) found the bell at 99+ from the first
+open, the list almost all one bulk change's housekeeping, one notification
+a job. The list and the bell now count lines, worked out on the device
+from the same 100 changes: changes one maker made within a minute of each
+other to more than two of a person's jobs are one line ("12 changes to 11
+jobs of yours at once"), and otherwise a day's changes to one job they're
+on or made are one line, opening the job. What's about them, or an offer
+they sent, is always its own line. Each line opens to show its changes.
+The bell counts the lines with something new on them. A change with no
+name says where it came from (the made-up data, or the device while
+sign-in is off), as the History tab's runs do, never "Someone". The server
+still sends changes, not lines, so the 100 cap is on changes.
