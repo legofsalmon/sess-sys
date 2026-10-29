@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Home at volume
+
+**Done**
+
+- Findings 32, 33, 62, 68, 69, 70 and 80 of the [20 October
+  audit](audit-2026-10-20.md) (PR #168): the week ahead one line per job
+  with errands folded, Needs attention split into the next fortnight and
+  housekeeping, links under the charts that look like links,
+  notifications grouped into lines with the bell counting lines, "Your
+  day" on Me, days in lieu said, and Working this week readable on a
+  phone. ADRs 0033 and 0058 note it. App 1.59.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 45
+  browser tests.
+
+
 ## 29 October 2026: Money says what its figures are
 
 **Done**

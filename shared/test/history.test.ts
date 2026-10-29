@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { historyDays, historyTime, runLabel } from '../src/history.ts'
-import type { HistoryEntry } from '../src/protocol.ts'
+import { historyDays, historyTime, makerOf, noticeLines, runLabel } from '../src/history.ts'
+import type { HistoryEntry, Notice } from '../src/protocol.ts'
 
 /**
  * The History tab's days and runs (ADR 0006, amended 2 October 2026): the
@@ -177,5 +177,61 @@ describe('pages', () => {
     const days = historyDays(many, now)
     expect(performance.now() - took).toBeLessThan(200)
     expect(days.reduce((n, d) => n + d.runs.reduce((m, r) => m + r.entries.length, 0), 0)).toBe(1000)
+  })
+})
+
+describe('notifications as lines (audit, 20 October 2026, finding 68)', () => {
+  /** A change to job `job` (or about them, with no job), newest first as the list comes. */
+  const notice = (at: string, who: HistoryEntry['who'], job: string | undefined, why: Notice['why'] = 'on'): Notice => ({
+    ...entry(at, who),
+    why: job ? why : 'you',
+    about: job ? { entity: 'project', id: job } : { entity: 'offer', id: 'o1' },
+  })
+  const jobOf = (n: Notice) => (n.about.entity === 'project' ? n.about.id : undefined)
+
+  it("makes one maker's changes within a minute to more than two jobs one line, and leaves what's about them its own", () => {
+    // Proves: a bulk change across eleven jobs is one line counting the jobs; the change to their own offer made in the same go stays its own line.
+    const changes = [
+      ...Array.from({ length: 11 }, (_, i) => notice(`2026-10-20T09:00:${String(50 - i * 4).padStart(2, '0')}Z`, colly, `j${i}`)),
+      notice('2026-10-20T09:00:05Z', colly, undefined),
+    ]
+    const lines = noticeLines(changes, jobOf)
+    expect(lines.map((l) => [l.kind, l.notices.length, l.jobs])).toEqual([
+      ['bulk', 11, 11],
+      ['one', 1, 0],
+    ])
+  })
+
+  it("makes a day's changes to one job one line, and the next day's another", () => {
+    // Proves: two people's changes to one job the same day are one line; a third job changed alone is its own; the next day starts again.
+    const changes = [
+      notice('2026-10-21T10:00:00Z', aoife, 'j1'),
+      notice('2026-10-20T16:00:00Z', aoife, 'j1'),
+      notice('2026-10-20T12:00:00Z', colly, 'j2'),
+      notice('2026-10-20T09:00:00Z', colly, 'j1'),
+    ]
+    expect(noticeLines(changes, jobOf).map((l) => [l.day, l.kind, l.notices.length])).toEqual([
+      ['2026-10-21', 'one', 1],
+      ['2026-10-20', 'job', 2],
+      ['2026-10-20', 'one', 1],
+    ])
+  })
+
+  it("doesn't bundle two people's changes, or one person's an hour apart", () => {
+    // Proves: a go is one maker's within a minute; three jobs changed by two people, or slowly, stay a line a job.
+    const changes = [
+      notice('2026-10-20T09:00:30Z', colly, 'j1'),
+      notice('2026-10-20T09:00:20Z', aoife, 'j2'),
+      notice('2026-10-20T09:00:10Z', colly, 'j3'),
+      notice('2026-10-20T08:00:00Z', colly, 'j4'),
+    ]
+    expect(noticeLines(changes, jobOf).map((l) => l.kind)).toEqual(['one', 'one', 'one', 'one'])
+  })
+
+  it('names a change with no name by where it came from, never "Someone"', () => {
+    // Proves: the made-up data, or a device while sign-in is off, is named; a person is named as themselves.
+    expect(makerOf(entry('2026-10-20T09:00:00Z', someone, { device: 'Made-up data', deviceCode: undefined }))).toBe('Made-up data')
+    expect(makerOf(entry('2026-10-20T09:00:00Z', someone))).toBe('Device c0ffee')
+    expect(makerOf(entry('2026-10-20T09:00:00Z', colly))).toBe('Colly Hewson')
   })
 })

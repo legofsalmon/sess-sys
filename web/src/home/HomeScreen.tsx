@@ -1,4 +1,4 @@
-import { canApproveLeave, crewByDay, crewFill, departmentOf, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, STATUS_LABELS, type Department, type JobView, type PersonView, type View } from '@sh/shared'
+import { canApproveLeave, crewByDay, kindOf, crewFill, departmentOf, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, STATUS_LABELS, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { useState } from 'react'
 import { useMe } from '../crew/Leave.tsx'
 import { linkFor } from '../crew/Messages.tsx'
@@ -6,11 +6,10 @@ import { STATUS } from '../crew/Calls.tsx'
 import { StatusPill } from '../StatusPill.tsx'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
-import { JobRow } from '../jobs/JobsScreen.tsx'
 import { kitShort } from '../jobs/Kit.tsx'
 import { BelowZero } from '../jobs/Money.tsx'
 import { useToday, useView } from '../view.ts'
-import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
+import { addDays, departmentsIn, jobsOn, kitOf, narrower, SOON, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
 import { arrive } from '../arrival.ts'
@@ -112,10 +111,28 @@ export function HomeScreen() {
   )
 }
 
-/** The counts that aren't nothing, as tiles; a word when all are. */
-function Tiles({ all, keys, title = 'Needs attention', clear, department }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string }) {
+/**
+ * The counts that aren't nothing, as tiles; a word when all are. Grouped, what
+ * stops the next fortnight's work comes first and the housekeeping after,
+ * smaller (audit, 20 October 2026, finding 33).
+ */
+function Tiles({ all, keys, title = 'Needs attention', clear, department, grouped = true }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string; grouped?: boolean }) {
   const shown = keys.map((k) => all[k]!).filter((t) => t && t.count > 0)
   const copying = useCopying()
+  const soon = grouped ? shown.filter((t) => SOON.has(t.key)) : shown
+  const rest = grouped ? shown.filter((t) => !SOON.has(t.key)) : []
+  const list = (tiles: Tile[], className = 'tiles') => (
+    <ul className={className}>
+      {tiles.map((t) => (
+        <li key={t.key}>
+          <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
+            <b>{t.count.toLocaleString('en-IE')}</b>
+            <span>{t.label}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
   return (
     <section className="card standing">
       <h2>{title}</h2>
@@ -123,17 +140,24 @@ function Tiles({ all, keys, title = 'Needs attention', clear, department }: { al
         <p className="all-clear">{STILL_ARRIVING}</p>
       ) : shown.length === 0 ? (
         <p className="all-clear">{clear}</p>
+      ) : !grouped ? (
+        list(shown)
       ) : (
-        <ul className="tiles">
-          {shown.map((t) => (
-            <li key={t.key}>
-              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
-                <b>{t.count.toLocaleString('en-IE')}</b>
-                <span>{t.label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="hint">What stops the next fortnight's work first, then the housekeeping. Each goes once it's sorted.</p>
+          {soon.length > 0 && (
+            <>
+              <h3>The next fortnight</h3>
+              {list(soon)}
+            </>
+          )}
+          {rest.length > 0 && (
+            <>
+              <h3>Housekeeping</h3>
+              {list(rest, 'tiles housekeeping')}
+            </>
+          )}
+        </>
       )}
     </section>
   )
@@ -142,7 +166,8 @@ function Tiles({ all, keys, title = 'Needs attention', clear, department }: { al
 /** What's on today, a line a job with its crew (audit finding 22); the next one when nothing is. */
 function Today({ view, today }: { view: View; today: string }) {
   const on = jobsOn(view, today)
-  const next = on.length === 0 ? weekAhead(view, today).find((j) => j.status !== 'enquiry') : undefined
+  const ahead = on.length === 0 ? weekAhead(view, today) : undefined
+  const next = ahead && [...ahead.work, ...ahead.errands].sort((a, b) => a.span!.start.localeCompare(b.span!.start))[0]
   const copying = useCopying()
   return (
     <section className="card">
@@ -155,7 +180,7 @@ function Today({ view, today }: { view: View; today: string }) {
         <ul className="job-list">
           {on.map((j) => (
             <li key={j.id}>
-              <TodayRow job={j} view={view} />
+              <JobLine job={j} view={view} />
             </li>
           ))}
         </ul>
@@ -164,14 +189,15 @@ function Today({ view, today }: { view: View; today: string }) {
   )
 }
 
-/** A job on today in one line: its name, then a quote not yet confirmed, its crew and kit short, as the jobs list says them. */
-function TodayRow({ job, view }: { job: JobView; view: View }) {
+/** A job in one line: its name, then (in the week ahead) its first day, a quote not yet confirmed, its crew and kit short, as the jobs list says them. */
+function JobLine({ job, view, from }: { job: JobView; view: View; from?: boolean }) {
   const crew = crewFill(job.calls)
   const short = kitShort(view.kit.byJob.get(job.id))
   return (
     <a className="job-row today-row" href={`#jobs/${job.id}`}>
       <b>{job.name}</b>
       <span className="side">
+        {from && job.span && <small>{dayLabel(job.span.start)}</small>}
         {job.status !== 'confirmed' && <small>{STATUS_LABELS[job.status]}</small>}
         {crew.needed > 0 && (
           <small>
@@ -184,27 +210,51 @@ function TodayRow({ job, view }: { job: JobView; view: View }) {
   )
 }
 
+/**
+ * The gigs and hires starting in the next seven days, a line a job as Today
+ * has (audit, 20 October 2026, finding 32), counted in the heading as
+ * listed; the errands and meetings behind one line that opens them.
+ */
 function WeekAhead({ view, today }: { view: View; today: string }) {
-  const week = weekAhead(view, today)
+  const { work, errands } = weekAhead(view, today)
   const copying = useCopying()
+  const rows = (jobs: JobView[]) => (
+    <ul className="job-list">
+      {jobs.map((j) => (
+        <li key={j.id}>
+          <JobLine job={j} view={view} from />
+        </li>
+      ))}
+    </ul>
+  )
   return (
-    <section className="card">
-      <Heading icon="calendar">The week ahead{week.length > 0 ? ` (${week.length})` : ''}</Heading>
-      {week.length === 0 && copying ? (
+    <section className="card week-ahead">
+      <Heading icon="calendar">The week ahead{work.length > 0 ? ` (${work.length})` : ''}</Heading>
+      {work.length === 0 && errands.length === 0 && copying ? (
         <p className="empty">{STILL_ARRIVING}</p>
-      ) : week.length === 0 ? (
+      ) : work.length === 0 && errands.length === 0 ? (
         <Empty>Nothing starts in the next seven days.</Empty>
       ) : (
-        <ul className="job-list">
-          {week.map((j) => (
-            <li key={j.id}>
-              <JobRow job={j} kit={view.kit.byJob.get(j.id)} current={false} />
-            </li>
-          ))}
-        </ul>
+        <>
+          {work.length > 0 ? rows(work) : <p className="empty">No gigs or hires start in the next seven days.</p>}
+          {errands.length > 0 && (
+            <details className="phase-details errands">
+              <summary>{errandsLine(errands, work.length > 0)}</summary>
+              {rows(errands)}
+            </details>
+          )}
+        </>
       )}
     </section>
   )
+}
+
+/** "and 2 errands and 1 meeting": what's folded, by kind. */
+function errandsLine(jobs: readonly JobView[], after: boolean): string {
+  const meetings = jobs.filter((j) => kindOf(j) === 'meeting').length
+  const errands = jobs.length - meetings
+  const said = [errands > 0 && plural(errands, 'errand'), meetings > 0 && plural(meetings, 'meeting')].filter(Boolean).join(' and ')
+  return after ? `and ${said}` : said.charAt(0).toUpperCase() + said.slice(1)
 }
 
 function ForCompany({ view, today, me }: { view: View; today: string; me: PersonView | undefined }) {
@@ -303,7 +353,7 @@ function CrewChart({ view, today, department }: { view: View; today: string; dep
       columns={crewByDay(view.crew.calls, today, 14, department)}
       empty={department ? `No ${department} calls in the next fourteen days.` : 'No crew called in the next fourteen days.'}
       more={
-        <a className="chart-more" href="#crew">
+        <a className="link chart-more" href="#crew">
           Crew calls
         </a>
       }
@@ -322,7 +372,7 @@ function KitChart({ view, today, department }: { view: View; today: string; depa
       format={(n) => n.toLocaleString('en-IE')}
       empty="No kit held for jobs in the next fourteen days."
       more={
-        <a className="chart-more" href="#stock">
+        <a className="link chart-more" href="#stock">
           Stock
         </a>
       }
@@ -394,7 +444,7 @@ function ForDepartment({
           <ul className="job-list">
             {working.map(({ c, o }) => (
               <li key={o.id}>
-                <a className="job-row" href={c.projectId ? `#jobs/${c.projectId}` : '#crew'}>
+                <a className="job-row working-row" href={c.projectId ? `#jobs/${c.projectId}` : '#crew'}>
                   <Avatar name={o.person!.name} src={photoOf(o.person)} />
                   <div>
                     <b>{o.person!.name}</b>
@@ -605,7 +655,8 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
           ) : (
             <p>
               {leaveDaysLabel(balance.annual.left)} of annual leave left this year, {leaveDaysLabel(balance.lieu.left)} in lieu to take.
-              {waiting.length > 0 && ` ${plural(waiting.length, 'request')} waiting to be approved.`}
+              {/* A day in lieu waiting is said beside the requests, as Leave shows it (audit, 20 October 2026, finding 70). */}
+              {awaiting(waiting.length, balance.lieu.waitingToApprove)}
             </p>
           )}
           <a className="button" href="#crew/leave">
@@ -613,9 +664,55 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
           </a>
         </section>
       )}
-      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
-      <Today view={view} today={today} />
+      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." grouped={false} />}
+      <YourDay view={view} today={today} me={me} mine={mine} />
     </>
+  )
+}
+
+/**
+ * Their own day, under Me (audit, 20 October 2026, finding 69): the
+ * bookings whose days take in today, with the call time and venue, or their
+ * leave; otherwise "Nothing on today" and the next booking. Never the
+ * company's Today, whose jobs they may not be on (ADR 0033 §1: my bookings,
+ * my leave).
+ */
+function YourDay({ view, today, me, mine }: { view: View; today: string; me: PersonView; mine: readonly { c: View['crew']['calls'][number]; o: View['crew']['calls'][number]['offers'][number] }[] }) {
+  const copying = useCopying()
+  const booked = mine.filter(({ o }) => o.status === 'confirmed')
+  const on = booked.filter(({ o }) => o.days.includes(today))
+  const away = view.crew.unavailability.find((u) => u.personId === me.id && u.start <= today && u.end >= today)
+  const next = on.length === 0 ? booked.map(({ c, o }) => ({ c, day: o.days.find((d) => d > today) })).filter((n) => n.day).sort((a, b) => a.day!.localeCompare(b.day!))[0] : undefined
+  return (
+    <section className="card your-day">
+      <Heading icon="time">Your day{on.length > 0 ? ` (${on.length})` : ''}</Heading>
+      {on.length === 0 && copying ? (
+        <p className="empty">{STILL_ARRIVING}</p>
+      ) : on.length === 0 ? (
+        <p className="empty">
+          {away ? (away.source === 'leave' ? 'On leave today.' : `Away today${away.note ? `: ${away.note}` : ''}.`) : 'Nothing on today.'}
+          {next && ` Next: ${next.c.project}, ${dayLabel(next.day!)}.`}
+        </p>
+      ) : (
+        <ul className="job-list">
+          {on.map(({ c, o }) => (
+            <li key={o.id}>
+              <a className="job-row" href={c.projectId ? `#jobs/${c.projectId}` : '#crew'}>
+                <div>
+                  <b>{c.project}</b>
+                  <p>
+                    {c.role}
+                    {c.phase && ` · ${c.phase}`}
+                    {c.venue && ` · ${c.venue}`}
+                  </p>
+                </div>
+                <div className="side">{c.callTime && <small>Call {c.callTime}</small>}</div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -671,4 +768,10 @@ function workCount(mine: readonly { o: { status: string } }[]) {
   const confirmed = mine.filter((m) => m.o.status === 'confirmed').length
   const accepted = mine.length - confirmed
   return [confirmed && `${confirmed} confirmed`, accepted && `${accepted} accepted`].filter(Boolean).join(', ')
+}
+
+/** " 1 request and 1 day in lieu waiting to be approved.", or nothing while nothing is. */
+export function awaiting(requests: number, lieuDays: number): string {
+  const parts = [requests > 0 && plural(requests, 'request'), lieuDays > 0 && `${leaveDaysLabel(lieuDays)} in lieu`].filter(Boolean)
+  return parts.length === 0 ? '' : ` ${parts.join(' and ')} waiting to be approved.`
 }

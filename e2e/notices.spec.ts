@@ -66,6 +66,48 @@ test('pops up a change someone else made to a job you made, counts it on the bel
   await expect(popUps).toBeChecked()
 })
 
+test("one maker's change to many of your jobs at once is one line on the list and one on the bell", async ({ page, request }) => {
+  // Proves (audit, 20 October 2026, finding 68): three jobs made here and moved on together from another device are one
+  // notification counting the jobs, opening to show each change, and the bell counts it once.
+  await page.goto('/#jobs')
+  const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Add job' }) })
+  const ids: string[] = []
+  for (let i = 0; i < 3; i++) {
+    const name = `Bulk Gig ${unique()}`
+    await page.goto('/#jobs')
+    await form.getByLabel('Job').fill(name)
+    await form.getByLabel('Phase 1', { exact: true }).fill('Show')
+    await form.getByLabel('Phase 1 from').fill('2026-11-21')
+    await form.getByLabel('Phase 1 to').fill('2026-11-21')
+    await form.getByRole('button', { name: 'Add job' }).click()
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+    ids.push(new URL(page.url()).hash.replace('#jobs/', ''))
+  }
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await page.goto('/#notifications')
+  await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toBeVisible()
+  await page.goto('/#home')
+
+  const createdAt = new Date().toISOString()
+  const res = await request.post('/api/sync/push', {
+    data: {
+      clientId: `e2ebulk${unique()}`,
+      mutations: ids.map((id) => ({ id: `b${unique()}`, name: 'project.update', args: { id, status: 'lost' }, createdAt })),
+      sentAt: createdAt,
+    },
+  })
+  expect((await res.json()).results.map((r: { status: string }) => r.status)).toEqual(['applied', 'applied', 'applied'])
+
+  const bell = page.getByRole('link', { name: /^Notifications/ }).first()
+  await expect(bell).toHaveAccessibleName('Notifications, 1 new')
+  await bell.click()
+  const line = page.locator('.notice').filter({ hasText: '3 changes to 3 jobs of yours at once' })
+  await expect(line).toContainText('New')
+  await line.getByText('Show all 3').click()
+  await expect(line.locator('.notice-fold li')).toHaveCount(3)
+  await expect(line.locator('.notice-fold li a').first()).toHaveAttribute('href', /^#jobs\//)
+})
+
 test('looks for notifications once as the app opens, not on each move, and again only for a change that could be news', async ({ page, request }) => {
   // Proves: the copy read, the list is looked for once; moving between screens doesn't look again; a change pulled in that no notification can be about (a place in the warehouse) costs no look, and one that can (a job) does (audit, 20 October 2026, finding 14).
   const looks: string[] = []

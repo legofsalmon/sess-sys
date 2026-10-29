@@ -1,5 +1,5 @@
 import { dayLabel } from './crew.ts'
-import type { HistoryEntry } from './protocol.ts'
+import type { HistoryEntry, Notice } from './protocol.ts'
 import { plural } from './stock.ts'
 
 /**
@@ -126,9 +126,86 @@ function dayName(day: string, today: string): string {
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${day.slice(0, 4) === today.slice(0, 4) ? '' : ` ${day.slice(0, 4)}`}`
 }
 
+/** Who made a change, in words: their name, or while there are no names the device's, never "Someone" (audit, 20 October 2026, finding 68). */
+export const makerOf = (e: HistoryEntry): string => whose(e).name
+
 /** Whose run a change belongs to: the person's, or while there are no names, the device's. */
 function whose(e: HistoryEntry): { key: string; name: string; byDevice: boolean } {
   if (e.who.kind !== 'unknown') return { key: e.who.key ?? `name:${e.who.name}`, name: e.who.name, byDevice: false }
   const name = e.deviceCode ? `Device ${e.deviceCode}` : (e.device ?? 'An unknown device')
   return { key: `device:${name}`, name, byDevice: true }
+}
+
+/**
+ * Notifications as lines (ADR 0058, later; audit, 20 October 2026, finding
+ * 68), so the list and the bell count what happened, not each change: the
+ * bundling the pop-ups already do, applied to the list.
+ *
+ * - Changes one maker made within a minute of each other to more than two
+ *   of a person's jobs (a bulk change, a calendar or a bring-in) are one
+ *   line, which opens to show them.
+ * - Otherwise, changes to a job they're on or made are one line a job a day.
+ * - What's about them, or an offer they sent, is always its own line.
+ *
+ * Newest first, each under the Irish day its newest change reached the
+ * server. `jobOf` says which job a change touched, from the device's copy.
+ */
+export interface NoticeLine {
+  /** Its newest change's id. */
+  id: string
+  day: string
+  /** One change; several to one job that day; or one maker's to many jobs at once. */
+  kind: 'one' | 'job' | 'bulk'
+  /** Newest first. */
+  notices: Notice[]
+  /** How many jobs a bulk line touched. */
+  jobs: number
+}
+
+/** Changes this close together, by one maker, are one go. */
+const BULK_GAP_MS = 60_000
+/** A go touching more jobs than this is one line. */
+const BULK_OVER = 2
+
+const ONE_JOB: ReadonlySet<string> = new Set(['on', 'made'])
+
+export function noticeLines(notices: readonly Notice[], jobOf: (n: Notice) => string | undefined): NoticeLine[] {
+  const job = new Map(notices.map((n) => [n.id, ONE_JOB.has(n.why) ? jobOf(n) : undefined]))
+  // One maker's goes: a change joins the one before it when the same maker made it within a minute.
+  const bulk = new Map<string, Notice[]>()
+  let go: Notice[] = []
+  const close = () => {
+    const jobs = new Set(go.map((n) => job.get(n.id)).filter(Boolean))
+    if (jobs.size > BULK_OVER) for (const n of go) bulk.set(n.id, go)
+    go = []
+  }
+  for (const n of notices) {
+    if (!job.get(n.id)) continue
+    const last = go.at(-1)
+    if (last && (whose(last).key !== whose(n).key || Math.abs(Date.parse(last.madeAt) - Date.parse(n.madeAt)) > BULK_GAP_MS)) close()
+    go.push(n)
+  }
+  close()
+
+  const lines: NoticeLine[] = []
+  const byKey = new Map<string, NoticeLine>()
+  for (const n of notices) {
+    const day = irishDay(new Date(n.arrivedAt))
+    const together = bulk.get(n.id)
+    const j = job.get(n.id)
+    const key = together ? `bulk:${together[0]!.id}` : j ? `job:${day}:${j}` : undefined
+    const line = key ? byKey.get(key) : undefined
+    if (line) {
+      line.notices.push(n)
+      continue
+    }
+    const fresh: NoticeLine = { id: n.id, day, kind: together ? 'bulk' : j ? 'job' : 'one', notices: [n], jobs: 0 }
+    if (key) byKey.set(key, fresh)
+    lines.push(fresh)
+  }
+  for (const l of lines) {
+    if (l.kind === 'job' && l.notices.length === 1) l.kind = 'one'
+    if (l.kind === 'bulk') l.jobs = new Set(l.notices.map((n) => job.get(n.id))).size
+  }
+  return lines
 }

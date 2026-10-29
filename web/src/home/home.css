@@ -59,3 +59,17 @@
   .home .chart-part.short, .home .chart-swatch.short { background: Highlight; }
 }
 .home .chart-more { justify-self: start; font-size: var(--text-link); }
+/* Working this week on a phone (audit, 20 October 2026, finding 80): the days go under the name, so the role and job aren't squeezed to a word a line beside them. */
+@media (max-width: 479px) {
+  .home .working-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-12); }
+  .home .working-row .side { grid-column: 2; justify-items: start; text-align: left; }
+}
+/* The week ahead's errands and meetings, folded behind one line (audit, 20 October 2026, finding 32). */
+.home .errands summary { padding: var(--space-12) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.home .errands[open] summary { margin-bottom: var(--space-4); }
+/* Needs attention in two groups (audit, 20 October 2026, finding 33): the next fortnight's full size, the housekeeping smaller under it. */
+.home .standing h3 { margin: var(--space-6) 0 0; color: var(--muted); font-size: var(--text-small); font-weight: 700; }
+.home .standing .hint { margin: 0; }
+.home .tiles.housekeeping { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.home .tiles.housekeeping .tile { min-height: 64px; padding: var(--space-8) var(--space-10); }
+.home .tiles.housekeeping .tile b { font-size: 1.25rem; }
