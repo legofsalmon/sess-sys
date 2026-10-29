@@ -476,6 +476,22 @@ function ownCalendarBlock(d: PageData): string {
   </section>`
 }
 
+/**
+ * Days off marked over a booking they hold (audit, 20 October 2026, finding 50): said beside the row, since marking
+ * themselves away doesn't take them off the job, and the way that does is on the booking. Nothing for approved leave,
+ * which the office approved knowing the bookings.
+ */
+function stillBooked(u: Unavailability, booked: PageData['jobs']): string {
+  if (u.source === 'leave') return ''
+  const hits = booked
+    .map((j) => ({ j, days: j.offer.days.filter((x) => x >= u.start && x <= u.end) }))
+    .filter((x) => x.days.length)
+  if (!hits.length) return ''
+  const on = hits.map(({ j, days }) => `<a href="#o-${h(j.offer.id)}">${h(j.call.project)}</a> ${days.length === 1 && hits.length === 1 ? 'that day' : `on ${h(daysLabel(days))}`}`).join(' and ')
+  const which = hits.length === 1 ? 'that booking' : 'each booking'
+  return `<p class="clash">You're booked on ${on}. Days off don't take you off it: use Can't make it any more on ${which}.</p>`
+}
+
 export function renderPage(d: PageData): string {
   const current = d.jobs.filter((j) => j.call.end >= d.today && j.call.status === 'open')
   const waiting = current.filter((j) => j.offer.status === 'offered' || j.offer.status === 'countered')
@@ -539,7 +555,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
           ${
             // Approved leave is cancelled in the app, never taken off here, so the two never disagree (ADR 0024).
             u.source === 'leave' ? '<small>Approved leave</small>' : `<form method="post" action="${d.base}/away/${encodeURIComponent(u.id)}/remove"><button>Remove</button></form>`
-          }</li>`
+          }${stillBooked(u, booked)}</li>`
             )
             .join('')}</ul>`
         : ''
@@ -680,8 +696,8 @@ fieldset.days input{width:20px}
 a.button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 a.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;text-decoration:none}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
-.away li button{min-height:44px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}
+.away li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+.away li .clash{flex-basis:100%;margin-right:6px;font-size:.92rem}.away li button{min-height:44px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}
 .closed li{font-size:.92rem}
 .add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
 footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}

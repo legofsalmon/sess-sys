@@ -320,6 +320,42 @@ describe('freelancer link', () => {
     expect(await entity<Offer>(app, 'offer', forced.id)).toMatchObject({ override: true })
   })
 
+  it('checks days off from the link: none gone by, none past a year, overlaps as one row, and a booking said beside them', async () => {
+    // Proves (audit, 20 October 2026, finding 50): the link refuses a first day already gone and a span past a year, while
+    // the office can still backdate; overlapping days off become one row with both notes; and days off over a booking they
+    // hold say beside the row that they're still booked and where to pull out, the booking staying as it was.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const away = (payload: string) =>
+      app.inject({ method: 'POST', url: `/f/${aoife.linkToken}/away`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload })
+    const past = await away('start=2020-01-01&end=2020-01-03')
+    expect(past.statusCode).toBe(422)
+    expect(flashOf(past.body)).toMatchObject({ ok: false, message: 'The first day off has gone by. Pick today or a day after it.' })
+    expect(past.body).toContain('value="2020-01-01"')
+    expect(flashOf((await away('start=2026-10-01&end=2999-12-31')).body)).toMatchObject({ ok: false, message: 'Days off can be at most 366 days at a time.' })
+    // The office's own path can still backdate, but not for ever either.
+    expect(await send(app, 'unavailability.add', { id: newId(), personId: aoife.id, start: '2026-09-01', end: '2026-09-02', note: '' })).toMatchObject({ status: 'applied' })
+    expect(await send(app, 'unavailability.add', { id: newId(), personId: aoife.id, start: '2020-01-01', end: '2025-08-01', note: '' })).toMatchObject({ status: 'rejected' })
+
+    expect((await away('start=2026-10-10&end=2026-10-14&note=On+tour')).statusCode).toBe(303)
+    expect((await away('start=2026-10-13&end=2026-10-16&note=Wedding')).statusCode).toBe(303)
+    const { rows } = await lastDb.query<{ start_day: string; end_day: string; note: string }>(
+      "SELECT start_day::text, end_day::text, note FROM unavailability WHERE start_day >= '2026-10-01'"
+    )
+    expect(rows).toEqual([{ start_day: '2026-10-10', end_day: '2026-10-16', note: 'On tour; Wedding' }])
+
+    // Booked on a job, then days off over one of its days: added, said beside the row, and the booking still holds.
+    const o = await offer(app, await call(app, { start: '2026-10-20', end: '2026-10-21' }), aoife.id)
+    await answer(app, aoife.linkToken, o.id, { answer: 'accept', picker: '1', days: ['2026-10-20', '2026-10-21'] })
+    await send(app, 'offer.confirm', { id: o.id })
+    expect((await away('start=2026-10-21&end=2026-10-22')).statusCode).toBe(303)
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    const list = page.slice(page.indexOf('<section id="away">'), page.indexOf('class="add-away"'))
+    expect(list).toContain(`You're booked on <a href="#o-${o.id}">Electric Picnic</a> that day. Days off don't take you off it: use Can't make it any more on that booking.`)
+    expect(list.match(/class="clash"/g)).toHaveLength(1)
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'confirmed' })
+  })
+
   it('publishes bookings as a calendar feed any calendar app can subscribe to', async () => {
     const app = await server()
     const aoife = await person(app, 'Aoife Byrne')
