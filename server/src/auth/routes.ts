@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { refusalFor, roleCan, ROLES, type Ability, type MeResponse, type ReaderOf, type Role, type StaffUser } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { clearCookie, publicOrigin, readCookie, setCookie } from '../http.ts'
 import { isStaff, type AuthConfig } from './config.ts'
 import { roleOfAccount } from './roles.ts'
@@ -267,7 +267,7 @@ export function registerAuth(app: FastifyInstance, db: Db, auth: AuthConfig | un
       try {
         identity = await auth.provider.exchange({ code: req.query.code, codeVerifier: verifier, redirectUri: callbackUrl(req) })
       } catch (err) {
-        req.log.warn({ err }, 'Sign-in with Google failed')
+        req.log.warn({ err: faultForLog(err) }, 'Sign-in with Google failed')
         return fail('failed')
       }
       if (!isStaff(auth, identity)) {

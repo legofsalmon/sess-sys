@@ -93,3 +93,12 @@ test('a tab brought back to the front looks for a new version, without waiting f
   await expect(tab.getByText('A new version is ready.')).toBeVisible({ timeout: 20_000 })
   await context.close()
 })
+
+test('a deploy downloads the app and the QR code reader, and leaves the map and the rack in 3D until they are first shown', () => {
+  // Proves: the service worker's list of files to fetch with each deploy has the QR code reader, which scanning with no signal needs from the first time (ADR 0016), and not the map's or the 3D drawing's code, which most phones never open; those are kept as they're first fetched (audit, 20 October 2026, finding 65).
+  const listed = [...before.sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!)
+  expect(listed.some((u) => /^assets\/jsQR-/.test(u))).toBe(true)
+  expect(listed.some((u) => /^assets\/Shell-.*\.js$/.test(u))).toBe(true)
+  expect(listed.filter((u) => /^assets\/(leaflet|Map|Rack3D)-/.test(u))).toEqual([])
+  expect(before.sw).toContain('on-first-use')
+})

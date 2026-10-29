@@ -35,6 +35,27 @@ export const CHANGELOG: readonly Release[] = [
     prs: [161],
   },
   {
+    version: '1.54.0',
+    date: '2026-10-29',
+    title: 'Crew needed shows the next fortnight, and unanswered offers wait to be chased',
+    what: "Crew needed now shows the next fortnight, as Home counts it, with every later call a tap away, and today's booked calls with someone running late sit on their own line. Offers nobody has answered by their reply-by date now wait in Answers to check, with a way to ring. Also fixed: an old tab could accept a declined offer, a counter noted with no signal showed no rate, a freelancer's resend could hide the office's changed rate or drop a day the office added, and an approver could set their own leave allowance.",
+    prs: [160],
+  },
+  {
+    version: '1.53.0',
+    date: '2026-10-29',
+    title: 'The app opens on the shape of the screen, and phones fetch less',
+    what: "While the app opens it now shows the tabs and the shape of the screen, then says it's reading this phone's copy, instead of a blank 'Loading…'. Phones ask the server for notifications far less often, and no longer download the map or the 3D rack drawing until someone first opens one.",
+    prs: [159],
+  },
+  {
+    version: '1.52.1',
+    date: '2026-10-29',
+    title: 'Changes made on two devices at once no longer quietly overwrite each other',
+    what: "Two people changing the same kit line, stock count, product, quote, vehicle or the office's details on different devices no longer quietly lose one person's change: the app keeps what was changed elsewhere, or says so and keeps what you typed. Changes from a phone that has been offline send faster, and a phone catching up shows current records while its own changes are still sending.",
+    prs: [158],
+  },
+  {
     version: '1.52.0',
     date: '2026-10-29',
     title: "Staff crew see their own work first, and nobody else's private details",

@@ -1,6 +1,6 @@
 import { AA_FUEL_PAGE, DEFAULT_LITRES_PER_100_KM, DEFAULT_TRAVEL_FROM_KM, irishToday, QUOTE_SETTINGS_ID, type FuelPriceFound } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { emit, serverChange } from '../kernel.ts'
 import { FUEL_FROM_AA_ACTION } from '../history.ts'
 import { getQuoteSettings } from './store.ts'
@@ -61,7 +61,7 @@ export function registerFuelRoutes(app: FastifyInstance, { lookup }: { lookup: F
     try {
       return reply.header('cache-control', 'no-store').send(await lookup())
     } catch (err) {
-      req.log.warn({ err }, "The AA's fuel prices couldn't be read")
+      req.log.warn({ err: faultForLog(err) }, "The AA's fuel prices couldn't be read")
       return reply.code(502).send({ error: "The AA's fuel prices couldn't be read just now. Open their page and type the diesel price in." })
     }
   })
@@ -152,7 +152,7 @@ export class FuelUpdates {
         }
         return month
       } catch (err) {
-        this.options.log?.warn({ err }, "Could not take the fuel price from the AA's survey; trying again tomorrow")
+        this.options.log?.warn({ err: faultForLog(err) }, "Could not take the fuel price from the AA's survey; trying again tomorrow")
         return undefined
       }
     })

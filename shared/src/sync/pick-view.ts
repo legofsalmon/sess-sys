@@ -134,18 +134,31 @@ function whereKept(a: { at: { name: string } | undefined; inCase: AssetView | un
   return parts.length ? parts.join(', ') : 'Not said where'
 }
 
-export function movesView(
+/**
+ * Where every scan and count leaves the kit: each item's latest scan, what's out with each job, item by item and counted,
+ * and what's missing. None of it reads the jobs, so it's kept from one change to the next while the scans, the stock and
+ * the faults are as they were: a change to a job builds the pick lists again from it, not this (audit, 20 October 2026,
+ * finding 12).
+ */
+export interface MoveTallies {
+  moves: ReadonlyMap<string, MovementView>
+  /** Each job's items that have been out with it: scanned, or in a case scanned. */
+  sent: ReadonlyMap<string, ReadonlySet<string>>
+  /** Each job's counted kit, by product. */
+  counted: ReadonlyMap<string, ReadonlyMap<string, { out: number; back: number; missing: number }>>
+  outState: ReadonlyMap<string, OutState>
+  /** Items whose latest scan, or their case's, is a report of them missing. */
+  missingNow: ReadonlySet<string>
+  outByJob: ReadonlyMap<string, AssetView[]>
+}
+
+export function moveTallies(
   entities: Partial<Tables>,
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number,
-  jobs: JobsView,
   warehouse: WarehouseView,
-  /** The kit on jobs, or how to get it: kit availability needs `lateOut` from here first, so it's read only once a pick list is. */
-  kitOrLater: KitView | (() => KitView),
-  today: string,
   faults?: FaultsView
-): MovesView {
-  const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
+): MoveTallies {
   const moves = new Map<string, MovementView>()
   for (const m of Object.values(entities.movement ?? {})) moves.set(m.id, { ...m, pending: false })
   for (const m of outbox) {
@@ -176,9 +189,7 @@ export function movesView(
   }
 
   const last = new Map<string, Event>()
-  /** Each job's items that have been out with it: scanned, or in a case scanned. */
   const sent = new Map<string, Set<string>>()
-  /** Each job's counted kit, by product. */
   const counted = new Map<string, Map<string, { out: number; back: number; missing: number }>>()
   const tally = (projectId: string, modelId: string) => {
     let byModel = counted.get(projectId)
@@ -212,7 +223,6 @@ export function movesView(
 
   // Each item's latest scan, or its case's, or that case's case's.
   const outState = new Map<string, OutState>()
-  /** Items whose latest scan, or their case's, is a report of them missing. */
   const missingNow = new Set<string>()
   /** Items retired while they were out. */
   const gone = new Set<string>()
@@ -239,6 +249,24 @@ export function movesView(
     list.push(a)
     outByJob.set(best.projectId, list)
   }
+  return { moves, sent, counted, outState, missingNow, outByJob }
+}
+
+export function movesView(
+  entities: Partial<Tables>,
+  outbox: readonly (Mutation & { appliedSeq?: number })[],
+  cursor: number,
+  jobs: JobsView,
+  warehouse: WarehouseView,
+  /** The kit on jobs, or how to get it: kit availability needs `lateOut` from here first, so it's read only once a pick list is. */
+  kitOrLater: KitView | (() => KitView),
+  today: string,
+  faults?: FaultsView,
+  /** Kept from the last build while the scans, the stock and the faults are the same (`moveTallies`). */
+  tallies: MoveTallies = moveTallies(entities, outbox, cursor, warehouse, faults)
+): MovesView {
+  const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
+  const { moves, sent, counted, outState, missingNow, outByJob } = tallies
 
   const jobById = new Map(jobs.jobs.map((j) => [j.id, j]))
   const modelById = new Map(warehouse.models.map((m) => [m.id, m]))

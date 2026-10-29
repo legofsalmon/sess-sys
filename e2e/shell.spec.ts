@@ -140,3 +140,43 @@ test('a demo persona is told to the server and the copy read again before the ap
   expect(told).toBeGreaterThan(-1)
   expect(marks.slice(told, moved)).toContain('pull')
 })
+
+test('while the app opens it draws the places and the shape of the screen, and past a second says what it is doing', async ({ browser }) => {
+  // Proves: with the screens slow to come (a warm phone reading its copy, audit, 20 October 2026, finding 11), the bar is drawn at once with the address's place lit, a skeleton stands where the screen will be in a busy region, there is never a "Loading…" alone, "Reading this phone's copy…" shows only past the design system's second, and the shell takes over as before.
+  // The app's own worker is kept out, so the screens' file comes over the network, where it can be held back.
+  const page = await (await browser.newContext({ viewport: phoneSize, serviceWorkers: 'block' })).newPage()
+  await ready(page, '#jobs')
+  // When the words came, and when the bar did, from the page's start.
+  await page.addInitScript(() => {
+    const seen = new MutationObserver(() => {
+      const w = window as unknown as { barAt?: number; wordsAt?: number }
+      w.barAt ??= document.querySelector('nav.tabs') ? performance.now() : undefined
+      if (document.querySelector('[role=status]')?.textContent) w.wordsAt ??= performance.now()
+    })
+    seen.observe(document, { subtree: true, childList: true, characterData: true })
+  })
+  let release!: () => void
+  const held = new Promise<void>((done) => (release = done))
+  await page.route('**/assets/Shell-*.js', async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.reload()
+  const bar = page.getByRole('navigation', { name: 'Areas' })
+  await expect(bar.getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('main [aria-busy="true"] .skeleton').first()).toBeVisible()
+  await expect(page.getByText('Loading…')).toHaveCount(0)
+  await expect(page.getByRole('status')).toHaveText("Reading this phone's copy…", { timeout: 5_000 })
+  const { barAt, wordsAt } = await page.evaluate(() => {
+    const w = window as unknown as { barAt: number; wordsAt: number }
+    return { barAt: w.barAt, wordsAt: w.wordsAt }
+  })
+  expect(wordsAt - barAt).toBeGreaterThanOrEqual(900)
+  // A place tapped meanwhile is where the app opens.
+  await bar.getByRole('link', { name: 'Stock' }).click()
+  await expect(bar.getByRole('link', { name: 'Stock' })).toHaveAttribute('aria-current', 'page')
+  release()
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  expect(new URL(page.url()).hash).toBe('#stock')
+})
