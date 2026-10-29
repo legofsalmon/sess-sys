@@ -28,7 +28,7 @@ import { emitAll, emitRemovedAll, Refused, serverChange, type Ctx } from '../ker
 import { projectHandlers } from '../projects/handlers.ts'
 import { getPhases, getProjects, namesForCall } from '../projects/store.ts'
 import type { GoogleEvent } from './google.ts'
-import { GAP_DAYS, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
+import { GAP_DAYS, keyEvent, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
 import { Halt, type CalendarSync } from './sync.ts'
 
 /**
@@ -56,7 +56,7 @@ const day = z.string().refine(isDay, 'Choose the first day to bring jobs in from
 const lookBody = z.object({ calendarId: z.string().min(1, 'Choose a calendar.').max(1024), from: day })
 const bringBody = lookBody.extend({
   jobs: z
-    .array(z.object({ key: z.string().min(1).max(400), name: z.string().max(200).transform(cleanText), kind: z.enum(PROJECT_KINDS).optional(), include: z.boolean() }))
+    .array(z.object({ key: z.string().min(1).max(2000), name: z.string().max(200).transform(cleanText), kind: z.enum(PROJECT_KINDS).optional(), include: z.boolean() }))
     .max(5000),
   people: z
     .array(
@@ -236,7 +236,7 @@ async function bring(
   calendar: ImportCalendar,
   app: AppData,
   parts: ReadonlyMap<string, NameParts> = new Map()
-): Promise<Omit<ImportResult, 'missing'>> {
+): Promise<Omit<ImportResult, 'missing' | 'already'>> {
   const personIds = new Map<string, string>()
   for (const p of plan.people) {
     if (!people.has(p.email)) continue
@@ -374,6 +374,7 @@ async function brought(q: Queryable): Promise<ImportBrought> {
   const days = await one(`SELECT coalesce(sum(end_day - start_day + 1), 0) AS n FROM phases ph JOIN projects p ON p.id = ph.project_id WHERE p.source_calendar IS NOT NULL`)
   const crew = await one(`SELECT count(*) AS n FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL`)
   const people = (await importedPeopleToGo(q)).length
+  const kept = Number((await q.query<{ n: string }>(`SELECT count(*) AS n FROM people WHERE notes = $1`, [PERSON_NOTE])).rows[0]!.n) - people
   const calendars = (await q.query<{ source_calendar: string }>(`SELECT DISTINCT source_calendar FROM projects WHERE source_calendar IS NOT NULL ORDER BY 1`)).rows.map((r) => r.source_calendar)
   const acted = [
     [`SELECT count(*) AS n FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL AND o.responded_via IN ('link', 'app', 'ops')`, 'answers to offers'],
@@ -384,6 +385,9 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     [`SELECT count(*) AS n FROM faults f JOIN projects p ON p.id = f.project_id WHERE p.source_calendar IS NOT NULL`, 'faults on jobs'],
     [`SELECT count(*) AS n FROM vehicle_bookings b JOIN projects p ON p.id = b.project_id WHERE p.source_calendar IS NOT NULL`, 'vehicles booked'],
     [`SELECT count(*) AS n FROM job_steps s JOIN projects p ON p.id = s.project_id WHERE p.source_calendar IS NOT NULL`, 'steps given out or ticked'],
+    // A quote, or crew saying they'll be late, is acted on as kit is (audit, 20 October 2026, finding 51).
+    [`SELECT count(*) AS n FROM quotes q JOIN projects p ON p.id = q.project_id WHERE p.source_calendar IS NOT NULL`, 'quotes'],
+    [`SELECT count(*) AS n FROM running_late r JOIN crew_calls c ON c.id = r.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL`, 'crew running late'],
   ] as const
   const found: string[] = []
   for (const [sql, what] of acted) if ((await one(sql)) > 0) found.push(what)
@@ -392,16 +396,22 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     days,
     crew,
     people,
+    kept,
     calendars,
     blocked: found.length ? `These jobs have been worked on in the app since (${found.join(', ')}), so they can't be taken back as a whole.` : null,
   }
 }
 
-/** People added from the invites that nothing but the bring-in refers to: no answer, timesheet, document, leave, day off, lateness or contact duty of their own. */
+/**
+ * People added from the invites that nothing but the bring-in refers to: no answer, timesheet, document, leave, day off,
+ * lateness or contact duty of their own; and that nobody has changed since, which the history shows as a change to them
+ * by anything but a bring-in. A name typed on Tidy up keeps its person (audit, 20 October 2026, finding 53).
+ */
 async function importedPeopleToGo(q: Queryable): Promise<string[]> {
   const { rows } = await q.query<{ id: string }>(
     `SELECT p.id FROM people p
       WHERE p.notes = $1
+        AND NOT EXISTS (SELECT 1 FROM changes ch JOIN mutations m ON m.id = ch.mutation_id WHERE ch.entity_id = p.id AND ch.entity = 'person' AND m.name <> $2)
         AND NOT EXISTS (SELECT 1 FROM offers o WHERE o.person_id = p.id AND (o.responded_via IS NULL OR o.responded_via <> 'calendar') AND o.status <> 'offered')
         AND NOT EXISTS (SELECT 1 FROM offers o JOIN crew_calls c ON c.id = o.call_id LEFT JOIN projects j ON j.id = c.project_id WHERE o.person_id = p.id AND j.source_calendar IS NULL)
         AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.person_id = p.id)
@@ -414,17 +424,22 @@ async function importedPeopleToGo(q: Queryable): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM job_steps s WHERE s.owner_id = p.id OR s.done_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM purchase_requests r WHERE r.asked_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM purchase_votes v WHERE v.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM leave_allowances a WHERE a.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM leave_requests l WHERE l.decided_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM lieu_entries l WHERE l.decided_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM own_calendars oc WHERE oc.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM counts ct WHERE ct.counted_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM erasures e WHERE e.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM person_merges pm WHERE pm.into_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM calendar_link cl WHERE cl.state <> 'off' AND lower(trim(cl.account_email)) = lower(trim(coalesce(p.email, ''))))
       ORDER BY p.id`,
-    [PERSON_NOTE]
+    [PERSON_NOTE, IMPORT_ACTION]
   )
   return rows.map((r) => r.id)
 }
 
 /** Take back everything the bring-ins made, in the reverse of the order it was saved, telling devices each record is gone. */
-async function takeBack(ctx: Ctx): Promise<Omit<ImportBrought, 'blocked' | 'calendars'>> {
+async function takeBack(ctx: Ctx): Promise<Omit<ImportBrought, 'blocked' | 'calendars' | 'kept'>> {
   const ids = async (sql: string) => (await ctx.tx.query<{ id: string }>(sql)).rows.map((r) => r.id)
   const jobs = await ids(`SELECT id FROM projects WHERE source_calendar IS NOT NULL ORDER BY id`)
   const phases = await ids(`SELECT ph.id FROM phases ph JOIN projects p ON p.id = ph.project_id WHERE p.source_calendar IS NOT NULL ORDER BY ph.id`)
@@ -489,7 +504,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           const was = await brought(ctx.tx)
           if (was.blocked) throw new Refused({ code: 'conflict', message: was.blocked })
           if (was.jobs === 0) throw new Refused({ code: 'not-found', message: 'Nothing brought in from Google Calendar is in the app.' })
-          const done = await takeBack(ctx)
+          const done = { ...(await takeBack(ctx)), kept: was.kept }
           await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ ...done, calendars: was.calendars })])
           return { ...done, calendars: was.calendars }
         }
@@ -499,6 +514,12 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
       return result
     } catch (err) {
       if (err instanceof Refused) return reply.code(409).send({ error: err.message })
+      // Something added to the app since that refers to a job or person brought in, which the lists above don't know
+      // of yet: said in words, and nothing is taken back (audit, 20 October 2026, finding 51).
+      if ((err as { code?: unknown }).code === '23503') {
+        req.log.warn({ detail: (err as { detail?: unknown }).detail }, 'Calendar import: take-back met something still referring to what was brought in')
+        return reply.code(409).send({ error: "Something in the app still refers to these jobs or people, so they can't be taken back as a whole." })
+      }
       throw err
     }
   })
@@ -546,11 +567,11 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     )
     const client = typeof req.query.client === 'string' && /^[a-z0-9]{1,64}$/.test(req.query.client) ? req.query.client : undefined
     const options = { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today }
-    /** The plan for what's ticked, and every job the calendar holds that isn't in the app yet. */
-    const plans = (app: AppData) => ({
-      plan: planImport(read.events, app, options, { names, kinds, include, people: personNames }),
-      found: new Set(planImport(read.events, app, options).jobs.map((j) => j.key)),
-    })
+    /** The plan for what's ticked, which also says every job chosen that the calendar still holds as new (finding 52). */
+    const plans = (app: AppData) => {
+      const plan = planImport(read.events, app, options, { names, kinds, include, people: personNames })
+      return { plan, found: new Set(plan.found) }
+    }
     // Planned first outside the write lock, which every device's change waits for (audit finding 7): a season is
     // thousands of events. Inside the lock the app is read again, and only when it has changed since is the plan made
     // again, so two people bringing in at once still can't bring the same events in twice.
@@ -565,7 +586,8 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     const before = await readApp(db.reads, read.from, read.to)
     const planned = plans(before)
     let missing: string[] = []
-    let result: Omit<ImportResult, 'missing'>
+    let already: string[] = []
+    let result: Omit<ImportResult, 'missing' | 'already'>
     try {
       result = await serverChange(
         db,
@@ -574,7 +596,12 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           // Planned again inside the lock, so two people bringing in at once can't bring the same events in twice.
           const app = await readApp(ctx.tx, read.from, read.to)
           const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : plans(app)
-          missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
+          // A job chosen that isn't new any more is in the app already, brought in by a bring-in sent before or made since,
+          // while its events are still on the calendar; otherwise it has gone from it (audit, 20 October 2026, finding 52).
+          const gone = choices.jobs.filter((j) => j.include && !found.has(j.key))
+          const known = new Set([...app.imported.map((i) => i.uid), ...read.events.filter((e) => !e.cancelled).map((e) => e.uid)])
+          already = gone.filter((j) => known.has(keyEvent(j.key))).map((j) => j.name || j.key)
+          missing = gone.filter((j) => !known.has(keyEvent(j.key))).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
           const done = await bring(ctx, plan, people, read.calendar, app, personParts)
           // The history keeps the first day asked for and what was left out, which the screen showed and is gone once brought in (audit finding 10).
@@ -586,10 +613,10 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     } catch (err) {
       if (err instanceof Refused) return reply.code(409).send({ error: err.message })
       if (!(err instanceof NothingToBring)) throw err
-      return { jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing }
+      return { jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing, already }
     }
-    req.log.info({ ...result, missing: missing.length }, 'Calendar import: brought jobs in')
+    req.log.info({ ...result, missing: missing.length, already: already.length }, 'Calendar import: brought jobs in')
     onChange()
-    return { ...result, missing }
+    return { ...result, missing, already }
   })
 }

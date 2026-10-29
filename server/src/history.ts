@@ -639,7 +639,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const details = [count(a.jobs, 'job', 'jobs'), count(a.days, 'day', 'days'), count(a.crew, 'crew booking or offer', 'crew bookings and offers'), count(a.people, 'person added from the invites', 'people added from the invites')].filter(
         (p): p is string => p !== undefined
       )
-      return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}`
+      const kept = count(a.kept, 'person added from the invites', 'people added from the invites')
+      return `Took back everything brought in from Google Calendar, to bring it in again${details.length ? `: ${inWords(details)}` : ''}${kept ? `. Kept ${kept}, named, changed or used since` : ''}`
     }
     case 'model.create':
       return `Added the product ${text(a.name, 'a product')} (${department(a.department)}, ${tracking(a.tracking)}${a.isRack ? ', a rack' : a.isCase ? ', holds other kit' : ''}${a.rackMount ? ', rack-mount' : ''}${typeof a.rackPart === 'string' ? `, ${RACK_PART_LABELS[a.rackPart as RackPart]?.toLowerCase() ?? 'a rack part'}` : ''}${typeof a.code === 'string' && a.code.trim() ? `, stock code ${clip(a.code.trim())}` : ''}${a.dryHire ? `, dry hire${typeof a.supplier === 'string' && a.supplier.trim() ? ` from ${clip(a.supplier.trim())}` : ''}` : ''})`

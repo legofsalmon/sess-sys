@@ -3,6 +3,7 @@ import {
   importFromDefault,
   phaseOnCalendar,
   type CrewCall,
+  type ImportBrought,
   type ImportChoices,
   type ImportPreview,
   type ImportResult,
@@ -262,9 +263,8 @@ describe('planning', () => {
       { email: 'sean@sessionhire.com', name: 'Seán Óg', kind: 'staff', suggested: true, needsName: false, jobs: 1 },
     ])
     // The office can give a name as it will show; a person's own address is suggested only once they're on a gig.
-    const named = planImport([ev('Gig - Show', '2031-06-01', { guests }), ev('Client meeting', '2031-06-02', { guests: [{ email: 'client@gmail.com', name: null, answer: 'accepted', notCrew: false }] })], app, {
-      ...opts,
-    }, { names: new Map(), include: new Set(['gig|2031-06-01', 'client meeting|2031-06-02']), people: new Map([['aoife.byrne@gmail.com', 'Aoife Ní Bhriain']]) })
+    const both = [ev('Gig - Show', '2031-06-01', { guests }), ev('Client meeting', '2031-06-02', { guests: [{ email: 'client@gmail.com', name: null, answer: 'accepted', notCrew: false }] })]
+    const named = planImport(both, app, opts, { names: new Map(), include: new Set(planImport(both, app, opts).jobs.map((j) => j.key)), people: new Map([['aoife.byrne@gmail.com', 'Aoife Ní Bhriain']]) })
     expect(named.people.map((p) => [p.name, p.suggested, p.needsName])).toEqual([
       ['Aoife Ní Bhriain', true, false],
       ['Seán Óg', true, false],
@@ -521,7 +521,7 @@ describe('bringing jobs in from Google Calendar', () => {
     // The office gives Sean his name as it will show.
     choices.people = choices.people.map((p) => (p.email === 'sean@sessionhire.com' ? { ...p, name: 'Seán Mac Aodha' } : p))
     const result = ok<ImportResult>(await s.bring(choices))
-    expect(result).toEqual({ jobs: 2, added: 0, days: 6, venues: 2, people: 2, crew: 4, missing: [] })
+    expect(result).toEqual({ jobs: 2, added: 0, days: 6, venues: 2, people: 2, crew: 4, missing: [], already: [] })
 
     const f = await s.feed()
     const nissan = f.projects.find((p) => p.name === 'Nissan')!
@@ -713,7 +713,7 @@ describe('bringing jobs in from Google Calendar', () => {
     const preview = ok<ImportPreview>(await s.look(OPS))
     ok<ImportResult>(await s.bring(choose(preview)))
     const brought = () => s.app.inject({ url: '/api/calendar/import/brought', cookies: s.colly.cookies })
-    expect(ok(await brought())).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, calendars: [OPS], blocked: null })
+    expect(ok(await brought())).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, kept: 0, calendars: [OPS], blocked: null })
 
     // Sean answers in the app, so the bring-in can't be taken back as a whole any more: his answer would go with it.
     const before = await s.feed()
@@ -731,7 +731,7 @@ describe('bringing jobs in from Google Calendar', () => {
     const taken = ok<{ jobs: number; days: number; crew: number; people: number; calendars: string[] }>(
       await s.app.inject({ method: 'POST', url: '/api/calendar/import/take-back?client=collylaptop', cookies: s.colly.cookies, headers: { 'user-agent': WINDOWS } })
     )
-    expect(taken).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, calendars: [OPS] })
+    expect(taken).toEqual({ jobs: 3, days: 8, crew: 4, people: 2, kept: 0, calendars: [OPS] })
     const f = await s.feed()
     expect(f.projects).toEqual([])
     expect(f.phases).toEqual([])
@@ -743,12 +743,68 @@ describe('bringing jobs in from Google Calendar', () => {
     const history = await s.colly.history()
     expect(history.entries[0]!.what).toBe('Took back everything brought in from Google Calendar, to bring it in again: 3 jobs, 8 days, 4 crew bookings and offers and 2 people added from the invites')
     expect(history.entries[0]!.command).toBe(TAKE_BACK_ACTION)
-    expect(ok(await brought())).toEqual({ jobs: 0, days: 0, crew: 0, people: 0, calendars: [], blocked: null })
+    expect(ok(await brought())).toEqual({ jobs: 0, days: 0, crew: 0, people: 0, kept: 0, calendars: [], blocked: null })
 
     // And the calendar can be brought in again, whole.
     const again = ok<ImportPreview>(await s.look(OPS))
     expect(again.jobs.map((j) => j.name)).toEqual(['Nissan', 'Web Summit', 'Christmas party'])
     expect(again.leftOut.map((l) => l.reason)).not.toContain('before')
+  })
+
+  it('says in words why a bring-in with a quote, or anything else referring to it, can\'t be taken back (audit, 20 October 2026, finding 51)', async () => {
+    const s = await setup()
+    await s.connect()
+    organisersCalendar(s.google)
+    ok<ImportResult>(await s.bring(choose(ok<ImportPreview>(await s.look(OPS)))))
+    const takeBack = () => s.app.inject({ method: 'POST', url: '/api/calendar/import/take-back?client=collylaptop', cookies: s.colly.cookies, headers: { 'user-agent': WINDOWS } })
+    const brought = async () => ok<ImportBrought>(await s.app.inject({ url: '/api/calendar/import/brought', cookies: s.colly.cookies }))
+    const f = await s.feed()
+    const nissan = f.projects.find((p) => p.name === 'Nissan')!
+    const aoife = f.people.find((p) => p.name === 'Aoife Byrne')!
+
+    // A quote on one of the jobs is the office's work on it, as kit is.
+    await s.db.query(`INSERT INTO quotes (id, project_id, version, status, lines) VALUES ('q1', $1, 1, 'draft', '[]')`, [nissan.id])
+    expect((await brought()).blocked).toBe("These jobs have been worked on in the app since (quotes), so they can't be taken back as a whole.")
+    expect(await takeBack()).toMatchObject({ statusCode: 409 })
+    await s.db.query(`DELETE FROM quotes`)
+
+    // A leave allowance, their own calendar, a count or a leave decision keeps the person, and the rest goes.
+    await s.db.query(`INSERT INTO leave_allowances (id, person_id, year, days) VALUES ('a1', $1, 2031, 20)`, [aoife.id])
+    expect(await brought()).toMatchObject({ people: 1, kept: 1, blocked: null })
+
+    // Anything added to the app later that refers to them, which the lists don't know of, is said in words too.
+    await s.db.query(`CREATE TABLE later_thing (project_id text REFERENCES projects(id))`)
+    await s.db.query(`INSERT INTO later_thing VALUES ($1)`, [nissan.id])
+    const refused = await takeBack()
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json().error).toBe("Something in the app still refers to these jobs or people, so they can't be taken back as a whole.")
+    expect((await s.feed()).projects).toHaveLength(3)
+
+    await s.db.query(`DROP TABLE later_thing`)
+    expect(ok(await takeBack())).toMatchObject({ jobs: 3, people: 1, kept: 1 })
+    expect((await s.feed()).people.map((p) => p.name)).toEqual(['Aoife Byrne'])
+  })
+
+  it('keeps people named or changed since, and says how many stay (audit, 20 October 2026, finding 53)', async () => {
+    const s = await setup()
+    await s.connect()
+    organisersCalendar(s.google)
+    ok<ImportResult>(await s.bring(choose(ok<ImportPreview>(await s.look(OPS)))))
+    const brought = async () => ok<ImportBrought>(await s.app.inject({ url: '/api/calendar/import/brought', cookies: s.colly.cookies }))
+    expect(await brought()).toMatchObject({ people: 2, kept: 0 })
+
+    // Named on Tidy up, which sends their notes as they were.
+    const sean = (await s.feed()).people.find((p) => p.email === 'sean@sessionhire.com')!
+    await s.colly.send('person.upsert', { id: sean.id, name: 'Seán Ó Briain', firstName: 'Seán', lastName: 'Ó Briain', kind: sean.kind, email: sean.email, phone: null, skills: [], dayRateCents: null, notes: sean.notes, nameChecked: true })
+    expect((await s.feed()).people.find((p) => p.id === sean.id)).toMatchObject({ name: 'Seán Ó Briain', notes: PERSON_NOTE })
+    expect(await brought()).toMatchObject({ people: 1, kept: 1, blocked: null })
+
+    const taken = ok<ImportBrought>(await s.app.inject({ method: 'POST', url: '/api/calendar/import/take-back?client=collylaptop', cookies: s.colly.cookies, headers: { 'user-agent': WINDOWS } }))
+    expect(taken).toMatchObject({ jobs: 3, people: 1, kept: 1 })
+    expect((await s.feed()).people.map((p) => p.name)).toEqual(['Seán Ó Briain'])
+    expect((await s.colly.history()).entries[0]!.what).toBe(
+      'Took back everything brought in from Google Calendar, to bring it in again: 3 jobs, 8 days, 3 crew bookings and offers and 1 person added from the invites. Kept 1 person added from the invites, named, changed or used since'
+    )
   })
 
   it('reports jobs that went from the calendar between looking and bringing in', async () => {
@@ -758,7 +814,28 @@ describe('bringing jobs in from Google Calendar', () => {
     const preview = ok<ImportPreview>(await s.look(OPS))
     s.google.edit(OPS, cal.summit.id, { status: 'cancelled' })
     const result = ok<ImportResult>(await s.bring(choose(preview, { Nissan: false, 'Christmas party': false })))
-    expect(result).toEqual({ jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing: ['Web Summit'] })
+    expect(result).toEqual({ jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing: ['Web Summit'], already: [] })
     expect((await s.colly.history()).entries.map((e) => e.command)).not.toContain('calendar.import')
+  })
+
+  it('brings in a job that gained an earlier day since it was looked at, and says a bring-in sent twice is in the app already (audit, 20 October 2026, finding 52)', async () => {
+    const s = await setup()
+    await s.connect()
+    organisersCalendar(s.google)
+    const preview = ok<ImportPreview>(await s.look(OPS))
+    const choices = choose(preview, { Nissan: false, 'Christmas party': false })
+    // Web Summit gets a build day the day before, after the office looked.
+    s.google.add(OPS, { summary: 'Web Summit - Build', days: '2031-03-19' })
+    const first = ok<ImportResult>(await s.bring(choices))
+    expect(first).toMatchObject({ jobs: 1, days: 3, missing: [], already: [] })
+    expect((await s.feed()).phases.map((p) => [p.name, p.start, p.end])).toEqual([
+      ['Build', '2031-03-19', '2031-03-19'],
+      ['Show', '2031-03-20', '2031-03-21'],
+    ])
+
+    // The same choices again, as after a dropped connection: nothing more, and nothing said to be gone.
+    const again = ok<ImportResult>(await s.bring(choices))
+    expect(again).toEqual({ jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing: [], already: ['Web Summit'] })
+    expect((await s.feed()).projects.map((p) => p.name)).toEqual(['Web Summit'])
   })
 })
