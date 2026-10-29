@@ -1,4 +1,5 @@
 import {
+  addDays,
   answersToCheck,
   dayLabel,
   daysLabel,
@@ -70,6 +71,13 @@ import { type Share, SharePanelFor, promptFor, tellTo } from './Messages.tsx'
 // The job's page and the call sheet (jobs/) take these from here, as they always have.
 export { CallCard } from './Calls.tsx'
 export { linkFor, peopleOn, promptFor, SharePanel, SharePanelFor, type Share } from './Messages.tsx'
+
+/** Crew needed shows the next fortnight's calls until Show all (audit, 20 October 2026, finding 23), as Home counts them. */
+const SOON_DAYS = 14
+/** Show all, kept for the tab's life, so Back from a job finds the same list and its place on it (places.ts). */
+let showingAllCalls = false
+/** Calls asked for here, kept in view whatever their days until the tab is next loaded, as someone just added to People is. */
+const madeHere = new Set<string>()
 
 /** The filter's choice for people with no department. */
 const NO_DEPARTMENT = '-'
@@ -216,6 +224,9 @@ export function CrewScreen() {
   const [turningDown, setTurningDown] = useState<string | undefined>()
   // Whether the filled calls are unfolded (audit finding 10).
   const [filledOpen, setFilledOpen] = useState(false)
+  const [allCalls, setAllCalls] = useState(showingAllCalls)
+  // A call asked for here is drawn at once, before the list hears of it.
+  const [, setMade] = useState(0)
   // Who was just archived, said where the list was, with the way back (rule 10).
   const [archivedNow, setArchivedNow] = useState<{ id: string; name: string } | undefined>()
   // Back from the archive only while their email is still theirs alone, as the server checks (ADR 0049).
@@ -247,12 +258,19 @@ export function CrewScreen() {
 
   // Only the calls short of people at rest, with the filled ones a tap away under them (audit finding 10). A filled call with
   // something to act on stays out too, as ShowAll keeps a line to act on: someone short of a certificate it needs, or running
-  // late, or the day itself, when someone who rings to say they're late is noted on its line (ADR 0028).
+  // late, or the day itself, when someone who rings to say they're late is noted on its line (ADR 0028). Those kept only for
+  // running late are under their own "On today" line above, so Crew needed holds only calls that need crew (audit, 20 October
+  // 2026, finding 73).
   const short = shownCalls.filter((c) => c.openDays.length > 0)
-  const atHand = (c: CallView) =>
-    c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
-  const inView = shownCalls.filter(atHand)
+  const lateAtHand = (c: CallView) => lateNotesOn(c, view.late).length > 0 || lateToNote(c).length > 0
+  const atHand = (c: CallView) => c.openDays.length > 0 || certificateWarnings(c, today).length > 0 || lateAtHand(c)
+  const onNow = shownCalls.filter((c) => c.openDays.length === 0 && certificateWarnings(c, today).length === 0 && lateAtHand(c))
+  const inView = shownCalls.filter((c) => atHand(c) && !onNow.includes(c))
   const filled = shownCalls.filter((c) => !atHand(c))
+  // The next fortnight at rest, as Home counts it, until Show all, as Coming up in Jobs does (audit, 20 October 2026, finding 23).
+  // A call asked for here stays in view whatever its days.
+  const soonEnd = addDays(today, SOON_DAYS)
+  const soon = allCalls ? inView : inView.filter((c) => c.start <= soonEnd || madeHere.has(c.id))
   // A long list (audit finding 11, ADR 0050): only the jobs' groups near the screen are drawn, and Back finds its place by them (places.ts).
   const callGroups = (calls: readonly CallView[], list: string) => (
     <Groups name={list} groups={groupCalls(calls, view.jobs.jobs)}>
@@ -511,7 +529,27 @@ export function CrewScreen() {
                 come is filled.
               </p>
             )}
-            {callGroups(inView, 'short')}
+            {onNow.length > 0 && (
+              <>
+                <h3 className="calls-part">{onNow.every((c) => c.days.includes(today)) ? 'On today' : 'On today and tomorrow'}</h3>
+                {callGroups(onNow, 'now')}
+                {inView.length > 0 && <h3 className="calls-part">Short of crew</h3>}
+              </>
+            )}
+            {inView.length > 0 && soon.length === 0 && <p className="hint">Nothing short in the next fortnight.</p>}
+            {callGroups(soon, 'short')}
+            {soon.length < inView.length && (
+              <button
+                type="button"
+                className="link show-all"
+                onClick={() => {
+                  showingAllCalls = true
+                  setAllCalls(true)
+                }}
+              >
+                Show all {inView.length.toLocaleString('en-IE')} calls still to come
+              </button>
+            )}
             {/* Filled calls are folded under the ones short of people (audit finding 10), as the archived are under the people: there for a look, out of the way. */}
             {filled.length > 0 && (
               <details className="filled-calls" open={filledOpen} onToggle={(e) => setFilledOpen(e.currentTarget.open)}>
@@ -529,7 +567,12 @@ export function CrewScreen() {
               <h2>Crew for something not in Jobs</h2>
               <p className="hint">For a job in Jobs, ask for crew from the job, so the crew get its phases, venue and any changes.</p>
               <Fold label="Ask for crew">
-                <NewCall />
+                <NewCall
+                  onMade={(id) => {
+                    madeHere.add(id)
+                    setMade((n) => n + 1)
+                  }}
+                />
               </Fold>
             </section>
           )}

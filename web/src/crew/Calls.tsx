@@ -637,7 +637,8 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   )
 }
 
-export function NewCall() {
+/** `onMade` hears each call's id as it's asked for, so the list can keep it in view whatever its days. */
+export function NewCall({ onMade }: { onMade?: (id: string) => void } = {}) {
   const today = useToday()
   const view = useView()
   const seesRates = useSeesRates()
@@ -670,9 +671,11 @@ export function NewCall() {
     // Ready for the next call on the same job and days; a refusal brings what was typed back, unless the next thing has been typed since.
     const cleared = { ...blank, project: f.project, venue: f.venue, start: f.start, end: f.end }
     setF(cleared)
+    const id = newId()
+    onMade?.(id)
     void run(() =>
       client.mutate('call.create', {
-        id: newId(),
+        id,
         project: f.project.trim(),
         phase: f.phase.trim(),
         venue: f.venue.trim(),
