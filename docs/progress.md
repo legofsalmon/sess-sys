@@ -23,6 +23,7 @@ waiting on someone.
 - iPhones read only QR codes in the app's camera for now; Code 128 needs a
   1D reader in the fallback. One-tap printing to the ZT411 (no print
   dialog) waits on Colly's pick of the options in that thread.
+
 ## 29 October 2026: heavy jobs that held everyone up
 
 **Done**
