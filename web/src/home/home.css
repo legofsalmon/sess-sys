@@ -59,3 +59,11 @@
   .home .chart-part.short, .home .chart-swatch.short { background: Highlight; }
 }
 .home .chart-more { justify-self: start; font-size: var(--text-link); }
+/* Working this week on a phone (audit, 20 October 2026, finding 80): the days may wrap, so the role and job aren't squeezed to a word a line beside them. */
+@media (max-width: 479px) {
+  .home .working-row .side { max-width: 40%; }
+  .home .working-row .side small { white-space: normal; }
+}
+/* The week ahead's errands and meetings, folded behind one line (audit, 20 October 2026, finding 32). */
+.home .errands summary { display: flex; align-items: center; min-height: 44px; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.home .errands[open] summary { margin-bottom: var(--space-4); }

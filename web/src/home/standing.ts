@@ -1,4 +1,4 @@
-import { answersToCheck, canApproveLeave, departmentOf, runningOut, sameDepartment, type Ability, type Department, type JobView, type PersonView, type View } from '@sh/shared'
+import { answersToCheck, canApproveLeave, departmentOf, kindOf, runningOut, sameDepartment, type Ability, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { calendarAnswersToSortOut } from '../crew/CrewScreen.tsx'
 
 /**
@@ -71,12 +71,19 @@ export function jobsOn(view: View, day: string): JobView[] {
   return view.jobs.jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.status !== 'enquiry' && j.phases.some((p) => p.start <= day && p.end >= day))
 }
 
-/** Jobs from tomorrow to a week on, by when they start: the week ahead. */
-export function weekAhead(view: View, today: string): JobView[] {
+/**
+ * Jobs from tomorrow to a week on, by when they start: the week ahead. Held
+ * to Today's rule and the Jobs by week chart's (audit, 20 October 2026,
+ * finding 32): going ahead or quoted, never an enquiry; gigs and hires are
+ * the work, and the errands and meetings are said apart, behind one line.
+ */
+export function weekAhead(view: View, today: string): { work: JobView[]; errands: JobView[] } {
   const end = addDays(today, 7)
-  return view.jobs.jobs
-    .filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.span && j.span.end > today && j.span.start <= end && !j.phases.some((p) => p.start <= today && p.end >= today))
+  const all = view.jobs.jobs
+    .filter((j) => j.status !== 'cancelled' && j.status !== 'lost' && j.status !== 'enquiry' && j.span && j.span.end > today && j.span.start <= end && !j.phases.some((p) => p.start <= today && p.end >= today))
     .sort((a, b) => a.span!.start.localeCompare(b.span!.start) || a.name.localeCompare(b.name))
+  const work = (j: JobView) => kindOf(j) === 'gig' || kindOf(j) === 'hire'
+  return { work: all.filter(work), errands: all.filter((j) => !work(j)) }
 }
 
 /**
