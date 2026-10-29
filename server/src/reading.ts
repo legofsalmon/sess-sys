@@ -6,6 +6,7 @@ import {
   readsDocumentOf,
   readsEverything,
   notesAsRead,
+  readsAttachmentOf,
   timesheetAsRead,
   type CrewCall,
   type Document,
@@ -82,6 +83,8 @@ export async function asRead<C extends { entity: string; op: 'put' | 'delete'; d
         return [{ ...c, data: notesAsRead(c.data as { personId: string; note: string; reason?: string }, reading) }]
       case 'document':
         return readsDocumentOf(reading, c.data as Document) ? [c] : []
+      case 'attachment':
+        return readsAttachmentOf(reading, c.data as { owner: string }) ? [c] : []
       default:
         return [c]
     }

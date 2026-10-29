@@ -126,7 +126,13 @@ export const SELECT = `
                        OR (m.client_id LIKE 'calendar:%' AND p.id = coalesce(pm.into_id, substr(m.client_id, 10)))`
 
 /** One page of the history, newest first. */
-export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true, notes = true): Promise<HistoryPage> {
+/**
+ * Whose documents a reader reads in full in the history (ADR 0062, audit, 20 October 2026, finding 38): true for everyone's,
+ * a person's id for only their own, null for nobody's. Another person's is said without its title, day or file.
+ */
+export type DocumentsRead = true | string | null
+
+export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates = true, notes = true, docs: DocumentsRead = true): Promise<HistoryPage> {
   const limit = Math.min(Math.max(1, Math.floor(Number(query.limit) || PAGE)), MAX_PAGE)
   const where: string[] = []
   const params: unknown[] = []
@@ -157,7 +163,7 @@ export async function readHistory(q: Queryable, query: HistoryQuery = {}, rates 
   const page = rows.slice(0, limit)
   const last = page.at(-1)
   return {
-    entries: await toEntries(q, page, rates, notes),
+    entries: await toEntries(q, page, rates, notes, docs),
     ...(rows.length > limit && last ? { next: writeCursor(last.received, last.id) } : {}),
     ...(query.before ? {} : { people: await historyPeople(q) }),
   }
@@ -211,7 +217,7 @@ function readCursor(text: string): { at: string; id: string } {
   throw new BadCursor('That page of the history no longer exists; start again from the newest.')
 }
 
-export async function toEntries(q: Queryable, rows: Row[], rates = true, notes = true): Promise<HistoryEntry[]> {
+export async function toEntries(q: Queryable, rows: Row[], rates = true, notes = true, docs: DocumentsRead = true): Promise<HistoryEntry[]> {
   const look = await lookup(q, rows)
   const left = await itemsAsLeft(q, rows)
   return rows.map((r) => {
@@ -221,7 +227,7 @@ export async function toEntries(q: Queryable, rows: Row[], rates = true, notes =
     const waited = r.waited === null ? undefined : Math.round(r.waited)
     return {
       id: r.id,
-      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app', rates, notes),
+      what: describe(r.name, args, look, left.get(r.id), link ? 'link' : calendar ? 'calendar' : 'app', rates, notes, docs),
       command: r.name,
       outcome: r.status === 'applied' ? 'done' : 'turned-down',
       ...(r.status === 'rejected' ? { reason: r.result?.reason?.message ?? 'No reason given.' } : {}),
@@ -349,8 +355,9 @@ const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? 'nothing')
  * off, pulling out and running late, and the reasons they were given (ADR
  * 0062). `rates` false leaves crew pay out (ADR 0046), for a reader whose
  * role doesn't see it: the history says a rate changed, never to what.
+ * `docs` says whose documents it names in full (DocumentsRead).
  */
-export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar', rates = true, notes = true): string {
+export function describe(command: string, a: Data, look: Look, left?: Data, from?: 'app' | 'link' | 'calendar', rates = true, notes = true, docs: DocumentsRead = true): string {
   const person = (id: unknown) => text(look('person', id)?.name, 'someone')
   const call = (id: unknown) => {
     const c = look('crewCall', id)
@@ -882,7 +889,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
     case 'document.remove':
     case DOCUMENT_ACTIONS.file:
     case DOCUMENT_ACTIONS.send:
-      return documentWords(command, a, look, person)
+      return documentWords(command, a, look, person, docs)
     // Documents kept on venues and clients (ADR 0032): "Saved The Heritage's floor plan, as a link".
     case 'attachment.save':
     case 'attachment.remove':
@@ -1035,8 +1042,25 @@ const fullDay = (d: string) => `${dayLabel(d)} ${d.slice(0, 4)}`
  * command or the record as it is now; a certificate's card says what it
  * set the certificate to.
  */
-function documentWords(command: string, a: Data, look: Look, person: (id: unknown) => string): string {
+function documentWords(command: string, a: Data, look: Look, person: (id: unknown) => string, docs: DocumentsRead = true): string {
   const d = look('document', a.id)
+  const personId = a.personId ?? d?.personId
+  // Someone else's, for a reader not sent it: whose, and nothing of what it is, when it runs out or its file.
+  if (docs !== true && personId !== docs) {
+    const one = `one of ${person(personId)}'s documents`
+    switch (command) {
+      case 'document.save':
+        return `Saved ${one}`
+      case 'document.check':
+        return `Checked ${one}`
+      case 'document.remove':
+        return `Removed ${one}`
+      case DOCUMENT_ACTIONS.file:
+        return a.added ? `Added ${one}, with its file` : `Put a file on ${one}`
+      default:
+        return `${person(personId)} sent a document`
+    }
+  }
   const kind = DOCUMENT_KINDS.find((k) => k === (a.kind ?? d?.kind))
   const title = titleInSentence(text(a.title ?? d?.title, (kind && DOCUMENT_TITLES[kind]) || 'document'))
   const whose = `${person(a.personId ?? d?.personId)}'s ${title}`

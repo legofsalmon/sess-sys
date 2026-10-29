@@ -122,7 +122,10 @@ export function Shell() {
   const persona = usePreview()
   const barAway = useBarAway()
   const desk = useDesk()
-  const seesMoney = useAccess().can('money')
+  const access = useAccess()
+  const seesMoney = access.can('money')
+  // A role without crew opens Crew on People: the calls and answers are the office's to-do list (audit, 20 October 2026, finding 34).
+  const areaHref = (hash: string) => (hash === '#crew' && !access.can('crew') ? '#crew/people' : hash)
   // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and the header says whose they are.
   const demo = auth.status === 'open' && auth.passcode === true
   useHoldPersona(demo ? persona : undefined)
@@ -207,7 +210,7 @@ export function Shell() {
       <StorageBanner />
       <nav className="tabs" aria-label="Areas" hidden={barAway}>
         {shown.map((a) => (
-          <a key={a.hash} href={a.hash} aria-current={a === lit ? 'page' : undefined}>
+          <a key={a.hash} href={areaHref(a.hash)} aria-current={a === lit ? 'page' : undefined}>
             <AreaIcon area={a.hash} />
             <span className="tab-word">{a.label}</span>
             {a.hash === '#crew' && <CrewBadge />}
