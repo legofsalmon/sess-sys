@@ -11,7 +11,7 @@ import {
   type WarehouseView,
 } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act, Confirm, Refusal, useAct } from '../act.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { when } from '../format.ts'
@@ -24,20 +24,16 @@ import { CertificatesCard } from './Certificates.tsx'
 import { ItemLog } from './ItemLog.tsx'
 import { CountsOf } from './Counts.tsx'
 import { PrintLabels } from './Labels.tsx'
-import { CameraScanner, primeSound } from './Scanner.tsx'
 import {
   contentsLabel,
   CountHere,
   CountRow,
   itemNumbered,
-  itemToPut,
   loopIn,
   numberLabel,
+  PutByNumber,
   SavedLine,
-  ScanMisses,
-  ScanResult,
   useNewPlace,
-  useScanMisses,
   whereLabel,
   WhereChoices,
   whereNamed,
@@ -479,39 +475,8 @@ function Retire({ a, onDone }: { a: AssetView; onDone: () => void }) {
 
 /** A case's contents: items in it, and what's counted in it. Items go in by their number, scanned or typed, with the camera staying on for the next (audit finding 18). */
 function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
-  const [number, setNumber] = useState('')
-  const [camera, setCamera] = useState(false)
-  const [putIn, setPutIn] = useState('')
   // What a count or a move of what's counted in it just did.
   const [said, setSaid] = useState('')
-  const { error, refuse } = useAct()
-  // With the camera on, what wasn't done is kept in a list until dismissed, as the next label is read at once; typed, it's the line under the field.
-  const { misses, add, dismiss } = useScanMisses()
-  const put = (t: string, scanned = false) => {
-    setPutIn('')
-    refuse('')
-    if (!t) return
-    const fail = (reason: string) => (scanned ? add(reason) : refuse(reason))
-    const { item, problem } = itemToPut(t, w)
-    if (!item) return fail(problem)
-    if (item.caseId === c.id) return fail(`${item.number} is in here already.`)
-    const loop = loopIn(item.id, c.id, w)
-    if (loop) return fail(loop)
-    void act(() => client.mutate('asset.move', { id: item.id, placeId: null, caseId: c.id })).then(
-      () => setPutIn(`${item.number} (${item.model?.name ?? 'an item'}) is in ${numberLabel(c)} now.`),
-      (err: Error) => fail(`${item.number}: ${err.message}`)
-    )
-  }
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    put(number.trim())
-    setNumber('')
-  }
-  const close = () => {
-    setCamera(false)
-    setPutIn('')
-    refuse('')
-  }
   const empty = c.items.length === 0 && c.counted.length === 0
   // Putting kit in a case is stock's (audit finding 9): a role without it sees what's in it.
   const mayPut = useAccess().can('stock')
@@ -542,49 +507,15 @@ function Inside({ c, w }: { c: AssetView; w: WarehouseView }) {
       ))}
       <SavedLine text={said} />
       {mayPut && (
-        <form className="grid-form" onSubmit={submit}>
-          <h3 className="wide">Put an item in</h3>
-          <div className="wide scan-row">
-            <label>
-              Its number
-              <input
-                value={number}
-                onChange={(e) => setNumber(e.target.value)}
-                placeholder="e.g. SH-000123"
-                autoComplete="off"
-                autoCapitalize="characters"
-                enterKeyHint="done"
-              />
-            </label>
-            <button
-              type="button"
-              aria-pressed={camera}
-              onClick={() => {
-                if (!camera) primeSound()
-                if (camera) close()
-                else setCamera(true)
-              }}
-            >
-              Scan
-            </button>
-          </div>
-          {camera && (
-            <div className="wide">
-              <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
-            </div>
-          )}
-          <Refusal error={error} className="wide" />
-          <ScanMisses misses={misses} onDismiss={dismiss} />
-          {putIn && !error && (
-            <ScanResult label="Put in" onClose={camera ? close : undefined}>
-              {putIn}
-              {camera && ' Scan the next label.'}
-            </ScanResult>
-          )}
-          <button type="submit" className="wide">
-            Put it in {numberLabel(c)}
-          </button>
-        </form>
+        <PutByNumber
+          w={w}
+          heading="Put an item in"
+          label="Put in"
+          button={`Put it in ${numberLabel(c)}`}
+          why={(item) => (item.caseId === c.id ? `${item.number} is in here already.` : loopIn(item.id, c.id, w))}
+          to={{ placeId: null, caseId: c.id }}
+          done={(item) => `${item.number} (${item.model?.name ?? 'an item'}) is in ${numberLabel(c)} now.`}
+        />
       )}
       <CountHere w={w} at={{ placeId: null, caseId: c.id }} title="Count what's in it" onSaid={setSaid} />
     </section>

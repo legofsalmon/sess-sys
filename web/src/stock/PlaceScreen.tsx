@@ -1,14 +1,13 @@
 import { plural, type AssetView, type PlaceView, type View, type WarehouseView } from '@sh/shared'
 import { useState, type FormEvent } from 'react'
-import { act, Confirm, Refusal, useAct } from '../act.tsx'
+import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Page } from '../jobs/common.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
-import { contentsLabel, CountHere, CountRow, itemToPut, numberLabel, SavedLine, ScanMisses, ScanResult, useScanMisses, WhereChoices } from './common.tsx'
+import { contentsLabel, CountHere, CountRow, numberLabel, PutByNumber, SavedLine, WhereChoices } from './common.tsx'
 import { CountsOf } from './Counts.tsx'
-import { CameraScanner, primeSound } from './Scanner.tsx'
 import { PLACES, STOCK } from '../Up.tsx'
 
 /**
@@ -183,80 +182,17 @@ function Here({ p, w }: { p: PlaceView; w: WarehouseView }) {
   )
 }
 
-/** Scan or type an item's number to say it's kept here. The camera stays on for the next one (audit finding 18). */
+/** Scan or type an item's number to say it's kept here. */
 function PutHere({ p, w }: { p: PlaceView; w: WarehouseView }) {
-  const [number, setNumber] = useState('')
-  const [camera, setCamera] = useState(false)
-  const { error, refuse } = useAct()
-  const [moved, setMoved] = useState('')
-  // With the camera on, what wasn't done is kept in a list until dismissed, as the next label is read at once; typed, it's the line under the field.
-  const { misses, add, dismiss } = useScanMisses()
-  const put = (t: string, scanned = false) => {
-    setMoved('')
-    refuse('')
-    if (!t) return
-    const fail = (reason: string) => (scanned ? add(reason) : refuse(reason))
-    const { item, problem } = itemToPut(t, w)
-    if (!item) return fail(problem)
-    if (item.placeId === p.id) return fail(`${item.number} is here already.`)
-    void act(() => client.mutate('asset.move', { id: item.id, placeId: p.id, caseId: null })).then(
-      () => setMoved(`${item.number} (${item.model?.name ?? 'an item'}) is here now.`),
-      (err: Error) => fail(`${item.number}: ${err.message}`)
-    )
-  }
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    put(number.trim())
-    setNumber('')
-  }
-  const close = () => {
-    setCamera(false)
-    setMoved('')
-    refuse('')
-  }
   return (
-    <form className="grid-form" onSubmit={submit}>
-      <h3 className="wide">Put an item here</h3>
-      <div className="wide scan-row">
-        <label>
-          Its number
-          <input
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            placeholder="e.g. SH-000123"
-            autoComplete="off"
-            autoCapitalize="characters"
-            enterKeyHint="done"
-          />
-        </label>
-        <button
-          type="button"
-          aria-pressed={camera}
-          onClick={() => {
-            if (!camera) primeSound()
-            if (camera) close()
-            else setCamera(true)
-          }}
-        >
-          Scan
-        </button>
-      </div>
-      {camera && (
-        <div className="wide">
-          <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
-        </div>
-      )}
-      <Refusal error={error} className="wide" />
-      <ScanMisses misses={misses} onDismiss={dismiss} />
-      {moved && !error && (
-        <ScanResult label="Put here" onClose={camera ? close : undefined}>
-          {moved}
-          {camera && ' Scan the next label.'}
-        </ScanResult>
-      )}
-      <button type="submit" className="wide">
-        Put it here
-      </button>
-    </form>
+    <PutByNumber
+      w={w}
+      heading="Put an item here"
+      label="Put here"
+      button="Put it here"
+      why={(item) => (item.placeId === p.id ? `${item.number} is here already.` : undefined)}
+      to={{ placeId: p.id, caseId: null }}
+      done={(item) => `${item.number} (${item.model?.name ?? 'an item'}) is here now.`}
+    />
   )
 }
