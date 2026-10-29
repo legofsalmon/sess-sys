@@ -56,8 +56,8 @@ export const flash = (f: { ok: boolean; text: string }) => `<p class="flash ${f.
 
 /**
  * The way back to the office (audit finding 10), on every page: the phone
- * and email as links a phone taps. Nothing until the office sets them on the
- * Account tab.
+ * and email as links a phone taps. Nothing until the office sets them on
+ * Admin.
  */
 export function officeBlock(o: OfficeDetails | null | undefined): string {
   const c = officeContact(o)

@@ -53,7 +53,7 @@ export const setting = z.object({
 })
 export type Setting = z.infer<typeof setting>
 
-/** The office's details as the pages and the Account tab use them. */
+/** The office's details as the pages and Admin use them. */
 export type OfficeDetails = Pick<Setting, 'name' | 'phone' | 'email'>
 
 export interface SettingEntities {

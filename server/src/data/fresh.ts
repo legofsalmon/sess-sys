@@ -81,7 +81,7 @@ export async function clearedSince(q: Queryable, generation: string): Promise<bo
 }
 
 export interface Who {
-  /** The signed-in member of staff, and their name for the Account tab. */
+  /** The signed-in member of staff, and their name for Admin. */
   userId?: string
   name?: string
   /** The app's device code, for the history. */

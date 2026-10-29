@@ -11,7 +11,7 @@ import { linkEntity, readLink, saveLink } from './store.ts'
 import { Halt, type CalendarSync } from './sync.ts'
 
 /**
- * Connecting Google Calendar from the Account tab (ADR 0008): off to Google
+ * Connecting Google Calendar from Admin (ADR 0008): off to Google
  * to connect an account, back again, pick a calendar, check now, switch
  * crew invites on or off (ADR 0009), and disconnect. All of it needs a
  * signed-in member of staff, like the rest of the API; the app only has
@@ -119,7 +119,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     return back(reply, 'connected')
   })
 
-  /** Why the calendar can't be reached just now, for the Account tab. */
+  /** Why the calendar can't be reached just now, for Admin. */
   const refuse = async (reply: FastifyReply, err: unknown) => {
     if (!(err instanceof Halt)) throw err
     return reply.code(err.why === 'busy' ? 503 : 409).send({ error: err.problem ?? "Google isn't answering just now. Try again in a minute." })
@@ -155,7 +155,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     return linkEntity(after)
   })
 
-  /** What turning crew invites on would send straight away, for the Account tab to ask first. */
+  /** What turning crew invites on would send straight away, for Admin to ask first. */
   app.get('/api/calendar/invites', async (_req, reply): Promise<CalendarInvites | void> => {
     reply.header('cache-control', 'no-store')
     if (!sync) return reply.code(409).send({ error: 'Google Calendar needs the Google key on the server first.' })

@@ -121,7 +121,7 @@ export interface AppOptions {
   backupWatch?: BackupWatch
   /**
    * Google Calendar (ADR 0008): the same Google client as sign-in. Without
-   * it the Account tab says the calendar needs the Google key first.
+   * it Admin says the calendar needs the Google key first.
    */
   calendar?: CalendarSetup
   /** How long calendar feeds are kept in memory at most (ADR 0012), and the clock, for tests. */

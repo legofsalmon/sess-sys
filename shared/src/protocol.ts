@@ -208,7 +208,7 @@ export type MeResponse =
    */
   | { auth: 'google'; user: StaffUser; role: Role; rolesOn: boolean; admin?: true }
 
-/** One nightly (or "Back up now") backup, as the Account screen shows it. */
+/** One nightly (or "Back up now") backup, as Admin shows it. */
 export interface BackupRun {
   id: string
   startedAt: string
@@ -269,7 +269,7 @@ export interface HistoryEntry {
   }
   /** The kind of device, such as "Safari on iPhone", when it said. */
   device?: string
-  /** The end of the device's own code, as its Account tab shows it. */
+  /** The end of the device's own code, as You shows it. */
   deviceCode?: string
   /** When it was done, on the server's clock. */
   madeAt: string

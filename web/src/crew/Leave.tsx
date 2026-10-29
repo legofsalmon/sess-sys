@@ -41,8 +41,8 @@ import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
  * balances, applying for leave and logging a day in lieu, my requests with
  * Cancel; and for whoever can approve time off, the queue with what to weigh
  * up, and each staff member's allowance. Who "me" is comes from the signed-in
- * account's email, matched to a person on the Crew tab as the Account tab
- * does for the calendar feed; while sign-in is off the screen asks once and
+ * account's email, matched to a person on the Crew tab as You does for
+ * the calendar feed; while sign-in is off the screen asks once and
  * remembers the answer on this device.
  */
 

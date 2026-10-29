@@ -5,8 +5,7 @@ import { buildApp } from '../src/app.ts'
 import { pgliteDb } from '../src/db.ts'
 
 /**
- * The office's own details (audit finding 10): set once on the Account
- * tab, synced to every device, and on every freelancer page as a way back
+ * The office's own details (audit finding 10): set once on Admin, synced to every device, and on every freelancer page as a way back
  * to the office. Nothing is shown until they are set.
  */
 

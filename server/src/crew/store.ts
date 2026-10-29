@@ -100,7 +100,7 @@ export async function personByToken(q: Queryable, token: string) {
 }
 /** Whether an address is a person's, as SQL on `people`: their own, or one they had as someone they were combined with (ADR 0055). `$n` is the address, trimmed and in small letters. */
 export const HAS_EMAIL = (param: string) => `(lower(trim(email)) = ${param} OR other_emails ? ${param})`
-/** The person a signed-in account is, by email, case aside (ADR 0024): the match the Account tab's feed card makes. */
+/** The person a signed-in account is, by email, case aside (ADR 0024): the match the feed card on You makes. */
 export async function personByEmail(q: Queryable, email: string) {
   const wanted = email.trim().toLowerCase()
   if (!wanted) return undefined

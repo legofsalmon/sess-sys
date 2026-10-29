@@ -11,7 +11,7 @@ architecture doc are answered.
 
 ## Phase 0: Foundations
 
-**Status: built; the phone field test is left.** Sync engine built and decided ([ADR 0001](adr/0001-sync-engine.md)); app live on Railway with Postgres in Frankfurt; staff sign-in built ([ADR 0003](adr/0003-staff-sign-in.md)) and waiting on its Google key; nightly backups with a test restore built ([ADR 0004](adr/0004-backups.md)) and waiting on their bucket; error alerts and uptime checks with Sentry built ([ADR 0005](adr/0005-error-alerts.md)) and waiting on the Sentry key; the history of every change and Download everything built and on ([ADR 0006](adr/0006-audit-trail-and-export.md)). Made-up data to try every part of the app with, and Start fresh to clear it all before the real data goes in, built and on ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)). See [progress.md](progress.md).
+**Status: built; the phone field test is left.** Sync engine built and decided ([ADR 0001](adr/0001-sync-engine.md)); app live on Railway with Postgres in Frankfurt; staff sign-in built ([ADR 0003](adr/0003-staff-sign-in.md)), nightly backups with a test restore built ([ADR 0004](adr/0004-backups.md)), and error alerts and uptime checks with Sentry built ([ADR 0005](adr/0005-error-alerts.md)), all three switched on 19 October 2026 when their keys were set; the history of every change and Download everything built and on ([ADR 0006](adr/0006-audit-trail-and-export.md)). Made-up data to try every part of the app with, and Start fresh to clear it all before the real data goes in, built and on ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)). See [progress.md](progress.md).
 
 - Repo, CI, preview deploys, EU hosting, backups with a tested restore.
 - Staff sign-in with Google Workspace; freelancer magic links.
@@ -40,7 +40,7 @@ venues built and on, with crew asked for from the job
 ([ADR 0007](adr/0007-jobs.md)). Confirmed jobs go onto Google Calendar in
 today's event format, kept up to date by the app
 ([ADR 0008](adr/0008-calendar-sync.md)); it switches on with the Google key
-and a calendar connected on the Account tab. Crew can be invited to their
+and a calendar connected on Admin. Crew can be invited to their
 days, with their Yes or No in Google counting as their answer, behind a
 switch that starts off ([ADR 0009](adr/0009-crew-invites.md)). The week and
 month planner shows every job and person, with clashes flagged
@@ -59,7 +59,7 @@ using it for real, which needs the Google key. See
   leading (built; tried first on Colly's test calendar, then **Session
   Hire Gigs**).
 - Crew as attendees on the events, with RSVPs updating assignments (built,
-  behind a switch on the Account tab that starts off; tried first on the
+  behind a switch on Admin that starts off; tried first on the
   test calendar with staff's own addresses).
 - Importer for the organisers' existing calendars (built: jobs come in
   confirmed or pencilled in, with their crew, after a look at everything
@@ -68,8 +68,7 @@ using it for real, which needs the Google key. See
   clashes flagged (the same freelancer on two jobs) (built; looking only
   for now, with dragging phases to wait until the office has used it).
 - Personal iCal feeds (built: a read-only address for each person, safe
-  in a shared calendar, found on their page, the Crew tab and the Account
-  tab).
+  in a shared calendar, found on their page, the Crew tab and You).
 
 **Done when:** ops create every new job in the system, crew still receive
 the same Google invites, and nobody has to type a job twice.
