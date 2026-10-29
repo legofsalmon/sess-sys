@@ -7,6 +7,7 @@ import { StatusPill } from '../StatusPill.tsx'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
 import { kitShort } from '../jobs/Kit.tsx'
+import { BelowZero } from '../jobs/Money.tsx'
 import { useToday, useView } from '../view.ts'
 import { addDays, departmentsIn, jobsOn, kitOf, narrower, SOON, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
@@ -292,6 +293,7 @@ function MoneyCard({ view, today }: { view: View; today: string }) {
   if (!sees || !m.any) return null
   const month = m.months.find((x) => x.key === moneyMonth(today).key)
   const owed = m.owed.reduce((s, o) => s + o.cents, 0)
+  const notInvoiced = owed - m.owed.reduce((s, o) => s + o.invoiced, 0)
   const toFreelancers = m.costsOwed.reduce((s, c) => s + c.cents, 0)
   return (
     <Chart
@@ -302,10 +304,15 @@ function MoneyCard({ view, today }: { view: View; today: string }) {
       format={wholeEuro}
       empty="No quotes in the three months either side of this one."
       more={
-        <p className="hint">
-          {money(month?.confirmed ?? 0)} confirmed of {money(month?.quoted ?? 0)} quoted for {moneyMonth(today).label}, before VAT. {money(owed)} owed by{' '}
-          {plural(m.owed.length, 'client')}, and {money(toFreelancers)} to freelancers. <a href="#jobs/money">Money</a>
-        </p>
+        <>
+          {/* What's accepted and unpaid says it's with VAT, and how much isn't invoiced yet (audit findings 29 and 71). */}
+          <p className="hint">
+            {money(month?.confirmed ?? 0)} confirmed of {money(month?.quoted ?? 0)} quoted for {moneyMonth(today).label}, before VAT. {money(owed)} with VAT accepted and
+            unpaid from {plural(m.owed.length, 'client')}
+            {notInvoiced > 0 ? `, ${money(notInvoiced)} of it not invoiced yet` : ''}; {money(toFreelancers)} owed to freelancers. <a href="#jobs/money">Money</a>
+          </p>
+          <BelowZero jobs={m.jobs} />
+        </>
       }
     />
   )

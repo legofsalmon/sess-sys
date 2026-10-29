@@ -117,6 +117,13 @@ The personas, the flows they follow and the problems rated are in
 - Every screen built from cards gets the strip for nothing. A card with
   a heading that reads badly as a short label shows up as it is.
 
+## Later: the freelancer's page at real volume (29 October 2026)
+
+On the freelancer's link the glance line now stays at the top of the
+screen as the page scrolls, and only the next three bookings are drawn as
+full cards; the rest are one line each (job, role, days, status) that
+opens in place, with no script (audit, 20 October 2026, finding 48).
+
 ## Later: Home at volume (29 October 2026)
 
 From the audit of 20 October (findings 32, 33, 69, 70):

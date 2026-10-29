@@ -135,3 +135,9 @@ calendars directly, isn't available yet.
   access later, the app can read both directly.
 - Only guests the account can see are brought in: an event whose guest
   list is hidden from other guests comes in without crew.
+- Later (29 October 2026, audit of 20 October, findings 17 and 18): new
+  people and venues are written in bulk like the jobs, so a season with
+  many holds the write lock about as long as one whose people are known.
+  The plan is made once, says what the calendar holds besides what was
+  ticked, looks jobs and venues up by key, and for a calendar of 300
+  events or more runs in a worker thread, as the busy reader does.

@@ -75,3 +75,15 @@ words, where before it read the same as for days off (audit, 20 October
 2026, finding 81). So the clashes ADR 0010's planner lists come from days
 off, marked after a booking or overridden; an overridden offer over a
 booking shows there as "check" while it waits.
+
+## Later: days off over a booking, and checked dates (29 October 2026)
+
+The rule stays one-way: an offer over marked days is refused, and days off
+marked over a booking someone already holds are still added, since a person
+may well be away for the rest of the span. They no longer pass quietly
+(audit, 20 October 2026, finding 50): the row on their link says they are
+still booked on that job, and that "Can't make it any more" on the booking
+is the way off it. Days off that overlap ones already marked become one row
+with both notes (approved leave is left as it is). From the link a first
+day already gone, and from anywhere a span over 366 days (a phase's cap),
+is refused; the office can still backdate.

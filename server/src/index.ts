@@ -122,6 +122,8 @@ async function main() {
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, async () => {
+      // Said, so a deploy that stops a backup or a push part way can be told from a crash (audit, 20 October 2026, finding 54).
+      app.log.info({ signal }, 'Shutting down: finishing the requests and any backup under way')
       await app.close()
       await db.close()
       await flushReports()

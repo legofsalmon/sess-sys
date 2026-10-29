@@ -28,10 +28,12 @@ against), `navigation.md`, `states.md`, `components.md` and `motion.md`.
 - **What stays this app's own:** storage and wire names, layout and flow,
   content, and meanings only this app has.
 
-sess-sys takes the system's colours only, as an override. Its own layout,
-type, density and components stay as they are. Its brand red stays as "you"
-and burnt orange as bad, by decision; everything else about colour follows the
-grammar.
+sess-sys takes the system's colours, as an override, with the tokens that sit
+beside them (washes, elevation, layers, motion durations) and the shared
+icons. Its own layout, type, density and components stay as they are; where
+the system has a part (the combobox, toasts), sess-sys follows its keys and
+states in its own look. Its brand red stays as "you" and burnt orange as bad,
+by decision; everything else about colour follows the grammar.
 
 ## Changelog and version
 

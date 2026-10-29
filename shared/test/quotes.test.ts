@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
 import { chargedFor, packageIncludes, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
-import { invoicesCsv, quoteRows, quoteRowShown, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
+import { belowZero, invoicesCsv, marginsByMonth, quoteRows, quoteRowShown, quotesToFollow, vatSummaryCsv, type JobMoney, type QuoteView } from '../src/sync/money-view.ts'
 import type { JobView } from '../src/sync/jobs-view.ts'
 
 /**
@@ -294,6 +294,31 @@ describe('money on the device', () => {
     expect(phone.view().money.owed).toEqual([])
   })
 
+  it("says how much of what's owed is invoiced, and sets a cancelled job's quote aside everywhere until it's invoiced (audit findings 29 and 30)", async () => {
+    const server = new Server()
+    server.put('client', 'bw', { id: 'bw', name: 'Brightwater Events', contacts: [], notes: '' })
+    server.put('project', 'gala', project)
+    server.put('project', 'fair', { ...project, id: 'fair', name: 'Craft Fair' })
+    server.put('project', 'gone', { ...project, id: 'gone', name: 'Called Off', status: 'cancelled' })
+    server.put('quote', 'q1', quote({}))
+    server.put('quote', 'q2', quote({ id: 'q2', projectId: 'fair', invoicedOn: null, invoiceRef: '' }))
+    server.put('quote', 'q3', quote({ id: 'q3', projectId: 'gone', invoicedOn: null, invoiceRef: '' }))
+    const phone = await new SyncClient({ storage: new MemoryStorage(), transport: server, clientId: 'phone' }).open()
+    await phone.sync()
+    let m = phone.view().money
+    // Accepted on both live jobs, invoiced on one: the cancelled job's isn't owed, quoted or in the margin.
+    expect(m.owed).toMatchObject([{ client: 'Brightwater Events', cents: 2 * 145700, invoiced: 145700 }])
+    expect(m.owed[0]!.quotes.map((x) => x.job.name)).toEqual(['Autumn Gala', 'Craft Fair'])
+    expect(m.job('gone')).toMatchObject({ setAside: true, quoted: 0, margin: null })
+    expect(m.months.reduce((s, x) => s + x.confirmed, 0)).toBe(240000)
+    // A cancellation fee is invoiced, and then it counts in all three.
+    await phone.mutate('quote.invoiced', { id: 'q3', on: '2026-10-20', ref: 'SH-1050' })
+    m = phone.view().money
+    expect(m.owed[0]).toMatchObject({ cents: 3 * 145700, invoiced: 2 * 145700 })
+    expect(m.job('gone')).toMatchObject({ setAside: false, quoted: 120000, margin: 120000 })
+    expect(m.months.reduce((s, x) => s + x.confirmed, 0)).toBe(360000)
+  })
+
   it('drops money it held when its role loses it, and reads again from the start when given it back', async () => {
     const server = new Server()
     server.put('project', 'gala', project)
@@ -354,6 +379,28 @@ describe('quotes to follow up (ADR 0081)', () => {
     const f = quotesToFollow({ jobs: rows as never, draftOf: () => quote({ status: 'draft' }) }, today)
     expect(f.waiting).toEqual([])
     expect(f.drafts).toHaveLength(1)
+  })
+})
+
+describe('margin by job (audit finding 31)', () => {
+  const jm = (name: string, start: string | null, margin: number | null, costs = 0) =>
+    ({ job: { id: name, name, span: start ? { start, end: start } : undefined }, current: margin === null ? undefined : {}, costs, margin }) as unknown as JobMoney
+
+  it('groups by the month each job starts: this month, then those coming, then those gone, the latest first', () => {
+    const jobs = [jm('Jan', '2026-01-10', 100), jm('Oct', '2026-10-05', 100), jm('Dec', '2026-12-01', 100), jm('Sep', '2026-09-30', 100), jm('Nov', '2026-11-02', 100), jm('Costs only', '2026-08-01', null, 500), jm('Nothing', '2026-08-01', null)]
+    expect(marginsByMonth(jobs, '2026-10-29').map((m) => [m.key, m.jobs.map((j) => j.job.name)])).toEqual([
+      ['2026-10', ['Oct']],
+      ['2026-11', ['Nov']],
+      ['2026-12', ['Dec']],
+      ['2026-09', ['Sep']],
+      ['2026-08', ['Costs only']],
+      ['2026-01', ['Jan']],
+    ])
+  })
+
+  it('names the jobs below zero, the most lost first', () => {
+    const jobs = [jm('Fine', '2026-10-01', 100), jm('Bit under', '2026-03-01', -27000), jm('Well under', '2026-10-01', -90000), jm('No quote', '2026-10-01', null, 500)]
+    expect(belowZero(jobs).map((j) => j.job.name)).toEqual(['Well under', 'Bit under'])
   })
 })
 
