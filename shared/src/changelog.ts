@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.52.1',
+    date: '2026-10-29',
+    title: 'Changes made on two devices at once no longer quietly overwrite each other',
+    what: "Two people changing the same kit line, stock count, product, quote, vehicle or the office's details on different devices no longer quietly lose one person's change: the app keeps what was changed elsewhere, or says so and keeps what you typed. Changes from a phone that has been offline send faster, and a phone catching up shows current records while its own changes are still sending.",
+    prs: [158],
+  },
+  {
     version: '1.52.0',
     date: '2026-10-29',
     title: "Staff crew see their own work first, and nobody else's private details",
