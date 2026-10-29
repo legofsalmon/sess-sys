@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-29',
     title: 'Shared colours brought up to date',
     what: 'Behind the scenes only: the shared colours are copied in again from the latest version of the design system. Nothing sess-sys shows uses what changed, so nothing on screen moves.',
-    prs: [0],
+    prs: [176],
   },
   {
     version: '1.63.1',
