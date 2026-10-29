@@ -199,10 +199,14 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await hold(page, speakers[0]!)
   await expect(said).toHaveText(`${speakers[0]} ${speaker} is already out with ${job}.`)
 
-  // A mic that isn't on the kit, from a scanner that types: out, with a warning.
+  // A mic that isn't on the kit, from a scanner that types: out, with a warning. Its keys go to the scan field from wherever focus
+  // is, here the Scan button (audit, 20 October 2026, finding 98).
   await hold(page, null)
-  await page.getByLabel('Number or serial').fill(micNumber!.toLowerCase())
-  await page.getByLabel('Number or serial').press('Enter')
+  await expect(page.getByLabel('Number or serial')).not.toBeFocused()
+  await page.keyboard.type(micNumber!.toLowerCase())
+  await expect(page.getByLabel('Number or serial')).toBeFocused()
+  await expect(page.getByLabel('Number or serial')).toHaveValue(micNumber!.toLowerCase())
+  await page.keyboard.press('Enter')
   await expect(said).toHaveText(`${micNumber} ${mic} out. It isn't on the kit for ${job}. Add it to the kit, or scan it back in if it isn't going.`)
   await expect(said).toHaveClass(/warn/)
   const micRow = pickRow(page, mic)
@@ -381,4 +385,45 @@ test('picking on the phone: whose kit, a walk round the warehouse, notes, Undo a
   await expect(page.locator('.pick-total')).toHaveText('0 of 24 out')
   await expect(page.locator('.conn')).toHaveText('Up to date')
   await context.close()
+})
+
+// An item scanned out of a rack reported missing says the rack is what was marked found, and "It's not in … any more"
+// takes it out of the rack and reports the rack missing again (audit, 20 October 2026, finding 102).
+test('a speaker scanned from a rack reported missing, then said to be out of the rack', async ({ browser, request }) => {
+  const id = tag()
+  const at = new Date().toISOString()
+  const setUp = [
+    { name: 'model.create', args: { id: `rk${id}`, name: `Speaker rack ${id}`, department: 'audio', category: 'Cases', tracking: 'serialised', isCase: true, valueCents: null, notes: '' } },
+    { name: 'model.create', args: { id: `sp${id}`, name: `d&b E8 ${id}`, department: 'audio', category: 'Speakers', tracking: 'serialised', isCase: false, valueCents: null, notes: '' } },
+    { name: 'place.upsert', args: { id: `b${id}`, name: `Bay C1 ${id}`, notes: '' } },
+    { name: 'asset.add', args: { id: `r${id}`, modelId: `rk${id}`, number: null, serial: '', placeId: `b${id}`, caseId: null, notes: '', fromCount: false } },
+    ...[1, 2, 3].map((n) => ({
+      name: 'asset.add',
+      args: { id: `s${n}${id}`, modelId: `sp${id}`, number: null, serial: `E8-${n}-${id}`, placeId: null, caseId: `r${id}`, notes: '', fromCount: false },
+    })),
+    { name: 'project.create', args: { id: `lost${id}`, name: `Lost rack job ${id}`, clientId: null, venueId: null, status: 'confirmed', notes: '' } },
+    { name: 'project.create', args: { id: `next${id}`, name: `Next job ${id}`, clientId: null, venueId: null, status: 'confirmed', notes: '' } },
+    { name: 'move.record', args: { id: `mv${id}`, projectId: `lost${id}`, direction: 'out', assetId: `r${id}`, modelId: `rk${id}`, qty: 1, at } },
+    { name: 'fault.report', args: { id: `f${id}`, kind: 'missing', assetId: `r${id}`, modelId: `rk${id}`, qty: 1, projectId: `lost${id}`, usable: false, note: 'Not back from the venue', at } },
+  ].map((m, i) => ({ ...m, id: `setup${id}${i}`, createdAt: at }))
+  const pushed = await request.post('/api/sync/push', { data: { clientId: `office${id}`, mutations: setUp } })
+  expect((await pushed.json()).results.map((r: { status: string }) => r.status)).toEqual(setUp.map(() => 'applied'))
+
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await ready(page, `#stock/item/r${id}`)
+  const rack = (await page.getByRole('heading', { level: 1 }).textContent())!.match(/SH-\d{6}/)![0]
+  await ready(page, `#jobs/next${id}/pick`)
+  await page.getByLabel('Number or serial').fill(`E8-1-${id}`)
+  await page.getByLabel('Number or serial').press('Enter')
+  const said = page.getByRole('status', { name: 'Last scan' })
+  await expect(said).toContainText(`It was out with Lost rack job ${id}; now it's out with Next job ${id}.`)
+  await expect(said).toContainText(`${rack}, the case it's kept in, was reported missing; it's marked found since this was in it.`)
+  await page.getByRole('button', { name: `It's not in ${rack} any more` }).click()
+  await expect(said).toHaveText(/^SH-\d{6} is out of SH-\d{6}, and SH-\d{6} is reported missing again\.$/)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  // The rack is missing again, with its note; the speaker isn't in it.
+  await ready(page, `#stock/item/r${id}`)
+  await expect(page.locator('.facts')).toContainText('Missing: Not back from the venue')
+  await ready(page, `#stock/item/s1${id}`)
+  await expect(page.locator('.facts')).not.toContainText(rack)
 })

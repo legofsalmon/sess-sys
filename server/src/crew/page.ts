@@ -14,8 +14,8 @@ import { busyByDay, type OwnCalendar } from '@sh/shared'
 export const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
-/** "Wed 30 Sep", in Ireland, from a timestamp. */
-const onDay = (iso: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }))
+/** "Wed 30 Sep", in Ireland, from a timestamp; with its year when that isn't plain from today (audit, 20 October 2026, finding 89). */
+const onDay = (iso: string, today: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }), today)
 
 /** The message after a post, and the offer it's about, when it's about one: it goes in that card. Or the section it's about. */
 export interface Flash {
@@ -24,7 +24,16 @@ export interface Flash {
   offer?: string
   /** Their details, the running-late card for the offer (ADR 0028), their documents (ADR 0029), their days off, or their own calendar (ADR 0044). */
   section?: 'details' | 'late' | 'documents' | 'away' | 'calendar'
+  /** A refusal about one field, said under it rather than at the top of the card (audit, 20 October 2026, finding 90): an offer's rate. */
+  field?: 'rate'
+  /** Or, on a timesheet, one extra, by its place among those filled in. */
+  extra?: number
 }
+
+/** A refusal about one field, under it and joined to it, as the design system's invalid state is (audit, 20 October 2026, finding 90). */
+export const fieldError = (id: string, text: string) => `<p class="field-error" id="${id}" role="alert">${h(text)}</p>`
+/** The attributes a field takes while a refusal is about it. */
+export const invalid = (id: string) => ` aria-invalid="true" aria-describedby="${id}"`
 
 /**
  * What a refused post typed (rule 11), drawn back into the form it came
@@ -142,16 +151,16 @@ function decline(call: CrewCall) {
 /** Staff are paid through payroll, so their page carries no rate (audit finding 21). */
 const isStaff = (p: Pick<Person, 'kind'>) => p.kind === 'staff'
 
-function facts(call: CrewCall, offer: Offer, staff: boolean) {
+function facts(call: CrewCall, offer: Offer, staff: boolean, today: string) {
   const rate = offer.status === 'countered' ? `${euro(offer.counterRateCents)} a day asked (offered ${euro(call.dayRateCents)})` : `${euro(offer.dayRateCents)}${offer.dayRateCents !== null ? ' a day' : ''}`
   return `<dl class="facts">
     <dt>Role</dt><dd>${h(call.role)}</dd>
-    <dt>Dates</dt><dd>${h(daysLabel(offer.status === 'offered' ? eachDay(call.start, call.end) : offer.days))}</dd>
+    <dt>Dates</dt><dd>${h(daysLabel(offer.status === 'offered' ? eachDay(call.start, call.end) : offer.days, today))}</dd>
     ${call.callTime ? `<dt>Call time</dt><dd>${h(call.callTime)}</dd>` : ''}
     ${call.venue ? `<dt>Venue</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.venue)}">${h(call.venue)}</a></dd>` : ''}
     ${needsOf(call).length ? `<dt>Needs</dt><dd>${h(capital(needsLabel(needsOf(call))))}</dd>` : ''}
     ${staff ? '' : `<dt>Rate</dt><dd>${h(rate)}</dd>`}
-    ${call.replyBy && offer.status === 'offered' ? `<dt>Reply by</dt><dd>${h(dayLabel(call.replyBy))}</dd>` : ''}
+    ${call.replyBy && offer.status === 'offered' ? `<dt>Reply by</dt><dd>${h(dayLabel(call.replyBy, today))}</dd>` : ''}
   </dl>
   ${call.details ? `<p class="details">${h(call.details).replace(/\n/g, '<br>')}</p>` : ''}`
 }
@@ -176,7 +185,7 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
             const open = openDays.includes(day) || (offer.status === 'accepted' && offer.days.includes(day))
             const checked = typed ? typed.getAll('days').includes(day) : (offer.status === 'offered' ? open : offer.days.includes(day)) && !busy[day]
             const note = !open ? 'filled' : busy[day] ? `booked on ${h(busy[day])}` : ''
-            return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day))}${note ? ` <small>${note}</small>` : ''}</label>`
+            return `<label class="${open ? '' : 'gone'}"><input type="checkbox" name="days" value="${day}"${checked ? ' checked' : ''}${open ? '' : ' disabled'}> ${h(dayLabel(day, d.today))}${note ? ` <small>${note}</small>` : ''}</label>`
           })
           .join('')}</fieldset>`
       : ''
@@ -194,11 +203,14 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
   const these = days.length > 1 ? 'Accept these days' : 'Accept'
   const accept =
     offer.status === 'accepted' ? 'Update my days' : countered ? `${these} at ${offered === null ? 'the rate the office sets' : `${euro(offered)} a day`} instead` : these
-  // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen.
+  // The page lands on the card after an answer, so the answer's message is in the card, not off the top of the screen;
+  // one about the rate goes under the rate field instead.
+  const mine = d.flash?.offer === offer.id && !d.flash.section ? d.flash : undefined
+  const rateError = mine?.field === 'rate' ? `rate-error-${h(offer.id)}` : undefined
   return `<article class="offer ${offer.status}" id="o-${h(offer.id)}">
-    ${d.flash?.offer === offer.id && !d.flash.section ? flash(d.flash) : ''}
+    ${mine && !rateError ? flash(mine) : ''}
     <header><h3>${title}</h3><span class="tag ${offer.status}">${STATUS_TEXT[offer.status]}</span></header>
-    ${facts(call, offer, staff)}
+    ${facts(call, offer, staff, d.today)}
     ${clash}
     ${holding ? `<a class="sheet-link" href="${d.base}/sheet/${encodeURIComponent(call.id)}">Call sheet: who's on, where, and who to ring ›</a>` : ''}
     ${
@@ -209,8 +221,8 @@ function offerCard(d: PageData, job: PageData['jobs'][number]) {
       <div class="buttons one">
         <button${countered ? '' : ' class="yes"'} name="answer" value="accept">${accept}</button>
       </div>
-      <details${offer.status === 'countered' || typed?.get('rate')?.trim() || (typed?.get('note') ?? '') !== '' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
-        ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal" value="${h(typed ? (typed.get('rate') ?? '') : offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : '')}"></label>`}
+      <details${offer.status === 'countered' || rateError || typed?.get('rate')?.trim() || (typed?.get('note') ?? '') !== '' ? ' open' : ''}><summary>${staff ? 'Add a note for the office' : 'Ask for a different rate or add a note'}</summary>
+        ${staff ? '' : `<label>Day rate you'd do it for (€) <input name="rate" inputmode="decimal"${rateError ? invalid(rateError) : ''} value="${h(typed ? (typed.get('rate') ?? '') : offer.counterRateCents !== null ? (offer.counterRateCents / 100).toString() : '')}"></label>${rateError && mine ? fieldError(rateError, mine.text) : ''}`}
         <label>Note for the office <textarea name="note" rows="2" maxlength="1000">${h(typed ? (typed.get('note') ?? '') : offer.note)}</textarea></label>
         ${staff ? '<p class="small">It goes with your answer.</p>' : `<button${countered ? ' class="yes"' : ''} name="answer" value="counter">Send rate</button>`}
       </details>
@@ -310,14 +322,15 @@ function timesheets(d: PageData): string {
         : t.status === 'sent'
           ? `Sent: ${euro(timesheetTotal(t).total)}. The office will check it ›`
           : `Approved: ${euro(timesheetTotal(t).total)} ›`
-      return `<li><a class="${state}" href="${d.base}/timesheet/${encodeURIComponent(offer.id)}"><b>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</b><small>${h(call.role)} · ${h(daysLabel(offer.days))}</small><span>${h(text)}</span></a></li>`
+      return `<li><a class="${state}" href="${d.base}/timesheet/${encodeURIComponent(offer.id)}"><b>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</b><small>${h(call.role)} · ${h(daysLabel(offer.days, d.today))}</small><span>${h(text)}</span></a></li>`
     })
     .join('')}</ul></section>`
 }
 /**
  * What's waiting on them and what's next, in one line at the top, each part
  * a link down the page (ADR 0033): a long page says what matters before
- * anyone scrolls. Nothing when there's nothing to say.
+ * anyone scrolls, and it stays at the top of the screen while they do
+ * (audit, 20 October 2026, finding 48). Nothing when there's nothing to say.
  */
 function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']): string {
   const toSend = d.noTimesheets ? 0 : d.jobs.filter((j) => !d.timesheets.get(j.offer.id) && noTimesheetReason(j.offer, j.call, d.person, d.today) === null).length
@@ -326,7 +339,7 @@ function glance(d: PageData, waiting: PageData['jobs'], booked: PageData['jobs']
   const parts = [
     waiting.length ? `<a href="#offers">${waiting.length === 1 ? '1 offer' : `${waiting.length} offers`} to answer</a>` : '',
     toSend ? `<a href="#timesheets">${toSend === 1 ? '1 timesheet' : `${toSend} timesheets`} to send</a>` : '',
-    next ? `<a href="#bookings">Next: ${h(next.call.project)}, ${h(dayLabel(firstDay(next)))}${next.call.callTime ? `, call ${h(next.call.callTime)}` : ''}</a>` : '',
+    next ? `<a href="#bookings">Next: ${h(next.call.project)}, ${h(dayLabel(firstDay(next), d.today))}${next.call.callTime ? `, call ${h(next.call.callTime)}` : ''}</a>` : '',
   ].filter(Boolean)
   return parts.length ? `<nav class="glance" aria-label="At a glance">${parts.join('<span aria-hidden="true"> · </span>')}</nav>` : ''
 }
@@ -358,8 +371,8 @@ function details(d: PageData): string {
 }
 
 /** How an offer in "Declined and withdrawn" ended, and the day it did: when they answered, or when the office withdrew it or the place went. */
-function ended(o: Offer, endedAt: string | undefined): string {
-  const on = (iso: string | null | undefined) => (iso ? ` on ${onDay(iso)}` : '')
+function ended(o: Offer, endedAt: string | undefined, today: string): string {
+  const on = (iso: string | null | undefined) => (iso ? ` on ${onDay(iso, today)}` : '')
   switch (o.status) {
     case 'declined':
       return `You declined${on(o.respondedAt)}`
@@ -378,10 +391,10 @@ function ended(o: Offer, endedAt: string | undefined): string {
 }
 
 /** One line of "Past work" or "Declined and withdrawn": the job, the role, the days, and how it ended. */
-function earlierLine(j: PageData['jobs'][number], how: string): string {
+function earlierLine(j: PageData['jobs'][number], how: string, today: string): string {
   const { call, offer } = j
   const days = HOLDING.includes(offer.status) ? offer.days : eachDay(call.start, call.end)
-  return `<li>${h(call.project)}${call.phase ? ` (${h(call.phase)})` : ''} · ${h(call.role)} · ${h(daysLabel(days))} <small>${h(how)}</small></li>`
+  return `<li>${h(call.project)}${call.phase ? ` (${h(call.phase)})` : ''} · ${h(call.role)} · ${h(daysLabel(days, today))} <small>${h(how)}</small></li>`
 }
 
 /**
@@ -441,10 +454,12 @@ function ownCalendarBlock(d: PageData): string {
   // What a refused share typed, back in the field (rule 11): it's their own page, kept from every cache.
   const typed = keptIn(d, 'calendar')
   const cal = d.ownCalendar
+  // Its button is plain, never the red fill (audit, 20 October 2026, finding 92): the fill marks the thing to do next,
+  // answering, arriving or sending, and sharing a calendar is something asked of them, not their next step.
   const field = (label: string, button: string) => `<form method="post" action="${d.base}/calendar#calendar" class="share-cal">
       <label>${label} <input name="address" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="2000" placeholder="e.g. webcal://… or https://….ics" value="${h(typed?.get('address'))}"></label>
       ${WHERE_TO_FIND}
-      <button${cal ? '' : ' class="yes"'}>${button}</button>
+      <button>${button}</button>
     </form>`
   const promise = 'We keep only the times you\'re busy: never what, where or who with. Nothing is ever added to your calendar, and Session Hire bookings in it aren\'t counted.'
   if (!cal)
@@ -455,7 +470,7 @@ function ownCalendarBlock(d: PageData): string {
     ${field("Your calendar's private address", "Share when I'm busy")}
   </section>`
   const busy = [...busyByDay(cal)].filter(([day]) => day >= d.today)
-  const read = cal.readAt ? (new Date(cal.readAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }) === d.today ? 'today' : `on ${onDay(cal.readAt)}`) : ''
+  const read = cal.readAt ? (new Date(cal.readAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }) === d.today ? 'today' : `on ${onDay(cal.readAt, d.today)}`) : ''
   return `<section id="calendar">
     <h2>Let us see when you're busy</h2>
     ${mine ? flash(mine) : ''}
@@ -465,7 +480,7 @@ function ownCalendarBlock(d: PageData): string {
       busy.length
         ? `<ul class="away busy">${busy
             .slice(0, BUSY_SHOWN)
-            .map(([day, words]) => `<li><span>${h(dayLabel(day))} <small>Busy ${h(words)}</small></span></li>`)
+            .map(([day, words]) => `<li><span>${h(dayLabel(day, d.today))} <small>Busy ${h(words)}</small></span></li>`)
             .join('')}</ul>${busy.length > BUSY_SHOWN ? `<p class="small">And ${busy.length - BUSY_SHOWN} more busy day${busy.length - BUSY_SHOWN === 1 ? '' : 's'} in the next four months.</p>` : ''}`
         : '<p class="empty">Nothing busy in the next four months.</p>'
     }
@@ -474,6 +489,46 @@ function ownCalendarBlock(d: PageData): string {
       ${field('Its private address', 'Share this one instead')}
     </details>
   </section>`
+}
+
+/** How many of the next bookings are drawn as full cards; the rest are a line each, opening in place. */
+const BOOKINGS_IN_FULL = 3
+
+/**
+ * Their bookings, soonest first (audit, 20 October 2026, finding 48): the next few as full cards, and the rest folded to
+ * one line each, the job, the role, the days and where it stands, opening in place with no script. Forty bookings drawn
+ * in full was a thirty-five-screen scroll. One a message or a refused post is about opens, so the page lands on it.
+ */
+function bookings(d: PageData, booked: PageData['jobs']): string {
+  const firstDay = (j: PageData['jobs'][number]) => j.offer.days.find((x) => x >= d.today) ?? j.call.start
+  const sorted = [...booked].sort((a, b) => firstDay(a).localeCompare(firstDay(b)))
+  const later = sorted.slice(BOOKINGS_IN_FULL)
+  return `${sorted.slice(0, BOOKINGS_IN_FULL).map((j) => offerCard(d, j)).join('')}${
+    later.length
+      ? `<p class="small">${later.length === 1 ? 'One more booking' : `${later.length} more bookings`} after these, a line each: tap one to open it.</p>${later
+          .map((j) => {
+            const about = d.flash?.offer === j.offer.id || d.kept?.form === `offer:${j.offer.id}`
+            return `<details class="later"${about ? ' open' : ''}><summary><b>${h(j.call.project)}</b> · ${h(j.call.role)} · ${h(daysLabel(j.offer.days, d.today))} <span class="tag ${j.offer.status}">${STATUS_TEXT[j.offer.status]}</span></summary>${offerCard(d, j)}</details>`
+          })
+          .join('')}`
+      : ''
+  }`
+}
+
+/**
+ * Days off marked over a booking they hold (audit, 20 October 2026, finding 50): said beside the row, since marking
+ * themselves away doesn't take them off the job, and the way that does is on the booking. Nothing for approved leave,
+ * which the office approved knowing the bookings.
+ */
+function stillBooked(u: Unavailability, booked: PageData['jobs'], today: string): string {
+  if (u.source === 'leave') return ''
+  const hits = booked
+    .map((j) => ({ j, days: j.offer.days.filter((x) => x >= u.start && x <= u.end) }))
+    .filter((x) => x.days.length)
+  if (!hits.length) return ''
+  const on = hits.map(({ j, days }) => `<a href="#o-${h(j.offer.id)}">${h(j.call.project)}</a> ${days.length === 1 && hits.length === 1 ? 'that day' : `on ${h(daysLabel(days, today))}`}`).join(' and ')
+  const which = hits.length === 1 ? 'that booking' : 'each booking'
+  return `<p class="clash">You're booked on ${on}. Days off don't take you off it: use Can't make it any more on ${which}.</p>`
 }
 
 export function renderPage(d: PageData): string {
@@ -523,7 +578,7 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
 
   <section id="bookings">
     <h2>Your bookings</h2>
-    ${booked.length ? booked.map((j) => offerCard(d, j)).join('') : '<p class="empty">No upcoming bookings.</p>'}
+    ${booked.length ? bookings(d, booked) : '<p class="empty">No upcoming bookings.</p>'}
     ${feedBlock(d.feed)}
   </section>
 
@@ -535,11 +590,11 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
         ? `<ul class="away">${d.away
             .filter((u) => u.end >= d.today)
             .map(
-              (u) => `<li><span>${h(daysLabel(eachDay(u.start, u.end)))}${u.note ? ` <small>${h(u.note)}</small>` : ''}</span>
+              (u) => `<li><span>${h(daysLabel(eachDay(u.start, u.end), d.today))}${u.note ? ` <small>${h(u.note)}</small>` : ''}</span>
           ${
             // Approved leave is cancelled in the app, never taken off here, so the two never disagree (ADR 0024).
             u.source === 'leave' ? '<small>Approved leave</small>' : `<form method="post" action="${d.base}/away/${encodeURIComponent(u.id)}/remove"><button>Remove</button></form>`
-          }</li>`
+          }${stillBooked(u, booked, d.today)}</li>`
             )
             .join('')}</ul>`
         : ''
@@ -559,9 +614,9 @@ ${d.demo ? `<p class="demo-bar" role="note"><span>Seeing it as <b>a freelancer</
 
   ${details(d)}
 
-  ${past.length ? `<section><h2>Past work</h2><ul class="closed">${past.map((j) => earlierLine(j, j.offer.status === 'confirmed' ? 'Confirmed' : 'Accepted, never confirmed')).join('')}</ul></section>` : ''}
+  ${past.length ? `<section><h2>Past work</h2><ul class="closed">${past.map((j) => earlierLine(j, j.offer.status === 'confirmed' ? 'Confirmed' : 'Accepted, never confirmed', d.today)).join('')}</ul></section>` : ''}
 
-  ${turned.length ? `<section><h2>Declined and withdrawn</h2><ul class="closed">${turned.map((j) => earlierLine(j, ended(j.offer, d.ended.get(j.offer.id)))).join('')}</ul></section>` : ''}
+  ${turned.length ? `<section><h2>Declined and withdrawn</h2><ul class="closed">${turned.map((j) => earlierLine(j, ended(j.offer, d.ended.get(j.offer.id), d.today), d.today)).join('')}</ul></section>` : ''}
 
   <footer>
     <a href="${d.base}/data.json">Download everything we hold on you</a>
@@ -669,19 +724,22 @@ label{display:grid;gap:4px;font-size:.9rem}input,textarea,select{font:inherit;pa
 fieldset.days input{width:20px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .flash{margin:0;padding:12px 14px;border-radius:10px;font-weight:600}.flash.ok{background:var(--good-soft);color:var(--good)}.flash.bad{background:var(--bad-soft);color:var(--bad)}.flash.warn{background:var(--warn-soft);color:var(--warn)}
+.field-error{margin:-4px 0 0;color:var(--bad);font-weight:600;font-size:.92rem}input[aria-invalid=true]{border-color:var(--bad);border-width:2px}
 .clash{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600}
 .empty,.small{color:var(--muted);margin:0;font-size:.92rem}
 .demo-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;padding:8px 16px;background:var(--ink);color:var(--bg);font-size:.9rem}
 .demo-bar a{color:inherit;font-weight:700;white-space:nowrap}
-.glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem}
+.glance{display:flex;flex-wrap:wrap;gap:4px;font-weight:600;font-size:.95rem;position:sticky;top:0;z-index:1;margin:0 -16px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--line)}
+details.later{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}details.later[open]{padding-bottom:12px}
+details.later summary{color:var(--ink);font-size:.95rem;padding:12px 0}details.later summary .tag{margin-left:4px}details.later .offer{border:0;padding:0;background:none}
 .glance a{color:inherit}
 .feed{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.feed input{font-size:.85rem;color:var(--muted)}
 .feed-buttons{display:flex;gap:8px}.feed-buttons>*{flex:1}.feed-buttons .copy[hidden]{display:none}
 a.button.yes{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 a.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;text-decoration:none}
 .away,.closed{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.away li{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
-.away li button{min-height:44px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}
+.away li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+.away li .clash{flex-basis:100%;margin-right:6px;font-size:.92rem}.away li button{min-height:44px;padding:6px 10px;font-size:.85rem}.away small,.closed small{color:var(--muted);display:block}
 .closed li{font-size:.92rem}
 .add-away{grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.add-away .wide,.add-away button{grid-column:1/-1}
 footer{display:grid;gap:6px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}

@@ -292,8 +292,9 @@ function SetAside({ labels }: { labels: LabelsView }) {
       {asking !== undefined ? (
         <Confirm
           className="wide"
-          question={`Reserve ${plural(asking, 'number')}? Nothing else gets them. The run can be cancelled until one of its labels is on an item.`}
-          yes="Reserve them"
+          // One verb for the one action, and what cancelling can't undo (audit, 20 October 2026, finding 101; ADR 0015).
+          question={`Set aside ${plural(asking, 'number')}? Nothing else gets them. The numbers stay used even if the run is cancelled later.`}
+          yes="Set them aside"
           no="Not yet"
           onYes={() => reserve(asking)}
           onNo={() => setAsking(undefined)}

@@ -58,8 +58,9 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   await phone.getByLabel('€', { exact: true }).first().fill('€12')
   await phone.screenshot(shot('timesheet-crew'))
   await phone.getByRole('button', { name: 'Send to the office' }).click()
-  await expect(phone.getByText("Thanks, it's gone to the office.")).toBeVisible()
-  await expect(phone.getByText('€412 in all')).toBeVisible()
+  // Said once, with the total (audit, 20 October 2026, finding 91).
+  await expect(phone.getByRole('status')).toContainText('€412 in all')
+  await expect(phone.getByText("Thanks, it's gone to the office.")).toHaveCount(0)
 
   // The office sees it arrive.
   await expect(card.getByRole('group', { name: 'To approve' })).toContainText('Laoise Keane')

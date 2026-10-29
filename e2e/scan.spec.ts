@@ -118,7 +118,7 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   const aside = page.getByRole('form', { name: 'Set numbers aside' })
   await aside.getByLabel('How many labels').fill('2')
   await aside.getByRole('button', { name: 'Set numbers aside' }).click()
-  await aside.getByRole('button', { name: 'Reserve them' }).click()
+  await aside.getByRole('button', { name: 'Set them aside' }).click()
   await expect(aside.locator('.added')).toHaveText(/^Set aside SH-\d{6} to SH-\d{6}\.$/)
   const one = (await aside.locator('.added a').textContent())!.split(' to ')[0]!
   const two = sh(Number(one.slice(3)) + 1)

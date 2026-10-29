@@ -28,7 +28,7 @@ async function ready(page: Page, hash = '#stock') {
 
 const part = (page: Page, heading: string) => page.locator('form').filter({ has: page.getByRole('heading', { name: heading, exact: true }) })
 
-/** Every product and place on the Stock tab, past the first five of each it shows (audit finding 16), so one missing from either is missing. */
+/** Every product and place on the Stock tab, past the first few of each it shows (audit finding 16; twenty products on a laptop, finding 97), so one missing from either is missing. */
 async function showAll(page: Page) {
   await expect(page.getByRole('region', { name: 'Catalogue', exact: true })).toBeVisible()
   for (const what of ['products', 'places']) {
@@ -180,7 +180,7 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   await ready(page)
-  // The catalogue shows its first five, with the rest behind "Show all" (audit finding 16).
+  // The catalogue shows its first few (five on a phone, twenty on a laptop), with the rest behind "Show all" (audit finding 16).
   const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
   if (await all.count()) await all.click()
   await expect(page.locator('.job-row', { hasText: speaker })).toContainText('2 items · 4 not labelled yet')

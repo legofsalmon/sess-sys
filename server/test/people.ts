@@ -85,7 +85,8 @@ export async function staff(app: FastifyInstance, db: Db, name: string, userAgen
  * (audit finding 21).
  */
 export function flashOf(html: string): { ok: boolean; message: string } {
-  const found = /<p class="flash (\w+)"[^>]*>(.*?)<\/p>/.exec(html)
+  // A refusal about one field is under it (audit, 20 October 2026, finding 90), and read the same.
+  const found = /<p class="(?:flash (\w+)|field-error)"[^>]*>(.*?)<\/p>/.exec(html)
   const message = found ? found[2]!.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') : ''
   return { ok: found?.[1] === 'ok', message }
 }

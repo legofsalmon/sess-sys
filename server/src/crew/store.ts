@@ -85,6 +85,12 @@ export async function getPerson(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE id = $1`, [id])
   return rows[0] ? toPerson(rows[0]) : undefined
 }
+/** Several people at once, in the order asked for. */
+export async function getPeople(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${PERSON} FROM people WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toPerson), ids)
+}
 /**
  * The person a private link belongs to: theirs, or the link of someone
  * they were combined with (ADR 0055), which opens the one person. An

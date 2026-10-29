@@ -12,6 +12,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useScanKeys } from '../scanKeys.ts'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
 import { useAccess } from '../role.ts'
@@ -410,6 +411,8 @@ export function TestingScreen({ view }: { view: View }) {
   const [day, setDay] = useState(today)
   const [typed, setTyped] = useState('')
   const [camera, setCamera] = useState(false)
+  // A scanner's first read goes to the scan field (audit, 20 October 2026, finding 98).
+  useScanKeys()
   const [said, setSaid] = useState<Said>()
   const [done, setDone] = useState<{ a: AssetView; passed: boolean; at: number; kind: InspectionKind; day: string }[]>([])
   const [held, setHeld] = useState<Held>()
