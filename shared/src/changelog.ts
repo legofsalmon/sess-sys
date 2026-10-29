@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.58.0',
+    date: '2026-10-29',
+    title: 'Money says what its figures are',
+    what: "Money now says what its biggest figure really is: quotes accepted and not yet paid, with VAT, split into those invoiced and those still to invoice, one row per client. Margin by job is by month with this month first, and names any job losing money, here and on Home. A cancelled or lost job's quote no longer counts anywhere until it's invoiced. A quote line half typed when you leave the screen is kept, and the link on amber warning lines is easier to read.",
+    prs: [167],
+  },
+  {
     version: '1.57.0',
     date: '2026-10-29',
     title: "A freelancer's own page is quicker to read",

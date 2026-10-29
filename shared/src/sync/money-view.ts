@@ -73,6 +73,11 @@ export interface JobMoney {
   toCome: number
   /** What's left of the quote once freelancers are paid: quoted less costs and those to come. Null with no quote. */
   margin: number | null
+  /**
+   * The job is cancelled or lost and its quote isn't invoiced, so the quote counts nowhere: not quoted, owed or in the
+   * margin (audit, 20 October 2026, finding 30). A cancellation fee is invoiced, and then it counts.
+   */
+  setAside: boolean
 }
 
 export interface MonthMoney {
@@ -93,6 +98,8 @@ export interface OwedBy {
   clientId: string | null
   /** Accepted, not paid: VAT included, as the invoice asks. */
   cents: number
+  /** Of that, what's been invoiced: the rest isn't asked for yet (audit finding 29). */
+  invoiced: number
   quotes: { job: JobView; quote: QuoteView }[]
 }
 
@@ -127,7 +134,7 @@ export interface MoneyView {
   jobs: JobMoney[]
   job(jobId: string): JobMoney | undefined
   months: MonthMoney[]
-  /** Clients with accepted quotes not paid, most owed first. */
+  /** Clients with accepted quotes not paid, most owed first. A job cancelled or lost counts only once invoiced. */
   owed: OwedBy[]
   /** Approved timesheets not marked paid, oldest first. */
   costsOwed: CostRow[]
@@ -353,8 +360,11 @@ export function moneyView(
       }
     }
     if (!current && !costs && !toCome && !byJob.has(job.id)) continue
-    const quoted = current && current.status !== 'declined' ? current.totals.net : 0
-    jobMoney.set(job.id, { job, current, quoted, costs, toCome, margin: current && current.status !== 'declined' ? quoted - costs - toCome : null })
+    // A stopped job's quote counts nowhere until it's invoiced, here as in the months and who owes (finding 30).
+    const setAside = !!current && STOPPED.includes(job.status) && !current.invoicedOn
+    const counts = !!current && current.status !== 'declined' && !setAside
+    const quoted = counts ? current.totals.net : 0
+    jobMoney.set(job.id, { job, current, quoted, costs, toCome, margin: counts ? quoted - costs - toCome : null, setAside })
   }
   const jobList = [...jobMoney.values()].sort((a, b) => (a.job.span?.start ?? '9999').localeCompare(b.job.span?.start ?? '9999') || a.job.name.localeCompare(b.job.name))
 
@@ -368,7 +378,7 @@ export function moneyView(
   }
   for (const jm of jobList) {
     const q = jm.current
-    if (!q || q.status === 'declined' || (STOPPED.includes(jm.job.status) && !q.invoicedOn)) continue
+    if (!q || q.status === 'declined' || jm.setAside) continue
     const m = monthFor(jm.job.span?.start ?? q.sentOn ?? irishToday(new Date(q.madeAt)))
     m.quoted += q.totals.net
     if (q.status === 'accepted') m.confirmed += q.totals.net
@@ -376,15 +386,16 @@ export function moneyView(
   }
   for (const c of approved) monthFor(lastDay(c.row)).costs += c.cents
 
-  // Who owes: accepted quotes not yet paid, VAT and all.
+  // Who owes: accepted quotes not yet paid, VAT and all, and of that what's invoiced.
   const owed = new Map<string, OwedBy>()
   for (const jm of jobList) {
     const q = jm.current
-    if (!q || q.status !== 'accepted' || q.paidOn) continue
+    if (!q || q.status !== 'accepted' || q.paidOn || jm.setAside) continue
     const key = jm.job.client?.id ?? ''
     let o = owed.get(key)
-    if (!o) owed.set(key, (o = { client: jm.job.client?.name ?? 'No client', clientId: jm.job.client?.id ?? null, cents: 0, quotes: [] }))
+    if (!o) owed.set(key, (o = { client: jm.job.client?.name ?? 'No client', clientId: jm.job.client?.id ?? null, cents: 0, invoiced: 0, quotes: [] }))
     o.cents += q.totals.gross
+    if (q.invoicedOn) o.invoiced += q.totals.gross
     o.quotes.push({ job: jm.job, quote: q })
   }
 
@@ -501,6 +512,30 @@ export function quotesToFollow(m: Pick<MoneyView, 'jobs' | 'draftOf'>, today: st
   out.waiting.sort(longest)
   out.outOfStep.sort(longest)
   return out
+}
+
+/** Jobs whose margin is below zero, the most lost first, for the sentence above Margin by job and on Home (audit finding 31). */
+export function belowZero(jobs: readonly JobMoney[]): JobMoney[] {
+  return jobs.filter((j) => j.margin !== null && j.margin < 0).sort((a, b) => a.margin! - b.margin! || a.job.name.localeCompare(b.job.name, 'en-IE'))
+}
+
+/**
+ * Margin by job under the month each job starts (audit finding 31), in the order a director asks about them: this month,
+ * then the months coming, soonest first, then those gone, the latest first. A job with no dates goes in this month.
+ */
+export function marginsByMonth(jobs: readonly JobMoney[], today: string): { key: string; label: string; jobs: JobMoney[] }[] {
+  const now = moneyMonth(today).key
+  const months = new Map<string, { key: string; label: string; jobs: JobMoney[] }>()
+  for (const j of jobs) {
+    if (!j.current && j.costs <= 0) continue
+    const month = moneyMonth(j.job.span?.start ?? today)
+    let m = months.get(month.key)
+    if (!m) months.set(month.key, (m = { ...month, jobs: [] }))
+    m.jobs.push(j)
+  }
+  // Coming months by their key; those gone after them, the latest first.
+  const order = (key: string) => (key >= now ? Number(key.replace('-', '')) : 2_000_000 - Number(key.replace('-', '')))
+  return [...months.values()].sort((a, b) => order(a.key) - order(b.key))
 }
 
 // Every quote in one list (ADR 0088), for the Quotes page: a job's latest, found by its job, client, venue or number.
