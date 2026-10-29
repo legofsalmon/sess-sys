@@ -495,7 +495,7 @@ describe('what each role reads', () => {
     await ok('offer.send', { id: 'sean-lx', callId: 'lx', personId: 'sean', override: false })
     const s = { sh_session: await signIn(sean) }
     const feed = await pull(s)
-    expect(feed.reading).toEqual({ rates: false, links: 'own', personId: 'sean', details: 'phones', documents: 'own' })
+    expect(feed.reading).toEqual({ rates: false, links: 'own', personId: 'sean', details: 'phones', documents: 'own', clientDocuments: false })
     expect(leaks(feed, 'sean')).toEqual({ rates: [], links: [] })
     // The records are all there, so the screens work, and say what's left out.
     expect(feed.of('crewCall', 'lx')).toMatchObject({ role: 'Stagehand', dayRateCents: null, rateHidden: true })
@@ -522,7 +522,7 @@ describe('what each role reads', () => {
     const { app, c, signIn, ok, pull } = await crewed()
     const h = { sh_session: await signIn(aine) }
     let feed = await pull(h)
-    expect(feed.reading).toEqual({ rates: false, links: 'department', personId: 'aine', department: 'Audio' })
+    expect(feed.reading).toEqual({ rates: false, links: 'department', personId: 'aine', department: 'Audio', clientDocuments: false })
     // Dara is in Audio, as she is; Niamh is in LX, and Colly and Seán in none.
     expect(leaks(feed, 'aine')).toEqual({ rates: [], links: ['dara'] })
     expect(feed.of('person', 'aine')).toMatchObject({ dayRateCents: 21000 })
@@ -676,6 +676,39 @@ describe('what each role reads', () => {
     await ok('person.role', { id: 'sean', role: 'freelancer' })
     const freelancer = await same('freelancer', s)
     expect(freelancer.entities.person?.dara).toMatchObject({ phone: null, email: null })
+  })
+
+  it("keeps what was written on other people's timesheets, their documents' details in the history, and clients' documents from staff crew (audit, 20 October 2026, findings 37 to 39)", async () => {
+    const { app, c, signIn, ok, pull } = await crewed()
+    await ok('timesheet.approve', { id: 'dara-sound', days: [day(-2)], dayRateCents: 25000, extras: [], officeNote: 'Food was on site, so no dinner.' })
+    await ok('document.save', { id: 'd-dara', personId: 'dara', kind: 'insurance', title: 'Public liability insurance', expires: day(30) })
+    await ok('venue.upsert', { id: 'heritage', name: 'The Heritage', address: '', notes: '' })
+    await ok('client.upsert', { id: 'nissan', name: 'Nissan Ireland', contacts: [], notes: '' })
+    await ok('attachment.save', { id: 'plan', owner: 'venue', ownerId: 'heritage', kind: 'floor-plan', title: 'Ballroom floor plan', link: 'https://example.com/plan' })
+    await ok('attachment.save', { id: 'po', owner: 'client', ownerId: 'nissan', kind: 'purchase-order', title: 'Purchase order 4471', link: 'https://example.com/po' })
+    const s = { sh_session: await signIn(sean) }
+    const feed = await pull(s)
+
+    // 37: the days stay, the words go.
+    expect(feed.of('timesheet', 'dara-sound')).toMatchObject({ days: [day(-2)], officeNote: '' })
+    expect((await pull(c)).of('timesheet', 'dara-sound')).toMatchObject({ officeNote: 'Food was on site, so no dinner.' })
+
+    // 38: the history says a document of Dara's was saved, not what it is or when it runs out.
+    const his = JSON.stringify((await app.inject({ url: '/api/history', cookies: s })).json())
+    expect(his).toContain("Saved one of Dara Quinn's documents")
+    expect(his).not.toContain('public liability insurance')
+    expect(JSON.stringify((await app.inject({ url: '/api/history', cookies: c })).json())).toContain("Saved Dara Quinn's public liability insurance")
+
+    // 39: a venue's for everyone, a client's for the office and directors.
+    expect(feed.of('attachment', 'plan')).toMatchObject({ title: 'Ballroom floor plan' })
+    expect(feed.of('attachment', 'po')).toBeUndefined()
+    const po = await app.inject({ url: '/api/attachments/po/file', cookies: s })
+    expect(po.statusCode).toBe(403)
+    expect(po.json().error).toMatch(/^Only the office and directors see clients' documents/)
+    expect((await app.inject({ url: '/api/attachments/plan/file', cookies: s })).statusCode).toBe(404)
+    expect((await pull(c)).of('attachment', 'po')).toMatchObject({ title: 'Purchase order 4471' })
+    // A head of department, who has neither jobs nor money, isn't sent it either.
+    expect((await pull({ sh_session: await signIn(aine) })).of('attachment', 'po')).toBeUndefined()
   })
 
   it('tells the history without figures to a role without rates', async () => {

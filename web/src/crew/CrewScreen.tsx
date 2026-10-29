@@ -302,7 +302,7 @@ export function CrewScreen() {
 
       {page === 'timesheets' &&
         view.office.useTimesheets &&
-        (view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
+        (!access.can('crew') || view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
           <TimesheetsCard view={view} />
         ) : (
           <section className="card">
@@ -314,6 +314,8 @@ export function CrewScreen() {
       {page === 'calls' && (
         <Split
           side={
+            // Answers are the office's to act on: a role without crew isn't shown them (audit, 20 October 2026, finding 34).
+            access.can('crew') &&
             (toCheck.length > 0 || toSortOut.length > 0 || late.length > 0 || docs.length > 0) && (
               <section className="card">
                 {/* Counted in full, so any past the first three are a tap away and never out of mind (audit finding 16). */}

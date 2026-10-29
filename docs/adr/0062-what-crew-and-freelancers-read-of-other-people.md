@@ -107,3 +107,27 @@ when they book only their own.
   Rated 1.
 - **A head reads every department's documents and details.** They book
   crew across departments for some jobs. Rated 1.
+
+## Later: timesheets, the history and clients' documents (29 October 2026)
+
+The 20 October audit (findings 34 to 39) found four ways round these rules
+and two screens that put the office's work in front of staff crew. Colly
+chose to close them before staff sign in.
+
+- **Timesheets are in rule 3.** What someone wrote on their timesheet, and
+  the office's note back, reach only them, the office, directors and heads,
+  as for time off. The days and the amounts' rules are unchanged.
+- **The history follows rule 2.** For a reader who gets only their own
+  documents, another person's document is "Saved one of Dara Quinn's
+  documents", with no title, expiry or file. The notices read the same way.
+- **Clients' documents are for roles with jobs or money** (the office and
+  directors), in the feed and on the file's address: a client's contract or
+  purchase order carries the prices kept from everyone else. Venues' stay
+  open to everyone, as crew need floor plans and access notes. ADR 0032's
+  open line about who opens which is settled here.
+- **Staff crew start on their own work.** With nothing chosen yet, a role
+  without crew opens Home on Me and Crew on People, sees no Answers to
+  check, and sees only their own timesheets. Home › Me links to their own
+  page when offers wait there, their person page has "Your page" to open
+  it and copy their calendar address, and Your work says which bookings
+  are confirmed and which only accepted.

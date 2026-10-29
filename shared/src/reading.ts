@@ -57,6 +57,13 @@ export interface Reading {
   details?: 'all' | 'phones' | 'own'
   /** Other people's documents, certificates and insurance, and their files (ADR 0062). Absent is all. */
   documents?: 'all' | 'own'
+  /**
+   * Clients' documents (ADR 0032): false for a role with neither jobs nor
+   * money, as a client's contract or purchase order carries the prices kept
+   * from them (audit, 20 October 2026, finding 39). Venues' are everyone's.
+   * Absent is all.
+   */
+  clientDocuments?: false
 }
 
 /** What a device reads with roles off, sign-in off, or for the office and directors. */
@@ -64,7 +71,7 @@ export const READS_EVERYTHING: Reading = { rates: true, links: 'all' }
 
 /** Whether nothing is left out for this reader. */
 export const readsEverything = (r: Reading | undefined) =>
-  !r || (r.rates && !r.ratesBy && r.links === 'all' && (r.details ?? 'all') === 'all' && (r.documents ?? 'all') === 'all')
+  !r || (r.rates && !r.ratesBy && r.links === 'all' && (r.details ?? 'all') === 'all' && (r.documents ?? 'all') === 'all' && r.clientDocuments !== false)
 
 /** Who is reading, as far as reading goes: their person on the Crew tab, their department, and the director's choice for heads. */
 export interface ReaderOf {
@@ -79,9 +86,9 @@ export function readingFor(role: Role | null | undefined, who: ReaderOf = {}): R
   const own = who.personId ? { personId: who.personId } : {}
   if (role === 'head') {
     const rates = who.headsSeeRates === true
-    return { rates, ...(rates ? { ratesBy: 'department' as const } : {}), links: 'department', ...own, department: who.department?.trim() || null }
+    return { rates, ...(rates ? { ratesBy: 'department' as const } : {}), links: 'department', ...own, department: who.department?.trim() || null, clientDocuments: false }
   }
-  return { rates: false, links: 'own', ...own, details: role === 'crew' ? 'phones' : 'own', documents: 'own' }
+  return { rates: false, links: 'own', ...own, details: role === 'crew' ? 'phones' : 'own', documents: 'own', clientDocuments: false }
 }
 
 /** Whether this reader reads the rates of a person or call in this department: every one, their own department's, or none. */
@@ -137,15 +144,32 @@ export function offerAsRead(o: Offer, r: Reading, callDepartment?: string | null
   return readsRatesIn(r, callDepartment) || o.personId === r.personId ? read : { ...read, dayRateCents: null, counterRateCents: null, rateHidden: true }
 }
 
-/** A timesheet as this reader is sent it: the rate and the extras' amounts left out unless they read its call's rates, or it's their own. */
+/**
+ * A timesheet as this reader is sent it: the rate and the extras' amounts
+ * left out unless they read its call's rates, or it's their own; and what
+ * was written on it, by them and by the office, left out as for time off
+ * unless it's their own or the reader reads everyone's details (ADR 0062,
+ * audit, 20 October 2026, finding 37).
+ */
 export function timesheetAsRead(t: Timesheet, mine: boolean, r: Reading, callDepartment?: string | null): Timesheet {
-  if (readsRatesIn(r, callDepartment) || mine) return t
+  if (mine) return t
+  const words = (r.details ?? 'all') === 'all' ? t : { ...t, note: '', officeNote: '' }
+  if (readsRatesIn(r, callDepartment)) return words
   const none = (extras: Timesheet['extras']) => extras.map((e) => ({ ...e, cents: 0 }))
-  return { ...t, dayRateCents: null, extras: none(t.extras), sent: { ...t.sent, dayRateCents: null, extras: none(t.sent.extras) }, amountsHidden: true }
+  return { ...words, dayRateCents: null, extras: none(t.extras), sent: { ...t.sent, dayRateCents: null, extras: none(t.sent.extras) }, amountsHidden: true }
 }
 
 /** Whether this reader is sent someone's document: all of them, or their own only (ADR 0062). */
 export const readsDocumentOf = (r: Reading, doc: Pick<Document, 'personId'>) => (r.documents ?? 'all') === 'all' || doc.personId === r.personId
+
+/** Whose documents the history names in full for this reader: everyone's, their own (their id), or nobody's (null). */
+export const documentsRead = (r: Reading): true | string | null => ((r.documents ?? 'all') === 'all' ? true : (r.personId ?? null))
+
+/** Whether this reader is sent a venue's or client's document: a venue's always, a client's unless held back (finding 39). */
+export const readsAttachmentOf = (r: Reading, doc: { owner: string }) => doc.owner !== 'client' || r.clientDocuments !== false
+
+/** Why someone can't open a client's document, and who can. */
+export const CLIENT_DOCUMENTS_REFUSAL = "Only the office and directors see clients' documents, as they can carry the prices agreed. Venues' are open to everyone."
 
 /** Why someone can't open another person's document, and who can. */
 export const DOCUMENTS_REFUSAL = "Only the office, directors and heads of department see other people's certificates and insurance. Your own are on your page."
