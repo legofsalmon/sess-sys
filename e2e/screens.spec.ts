@@ -132,7 +132,7 @@ async function openJob(page: Page, name: string) {
 }
 
 test('staff crew are offered nothing on a job or on Crew they could only be refused', async ({ browser }) => {
-  // Proves: staff crew, who can change only their leave and report faults, see a job's phases, kit and crew with no Change, Add kit, Add phase or Ask for crew, and Crew's answers and calls with nothing to settle or offer.
+  // Proves: staff crew, who can change only their leave and report faults, see a job's phases, kit and crew with no Change, Add kit, Add phase or Ask for crew, and Crew's calls with nothing to settle or offer and no answers to check, which are the office's (audit finding 34).
   const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await as(page, 'crew', /^Staff crew/)
   await openJob(page, 'Harbour Lights Festival')
@@ -152,7 +152,8 @@ test('staff crew are offered nothing on a job or on Crew they could only be refu
   for (const name of ['Withdraw', 'Send', 'Cancel crew call']) await expect(main.getByRole('button', { name, exact: true })).toHaveCount(0)
 
   await page.goto('/#crew/calls')
-  await expect(page.getByRole('heading', { name: /^Answers to check/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Calls' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Answers to check/ })).toHaveCount(0)
   for (const name of [/^Noted/, /^Confirm$/, /^Release$/, /^Offer…$/, /^Checked:/, /^Not right:/, /^Ask for crew$/]) await expect(main.getByRole('button', { name })).toHaveCount(0)
   // Reporting a fault is still theirs.
   await page.goto('/#stock')
