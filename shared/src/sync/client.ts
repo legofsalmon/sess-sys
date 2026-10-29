@@ -19,7 +19,7 @@ import { notesKitView, type NotesKitView } from './notes-kit-view.ts'
 import { lateView, type LateView } from './late-view.ts'
 import { leaveView, type LeaveView } from './leave-view.ts'
 import { officeView, type OfficeView } from './office-view.ts'
-import { movesView, type MovesView } from './pick-view.ts'
+import { moveTallies, movesView, type MoveTallies, type MovesView } from './pick-view.ts'
 import { warehouseView, type WarehouseView } from './stock-view.ts'
 import { timesheetsView, type TimesheetsView } from './timesheets-view.ts'
 import { moneyView, type MoneyView } from './money-view.ts'
@@ -252,6 +252,8 @@ const LAZY = [
 ] as const satisfies readonly (keyof View)[]
 type Lazy = (typeof LAZY)[number]
 type MovesKit = { moves: MovesView; kit: KitView }
+/** Parts kept like the view's own, that screens don't read: what each builds. */
+type Inner = { movesKit: MovesKit; moveTallies: MoveTallies }
 
 /** The same view for another state of the connection, its parts still built only when read. */
 function withConnection(view: Omit<View, 'connection'>, connection: Connection): View {
@@ -321,6 +323,8 @@ export class SyncClient {
   private derived = new Derived()
   /** Each product's kit days, kept between builds of the kit (kit-view.ts). */
   private kitMemo: KitMemo = new Map()
+  /** The tables the server's changes have landed in since `takePulled` was last asked. */
+  private pulledInto = new Set<string>()
   /** The tables changed since the copy was last saved, so a save writes only those; all of them after anything else. */
   private dirty: Set<string> | 'all' = new Set()
   private readonly storage: Storage
@@ -403,6 +407,16 @@ export class SyncClient {
    * the server checks the same, so this only saves a change it would turn down.
    */
   guard?: (name: CommandName, args: unknown) => string | undefined
+
+  /**
+   * The tables the server's changes have landed in since this was last asked, and from now on none: what a pull brought,
+   * for whatever needs to look again only when something of a kind it cares about arrived (notices, in the web app).
+   */
+  takePulled(): ReadonlySet<string> {
+    const pulled = this.pulledInto
+    this.pulledInto = new Set()
+    return pulled
+  }
 
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
@@ -532,14 +546,14 @@ export class SyncClient {
     const kitMemo = this.kitMemo
     const lazy = {} as { [K in Lazy]: () => View[K] }
     /** Built once for this version of the copy, from the parts kept unless what they read has changed. */
-    const part = <K extends Lazy | 'movesKit'>(key: K, deps: () => readonly unknown[], make: (e: typeof entities, o: readonly PendingMutation[]) => K extends Lazy ? View[K] : MovesKit) => {
+    const part = <K extends Lazy | keyof Inner>(key: K, deps: () => readonly unknown[], make: (e: typeof entities, o: readonly PendingMutation[]) => K extends Lazy ? View[K] : K extends keyof Inner ? Inner[K] : never) => {
       let got: { value: unknown } | undefined
       return () => {
         if (!got) {
           const ds = deps()
           got = { value: derived.part(key, { entities, waiting, today, deps: ds }, make as (e: typeof entities, o: readonly Mutation[]) => unknown) }
         }
-        return got.value as K extends Lazy ? View[K] : MovesKit
+        return got.value as K extends Lazy ? View[K] : K extends keyof Inner ? Inner[K] : never
       }
     }
     // Someone erased on this device is shown erased at once, everywhere the crew reaches (ADR 0027).
@@ -552,12 +566,15 @@ export class SyncClient {
       const inspections = lazy.inspections()
       return faultsView(e, o, cursor, lazy.jobs(), lazy.warehouse(), (id) => !!inspections.blocks(id))
     })
+    // Where the scans leave the kit, which reads no job: kept through a change to one (audit, 20 October 2026, finding 12).
+    // The faults are built again with every job, so it goes by what it reads of them, the reports of kit missing from a job.
+    const tallies = part('moveTallies', () => [lazy.warehouse(), missingFrom(lazy.faults())], (e, o) => moveTallies(e, o, cursor, lazy.warehouse(), lazy.faults()))
     // Kit still out after its job comes off what's free (ADR 0031), and the pick lists need the kit: so the moves first,
     // reading the kit only when a pick list is. Kept together, as each reads the other.
-    const movesKit = part('movesKit', () => [lazy.jobs(), lazy.warehouse(), lazy.faults()], (e, o) => {
+    const movesKit = part('movesKit', () => [lazy.jobs(), lazy.warehouse(), lazy.faults(), tallies()], (e, o) => {
       const [jobs, warehouse, faults] = [lazy.jobs(), lazy.warehouse(), lazy.faults()]
       let kit: KitView | undefined
-      const moves = movesView(e, o, cursor, jobs, warehouse, () => kit!, today, faults)
+      const moves = movesView(e, o, cursor, jobs, warehouse, () => kit!, today, faults, tallies())
       kit = kitView(e, o, cursor, jobs, warehouse, today, faults, moves.lateOut, kitMemo)
       return { moves, kit }
     })
@@ -758,6 +775,7 @@ export class SyncClient {
         }
         applyChange(this.state, change)
         this.touched(change.entity)
+        this.pulledInto.add(change.entity)
       }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
       // Reading only the latest of each record, there's more to come; read to the end, or from a server that sent every change, it's done.
@@ -882,6 +900,14 @@ export class SyncClient {
     this.told = view
     for (const fn of this.listeners) fn(view)
   }
+}
+
+/** What the moves read of the faults (pick-view.ts), as one string: the same reports give the same string. */
+function missingFrom(faults: FaultsView): string {
+  return faults.all
+    .filter((f) => f.kind === 'missing' && f.projectId)
+    .map((f) => [f.id, f.projectId, f.assetId, f.modelId, f.qty, f.at, f.pending, f.outcome].join('|'))
+    .join('\n')
 }
 
 /**
