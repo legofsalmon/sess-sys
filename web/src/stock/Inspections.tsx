@@ -21,7 +21,7 @@ import { useToday } from '../view.ts'
 import { dateLabel, mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { StockViews } from '../Views.tsx'
-import { Fold } from '../Fold.tsx'
+import { Fold, ShowAll } from '../Fold.tsx'
 import { Split } from '../Split.tsx'
 import { Heading } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
@@ -258,8 +258,11 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
   )
 }
 
-/** The Stock tab's list of what's failed, overdue or due in the next 30 days, and what's not recorded yet. */
-export function InspectionsDue({ view }: { view: View }) {
+/**
+ * The Stock tab's list of what's failed, overdue or due in the next 30 days, and what's not recorded yet: ten of each until
+ * Show all, anything just tested here kept in view (audit, 20 October 2026, finding 96).
+ */
+export function InspectionsDue({ view, recent }: { view: View; recent?: ReadonlySet<string> }) {
   // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
   const [department, widen] = useNarrowed('#stock/testing')
   const attention = view.inspections.attention.filter((d) => inKitOf(department)(d.asset.model))
@@ -268,6 +271,7 @@ export function InspectionsDue({ view }: { view: View }) {
   if (!needed && view.inspections.certificatesDue.length === 0) return null
   const stopped = attention.filter((d) => d.state !== 'soon')
   const soon = attention.filter((d) => d.state === 'soon')
+  const keep = (d: Due) => !!recent?.has(d.asset.id)
   const row = (d: Due) => (
     <li key={`${d.asset.id}-${d.kind}`}>
       <a className="job-row" href={`#stock/item/${d.asset.id}`}>
@@ -294,14 +298,18 @@ export function InspectionsDue({ view }: { view: View }) {
       {stopped.length === 0 && soon.length === 0 && certsDue.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
       {stopped.length > 0 && (
         <>
-          <h3>Can't go out</h3>
-          <ul className="job-list">{stopped.map(row)}</ul>
+          <h3>Can't go out ({stopped.length.toLocaleString('en-IE')})</h3>
+          <ShowAll items={stopped} limit={10} what="items" keep={keep}>
+            {(shown) => <ul className="job-list">{shown.map(row)}</ul>}
+          </ShowAll>
         </>
       )}
       {soon.length > 0 && (
         <>
-          <h3>Due in the next 30 days</h3>
-          <ul className="job-list">{soon.map(row)}</ul>
+          <h3>Due in the next 30 days ({soon.length.toLocaleString('en-IE')})</h3>
+          <ShowAll items={soon} limit={10} what="items" keep={keep}>
+            {(shown) => <ul className="job-list">{shown.map(row)}</ul>}
+          </ShowAll>
         </>
       )}
       {certsDue.length > 0 && (
@@ -625,7 +633,7 @@ export function TestingScreen({ view }: { view: View }) {
             {mayTest && <RoundCertificate view={view} done={done} kind={kind} day={day} />}
           </section>
         )}
-        <InspectionsDue view={view} />
+        <InspectionsDue view={view} recent={new Set(done.map((d) => d.a.id))} />
       </Split>
     </div>
   )

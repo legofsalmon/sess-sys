@@ -1,10 +1,13 @@
 import {
+  DEPARTMENT_LABELS,
+  DEPARTMENTS,
   MAX_QTY,
   newId,
   OUTCOME_LABELS,
   OUTCOMES_FOR,
   type AssetView,
   type CommandInput,
+  type Department,
   type FaultKind,
   type FaultOutcome,
   type FaultView,
@@ -21,6 +24,7 @@ import { client } from '../sync.ts'
 import { numberLabel } from './common.tsx'
 import { Heading } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
+import { useUnderTop } from '../useUnderTop.ts'
 
 /**
  * Faults and missing kit (ADR 0018): reporting damage or kit that's
@@ -199,6 +203,9 @@ const CLOSE_LABELS: Record<FaultOutcome, string> = { fixed: 'Mark fixed', 'not-f
 
 function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   const [editing, setEditing] = useState(false)
+  // On the repair list, one quiet Sort it out a fault, opening the ways to close it, where four buttons each made 25 faults
+  // 95 buttons long (audit, 20 October 2026, finding 93); on the item's own page they're all there.
+  const [sorting, setSorting] = useState(!linked)
   // Closing a fault can't be undone (there's no reopening one), so each way of closing it asks first, in place.
   const [closing, setClosing] = useState<FaultOutcome>()
   const { run, error } = useAct()
@@ -257,7 +264,12 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
       ) : closing ? (
         <Confirm question={asks[closing].question} yes={asks[closing].yes} onYes={() => closeAs(closing)} onNo={() => setClosing(undefined)} />
       ) : (
-        f.open && (
+        f.open &&
+        (!sorting ? (
+          <button type="button" className="link sort-out" onClick={() => setSorting(true)}>
+            Sort it out
+          </button>
+        ) : (
           <div className="actions">
             {OUTCOMES_FOR[f.kind].map((o) => (
               <button key={o} type="button" onClick={() => setClosing(o)}>
@@ -268,7 +280,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
               Change details
             </button>
           </div>
-        )
+        ))
       )}
       <Refusal error={error} />
     </li>
@@ -320,38 +332,58 @@ function EditFault({ f, onDone }: { f: FaultView; onDone: () => void }) {
   )
 }
 
-/** The Stock tab's repair list: every open fault, oldest first. */
+/**
+ * The Stock tab's repair list: every open fault, by kind, what can't go out first and then oldest first, under a heading
+ * that stays in view, and narrowed to a department as the catalogue is (audit, 20 October 2026, finding 93): before a
+ * load-out it's what can't go out that's wanted.
+ */
 export function RepairList({ view }: { view: View }) {
   // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
-  const [department, widen] = useNarrowed('#stock/repairs')
-  const open = view.faults.open.filter((f) => inKitOf(department)(f.model))
-  if (open.length === 0) return null
-  const missing = open.filter((f) => f.kind === 'missing')
-  const damaged = open.filter((f) => f.kind === 'damaged')
-  const list = (faults: FaultView[]) => (
-    <ul className="fault-list">
-      {faults.map((f) => (
-        <FaultItem key={f.id} f={f} linked />
-      ))}
-    </ul>
-  )
+  const [narrowed, widen] = useNarrowed('#stock/repairs')
+  const [department, setDepartment] = useState<Department | 'all'>('all')
+  const card = useUnderTop<HTMLElement>(true)
+  const inNarrowed = view.faults.open.filter((f) => inKitOf(narrowed)(f.model))
+  if (inNarrowed.length === 0) return null
+  const departmentOf = (f: FaultView): Department => f.model?.department ?? 'other'
+  const present = DEPARTMENTS.filter((d) => inNarrowed.some((f) => departmentOf(f) === d))
+  const chosen = department !== 'all' && present.includes(department) ? department : 'all'
+  const open = chosen === 'all' ? inNarrowed : inNarrowed.filter((f) => departmentOf(f) === chosen)
+  const groups: [string, FaultView[]][] = [
+    ["Damaged, can't go out", open.filter((f) => f.kind === 'damaged' && f.stops)],
+    ['Damaged, fit to go out', open.filter((f) => f.kind === 'damaged' && !f.stops)],
+    ['Missing', open.filter((f) => f.kind === 'missing')],
+  ]
   return (
-    <section className="card faults" aria-label="Faults and repairs">
+    <section className="card faults repairs" aria-label="Faults and repairs" ref={card}>
       <Heading icon="repair">Faults and repairs</Heading>
-      <Narrowed department={department} onWiden={widen} />
+      <Narrowed department={narrowed} onWiden={widen} />
       <p className="hint">Kit that can't go out is taken off what's free for jobs until it's fixed or found.</p>
-      {damaged.length > 0 && (
-        <>
-          <h3>Damaged</h3>
-          {list(damaged)}
-        </>
+      {!narrowed && present.length > 1 && (
+        <div className="filters" role="group" aria-label="Department">
+          <button type="button" aria-pressed={chosen === 'all'} onClick={() => setDepartment('all')}>
+            All ({inNarrowed.length.toLocaleString('en-IE')})
+          </button>
+          {present.map((d) => (
+            <button key={d} type="button" aria-pressed={chosen === d} onClick={() => setDepartment(d)}>
+              {DEPARTMENT_LABELS[d]} ({inNarrowed.filter((f) => departmentOf(f) === d).length.toLocaleString('en-IE')})
+            </button>
+          ))}
+        </div>
       )}
-      {missing.length > 0 && (
-        <>
-          <h3>Missing</h3>
-          {list(missing)}
-        </>
-      )}
+      {groups
+        .filter(([, faults]) => faults.length > 0)
+        .map(([title, faults]) => (
+          <div className="repair-group" key={title}>
+            <h3>
+              {title} ({faults.length.toLocaleString('en-IE')})
+            </h3>
+            <ul className="fault-list">
+              {faults.map((f) => (
+                <FaultItem key={f.id} f={f} linked />
+              ))}
+            </ul>
+          </div>
+        ))}
     </section>
   )
 }

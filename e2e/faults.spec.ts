@@ -212,6 +212,13 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await expect(repairs.getByRole('listitem', { name: `2 × ${cable}` })).toContainText('Cut near the plug')
   await expect(repairs.getByRole('listitem', { name: `3 × ${cable}` })).toContainText(`Missing · From ${job}`)
   await expect(repairs.getByRole('listitem', { name: `${speakers[1]} ${speaker}` })).toHaveCount(0)
+  // What can't go out first, each kind under its own heading, and one quiet way into sorting each out (audit, 20 October 2026, finding 93).
+  await expect(repairs.locator('.repair-group h3').first()).toHaveText(/^Damaged, can't go out \(\d+\)$/)
+  await expect(repairs.locator('.repair-group h3').last()).toHaveText(/^Missing \(\d+\)$/)
+  const blown = repairs.getByRole('listitem', { name: `${speakers[0]} ${speaker}` })
+  await expect(blown.getByRole('button', { name: 'Mark fixed' })).toHaveCount(0)
+  await blown.getByRole('button', { name: 'Sort it out' }).click()
+  await expect(blown.getByRole('button', { name: 'Mark fixed' })).toBeVisible()
 
   // Fixed on the bench.
   await repairs.getByRole('link', { name: `${speakers[0]} ${speaker}` }).click()

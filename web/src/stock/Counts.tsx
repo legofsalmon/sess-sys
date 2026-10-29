@@ -433,7 +433,7 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
             {said.text}
           </p>
         )}
-        {toFind.length > 0 && <Numbers title={`Still to find (${toFind.length})`} items={toFind} view={view} />}
+        {toFind.length > 0 && <Numbers title={`Still to find (${toFind.length.toLocaleString('en-IE')})`} items={toFind} view={view} each="to find" />}
         {extra.length + d.unknown.length > 0 && (
           <div className="group">
             <h3>Not as recorded ({extra.length + d.unknown.length})</h3>
@@ -453,8 +453,8 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
         )}
         {found.length > 0 && (
           <details>
-            <summary>Found ({found.length})</summary>
-            <Numbers items={found} view={view} />
+            <summary>Found ({found.length.toLocaleString('en-IE')})</summary>
+            <Numbers items={found} view={view} each="found" />
           </details>
         )}
         {awayWords.length > 0 && <p className="hint">Not expected on the shelf: {awayWords.join(', ')}.</p>}
@@ -462,8 +462,17 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
 
       <CountedKit view={view} d={d} products={products} onChange={(counted) => update({ counted })} onAdd={(id) => update({ added: [...latest().added, id] })} />
 
+      {/* Finish in reach while scrolling through what's still to find, in the bar kit from the notes uses (ADR 0067; audit,
+          20 October 2026, finding 43): a full bay's 1,080 numbers put it forty screens down. */}
+      {!discarding && (
+        <div className="finish-bar">
+          <Refusal error={error} />
+          <button type="button" className="primary big" onClick={finish} disabled={!known}>
+            Finish the count
+          </button>
+        </div>
+      )}
       <section className="card finish">
-        <Refusal error={error} />
         {discarding ? (
           <Confirm
             question={`Discard the count of ${name}? What was scanned and typed goes, and nothing is recorded.`}
@@ -477,9 +486,6 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
           />
         ) : (
           <>
-            <button type="button" className="primary big" onClick={finish} disabled={!known}>
-              Finish the count
-            </button>
             <p className="hint">Finishing compares it with the record and keeps it. What's different is put right afterwards, one tap each.</p>
             <button type="button" className="link" onClick={() => setDiscarding(true)}>
               Discard this count
@@ -509,8 +515,11 @@ function Who({ view, d, signedIn, me, onPick }: { view: View; d: CountDraft; sig
   )
 }
 
-/** Items by product, each number a link to its page, as on a place's page. */
-function Numbers({ title, items, view }: { title?: string; items: readonly CountItem[]; view: View }) {
+/**
+ * Items by product, each number a link to its page, as on a place's page: how many in each product's name, and its first
+ * twenty numbers until Show all, as the catalogue does (audit, 20 October 2026, finding 43).
+ */
+function Numbers({ title, items, view, each }: { title?: string; items: readonly CountItem[]; view: View; each: string }) {
   const w = view.warehouse
   const groups = new Map<string, AssetView[]>()
   for (const i of items) {
@@ -522,14 +531,23 @@ function Numbers({ title, items, view }: { title?: string; items: readonly Count
       {title && <h3>{title}</h3>}
       {[...groups.values()].map((list) => (
         <div key={list[0]!.modelId}>
-          <p className="group-name">{list[0]!.model?.name ?? 'A product since removed'}</p>
-          <ul className="numbers">
-            {list.map((a) => (
-              <li key={a.id}>
-                <a href={`#stock/item/${a.id}`}>{numberLabel(a)}</a>
-              </li>
-            ))}
-          </ul>
+          <p className="group-name">
+            {list[0]!.model?.name ?? 'A product since removed'}{' '}
+            <small>
+              · {list.length.toLocaleString('en-IE')} {each}
+            </small>
+          </p>
+          <ShowAll items={list} limit={20} what="numbers">
+            {(shown) => (
+              <ul className="numbers">
+                {shown.map((a) => (
+                  <li key={a.id}>
+                    <a href={`#stock/item/${a.id}`}>{numberLabel(a)}</a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ShowAll>
         </div>
       ))}
     </div>
@@ -948,8 +966,8 @@ function Rest({ view, c }: { view: View; c: CountView }) {
     <section className="card">
       {found.length > 0 && (
         <details>
-          <summary>Found ({found.length})</summary>
-          <Numbers items={found} view={view} />
+          <summary>Found ({found.length.toLocaleString('en-IE')})</summary>
+          <Numbers items={found} view={view} each="found" />
         </details>
       )}
       {away.length > 0 && (
