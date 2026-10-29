@@ -3,6 +3,21 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: opening on the screen's shape, and less to fetch
+
+**Done**
+
+- Findings 11, 12 (in part), 14 and 65 of the [20 October
+  audit](audit-2026-10-20.md) (PR #159): the app opens on the tab bar and a
+  skeleton of the screen, then says it is reading the phone's copy;
+  notifications are looked for once the copy is read and then only after
+  news; the map and the 3D rack drawing are fetched the first time they are
+  shown; where the scans leave the kit is kept through a change to a job.
+  Finding 64 did not reproduce on current main. ADRs 0016, 0057 and 0076
+  note it. App 1.53.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 60
+  browser tests.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**

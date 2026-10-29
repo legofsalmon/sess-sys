@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.53.0',
+    date: '2026-10-29',
+    title: 'The app opens on the shape of the screen, and phones fetch less',
+    what: "While the app opens it now shows the tabs and the shape of the screen, then says it's reading this phone's copy, instead of a blank 'Loading…'. Phones ask the server for notifications far less often, and no longer download the map or the 3D rack drawing until someone first opens one.",
+    prs: [159],
+  },
+  {
     version: '1.52.0',
     date: '2026-10-29',
     title: "Staff crew see their own work first, and nobody else's private details",
