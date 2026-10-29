@@ -25,10 +25,11 @@ import {
   type TapeColour,
   type View,
 } from '@sh/shared'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Heading } from '../Icon.tsx'
+import { lazyPart } from '../lazyPart.tsx'
 import { Page } from '../jobs/common.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
@@ -83,8 +84,8 @@ export function RackDesigner({ view, id, bare }: { view: View; id: string; bare?
   )
 }
 
-// The 3D drawing (ADR 0076) and three.js come down only when it's shown.
-const Rack3D = lazy(() => import('./Rack3D.tsx'))
+// The 3D drawing (ADR 0076) and three.js come down only when it's first shown, and are kept from then (lazyPart.tsx).
+const Rack3D = lazyPart(() => import('./Rack3D.tsx'))
 
 type Drawn = 'flat' | '3d' | 'side'
 const VIEWS: [Drawn, string][] = [
@@ -342,9 +343,17 @@ function Designer({ view, r }: { view: View; r: RackView }) {
             </div>
           )}
           {drawn === '3d' && (
-            <Suspense fallback={<p className="hint">Drawing it in 3D…</p>}>
-              <Rack3D r={r} held={held} heldModel={heldModel} mayChange={mayChange} bad={bad} onHold={setHeld} onPlace={place} />
-            </Suspense>
+            <Rack3D
+              r={r}
+              held={held}
+              heldModel={heldModel}
+              mayChange={mayChange}
+              bad={bad}
+              onHold={setHeld}
+              onPlace={place}
+              waiting={<p className="hint">Drawing it in 3D…</p>}
+              missing={<p className="hint">The 3D drawing comes with signal: it hasn't been opened on this phone before. Front and back, and From the side, work without.</p>}
+            />
           )}
           {drawn === 'side' && <SideCut r={r} bad={bad} />}
           <Groups r={r} />

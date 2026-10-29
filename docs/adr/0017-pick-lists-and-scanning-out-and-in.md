@@ -96,6 +96,13 @@ filling up, so some of a job's kit will be counted, not labelled.
   recent ones.
 - Printing a pick list on paper comes later, with document templates.
 
+Later (29 October 2026): an item retired while it is out (lost on site,
+say) is no longer out with its job, nor back: the job leaves the
+still-out list, as the server's own reading of what is out already kept
+to active items. Retiring it stays allowed while it's out, since
+refusing would block the honest "lost on site" (audit, 20 October 2026,
+finding 44).
+
 Later (29 October 2026): since an item's state is read from its case chain,
 nothing goes into a case that's out with a job (a move, or an item added
 into it) until the case is scanned back: it would be out with that job

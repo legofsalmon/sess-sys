@@ -644,18 +644,20 @@ const isWhole = (typed: string) => typed.trim() !== '' && Number.isInteger(Numbe
 function Allowances({ view, me, year }: { view: View; me: PersonView; year: number }) {
   // Only this year's and next year's can be set, so another year's are shown as they stand.
   const fixed = noAllowanceReason(year, useToday())
+  // Your own is for another approver to set, as a request is; with nobody else, you set it and it's marked (audit, 20 October 2026, finding 84).
+  const another = view.leave.staff.some((p) => p.id !== me.id && canApproveLeave(p))
   return (
     <section className="card" aria-label={`Allowances, ${year}`}>
       <h2>Allowances, {year}</h2>
       <p className="hint">{fixed ?? `Days of annual leave for the year, and any carried over from the year before. ${days(DEFAULT_ALLOWANCE_DAYS)} until one is set.`}</p>
       {view.leave.staff.map((p) => (
-        <AllowanceRow key={p.id} person={p} year={year} view={view} me={me} fixed={fixed !== null} />
+        <AllowanceRow key={p.id} person={p} year={year} view={view} me={me} fixed={fixed !== null || (another && p.id === me.id)} byAnother={fixed === null && another && p.id === me.id} />
       ))}
     </section>
   )
 }
 
-function AllowanceRow({ person, year, view, me, fixed }: { person: PersonView; year: number; view: View; me: PersonView; fixed: boolean }) {
+function AllowanceRow({ person, year, view, me, fixed, byAnother }: { person: PersonView; year: number; view: View; me: PersonView; fixed: boolean; byAnother: boolean }) {
   const set = view.leave.allowance(person.id, year)
   const b = view.leave.balance(person.id, year)
   const [f, setF] = useState({ days: String(b.allowance), carried: String(b.carriedOver) })
@@ -680,6 +682,8 @@ function AllowanceRow({ person, year, view, me, fixed }: { person: PersonView; y
         <b>{person.name}</b>
         <p>
           {days(b.annual.taken + b.annual.booked)} approved, {days(b.annual.left)} left
+          {set?.selfSet && ' · set by themselves'}
+          {byAnother && ' · another approver sets yours'}
           {set?.pending && ' · waiting to sync'}
         </p>
       </div>

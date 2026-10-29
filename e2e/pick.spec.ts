@@ -179,6 +179,9 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await expect(speakersAt).toContainText(`${bay}: ${speakers.length} here`)
   await speakersAt.getByText(`The ${speakers.length} numbers`).click()
   await expect(speakersAt.locator('details p')).toHaveText(speakers.join(', '))
+  // Each number whole on its line, never broken at its hyphen (audit, 20 October 2026, finding 41).
+  await expect(speakersAt.locator('details p .number')).toHaveCount(speakers.length)
+  await expect(speakersAt.locator('details p .number').first()).toHaveCSS('white-space', 'nowrap')
   await expect(cableRow.getByRole('list', { name: 'Where to find them' })).toHaveText('Warehouse: 40 here')
 
   // The first speaker, with the camera; held still, it's read once.
@@ -245,6 +248,13 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await page.getByRole('button', { name: 'Coming back' }).click()
   // The mic that wasn't going counts as back.
   await expect(page.locator('.pick-total')).toHaveText('1 back, 14 still out')
+  // Back and Missing each a 44 px target, apart, so a gloved tap for one doesn't land on the other (audit, 20 October 2026, finding 40).
+  const outItem = speakerRow.getByRole('list', { name: 'Still out' }).getByRole('listitem').first()
+  const back = (await outItem.getByRole('button', { name: 'Back' }).boundingBox())!
+  const missing = (await outItem.getByRole('button', { name: 'Missing' }).boundingBox())!
+  expect(back.width).toBeGreaterThanOrEqual(44)
+  expect(missing.width).toBeGreaterThanOrEqual(44)
+  expect(missing.x - (back.x + back.width)).toBeGreaterThanOrEqual(12)
   await page.getByRole('button', { name: 'Scan' }).click()
   await hold(page, speakers[0]!)
   await expect(said).toHaveText(`${speakers[0]} ${speaker} back: 1 of 2 back.`)
@@ -253,6 +263,10 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await page.getByLabel('Number or serial').fill(speakers[2]!)
   await page.getByLabel('Number or serial').press('Enter')
   await expect(said).toHaveText(`${speakers[2]} ${speaker} isn't out, so there's nothing to bring back.`)
+  // A number slipped on the keypad isn't taken for a new label (audit, 20 October 2026, finding 94).
+  await page.getByLabel('Number or serial').fill('SH-999999')
+  await page.getByLabel('Number or serial').press('Enter')
+  await expect(said).toHaveText('Nothing has the number SH-999999. Check the label.')
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('10')
   await countBack.getByRole('button', { name: 'Count back', exact: true }).click()

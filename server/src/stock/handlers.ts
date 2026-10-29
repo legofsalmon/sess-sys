@@ -262,6 +262,16 @@ export async function retireItem(ctx: Ctx, id: string, reason: RetiredReason, no
   await emitAsset(ctx, id)
 }
 
+/**
+ * A product's price (ADR 0042) goes before the product does, and every device is told: it held the product back from
+ * being removed with a bare foreign-key error, and was left behind by one marked a mistake (audit, 20 October 2026,
+ * finding 46). Nothing quoted refers to it: a quote keeps its lines whole.
+ */
+async function dropPrice(ctx: Ctx, modelId: string) {
+  const { rows } = await ctx.tx.query('DELETE FROM product_prices WHERE model_id = $1 RETURNING 1', [modelId])
+  if (rows.length) await emitRemoved(ctx, 'productPrice', modelId)
+}
+
 export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
   async 'model.create'(ctx, a) {
     if (await getModel(ctx.tx, a.id)) throw new Refused({ code: 'conflict', message: 'This product already exists.' })
@@ -384,6 +394,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     // Its photo (ADR 0083) goes on the list of files to delete with it.
     const { rows: photo } = await ctx.tx.query<{ photo_key: string | null }>('SELECT photo_key FROM models WHERE id = $1', [a.id])
     if (photo[0]?.photo_key) await queueFile(ctx.tx, photo[0].photo_key, true)
+    await dropPrice(ctx, a.id)
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },
@@ -406,6 +417,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     for (const c of counts) await adjust(ctx, a.id, { placeId: c.place_id, caseId: c.case_id }, { to: 0 })
     // A rack's layout goes with it: it was never a rack.
     await clearLayout(ctx, a.id)
+    // Never stock, so never priced.
+    await dropPrice(ctx, a.id)
     await ctx.tx.query('UPDATE models SET mistake = true WHERE id = $1', [a.id])
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },

@@ -98,6 +98,12 @@ const MIGRATIONS: string[] = [
   ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS fuel_month text;
   ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS crew_per_car integer CHECK (crew_per_car BETWEEN 1 AND 8);
   `,
+  // A product's price goes with the product (audit, 20 October 2026, finding 46). Removing one deletes its price and tells
+  // the devices first; this keeps a price from ever holding a removal back.
+  `
+  ALTER TABLE product_prices DROP CONSTRAINT IF EXISTS product_prices_model_id_fkey;
+  ALTER TABLE product_prices ADD CONSTRAINT product_prices_model_id_fkey FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE;
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

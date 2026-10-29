@@ -120,3 +120,10 @@ server needs no key at all.
 - A drill every few months is still worth doing: restore the latest backup
   into a new Neon branch or a local database with the `backup` command, and
   open the app on it.
+- Later (29 October 2026, audit of 20 October, findings 19 and 54): a
+  backup reads each table's keys and size once for them all and small
+  tables in one go, a few dozen trips rather than over three hundred. A
+  server shutting down (a deploy) waits up to 25 s for a backup under way,
+  inside the 30 s `drainingSeconds` in `railway.json`; one that doesn't
+  finish is marked "stopped partway by a restart", which doesn't hold up
+  "Back up now", and the next server makes it up a minute after it starts.

@@ -1,5 +1,6 @@
-import type { NoticesPage, Person } from '@sh/shared'
+import { NOTICE_ENTITIES, type NoticesPage, type Person } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
+import { readNotices } from '../src/notices.ts'
 import { IPHONE, onLink, server, staff, WINDOWS } from './people.ts'
 
 /**
@@ -101,5 +102,11 @@ describe('notifications', () => {
     await aoife.send('offer.respond', { id: 'o1', answer: 'decline', note: '' } as never)
     await colly.send('offer.seen', { id: 'o1' })
     expect((await notices(aoife)).notices.map((n) => n.command)).not.toContain('offer.seen')
+  })
+
+  it('reads changes to the tables the phone is told to look again for, and to no others', () => {
+    // Proves: the list of tables a notification can be about, which a phone uses to skip looking after a pull that brought none of them (audit, 20 October 2026, finding 14), is the one the server's query reads: a table added there and not here would be news the phone never looked for.
+    const read = new Set([...readNotices.toString().matchAll(/SELECT '(\w+)'/g)].map((m) => m[1]))
+    expect(read).toEqual(new Set(NOTICE_ENTITIES))
   })
 })
