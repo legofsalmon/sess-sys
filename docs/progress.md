@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: edits checked against what each device saw
+
+**Done**
+
+- Findings 15, 16, 20, 21, 22, 66, 67 and 88 of the [20 October
+  audit](audit-2026-10-20.md) (PR #158, Colly asked for all remaining
+  items): the rest of the edits that save typed text are checked against
+  what the device saw, pushes take fewer database trips and stop when the
+  phone has gone, refused changes skip the write lock, a bad pull cursor
+  gets a plain answer, and database faults are logged without their rows.
+  ADR 0049 notes what still applies in arrival order. App 1.52.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and 13
+  browser spec files.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**

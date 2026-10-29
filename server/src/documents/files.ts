@@ -1,7 +1,7 @@
 import { irishToday, newId, type DocumentStorage } from '@sh/shared'
 import { decryptBackup, encryptBackup, isEncrypted } from '../backup/crypto.ts'
 import type { BackupStore } from '../backup/store.ts'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { queueFile } from './store.ts'
 
 /**
@@ -71,7 +71,7 @@ export class DocumentFiles {
     try {
       await store.put(key, this.options.key ? encryptBackup(data, this.options.key) : data)
     } catch (err) {
-      this.options.log?.warn({ err }, 'Could not put a document file in the storage')
+      this.options.log?.warn({ err: faultForLog(err) }, 'Could not put a document file in the storage')
       throw new NotKept("The file couldn't be kept in the storage just now, so nothing was saved. Try again in a minute.")
     }
     return key
@@ -123,7 +123,7 @@ export class DocumentFiles {
         } while (this.again)
       } catch (err) {
         // The database or the storage away: the list keeps every file, for the next change or tomorrow.
-        this.options.log?.warn({ err }, 'Could not work through the list of document files to delete; trying again after the next change and tomorrow')
+        this.options.log?.warn({ err: faultForLog(err) }, 'Could not work through the list of document files to delete; trying again after the next change and tomorrow')
         this.options.report?.(err)
       } finally {
         this.tidying = undefined
@@ -198,7 +198,7 @@ export class DocumentFiles {
     try {
       await this.strays()
     } catch (err) {
-      this.options.log?.warn({ err }, 'Could not count the files under documents/ in the storage')
+      this.options.log?.warn({ err: faultForLog(err) }, 'Could not count the files under documents/ in the storage')
     }
   }
 

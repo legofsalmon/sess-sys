@@ -60,7 +60,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
       }
       return db.query(sql, params)
     },
-    transaction: (fn) => (queries.count++, db.transaction(fn)),
+    transaction: (fn, o) => (queries.count++, db.transaction(fn, o)),
   }
   const app = await buildApp({
     db: counted,

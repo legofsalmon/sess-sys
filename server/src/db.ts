@@ -31,9 +31,22 @@ export interface Db extends Queryable {
    * write lock (audit finding 7); on PGlite the same database.
    */
   reads: Queryable
-  transaction<T>(fn: (tx: Queryable) => Promise<T>): Promise<T>
+  /**
+   * With `writeLockMs`, the write lock (see `emit`) is taken as the transaction begins, waiting at most that long for it,
+   * in the same trip to the database as the BEGIN (audit, 20 October 2026, finding 15). Another change holding it longer
+   * (a bring-in, a restore) fails the wait with `isLockBusy`, and the caller answers "busy, try again" rather than holding
+   * a connection and the device waiting (audit finding 7).
+   */
+  transaction<T>(fn: (tx: Queryable) => Promise<T>, options?: TransactionOptions): Promise<T>
   close(): Promise<void>
 }
+
+export interface TransactionOptions {
+  writeLockMs?: number
+}
+
+/** The statements that take the write lock, waiting at most `ms`: the limit is for the rest of the transaction only. */
+export const writeLockSql = (ms: number) => `SET LOCAL lock_timeout = ${Math.max(1, Math.round(ms))}; SELECT pg_advisory_xact_lock(7331)`
 
 export async function pgliteDb(dataDir?: string): Promise<Db> {
   const lite = await PGlite.create(dataDir)
@@ -44,10 +57,11 @@ export async function pgliteDb(dataDir?: string): Promise<Db> {
     query,
     exec,
     reads: { query, exec },
-    transaction: (fn) =>
-      lite.transaction((tx) =>
-        fn({ query: (sql, params) => tx.query(sql, params) as never, exec: async (sql) => void (await tx.exec(sql)) })
-      ),
+    transaction: (fn, options) =>
+      lite.transaction(async (tx) => {
+        if (options?.writeLockMs !== undefined) await tx.exec(writeLockSql(options.writeLockMs))
+        return fn({ query: (sql, params) => tx.query(sql, params) as never, exec: async (sql) => void (await tx.exec(sql)) })
+      }),
     close: () => lite.close(),
   }
 }
@@ -103,7 +117,7 @@ export function postgresDb(connectionString: string, options: PostgresOptions | 
       query: (sql, params) => readPool.query(sql, params as unknown[]) as never,
       exec: async (sql) => void (await readPool.query(sql)),
     },
-    async transaction(fn) {
+    async transaction(fn, options) {
       const client = await pool.connect()
       // Out of the pool, a connection that fails raises the same event with
       // nobody listening, which would stop the process. The statement it cut
@@ -113,7 +127,7 @@ export function postgresDb(connectionString: string, options: PostgresOptions | 
       const failed = (err: Error) => void (lost = err)
       client.on('error', failed)
       try {
-        await client.query(begin)
+        await client.query(options?.writeLockMs === undefined ? begin : `${begin}; ${writeLockSql(options.writeLockMs)}`)
         const result = await fn({
           query: (sql, params) => client.query(sql, params as unknown[]) as never,
           exec: async (sql) => void (await client.query(sql)),
