@@ -718,6 +718,49 @@ describe('a new device reads the records as they are, not every change ever made
   })
 })
 
+describe('a copy read again while a change of its own is on its way back (audit, 20 October 2026, finding 22)', () => {
+  it('reads only the latest of each record, keeps its own change on screen throughout, and ends as reading every change would', async () => {
+    // Proves: a re-read noticed by the pull of the same round whose push applied the phone's change (here, the server
+    // reading the feed differently) asks for the latest only, rather than walking every change from the first; the change
+    // stays on the phone's screen at every page, and the copy ends holding exactly what a device that read every change does.
+    const app = await server(undefined, { pullLimit: 3 })
+    const office = await seed(app)
+    for (let i = 0; i < 6; i++) {
+      await office.client.mutate('stock.move', move(2, 'a3', 'van1'))
+      await office.client.mutate('stock.move', move(2, 'van1', 'a3'))
+    }
+    for (let i = 0; i < 5; i++) await office.client.mutate('place.upsert', { id: `shelf${i}`, name: `Shelf ${i}`, notes: '' })
+    await office.client.sync()
+    // A copy saved before FEED 2, read to where the office is.
+    const full = (await (office as { storage: MemoryStorage }).storage.load())!
+    const storage = new MemoryStorage()
+    await storage.save({ ...emptySnapshot('phone'), cursor: office.client.cursor, entities: structuredClone(full.entities) })
+    const link = new LatestLink(app)
+    const phone = await new SyncClient({ storage, transport: link }).open()
+    link.online = false
+    await phone.mutate('place.upsert', { id: 'van3', name: 'Van 3', notes: '' }).catch(() => {})
+    link.online = true
+    const shown: boolean[] = []
+    const pull = link.pull.bind(link)
+    link.pull = async (after, latest) => {
+      shown.push(phone.view().warehouse.places.some((p) => p.id === 'van3'))
+      return pull(after, latest)
+    }
+    await phone.sync()
+    // The first pull hears of the new reading; the read from the start after it asks for the latest only.
+    expect(link.asked[0]).toBeUndefined()
+    expect(link.asked[1]).toBe(0)
+    expect(link.asked.length).toBeGreaterThan(2)
+    expect(shown.every(Boolean)).toBe(true)
+    expect(phone.view().warehouse.places.some((p) => p.id === 'van3')).toBe(true)
+    expect(phone.view().pendingCount).toBe(0)
+    const replayed = await newDevice(app, false)
+    await replayed.client.sync()
+    expect((await held({ storage, client: phone })).entities).toEqual((await held(replayed)).entities)
+    expect(phone.cursor).toBe(replayed.client.cursor)
+  })
+})
+
 describe('a pull with a cursor the server never gave (audit, 20 October 2026, finding 67)', () => {
   it('is turned away in words as a bad request, not answered as a fault of the server', async () => {
     // Proves: a cursor past the database's biggest number, a decimal, a negative or a word is a 400 that says why, before the
