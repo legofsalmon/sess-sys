@@ -76,6 +76,9 @@ describe('a day price in any stock list', () => {
     const kept = previewStockList(rows({ dayPrice: '60' }), known(5000), opts)
     expect(kept.plan.prices).toEqual([])
     expect(kept.rows[0]!.does).toEqual(['Counts 2 at Warehouse'])
+    // The price kept is said beside the list's, so a change in the old system's rates isn't missed (audit, 20 October 2026, finding 106).
+    expect(kept.rows[0]!.asides).toEqual(["Day price €60 in the list; €50 here stays. Change it on the product's page."])
+    expect(previewStockList(rows({ dayPrice: '50' }), known(5000), opts).rows[0]!.asides).toEqual([])
     const two = previewStockList(rows({ dayPrice: '60' }, { dayPrice: '70', place: 'Yard' }), known(null), { make: true, defaultPlace: '' })
     expect(two.rows[1]!.problems.map((x) => x.text)).toEqual(['Row 2 gives Corvo K12 a day price of €60; this row says €70. Make them the same, or clear one.'])
     expect(previewStockList(rows({ dayPrice: 'lots' }), known(null), opts).rows[0]!.problems[0]).toMatchObject({ field: 'dayPrice' })

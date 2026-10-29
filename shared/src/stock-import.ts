@@ -1151,6 +1151,11 @@ export function previewStockList(
       if (prices) plan.prices.push({ row: first.input.row, model: { id: k.id }, dayCents: g.dayCents! })
       if (parts.length) plan.productChanges.push(change)
       if (prices) parts.push(`day price ${valueLabel(g.dayCents!)}`)
+      // A figure set here that the list differs from stays, and is said, so a change in the old system's rates isn't missed (audit, 20 October 2026, finding 106).
+      if (typeof k.dayCents === 'number' && g.dayCents !== null && g.dayCents !== k.dayCents)
+        first.asides.push(`Day price ${valueLabel(g.dayCents)} in the list; ${valueLabel(k.dayCents)} here stays. Change it on the product's page.`)
+      if (k.valueCents !== null && g.valueCents !== null && g.valueCents !== k.valueCents)
+        first.asides.push(`Value ${valueLabel(g.valueCents)} in the list; ${valueLabel(k.valueCents)} here stays. Change it on the product's page.`)
       if (parts.length) {
         const s = doing(first)
         s.does.push(`Updates ${k.name}: ${inWords(parts)}`)
