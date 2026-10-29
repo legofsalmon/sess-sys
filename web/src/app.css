@@ -96,6 +96,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 /* The whole of the company's name and the line under it is the target, 44px and more tall: the line itself is cut short by its … and too thin for a thumb. */
 .brand:has(.seen-as) { position: relative; }
 .brand .seen-as a::after { content: ''; position: absolute; inset: 0; }
+/* Whose eyes it is wraps rather than being cut to "Seeing it as Offic…" on a phone (audit, 20 October 2026, finding 60d). */
+.brand small.seen-as { white-space: normal; text-overflow: clip; }
 /* Dark or light, top right (ThemeButton.tsx): a picture, its words for a screen reader and a pointer's hover. */
 .theme-button { flex: none; display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
 .theme-button .icon { width: 22px; height: 22px; }

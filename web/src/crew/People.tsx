@@ -208,6 +208,7 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
   const [moreOpen] = useState(() => !!initial && (!!initial.department || !!initial.knownAs || initial.level !== DEFAULT_LEVEL || !!initial.company || Object.values(initial.certificates).some((c) => c && (c.held !== null || !!c.expires || !!c.note))))
   const listId = useId()
   const { run, error, refuse } = useAct()
+  const [badEmail, setBadEmail] = useState(false)
   const set = (k: Exclude<keyof typeof blank, 'approvesLeave' | 'certs' | 'skills' | 'skillsTyped'>) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   // Only freelancers trade through a company (ADR 0025); one a member of staff already has (from the crew list, say)
   // stays in view so it can be seen and cleared, never dropped without a word.
@@ -260,7 +261,27 @@ export function PersonForm({ initial, submitLabel, onSubmit, onDone }: { initial
         Mobile <input type="tel" value={f.phone} onChange={set('phone')} placeholder="+353 87…" />
       </label>
       <label>
-        Email <input type="email" value={f.email} onChange={set('email')} readOnly={!!whoFixed} />
+        Email{' '}
+        <input
+          type="email"
+          value={f.email}
+          onChange={(e) => {
+            if (badEmail) {
+              setBadEmail(false)
+              refuse('')
+            }
+            set('email')(e)
+          }}
+          readOnly={!!whoFixed}
+          aria-invalid={badEmail || undefined}
+          // Said in a line that stays, with the form's other refusals, not in the browser's bubble that goes as soon as it's read
+          // (audit, 20 October 2026, finding 60a).
+          onInvalid={(e) => {
+            e.preventDefault()
+            setBadEmail(true)
+            refuse("That email address doesn't look right: it needs an @ and the rest, as name@example.com.")
+          }}
+        />
       </label>
       <SkillsField
         className="wide"

@@ -142,7 +142,7 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
     { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock', part: 'Pick lists' },
     { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true, part: 'Still out after the job' },
     { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short' : 'kit lines short', href: '#stock', bad: short.some((l) => l.hold === 'held'), part: 'Kit short' },
-    { key: 'faults', count: faults.length, label: faults.length === 1 ? 'fault open' : 'faults open', href: '#stock/repairs', bad: faults.some((f) => f.stops) },
+    { key: 'faults', count: faults.length, label: faults.length === 1 ? 'repair open' : 'repairs open', href: '#stock/repairs', bad: faults.some((f) => f.stops) },
     { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock/testing', bad: true, part: 'Inspections due' },
     { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock/testing', part: 'Inspections due' },
     { key: 'vehicles', count: vehicleChecks.length, label: vehicleChecks.length === 1 ? 'vehicle check running out' : 'vehicle checks running out', href: '#stock/vehicles', bad: vehicleRanOut, part: 'Vehicle checks running out' },
