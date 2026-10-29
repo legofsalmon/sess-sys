@@ -208,6 +208,13 @@ const familyName = z.string().transform((s) => s.trim()).pipe(text(100, 'The las
 const PARTICLES = ['ó', 'ní', 'nic', 'mac', 'mc', 'ua', 'uí', 'mhic', 'o', 'de', 'van', 'von', 'der', 'den', 'da', 'di', 'du', 'le', 'la', 'del', 'della', 'st', 'st.']
 export const NAME_PARTICLES: readonly string[] = [...new Set(PARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
 const PARTICLE = new Set(NAME_PARTICLES)
+/**
+ * "an" and "na", which carry a last name on after a word that starts one: "Pádraig Mac an tSaoi", "Seosamh Mac na
+ * Mara". Only after one, so a first name is never cut short by them alone (audit, 20 October 2026, finding 85).
+ */
+const ARTICLES = ['an', 'na']
+export const NAME_ARTICLES: readonly string[] = [...new Set(ARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
+const ARTICLE = new Set(NAME_ARTICLES)
 
 export interface NameParts {
   firstName: string
@@ -216,7 +223,7 @@ export interface NameParts {
 
 /**
  * A whole name as a first and a last name: the last word is the last name,
- * with any words before it that start one ("Ó", "Mac", "van"); one word is a
+ * with any words before it that start one ("Ó", "Mac", "van", "Mac an"); one word is a
  * first name alone. Names typed before the two were asked for are split this
  * way, and the office corrects any it gets wrong.
  */
@@ -224,7 +231,11 @@ export function splitName(name: string): NameParts {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length < 2) return { firstName: words[0] ?? '', lastName: '' }
   let i = words.length - 1
-  while (i > 1 && PARTICLE.has(words[i - 1]!)) i--
+  for (;;) {
+    if (i > 1 && PARTICLE.has(words[i - 1]!)) i--
+    else if (i > 2 && ARTICLE.has(words[i - 1]!) && PARTICLE.has(words[i - 2]!)) i -= 2
+    else break
+  }
   return { firstName: words.slice(0, i).join(' '), lastName: words.slice(i).join(' ') }
 }
 
