@@ -218,7 +218,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     const app = await buildApp({
       db,
       auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
-      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now },
+      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, writes: true, gapMs: 0, settleMs: 3_600_000, now },
     })
     try {
       const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
