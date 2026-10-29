@@ -47,7 +47,11 @@ test.beforeAll(async () => {
       asked.push({ system: sent.system, user: sent.messages[0]!.content })
       // The quote's ask names its lines by id; the first Y10P line gets two more.
       const lines = sent.messages[0]!.content.match(/"id":"([^"]+)","kind":"kit","what":"d&b Y10P"/)
-      const answer = sent.system.includes('Read the enquiry')
+      // The to-do list names the first job in the facts, by its id.
+      const job = sent.messages[0]!.content.match(/"jobId":"([^"]+)","job":"([^"]+)"/)
+      const answer = sent.system.includes('writing the to-do list')
+        ? { summary: 'One quote to chase.', items: [{ jobId: job?.[1] ?? '', where: 'quote', title: `Chase the quote for ${job?.[2] ?? 'the job'}`, why: 'Sent over a week ago with no answer.' }, { jobId: 'not-a-job', where: 'crew', title: 'Book a lighting tech', why: '' }] }
+        : sent.system.includes('Read the enquiry')
         ? reading
         : {
             note: 'Two more Y10Ps, and 10% off the whole quote.',
@@ -147,4 +151,24 @@ test('the office starts a quote from an enquiry Claude read, then has Claude cha
   // What it cost is counted under Admin.
   await office.goto('/#admin')
   await expect(card).toContainText('asked 2 times')
+
+  // Claude's to-do list (ADR 0097): none yet this morning, written on request, each thing a link and a tick.
+  await office.goto('/#notifications')
+  const todo = office.getByRole('region', { name: 'To do, from Claude' })
+  await expect(todo).toContainText('each weekday from 7am')
+  await todo.getByRole('button', { name: 'Write it now' }).click()
+  await expect(todo).toContainText('One quote to chase.')
+  await expect(todo).toContainText('Written by Claude today at')
+  expect(asked.at(-1)!.system).toContain('writing the to-do list')
+  const chase = todo.getByRole('listitem').filter({ hasText: 'Chase the quote for' })
+  await expect(chase.getByRole('link')).toHaveAttribute('href', /^#jobs\/[^/]+\/quote$/)
+  // A job Claude made up isn't linked to: it opens Quotes.
+  await expect(todo.getByRole('link', { name: 'Book a lighting tech' })).toHaveAttribute('href', '#quotes')
+  await chase.getByRole('checkbox').check()
+  await expect(todo).toContainText('1 thing left.')
+  // Ticked stays ticked, and the same list is on Home.
+  await office.goto('/#home')
+  const home = office.getByRole('region', { name: 'To do, from Claude' })
+  await expect(home.getByRole('checkbox', { name: /Done: Chase the quote/ })).toBeChecked()
+  await expect(home.getByRole('button', { name: 'Write it again now' })).toBeVisible()
 })

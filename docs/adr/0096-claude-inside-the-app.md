@@ -104,7 +104,8 @@ presses each, across several lines.
 
 ## Open
 
-- The to-do list and notifications for the office and directors.
+- The to-do list and notifications for the office and directors: built in
+  [ADR 0097](0097-claudes-to-do-list.md).
 - Whether to send Claude the stock list's names, so it can name kit as the
   company does. Left out for now: it's long, and the matcher does it well.
 - Hosting in the EU, if the company wants it.
