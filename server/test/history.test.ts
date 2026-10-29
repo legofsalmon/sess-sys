@@ -1,4 +1,4 @@
-import { COMMAND_NAMES, DOCUMENT_ACTIONS, OWN_CALENDAR_ACTIONS, newId, waitLabel, type Person } from '@sh/shared'
+import { addDays, COMMAND_NAMES, daysLabel, DOCUMENT_ACTIONS, irishToday, OWN_CALENDAR_ACTIONS, newId, waitLabel, type Person } from '@sh/shared'
 import { describe, expect, it } from 'vitest'
 import { IMPORT_ACTION } from '../src/calendar/import.ts'
 import { CALENDAR_ACTIONS } from '../src/calendar/routes.ts'
@@ -94,11 +94,13 @@ describe('the history', () => {
     const dara = await colly.record<Person>('person', 'p1')
 
     await onLink(app, `/f/${dara.linkToken}/offers/o1`, { answer: 'accept' })
-    await onLink(app, `/f/${dara.linkToken}/away`, { start: '2026-10-05', end: '2026-10-06', note: 'Family wedding' })
+    // Days still to come: the link turns down days off already gone (audit, 20 October 2026, finding 50).
+    const away = [addDays(irishToday(), 30), addDays(irishToday(), 31)]
+    await onLink(app, `/f/${dara.linkToken}/away`, { start: away[0]!, end: away[1]!, note: 'Family wedding' })
 
     const page = await colly.history()
     expect(page.entries.map((e) => [e.who.name, e.who.kind, e.what])).toEqual([
-      ['Dara Kelly', 'link', 'Marked Dara Kelly away Mon 5 Oct to Tue 6 Oct (Family wedding)'],
+      ['Dara Kelly', 'link', `Marked Dara Kelly away ${daysLabel(away)} (Family wedding)`],
       ['Dara Kelly', 'link', 'Dara Kelly accepted Audio tech on Electric Picnic'],
       ['Colly Hewson', 'staff', 'Offered Audio tech on Electric Picnic to Dara Kelly'],
       ['Colly Hewson', 'staff', 'Asked for 1 × Audio tech for Electric Picnic (Build), Fri 2 Oct to Sun 4 Oct'],

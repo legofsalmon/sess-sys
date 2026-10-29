@@ -16,6 +16,7 @@ import {
   type AssetView,
   type Department,
   type Direction,
+  type FaultView,
   type JobView,
   type PickFrom,
   type PickList,
@@ -23,6 +24,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useScanKeys } from '../scanKeys.ts'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
@@ -57,6 +59,13 @@ interface Said {
   back?: AssetView
   /** Takes back what was just recorded, by recording the opposite (ADR 0072): nothing is deleted. */
   undo?: Undo
+  /** Found because the case it's kept in was reported missing and is marked found with it: it may have been taken out of that case. */
+  outOf?: OutOfCase
+}
+interface OutOfCase {
+  item: AssetView
+  holder: AssetView
+  fault: FaultView
 }
 /** What to record to take a scan or a count back, and what to say once it's done. */
 interface Undo {
@@ -114,6 +123,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const dock = useUnderTop(mayMove)
   const say: Say = (tone, text, more) => setSaid({ tone, text, at: Date.now(), ...more })
   useWakeLock(mayMove)
+  // A scanner's first read goes to the scan field (audit, 20 October 2026, finding 98).
+  useScanKeys(mayMove)
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
   // What's looked up before anything is recorded comes from the view on screen;
@@ -141,14 +152,19 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     const fault = view.faults.stopping(a.id)
     const found = fault?.kind === 'missing'
     if (found) await act(() => closeFault(fault, 'found'))
-    if (found) notes.push("It was reported missing, so it's marked found.")
+    // Missing because the case it's kept in is: that case is marked found with it, as a sealed case is (ADR 0018), and saying
+    // so offers the other answer, that it was taken out of that case (audit, 20 October 2026, finding 102).
+    const holder = found && fault.assetId && fault.assetId !== a.id ? w.assets.get(fault.assetId) : undefined
+    const answer: Say = holder && fault ? (tone, text, more) => say(tone, text, { ...more, outOf: { item: a, holder, fault } }) : say
+    if (holder) notes.push(`${holder.number || 'The case'}, the case it's kept in, was reported missing; it's marked found since this was in it.`)
+    else if (found) notes.push("It was reported missing, so it's marked found.")
     else if (fault && mode === 'out') notes.push(`It's reported ${faultState(fault).toLowerCase()}${fault.note ? `: ${fault.note}` : ''}. Check it before it goes.`)
     // Failed or overdue its PAT or examination (ADR 0020): it shouldn't go.
     const check = mode === 'out' ? view.inspections.blocks(a.id) : undefined
     if (check) notes.push(`${dueText(check)}. Test it before it goes.`)
 
     if (mode === 'out') {
-      if (was && !other) return say('quiet', `${name} is already out with ${job.name}${was.inCase ? `, in ${was.inCase.number}` : ''}.`)
+      if (was && !other) return answer(holder ? 'warn' : 'quiet', `${name} is already out with ${job.name}${was.inCase ? `, in ${was.inCase.number}` : ''}.`)
       await act(() => record(job.id, 'out', { assetId: a.id, modelId: a.modelId }))
       const row = client.view().moves.pickList(job.id)?.rows.find((r) => r.modelId === a.modelId)
       const contents = a.model?.isCase ? inside(a) : 0
@@ -162,17 +178,17 @@ function Pick({ view, job }: { view: View; job: JobView }) {
       const undo: Undo = was
         ? { run: () => record(was.projectId, 'out', { assetId: a.id, modelId: a.modelId }), said: `${name} is out with ${other} again, as it was.` }
         : { run: () => record(job.id, 'in', { assetId: a.id, modelId: a.modelId }), said: `${name} isn't out: it's back in stock.` }
-      return say(notes.length || (row && row.out > row.need && row.need > 0) ? 'warn' : 'ok', [text, ...notes].join(' '), { undo })
+      return answer(notes.length || (row && row.out > row.need && row.need > 0) ? 'warn' : 'ok', [text, ...notes].join(' '), { undo })
     }
 
-    if (!was) return say(found ? 'warn' : 'quiet', [`${name} isn't out, so there's nothing to bring back.`, ...notes].join(' '))
+    if (!was) return answer(found ? 'warn' : 'quiet', [`${name} isn't out, so there's nothing to bring back.`, ...notes].join(' '))
     await act(() => record(was.projectId, 'in', { assetId: a.id, modelId: a.modelId }))
     const row = client.view().moves.pickList(job.id)?.rows.find((r) => r.modelId === a.modelId)
     let text = `${name} back.`
     if (!other && row) text = `${name} back: ${row.back} of ${row.back + row.out} back.`
     if (other) notes.push(`It went out with ${other}, not ${job.name}, so it's back from there.`)
     const undo: Undo = { run: () => record(was.projectId, 'out', { assetId: a.id, modelId: a.modelId }), said: `${name} is out with ${other ?? job.name} again.` }
-    return say(notes.length ? 'warn' : 'ok', [text, ...notes].join(' '), { back: a, undo })
+    return answer(notes.length ? 'warn' : 'ok', [text, ...notes].join(' '), { back: a, undo })
   }
 
   const read = (code: string) => void onCode(code).catch((err: Error) => setFailed((f) => [...f, `${code.trim()}: ${err.message}`]))
@@ -258,6 +274,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
                 {said.text}
               </p>
               {said.undo && <UndoButton undo={said.undo} say={say} />}
+              {said.outOf && <NotInCase key={`out-of-${said.at}`} {...said.outOf} say={say} />}
             </div>
           )}
           {failed.length > 0 && (
@@ -506,6 +523,31 @@ function UndoButton({ undo, say }: { undo: Undo; say: Say }) {
   )
 }
 
+/**
+ * The item scanned was in a case reported missing, so the case was marked found with it; this says it had been taken out of
+ * the case instead (audit, 20 October 2026, finding 102): it comes out of the case, and the case is reported missing again,
+ * with the same note.
+ */
+function NotInCase({ item, holder, fault, say }: OutOfCase & { say: Say }) {
+  const { run, error } = useAct()
+  const number = holder.number || 'the case'
+  const separate = async () => {
+    await client.mutate('asset.move', { id: item.id, placeId: null, caseId: null })
+    await reportFault({ kind: 'missing', assetId: holder.id, modelId: holder.modelId, qty: 1, projectId: fault.projectId, usable: false, note: fault.note })
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void run(separate).then((ok) => ok && say('warn', `${item.number || 'It'} is out of ${number}, and ${number} is reported missing again.`))}
+      >
+        It's not in {number} any more
+      </button>
+      <Refusal error={error} />
+    </>
+  )
+}
+
 /** Coming back: report damage to the item just scanned. Once it's reported, the scan line says so and the button goes (audit, 20 October 2026, finding 42). */
 function DamageTo({ a, job, say }: { a: AssetView; job: JobView; say: Say }) {
   const [open, setOpen] = useState(false)
@@ -541,7 +583,7 @@ function heldText(h: PickRow['held'][number]): string {
 }
 
 /** What a scan or a tap on the list did, said in the scan line at the top, where the eye already goes. */
-type Say = (tone: Tone, text: string, more?: { back?: AssetView; undo?: Undo }) => void
+type Say = (tone: Tone, text: string, more?: { back?: AssetView; undo?: Undo; outOf?: OutOfCase }) => void
 
 /** All out that's needed, or all back: nothing left to do on the row. */
 const rowDone = (row: PickRow, mode: Direction) => (mode === 'out' ? row.lines.length > 0 && row.out >= row.need : row.out === 0 && row.missing === 0)

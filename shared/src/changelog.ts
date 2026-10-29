@@ -28,6 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.57.0',
+    date: '2026-10-29',
+    title: "A freelancer's own page is quicker to read",
+    what: "A freelancer's own page opens faster on a weak signal. It shows the next few bookings in full and the rest a line each, and keeps the summary line in view. Dates say their year when it isn't obvious. A mistake in a rate or an extra is said beside it. Days off can't be in the past or longer than a year, overlapping ones merge, and days off over a booking say plainly that you're still booked on it.",
+    prs: [166],
+  },
+  {
+    version: '1.56.0',
+    date: '2026-10-29',
+    title: "Stock puts today's work first",
+    what: "On Stock, the kit going out in the next two weeks now comes before kit still out, latest first. A barcode scanner works on the pick list, a count and testing without tapping the box first. An item found through its missing case says so, and can be taken out of the case. Kit can't be put into a case that's out on a job. Re-running the stock list says where its prices differ from yours, and adds up a product kept in two places.",
+    prs: [165],
+  },
+  {
     version: '1.55.1',
     date: '2026-10-29',
     title: 'Heavy jobs no longer hold everyone up',

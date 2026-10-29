@@ -345,6 +345,12 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS item_certificate_items_asset ON item_certificate_items (asset_id);
   `,
+  // The next free label number (store.ts, nextNumber) read off an index of
+  // the numbers as numbers, not every label in the company (audit, 20
+  // October 2026, finding 104).
+  `
+  CREATE INDEX IF NOT EXISTS identifiers_sh_number ON identifiers ((substr(value, 4)::int)) WHERE kind = 'sh';
+  `,
 ]
 
 export const STOCK: Module = { versionTable: 'stock_schema_version', migrations: MIGRATIONS }

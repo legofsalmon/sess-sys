@@ -25,6 +25,39 @@ waiting on someone.
   notifications in the app, and helps start, change and update quotes in
   this early phase. Building that next.
 
+## 29 October 2026: a freelancer's own page
+
+**Done**
+
+- Findings 47 to 50, 86 and 89 to 92 of the [20 October
+  audit](audit-2026-10-20.md) (PR #166): link pages compressed, the next
+  three bookings in full and the rest a line each, a refusal that names
+  the job, checked days off that merge and warn over a booking, own
+  calendars tried again after a failed read, years on dates, mistakes said
+  beside their field, one sent line on a timesheet, and a plain Share
+  button. ADRs 0002, 0033 and 0049 note it. App 1.57.0.
+- Not built: the invoice details finding 89 defers to ADR 0022's invoice
+  step, which waits on Colly.
+- Checked: typecheck, shared, server and real-Postgres tests, and 35
+  browser tests.
+
+
+## 29 October 2026: Stock puts today's work first
+
+**Done**
+
+- Findings 97 to 106 of the [20 October audit](audit-2026-10-20.md)
+  (PR #165): going out before still out, twenty products on a desk, a
+  scanner that works without a tap, plainer words on setting numbers
+  aside, an item found through its case and taken back out, no packing
+  into a case that's out, a faster next label number, and a re-run stock
+  list that adds up and notes price differences. Finding 100 was already
+  fixed. ADRs 0017 and 0018 note it. App 1.56.0.
+- Left open: the catalogue's long page after Show all on a desk (finding
+  97), as search is the designed way in.
+- Checked: typecheck, shared, server and real-Postgres tests, and 17
+  browser test files.
+
 ## 29 October 2026: heavy jobs that held everyone up
 
 **Done**
