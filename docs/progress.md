@@ -3,6 +3,16 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Heads see clients' documents
+
+**Done**
+
+- Colly's answer to the open question from finding 39 of the [20 October
+  audit](audit-2026-10-20.md): heads of department are sent clients'
+  documents and can open their files (PR #178). Staff crew and freelancers
+  still aren't. ADR 0062 notes it. App 1.64.0.
+- Checked: typecheck, shared tests and the roles tests.
+
 ## 29 October 2026: zod 4
 
 **Done**
