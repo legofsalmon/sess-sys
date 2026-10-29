@@ -400,3 +400,47 @@ test('on a laptop the places are down the left, and the app opens dark with ligh
   expect(await theme()).toBe('dark')
   await context.close()
 })
+
+test('every page is the same width as every other, on a phone, a laptop and a big screen, so moving between them never jumps', async ({ browser }) => {
+  // Each area's row, a record, the planner and Admin (ADR 0091): only how the width is shared out inside the page changes.
+  const pages = [
+    ['#stock', 'Catalogue'],
+    ['#stock/places', 'Places'],
+    ['#stock/labels', 'Labels'],
+    ['#stock/count', 'Counting'],
+    ['#stock/testing', 'Testing'],
+    ['#stock/repairs', 'Repairs'],
+    ['#stock/racks', 'Racks'],
+    ['#stock/vehicles', 'Vehicles'],
+    ['#stock/buy', 'Purchase list'],
+    ['#jobs', 'Jobs'],
+    ['#jobs/clients', 'Clients'],
+    ['#jobs/venues', 'Venues'],
+    ['#crew', 'Calls'],
+    ['#crew/people', 'People'],
+    ['#crew/leave', 'Leave'],
+    ['#admin', 'Admin'],
+    ['#me', undefined],
+    ['#', 'Home'],
+  ] as const
+  for (const viewport of [phoneSize, laptopSize, { width: 1680, height: 1000 }]) {
+    const context = await browser.newContext({ viewport })
+    const page = await context.newPage()
+    await page.goto('/#stock')
+    await expect(page.getByRole('status')).toHaveText('Up to date')
+    const widths = new Map<string, number>()
+    for (const [hash, heading] of pages) {
+      await page.evaluate((h) => (location.hash = h), hash)
+      if (heading) await expect(page.getByRole('heading', { level: 1, name: heading, exact: true })).toBeVisible()
+      else await expect(page.locator('main .app.you')).toBeVisible()
+      widths.set(hash, (await page.locator('main .app').first().boundingBox())!.width)
+    }
+    // The week planner, whose address carries the day.
+    await page.evaluate(() => (location.hash = '#jobs'))
+    await page.getByRole('navigation', { name: 'Jobs pages' }).getByRole('link', { name: 'Week' }).click()
+    await expect(page.locator('main .app.plan')).toBeVisible()
+    widths.set('week', (await page.locator('main .app').first().boundingBox())!.width)
+    expect(new Set(widths.values()), `${viewport.width}px: ${JSON.stringify(Object.fromEntries(widths))}`).toHaveProperty('size', 1)
+    await context.close()
+  }
+})

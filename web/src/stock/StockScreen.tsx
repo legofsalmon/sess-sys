@@ -43,7 +43,7 @@ import { RacksScreen, sizeFrom, SizeFields, sizeTypedOf, suppliersOf, whoseFrom,
 import './stock.css'
 import { PLACES, STOCK, type Trail } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
-import { Thumb } from '../Picture.tsx'
+import { productPhotoOf, Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from './kitIcon.ts'
 import { Heading, Icon } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
@@ -90,12 +90,12 @@ export function StockScreen() {
   if (count) return <CountPage key={count} view={view} id={decodeURIComponent(count)} />
   const [, run] = /^#stock\/labels\/(.+)$/.exec(hash) ?? []
   if (run) return <RunScreen key={run} view={view} id={decodeURIComponent(run)} />
-  const [, kind, id] = /^#stock\/(product|item|place)\/(.+)$/.exec(hash) ?? []
+  const [, kind, id, part] = /^#stock\/(product|item|place)\/([^/]+)(?:\/([a-z]+))?$/.exec(hash) ?? []
   const open = id ? decodeURIComponent(id) : ''
   // Keyed by the record, so a form left open on one page isn't still open on the next.
   const record =
     kind === 'product' ? (
-      <ProductScreen key={open} view={view} id={open} bare={wide} />
+      <ProductScreen key={open} view={view} id={open} part={part} bare={wide} />
     ) : kind === 'item' ? (
       <ItemScreen key={open} view={view} id={open} bare={wide} />
     ) : kind === 'place' ? (
@@ -330,7 +330,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           {[...(exact ? [exact] : []), ...items].map((a) => (
             <li key={a.id}>
               <a className="item-row" href={`#stock/item/${a.id}`}>
-                <Thumb icon={kitIcon(a.model)} />
+                <Thumb icon={kitIcon(a.model)} src={productPhotoOf(a.model)} />
                 <div>
                   <b>{numberLabel(a)}</b> {a.model?.name}
                   <p>
@@ -360,7 +360,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
             {rows.map((m) => (
               <li key={m.id}>
                 <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
-                  <Thumb icon={kitIcon(m)} />
+                  <Thumb icon={kitIcon(m)} src={productPhotoOf(m)} />
                   <div>
                     <b>{m.name}</b>
                     <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
@@ -500,7 +500,8 @@ function NewProduct({ view, department }: { view: View; department: Department }
     void run(() => client.mutate('model.create', args)).then((ok) => {
       if (ok) {
         setSize(sizeTypedOf())
-        location.hash = `#stock/product/${id}`
+        // A new product of our own has nothing yet, so it opens where its items and counts go in (ADR 0082).
+        location.hash = args.dryHire ? `#stock/product/${id}` : `#stock/product/${id}/items`
       } else setF((now) => (now === cleared ? f : now))
     })
   }

@@ -125,6 +125,8 @@ async function ready(page: Page, hash: string) {
 
 /** On a phone the list of things to sort out comes first; the screenshots show the planner itself, scrolled sideways to a day. */
 async function timeline(page: Page, day = 0) {
+  // After the new screen has settled at its top (places.ts), or that would undo the scroll.
+  await page.waitForTimeout(400)
   await page.locator('.scroller').evaluate((el, day) => {
     el.closest('section')!.scrollIntoView()
     const heads = el.querySelectorAll<HTMLElement>('thead th')
@@ -152,6 +154,10 @@ test('a week by job on a phone, then by person with its clashes', async ({ brows
   await expect(summit.nth(0).locator('.blk')).toHaveClass(/solid short/)
   await expect(summit.nth(2)).toHaveText('Show 1/20 of 2 crew, 1 asked')
   await expect(row(phone, named('Nissan launch')).nth(3).locator('.blk')).toHaveClass(/solid full/)
+  // A phase over days reads as one bar: the build's two days join, and the show starts a bar of its own.
+  await expect(summit.nth(0).locator('.blk')).toHaveClass(/join-r/)
+  await expect(summit.nth(1).locator('.blk')).toHaveClass(/join-l/)
+  await expect(summit.nth(2).locator('.blk')).not.toHaveClass(/join-l/)
   // Pencilled in: the quote is dashed and says so.
   await expect(phone.getByRole('rowheader', { name: named('Tech Ireland awards') })).toContainText('Quoted')
   await expect(row(phone, named('Tech Ireland awards')).nth(5).locator('.blk')).toHaveClass(/dashed/)
@@ -199,6 +205,10 @@ test('a month on a laptop, whose dates open their week', async ({ browser }) => 
   await expect(laptop.getByRole('heading', { name: 'March 2031' })).toBeVisible()
   const paddys = row(laptop, named("St Patrick's Festival"))
   await expect(paddys.nth(13).locator('[aria-hidden]')).toHaveText('Bu')
+  // The three build days are one bar, its code said once; the words stay on every day for a screen reader.
+  await expect(paddys.nth(14).locator('.blk')).toHaveClass(/join-lr/)
+  await expect(paddys.nth(14).locator('[aria-hidden]')).toHaveText('')
+  await expect(paddys.nth(15).locator('.sr-only')).toContainText('Build')
   await expect(paddys.nth(16)).toHaveText('ShShow, 1 of 2 crew')
   await expect(paddys.nth(17).locator('[aria-hidden]')).toHaveText('Out')
   await expect(row(laptop, named('Dublin Tech expo')).nth(24).locator('.blk')).toHaveClass(/dashed/)

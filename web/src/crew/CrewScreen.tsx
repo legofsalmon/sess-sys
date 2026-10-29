@@ -225,17 +225,18 @@ export function CrewScreen() {
       return client.mutate('person.archive', { id, archived: false })
     })
   const [, timesheet] = /^#crew\/timesheet\/(.+)$/.exec(hash) ?? []
-  if (timesheet) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
+  if (timesheet && view.office.useTimesheets) return <TimesheetScreen view={view} offerId={decodeURIComponent(timesheet)} />
   // Each person has a page of their own (#crew/person/<id>); the People list is one line each that opens it.
-  const [, personId] = /^#crew\/person\/(.+)$/.exec(hash) ?? []
-  if (personId) return <PersonScreen view={view} id={decodeURIComponent(personId)} onArchived={setArchivedNow} />
+  const [, personId, personPart] = /^#crew\/person\/([^/]+)(?:\/([a-z]+))?$/.exec(hash) ?? []
+  if (personId) return <PersonScreen key={personId} view={view} id={decodeURIComponent(personId)} part={personPart} onArchived={setArchivedNow} />
   // Staff leave and time in lieu (ADR 0024) have a screen of their own under Crew.
   if (hash === '#crew/leave') return <LeaveScreen view={view} />
   // Bringing in the crew list (ADR 0025), under Crew where the list lives (ADR 0041).
   if (hash === '#crew/import') return <ImportPeopleScreen view={view} />
 
   // Crew's row (ADR 0041): the calls and answers here, the people at #crew/people, the timesheets at #crew/timesheets.
-  const page = hash === '#crew/people' ? 'people' : hash === '#crew/timesheets' ? 'timesheets' : 'calls'
+  // A timesheet's address while they're not used (ADR 0090) opens their page, which says so.
+  const page = hash === '#crew/people' ? 'people' : hash === '#crew/timesheets' || timesheet ? 'timesheets' : 'calls'
 
   /** Settle a yes or a counter, then tell them. */
   const settle = (o: OfferView, c: CallView, command: 'offer.confirm' | 'offer.cancel', event: TellEvent) => {
@@ -297,7 +298,10 @@ export function CrewScreen() {
         heading={page === 'calls' ? 'Calls' : page === 'people' ? 'People' : 'Timesheets'}
       />
 
+      {page === 'timesheets' && !view.office.useTimesheets && <TimesheetsOff />}
+
       {page === 'timesheets' &&
+        view.office.useTimesheets &&
         (view.timesheets.toApprove.length || view.timesheets.notIn.length || view.timesheets.approved.length ? (
           <TimesheetsCard view={view} />
         ) : (
@@ -609,6 +613,20 @@ export function CrewScreen() {
  * is rarely right; "Tick all" is there when it is. One command for them all,
  * so the history says it once.
  */
+/** Crew › Timesheets while the company doesn't use them (ADR 0090): what's kept is kept, and where they're turned on. */
+function TimesheetsOff() {
+  const admin = useAccess().can('settings')
+  return (
+    <section className="card" aria-label="Timesheets are off">
+      <h2>Timesheets are off</h2>
+      <p className="empty">
+        Crew aren't asked for timesheets, and none can be sent from their links. Any already sent are kept. Timesheets are turned on under{' '}
+        {admin ? <a href="#admin/company">Admin › Company</a> : 'Admin, by the office'}.
+      </p>
+    </section>
+  )
+}
+
 function GiveDepartment({ view, calls, onGiven }: { view: View; calls: readonly CallView[]; onGiven: (said: string, department: string) => void }) {
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [department, setDepartment] = useState<string | null>(null)

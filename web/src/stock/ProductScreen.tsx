@@ -53,7 +53,9 @@ import { faultState, FaultsCard, ReportButtons } from './Faults.tsx'
 import { dueText } from './Inspections.tsx'
 import { Heading } from '../Icon.tsx'
 import { Thumb } from '../Picture.tsx'
+import { TabPanel, Tabs, useTab } from '../Tabs.tsx'
 import { kitIcon } from './kitIcon.ts'
+import { ProductPhoto } from './ProductPhoto.tsx'
 import { STOCK } from '../Up.tsx'
 import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
@@ -66,11 +68,21 @@ import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, supp
  * marked as a mistake, which hides it and its items everywhere but the
  * history (audit finding 19).
  */
-export function ProductScreen({ view, id, bare }: { view: View; id: string; bare?: boolean }) {
+/** A product's page in parts (ADR 0082), one at a time under its name: what it is, the jobs it's on, its items and what's counted, its faults. */
+type ProductPart = 'details' | 'jobs' | 'items' | 'faults'
+const PRODUCT_LABELS: Record<ProductPart, string> = { details: 'Details', jobs: 'On jobs', items: 'Items', faults: 'Faults' }
+
+export function ProductScreen({ view, id, part: asked, bare }: { view: View; id: string; part?: string; bare?: boolean }) {
   const w = view.warehouse
   const m = w.models.find((x) => x.id === id)
   const mistake = w.mistakes.get(id)
   const up = { steps: [STOCK], here: m?.name }
+  const faults = view.faults.ofModel(id)
+  const showsFaults = !!m && (m.tracking === 'bulk' || m.countedTotal > 0 || faults.length > 0)
+  // Dry hire stock (ADR 0075) has none of its own to list.
+  const parts: ProductPart[] = ['details', 'jobs', ...(m && !m.dryHire ? (['items'] as const) : []), ...(showsFaults ? (['faults'] as const) : [])]
+  const [part, pick] = useTab({ parts, asked, remember: 'sh.productPart', address: (p) => `#stock/product/${id}/${p}` })
+  const onJobs = view.kit.byModel.get(id) ?? []
   if (!m)
     return (
       <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
@@ -84,18 +96,46 @@ export function ProductScreen({ view, id, bare }: { view: View; id: string; bare
       </Page>
     )
   return (
-    <Page view={view} title="Stock" className="warehouse" up={up} bare={bare}>
-      <Summary m={m} w={w} view={view} />
-      {m.isRack && view.racks.of(m.id) && <RackCard view={view} r={view.racks.of(m.id)!} />}
-      <OnJobs m={m} lines={view.kit.byModel.get(m.id) ?? []} />
-      {/* Dry hire stock (ADR 0075) has none of its own to list. */}
-      {m.tracking === 'serialised' && !m.dryHire && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
-      {!m.dryHire && <Counted m={m} w={w} />}
-      {(m.tracking === 'bulk' || m.countedTotal > 0 || view.faults.ofModel(m.id).length > 0) && (
-        <FaultsCard faults={view.faults.ofModel(m.id)} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
-          {m.countedTotal > 0 && <ReportButtons model={m} most={m.countedTotal} />}
-        </FaultsCard>
-      )}
+    <Page
+      view={view}
+      title="Stock"
+      className="warehouse"
+      up={up}
+      bare={bare}
+      picture={<Thumb icon={kitIcon(m)} size="large" />}
+      heading={m.name}
+      badge={<Pending pending={m.pending} />}
+      sub={<p>{[DEPARTMENT_LABELS[m.department], m.category, amountLabel(m)].filter(Boolean).join(' · ')}</p>}
+    >
+      <Tabs
+        label={`About ${m.name}`}
+        id="product"
+        parts={parts}
+        labels={PRODUCT_LABELS}
+        current={part}
+        counts={{ jobs: onJobs.length || undefined, items: m.items.length || undefined, faults: faults.length || undefined }}
+        onPick={pick}
+      />
+      <TabPanel id="product" current={part}>
+        {part === 'details' && (
+          <>
+            <Summary m={m} w={w} view={view} />
+            {m.isRack && view.racks.of(m.id) && <RackCard view={view} r={view.racks.of(m.id)!} />}
+          </>
+        )}
+        {part === 'jobs' && <OnJobs m={m} lines={onJobs} />}
+        {part === 'items' && (
+          <>
+            {m.tracking === 'serialised' && <Items m={m} w={w} faults={view.faults} inspections={view.inspections} />}
+            <Counted m={m} w={w} />
+          </>
+        )}
+        {part === 'faults' && (
+          <FaultsCard faults={faults} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
+            {m.countedTotal > 0 && <ReportButtons model={m} most={m.countedTotal} />}
+          </FaultsCard>
+        )}
+      </TabPanel>
       <WhereChoices w={w} />
     </Page>
   )
@@ -147,14 +187,8 @@ function Summary({ m, w, view }: { m: ModelView; w: WarehouseView; view: View })
   }
   const hidden = [m.items.length > 0 && plural(m.items.length, 'item'), m.countedTotal > 0 && `${m.countedTotal.toLocaleString('en-IE')} counted`].filter(Boolean)
   return (
-    <section className="card">
-      <header className="title">
-        <div className="pictured">
-          <Thumb icon={kitIcon(m)} size="large" />
-          <h1>{m.name}</h1>
-        </div>
-        <Pending pending={m.pending} />
-      </header>
+    <section className="card" aria-label="Details">
+      <ProductPhoto m={m} />
       <dl className="facts">
         {m.aliases.length > 0 && (
           <div>

@@ -71,6 +71,10 @@ function ClientSummary({ c }: { c: ClientView }) {
             </dd>
           </div>
         ))}
+        <div>
+          <dt>Address for quotes</dt>
+          <dd className="lines">{c.address?.trim() || 'None yet'}</dd>
+        </div>
       </dl>
       {c.notes && <p className="notes">{c.notes}</p>}
       {/* Changing it is the jobs' (audit finding 9): a role without them reads it. */}
@@ -88,7 +92,7 @@ function ClientSummary({ c }: { c: ClientView }) {
 const blankContact = (): Contact => ({ name: '', role: '', email: null, phone: null })
 
 function EditClient({ c, onDone }: { c: ClientView; onDone: () => void }) {
-  const [f, setF] = useState({ name: c.name, notes: c.notes, contacts: c.contacts })
+  const [f, setF] = useState({ name: c.name, notes: c.notes, contacts: c.contacts, address: c.address ?? '' })
   const { run, error } = useAct()
   const setContact = (i: number, changes: Partial<Contact>) => setF({ ...f, contacts: f.contacts.map((x, j) => (j === i ? { ...x, ...changes } : x)) })
   const save = (e: FormEvent) => {
@@ -97,7 +101,7 @@ function EditClient({ c, onDone }: { c: ClientView; onDone: () => void }) {
     const contacts = f.contacts
       .filter((x) => x.name.trim())
       .map((x) => ({ name: x.name.trim(), role: x.role.trim(), email: x.email?.trim() || null, phone: x.phone?.trim() || null }))
-    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim() })).then((ok) => ok && onDone())
+    void run(() => client.mutate('client.upsert', { id: c.id, name: f.name.trim(), contacts, notes: f.notes.trim(), address: f.address.trim() })).then((ok) => ok && onDone())
   }
   return (
     <form className="grid-form" onSubmit={save} aria-label={`Change ${c.name}`}>
@@ -125,6 +129,10 @@ function EditClient({ c, onDone }: { c: ClientView; onDone: () => void }) {
       <button type="button" className="wide" onClick={() => setF({ ...f, contacts: [...f.contacts, blankContact()] })}>
         Add a contact
       </button>
+      <label className="wide">
+        Address for quotes{' '}
+        <textarea rows={3} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} maxLength={500} placeholder="A line each, as on a letter" />
+      </label>
       <label className="wide">
         Notes <textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
       </label>

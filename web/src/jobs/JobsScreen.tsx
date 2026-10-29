@@ -35,7 +35,7 @@ import { TidyNudge, TidyScreen } from './TidyScreen.tsx'
 import { JOB_PARTS, JobScreen, type JobPart } from './JobScreen.tsx'
 import { kitShort } from './Kit.tsx'
 import { MoneyScreen, PricesScreen } from './Money.tsx'
-import { PastQuoteScreen, PastQuotesScreen } from './PastQuotes.tsx'
+import { MatchScreen, PastQuoteScreen, PastQuotesScreen } from './PastQuotes.tsx'
 import { NotesKitListScreen, NotesKitNudge, NotesKitScreen } from './NotesKit.tsx'
 import { PickScreen } from './PickScreen.tsx'
 import { QuoteScreen } from './Quote.tsx'
@@ -88,6 +88,7 @@ export function JobsScreen() {
   if (hash === '#jobs/money') return <MoneyScreen view={view} />
   if (hash === '#jobs/money/prices') return <PricesScreen view={view} />
   if (hash === '#jobs/money/current-rms') return <PastQuotesScreen view={view} />
+  if (hash === '#jobs/money/current-rms/match') return <MatchScreen view={view} />
   if (hash.startsWith('#jobs/money/current-rms/')) return <PastQuoteScreen view={view} id={decodeURIComponent(hash.slice('#jobs/money/current-rms/'.length))} />
   if (hash === '#jobs/notes-kit') return <NotesKitListScreen view={view} />
   if (hash.startsWith('#jobs/venues/')) return <VenueScreen view={view} id={decodeURIComponent(hash.slice('#jobs/venues/'.length))} />

@@ -214,6 +214,10 @@ const ABOUT: Record<string, string> = {
   faults: 'Faults and missing kit: the item, or the product and how many, damaged or missing, the job it came back from, what was wrong, the repair notes, and how it ended.',
   identifiers: 'The Session Hire numbers on items, current and replaced; a number is never used twice.',
   inspections: 'Electrical tests (PAT) and thorough examinations of numbered items: when, by whom, passed or failed, and any note. The register the law asks for.',
+  // Certificates on items (ADR 0094): the details here, the files in the storage.
+  item_certificate_items: 'Which items each certificate on items covers.',
+  item_certificates:
+    'Certificates kept on numbered items: a PAT certificate, a report of a thorough examination, or another such as a declaration of conformity; the title, the day on it, the day another runs out, the link to where it is shared, and the file\'s type and size. The files stay in the storage: see Left out on purpose.',
   kit_lines: 'Kit on jobs: how many of a product each job needs, for the whole job or one phase, and how many of those are subhired and from whom.',
   kit_names: 'Names that jobs\' notes use for kit, as chosen once in Kit from the notes: the product each means, or blank for not kit.',
   kit_notes_read: 'Jobs whose notes have been turned into kit lines, with a fingerprint of the notes as they were, so a job comes back to the list only when its notes change.',
@@ -222,12 +226,14 @@ const ABOUT: Record<string, string> = {
   leave_requests: 'Staff requests for annual leave and days in lieu: the days asked for and counted, and whether each was approved, declined or cancelled, by whom and why.',
   leave_years: 'The years the office has opened for leave, and when: staff can ask for leave only in an open year.',
   lieu_entries: 'Days staff worked that earn days in lieu, and whether each was approved.',
-  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code, whether it goes on a rack’s rails and its size (rack units, width, depth, weight, power), a rack case’s outside size, castors and power limit, whether it is a rack part (a blank, vent, shelf or drawer), whether it is ours or dry hired in and from whom at what a day, and whether one was added by mistake and so hidden from the list.',
+  models: 'Products in the stock list: department, category, other names it goes by, numbered or counted, replacement value, whether it is a rack, its stock code, whether it goes on a rack’s rails and its size (rack units, width, depth, weight, power), a rack case’s outside size, castors and power limit, whether it is a rack part (a blank, vent, shelf or drawer), whether it is ours or dry hired in and from whom at what a day, whether one was added by mistake and so hidden from the list, and when its photo was put up.',
   // Racks (ADR 0074).
   rack_slots: "Each rack's layout: the product that goes in it, at which rack unit from the top and on the front or the back (blank for loose in it), where across the rails narrower kit sits, how many, a note, the label and group it has in that rack and the colour of its tape, and the shelf or drawer loose kit is in.",
   movements: 'Kit scanned or counted out to jobs and back in: the job, the item or the product and how many, and when, by the phone that scanned it.',
   mutations: 'The history as the server keeps it: every change anyone asked for, with the answer.',
   offers: 'Work offered to people, and their answers; a confirmed offer is a booking.',
+  // Packages (ADR 0087).
+  packages: "Packages on the price list: kit quoted together at one price, with its name, the department it's listed under, its price in cents and how it's charged, the products it holds and how many of each, and anything else it includes.",
   people: 'Staff and freelancers on the crew list: contact details, department, level, the name they go by, certificates, the company and VAT and CRO numbers they trade through, skills and rates, whether they have been archived, which staff can approve time off, and the other addresses of anyone combined with them.',
   // Combining people brought in twice (ADR 0055).
   person_merges: 'People made part of another, as one person: who, whom, and when. Their old private links open the one person; the links themselves are left out.',
@@ -236,7 +242,8 @@ const ABOUT: Record<string, string> = {
   product_prices: "The price list: each product's price for a day, in cents.",
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   quotes:
-    "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, when it was sent, the client's answer, and the invoice and payment the office recorded for it.",
+    "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, how many days its prices hold and any deposit, when it was sent and the quote number it was given then, the client's answer, and the invoice and payment the office recorded for it.",
+  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages, and the VAT number and address printed on quotes; whether heads of department see crew rates; and whether the app prompts messages to crew.",
@@ -252,6 +259,7 @@ const ABOUT: Record<string, string> = {
   // Current RMS, read through its API (ADR 0078).
   rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
   rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",
+  rms_matches: 'Each opportunity read from Current RMS that the office linked to its job: the job, who linked it and when.',
   rms_reads: 'Each time Current RMS was read: when, how many opportunities and lines, and what went wrong if it did.',
   job_steps: "Each job's steps given to someone or ticked by hand: the job, the step (quote, confirmed, crew, kit, prep, show, back, deprep), who it's down to, and when it was ticked and by whom. Steps the app ticks from the job's own records aren't kept.",
   // Vans and drivers (ADR 0047).
@@ -298,7 +306,9 @@ Left out on purpose
   the storage beside the backups, and each opens from the person's card on
   the Crew tab. documents lists their details. The same goes for files
   on venues and clients, which open from their pages; attachments lists
-  their details.
+  their details, and certificates on items, which open from the item's
+  page; item_certificates lists their details. And photos of people and products, which show on their
+  pages: people and models say when each was put up.
 
 Good to know
 ------------

@@ -8,6 +8,7 @@ import {
   type AssetView,
   type Due,
   type InspectionKind,
+  type InspectionView,
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
@@ -17,12 +18,14 @@ import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
-import { mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
+import { dateLabel, mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { StockViews } from '../Views.tsx'
+import { Fold } from '../Fold.tsx'
 import { Split } from '../Split.tsx'
 import { Heading } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
+import { CertificateForm, OpenCertificate } from './Certificates.tsx'
 
 /**
  * Inspections (ADR 0020): the electrical test (PAT) and the thorough
@@ -31,12 +34,11 @@ import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
  * time by scanning (#stock/testing), where each pass is held for a few
  * seconds with Undo before it's recorded (audit finding 17), and the
  * Stock tab lists what's failed, overdue or due soon. Failed or overdue
- * kit can't go out.
+ * kit can't go out. Each test's certificate (ADR 0094) is kept beside it:
+ * opened from the test's line, added there, or for a whole round from the
+ * testing screen.
  */
 
-/** "2 Oct 2027". */
-export const dateLabel = (day: string) =>
-  new Date(`${day}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 /** "PAT overdue since 2 Oct 2026", "PAT failed on 1 Sep 2026", "PAT due 2 Oct 2026"; a day the stock list gave says so, as no test here set it. */
 export function dueText(d: Due): string {
@@ -115,7 +117,7 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
                     ? 'Record the last one, if it was done on paper.'
                     : d.fromList
                       ? `None recorded here yet; then every ${d.months === 1 ? 'month' : `${d.months} months`}.`
-                      : `Every ${d.months === 1 ? 'month' : `${d.months} months`}; last passed ${dateLabel(d.last!.day)}.`}
+                      : `Every ${d.months === 1 ? 'month' : `${d.months} months`}; last passed ${dateLabel(d.last!.day)}${d.certificate ? ', certificate kept' : ', no certificate kept yet'}.`}
               </span>
             </li>
           ))}
@@ -137,24 +139,52 @@ export function InspectionsCard({ view, a }: { view: View; a: AssetView }) {
           <summary>{done.length === 1 ? 'One recorded' : `${done.length} recorded`}</summary>
           <ul className="item-list">
             {done.map((i) => (
-              <li key={i.id} className="inspection">
-                <div>
-                  <b>
-                    {INSPECTION_LABELS[i.kind]}: {i.passed ? 'passed' : 'failed'}
-                  </b>
-                  <p>
-                    {dateLabel(i.day)}
-                    {i.by && ` · ${i.by}`}
-                    {i.note && ` · ${i.note}`}
-                  </p>
-                </div>
-                <Pending pending={i.pending} />
-              </li>
+              <TestLine key={i.id} view={view} a={a} i={i} mayAdd={mayRecord && a.status === 'active'} />
             ))}
           </ul>
         </details>
       )}
     </section>
+  )
+}
+
+/** One test: what and when, by whom, its certificate to open, or adding it. */
+function TestLine({ view, a, i, mayAdd }: { view: View; a: AssetView; i: InspectionView; mayAdd: boolean }) {
+  const cert = view.inspections.certificateFor(i)
+  const [adding, setAdding] = useState(false)
+  const name = `${INSPECTION_LABELS[i.kind]} on ${dateLabel(i.day)}`
+  return (
+    <li className="inspection">
+      <div>
+        <b>
+          {INSPECTION_LABELS[i.kind]}: {i.passed ? 'passed' : 'failed'}
+        </b>
+        <p>
+          {dateLabel(i.day)}
+          {i.by && ` · ${i.by}`}
+          {i.note && ` · ${i.note}`}
+          {cert && ` · ${cert.title}`}
+        </p>
+      </div>
+      <Pending pending={i.pending} />
+      <div className="actions">
+        {cert ? (
+          <OpenCertificate a={a} c={cert} what={`the certificate for the ${name}`} />
+        ) : (
+          // A pass is what a certificate is asked for; a fail's report goes on the Certificates card if there is one.
+          mayAdd &&
+          i.passed &&
+          !adding && (
+            <button type="button" className="link" onClick={() => setAdding(true)} aria-label={`Add the certificate for the ${name}`}>
+              Add certificate
+            </button>
+          )
+        )}
+      </div>
+      {adding && !cert && (
+        <CertificateForm a={a} kind={i.kind} day={i.day} label={`Add the certificate for the ${name}`} onDone={() => setAdding(false)} />
+      )}
+    </li>
   )
 }
 
@@ -235,7 +265,7 @@ export function InspectionsDue({ view }: { view: View }) {
   const attention = view.inspections.attention.filter((d) => inKitOf(department)(d.asset.model))
   const { unrecorded } = view.inspections
   const needed = view.warehouse.models.some((m) => m.patMonths || m.liftingMonths)
-  if (!needed) return null
+  if (!needed && view.inspections.certificatesDue.length === 0) return null
   const stopped = attention.filter((d) => d.state !== 'soon')
   const soon = attention.filter((d) => d.state === 'soon')
   const row = (d: Due) => (
@@ -250,13 +280,18 @@ export function InspectionsDue({ view }: { view: View }) {
       </a>
     </li>
   )
+  const certsDue = view.inspections.certificatesDue.filter((c) => inKitOf(department)(c.asset.model))
+  const uncertified = view.inspections.uncertified.filter((d) => inKitOf(department)(d.asset.model))
+  const counted = new Map<string, number>()
+  for (const d of uncertified) counted.set(d.asset.model?.name ?? 'A product', (counted.get(d.asset.model?.name ?? 'A product') ?? 0) + 1)
+  const uncertifiedWords = [...counted].map(([name, n]) => `${n} × ${name}`).join(', ')
   const byProduct = new Map<string, number>()
   for (const d of unrecorded) byProduct.set(d.asset.model?.name ?? 'A product', (byProduct.get(d.asset.model?.name ?? 'A product') ?? 0) + 1)
   return (
     <section className="card inspections-due" aria-label="Inspections due">
       <Heading icon="inspection">Inspections due</Heading>
       <Narrowed department={department} onWiden={widen} />
-      {stopped.length === 0 && soon.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
+      {stopped.length === 0 && soon.length === 0 && certsDue.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
       {stopped.length > 0 && (
         <>
           <h3>Can't go out</h3>
@@ -269,6 +304,32 @@ export function InspectionsDue({ view }: { view: View }) {
           <ul className="job-list">{soon.map(row)}</ul>
         </>
       )}
+      {certsDue.length > 0 && (
+        <>
+          <h3>Certificates running out</h3>
+          <ul className="job-list">
+            {certsDue.map((c) => (
+              <li key={`${c.asset.id}-${c.certificate.id}`}>
+                <a className="job-row" href={`#stock/item/${c.asset.id}`}>
+                  <div>
+                    <b>
+                      {numberLabel(c.asset)} {c.asset.model?.name}
+                    </b>
+                    <p>
+                      {c.certificate.title} {c.state === 'expired' ? 'ran out on' : 'runs out'} {dateLabel(c.certificate.expires!)}
+                    </p>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {uncertified.length > 0 && (
+        <p className="hint">
+          No certificate kept yet for the last test of {uncertifiedWords}. They can still go out; add each from its page, or a round's from Testing.
+        </p>
+      )}
       {unrecorded.length > 0 && (
         <p className="hint">
           Not recorded yet: {[...byProduct].map(([name, n]) => `${n} × ${name}`).join(', ')}. They can still go out; record their last test when you
@@ -276,6 +337,28 @@ export function InspectionsDue({ view }: { view: View }) {
         </p>
       )}
     </section>
+  )
+}
+
+/**
+ * The certificate for the round just tested (ADR 0094): one file or link
+ * for every item that passed here, of the kind and on the day being
+ * tested, as the tester's report covers them all. A fail is left off; its
+ * own report goes on its page.
+ */
+function RoundCertificate({ view, done, kind, day }: { view: View; done: { a: AssetView; passed: boolean; kind: InspectionKind; day: string }[]; kind: InspectionKind; day: string }) {
+  // The last result for each item counts: one passed then marked failed is left off.
+  const last = new Map<string, boolean>()
+  for (const d of [...done].reverse()) if (d.kind === kind && d.day === day) last.set(d.a.id, d.passed)
+  const passed = [...last].filter(([, ok]) => ok).map(([id]) => id)
+  const without = passed.filter((id) => !view.inspections.certificateFor({ assetId: id, kind, day }))
+  if (passed.length === 0) return null
+  const what = kind === 'pat' ? 'PAT certificate' : 'report of thorough examination'
+  if (without.length === 0) return <p className="hint">Each one that passed here has its {what}.</p>
+  return (
+    <Fold label={`Add the ${what} for ${without.length === 1 ? 'the one' : `these ${without.length}`} passed`}>
+      <CertificateForm kind={kind} day={day} assetIds={without} label={`Add the ${what} for the round`} />
+    </Fold>
   )
 }
 
@@ -320,7 +403,7 @@ export function TestingScreen({ view }: { view: View }) {
   const [typed, setTyped] = useState('')
   const [camera, setCamera] = useState(false)
   const [said, setSaid] = useState<Said>()
-  const [done, setDone] = useState<{ a: AssetView; passed: boolean; at: number }[]>([])
+  const [done, setDone] = useState<{ a: AssetView; passed: boolean; at: number; kind: InspectionKind; day: string }[]>([])
   const [held, setHeld] = useState<Held>()
   const [now, setNow] = useState(() => Date.now())
   // The one held as of the latest read, for a read or a timer that lands before the next render.
@@ -355,7 +438,7 @@ export function TestingScreen({ view }: { view: View }) {
     } catch (err) {
       return missed(`${name}: not recorded. ${(err as Error).message}`)
     }
-    setDone((d) => [{ a: h.a, passed: true, at: Date.now() }, ...d])
+    setDone((d) => [{ a: h.a, passed: true, at: Date.now(), kind: h.kind, day: h.day }, ...d])
     const due = client
       .view()
       .inspections.dueOf(h.a.id)
@@ -429,7 +512,7 @@ export function TestingScreen({ view }: { view: View }) {
   const failed = (last: NonNullable<Said['last']>) =>
     void act(() => record({ assetId: last.a.id, kind: last.kind, passed: false, day: last.day, today: last.today, by: last.by, note: '' })).then(
       () => {
-        setDone((d) => [{ a: last.a, passed: false, at: Date.now() }, ...d])
+        setDone((d) => [{ a: last.a, passed: false, at: Date.now(), kind: last.kind, day: last.day }, ...d])
         say('warn', `${itemName(last.a)}: failed. It can't go out until it passes. Report what's wrong on its page.`)
       },
       (err: Error) => missed(`${itemName(last.a)}: the fail wasn't recorded. ${err.message}`),
@@ -539,6 +622,7 @@ export function TestingScreen({ view }: { view: View }) {
                 </li>
               ))}
             </ul>
+            {mayTest && <RoundCertificate view={view} done={done} kind={kind} day={day} />}
           </section>
         )}
         <InspectionsDue view={view} />

@@ -9,6 +9,7 @@ import { Icon, type IconName } from '../Icon.tsx'
 const ICONS: Record<string, IconName> = {
   '#home': 'home',
   '#jobs': 'calendar',
+  '#quotes': 'document',
   '#stock': 'warehouse',
   '#crew': 'people',
   '#menu': 'menu',

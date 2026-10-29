@@ -158,6 +158,9 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'fault.update': 'stock',
   'fault.close': 'stock',
   'inspection.record': 'stock',
+  // Certificates on items (ADR 0094), as the tests they're for.
+  'itemCertificate.save': 'stock',
+  'itemCertificate.remove': 'stock',
   'count.record': 'stock',
   // The vehicles themselves and their checks (ADR 0047), kept by whoever keeps the stock.
   'vehicle.save': 'stock',
@@ -193,7 +196,12 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'quote.answer': 'money',
   'quote.invoiced': 'money',
   'quote.paid': 'money',
+  'quoting.update': 'money',
+  'quoting.travel': 'money',
   'price.product': 'money',
+  'price.rulesFromRms': 'money',
+  'package.save': 'money',
+  'package.remove': 'money',
   'price.role': 'money',
   'price.client': 'money',
   'cost.paid': 'money',
@@ -203,6 +211,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'reading.heads': 'company',
   // Whether the app prompts messages to crew (ADR 0048): a setting, so the office's as much as a director's.
   'messages.prompt': 'settings',
+  // Whether the company uses timesheets (ADR 0090): a setting like messages to crew.
+  'timesheets.use': 'settings',
 
   'person.role': 'company',
   'person.erase': 'company',

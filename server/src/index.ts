@@ -8,6 +8,7 @@ import { dirStore, storeFromEnv } from './backup/store.ts'
 import { dbFromEnv } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
 import { nominatim } from './projects/places.ts'
+import { outsideLooks } from './status.ts'
 import { backupWatch, errorReportingFromEnv, flushReports, reportError, startErrorReporting, watchEventLoop } from './monitoring.ts'
 
 // Error reporting first, so a start-up that goes wrong is reported too (ADR 0005).
@@ -54,6 +55,8 @@ async function main() {
     // Writing to Google Calendar stays off until CALENDAR_WRITES is on: Colly's call, 16 October 2026.
     // Local stand-ins the browser tests read calendars from (ADR 0044): never set where the server runs for real.
     places: nominatim({ base: process.env.NOMINATIM_URL || undefined }),
+    // Admin › Status asks the map search and GitHub's copy of the changelog (ADR 0093); the browser tests point both nowhere.
+    outside: outsideLooks({ mapsBase: process.env.NOMINATIM_URL || undefined, latestUrl: process.env.LATEST_VERSION_URL || undefined }),
     ownCalendars: process.env.OWN_CALENDAR_TEST_HOSTS ? { testHosts: process.env.OWN_CALENDAR_TEST_HOSTS.split(',').map((h) => h.trim()).filter(Boolean) } : undefined,
     // Current RMS, read only (ADR 0078). Colly saved the key as CURRENT_CMS_KEY, 23 October 2026; the subdomain is the company's own.
     currentRms: currentRmsKey() ? { subdomain: process.env.CURRENT_RMS_SUBDOMAIN?.trim() || 'sessionhire', apiKey: currentRmsKey()! } : undefined,
@@ -83,6 +86,8 @@ async function main() {
   // Documents' files no document has any more, deleted, as each day from now on (ADR 0029). Not waited for: it talks to
   // the bucket, which mustn't hold up the server starting, and it says in the log what it couldn't do.
   void app.documents.start()
+  // The fuel price from each new month of the AA's survey (ADR 0086). Not waited for: it reads their page.
+  void app.fuelUpdates.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
   else if (passcode) {

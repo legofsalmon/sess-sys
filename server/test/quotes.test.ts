@@ -110,6 +110,75 @@ describe('a quote', () => {
   })
 })
 
+describe('a quote number (ADR 0084)', () => {
+  it('is given when a quote first goes, kept on every version, and carries on from the number Admin sets', async () => {
+    const { app, quote } = await gala()
+    await ok(
+      app,
+      m('project.create', { id: 'ball', name: 'Winter Ball', clientId: 'bw', venueId: null, status: 'enquiry', notes: '' }),
+      m('quoting.update', { nextNumber: 1115, terms: 'Half up front, the rest within 30 days.', bank: 'IBAN IE00 BANK 0000 0000 0000 00' }),
+      save('v1')
+    )
+    expect(await quote('v1')).toMatchObject({ number: null, validDays: 30, depositPct: null })
+    await ok(app, m('quote.save', { id: 'v1', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', validDays: 14, depositPct: 50 }), m('quote.sent', { id: 'v1', on: today }))
+    expect(await quote('v1')).toMatchObject({ number: 1115, validDays: 14, depositPct: 50 })
+
+    // A second version keeps the number, and the days and deposit unless it says otherwise; a save that doesn't say them leaves them.
+    await ok(app, save('v2', [line({ qty: 9 })]), save('v2', [line({ qty: 10 })]), m('quote.sent', { id: 'v2', on: today }))
+    expect(await quote('v2')).toMatchObject({ version: 2, number: 1115, validDays: 14, depositPct: 50 })
+
+    // Another job's, answered straight from its draft, takes the next.
+    await ok(app, m('quote.save', { id: 'b1', projectId: 'ball', lines: [line()], discountPct: 0, notes: '' }), m('quote.answer', { id: 'b1', answer: 'accepted', on: today }))
+    expect(await quote('b1')).toMatchObject({ number: 1116 })
+
+    // The next number can't go back over one given.
+    expect(await refused(app, m('quoting.update', { nextNumber: 1116, terms: '', bank: '' }))).toBe('Quote 1116 has been given already, so the next number is 1117 or more.')
+    await ok(app, m('quoting.update', { nextNumber: null, terms: '', bank: '' }))
+  })
+
+  it("goes to the client's address, which a save from an older app leaves as it was", async () => {
+    const { app } = await gala()
+    const client = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string; id: string }) => c.entity === 'client' && c.id === 'bw').at(-1).data
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events', contacts: [], notes: '', address: '1 Quay Street\nGalway' }))
+    expect(await client()).toMatchObject({ address: '1 Quay Street\nGalway' })
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events Ltd', contacts: [], notes: '' }))
+    expect(await client()).toMatchObject({ name: 'Brightwater Events Ltd', address: '1 Quay Street\nGalway' })
+    await ok(app, m('client.upsert', { id: 'bw', name: 'Brightwater Events Ltd', contacts: [], notes: '', address: '' }))
+    expect(await client()).not.toHaveProperty('address')
+  })
+})
+
+describe('travel and subsistence (ADR 0086)', () => {
+  it('keeps how they are charged, moving the day the fuel price was set only when it changes', async () => {
+    const { app } = await gala()
+    const settings = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'quoteSettings').at(-1)?.data
+    // Printed quotes saved first leave travel to its defaults, and travel saved after leaves the printed quote's.
+    await ok(app, m('quoting.update', { nextNumber: 1115, terms: 'Terms', bank: 'Bank' }))
+    expect(await settings()).not.toHaveProperty('travelFromKm')
+    await ok(app, m('quoting.travel', { travelFromKm: 60, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: 3908, on: day(-40) }))
+    expect(await settings()).toMatchObject({ nextNumber: 1115, terms: 'Terms', travelFromKm: 60, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: 3908, fuelSetOn: day(-40) })
+    await ok(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))
+    expect(await settings()).toMatchObject({ travelFromKm: 80, perDiemCents: null, fuelSetOn: day(-40) })
+    await ok(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 169.5, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))
+    expect(await settings()).toMatchObject({ fuelCentsPerLitre: 169.5, fuelSetOn: day(0) })
+    await ok(app, m('quoting.update', { nextNumber: null, terms: '', bank: '' }))
+    expect(await settings()).toMatchObject({ travelFromKm: 80, fuelCentsPerLitre: 169.5 })
+    expect(await refused(app, m('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.95, litresPer100Km: 9.5, perDiemCents: null, on: day(0) }))).toMatch(/fuel price/)
+  })
+
+  it('keeps meals provided and the distance on a quote, and on its next version, and a save from an older app leaves them', async () => {
+    const { app, quote } = await gala()
+    await ok(app, m('quote.save', { id: 'v1', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', mealsProvided: true, travelKm: 210 }))
+    expect(await quote('v1')).toMatchObject({ mealsProvided: true, travelKm: 210 })
+    await ok(app, save('v1', [line({ qty: 4 })]))
+    expect(await quote('v1')).toMatchObject({ mealsProvided: true, travelKm: 210 })
+    await ok(app, m('quote.sent', { id: 'v1', on: today }), save('v2'))
+    expect(await quote('v2')).toMatchObject({ version: 2, mealsProvided: true, travelKm: 210 })
+    await ok(app, m('quote.save', { id: 'v2', projectId: 'gala', lines: [line()], discountPct: 0, notes: '', mealsProvided: false, travelKm: null }))
+    expect(await quote('v2')).toMatchObject({ mealsProvided: false, travelKm: null })
+  })
+})
+
 describe('the price list', () => {
   it('sets and clears a day price for a product, a role and a discount for a client', async () => {
     const { app } = await gala()
@@ -125,6 +194,72 @@ describe('the price list', () => {
     const after = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes as { entity: string; op: string }[]
     expect(after.filter((c) => c.entity === 'rolePrice').map((c) => c.op)).toEqual(['put', 'delete'])
     expect(await refused(app, m('price.product', { modelId: 'gone', dayCents: 100 }))).toBe('That product is no longer in the stock list.')
+  })
+})
+
+describe('rate rules and an agreed price (ADR 0085)', () => {
+  it("keeps a product's rule through a price change that doesn't say one, as from an older app", async () => {
+    const { app } = await gala()
+    await ok(app, m('model.create', { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' }))
+    await ok(app, m('price.product', { modelId: 'y10p', dayCents: 4500, rate: 'week3' }), m('price.product', { modelId: 'y10p', dayCents: 5000 }))
+    const prices = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'productPrice')
+    expect(prices.at(-1).data).toEqual({ id: 'y10p', dayCents: 5000, rate: 'week3' })
+  })
+
+  it("takes each priced product's rule from the lines read from Current RMS, by name or other name, leaving one chosen alone", async () => {
+    const { app, db } = await gala()
+    const model = (id: string, name: string, aliases: string[] = []) =>
+      m('model.create', { id, name, aliases, department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' })
+    await ok(app, model('y10p', 'd&b Y10P'), model('sm58', 'Shure SM58', ['SM58']), model('di', 'DI box'), model('unpriced', 'Hazer'))
+    await ok(app, m('price.product', { modelId: 'y10p', dayCents: 4500 }), m('price.product', { modelId: 'sm58', dayCents: 500 }), m('price.product', { modelId: 'di', dayCents: 300, rate: 'daily' }))
+    await db.query(`INSERT INTO rms_opportunities (id) VALUES (1)`)
+    const rows: [string, string][] = [
+      ['D&B Y10P', 'Weekly Rate'], ['d&b Y10P', 'Weekly Rate'], ['d&b Y10P', '3 Day Week Rate'],
+      ['SM58', '3 Day Week Rate'], ['DI box', 'Weekly Rate'], ['Hazer', 'Weekly Rate'], ['d&b Y10P', 'Sale'],
+    ]
+    for (const [i, [name, rate]] of rows.entries()) await db.query(`INSERT INTO rms_lines (id, opportunity_id, name, rate_definition) VALUES ($1, 1, $2, $3)`, [i + 1, name, rate])
+    await ok(app, m('price.rulesFromRms', { all: false }))
+    const pulled = (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes as { entity: string; id: string; data: { rate?: string } }[]
+    const rule = (id: string) => pulled.filter((c) => c.entity === 'productPrice' && c.id === id).at(-1)!.data.rate
+    expect([rule('y10p'), rule('sm58'), rule('di')]).toEqual(['weekly', 'week3', 'daily'])
+    expect(pulled.some((c) => c.entity === 'productPrice' && c.id === 'unpriced')).toBe(false)
+  })
+
+  it('holds a price agreed on its draft until it is cleared', async () => {
+    const { app, quote } = await gala()
+    await ok(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: 60000, notes: '' }))
+    expect((await quote('q1')).agreedCents).toBe(60000)
+    // A save from an older app says nothing of it, and it stays.
+    await ok(app, save('q1'))
+    expect((await quote('q1')).agreedCents).toBe(60000)
+    await ok(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: null, notes: '' }))
+    expect((await quote('q1')).agreedCents).toBeNull()
+    expect(await refused(app, m('quote.save', { id: 'q1', projectId: 'gala', lines: [line()], discountPct: 0, agreedCents: -1, notes: '' }))).toBe("A price can't be less than nothing.")
+  })
+})
+
+describe('a package (ADR 0087)', () => {
+  it('is saved with what it holds, changed, and taken off the price list, and holds only products in the stock list', async () => {
+    const { app } = await gala()
+    await ok(app, m('model.create', { id: 'sm58', name: 'Shure SM58', department: 'audio', category: 'Mics', tracking: 'bulk', isCase: false, valueCents: 0, notes: '' }))
+    const pkg = { id: 'mics', name: '  Mic package ', department: 'audio' as const, dayCents: 10000, rate: 'weekly' as const, items: [{ modelId: 'sm58', qty: 4 }], notes: 'with clips' }
+    await ok(app, m('package.save', pkg), m('package.save', { ...pkg, dayCents: 12000 }))
+    const pulled = async () => (await app.inject({ url: '/api/sync/pull?after=0' })).json().changes.filter((c: { entity: string }) => c.entity === 'package')
+    expect((await pulled()).at(-1).data).toEqual({ id: 'mics', name: 'Mic package', department: 'audio', dayCents: 12000, rate: 'weekly', items: [{ modelId: 'sm58', qty: 4 }], notes: 'with clips' })
+    expect(await refused(app, m('package.save', { ...pkg, items: [{ modelId: 'gone', qty: 1 }] }))).toBe('One of the products in the package is no longer in the stock list.')
+    expect(await refused(app, m('package.save', { ...pkg, items: [{ modelId: 'sm58', qty: 1 }, { modelId: 'sm58', qty: 2 }] }))).toBe('Each product is in a package once, with how many.')
+    await ok(app, m('package.remove', { id: 'mics' }))
+    expect((await pulled()).at(-1).op).toBe('delete')
+  })
+})
+
+describe('the cost side of a line (ADR 0089)', () => {
+  it('keeps how many are hired in, who from and what a line costs, with the supplier trimmed, and refuses a cost below nothing', async () => {
+    const { app, quote } = await gala()
+    await ok(app, save('q1', [line({ qty: 8, subhireQty: 2, supplier: '  Hire Co ', costCents: 15000 })]))
+    expect((await quote('q1')).lines[0]).toMatchObject({ qty: 8, subhireQty: 2, supplier: 'Hire Co', costCents: 15000 })
+    expect(await refused(app, save('q1', [line({ costCents: -5 })]))).toBe("A price can't be less than nothing.")
+    expect(await refused(app, save('q1', [line({ subhireQty: 1.5 })]))).toBe('How many are hired in is a whole number from 0 to 10,000.')
   })
 })
 

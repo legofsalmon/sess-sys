@@ -67,6 +67,7 @@ test('the office approves timesheets, and a freelancer sends theirs from their l
   // And Dara sees on their link what was approved, and what changed.
   await office.getByRole('navigation', { name: 'Crew pages' }).getByRole('link', { name: 'People' }).click()
   await office.getByRole('region', { name: 'People' }).getByRole('link', { name: /^Dara Quinn/ }).click()
+  await office.getByRole('tab', { name: /^Their link/ }).click()
   await office.getByRole('button', { name: 'Copy link' }).click()
   const daraLink = await office.evaluate(() => navigator.clipboard.readText())
   const dara = await (await browser.newContext({ viewport: phoneSize, javaScriptEnabled: false })).newPage()

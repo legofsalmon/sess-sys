@@ -29,10 +29,11 @@ import {
   type ProjectStatus,
   type RetiredReason,
 } from '@sh/shared'
+import { RATE_LABELS, type RateRule } from '@sh/shared'
 import { certificateName, certificateOf, DOCUMENT_ACTIONS, DOCUMENT_KINDS, DOCUMENT_TITLES, fileLabel, FILE_TYPES, titleInSentence, type FileType } from '@sh/shared'
 import { countSummaryWords, isCountSummary } from '@sh/shared'
 import { ROLE_LABELS, type Role } from '@sh/shared'
-import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS } from '@sh/shared'
+import { OWN_CALENDAR_ACTIONS, PHOTO_ACTIONS, PRODUCT_PHOTO_ACTIONS } from '@sh/shared'
 import { LEFT_OUT_REASONS, leftOutLabel, type LeftOutReason } from '@sh/shared'
 import { VEHICLE_KIND_LABELS, type VehicleKind } from '@sh/shared'
 import { STEP_LABELS, type JobStep } from '@sh/shared'
@@ -40,6 +41,7 @@ import { PURCHASE_STATUS_LABELS, type PurchaseStatus } from '@sh/shared'
 import { aliasesOf } from '@sh/shared'
 import { RACK_PART_LABELS, type RackPart } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
+import { ITEM_CERTIFICATE_FILE_ACTION, ITEM_CERTIFICATE_KINDS, ITEM_CERTIFICATE_LABELS } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -62,6 +64,8 @@ export const ERASED_AGAIN_ACTION = 'person.erase-again'
 export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
 /** And clearing running late 30 days after its day (ADR 0028). */
 export const LATE_CLEARED_ACTION = 'late.clear-old'
+/** And taking the fuel price from a new month of the AA's survey (ADR 0086). */
+export const FUEL_FROM_AA_ACTION = 'quoting.fuel-from-aa'
 
 const PAGE = 50
 const MAX_PAGE = 200
@@ -257,6 +261,8 @@ const REFERENCES = [
   'placeId',
   'caseId',
   'assetId',
+  // Certificates on items (ADR 0094): the items each covers.
+  'assetIds',
   'fromPlaceId',
   'fromCaseId',
   'toPlaceId',
@@ -524,6 +530,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return a.rates === true ? 'Let heads of department see crew rates' : 'Kept crew rates from heads of department'
     case 'messages.prompt':
       return a.on === true ? 'Turned on messages to crew' : 'Turned off messages to crew'
+    case 'timesheets.use':
+      return a.on === true ? 'Turned on timesheets' : 'Turned off timesheets'
     case 'offer.confirm': {
       const o = offer(a.id)
       return `Confirmed ${o.who} for ${o.what}`
@@ -662,6 +670,11 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       return `Removed the product ${model(a.id)}`
     case 'model.mistake':
       return `Marked the product ${model(a.id)} as added by mistake`
+    // A product's photo (ADR 0083): that it changed, never the picture.
+    case PRODUCT_PHOTO_ACTIONS.put:
+      return `${a.replaced ? 'Put a new photo' : 'Put a photo'} on the product ${model(a.id)}`
+    case PRODUCT_PHOTO_ACTIONS.remove:
+      return `Took the photo off the product ${model(a.id)}`
     case 'place.upsert':
       return `Saved the place ${text(a.name, 'a place')}`
     case 'place.remove':
@@ -883,6 +896,21 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'attachment.save') return `Saved ${whose}${typeof a.link === 'string' ? ', as a link' : ''}`
       return a.added ? `Added ${whose}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${whose}${file}`
     }
+    // Certificates on items (ADR 0094): "Saved the PAT certificate for SH-000123 (CM Lodestar) and 11 more items, as a link".
+    case 'itemCertificate.save':
+    case 'itemCertificate.remove':
+    case ITEM_CERTIFICATE_FILE_ACTION: {
+      const c = look('itemCertificate', a.id)
+      const kind = ITEM_CERTIFICATE_KINDS.find((k) => k === (a.kind ?? c?.kind))
+      const title = kind === 'other' || !kind ? text(a.title ?? c?.title, 'a certificate') : ITEM_CERTIFICATE_LABELS[kind]
+      const ids: unknown[] = Array.isArray(a.assetIds) ? a.assetIds : Array.isArray(c?.assetIds) ? c.assetIds : []
+      const more = ids.length > 1 ? ` and ${ids.length - 1} more ${ids.length === 2 ? 'item' : 'items'}` : ''
+      const what = `${kind === 'other' ? `“${clip(title)}”` : `the ${title.charAt(0).toLowerCase()}${title.slice(1)}`} for ${ids.length ? item(ids[0]) : 'an item'}${more}`
+      const file = typeof a.type === 'string' && a.type in FILE_TYPES && typeof a.bytes === 'number' ? ` (${fileLabel({ type: a.type as FileType, bytes: a.bytes })})` : ''
+      if (command === 'itemCertificate.remove') return c ? `Removed ${what}` : 'Removed a certificate'
+      if (command === 'itemCertificate.save') return `Saved ${what}${typeof a.link === 'string' ? ', as a link' : ''}`
+      return a.added ? `Added ${what}, with its file${file}` : `${a.replaced ? 'Put a new file on' : 'Put a file on'} ${what}${file}`
+    }
     // Money (ADR 0042), in words with no amounts: every member of staff reads the history, and only some see money.
     case 'quote.save':
     case 'quote.sent':
@@ -900,8 +928,26 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'quote.invoiced') return a.on === null ? `Took back the invoice for ${of}` : `Marked ${of} invoiced${on}${typeof a.ref === 'string' && a.ref.trim() ? `, as ${clip(a.ref.trim())}` : ''}`
       return a.on === null ? `Took back the payment for ${of}` : `Marked ${of} paid${on}`
     }
+    case 'quoting.update':
+      return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
+    case FUEL_FROM_AA_ACTION:
+      return `Took the fuel price from the AA's ${text(a.month, 'latest')} survey: ${typeof a.centsPerLitre === 'number' ? `${a.centsPerLitre}c a litre` : 'a new price'}`
+    case 'quoting.travel':
+      return `Set how travel and subsistence are charged: travel past ${typeof a.travelFromKm === 'number' ? a.travelFromKm : '?'} km from Dublin, ${
+        typeof a.fuelCentsPerLitre === 'number' ? `fuel at ${a.fuelCentsPerLitre}c a litre` : 'no fuel price'
+      }, ${typeof a.perDiemCents === 'number' ? `a per diem of ${euro(a.perDiemCents)}` : 'no per diem'}`
     case 'price.product':
-      return a.dayCents === null ? `Took ${model(a.modelId)} off the price list` : `Set the day price of ${model(a.modelId)}`
+      return a.dayCents === null
+        ? `Took ${model(a.modelId)} off the price list`
+        : `Set the price of ${model(a.modelId)}${typeof a.rate === 'string' && a.rate in RATE_LABELS ? `, charged ${RATE_LABELS[a.rate as RateRule]}` : ''}`
+    case 'price.rulesFromRms':
+      return a.all === true ? "Set every product's rate rule from Current RMS's quotes" : "Set the rate rule of products with none from Current RMS's quotes"
+    case 'package.save':
+      return `Saved the package ${text(a.name, 'a package')}`
+    case 'package.remove': {
+      const p = look('package', a.id)
+      return `Took the package ${text(p?.name, 'a package')} off the price list`
+    }
     case 'price.role':
       return a.dayCents === null ? `Took ${text(a.role, 'a role')} off the price list, to quote it at its booked rate` : `Set the day price for ${text(a.role, 'a role')}`
     case 'price.client':

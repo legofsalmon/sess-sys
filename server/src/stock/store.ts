@@ -5,7 +5,7 @@ import type { Queryable } from '../db.ts'
 
 const MODEL = `id, name, department, category, tracking, is_case, value_cents, notes, pat_months, lifting_months, mistake, aliases, list_id,
   is_rack, code, units, depth_mm, weight_kg::float8 AS weight_kg, power_w, dry_hire, supplier, hire_day_cents,
-  rack_mount, rack_width, case_width_mm, case_height_mm, case_depth_mm, castors, power_limit_a, rack_part`
+  rack_mount, rack_width, case_width_mm, case_height_mm, case_depth_mm, castors, power_limit_a, rack_part, photo_at`
 const PLACE = `id, name, notes`
 const STOCK = `id, model_id, place_id, case_id, qty`
 // An item with its current number and the ones it had before, oldest first.
@@ -47,6 +47,7 @@ export const toModel = (r: Row): Model => ({
   castors: r.castors,
   powerLimitA: r.power_limit_a,
   rackPart: r.rack_part,
+  ...(r.photo_at ? { photo: { at: new Date(r.photo_at).toISOString() } } : {}),
 })
 export const toPlace = (r: Row): Place => ({ id: r.id, name: r.name, notes: r.notes })
 export const toStock = (r: Row): Stock => ({ id: r.id, modelId: r.model_id, placeId: r.place_id, caseId: r.case_id, qty: r.qty })

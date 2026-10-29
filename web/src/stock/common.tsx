@@ -474,3 +474,7 @@ export function TrackingChoice({
     </fieldset>
   )
 }
+
+/** "2 Oct 2027": a test's day, when one's due, and a certificate's (ADR 0020, ADR 0094). */
+export const dateLabel = (day: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })

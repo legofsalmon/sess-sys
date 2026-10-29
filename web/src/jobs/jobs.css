@@ -50,24 +50,38 @@
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
 
-/* The planner: the one screen that uses a laptop's full width. */
-.app.plan { max-width: 1400px; }
-.plan .plan-title { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
-.plan .actions .button { flex: 1 1 auto; max-width: 180px; }
+/* The planner: the same width as every other page (ADR 0091), so List, Week and Month don't jump. */
+.plan .plan-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
+.plan .plan-bar .steps { display: flex; gap: var(--space-6); flex: 1 1 18rem; max-width: 30rem; }
+.plan .plan-bar .steps .button { flex: 1 1 0; white-space: nowrap; }
+/* On the days that hold today, This week is where you are already: said, and quieter. */
+.plan .plan-bar .steps [aria-current] { color: var(--muted); }
 .plan .checks { border-color: var(--warn); }
 .plan .checks h2 { color: var(--warn); }
 .plan .problem > div { flex: 1; min-width: 60%; }
 .plan .problem p { color: var(--ink); }
-/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. */
-.plan .scroller { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. It ends at the foot of the
+   screen (under the bar, over the phone's tabs), so a long month scrolls inside it with its days and names kept in view. */
+.plan .scroller { position: relative; overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - 96px - env(safe-area-inset-bottom)); border: 1px solid var(--line); border-radius: 10px; }
+@media (min-width: 900px) { .plan .scroller { max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
 .plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plan .timeline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
-.plan .timeline.week { min-width: calc(8rem + 7 * 6.5rem); }
-.plan .timeline.month { min-width: calc(8rem + var(--days) * 2.2rem); }
-.plan .timeline col.names { width: 8rem; }
-.plan .timeline th, .plan .timeline td { padding: var(--space-4); text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.plan .timeline thead th { border-top: 0; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.plan .timeline { --names: 7rem; --pad: var(--space-4); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
+/* A desk has room for a job's name on one line; a month's days then fit a laptop without scrolling sideways. */
+@media (min-width: 900px) { .plan .timeline { --names: 12rem; } }
+.plan .timeline.week { min-width: calc(var(--names) + 7 * 6.5rem); }
+.plan .timeline.month { --pad: var(--space-2); min-width: calc(var(--names) + var(--days) * 1.9rem); }
+.plan .timeline col.names { width: var(--names); }
+.plan .timeline th, .plan .timeline td { padding: var(--pad); text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+/* Lets a day's block fill its row, so the days of a run line up. */
+.plan .timeline.week td { height: 1px; }
+.plan .timeline thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); border-top: 0; border-bottom: 1px solid var(--line); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.plan .timeline tbody tr:first-child > * { border-top: 0; }
 .plan .timeline tr > :first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); border-left: 0; border-right: 1px solid var(--line); }
+.plan .timeline thead tr > :first-child { z-index: 3; }
+/* The row under the pointer, so a day can be followed back to its job across a wide week. */
+@media (hover: hover) {
+  .plan .timeline tbody tr:hover > * { background-image: linear-gradient(var(--ds-wash-hover), var(--ds-wash-hover)); }
+}
 .plan .timeline tr > :nth-child(2) { border-left: 0; }
 .plan .timeline th[scope='row'] { font-weight: 700; overflow-wrap: anywhere; }
 .plan .timeline th[scope='row'] a { color: inherit; text-decoration: none; }
@@ -77,22 +91,26 @@
 .plan .timeline th[scope='row'] a:focus-visible { outline: none; }
 .plan .timeline th[scope='row'] a:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .plan .timeline th[scope='row'] small { display: block; color: var(--muted); font-weight: 500; }
-.plan .timeline .weekend { background: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
+.plan .timeline .weekend { background-color: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
 /* A public holiday (ADR 0024): a faint band in the off tone, a shade deeper than a weekend, named under its date. */
-.plan .timeline .holiday { background: color-mix(in srgb, var(--line) 55%, var(--panel)); }
+.plan .timeline .holiday { background-color: color-mix(in srgb, var(--line) 55%, var(--panel)); }
 .plan .timeline thead th.holiday { color: var(--ink); }
 .plan .timeline .holiday-name { display: block; font-size: .7rem; font-weight: 600; color: var(--muted); white-space: normal; line-height: 1.2; }
 .plan .legend .swatch.holiday { background: color-mix(in srgb, var(--line) 55%, var(--panel)); box-shadow: inset 0 0 0 1px var(--line); }
 .plan .timeline th.today { color: var(--ink); box-shadow: inset 0 -3px 0 var(--ink); }
-.plan .timeline.month th, .plan .timeline.month td { padding: var(--space-2); text-align: center; }
+/* Today's column, faintly, all the way down, so it can be found in the middle of a long month. */
+.plan .timeline td.today { background-color: color-mix(in srgb, var(--ink) 5%, var(--panel)); }
+.plan .timeline .today-word { display: block; font-size: .7rem; font-weight: 700; }
+.plan .timeline.month th, .plan .timeline.month td { text-align: center; vertical-align: middle; }
 .plan .timeline.month tr > :first-child { text-align: left; padding: var(--space-4) var(--space-6); }
 .plan .timeline.month thead a { display: grid; min-height: 44px; place-content: center; color: inherit; text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .plan .timeline.month thead a:hover { background: var(--bg); }
 .plan .timeline.month thead small { font-size: .7rem; font-weight: 500; }
-/* A job's day: solid when confirmed, dashed when pencilled in; green when its crew are booked, amber while some are still to find. */
-.plan .blk { display: grid; gap: 1px; padding: var(--space-4) var(--space-6); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--panel); }
-.plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; }
-.plan .blk.full { background: var(--good-soft); }
+/* A job's day: solid when confirmed, dashed when pencilled in; amber while crew are still to find. Crew all found is the quiet case
+   and has no colour of its own (healthy is quiet), so the amber days stand out. */
+.plan .blk { display: grid; align-content: start; gap: 1px; padding: var(--space-4) var(--space-6); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--ds-surface-raised); }
+.plan .week .blk { height: 100%; }
+.plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; background: var(--panel); }
 .plan .blk.short { background: var(--warn-soft); }
 .plan .blk.stray { border: 2px solid var(--warn); box-shadow: none; }
 .plan .blk.pending { opacity: .75; }
@@ -101,17 +119,24 @@ a.blk:hover { border-color: var(--ink); filter: brightness(.96); }
 a.blk:hover b { text-decoration: underline; }
 a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .blk small { color: var(--muted); }
-.plan .blk.full small { color: var(--good); }
 .plan .blk.short small, .plan .blk.stray small { color: var(--warn); }
-.plan .month .blk { padding: 3px 0; place-items: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
+.plan .month .blk { padding: 3px 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
 .plan .month .blk.solid:not(.stray) { border-width: 1px 1px 1px 3px; }
-/* A person's day: green where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
+/* The days of one phase, or of one job for a person or a van, join into one bar over the lines between them: square where they meet,
+   the start marked once. */
+.plan .timeline :is(.blk, .code):is(.join-r, .join-lr) { margin-right: calc(-1 * var(--pad)); border-right-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.plan .timeline :is(.blk, .code):is(.join-l, .join-lr) { position: relative; margin-left: calc(-1 * var(--pad) - 1px); border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; box-shadow: none; }
+.plan .month .blk.solid:not(.stray):is(.join-l, .join-lr) { border-left-width: 0; }
+.plan .month .blk.solid:not(.stray):is(.join-r, .join-lr) { border-right-width: 0; }
+/* A person's day: solid where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
 .plan .item { display: grid; padding: 3px var(--space-6); border-radius: 6px; }
 .plan .item + .item { margin-top: 3px; }
 .plan .item a { color: inherit; font-weight: 700; text-decoration: none; }
 .plan .item a:hover { text-decoration: underline; }
 .plan .item small { color: var(--muted); }
-.plan .item.booked, .plan .code.booked { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
+.plan .item.booked, .plan .code.booked { background: var(--ds-surface-raised); box-shadow: inset 3px 0 0 var(--ink), inset 0 0 0 1px var(--line); }
+.plan .code.booked:is(.join-l, .join-lr) { box-shadow: inset 0 1px 0 var(--line), inset 0 -1px 0 var(--line); }
+.plan .code.booked.join-r { box-shadow: inset 3px 0 0 var(--ink), inset 0 1px 0 var(--line), inset 0 -1px 0 var(--line); }
 .plan .item.offered, .plan .code.offered { border: 1px dashed var(--muted); }
 .plan .item.away, .plan .code.away { background: var(--line); color: var(--on-line); }
 /* Busy in their own calendar (ADR 0044): neutral and hatched, like time blocked out in a calendar, so it reads apart from "unavailable" and is never mistaken for a clash. */
@@ -261,18 +286,50 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
 .quote-screen .quote-line .amount small { display: block; font-weight: 400; }
 .quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
+.quote-screen .quote-line .last-charged { grid-column: 1 / -1; font-size: var(--text-small); }
+.quote-screen .quote-line .last-charged p { margin: 0; }
 .quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
 .quote-screen .quote-line.unpriced input[aria-invalid] { border-color: var(--warn); }
 .quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
 /* Where the draft has the room, a line is one row, like the table it prints as. */
 @container (min-width: 860px) {
-  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(6em, 1.1fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
+  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(8em, 1.3fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
   .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
+  /* Under the cost side (ADR 0089), Remove and Done end the line on a row of their own. */
+  .quote-screen .quote-line .line-cost ~ .line-actions { grid-column: 1 / -1; justify-self: end; }
+  .quote-screen .quote-line .last-charged { grid-column: 1 / -1; }
 }
 /* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
 .quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
 .quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The cost side (ADR 0089): whether there's kit enough, under a line; hired in and what it costs, never printed; and a director's margin. */
+.quote-screen .quote-line-row { display: grid; gap: var(--space-4); }
+.quote-screen .quote-line-row .kit-note { margin: 0 0 var(--space-6); }
+.quote-screen .kit-note { font-size: var(--text-hint); }
+.quote-screen .kit-note .link { font-weight: 600; }
+.quote-screen .quote-line .kit-note, .quote-screen .quote-line .line-cost { grid-column: 1 / -1; }
+.quote-screen .line-cost { border: 0; border-top: 1px dashed var(--line); margin: 0; padding: var(--space-8) 0 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8) var(--space-12); }
+.quote-screen .line-cost legend { float: left; width: 100%; padding: 0; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .line-cost label { flex: 0 1 9em; }
+.quote-screen .line-cost label.supplier { flex: 1 1 14em; }
+.quote-screen .line-cost label:last-of-type { flex: 0 1 16em; }
+.quote-screen .line-cost .line-margin { margin-left: auto; align-self: center; }
+.quote-screen .line-cost small { color: var(--muted); }
+.quote-screen .line-margin { margin: 0; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
+.quote-screen .line-margin.bad, .quote-screen .margin-words.bad b { color: var(--bad); }
+.quote-screen .quote-line-shut .amount .line-margin { display: block; text-align: right; }
+.quote-screen .margin-words small { color: var(--muted); }
+.quote-screen .quote-margin { margin: 0; }
+/* Travel and subsistence (ADR 0086): worked out, not typed, so each reads as a shut line, with what the office says about the job under it. */
+.quote-screen .quote-extra { display: grid; gap: var(--space-8); padding-bottom: var(--space-8); }
+.quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); padding: var(--space-8) 0; border-top: 1px solid var(--line); min-height: 44px; }
+.quote-screen .quote-extra .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-extra .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quote-screen .quote-extra .signal b, .quote-screen .quote-extra .signal small { display: block; }
+.quote-screen .quote-extra .extra-km { max-width: 22em; }
+.office-form .fuel-field { display: grid; gap: var(--space-8); align-content: start; }
+.office-form .fuel-field button { justify-self: start; }
 /* What it comes to stays in view under the top bar while the lines are changed. */
 .quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
@@ -286,6 +343,10 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
 .quote-screen .kit-days-all input { width: 4.5em; }
+.quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .group-discount label { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-screen .group-discount input { width: 4.5em; color: var(--ink); }
+.quote-screen .agreed-note { margin: var(--space-2) 0 0; color: var(--ink); }
 .quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
 .quote-screen .quote-send label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-send .hint { flex-basis: 100%; }
@@ -301,7 +362,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-totals { margin: var(--space-10) 0 0 auto; display: grid; gap: var(--space-2); max-width: 22em; font-variant-numeric: tabular-nums; }
 .quote-totals div { display: flex; justify-content: space-between; gap: var(--space-12); }
 .quote-totals dt { color: var(--muted); }
-.quote-totals dd { margin: 0; }
+.quote-totals dd { margin: 0; white-space: nowrap; }
 .quote-totals .total { border-top: 1px solid var(--line); padding-top: var(--space-4); font-weight: 700; }
 .quote-totals .total dt { color: var(--ink); }
 .jobs .margin-line { margin: 0; }
@@ -330,6 +391,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .money .price-row .euro { display: inline-flex; align-items: center; gap: var(--space-4); }
 .money .price-row .euro input { width: 6.5em; }
 .money .price-row .alert { flex-basis: 100%; }
+.money .rate-rules { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-12); }
+.money .rate-rules .hint { margin: 0; }
 @media print {
   .print-sheet.quote-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
   .quote-sheet h1 { font-size: 17pt; margin: 2pt 0; }
@@ -343,8 +406,27 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-sheet .quote-totals dt { color: #444; }
   .quote-sheet .quote-totals .total { border-top: 1px solid #000; }
   .quote-sheet .quote-totals .total dt { color: #000; }
+  .quote-sheet .lines { white-space: pre-line; }
+  .quote-sheet .sheet-head { display: flex; justify-content: space-between; gap: 12pt; align-items: flex-start; }
+  .quote-sheet .from { display: grid; font-size: 9pt; color: #444; }
+  .quote-sheet .from .company { font-size: 13pt; font-weight: 700; color: #000; }
+  .quote-sheet .sheet-facts { margin: 0; display: grid; gap: 1pt; font-size: 9.5pt; text-align: right; }
+  .quote-sheet .sheet-facts div { display: flex; justify-content: flex-end; gap: 6pt; }
+  .quote-sheet .sheet-facts dt { color: #444; }
+  .quote-sheet .sheet-facts dd { margin: 0; font-weight: 700; min-width: 8.5em; }
+  .quote-sheet .sheet-to { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12pt; padding: 6pt 0; border-top: 1px solid #999; border-bottom: 1px solid #999; }
+  .quote-sheet .sheet-to .who { font-weight: 700; }
+  .quote-sheet .deposit { font-size: 10.5pt; }
+  .quote-sheet .sheet-terms { break-inside: avoid; font-size: 9pt; }
+  .quote-sheet .sheet-terms h2 { font-size: 10pt; margin: 0 0 2pt; }
   .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
+/* The printed quote's terms on the draft (ADR 0084): two short fields side by side. */
+.quote-terms { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.quote-terms .field { flex: 1 1 14em; }
+.quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-terms .with-unit input, .quote-terms input, .quote-extra .with-unit input, .office-form .with-unit input { max-width: 7em; }
+.version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
 .money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 
 /* Kit from the notes (ADR 0043): each line as the notes write it, over what it matched. */
@@ -405,7 +487,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  * A job's page (JobScreen): the whole width, with no list beside it, its
  * parts one at a time under tabs (the design system's tabs: the open one
  * underlined in the accent, the rest muted). One column, as its forms and
- * calls read down; from 1200px a little wider than other pages.
+ * calls read down, at the same width as every other page (ADR 0091).
  */
 .part-tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .part-tabs::-webkit-scrollbar { display: none; }
@@ -415,9 +497,6 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .part-count { font-weight: 600; font-variant-numeric: tabular-nums; opacity: .8; }
 .job-part { display: grid; gap: var(--space-14); min-width: 0; }
 .jobs .phase-crew { margin: 0; }
-@media (min-width: 1200px) {
-  .app.job-page { max-width: 960px; }
-}
 /* A person's first and last name side by side (ADR 0066), wrapping to two lines on a narrow phone. */
 :is(.import, .tidy) .names { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); }
 :is(.import, .tidy) .names .name { flex: 1 1 8rem; width: auto; min-width: 0; }
@@ -425,3 +504,45 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Past quotes from Current RMS (ADR 0078): a group's name heads its lines, as Current RMS lists them. */
 .past-quote .rms-lines .rms-group { padding-top: var(--space-12); }
 .past-quote .rms-lines .rms-group:first-child { padding-top: 0; }
+
+/* Under a job's name (ADR 0082): its client, venue and dates, then its crew and kit, as lines rather than a card of facts, so its parts start on the first screen. Its notes and Change details follow, unboxed until they're being changed. */
+.job-page .job-line { color: var(--ink); }
+.job-page .job-line + .job-line { color: var(--muted); }
+.job-page .job-notes { display: grid; gap: var(--space-6); justify-items: start; }
+.job-page .job-notes .notes { margin: 0; color: var(--muted); }
+
+/* Quotes to follow up (ADR 0081): on Money and Notifications, each group a short list, the oldest waiting first. */
+.quotes-to-follow .follow-group h3 { margin: var(--space-12) 0 var(--space-4); font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .follow-group li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quotes-to-follow .follow-group li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .warn { color: var(--warn); }
+.quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
+.quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
+/* Every quote (ADR 0088): a row a job, its quote's state on the right, as the rows to follow up. */
+.quote-list .filters { margin: var(--space-8) 0; }
+.quote-list ul.plain { list-style: none; margin: 0; padding: 0; }
+.quote-list li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quote-list li a { font-weight: 600; }
+.quote-list li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
+.quote-screen .in-step p { margin: 0; }
+
+/* Packages (ADR 0087): what one holds, under its line and on the price list. */
+.quote-screen .includes, .quote-sheet .includes { display: block; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
+.money .package-row { align-items: center; }
+.money .package-row > div:first-child { flex: 1 1 14em; }
+.money .package-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.money .package-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.money .package-editor { display: grid; gap: var(--space-12); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
+.money .package-fields { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.money .package-fields .field { flex: 1 1 10em; }
+.money .package-items { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
+.money .package-items legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
+.money .package-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.money .package-item > span { flex: 1 1 6em; }
+.money .package-item label { display: inline-flex; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
+.money .package-item input { width: 4.5em; color: var(--ink); }
+
+/* Matching past quotes to jobs (ADR 0092). */
+.rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
+.rms-match .match-row select { flex: 1 1 18em; min-width: 0; }

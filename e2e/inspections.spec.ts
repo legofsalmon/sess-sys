@@ -54,6 +54,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
     await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
     speakers.push((await add.locator('.added').textContent())!.slice(6, -1))
   }
+  await page.getByRole('tab', { name: /^Details/ }).click()
   await expect(page.locator('.facts')).toContainText('TestingNone')
 
   // It needs a PAT every 12 months.
@@ -66,6 +67,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await expect(page.locator('.facts')).toContainText('TestingPAT every 12 months')
 
   // The first one's last PAT was on paper, over a year ago: overdue.
+  await page.getByRole('tab', { name: /^Items/ }).click()
   await page.getByRole('link', { name: speakers[0] }).click()
   const card = page.getByRole('region', { name: 'Inspections' })
   await expect(card.locator('.due')).toContainText('PAT not recorded yet')
@@ -121,13 +123,16 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   await page.goto('/#stock/testing')
   await expect(due.locator('li', { hasText: speakers[0]! })).toHaveCount(0)
   await expect(due.locator('li', { hasText: speakers[1]! })).toContainText('PAT failed on')
-  await expect(due).not.toContainText(`× ${speaker}`)
+  await expect(due).not.toContainText('Not recorded yet')
+  // Both that passed have no certificate kept yet (ADR 0094): listed, never stopped.
+  await expect(due).toContainText(`No certificate kept yet for the last test of 2 × ${speaker}`)
   await due.getByRole('link', { name: `${speakers[1]} ${speaker}` }).click()
   await expect(card.locator('.due')).toContainText('PAT failed on')
   await expect(card.locator('summary')).toHaveText('2 recorded')
   await card.scrollIntoViewIfNeeded()
   await page.screenshot(shot('inspections-item'))
   await page.getByRole('link', { name: `‹ ${speaker}` }).click()
+  await page.getByRole('tab', { name: /^Details/ }).click()
   await expect(page.locator('.facts')).toContainText("1 can't go out")
 
   // Scanning it out for a job warns.

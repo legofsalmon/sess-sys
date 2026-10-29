@@ -30,7 +30,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday, useView } from '../view.ts'
 import { Heading, Icon } from '../Icon.tsx'
-import { Thumb } from '../Picture.tsx'
+import { productPhotoOf, Thumb } from '../Picture.tsx'
 import { departmentIcon, kitIcon } from '../stock/kitIcon.ts'
 import { NotesKitLink } from './NotesKit.tsx'
 
@@ -433,7 +433,7 @@ function KitLine({ line, job, today, mayChange, brief }: { line: KitLineView; jo
   return (
     <article className="kit-line" aria-label={`${line.qty} × ${productName(line)}`}>
       <header>
-        <Thumb icon={kitIcon(line.model)} size="small" />
+        <Thumb icon={kitIcon(line.model)} src={productPhotoOf(line.model)} size="small" />
         <div>
           <b>
             {line.qty} × {productName(line)}

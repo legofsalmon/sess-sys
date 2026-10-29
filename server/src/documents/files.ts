@@ -162,9 +162,9 @@ export class DocumentFiles {
    */
   async strays(): Promise<number> {
     if (!this.store) return 0
-    // People's photos (ADR 0065) are kept under the same prefix, by `keep`.
+    // People's photos (ADR 0065) and products' (ADR 0083) are kept under the same prefix, by `keep`.
     const listed = await this.store.list(PREFIX)
-    const { rows } = await this.db.query<{ key: string }>(`SELECT file_key AS key FROM documents WHERE file_key IS NOT NULL UNION SELECT file_key FROM attachments WHERE file_key IS NOT NULL UNION SELECT photo_key FROM people WHERE photo_key IS NOT NULL UNION SELECT key FROM document_files_to_delete`)
+    const { rows } = await this.db.query<{ key: string }>(`SELECT file_key AS key FROM documents WHERE file_key IS NOT NULL UNION SELECT file_key FROM attachments WHERE file_key IS NOT NULL UNION SELECT file_key FROM item_certificates WHERE file_key IS NOT NULL UNION SELECT photo_key FROM people WHERE photo_key IS NOT NULL UNION SELECT photo_key FROM models WHERE photo_key IS NOT NULL UNION SELECT key FROM document_files_to_delete`)
     const known = new Set(rows.map((r) => r.key))
     const n = listed.filter((f) => !known.has(f.key)).length
     if (n)

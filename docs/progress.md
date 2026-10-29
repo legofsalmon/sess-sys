@@ -3,7 +3,7 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
-## 27 October 2026: a director's sign-in is the directors' to change
+## 29 October 2026: a director's sign-in is the directors' to change
 
 **Done**
 
@@ -12,8 +12,275 @@ waiting on someone.
   combining need a director, and no command gives the sender's own sign-in
   address to another person, so the office can't take a director's account
   in two steps. A director may still combine her own two records. ADR 0064
-  notes it. App 1.38.2. All ten P1s of the audit are now fixed.
+  notes it. App 1.51.1. All ten P1s of the audit are now fixed.
 - Checked: typecheck, shared and server tests.
+
+## 28 October 2026: certificates on stock items
+
+**Done**
+
+- [ADR 0094](adr/0094-certificates-on-items.md), at Colly's ask: numbered
+  items keep their certificates, a PAT certificate, a report of thorough
+  examination (motors and other lifting gear) or another (a declaration of
+  conformity, an FR certificate), each a file, a link, or both, kept as
+  venues' documents are. One certificate covers a whole round. A test's
+  certificate is the one of its kind on its item dated its day, so the
+  tests stay as recorded. On an item's page each test has its certificate
+  to open, or Add certificate beside a pass, and a Certificates card lists
+  them all; after a round on the Testing page one report goes on every item
+  that passed; Inspections due lists other certificates running out and
+  how many tests have none yet. Nothing new stops kit going out: failed or
+  overdue tests still do. App 1.51.0.
+- Checked: typecheck, server tests (item-certificates.test.ts: links,
+  files, a round, refusals, history words, strays, starting fresh, no
+  bucket), device tests (which test a certificate is for, running out,
+  waiting changes), browser tests (item-certificates.spec.ts, inspections
+  and scanning).
+
+**Waiting on** the storage bucket on the live server for files; links work
+meanwhile. Emailing certificates to a venue from a job could follow.
+
+## 28 October 2026: a status page for everything the app relies on
+
+**Done**
+
+- [ADR 0093](adr/0093-system-status.md), at Colly's ask: Admin › Status
+  (office, directors, system admins) checks thirteen things at once and says
+  in a sentence how each stands and what to do when one needs someone: the
+  server and its version, whether main has a newer version Railway hasn't
+  deployed, the database (speed and size), sign-in, error reports, live
+  updates, nightly backups, the bucket, Google Calendar, crew's own
+  calendars, Current RMS, the AA fuel price and the map search. Read only:
+  nothing is written to Google and nobody is contacted. Kept for a minute;
+  Check again asks afresh. `/api/health` now gives the version and commit.
+  App 1.49.0.
+- Checked: typecheck, server tests (status.test.ts: every check's words and
+  what to do, a newer version on main, services down, the minute's keep, a
+  real backup and bucket; crew refused), browser tests (status.spec.ts, and
+  the layout, access and backups tests).
+
+**Waiting on** nobody. Telling the office in Notifications when a check
+turns bad could follow.
+
+## 28 October 2026: every page the same width
+
+**Done**
+
+- [ADR 0091](adr/0091-one-page-width.md), at Colly's ask: every page in the
+  app is one width at a given window size (full width to 640px on a phone,
+  up to 1200px beside the sidebar from 900px), planner, job page and the
+  catalogue beside a record included. Before, Stock's pages alone were
+  960, 1072 or 1400px. Only sign-in keeps the phone's width. A card's
+  paragraphs stop at about 75 characters instead. App 1.48.1.
+- Checked: a browser test walks every area's pages, Admin, You and Home on
+  a phone, a laptop and a 1680px screen and fails on any difference (it
+  failed on main as it should).
+
+## 28 October 2026: Current RMS's history on quotes
+
+**Done**
+
+- [ADR 0092](adr/0092-current-rms-history-on-quotes.md), part 4 of the
+  quoting plan. Match to jobs (`#jobs/money/current-rms/match`): each
+  opportunity beside its likeliest job by days, client and name; link one,
+  link all the sure ones, unlink. Links kept in `rms_matches` (server only).
+  A job's quote has an "In Current RMS" card (linked past quotes, the
+  client's record); a line being priced shows what it was last charged to
+  the client and to anyone, with "Use €X". Past quotes has a By client card
+  (went ahead of those decided, usual discount, last). Colly chose "Link and
+  look up only": no jobs made from old quotes. App 1.50.0.
+- Checked: typecheck, shared tests (outcomes, client names, matching, client
+  records), server tests (matches, link and unlink, a job's past quotes,
+  last charged, by client), browser tests (rms-history.spec.ts and the
+  quotes tests).
+
+**Waiting on** Colly: read Current RMS again from Admin › Connections if it
+has been a while, then link the sure ones on Match to jobs.
+
+## 28 October 2026: timesheets can be turned off, and start off
+
+**Done**
+
+- [ADR 0090](adr/0090-timesheets-off-until-used.md). A "Timesheets" switch
+  under Admin › Company, off by default (Colly won't use them on day one).
+  While off: no Timesheets page in Crew's row or the Menu, no Home count, no
+  notifications of them, nothing on freelancers' links (their timesheet page
+  is 404 and a post is turned down), and Money's "Owed to freelancers" only
+  if some approved are still to pay. Nothing deleted. Made-up data turns
+  them on. App 1.48.0.
+- Checked: typecheck, shared and server tests (off by default, link page and
+  post refused while off, kept and back when on, the history entry), browser
+  tests (timesheets-switch.spec.ts, and the timesheet, crew row, home,
+  departments and access tests).
+
+**Waiting on** nobody. Colly turns them on under Admin › Company when needed.
+
+## 28 October 2026: Quotes, a place of its own
+
+**Done**
+
+- [ADR 0088](adr/0088-quotes-in-the-sidebar.md). Quotes (`#quotes`) is a
+  sixth place in the desk sidebar, after Jobs, for those who see money; on a
+  phone it's on the Menu, which keeps its tab. The page has "To follow up"
+  (moved from Money, with New quote) and "All quotes": each job's quote, the
+  last changed first, found by job, client, venue, number or invoice and
+  narrowed by what it is. Money keeps the figures and links to it. App
+  1.47.0.
+- Checked: typecheck, unit tests (the list, its order, a draft over a sent
+  version, narrowing and finding), browser tests (quotes-page.spec.ts: the
+  sidebar on a desk, the Menu on a phone; quote-follow-up.spec.ts moved to
+  Quotes).
+
+## 28 October 2026: availability, subhire and margin on quotes
+
+**Done**
+
+- [ADR 0089](adr/0089-availability-subhire-and-margin-on-quotes.md), part 3
+  of the quoting plan. Each kit line is checked against the job's days by
+  the kit's hold rules, leaving out the job's own kit. Short lines say so
+  and offer "Hire in". Lines carry how many are hired in, the supplier and
+  what they cost us (`subhireQty`, `supplier`, `costCents`), with crew
+  costed at booked rates when left empty. "Add transport" adds the job's
+  vans. The office and directors see each line's margin and the quote's,
+  never printed.
+  App 1.46.0.
+- Checked: typecheck, unit tests (enough kit, what's wanted, line costs,
+  margin), server (cost side kept, supplier trimmed), browser test
+  (quotes.spec.ts: short, hired in, transport, nothing printed).
+
+## 28 October 2026: crew travel by car, and the fuel price kept up from the AA
+
+**Done**
+
+- Travel on quotes is the crew's own, not the vans': a car trip there and
+  back for each crew day, or each car load ("Crew to a car" in Admin), at
+  6.5 litres for 100 km unless set. Van fuel stays in the transport lines.
+- [ADR 0086](adr/0086-travel-and-subsistence-on-quotes.md), added to. The
+  server looks at the AA's survey once a day and takes a new month's diesel
+  price the day it appears (it comes out on the second Monday), unless
+  Admin's switch is off; a price more than 30% from the last waits for
+  someone. Admin says which survey the price is from. App 1.45.0.
+- Checked: typecheck, server (taken once a month, not when off, not a far
+  jump, the history entry), parity, browser test (quotes.spec.ts).
+
+## 28 October 2026: packages
+
+**Done**
+
+- [ADR 0087](adr/0087-packages.md), part 2b of the quoting plan. Packages on
+  the price list (`packages`): a name, the department it's listed under, a
+  price and rate rule, the products it holds and anything else it includes.
+  "Add a package" on a quote puts it on as one line, with what it holds
+  written on the line (`includes`) and printed under it. App 1.44.0.
+- Checked: typecheck, unit tests (what a package prints, saved, changed and
+  taken off, only products in the stock list), parity, browser test
+  (quotes.spec.ts: a package made on the price list, added to a quote and
+  printed).
+
+## 28 October 2026: travel and subsistence on quotes
+
+**Done**
+
+- [ADR 0086](adr/0086-travel-and-subsistence-on-quotes.md). A quote works
+  out the crew's travel (past a distance from Dublin city centre, the fuel
+  there and back for each van) and subsistence (a per diem for each crew
+  day, off when "Meals provided" is on) as two lines of its own. Admin ›
+  Company › Travel and subsistence sets the distance, the fuel price (read
+  from the AA's monthly survey in one press), what a van uses and the per
+  diem. App 1.43.0.
+- Checked: typecheck, unit tests (distance, fuel, crew days, the lines and
+  why there's none), server (settings, quote fields, the AA's page read and
+  refused), parity, browser test (quotes.spec.ts).
+
+**Waiting on**
+
+- Colly: set the fuel price (Read the AA's price, then Save) and the per diem
+  in Admin › Company › Travel and subsistence.
+
+## 28 October 2026: rate rules, discounts and an agreed price
+
+**Done**
+
+- [ADR 0085](adr/0085-rate-rules-discounts-and-an-agreed-price.md), part 2a
+  of the quoting plan. Each product price is charged Daily, 3 Day Week or
+  Weekly (`product_prices.rate`), and "Take the rules from Current RMS" on
+  the price list gives each priced product the one its Current RMS lines
+  were charged by most. A kit line charged by a rule keeps its days out and
+  works out its days charged. Lines have their own discount, a department
+  can be given one at once, and "Agree a total" (`quotes.agreed_cents`) makes
+  the discount whatever comes to the price agreed. App 1.42.0.
+- Checked: typecheck, unit tests (the three rules against Current RMS's
+  counts, a line's discount, an agreed price across VAT rates, a rule kept
+  through an older app's change, rules taken from Current RMS lines by name
+  and other name), parity, browser test (quotes.spec.ts).
+
+**Waiting on**
+
+- Colly: read Current RMS's quotes if not already, then press "Take the
+  rules from Current RMS" on the price list.
+
+## 28 October 2026: product photos and the rack sheet
+
+**Done**
+
+- [ADR 0083](adr/0083-product-photos-and-the-rack-sheet.md), part 3 of 3 of
+  the advanced rack builder. A product can have a photo (`models.photo_*`,
+  kept as people's photos are, changed by whoever changes stock, seen by
+  everyone signed in), kept at its own shape; it shows on the product's
+  page, in the lists, and on its panel in the rack, flat and in 3D. Print
+  the rack sheet, on the rack's page and in the designer: front and back,
+  groups, what goes where and what's loose, black on white. App 1.40.0.
+- Checked: typecheck, unit tests (a product's photo put up, replaced,
+  taken down, gone with the product, and who can), browser test
+  (racks.spec.ts: a photo from the product's page on its panel, and the
+  sheet as it prints).
+
+**Next**
+
+- Nothing more planned for racks. Sizes from a list of known models were
+  left out (see the ADR).
+
+## 28 October 2026: the printed quote
+
+**Done**
+
+- [ADR 0084](adr/0084-the-printed-quote.md), part 1c of the quoting plan.
+  Quote numbers given when a quote is first sent, kept on every version,
+  carrying on from Admin's "next quote number" (1115, after Current RMS);
+  valid until (30 days unless changed) and a deposit on each quote; terms
+  and bank details in Admin; a client address for quotes; the printed page
+  laid out as a letter; "What changed since version 1". App 1.41.0.
+- Checked: typecheck, unit tests (numbers, valid until, deposit, version
+  changes), server tests (numbering, the next number refused below one
+  given, the address kept by an older save), parity, and the quotes e2e
+  test extended through printing, numbering and a second version.
+
+**Waiting on Colly**
+
+- In Admin › Printed quotes: set the next quote number to 1115, and type
+  the terms and bank details.
+
+**Next**
+
+- Part 2: the three rate rules, line and department discounts, "Agree a
+  total", packages.
+
+## 27 October 2026: starting a quote and following it up
+
+**Done**
+
+- [ADR 0081](adr/0081-starting-a-quote-and-following-it-up.md), part 1b of
+  the quoting plan. New quote on Money (an enquiry and its draft from a
+  name, client and days); marking a quote sent makes the job quoted; an
+  answer offers to confirm the job or mark it lost; Money lists quotes
+  waiting on the office, and Notifications the ones worth a call. App
+  1.39.0.
+- Checked: typecheck, unit tests (`quotesToFollow`), a new e2e test from New
+  quote to confirming the job, and the quotes e2e test.
+
+**Next**
+
+- 1c: the printed quote (number, valid until, terms, deposit).
 
 ## 27 October 2026: building a rack up
 

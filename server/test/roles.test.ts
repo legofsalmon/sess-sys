@@ -506,6 +506,8 @@ describe('what each role reads', () => {
     expect(feed.of('offer', 'sean-lx').rateHidden).toBeUndefined()
     // Download everything stays the office's and directors'.
     expect((await app.inject({ url: '/api/export', cookies: s })).statusCode).toBe(403)
+    // So does how everything the app relies on stands (ADR 0093).
+    expect((await app.inject({ url: '/api/status', cookies: s })).statusCode).toBe(403)
   })
 
   it('sends a freelancer no rate or link but their own', async () => {

@@ -66,7 +66,7 @@ test.beforeAll(async ({ browser }) => {
 
 test('brings the crew list in from a file, fixing a phone in place, and shows them on the Crew tab', async ({ browser }) => {
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
-  await office.goto('/#admin')
+  await office.goto('/#admin/data')
   // Admin names every list and where it's brought in; the crew list is under Crew.
   const card = office.getByRole('region', { name: 'Bring lists in' })
   await expect(card).toContainText('Sign-in is off, so anyone who can reach the app can read whatever you bring in.')
@@ -128,6 +128,7 @@ test('brings the crew list in from a file, fixing a phone in place, and shows th
   await expect(people.getByRole('link', { name: new RegExp(`^Ruth Devane ${id}`) })).toContainText('LX · Level 0')
   // Oisín's page holds the phone as it was fixed.
   await people.getByRole('link', { name: new RegExp(`^Oisín Clarke ${id}`) }).click()
+  await office.getByRole('tab', { name: /^Details/ }).click()
   await expect(office.getByRole('link', { name: 'Call +353877000102' })).toHaveAttribute('href', 'tel:+353877000102')
   await expect(office.locator('.person-page .facts')).toContainText(`oisin.${id}@example.com`)
   await office.getByRole('link', { name: '‹ All people' }).click()

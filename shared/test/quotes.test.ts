@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { PullResponse, PushRequest, PushResponse } from '../src/protocol.ts'
-import { changesFromJob, csvText, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
+import { chargedFor, packageIncludes, changesFromJob, csvText, depositCents, quoteNumberLabel, validUntil, versionChanges, lineCents, linesFor, quoteLine, linesByGroup, money, quoteTotals, vatPeriodOf, type Quote, type QuoteLine } from '../src/quotes.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
-import { invoicesCsv, vatSummaryCsv } from '../src/sync/money-view.ts'
+import { invoicesCsv, quoteRows, quoteRowShown, quotesToFollow, vatSummaryCsv, type QuoteView } from '../src/sync/money-view.ts'
+import type { JobView } from '../src/sync/jobs-view.ts'
 
 /**
  * Quotes and money (ADR 0042): what a quote comes to, VAT by rate after the
@@ -13,6 +14,38 @@ import { invoicesCsv, vatSummaryCsv } from '../src/sync/money-view.ts'
  */
 
 const line = (l: Partial<QuoteLine>): QuoteLine => ({ id: 'l', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 10000, vat: '23', ...l })
+
+describe('the printed quote (ADR 0084)', () => {
+  it("is numbered without padding, holds its prices for so many days from the day it's sent, and works out the deposit", () => {
+    expect(quoteNumberLabel({ number: 1115, version: 1 })).toBe('1115')
+    expect(quoteNumberLabel({ number: 1115, version: 2 })).toBe('1115 · version 2')
+    expect(quoteNumberLabel({ number: null, version: 1 })).toBe('')
+    expect(validUntil({ sentOn: '2026-10-28', validDays: 30 }, '2026-11-02')).toBe('2026-11-27')
+    // A draft counts from today, and a quote from before holds for 30.
+    expect(validUntil({ sentOn: null }, '2026-12-20')).toBe('2027-01-19')
+    expect(depositCents(95027, 50)).toBe(47514)
+  })
+
+  it('says what changed since the version before, matching lines by what they are, not their ids', () => {
+    const y10 = line({ id: 'a', kind: 'kit', what: 'd&b Y10P', modelId: 'y10', qty: 8, days: 2, unitCents: 4500 })
+    const was = { discountPct: 0, lines: [y10, line({ id: 'b', what: 'Delivery', per: 'once' }), line({ id: 'c', kind: 'crew', what: 'Audio tech', ref: 'call1', days: 2, unitCents: 40000 })] }
+    const now = {
+      discountPct: 10,
+      lines: [
+        { ...y10, id: 'a2', qty: 10 },
+        // The same, charged once: days don't count.
+        line({ id: 'b2', what: 'delivery ', per: 'once', days: 3 }),
+        line({ id: 'd', what: 'Generator', unitCents: 30000 }),
+      ],
+    }
+    const c = versionChanges(was, now)
+    expect(c.added.map((l) => l.what)).toEqual(['Generator'])
+    expect(c.removed.map((l) => l.what)).toEqual(['Audio tech'])
+    expect(c.changed.map((x) => [x.line.qty, x.was.qty])).toEqual([[10, 8]])
+    expect(c.discount).toEqual({ was: 0, now: 10 })
+    expect(versionChanges(was, { ...was, lines: was.lines.map((l) => ({ ...l, id: `${l.id}2` })) })).toEqual({ added: [], removed: [], changed: [], discount: null, agreed: null })
+  })
+})
 
 describe('what a quote comes to', () => {
   it('takes the discount off each rate and works the VAT out on what is left, so the totals add up', () => {
@@ -49,6 +82,53 @@ describe('what a quote comes to', () => {
   it('writes euros as a quote does', () => {
     expect(money(125000)).toBe('€1,250.00')
     expect(money(5)).toBe('€0.05')
+  })
+})
+
+describe('rate rules, line discounts and an agreed price (ADR 0085)', () => {
+  it('charges a week as one, a 3 Day Week as no more than three days in any seven, and Daily by the day, as Current RMS did', () => {
+    // Proves: the counts Current RMS charged on its lines, read from its history.
+    expect([1, 3, 7, 8, 14, 15].map((d) => chargedFor('weekly', d))).toEqual([1, 1, 1, 2, 2, 3])
+    expect([1, 2, 3, 4, 7, 8, 10, 11, 14, 0.5].map((d) => chargedFor('week3', d))).toEqual([1, 2, 3, 3, 3, 4, 6, 6, 6, 1])
+    expect([1, 2.5, 9].map((d) => chargedFor('daily', d))).toEqual([1, 2.5, 9])
+  })
+
+  it("takes a line's own discount off it before the whole quote's", () => {
+    expect(lineCents(line({ qty: 2, days: 3, unitCents: 10000, discountPct: 30 }))).toBe(42000)
+    expect(lineCents(line({ qty: 1, days: 1, unitCents: 333, discountPct: 12.5 }))).toBe(291)
+    const t = quoteTotals({ lines: [line({ unitCents: 10000, discountPct: 50 }), line({ unitCents: 10000 })], discountPct: 10 })
+    expect(t).toMatchObject({ subtotal: 15000, discount: 1500, net: 13500 })
+    expect(quoteLine.safeParse(line({ discountPct: 101 })).success).toBe(false)
+    expect(quoteLine.safeParse(line({ rate: 'week3', out: 10, days: 6 })).success).toBe(true)
+  })
+
+  it('makes the discount whatever brings the lines to a price agreed, shared across the VAT rates so the totals still add up', () => {
+    const lines = [line({ qty: 8, days: 2, unitCents: 4500 }), line({ unitCents: 15000, vat: '13.5' })]
+    const t = quoteTotals({ lines, discountPct: 10, agreedCents: 80000 })
+    expect(t).toMatchObject({ subtotal: 87000, discount: 7000, net: 80000, discountPct: 8 })
+    expect(t.rates.reduce((n, r) => n + r.discount, 0)).toBe(7000)
+    expect(t.gross).toBe(t.net + t.vat)
+    // None agreed: the percentage, as before.
+    expect(quoteTotals({ lines, discountPct: 10, agreedCents: null })).toMatchObject({ discount: 8700, discountPct: 10 })
+    const was = { lines, discountPct: 0, agreedCents: null }
+    expect(versionChanges(was, { ...was, agreedCents: 80000, discountPct: 8 })).toMatchObject({ agreed: { was: null, now: 80000 }, discount: null })
+  })
+
+  it("counts a kit line's days by its product's rule, keeping the days out", () => {
+    const [l] = linesFor([{ id: 'k1', modelId: 'y10p', name: 'd&b Y10P', group: 'Audio', qty: 4, days: 10 }], [], { product: () => 5500, role: () => undefined, rate: () => 'week3' }, () => 'n1')
+    expect(l).toMatchObject({ rate: 'week3', out: 10, days: 6, unitCents: 5500 })
+    expect(lineCents(l!)).toBe(4 * 6 * 5500)
+  })
+})
+
+describe('a package (ADR 0087)', () => {
+  it('prints what it holds, and anything else it includes, after its line', () => {
+    const names: Record<string, string> = { sm58: 'Shure SM58', di: 'DI box' }
+    const items = [{ modelId: 'sm58', qty: 4 }, { modelId: 'di', qty: 2 }]
+    expect(packageIncludes({ items, notes: 'with clips' }, (id) => names[id])).toBe('4 × Shure SM58, 2 × DI box, with clips')
+    expect(packageIncludes({ items: [{ modelId: 'gone', qty: 1 }], notes: '' }, (id) => names[id])).toBe('1 × a product no longer listed')
+    expect(packageIncludes({ items: [], notes: ' Stands and clips ' }, () => undefined)).toBe('Stands and clips')
+    expect(quoteLine.safeParse(line({ kind: 'kit', what: 'Mic package', packageId: 'p1', includes: '4 × Shure SM58' })).success).toBe(true)
   })
 })
 
@@ -235,5 +315,76 @@ describe('money on the device', () => {
     await phone.sync()
     expect(phone.view().money.quotesOf('gala')).toHaveLength(1)
     expect(phone.view().money.productPrice('y10p')).toBe(4500)
+  })
+})
+
+describe('quotes to follow up (ADR 0081)', () => {
+  const job = (id: string, status: JobView['status']) => ({ id, name: id, status }) as JobView
+  let n = 0
+  const quote = (over: Partial<QuoteView>) =>
+    ({ id: `q${++n}`, status: 'sent', sentOn: null, answeredOn: null, invoicedOn: null, savedAt: '2026-10-20T10:00:00Z', ...over }) as QuoteView
+  const today = '2026-10-27'
+
+  it('sorts each job by what it is waiting on, the longest waiting first', () => {
+    const drafts = new Map<string, QuoteView>()
+    const rows: { job: JobView; current: QuoteView | undefined }[] = [
+      { job: job('Draft only', 'enquiry'), current: undefined },
+      { job: job('Sent lately', 'quoted'), current: quote({ sentOn: '2026-10-25' }) },
+      { job: job('Sent long ago', 'quoted'), current: quote({ sentOn: '2026-10-10' }) },
+      { job: job('Said yes', 'quoted'), current: quote({ status: 'accepted', sentOn: '2026-10-10', answeredOn: '2026-10-20' }) },
+      { job: job('Said yes, confirmed, invoiced', 'confirmed'), current: quote({ status: 'accepted', answeredOn: '2026-10-20', invoicedOn: '2026-10-21' }) },
+      { job: job('Said no', 'quoted'), current: quote({ status: 'declined', answeredOn: '2026-10-26' }) },
+      { job: job('Lost', 'lost'), current: quote({ sentOn: '2026-10-01' }) },
+    ]
+    drafts.set('Draft only', quote({ status: 'draft', savedAt: '2026-10-24T09:00:00Z' }))
+    const f = quotesToFollow({ jobs: rows as never, draftOf: (id) => drafts.get(id) }, today)
+    expect(f.drafts.map((x) => [x.job.name, x.days])).toEqual([['Draft only', 3]])
+    expect(f.waiting.map((x) => [x.job.name, x.days])).toEqual([
+      ['Sent long ago', 17],
+      ['Sent lately', 2],
+    ])
+    expect(f.outOfStep.map((x) => [x.job.name, x.want])).toEqual([
+      ['Said yes', 'confirmed'],
+      ['Said no', 'lost'],
+    ])
+  })
+
+  it('leaves a sent quote out of waiting while a new version is being drafted', () => {
+    const rows = [{ job: job('Second go', 'quoted'), current: quote({ sentOn: '2026-10-01' }) }]
+    const f = quotesToFollow({ jobs: rows as never, draftOf: () => quote({ status: 'draft' }) }, today)
+    expect(f.waiting).toEqual([])
+    expect(f.drafts).toHaveLength(1)
+  })
+})
+
+describe('every quote in one list (ADR 0088)', () => {
+  const job = (id: string, client?: string) => ({ id, name: id, status: 'quoted', client: client ? { name: client } : undefined }) as JobView
+  const quote = (over: Partial<QuoteView>) =>
+    ({ id: over.id ?? 'q', status: 'sent', sentOn: null, answeredOn: null, invoicedOn: null, paidOn: null, invoiceRef: '', number: null, savedAt: '2026-10-20T10:00:00Z', ...over }) as QuoteView
+
+  it("lists each job's draft, or else the quote that counts, the last changed first", () => {
+    const drafts = new Map([['Second go', quote({ id: 'd', status: 'draft', savedAt: '2026-10-26T09:00:00Z' })]])
+    const rows = quoteRows({
+      jobs: [
+        { job: job('Paid lately', 'Liffey Brands'), current: quote({ status: 'accepted', number: 1115, invoicedOn: '2026-10-22', paidOn: '2026-10-27', invoiceRef: 'SH-1050' }) },
+        { job: job('Second go'), current: quote({ id: 'v1', number: 1116, sentOn: '2026-10-01' }) },
+        { job: job('Costs only'), current: undefined },
+        { job: job('Sent'), current: quote({ sentOn: '2026-10-21' }) },
+      ] as never,
+      draftOf: (id) => drafts.get(id),
+    })
+    expect(rows.map((r) => [r.job.name, r.quote.status, r.changed])).toEqual([
+      ['Paid lately', 'accepted', '2026-10-27'],
+      ['Second go', 'draft', '2026-10-26'],
+      ['Sent', 'sent', '2026-10-21'],
+    ])
+    expect(rows[1]!.behind?.id).toBe('v1')
+
+    // Narrowed by what it is, and found by the client, the number of the version sent, or the invoice.
+    expect(rows.filter((r) => quoteRowShown(r, 'accepted', '')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', 'liffey')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', '1116')).map((r) => r.job.name)).toEqual(['Second go'])
+    expect(rows.filter((r) => quoteRowShown(r, 'all', 'sh-1050')).map((r) => r.job.name)).toEqual(['Paid lately'])
+    expect(rows.filter((r) => quoteRowShown(r, 'sent', 'liffey'))).toEqual([])
   })
 })

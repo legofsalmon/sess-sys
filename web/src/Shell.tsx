@@ -10,6 +10,7 @@ import { PreviewSplash, useHoldPersona, usePreview } from './home/Preview.tsx'
 // Holds every change to the person's role (ADR 0034).
 import './role.ts'
 import { JobsScreen } from './jobs/JobsScreen.tsx'
+import { QuotesScreen } from './jobs/QuotesScreen.tsx'
 import { MenuScreen } from './MenuScreen.tsx'
 import { NoticesScreen, Toaster } from './Notices.tsx'
 import { settlePlace } from './places.ts'
@@ -17,6 +18,7 @@ import { SignIn } from './SignIn.tsx'
 import { StockScreen } from './stock/StockScreen.tsx'
 import { StorageBanner, useUnkept } from './StorageBanner.tsx'
 import { UpdateBar } from './update.tsx'
+import { useAccess } from './role.ts'
 import { YouScreen } from './YouScreen.tsx'
 import { ChangesScreen } from './ChangesScreen.tsx'
 
@@ -35,10 +37,14 @@ import { ChangesScreen } from './ChangesScreen.tsx'
  * company's settings, at #admin; the old #account lands there, ADR 0041),
  * History and You (a person's own settings), and Notifications, which the
  * bell in the top bar opens (ADR 0058). Those keep the Menu's tab.
+ *
+ * Quotes (ADR 0088) is a sixth, for the office and directors, in the sidebar on a desk only: a phone's bar holds five
+ * (the design system's navigation), so there it's on the Menu, whose tab it keeps.
  */
 const AREAS = [
   { hash: '#home', label: 'Home', Screen: HomeScreen },
   { hash: '#jobs', label: 'Jobs', Screen: JobsScreen },
+  { hash: '#quotes', label: 'Quotes', Screen: QuotesScreen, desk: true },
   { hash: '#stock', label: 'Stock', Screen: StockScreen },
   { hash: '#crew', label: 'Crew', Screen: CrewScreen },
   { hash: '#menu', label: 'Menu', Screen: MenuScreen },
@@ -98,11 +104,25 @@ function useBarAway(): boolean {
   return away
 }
 
+/** From 900px across the places are a sidebar (ADR 0036), with room for more than a phone's bar. */
+const deskWide = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : undefined
+function useDesk(): boolean {
+  const [desk, setDesk] = useState(deskWide?.matches ?? false)
+  useEffect(() => {
+    const on = () => setDesk(deskWide?.matches ?? false)
+    deskWide?.addEventListener('change', on)
+    return () => deskWide?.removeEventListener('change', on)
+  }, [])
+  return desk
+}
+
 export function Shell() {
   const auth = useAuth()
   const unkept = useUnkept()
   const persona = usePreview()
   const barAway = useBarAway()
+  const desk = useDesk()
+  const seesMoney = useAccess().can('money')
   // The demo copy opens on a choice of whose eyes to see it through (ADR 0033), and the header says whose they are.
   const demo = auth.status === 'open' && auth.passcode === true
   useHoldPersona(demo ? persona : undefined)
@@ -114,9 +134,12 @@ export function Shell() {
   }, [])
   const within = (root: string) => hash === root || hash.startsWith(`${root}/`)
   // Every address starts with its area (ADR 0041), so its tab is the one it starts with; Admin, History and You keep the Menu's.
-  const menu = AREAS[4]
+  const menu = AREAS[5]
   const under = UNDER_MENU.find((u) => within(u.hash))
   const area = under ? menu : (AREAS.find((a) => within(a.hash)) ?? AREAS[0])
+  // A place drawn in the sidebar only (Quotes) is reached from the Menu on a phone, so lights its tab there.
+  const shown = AREAS.filter((a) => !('desk' in a) || (desk && seesMoney))
+  const lit = shown.includes(area) ? area : menu
   const Screen = under?.Screen ?? area.Screen
 
   const main = useRef<HTMLElement>(null)
@@ -183,8 +206,8 @@ export function Shell() {
       </a>
       <StorageBanner />
       <nav className="tabs" aria-label="Areas" hidden={barAway}>
-        {AREAS.map((a) => (
-          <a key={a.hash} href={a.hash} aria-current={a === area ? 'page' : undefined}>
+        {shown.map((a) => (
+          <a key={a.hash} href={a.hash} aria-current={a === lit ? 'page' : undefined}>
             <AreaIcon area={a.hash} />
             <span className="tab-word">{a.label}</span>
             {a.hash === '#crew' && <CrewBadge />}

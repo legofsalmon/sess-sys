@@ -1,5 +1,6 @@
 import {
   addDays,
+  CHASE_AFTER_DAYS,
   costsCsv,
   dayLabel,
   daysLabel,
@@ -9,17 +10,24 @@ import {
   invoicesCsv,
   money,
   moneyMonth,
+  newId,
   parseEuro,
   pctWord,
   plural,
+  quotesToFollow,
+  RATE_LABELS,
+  RATE_RULES,
+  RATE_UNIT,
   vatPeriodOf,
   vatSummaryCsv,
   type CostRow,
   type MoneyView,
   type Period,
+  type QuoteToFollow,
+  type RateRule,
   type View,
 } from '@sh/shared'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
@@ -29,9 +37,10 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { JOBS, MONEY } from '../Up.tsx'
 import { useToday } from '../view.ts'
-import { Top } from './common.tsx'
+import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
+import { PackagesCard } from './Packages.tsx'
 import { JobViews } from './PlanScreen.tsx'
-import { QuotePill } from './Quote.tsx'
+import { InStep, QuotePill } from './Quote.tsx'
 
 /**
  * Money (ADR 0042), #jobs/money, on Jobs' row, where the director looks:
@@ -89,20 +98,180 @@ export function MoneyScreen({ view }: { view: View }) {
           </div>
         </dl>
         <p className="hint">
-          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#jobs/money/prices">Price list</a> · <a href="#jobs/money/current-rms">Past quotes from Current RMS</a>
+          Before VAT, by the month each job starts, except what's owed, which is with VAT, as invoiced. <a href="#quotes">Quotes</a> · <a href="#jobs/money/prices">Price list</a> ·{' '}
+          <a href="#jobs/money/current-rms">Past quotes from Current RMS</a>
         </p>
       </section>
-      {!m.any && (
-        <section className="card">
-          <Empty>Nothing yet. Set prices on the price list, then make a quote from a job's page.</Empty>
-        </section>
-      )}
       <ByMonth m={m} />
-      <Owed m={m} />
+      {/* What's owed comes from approved timesheets: not shown while they're off (ADR 0090), unless some approved are still to pay. */}
+      {(view.office.useTimesheets || m.costsOwed.length > 0) && <Owed m={m} />}
       <Freelancers m={m} />
       <Margins m={m} />
       <ForTheAccountant m={m} />
     </div>
+  )
+}
+
+/** "today", "yesterday", "9 days ago". */
+const ago = (days: number) => (days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`)
+
+/** One quote waiting on the office: the job, what's waiting and for how long, and what it comes to. */
+function FollowRow({ f, what, chase, children }: { f: QuoteToFollow; what: string; chase?: boolean; children?: ReactNode }) {
+  return (
+    <li className="row">
+      <div>
+        <a href={`#jobs/${encodeURIComponent(f.job.id)}/quote`}>{f.job.name}</a>
+        <p>
+          {[f.job.client?.name, `version ${f.quote.version}`, money(f.quote.totals.net)].filter(Boolean).join(' · ')}
+          <br />
+          <span className={chase ? 'warn' : undefined}>
+            {what} {ago(f.days)}
+            {chase ? ': worth a call' : ''}
+          </span>
+        </p>
+      </div>
+      {children}
+    </li>
+  )
+}
+
+/**
+ * To follow up (ADR 0081), at the top of Quotes (ADR 0088, at first on Money): a new one in a few words, and every quote
+ * waiting on the office, the longest waiting first: answered but the job not yet in step, sent with no answer (a call
+ * after a week), and drafts not sent. Nothing here is sent to anyone: the office rings or emails the client themselves.
+ */
+export function ToFollowUp({ view }: { view: View }) {
+  const today = useToday()
+  const [starting, setStarting] = useState(false)
+  const f = quotesToFollow(view.money, today)
+  const none = f.drafts.length + f.waiting.length + f.outOfStep.length === 0
+  return (
+    <section className="card quotes-to-follow" aria-label="To follow up">
+      <Heading icon="document">To follow up</Heading>
+      {!starting && (
+        <button type="button" className="primary" onClick={() => setStarting(true)}>
+          New quote
+        </button>
+      )}
+      {starting && <NewQuote view={view} onCancel={() => setStarting(false)} />}
+      {none && !starting && <Empty>No quote is waiting on anyone. Start a new one here, or from a job's page.</Empty>}
+      <QuoteGroups f={f} />
+    </section>
+  )
+}
+
+function QuoteGroups({ f, chaseOnly }: { f: ReturnType<typeof quotesToFollow>; chaseOnly?: boolean }) {
+  const waiting = chaseOnly ? f.waiting.filter((w) => w.days >= CHASE_AFTER_DAYS) : f.waiting
+  return (
+    <>
+      {f.outOfStep.length > 0 && (
+        <div className="follow-group">
+          <h3>Answered: put the job in step</h3>
+          <ul className="plain">
+            {f.outOfStep.map((x) => (
+              <FollowRow key={x.quote.id} f={x} what={x.want === 'confirmed' ? 'Accepted' : 'Turned down'}>
+                <InStep job={x.job} want={x.want} compact />
+              </FollowRow>
+            ))}
+          </ul>
+        </div>
+      )}
+      {waiting.length > 0 && (
+        <div className="follow-group">
+          <h3>Waiting for an answer</h3>
+          <ul className="plain">
+            {waiting.map((x) => (
+              <FollowRow key={x.quote.id} f={x} what="Sent" chase={x.days >= CHASE_AFTER_DAYS} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {!chaseOnly && f.drafts.length > 0 && (
+        <div className="follow-group">
+          <h3>Not sent yet</h3>
+          <ul className="plain">
+            {f.drafts.map((x) => (
+              <FollowRow key={x.quote.id} f={x} what="Last changed" />
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * On Notifications, for the office and directors (ADR 0081): only the quotes that need doing something about, a
+ * client to ring and jobs to put in step. Worked out on this device, so it shows without signal.
+ */
+export function QuotesToChase({ view }: { view: View }) {
+  const today = useToday()
+  const f = quotesToFollow(view.money, today)
+  const chase = f.waiting.filter((w) => w.days >= CHASE_AFTER_DAYS).length
+  if (chase + f.outOfStep.length === 0) return null
+  return (
+    <section className="card quotes-to-follow" aria-label="Quotes to follow up">
+      <Heading icon="document">Quotes to follow up</Heading>
+      <p className="hint">
+        Sent over a week ago with no answer, or answered with the job not yet in step. The app contacts nobody: ring or email the client yourself. All
+        quotes are on <a href="#quotes">Quotes</a>.
+      </p>
+      <QuoteGroups f={f} chaseOnly />
+    </section>
+  )
+}
+
+/**
+ * A quote from nothing (ADR 0081): the job in a few words, made as an enquiry with its days as one Show, and its
+ * first draft opened, so a phone call can turn into a quote without making the job first.
+ */
+function NewQuote({ view, onCancel }: { view: View; onCancel: () => void }) {
+  const today = useToday()
+  const { clients, venues } = view.jobs
+  const [f, setF] = useState({ name: '', client: '', venue: '', start: today, end: today })
+  const { run, error } = useAct()
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.name.trim()) return
+    const id = newId()
+    void run(async () => {
+      const clientId = await clientNamed(f.client, clients)
+      const venueId = await venueNamed(f.venue, venues)
+      await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: 'enquiry', kind: 'gig', notes: '' })
+      await client.mutate('phase.add', { id: newId(), projectId: id, name: 'Show', start: f.start, end: f.end < f.start ? f.start : f.end, venueId: null, notes: '' })
+      await client.mutate('quote.save', { id: newId(), projectId: id, lines: [], discountPct: view.money.discountOf(clientId) ?? 0, notes: '' })
+    }).then((ok) => ok && (location.hash = `#jobs/${encodeURIComponent(id)}/quote`))
+  }
+  return (
+    <form className="grid-form new-quote" onSubmit={submit} aria-label="New quote">
+      <label className="wide">
+        What's the job? <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Nissan launch" required autoFocus />
+      </label>
+      <label>
+        Client <input list="new-quote-clients" value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })} placeholder="Pick or add one" />
+      </label>
+      <label>
+        Venue <input list="new-quote-venues" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="Pick or add one" />
+      </label>
+      <label>
+        From <input type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })} required />
+      </label>
+      <label>
+        To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} required />
+      </label>
+      <p className="hint wide">It's added to Jobs as an enquiry, and moves to quoted when you mark the quote sent. Kit, crew and the rest can be added on the quote.</p>
+      <Refusal error={error} className="wide" />
+      <div className="actions wide">
+        <button type="submit" className="primary">
+          Start the quote
+        </button>
+        <button type="button" className="link" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <Choices id="new-quote-clients" names={clients} />
+      <Choices id="new-quote-venues" names={venues} />
+    </form>
   )
 }
 
@@ -322,7 +491,7 @@ function ForTheAccountant({ m }: { m: MoneyView }) {
       </div>
       <p className="hint">
         Spreadsheets made on this device: each invoice by VAT rate, by the day it was invoiced; the VAT on them by Revenue's two-month period and rate; and
-        freelancers' approved timesheets, by the day approved. Every table is also in Download everything, on <a href="#admin">Admin</a>.
+        freelancers' approved timesheets, by the day approved. Every table is also in Download everything, on <a href="#admin/data">Admin › Data</a>.
       </p>
     </section>
   )
@@ -343,7 +512,7 @@ export function PricesScreen({ view }: { view: View }) {
       <section className="card">
         <h1>Price list</h1>
         <p className="hint">
-          Day prices before VAT, which a new quote is built from. Changing one here changes no quote already made: open a quote's draft to change its lines.
+          Prices before VAT, which a new quote is built from. Changing one here changes no quote already made: open a quote's draft to change its lines.
         </p>
       </section>
 
@@ -352,6 +521,7 @@ export function PricesScreen({ view }: { view: View }) {
         <p className="hint">
           {priced} of {plural(view.warehouse.models.length, 'product')} priced. A product with no price goes on a quote at nothing, for you to price there.
         </p>
+        <RateRules view={view} />
         <input className="search" type="search" placeholder="Find a product" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Find a product" />
         {DEPARTMENTS.map((d) => {
           const here = models.filter((x) => x.department === d)
@@ -363,11 +533,12 @@ export function PricesScreen({ view }: { view: View }) {
                 {(rows) =>
                   rows.map((x) => (
                     <PriceRow
-                      key={`${x.id} ${m.productPrice(x.id)}`}
+                      key={`${x.id} ${m.productPrice(x.id)} ${m.productRate(x.id)}`}
                       label={x.name}
                       cents={m.productPrice(x.id)}
+                      rule={m.productRate(x.id) ?? 'daily'}
                       pending={m.pricePending('product', x.id)}
-                      onSave={(cents) => client.mutate('price.product', { modelId: x.id, dayCents: cents })}
+                      onSave={(cents, rate) => client.mutate('price.product', { modelId: x.id, dayCents: cents, rate })}
                     />
                   ))
                 }
@@ -377,6 +548,8 @@ export function PricesScreen({ view }: { view: View }) {
         })}
         {view.warehouse.models.length === 0 && <Empty>No products yet: they come from the Stock tab.</Empty>}
       </section>
+
+      <PackagesCard view={view} />
 
       <section className="card" aria-label="Crew">
         <Heading icon="people">Crew</Heading>
@@ -407,16 +580,56 @@ export function PricesScreen({ view }: { view: View }) {
   )
 }
 
-/** One price, changed in place: nothing typed takes it off the list. */
-function PriceRow({ label, sub, cents, pending, onSave }: { label: string; sub?: string; cents: number | undefined; pending: boolean; onSave: (cents: number | null) => Promise<unknown> }) {
+/**
+ * How each product is charged (ADR 0085): the three rate rules Current RMS used, and one press to give every priced
+ * product the rule its quotes there were charged by most.
+ */
+function RateRules({ view }: { view: View }) {
+  const m = view.money
+  const { run, error } = useAct()
+  const priced = view.warehouse.models.filter((x) => m.productPrice(x.id) !== undefined)
+  const by = (r: RateRule) => priced.filter((x) => (m.productRate(x.id) ?? 'daily') === r).length
+  return (
+    <div className="rate-rules">
+      <p className="hint">
+        Each price is charged by its rule: <b>Daily</b>, by the day; <b>3 Day Week</b>, by the day but never more than three days a week; <b>Weekly</b>, the
+        price is for a week, and up to seven days out is charged once. Now: {RATE_RULES.map((r) => `${by(r)} ${RATE_LABELS[r]}`).join(', ')}.
+      </p>
+      <button type="button" onClick={() => void run(() => client.mutate('price.rulesFromRms', { all: false }))}>
+        Take the rules from Current RMS
+      </button>
+      <p className="hint">Gives each priced product with no rule the one its quotes in Current RMS were charged by most, once Admin has read them.</p>
+      <Refusal error={error} />
+    </div>
+  )
+}
+
+/** One price, changed in place: nothing typed takes it off the list. A product's has its rate rule beside it. */
+function PriceRow({
+  label,
+  sub,
+  cents,
+  rule,
+  pending,
+  onSave,
+}: {
+  label: string
+  sub?: string
+  cents: number | undefined
+  rule?: RateRule
+  pending: boolean
+  onSave: (cents: number | null, rate?: RateRule) => Promise<unknown>
+}) {
   const [text, setText] = useState(cents === undefined ? '' : euroText(cents))
+  const [ruleNow, setRule] = useState(rule)
   const { run, error, refuse } = useAct()
   const was = cents === undefined ? '' : euroText(cents)
   const save = (e: FormEvent) => {
     e.preventDefault()
     const p = parseEuro(text)
     if (p.reason) return refuse(p.reason)
-    void run(() => onSave(p.cents ?? null))
+    // The rule goes only once it's chosen, so a price changed alone leaves one still to come from Current RMS.
+    void run(() => onSave(p.cents ?? null, ruleNow !== rule ? ruleNow : undefined))
   }
   return (
     <form className="row price-row" onSubmit={save}>
@@ -427,11 +640,26 @@ function PriceRow({ label, sub, cents, pending, onSave }: { label: string; sub?:
       <div className="actions">
         <label className="euro">
           <span>€</span>
-          <input inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} placeholder="No price" aria-label={`${label}: price a day`} />
-          <span className="muted">a day</span>
+          <input
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="No price"
+            aria-label={`${label}: price a ${ruleNow ? RATE_UNIT[ruleNow] : 'day'}`}
+          />
+          <span className="muted">a {ruleNow ? RATE_UNIT[ruleNow] : 'day'}</span>
         </label>
+        {ruleNow && (
+          <select value={ruleNow} onChange={(e) => setRule(e.target.value as RateRule)} aria-label={`${label}: charged`} disabled={!text.trim()}>
+            {RATE_RULES.map((r) => (
+              <option key={r} value={r}>
+                {RATE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        )}
         <Pending pending={pending} />
-        {text.trim() !== was && (
+        {(text.trim() !== was || ruleNow !== rule) && (
           <button type="submit" className="primary">
             Save
           </button>

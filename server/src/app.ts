@@ -1,7 +1,7 @@
 import compress from '@fastify/compress'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { APP_VERSION, FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { LogController, type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import { readFileSync } from 'node:fs'
 import { join, sep } from 'node:path'
@@ -46,9 +46,11 @@ import { registerStockImportRoutes, type StockImportRound } from './stock/import
 import { takeTurns } from './turns.ts'
 import { registerItemLogRoutes } from './stock/log.ts'
 import { nominatim, registerPlaceRoutes, type PlaceSearch } from './projects/places.ts'
+import { aaFuel, FuelUpdates, registerFuelRoutes, type FuelLookup } from './finance/fuel.ts'
 import { RmsApi, type RmsConfig } from './rms/api.ts'
 import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
+import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
 /** The longest the server waits for a whole request to arrive. */
@@ -130,10 +132,14 @@ export interface AppOptions {
   ownCalendars?: OwnCalendarsOptions
   /** Finding venues on the map (ADR 0057): OpenStreetMap's search unless a test stands in for it. */
   places?: PlaceSearch
+  /** The fuel price from AA Ireland's survey (ADR 0086), unless a test stands in for it. */
+  fuel?: FuelLookup
   /** Current RMS's API, read only (ADR 0078): the subdomain and key. Without it Admin says it isn't set up. */
   currentRms?: RmsConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
+  /** Admin › Status's looks outside the server (ADR 0093): the map search and GitHub. Without them, those two say so. */
+  outside?: OutsideLooks
 }
 
 export interface CalendarSetup extends Pick<CalendarSyncOptions, 'appUrl' | 'settleMs' | 'gapMs' | 'now' | 'nightly' | 'pollMs' | 'retryMs' | 'writes'> {
@@ -153,6 +159,8 @@ declare module 'fastify' {
     erasures: ErasureList | undefined
     /** What erasures kept, taken on the day the law stops asking for it (ADR 0027); the caller starts it. */
     dueErasures: DueErasures
+    /** The fuel price taken from each new month of the AA's survey (ADR 0086); the caller starts it. */
+    fuelUpdates: FuelUpdates
     /** Documents' files (ADR 0029): where they're kept, and the list of files to delete; the caller starts its daily look. */
     documents: DocumentFiles
     /** Freelancers' own calendars, read only (ADR 0044); the caller starts reading them on a schedule. */
@@ -320,6 +328,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const ownCalendars = new OwnCalendars(db, { ...options.ownCalendars, onChange: changed, report: (err) => reportError(err, { area: 'own-calendar' }) })
   app.decorate('ownCalendars', ownCalendars)
   app.decorate('dueErasures', new DueErasures(db, { changed, log: app.log, report: (err) => reportError(err, { area: 'erasure' }) }))
+  // AA_FUEL_URL points the AA's page elsewhere, as the browser tests do, so they never read the real one.
+  const fuel = options.fuel ?? aaFuel(process.env.AA_FUEL_URL ? { url: process.env.AA_FUEL_URL } : {})
+  app.decorate('fuelUpdates', new FuelUpdates(db, fuel, { changed, log: app.log }))
 
   // A request that failed on the server is reported (ADR 0005) by the route as the
   // code names it, never the address used, which could hold a private link.
@@ -374,6 +385,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const backup = backups.status()
     return {
       ok: true,
+      // Which version is live, so a merge Railway hasn't deployed yet shows (ADR 0093).
+      version: APP_VERSION,
+      commit: commit ?? null,
       db: db.kind,
       auth: auth ? 'google' : passcode ? 'passcode' : 'off',
       errors: errorReporting ? 'sentry' : 'off',
@@ -569,11 +583,16 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerItemLogRoutes(app, { db })
   registerNoticeRoutes(app, { db })
   registerPlaceRoutes(app, { search: options.places ?? nominatim() })
+  registerFuelRoutes(app, { lookup: fuel })
   registerCalendarRoutes(app, { db, google, sync: calendarSync, secret: calendar?.clientSecret, onChange: () => void poke() })
   registerImportRoutes(app, { db, sync: calendarSync, onChange: () => void poke() })
   const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)
   app.decorate('rms', rms)
   registerRmsRoutes(app, { db, reader: rms })
+  registerStatusRoutes(
+    app,
+    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
+  )
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
   app.get<{ Querystring: { before?: string; limit?: string; who?: string; entity?: string; id?: string } }>('/api/history', async (req, reply) => {
@@ -660,6 +679,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     await rms.done?.catch(() => {})
     backups.stop()
     app.dueErasures.stop()
+    app.fuelUpdates.stop()
     documents.stop()
     calendarSync?.stop()
     ownCalendars.stop()

@@ -20,6 +20,12 @@ async function push(request: APIRequestContext, id: string, mutations: [string, 
   expect(results.map((r) => r.reason?.message ?? r.status)).toEqual(mutations.map(() => 'applied'))
 }
 
+/** A wide, short PNG, 40 by 4, as a photo of a front panel would be. */
+const WIDE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAACgAAAAECAIAAABz8up3AAAAE0lEQVR4nGM4YWMzIIhh1GJ6IQB0d8gBAXu8/QAAAABJRU5ErkJggg==',
+  'base64'
+)
+
 const AMP = { department: 'audio', category: 'Amps', tracking: 'serialised', isCase: false, valueCents: null, notes: '', rackMount: true }
 
 test('a rack, laid out, drawn, and a built one checked against its layout', async ({ browser, request }) => {
@@ -264,4 +270,58 @@ test('building a rack up: half-width kit side by side, labels, groups and tape, 
   await expect(page.getByRole('heading', { name: `RF rack B ${id}`, level: 1 })).toBeVisible()
   await expect(rack.getByRole('button', { name: `IEM 1–2 (${rx}), U1 on the left on the front, RF, blue tape` })).toBeVisible()
   await expect(rack.getByRole('heading', { name: `In the ${drawer} at U3` })).toBeVisible()
+})
+
+test("a product's photo on its panel in the rack, and the rack sheet printed", async ({ browser, request }) => {
+  const id = Date.now().toString(36)
+  const amp = `Lab Gruppen PLM ${id}`
+  await push(request, id, [
+    ['model.create', { id: `amp-${id}`, name: amp, ...AMP, units: 2, depthMm: 480, weightKg: 12, powerW: 1200 }],
+    ['model.create', { id: `rack-${id}`, name: `Amp rack C ${id}`, department: 'audio', category: 'Racks', tracking: 'serialised', isCase: true, isRack: true, valueCents: null, notes: '', units: 4, depthMm: 600 }],
+    ['rackSlot.set', { id: `s1-${id}`, rackId: `rack-${id}`, modelId: `amp-${id}`, top: 1, side: 'front', qty: 1, notes: 'Fed from the left distro', label: 'Amp A', group: 'Mains', colour: 'red' }],
+  ])
+
+  const context = await browser.newContext({ viewport: deskSize })
+  await context.addInitScript(() => {
+    // The print dialog can't open here: count the times it's asked for instead.
+    const w = window as unknown as { printed: number }
+    w.printed = 0
+    window.print = () => void w.printed++
+  })
+  const page = await context.newPage()
+
+  // A photo of its front panel, from its page, kept at its own shape.
+  await page.goto(`/#stock/product/amp-${id}`)
+  await expect(page.getByRole('heading', { level: 1, name: amp })).toBeVisible()
+  await page.getByText('Add a photo').locator('input[type=file]').setInputFiles({ name: 'front.png', mimeType: 'image/png', buffer: WIDE_PNG })
+  const photo = page.getByRole('img', { name: `${amp}, as it looks` })
+  await expect(photo).toHaveAttribute('src', new RegExp(`/api/models/amp-${id}/photo\\?v=`))
+  await expect(page.getByText('Change photo')).toBeVisible()
+  // Kept at its own shape, once the browser has it.
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight])).toEqual([40, 4])
+
+  // On its panel in the rack, drawn flat, with its label over it.
+  await page.goto(`/#stock/racks/rack-${id}`)
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  const rack = page.getByRole('region', { name: 'The rack' })
+  await rack.getByRole('button', { name: 'Front and back' }).click()
+  const panel = rack.getByRole('button', { name: `Amp A (${amp}), U1–2 on the front, Mains, red tape` })
+  await expect(panel).toHaveClass(/with-photo/)
+  await expect(panel).toHaveCSS('background-image', new RegExp(`/api/models/amp-${id}/photo`))
+
+  // The rack sheet: the rack as drawn and what goes where, on paper only.
+  await page.getByRole('button', { name: 'Print the rack sheet' }).click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1)
+  const sheet = page.locator('.print-sheet.rack-sheet')
+  await expect(sheet).toBeHidden()
+  await page.emulateMedia({ media: 'print' })
+  await expect(sheet.getByRole('heading', { level: 1 })).toHaveText(`Amp rack C ${id}`)
+  await expect(sheet.getByRole('heading', { name: 'On the rails, top to bottom' })).toBeVisible()
+  await expect(sheet.locator('tbody tr')).toHaveText([`U1–2 frontAmp A (${amp})MainsRedFed from the left distro`])
+  await expect(sheet.getByText('Mains · 1 thing, red tape')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Kit to build with' })).toBeHidden()
+  if (process.env.SHOTS) await page.screenshot({ path: 'docs/hub/img/rack-sheet.png', fullPage: true })
+  await page.emulateMedia({ media: 'screen' })
+  await page.evaluate(() => dispatchEvent(new Event('afterprint')))
+  await expect(sheet).toHaveCount(0)
 })

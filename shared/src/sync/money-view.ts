@@ -1,10 +1,13 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
-import { eachDay } from '../crew.ts'
+import { daysBetween, eachDay } from '../crew.ts'
 import { irishToday } from '../day.ts'
 import { STOPPED } from '../jobs.ts'
+import { DEFAULT_CREW_PER_CAR } from '../travel.ts'
 import {
   amount,
   csvText,
+  DEFAULT_VALID_DAYS,
+  QUOTE_SETTINGS_ID,
   moneyMonth,
   quoteTotals,
   roleKey,
@@ -15,9 +18,12 @@ import {
   type CostPaid,
   type CrewToQuote,
   type KitToQuote,
+  type Package,
   type ProductPrice,
   type Quote,
   type QuoteEntities,
+  type QuoteSettings,
+  type RateRule,
   type QuoteTotals,
   type RolePrice,
   type VatRate,
@@ -99,12 +105,22 @@ export interface MoneyView {
   quote(id: string): QuoteView | undefined
   /** A product's day price, a role's, a client's discount: undefined for none set. */
   productPrice(modelId: string): number | undefined
+  /** A product's rate rule (ADR 0085): undefined for none set, which charges it by the day. */
+  productRate(modelId: string): RateRule | undefined
   rolePrice(role: string): number | undefined
   discountOf(clientId: string | null | undefined): number | undefined
+  /** The packages on the price list (ADR 0087), by name, each marked while this device's change is on its way. */
+  packages: (Package & { pending: boolean })[]
+  package(id: string): (Package & { pending: boolean }) | undefined
   /** Whether this device's own change to a price is still on its way. */
   pricePending(kind: 'product' | 'role' | 'client', key: string): boolean
   /** Every role with a price, and every role crew have been asked for, by name. */
   roles: { role: string; cents: number | undefined; booked: number | undefined }[]
+  /**
+   * The day rate a crew line's crew are booked at (ADR 0089): its crew call's, else the rate anyone's been booked at
+   * for its role; undefined when nobody has.
+   */
+  bookedRate(jobId: string, line: { ref: string | null; what: string }): number | undefined
   /** A job's kit and crew, as a new quote is built from them. */
   sourceOf(jobId: string): { kit: KitToQuote[]; crew: CrewToQuote[] }
   /** Each job with a quote or a freelancer's cost, soonest first. */
@@ -119,6 +135,10 @@ export interface MoneyView {
   costsPaid: CostRow[]
   /** Anything to show at all: a quote, a price or a cost. */
   any: boolean
+  /** What every printed quote says (ADR 0084): the next number, the terms, the bank details. */
+  quoting: QuoteSettings & { pending: boolean }
+  /** The number the next quote sent will get, as the server will give it, unless another device's goes first. */
+  nextNumber: number
 }
 
 type Tables = { [E in keyof QuoteEntities]: Record<string, QuoteEntities[E]> }
@@ -137,8 +157,24 @@ export function moneyView(
   const products = new Map<string, ProductPrice & { pending?: boolean }>(Object.values(entities.productPrice ?? {}).map((p) => [p.id, p]))
   const roles = new Map<string, RolePrice & { pending?: boolean }>(Object.values(entities.rolePrice ?? {}).map((r) => [r.id, r]))
   const discounts = new Map<string, ClientDiscount & { pending?: boolean }>(Object.values(entities.clientDiscount ?? {}).map((d) => [d.id, d]))
+  const packages = new Map<string, Package & { pending: boolean }>(Object.values(entities.package ?? {}).map((p) => [p.id, { ...p, pending: false }]))
   const paid = new Map<string, CostPaid & { pending?: boolean }>(Object.values(entities.costPaid ?? {}).map((c) => [c.id, c]))
+  let quoting: QuoteSettings & { pending: boolean } = {
+    ...{ id: QUOTE_SETTINGS_ID, nextNumber: null, terms: '', bank: '' },
+    ...entities.quoteSettings?.[QUOTE_SETTINGS_ID],
+    pending: false,
+  }
   const gone = { product: new Set<string>(), role: new Set<string>(), client: new Set<string>(), cost: new Set<string>() }
+
+  // The number a quote going out now will have, worked out as the server does (ADR 0084): an earlier version's, or the
+  // next, which moves on. Another device's quote sent first can take it, and then the server's number is shown once it's in.
+  const numberOf = (q: Quote) => {
+    const had = q.number ?? [...quotes.values()].find((v) => v.projectId === q.projectId && v.number)?.number
+    if (had) return had
+    const n = Math.max(quoting.nextNumber ?? 1, Math.max(0, ...[...quotes.values()].map((v) => v.number ?? 0)) + 1)
+    quoting = { ...quoting, nextNumber: n + 1, pending: true }
+    return n
+  }
 
   for (const m of outbox) {
     if (m.appliedSeq !== undefined && m.appliedSeq <= cursor) continue
@@ -148,7 +184,9 @@ export function moneyView(
         const was = quotes.get(a.id)
         if (was && was.status !== 'draft') break
         if (!was && [...quotes.values()].some((q) => q.projectId === a.projectId && q.status === 'draft')) break
-        const version = was?.version ?? Math.max(0, ...[...quotes.values()].filter((q) => q.projectId === a.projectId).map((q) => q.version)) + 1
+        const versions = [...quotes.values()].filter((q) => q.projectId === a.projectId)
+        const version = was?.version ?? Math.max(0, ...versions.map((q) => q.version)) + 1
+        const before = was ?? versions.sort((x, y) => y.version - x.version)[0]
         quotes.set(a.id, {
           id: a.id,
           projectId: was?.projectId ?? a.projectId,
@@ -164,6 +202,13 @@ export function moneyView(
           invoicedOn: null,
           invoiceRef: '',
           paidOn: null,
+          // Kept from the draft, or the version before, when the save doesn't say them, as the server does.
+          number: was?.number ?? null,
+          validDays: a.validDays ?? before?.validDays ?? DEFAULT_VALID_DAYS,
+          depositPct: a.depositPct !== undefined ? a.depositPct : (before?.depositPct ?? null),
+          agreedCents: a.agreedCents !== undefined ? a.agreedCents : (was?.agreedCents ?? null),
+          mealsProvided: a.mealsProvided ?? before?.mealsProvided ?? false,
+          travelKm: a.travelKm !== undefined ? a.travelKm : (before?.travelKm ?? null),
           pending: true,
         })
         break
@@ -171,7 +216,7 @@ export function moneyView(
       case 'quote.sent': {
         const a = m.args as CommandArgs<'quote.sent'>
         const was = quotes.get(a.id)
-        if (was?.status === 'draft') quotes.set(a.id, { ...was, status: 'sent', sentOn: a.on, pending: true })
+        if (was?.status === 'draft') quotes.set(a.id, { ...was, status: 'sent', sentOn: a.on, number: numberOf(was), pending: true })
         break
       }
       case 'quote.answer': {
@@ -179,7 +224,7 @@ export function moneyView(
         const was = quotes.get(a.id)
         if (!was || was.invoicedOn) break
         if (a.answer === 'none') quotes.set(a.id, { ...was, status: was.status === 'draft' ? 'draft' : 'sent', answeredOn: null, pending: true })
-        else quotes.set(a.id, { ...was, status: a.answer, answeredOn: a.on, sentOn: was.sentOn ?? a.on, pending: true })
+        else quotes.set(a.id, { ...was, status: a.answer, answeredOn: a.on, sentOn: was.sentOn ?? a.on, number: was.status === 'draft' ? numberOf(was) : (was.number ?? null), pending: true })
         break
       }
       case 'quote.invoiced': {
@@ -197,8 +242,22 @@ export function moneyView(
       case 'price.product': {
         const a = m.args as CommandArgs<'price.product'>
         if (a.dayCents === null) products.delete(a.modelId)
-        else products.set(a.modelId, { id: a.modelId, dayCents: a.dayCents, pending: true })
+        else {
+          // A change that doesn't say the rule keeps it, as the server does (ADR 0085).
+          const rate = a.rate ?? products.get(a.modelId)?.rate
+          products.set(a.modelId, { id: a.modelId, dayCents: a.dayCents, ...(rate ? { rate } : {}), pending: true })
+        }
         gone.product.add(a.modelId)
+        break
+      }
+      case 'package.save': {
+        const a = m.args as CommandArgs<'package.save'>
+        packages.set(a.id, { ...a, name: a.name.trim(), notes: a.notes.trim(), pending: true })
+        break
+      }
+      case 'package.remove': {
+        const a = m.args as CommandArgs<'package.remove'>
+        packages.delete(a.id)
         break
       }
       case 'price.role': {
@@ -214,6 +273,32 @@ export function moneyView(
         if (a.pct === null) discounts.delete(a.clientId)
         else discounts.set(a.clientId, { id: a.clientId, pct: a.pct, pending: true })
         gone.client.add(a.clientId)
+        break
+      }
+      case 'quoting.update': {
+        const a = m.args as CommandArgs<'quoting.update'>
+        quoting = { ...quoting, id: QUOTE_SETTINGS_ID, nextNumber: a.nextNumber, terms: a.terms, bank: a.bank, pending: true }
+        break
+      }
+      case 'quoting.travel': {
+        const a = m.args as CommandArgs<'quoting.travel'>
+        // The day the fuel price was set moves only when the price does, as on the server.
+        const same = a.fuelCentsPerLitre === (quoting.fuelCentsPerLitre ?? null)
+        const fuelSetOn = same ? (quoting.fuelSetOn ?? null) : a.on
+        const fuelMonth = a.fuelMonth !== undefined ? a.fuelMonth : same ? (quoting.fuelMonth ?? null) : null
+        quoting = {
+          ...quoting,
+          id: QUOTE_SETTINGS_ID,
+          travelFromKm: a.travelFromKm,
+          fuelCentsPerLitre: a.fuelCentsPerLitre,
+          litresPer100Km: a.litresPer100Km,
+          perDiemCents: a.perDiemCents,
+          fuelSetOn,
+          fuelAuto: a.fuelAuto ?? quoting.fuelAuto ?? true,
+          fuelMonth,
+          crewPerCar: a.crewPerCar ?? quoting.crewPerCar ?? DEFAULT_CREW_PER_CAR,
+          pending: true,
+        }
         break
       }
       case 'cost.paid': {
@@ -327,6 +412,7 @@ export function moneyView(
           ...(l.phase ? { phase: l.phase.name } : {}),
           qty: l.qty,
           days: span(l.span),
+          ...(l.subhireQty ? { subhireQty: l.subhireQty, supplier: l.supplier } : {}),
         })
       ),
       crew: job.calls
@@ -350,19 +436,117 @@ export function moneyView(
     currentOf,
     quote: (id) => views.get(id),
     productPrice: (modelId) => products.get(modelId)?.dayCents,
+    productRate: (modelId) => products.get(modelId)?.rate,
+    packages: [...packages.values()].sort((a, b) => a.name.localeCompare(b.name, 'en-IE')),
+    package: (id) => packages.get(id),
     rolePrice: (role) => roles.get(roleKey(role))?.dayCents,
     discountOf: (clientId) => (clientId ? discounts.get(clientId)?.pct : undefined),
     pricePending: (kind, key) => (kind === 'product' ? gone.product.has(key) : kind === 'role' ? gone.role.has(roleKey(key)) : gone.client.has(key)),
     roles: [...roleList.values()].sort((a, b) => a.role.localeCompare(b.role, 'en-IE')),
     sourceOf,
+    bookedRate: (jobId, line) => {
+      const call = line.ref ? jobs.jobs.find((j) => j.id === jobId)?.calls.find((c) => c.id === line.ref) : undefined
+      if (call?.dayRateCents != null) return call.dayRateCents
+      // "Audio tech (Show)": the role, without the phase it's for.
+      const role = (w: string) => roleList.get(roleKey(w))?.booked
+      return role(line.what) ?? role(line.what.replace(/\s*\([^)]*\)$/, ''))
+    },
     jobs: jobList,
     job: (jobId) => jobMoney.get(jobId),
     months: [...months.values()].sort((a, b) => a.key.localeCompare(b.key)),
     owed: [...owed.values()].sort((a, b) => b.cents - a.cents || a.client.localeCompare(b.client)),
     costsOwed: approved.filter((c) => !c.paidOn).sort((a, b) => (a.row.timesheet?.approvedAt ?? '').localeCompare(b.row.timesheet?.approvedAt ?? '')),
     costsPaid: approved.filter((c) => c.paidOn).sort((a, b) => b.paidOn!.localeCompare(a.paidOn!)),
-    any: quotes.size > 0 || products.size > 0 || roles.size > 0 || approved.length > 0,
+    any: quotes.size > 0 || products.size > 0 || packages.size > 0 || roles.size > 0 || approved.length > 0,
+    quoting,
+    nextNumber: Math.max(quoting.nextNumber ?? 1, Math.max(0, ...[...quotes.values()].map((q) => q.number ?? 0)) + 1),
   }
+}
+
+// Quotes to follow up (ADR 0081): what's waiting on the office, so nothing quoted is forgotten.
+
+/** A quote sent this many days ago with no answer is worth a call to the client. */
+export const CHASE_AFTER_DAYS = 7
+
+export interface QuoteToFollow {
+  job: JobView
+  quote: QuoteView
+  /** Days since it was last saved (a draft), sent (waiting) or answered (out of step). */
+  days: number
+}
+
+export interface QuotesToFollow {
+  /** Being put together, not sent yet. */
+  drafts: QuoteToFollow[]
+  /** Sent, with no answer yet: the longest waiting first. */
+  waiting: QuoteToFollow[]
+  /** Answered, but the job doesn't say so yet: accepted and not confirmed, or turned down and not marked lost. */
+  outOfStep: (QuoteToFollow & { want: 'confirmed' | 'lost' })[]
+}
+
+export function quotesToFollow(m: Pick<MoneyView, 'jobs' | 'draftOf'>, today: string): QuotesToFollow {
+  const out: QuotesToFollow = { drafts: [], waiting: [], outOfStep: [] }
+  const since = (d: string | null | undefined) => (d ? Math.max(0, daysBetween(d, today)) : 0)
+  for (const { job, current } of m.jobs) {
+    const stopped = STOPPED.includes(job.status)
+    const draft = m.draftOf(job.id)
+    if (draft && !stopped) out.drafts.push({ job, quote: draft, days: since(irishToday(new Date(draft.savedAt))) })
+    if (!current) continue
+    if (current.status === 'sent' && !stopped && !draft) out.waiting.push({ job, quote: current, days: since(current.sentOn) })
+    if (current.status === 'accepted' && !stopped && job.status !== 'confirmed') out.outOfStep.push({ job, quote: current, days: since(current.answeredOn), want: 'confirmed' })
+    if (current.status === 'declined' && !stopped && !draft) out.outOfStep.push({ job, quote: current, days: since(current.answeredOn), want: 'lost' })
+  }
+  const longest = (a: QuoteToFollow, b: QuoteToFollow) => b.days - a.days || a.job.name.localeCompare(b.job.name, 'en-IE')
+  out.drafts.sort(longest)
+  out.waiting.sort(longest)
+  out.outOfStep.sort(longest)
+  return out
+}
+
+// Every quote in one list (ADR 0088), for the Quotes page: a job's latest, found by its job, client, venue or number.
+
+/** What the Quotes page can narrow to. An invoiced or paid quote is accepted. */
+export type QuoteShow = 'all' | 'draft' | 'sent' | 'accepted' | 'declined'
+export const QUOTE_SHOWS: [QuoteShow, string][] = [
+  ['all', 'All'],
+  ['draft', 'Not sent'],
+  ['sent', 'Sent'],
+  ['accepted', 'Accepted'],
+  ['declined', 'Turned down'],
+]
+
+export interface QuoteRow {
+  job: JobView
+  /** The version being put together if there is one, or else the one that counts. */
+  quote: QuoteView
+  /** The one that counts, when a newer version is being drafted over it. */
+  behind: QuoteView | undefined
+  /** The last day anything happened to it: saved, sent, answered, invoiced or paid. */
+  changed: string
+}
+
+/** Each job's quote, the last changed first. */
+export function quoteRows(m: Pick<MoneyView, 'jobs' | 'draftOf'>): QuoteRow[] {
+  const rows: QuoteRow[] = []
+  for (const { job, current } of m.jobs) {
+    const draft = m.draftOf(job.id)
+    const quote = draft ?? current
+    if (!quote) continue
+    const days = [draft, current].flatMap((q) => (q ? [irishToday(new Date(q.savedAt)), q.sentOn, q.answeredOn, q.invoicedOn, q.paidOn] : []))
+    const changed = days.filter((d): d is string => !!d).sort().at(-1) ?? ''
+    rows.push({ job, quote, behind: draft && current ? current : undefined, changed })
+  }
+  return rows.sort((a, b) => b.changed.localeCompare(a.changed) || a.job.name.localeCompare(b.job.name, 'en-IE'))
+}
+
+/** Whether a row is one of those shown, and has every word typed somewhere in its job's name, client, venue, number or invoice. */
+export function quoteRowShown(r: QuoteRow, show: QuoteShow, search: string): boolean {
+  if (show !== 'all' && r.quote.status !== show) return false
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const q = r.behind ?? r.quote
+  const text = [r.job.name, r.job.client?.name, r.job.venue?.name, q.number ? String(q.number) : '', q.invoiceRef].filter(Boolean).join(' ').toLowerCase()
+  return words.every((w) => text.includes(w))
 }
 
 // The accountant's files (ADR 0042): made on the device from what it holds, for a period.

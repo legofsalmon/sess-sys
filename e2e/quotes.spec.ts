@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 /**
  * Quotes and money (ADR 0042): the office builds a quote from a job's kit
@@ -14,6 +14,8 @@ import { expect, test } from '@playwright/test'
 
 const phoneSize = { width: 390, height: 844 }
 const fresh = { data: { confirm: 'delete everything' } }
+/** The browser's own print dialog would end printing at once and take the sheet away before it's read, so it's left out. */
+const noPrintDialog = (page: Page) => page.addInitScript(() => void (window.print = () => undefined))
 
 test('the office quotes a job, records the answer and the invoice, and sees who owes', async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
@@ -30,7 +32,14 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await office.getByLabel('VAT number').fill('IE 1234567T')
   await office.getByLabel('Address').fill('Unit 4, Docklands Business Park\nDublin 3')
   await office.getByRole('button', { name: 'Save office details' }).click()
+  // Numbers carry on from the last system's, and the terms and bank details go under every quote (ADR 0084).
+  const quoting = office.getByRole('region', { name: 'Printed quotes' })
+  await quoting.getByLabel('Next quote number').fill('1115')
+  await quoting.getByLabel('Terms').fill('Payment within 30 days of the invoice.')
+  await quoting.getByLabel('Bank details').fill('Session Hire Ltd\nIBAN IE00 BANK 0000 0000 0000 00')
+  await quoting.getByRole('button', { name: 'Save printed quotes' }).click()
   await expect(office.locator('.conn')).toHaveText('Up to date')
+  await expect(quoting).toContainText('The next one sent will be 1115.')
   await office.goto('/#jobs')
   await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
   await office.getByRole('tab', { name: 'Quote' }).click()
@@ -68,13 +77,24 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(draft.getByRole('button', { name: 'Line 3: Delivery, change it' })).toContainText('€150.00 once')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
-  // Printed as an A4 page to save as a PDF: only the quote is on the page.
-  await draft.getByRole('button', { name: 'Print or save as PDF' }).click()
+  // A deposit of half, and the prices held for 14 days.
+  await draft.getByLabel('Prices hold for, days').fill('14')
+  await draft.getByLabel('Deposit, %').fill('50')
+  await expect(draft.locator('.quote-terms:not(.quote-discount)')).toContainText('€933.83 before the job')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await expect(draft).toContainText('Marked sent, it becomes quote 1115')
+
+  // Printed as an A4 page to save as a PDF: only the quote is on the page. Not sent yet, it says it's a draft.
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
   const printed = office.locator('.print-sheet.quote-sheet')
-  await expect(printed).toContainText('For Liffey Brands')
+  await expect(printed.locator('.sheet-to')).toContainText('Liffey Brands')
   await expect(printed).toContainText('Delivery')
   await expect(printed).toContainText('€1,867.65')
-  await expect(printed.locator('.from')).toHaveText('Unit 4, Docklands Business Park\nDublin 3VAT number IE 1234567T')
+  await expect(printed.locator('.sheet-facts')).toContainText('Draft quoteNot sent yet')
+  await expect(printed.locator('.from')).toContainText('Unit 4, Docklands Business Park\nDublin 3')
+  await expect(printed.locator('.from')).toContainText('VAT number IE 1234567T')
+  await expect(printed).toContainText('A deposit of 50%, €933.83, confirms the booking.')
+  await expect(printed.locator('.sheet-terms')).toHaveCount(2)
   await expect.poll(() => office.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1)
   await office.emulateMedia({ media: 'print' })
   await expect(printed).toBeVisible()
@@ -86,12 +106,23 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await draft.getByRole('button', { name: 'Mark as sent' }).click()
   const v1 = office.getByRole('region', { name: 'Version 1' })
   await expect(v1.getByText('Sent', { exact: true })).toBeVisible()
+  await expect(v1.locator('.quote-facts')).toContainText('Quote 1115 · Valid until')
+  await v1.getByRole('button', { name: 'Print or save as PDF' }).click()
+  await expect(printed.locator('.sheet-facts')).toContainText('Quote1115')
+  await expect(printed).toContainText('Please give quote 1115 as the reference.')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
   await v1.getByRole('button', { name: 'Start a new version' }).click()
   const v2 = office.getByRole('form', { name: 'Version 2, a draft' })
   await v2.getByLabel('Discount, %').fill('10')
   await expect(v2.locator('.quote-totals')).toContainText('Total€1,680.89')
   await expect(v2.locator('.save-state')).toHaveText('Saved')
+  // What changed, to tell the client in a sentence; the deposit and days carry over.
+  const since = office.getByRole('region', { name: 'What changed since version 1' })
+  await expect(since).toContainText('Discount 10%, was 0%')
+  await expect(since).toContainText('€186.76 less than version 1')
+  await expect(v2.getByLabel('Deposit, %')).toHaveValue('50')
   await v2.getByRole('button', { name: 'Mark as sent' }).click()
+  await expect(office.getByRole('region', { name: 'Version 2' }).locator('.quote-facts')).toContainText('Quote 1115')
 
   // The client said yes; the office invoiced it outside the app and records that here.
   const records = office.getByRole('region', { name: 'What happened' })
@@ -136,6 +167,199 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await kit.getByRole('button', { name: 'Save' }).click()
   await expect(kit.getByRole('button', { name: 'Save' })).toHaveCount(0)
   await expect(office.getByRole('region', { name: 'Crew' })).toContainText('LX op')
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test('kit charged by the week, a line discounted, and a total agreed with the client (ADR 0085)', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  // The Spiiders are hired by the week: the price list says so beside the price.
+  await office.goto('/#jobs/money/prices')
+  const kit = office.getByRole('region', { name: 'Kit' })
+  await kit.getByLabel('Robe Spiider: charged').selectOption('weekly')
+  await kit.getByLabel('Robe Spiider: price a week').fill('150')
+  await kit.getByRole('button', { name: 'Save' }).click()
+  await expect(kit.getByRole('button', { name: 'Save' })).toHaveCount(0)
+  await expect(office.locator('.rate-rules')).toContainText('1 Weekly')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  // Two days out is one week charged.
+  await expect(draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' })).toContainText('12 × €150.00 a week × 1 week')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €2,520.00')
+
+  // Half off the Spiiders, then a 3 Day Week for ten days out: six days charged.
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  await draft.getByLabel('Line 1: discount, %').fill('50')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €1,620.00')
+  await draft.getByLabel('Line 1: charged').selectOption('week3')
+  await draft.getByLabel('Line 1: days out').fill('10')
+  await expect(draft).toContainText('Charged 6 days')
+  await draft.getByLabel('Line 1: charged').selectOption('weekly')
+  await draft.getByLabel('Line 1: days out').fill('2')
+
+  // The client agreed €1,500 before VAT: the discount is whatever comes to it.
+  await draft.getByLabel('Agreed price before VAT, €').fill('1500')
+  await expect(draft.getByLabel('Discount, %', { exact: true })).toHaveCount(0)
+  await expect(draft.locator('.quote-totals')).toContainText('Agreed discount, 7.4%−€120.00')
+  await expect(draft.locator('.quote-totals')).toContainText('Before VAT€1,500.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('less 50%')
+  await expect(printed).toContainText('Agreed discount, 7.4%')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test("the crew's travel to a venue far from Dublin, and their subsistence unless meals are provided (ADR 0086)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  // Admin says how they're charged: past 50 km, diesel at €1.749, a car using 10 litres for 100 km, €39.08 a day each.
+  await office.goto('/#admin')
+  const travel = office.getByRole('region', { name: 'Travel and subsistence' })
+  await travel.getByLabel('Travel after').fill('50')
+  await travel.getByLabel('Fuel price, € a litre').fill('1.749')
+  await travel.getByLabel('A car uses, litres for 100 km').fill('10')
+  await travel.getByLabel('Per diem, € a day').fill('39.08')
+  await travel.getByRole('button', { name: 'Save travel and subsistence' }).click()
+  await expect(office.locator('.conn')).toHaveText('Up to date')
+  await expect(travel).toContainText('Set today.')
+  await expect(travel).toContainText('So 100 km each way comes to €34.98 of fuel for one car.')
+  // The price keeps up with the AA's survey unless turned off, to keep one typed in.
+  const auto = travel.getByRole('switch', { name: /Update the fuel price from the AA each month/ })
+  await expect(auto).toBeChecked()
+  await auto.click()
+  await expect(auto).not.toBeChecked()
+  await expect(travel).toContainText('Off: the fuel price stays as saved here')
+  await expect(travel.getByLabel('Fuel price, € a litre')).toHaveValue('1.749')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  const extras = draft.getByRole('group', { name: 'Travel and subsistence' })
+
+  // The crew's subsistence comes in by itself; the venue is in Dublin, so there's no travel until it's said to be 200 km.
+  await expect(extras).toContainText(/Crew subsistence, \d+ crew days?/)
+  await expect(extras).toContainText('No travel')
+  await extras.getByLabel('Distance each way from Dublin city centre, km').fill('200')
+  await expect(extras).toContainText(/Crew travel, 200 km each way from Dublin, \d+ car trips?/)
+  await expect(extras).toContainText('€69.96')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
+  // The job feeds the crew: no subsistence.
+  await extras.getByRole('switch', { name: /Meals provided/ }).check()
+  await expect(extras).toContainText('No subsistence')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Crew travel, 200 km each way from Dublin')
+  await expect(printed).not.toContainText('Crew subsistence')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test('a package made on the price list goes on a quote as one line, with what it holds under it (ADR 0087)', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  await office.goto('/#jobs/money/prices')
+  const packages = office.getByRole('region', { name: 'Packages' })
+  await packages.getByRole('button', { name: 'Add a package' }).click()
+  const editor = packages.getByRole('form', { name: 'New package' })
+  await editor.getByLabel('Name').fill('Mic package')
+  await editor.getByLabel('Add a product to it').fill('SM58')
+  await editor.getByRole('option', { name: /Shure SM58/ }).click()
+  await editor.getByLabel('How many Shure SM58').fill('4')
+  await editor.getByLabel('Charged').selectOption('weekly')
+  await editor.getByLabel('Price, € a week').fill('100')
+  await editor.getByLabel('Anything else it includes').fill('with clips and stands')
+  await editor.getByRole('button', { name: 'Add the package' }).click()
+  await expect(packages).toContainText('4 × Shure SM58, with clips and stands')
+  await expect(packages).toContainText('€100.00 a week')
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  await draft.getByRole('button', { name: 'Add a package' }).click()
+  await draft.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(draft.getByLabel('Line 3: includes')).toHaveValue('4 × Shure SM58, with clips and stands')
+  await expect(draft.getByRole('group', { name: 'What it comes to' })).toContainText('Before VAT €2,140.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Mic package4 × Shure SM58, with clips and stands')
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test("a line short of kit hires in what it's short of, transport is added at a cost, and the office sees the margin, none of it printed (ADR 0089)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await noPrintDialog(office)
+
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await office.getByRole('tab', { name: 'Quote' }).click()
+  await office.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await office.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  const summary = draft.getByRole('group', { name: 'What it comes to' })
+  await expect(summary).toContainText('Margin')
+
+  // Far more Spiiders than there are: the line says it's short, and hires in what it's short of.
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  await draft.getByLabel('Line 1: how many').fill('500')
+  await expect(draft.locator('.kit-note')).toContainText('Short by')
+  await expect(summary).toContainText('1 line short of kit')
+  await draft.getByRole('button', { name: /^Hire \d+ in$/ }).click()
+  await expect(draft.getByLabel('Line 1: hired in')).not.toHaveValue('')
+  await expect(summary).not.toContainText('short of kit')
+  await expect(summary).toContainText('1 line with no cost yet')
+  await draft.getByLabel('Line 1: supplier').fill('  Hire Co ')
+  await draft.getByLabel('Line 1: costs us').fill('2000')
+  await expect(summary).not.toContainText('no cost yet')
+  await draft.getByRole('button', { name: 'Done' }).click()
+  await expect(draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' })).toContainText('hired in from Hire Co')
+
+  // Transport, charged once, and what it costs us: the job's Luton is booked with a driver, so it's offered first.
+  await draft.getByRole('button', { name: 'Add transport' }).click()
+  await draft.getByRole('button', { name: 'Add', exact: true }).click()
+  await draft.getByLabel('Line 3: price').fill('180')
+  await draft.getByLabel('Line 3: costs us').fill('120')
+  await draft.getByRole('button', { name: 'Done' }).click()
+  await expect(draft.getByRole('button', { name: 'Line 3: Luton van and driver, change it' })).toContainText('makes €60.00')
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
+  // The client's copy has none of it.
+  await draft.getByRole('button', { name: 'Print a draft' }).click()
+  const printed = office.locator('.print-sheet.quote-sheet')
+  await expect(printed).toContainText('Luton van and driver')
+  for (const word of ['Hire Co', 'hired in', 'Margin', 'makes', '€2,000.00', '€120.00']) await expect(printed).not.toContainText(word)
+  await office.evaluate(() => dispatchEvent(new Event('afterprint')))
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })

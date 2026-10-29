@@ -207,6 +207,9 @@ const CASES: Case[] = [
   c('fault.close', { id: 'f1', outcome: 'fixed', at: new Date().toISOString() }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: true, at: new Date().toISOString(), by: 'Cian', note: '' }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: false, at: new Date().toISOString(), by: 'Cian', note: 'Earth fault' }, { as: 'failed' }),
+  // Certificates on items (ADR 0094).
+  c('itemCertificate.save', { id: 'pat-cert', kind: 'pat', title: 'PAT certificate', day: today, expires: null, assetIds: ['a1'], link: 'https://example.com/pat' }),
+  c('itemCertificate.remove', { id: 'pat-cert' }, { before: [m('itemCertificate.save', { id: 'pat-cert', kind: 'pat', title: 'PAT certificate', day: today, expires: null, assetIds: ['a1'], link: 'https://example.com/pat' })] }),
   c('count.record', {
     id: newId(),
     placeId: 'wh',
@@ -232,6 +235,7 @@ const CASES: Case[] = [
   c('office.update', { name: 'Session Hire', phone: '+35315551234', email: 'office@sessionhire.com' }),
   c('reading.heads', { rates: true }),
   c('messages.prompt', { on: false }),
+  c('timesheets.use', { on: true }),
 
   // Leave and time in lieu.
   c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(40), note: 'Family' }),
@@ -259,7 +263,17 @@ const CASES: Case[] = [
   // Money.
   c('quote.save', { id: 'q2', projectId: 'gala', lines: [{ id: 'l1', kind: 'kit', what: 'd&b Y10P', ref: 'y10p', group: 'Audio', qty: 4, days: 3, unitCents: 4500, vat: '23' }, { id: 'l2', kind: 'other', what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '13.5' }], discountPct: 5, notes: 'Second go' }, { as: 'a new version' }),
   c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' }, { as: 'a first draft' }),
+  c('quote.save', { id: 'q3', projectId: 'enq', lines: [{ ...DELIVERY, discountPct: 20 }], discountPct: 0, agreedCents: 10000, notes: '' }, { as: 'a price agreed' }),
+  c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' }, { as: 'keeping the price agreed', before: [m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, agreedCents: 10000, notes: '' })] }),
   c('quote.sent', { id: 'q3', on: today }, { before: [m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '' })] }),
+  c('quote.sent', { id: 'q3', on: today }, { as: 'numbered after the next number set', before: [m('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }), m('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY], discountPct: 0, notes: '', validDays: 14, depositPct: 50 })] }),
+  c('quoting.update', { nextNumber: 1115, terms: 'Half up front.', bank: 'IBAN IE00 0000' }),
+  c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: today }),
+  c('quoting.travel', { travelFromKm: 80, fuelCentsPerLitre: 174.9, litresPer100Km: 9.5, perDiemCents: null, on: today }, { as: 'the fuel price the same', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: day(-3) })] }),
+  c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 214.8, litresPer100Km: 10, perDiemCents: null, on: today, fuelMonth: 'October 2026', fuelAuto: false }, { as: 'read from the AA, kept from then on' }),
+  c('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 180, litresPer100Km: 10, perDiemCents: null, on: today }, { as: 'a price typed over the AA’s', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 214.8, litresPer100Km: 10, perDiemCents: null, on: today, fuelMonth: 'October 2026' })] }),
+  c('quoting.update', { nextNumber: null, terms: '', bank: '' }, { as: 'keeping travel', before: [m('quoting.travel', { travelFromKm: 50, fuelCentsPerLitre: 174.9, litresPer100Km: 10, perDiemCents: 3908, on: today })] }),
+  c('quote.save', { id: 'q3', projectId: 'enq', lines: [DELIVERY, { ...DELIVERY, id: 't1', what: 'Travel, 120 km each way from Dublin', group: 'Travel and subsistence', per: 'once', extra: 'travel' }], discountPct: 0, notes: '', mealsProvided: true, travelKm: 120 }, { as: 'with travel, meals provided' }),
   c('quote.answer', { id: 'q1', answer: 'accepted', on: today }, { as: 'accepted' }),
   c('quote.answer', { id: 'q1', answer: 'declined', on: today }, { as: 'declined' }),
   c('quote.answer', { id: 'q1', answer: 'none', on: today }, { as: 'taken back', before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
@@ -267,6 +281,11 @@ const CASES: Case[] = [
   c('quote.paid', { id: 'q1', on: today }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today }), m('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' })] }),
   c('price.product', { modelId: 'xlr', dayCents: 300 }),
   c('price.product', { modelId: 'y10p', dayCents: null }, { as: 'taken off' }),
+  c('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'weekly' }, { as: 'charged by the week' }),
+  c('price.product', { modelId: 'xlr', dayCents: 1500 }, { as: 'keeping its rule', before: [m('price.product', { modelId: 'xlr', dayCents: 1200, rate: 'week3' })] }),
+  c('price.rulesFromRms', { all: false }),
+  c('package.save', { id: 'mics', name: 'Mic package', department: 'audio', dayCents: 10000, rate: 'weekly', items: [{ modelId: 'xlr', qty: 4 }], notes: 'with clips' }),
+  c('package.remove', { id: 'mics' }, { before: [m('package.save', { id: 'mics', name: 'Mic package', department: 'audio', dayCents: 10000, rate: 'daily', items: [], notes: '' })] }),
   c('price.role', { role: '  Sound   No.1 ', dayCents: 35000 }),
   c('price.client', { clientId: 'bw', pct: 10 }),
   c('cost.paid', { id: 'dara-then', on: today }, { before: [m('timesheet.approve', { id: 'dara-then', days: [day(-3), day(-2)], dayRateCents: 32000, extras: [], officeNote: '' })] }),
@@ -310,15 +329,27 @@ const CASES: Case[] = [
  */
 const NOT_LAID_OVER: CommandName[] = ['person.newLink', 'person.erase', 'ownCalendar.stop']
 
-describe('a change shown while it waits, and once the server has it', () => {
-  it('covers every command', async () => {
-    const covered = new Set<string>([...CASES.map((k) => k.name), ...NOT_LAID_OVER])
-    expect(COMMAND_NAMES.filter((n) => !covered.has(n))).toEqual([])
-  })
+/**
+ * Each case builds a company of its own, a few seconds apiece, so the cases
+ * are dealt across parity-1 to parity-4.test.ts, which run side by side
+ * rather than one after another. Part 1 also checks every command is covered.
+ */
+export const PARTS = 4
 
-  for (const k of CASES)
-    it(`${k.name}${k.as ? `, ${k.as}` : ''}`, async () => {
-      const drift = await run(k)
-      expect(drift, drift.join('\n')).toEqual([])
+export function parity(part: number) {
+  describe(`a change shown while it waits, and once the server has it (part ${part} of ${PARTS})`, () => {
+    if (part === 1)
+      it('covers every command', async () => {
+        const covered = new Set<string>([...CASES.map((k) => k.name), ...NOT_LAID_OVER])
+        expect(COMMAND_NAMES.filter((n) => !covered.has(n))).toEqual([])
+      })
+
+    CASES.forEach((k, i) => {
+      if (i % PARTS !== part - 1) return
+      it(`${k.name}${k.as ? `, ${k.as}` : ''}`, async () => {
+        const drift = await run(k)
+        expect(drift, drift.join('\n')).toEqual([])
+      })
     })
-})
+  })
+}

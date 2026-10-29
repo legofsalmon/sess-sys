@@ -22,6 +22,8 @@ export const OFFICE_SETTING_ID = 'office'
 export const READING_SETTING_ID = 'reading'
 /** Whether the app prompts messages to crew (ADR 0048): the third setting, with only `promptMessages` to it. */
 export const MESSAGES_SETTING_ID = 'messages'
+/** Whether the company uses timesheets (ADR 0090): the fourth setting, with only `useTimesheets` to it. */
+export const TIMESHEETS_SETTING_ID = 'timesheets'
 
 export const setting = z.object({
   id,
@@ -41,6 +43,13 @@ export const setting = z.object({
    * lists without a mis-tap messaging a freelancer about a job in October.
    */
   promptMessages: z.boolean().optional(),
+  /**
+   * On the "timesheets" setting (ADR 0090): whether the company uses
+   * timesheets at all. Off until the office says, so a company that pays
+   * crew from its own records sees no Timesheets page, tile or count, and
+   * no freelancer is asked for one. What's kept stays kept.
+   */
+  useTimesheets: z.boolean().optional(),
 })
 export type Setting = z.infer<typeof setting>
 
@@ -66,6 +75,8 @@ export const officeCommandSchemas = {
   'reading.heads': z.object({ rates: z.boolean() }),
   /** Whether the app prompts messages to crew (ADR 0048). The office's to decide, under Admin. */
   'messages.prompt': z.object({ on: z.boolean() }),
+  /** Whether the company uses timesheets (ADR 0090). The office's to decide, under Admin. */
+  'timesheets.use': z.object({ on: z.boolean() }),
 } as const
 
 /** The details when there is a way back in them: a phone or an email. A name alone is nothing to show. */
