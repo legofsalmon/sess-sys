@@ -13,7 +13,7 @@ waiting on someone.
   by its events, so one that gained an earlier day still comes in and one
   already brought in says so; Mac an and Nic na surnames split properly,
   and those split before are mended on start-up. ADRs 0037 and 0066 note
-  it. App 1.59.1.
+  it. App 1.60.1.
 - Checked: typecheck, shared, server and real-Postgres tests, and the
   bring-in browser test.
 
