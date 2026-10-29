@@ -182,6 +182,23 @@ describe('text pasted with control characters', () => {
   })
 })
 
+describe('text typed with spaces round it', () => {
+  it('is kept trimmed on the device while it waits, as the server keeps it, so it shows and sorts the same before and after a sync', async () => {
+    // Proves (audit, 20 October 2026, finding 63): the spaces round a name and its notes are gone from what the device keeps, shows
+    // and sends, the line breaks inside the notes stay, and a name of nothing but spaces is "needed" on the phone as on the server.
+    const server = new PretendServer()
+    const storage = new MemoryStorage()
+    const phone = await device(server, storage)
+    const sent = await phone.mutate('place.upsert', { id: 'b7', name: '  Bay B7  ', notes: '\n  Top shelf\nspares  \n' })
+    const kept = { id: 'b7', name: 'Bay B7', notes: 'Top shelf\nspares' }
+    expect(sent.args).toEqual(kept)
+    expect(phone.view().warehouse.places).toMatchObject([{ id: 'b7', name: 'Bay B7', pending: true }])
+    await expect(phone.mutate('place.upsert', { id: 'b8', name: '   ', notes: '' })).rejects.toThrow("The place's name is needed.")
+    await phone.sync()
+    expect(server.pushes[0]!.mutations[0]!.args).toEqual(kept)
+  })
+})
+
 describe('a change the view cannot show', () => {
   it('is taken back off the outbox and refused in words, and the next change still goes in', async () => {
     const server = new PretendServer()
