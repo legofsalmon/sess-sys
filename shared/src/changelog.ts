@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.59.2',
+    date: '2026-10-29',
+    title: 'Easier on a phone, and printing any screen',
+    what: "On a phone, rows and tables that run off the edge now fade where there's more, and buttons and links are easier to tap. Pressing Cmd-P on any screen prints it rather than a blank page. Venues has a search box, and a few words and colours are more consistent.",
+    prs: [170],
+  },
+  {
     version: '1.58.0',
     date: '2026-10-29',
     title: 'Money says what its figures are',
