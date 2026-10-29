@@ -411,7 +411,7 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
             type="search"
             enterKeyHint="go"
             autoComplete="off"
-            placeholder="Scan or type a number"
+            placeholder="SH-000123"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             aria-label="Number or serial"

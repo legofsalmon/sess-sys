@@ -67,6 +67,11 @@ export interface PickRow {
   unusable: number
   /** Where to find the ones that aren't out, by place: items that can't go out left out. */
   from: PickFrom[]
+  /**
+   * The items not out that can't go out, by place and why, so a pick with none to find says what's on the bench rather
+   * than only "none" (audit, 20 October 2026, finding 94).
+   */
+  held: { where: string; why: 'damaged' | 'missing' | 'test'; items: AssetView[] }[]
 }
 
 export interface PickList {
@@ -285,6 +290,7 @@ export function movesView(
           missing: 0,
           unusable: faults?.unusable(modelId) ?? 0,
           from: [],
+          held: [],
         }
         rows.set(modelId, r)
       }
@@ -318,7 +324,20 @@ export function movesView(
       // Where to find the rest: items not out with any job, and what's counted, place by place.
       const from = new Map<string, PickFrom>()
       const at = (where: string) => from.get(where) ?? (from.set(where, { where, items: [], counted: 0 }), from.get(where)!)
-      for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.cantGoOut(a.id)) at(whereKept(a)).items.push(a)
+      const held = new Map<string, PickRow['held'][number]>()
+      for (const a of r.model?.items ?? []) {
+        if (outState.has(a.id)) continue
+        if (!faults?.cantGoOut(a.id)) {
+          at(whereKept(a)).items.push(a)
+          continue
+        }
+        const kind = faults.stopping(a.id)?.kind
+        const why = kind === 'missing' ? 'missing' : kind ? 'damaged' : 'test'
+        const where = why === 'missing' ? '' : whereKept(a)
+        const key = `${why} ${where}`
+        held.get(key)?.items.push(a) ?? held.set(key, { where, why, items: [a] })
+      }
+      r.held = [...held.values()].sort((a, b) => byWhere.compare(a.where, b.where) || a.why.localeCompare(b.why))
       for (const s of r.model?.counted ?? []) at(whereKept(s)).counted += s.qty
       r.from = [...from.values()].sort((a, b) => byWhere.compare(a.where, b.where))
     }

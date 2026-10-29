@@ -338,6 +338,11 @@ describe('what a device shows', () => {
       ['d&b Y10P', 2, [number(speakers[1]!), number(speakers[3]!)]],
       ['XLR 10 m', 3, []],
     ])
+    // What can't go out, by place and why, for a pick that finds none (audit, 20 October 2026, finding 94).
+    expect(pick.rows[0]!.held.map((h) => [h.where, h.why, h.items.map((a) => a.number)])).toEqual([
+      ['', 'missing', [number(speakers[2]!)]],
+      ['Bay A3', 'damaged', [number(speakers[0]!)]],
+    ])
 
     // Synced, fixed on the bench, and seen by the office.
     phone.signal.on = true

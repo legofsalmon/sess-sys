@@ -564,7 +564,7 @@ export function TestingScreen({ view }: { view: View }) {
               </div>
               <div className="grid-form">
                 <label>
-                  By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
+                  By <input value={by} onChange={(e) => setBy(e.target.value)} maxLength={200} />
                 </label>
                 <label>
                   When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
@@ -575,7 +575,7 @@ export function TestingScreen({ view }: { view: View }) {
                   type="search"
                   enterKeyHint="go"
                   autoComplete="off"
-                  placeholder="Scan or type a number"
+                  placeholder="SH-000123"
                   value={typed}
                   onChange={(e) => setTyped(e.target.value)}
                   aria-label="Number or serial"

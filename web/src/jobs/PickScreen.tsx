@@ -123,7 +123,13 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     const n = normaliseNumber(code)
     // An old tag from before Session Hire's labels works too (ADR 0026).
     const a = itemByCode(w, code)
-    if (!a) return say('warn', n ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the code ${code.trim()}.`)
+    // A label from a run not stuck on anything yet says so; any other number is most likely a slip of the finger, as the Stock
+    // search reads it (audit, 20 October 2026, finding 94).
+    if (!a)
+      return say(
+        'warn',
+        n && view.labels.runOf(n) ? `${n} isn't on anything yet. Put it on an item in the Stock tab first.` : `Nothing has the number ${n || code.trim()}. Check the label.`
+      )
     const name = itemName(a)
     // Never stock, so nothing to scan out or back (audit finding 19).
     if (a.retiredReason === 'mistake') return say('warn', `${mistakeLabel(a)} Nothing was recorded.`)
@@ -228,7 +234,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               type="search"
               enterKeyHint="go"
               autoComplete="off"
-              placeholder={mode === 'out' ? 'Scan or type a number to send out' : 'Scan or type a number coming back'}
+              // An example that fits at phone width, where a sentence was cut short (audit, 20 October 2026, finding 95).
+              placeholder="SH-000123"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               aria-label="Number or serial"
@@ -266,7 +273,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
               </button>
             </div>
           )}
-          {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} />}
+          {said?.back && mode === 'in' && <DamageTo key={`damage-${said.at}`} a={said.back} job={job} say={say} />}
         </section>
       )}
 
@@ -499,8 +506,8 @@ function UndoButton({ undo, say }: { undo: Undo; say: Say }) {
   )
 }
 
-/** Coming back: report damage to the item just scanned. */
-function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
+/** Coming back: report damage to the item just scanned. Once it's reported, the scan line says so and the button goes (audit, 20 October 2026, finding 42). */
+function DamageTo({ a, job, say }: { a: AssetView; job: JobView; say: Say }) {
   const [open, setOpen] = useState(false)
   if (!open)
     return (
@@ -510,7 +517,27 @@ function DamageTo({ a, job }: { a: AssetView; job: JobView }) {
         </button>
       </div>
     )
-  return <ReportFault kind="damaged" asset={a} model={a.model} projectId={job.id} onDone={() => setOpen(false)} />
+  return (
+    <ReportFault
+      kind="damaged"
+      asset={a}
+      model={a.model}
+      projectId={job.id}
+      onDone={() => setOpen(false)}
+      onReported={({ usable }) => say('warn', damagedText(a.number || itemName(a), usable))}
+    />
+  )
+}
+
+/** "SH-000013 reported damaged: can't go out until it's fixed." */
+const damagedText = (what: string, usable: boolean, many = false) =>
+  `${what} reported damaged: ${usable ? `${many ? 'they' : 'it'} can still go out.` : `can't go out until ${many ? "they're" : "it's"} fixed.`}`
+
+/** "1 in Bay A2 can't go out (damaged)", the kit card's words, or "2 missing". */
+function heldText(h: PickRow['held'][number]): string {
+  const n = h.items.length.toLocaleString('en-IE')
+  if (h.why === 'missing') return `${n} missing`
+  return `${n} ${h.where === 'Not said where' ? 'not placed' : `in ${h.where}`} can't go out (${h.why === 'damaged' ? 'damaged' : 'due a test'})`
 }
 
 /** What a scan or a tap on the list did, said in the scan line at the top, where the eye already goes. */
@@ -570,7 +597,15 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
               {f.items.length > 0 && (
                 <details>
                   <summary>{f.items.length === 1 ? 'Its number' : `The ${f.items.length.toLocaleString('en-IE')} numbers`}</summary>
-                  <p>{f.items.map((a) => a.number || 'no number yet').join(', ')}</p>
+                  {/* Each number kept whole on its line, so it never breaks at its hyphen (audit, 20 October 2026, finding 41). */}
+                  <p>
+                    {f.items.map((a, i) => (
+                      <span key={a.id}>
+                        {i > 0 && ', '}
+                        <span className="number">{a.number || 'no number yet'}</span>
+                      </span>
+                    ))}
+                  </p>
                 </details>
               )}
             </li>
@@ -578,13 +613,19 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
         </ul>
       )}
       {mode === 'out' && !extra && row.out < row.need && row.from.length === 0 && (
-        <p className="kit-state warn">None in the stock list that aren't out. Subhire them on the job's page, or count them in the Stock tab.</p>
+        <p className="kit-state warn">
+          {row.held.length
+            ? `None fit to go out: ${row.held.map(heldText).join('; ')}. Subhire them on the job's page, or sort them out on Repairs or Testing.`
+            : "None in the stock list that aren't out. Subhire them on the job's page, or count them in the Stock tab."}
+        </p>
       )}
       {row.items.length > 0 && (
         <ul className="numbers out-items" aria-label={mode === 'out' ? 'Out' : 'Still out'}>
           {row.items.map((a) => (
             <li key={a.id}>
               <a href={`#stock/item/${a.id}`}>{a.number || 'no number yet'}</a>
+              {/* Apart and at least 44 px wide, so a gloved tap for Back doesn't land on Missing; Missing is the quieter of the two,
+                  and happens at once with Undo beside its answer (audit, 20 October 2026, finding 40). */}
               {mayMove && (
                 <button type="button" className="link" onClick={() =>
                     void run(() => record(job.id, 'in', { assetId: a.id, modelId: a.modelId })).then(
@@ -602,12 +643,24 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
               {mode === 'in' && (
                 <button
                   type="button"
-                  className="link"
-                  onClick={() =>
-                    void run(() => reportFault({ kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' })).then(
-                      (ok) => ok && say('warn', `${a.number || name} marked missing. Scan it when it turns up and it's marked found.`)
+                  className="link quiet"
+                  onClick={() => {
+                    const id = newId()
+                    void run(() => reportFault({ id, kind: 'missing', assetId: a.id, modelId: a.modelId, qty: 1, projectId: job.id, usable: false, note: '' })).then(
+                      (ok) =>
+                        ok &&
+                        say('warn', `${a.number || name} marked missing. Scan it when it turns up and it's marked found.`, {
+                          // Taken back as the opposite (ADR 0072): the report closed as found, and the item out with the job again.
+                          undo: {
+                            run: async () => {
+                              await client.mutate('fault.close', { id, outcome: 'found', at: new Date().toISOString() })
+                              await record(job.id, 'out', { assetId: a.id, modelId: a.modelId })
+                            },
+                            said: `${a.number || name} isn't missing: it's out with ${job.name} again.`,
+                          },
+                        })
                     )
-                  }
+                  }}
                 >
                   Missing
                 </button>
@@ -632,7 +685,16 @@ function Row({ row, job, mode, say, mayMove }: { row: PickRow; job: JobView; mod
           Report damage to counted {name}
         </button>
       )}
-      {damage && <ReportFault kind="damaged" model={row.model} projectId={job.id} most={row.countedBack} onDone={() => setDamage(false)} />}
+      {damage && (
+        <ReportFault
+          kind="damaged"
+          model={row.model}
+          projectId={job.id}
+          most={row.countedBack}
+          onDone={() => setDamage(false)}
+          onReported={({ usable, qty }) => say('warn', damagedText(`${qty.toLocaleString('en-IE')} × ${name}`, usable, qty > 1))}
+        />
+      )}
     </article>
   )
 }

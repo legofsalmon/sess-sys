@@ -148,6 +148,9 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await damage.getByLabel("What's wrong").fill('Blown driver')
   await damage.getByRole('button', { name: 'Report damage' }).click()
   await expect(damage).toHaveCount(0)
+  // Said where the eye already is, and not offered again (audit, 20 October 2026, finding 42).
+  await expect(said).toHaveText(`${speakers[0]} reported damaged: can't go out until it's fixed.`)
+  await expect(page.getByRole('button', { name: `Report damage to ${speakers[0]}` })).toHaveCount(0)
   // The second speaker didn't come back.
   await speakerRow
     .getByRole('list', { name: 'Still out' })
@@ -156,6 +159,17 @@ test('damaged and missing kit, reported on return, then fixed, found and written
     .click()
   await expect(speakerRow.locator('.count')).toHaveText('1 still out, 1 missing')
   await expect(speakerRow.getByRole('list', { name: 'Missing' })).toHaveText(speakers[1]!)
+  await expect(said).toHaveText(`${speakers[1]} marked missing. Scan it when it turns up and it's marked found.`)
+  // At once, with Undo rather than a question first (audit, 20 October 2026, finding 40): undone, it's out again; then missing after all.
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(said).toHaveText(`Undone: ${speakers[1]} isn't missing: it's out with ${job} again.`)
+  await expect(speakerRow.locator('.count')).toHaveText('2 still out')
+  await speakerRow
+    .getByRole('list', { name: 'Still out' })
+    .locator('li', { hasText: speakers[1]! })
+    .getByRole('button', { name: 'Missing' })
+    .click()
+  await expect(speakerRow.locator('.count')).toHaveText('1 still out, 1 missing')
   // 17 cables back, 3 missing, and 2 of those back are cut.
   const countBack = cableRow.getByRole('form', { name: `Count back ${cable}` })
   await countBack.getByLabel('How many').fill('17')
@@ -170,6 +184,7 @@ test('damaged and missing kit, reported on return, then fixed, found and written
   await cut.getByLabel("What's wrong").fill('Cut near the plug')
   await cut.getByRole('button', { name: 'Report damage' }).click()
   await expect(cut).toHaveCount(0)
+  await expect(said).toHaveText(`2 × ${cable} reported damaged: can't go out until they're fixed.`)
   await expect(page.locator('.pick-total')).toHaveText('18 back, 1 still out, 4 missing')
   await expect(page.locator('.conn')).toContainText('No signal')
   await page.screenshot(shot('faults-back'))

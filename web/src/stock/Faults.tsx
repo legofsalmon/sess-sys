@@ -50,7 +50,7 @@ export async function closeFault(f: FaultView, outcome: FaultOutcome) {
 }
 
 /** One report as a change; whoever asks for it runs it through act(). */
-export const reportFault = (args: Omit<CommandInput<'fault.report'>, 'id' | 'at'>) =>
+export const reportFault = (args: Omit<CommandInput<'fault.report'>, 'id' | 'at'> & { id?: string }) =>
   client.mutate('fault.report', { id: newId(), at: new Date().toISOString(), ...args })
 
 /** Report an item, or some counted kit, damaged or missing. */
@@ -61,6 +61,7 @@ export function ReportFault({
   projectId = null,
   most,
   onDone,
+  onReported,
 }: {
   kind: FaultKind
   asset?: AssetView
@@ -69,6 +70,8 @@ export function ReportFault({
   /** For counted kit: the most there could be. */
   most?: number
   onDone: () => void
+  /** Once it's reported, before onDone: what was reported, for whoever opened the form to say so. */
+  onReported?: (what: { usable: boolean; qty: number }) => void
 }) {
   const [qty, setQty] = useState(most === 1 ? '1' : '')
   const [note, setNote] = useState('')
@@ -82,9 +85,11 @@ export function ReportFault({
     if (kind === 'damaged' && !note.trim()) return refuse("Say what's wrong, for whoever repairs it.")
     const modelId = asset?.modelId ?? model?.id
     if (!modelId) return refuse('That product is no longer in the stock list.')
-    void run(() => reportFault({ kind, assetId: asset?.id ?? null, modelId, qty: n, projectId, usable: kind === 'damaged' && usable, note: note.trim() })).then(
-      (ok) => ok && onDone()
-    )
+    void run(() => reportFault({ kind, assetId: asset?.id ?? null, modelId, qty: n, projectId, usable: kind === 'damaged' && usable, note: note.trim() })).then((ok) => {
+      if (!ok) return
+      onReported?.({ usable: kind === 'damaged' && usable, qty: n })
+      onDone()
+    })
   }
   return (
     <form className="grid-form fault-form" onSubmit={submit} aria-label={`Report ${name} ${kind}`}>
