@@ -109,3 +109,18 @@ test("a venue's own map gives directions, and its pin is moved by a pasted link 
   await expect(card.getByRole('link', { name: 'Directions' })).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=53.3478,-6.237')
   await expect(page.getByRole('status')).toHaveText('Up to date')
 })
+
+test('a map first opened with no signal says it comes with signal, and comes when it does', async ({ browser }) => {
+  // Proves: the map's code isn't in every phone's download (audit, 20 October 2026, finding 65), so a phone that never opened a map and has no signal is told so where the map would be, the rest of the page still works, and the map arrives on its own once the signal is back.
+  const page = await office(browser, () => ({ status: 200, body: { found: [] } }))
+  await page.goto('/#jobs')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.context().setOffline(true)
+  await page.goto('/#jobs/venues')
+  const map = page.getByRole('region', { name: 'Map of 4 venues' })
+  await expect(map).toContainText("The map comes with signal: it hasn't been opened on this phone before.")
+  await expect(page.getByRole('link', { name: /^Clonmore House/ })).toBeVisible()
+  await page.context().setOffline(false)
+  await expect(pins(page)).toHaveCount(4)
+  await expect(page.locator('.map-missing')).toHaveCount(0)
+})
