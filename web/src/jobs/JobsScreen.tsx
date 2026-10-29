@@ -45,6 +45,7 @@ import { ClientScreen } from './ClientScreen.tsx'
 import { jobsAt, VenueScreen } from './VenueScreen.tsx'
 import { VenuesMapCard } from './VenueMaps.tsx'
 import { Heading, Icon } from '../Icon.tsx'
+import { plain, wordsOf } from '../crew/People.tsx'
 import { JOBS } from '../Up.tsx'
 import { useWindowed } from '../windowed.ts'
 
@@ -177,17 +178,25 @@ function ClientsScreen({ view }: { view: View }) {
   )
 }
 
-/** Every venue, on a page along Jobs' row (ADR 0041), with a map of them all above the list (ADR 0057). */
+/**
+ * Every venue, on a page along Jobs' row (ADR 0041), with a map of them all above the list (ADR 0057). Sixty and more is a long
+ * list, so it has People's find box at its top, by name or address with or without the fadas (audit, 20 October 2026, finding 76).
+ */
 function VenuesScreen({ view }: { view: View }) {
   const { jobs, venues } = view.jobs
+  const [find, setFind] = useState('')
+  const words = wordsOf(find)
+  const shown = words.length ? venues.filter((v) => words.every((w) => plain([v.name, v.address].filter(Boolean).join(' ')).includes(w))) : venues
   return (
     <div className="app crew jobs">
       <Top view={view} views={<JobViews current="venues" />} heading="Venues" />
       <VenuesMapCard venues={venues} jobsAt={(id) => jobsAt(jobs, id).length} />
-      <section className="card plain">
+      <section className="card plain" aria-label="Every venue">
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
+        {venues.length > 0 && <input className="search" type="search" placeholder="Name or address" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a venue" />}
+        {venues.length > 0 && shown.length === 0 && <p className="empty">No venue matches.</p>}
         <ul className="job-list">
-          {venues.map((v) => (
+          {shown.map((v) => (
             <li key={v.id}>
               <VenueRow v={v} jobs={jobsAt(jobs, v.id).length} docs={view.attachments.of('venue', v.id).length} />
             </li>
@@ -335,6 +344,8 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
 /** A job in the next fortnight with neither is worth a prompt; on every other row the empty line is noise (audit of 16 October, finding 8). */
 const PROMPT_DAYS = 14
 
+const sameWord = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
 export function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitLineView[] | undefined; current: boolean }) {
   const crew = crewFill(job.calls)
   const short = kitShort(kit)
@@ -347,7 +358,8 @@ export function JobRow({ job, kit, current }: { job: JobView; kit: readonly KitL
         <b>{job.name}</b>
         {(where || soon) && <p>{where || 'No client or venue yet'}</p>}
         <p>
-          {kindOf(job) !== 'gig' && `${KIND_LABELS[kindOf(job)]} · `}
+          {/* The kind once: a meeting whose one phase is called Meeting doesn't say it twice (audit, 20 October 2026, finding 77a). */}
+          {kindOf(job) !== 'gig' && !sameWord(KIND_LABELS[kindOf(job)], phaseNames(job.phases)) && `${KIND_LABELS[kindOf(job)]} · `}
           {job.span ? spanLabel(job.span) : 'No dates yet'}
           {job.phases.length > 0 && ` · ${phaseNames(job.phases)}`}
         </p>

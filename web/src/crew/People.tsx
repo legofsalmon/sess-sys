@@ -50,7 +50,7 @@ import { SkillsField, withTyped } from './SkillsField.tsx'
 export const dept = (p: Pick<PersonView, 'department'>) => (p.department ?? '').toLowerCase()
 
 /** Lower case with the fadas off, so "padraig" finds Pádraig and "sean" finds Seán: names are often typed without them. */
-const plain = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+export const plain = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 /** The words typed into a search for someone. */
 export const wordsOf = (typed: string) => plain(typed).split(/\s+/).filter(Boolean)
