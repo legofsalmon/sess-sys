@@ -214,3 +214,158 @@ describe('an edit made against an older copy', () => {
     expect(res.json().results[0].status).toBe('applied')
   })
 })
+
+/** Made on the office, synced to both; then the phone goes offline, both change it, the office syncs first, then the phone. */
+async function bothChange(
+  app: FastifyInstance,
+  office: Awaited<ReturnType<typeof device>>,
+  phone: Awaited<ReturnType<typeof device>>,
+  theirs: () => Promise<unknown>,
+  mine: () => Promise<unknown>
+) {
+  await office.client.sync()
+  await phone.client.sync()
+  phone.signal.on = false
+  await mine()
+  await theirs()
+  await office.client.sync()
+  phone.signal.on = true
+  await phone.client.sync()
+  return phone.client.view().problems
+}
+
+describe('the rest that save typed text or a whole record (audit, 20 October 2026, finding 20)', () => {
+  const Y10P = { id: 'y10p', name: 'd&b Y10P', department: 'audio', category: 'Speakers', tracking: 'bulk', isCase: false, valueCents: null, notes: '' } as const
+
+  it("turns down a stale quantity on a job's kit, rather than putting 13 back over 17", async () => {
+    // Proves: the finding's case: a kit line at 12, the office makes it 17 and syncs, the phone on its old copy makes it 13.
+    const { app, ids, office, phone } = await setup()
+    await office.client.mutate('model.create', Y10P)
+    const k = newId()
+    await office.client.mutate('kit.add', { id: k, projectId: ids.job, phaseId: null, modelId: 'y10p', qty: 12, subhireQty: 0, supplier: '', notes: '' })
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('kit.update', { id: k, qty: 17 }),
+      () => phone.client.mutate('kit.update', { id: k, qty: 13 })
+    )
+    expect((await latest<{ qty: number }>(app, 'kitLine', k))?.qty).toBe(17)
+    expect(problems[0]?.reason.message).toMatch(/^Someone changed the quantity of this line of kit on another device/)
+  })
+
+  it('keeps the notes typed on one device and the quantity set on another', async () => {
+    // Proves: only the fields a change sets are checked, so two people on different parts of a kit line both keep theirs.
+    const { app, ids, office, phone } = await setup()
+    await office.client.mutate('model.create', Y10P)
+    const k = newId()
+    await office.client.mutate('kit.add', { id: k, projectId: ids.job, phaseId: null, modelId: 'y10p', qty: 12, subhireQty: 0, supplier: '', notes: '' })
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('kit.update', { id: k, qty: 17 }),
+      () => phone.client.mutate('kit.update', { id: k, notes: 'Two spare' })
+    )
+    expect(problems).toEqual([])
+    expect(await latest(app, 'kitLine', k)).toMatchObject({ qty: 17, notes: 'Two spare' })
+  })
+
+  it('turns down a stale stock count, found by product and place as the count keeps it', async () => {
+    // Proves: a count, which carries no id of its own, is checked against the feed's record for that product in that place.
+    const { app, office, phone } = await setup()
+    await office.client.mutate('model.create', Y10P)
+    await office.client.mutate('place.upsert', { id: 'a3', name: 'Bay A3', notes: '' })
+    await office.client.mutate('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 4 })
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 6 }),
+      () => phone.client.mutate('stock.set', { modelId: 'y10p', placeId: 'a3', caseId: null, qty: 5 })
+    )
+    expect((await latest<{ qty: number }>(app, 'stock', 'y10p@p:a3'))?.qty).toBe(6)
+    expect(problems[0]?.reason.message).toMatch(/^Someone changed the count of this product in this place/)
+  })
+
+  it("keeps the office's phone number changed elsewhere when the form is saved with only the name changed", async () => {
+    // Proves: the office's one record is checked by its fixed id, and a whole-form save keeps a field changed since that the
+    // person left alone, the address sent empty and kept as none included.
+    const { app, office, phone } = await setup()
+    const details = { name: 'Session Hire', phone: '01 234 5678', email: 'office@example.ie', vatNumber: null, address: '' }
+    await office.client.mutate('office.update', details)
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('office.update', { ...details, phone: '01 999 0000' }),
+      () => phone.client.mutate('office.update', { ...details, name: 'Session Hire Ltd' })
+    )
+    expect(problems).toEqual([])
+    expect(await latest(app, 'setting', 'office')).toMatchObject({ name: 'Session Hire Ltd', phone: '01 999 0000' })
+  })
+
+  it("turns down a stale product's notes", async () => {
+    const { app, office, phone } = await setup()
+    await office.client.mutate('model.create', Y10P)
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('model.update', { id: 'y10p', notes: 'Rigging points checked' }),
+      () => phone.client.mutate('model.update', { id: 'y10p', notes: 'Grille dented' })
+    )
+    expect((await latest<{ notes: string }>(app, 'model', 'y10p'))?.notes).toBe('Rigging points checked')
+    expect(problems[0]?.reason.message).toMatch(/^Someone changed the notes of the product d&b Y10P/)
+  })
+})
+
+describe('the fields the check used to skip (audit, 20 October 2026, finding 21)', () => {
+  const aoife = (id: string): CommandInput<'person.upsert'> => ({ id, name: 'Aoife Byrne', kind: 'staff', email: null, phone: null, skills: ['Audio'], notes: '' })
+
+  it("keeps an approver's tick when another device saves the person's form from its old copy", async () => {
+    // Proves: "approves leave" is checked, so a stale save of the person's form leaves the tick as someone else set it.
+    const { app, office, phone } = await setup()
+    const id = newId()
+    await office.client.mutate('person.upsert', { ...aoife(id), approvesLeave: false })
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('person.upsert', { ...aoife(id), approvesLeave: true }),
+      () => phone.client.mutate('person.upsert', { ...aoife(id), approvesLeave: false, notes: 'Has her own van' })
+    )
+    expect(problems).toEqual([])
+    expect(await latest(app, 'person', id)).toMatchObject({ approvesLeave: true, notes: 'Has her own van' })
+  })
+
+  it("keeps a call's required certificate and department when another device saves the call from its old copy", async () => {
+    // Proves: a call's certificates and department are checked, so a stale save of the call's form doesn't undo them.
+    const { app, office, phone } = await setup()
+    const id = newId()
+    const call = {
+      id,
+      project: 'Electric Picnic',
+      phase: 'Show',
+      venue: 'Vicar Street',
+      role: 'Audio tech',
+      start: '2026-10-20',
+      end: '2026-10-20',
+      callTime: '08:00',
+      needed: 1,
+      dayRateCents: 25000,
+      details: '',
+      replyBy: null,
+    }
+    await office.client.mutate('call.create', { ...call, department: null })
+    const problems = await bothChange(
+      app,
+      office,
+      phone,
+      () => office.client.mutate('call.update', { ...call, needsCertificates: ['safe-pass'], department: 'Audio' }),
+      () => phone.client.mutate('call.update', { ...call, needsCertificates: [], department: null, details: 'Food on site.' })
+    )
+    expect(problems).toEqual([])
+    expect(await latest(app, 'crewCall', id)).toMatchObject({ needsCertificates: ['safe-pass'], department: 'Audio', details: 'Food on site.' })
+  })
+})

@@ -51,7 +51,7 @@ function withFault(db: Db, statement: (sql: string) => boolean, fault = 'SELECT 
   const faulty: Db & { failNext: boolean } = {
     ...db,
     failNext: false,
-    transaction: (fn) =>
+    transaction: (fn, o) =>
       db.transaction((tx) => {
         const query: Queryable['query'] = <T>(sql: string, params?: unknown[]) => {
           if (faulty.failNext && statement(sql)) {
@@ -61,7 +61,7 @@ function withFault(db: Db, statement: (sql: string) => boolean, fault = 'SELECT 
           return tx.query<T>(sql, params)
         }
         return fn({ ...tx, query })
-      }),
+      }, o),
   }
   return faulty
 }
@@ -118,6 +118,25 @@ describe('a fault the server did not expect', () => {
     expect((await push(app, [next])).json().results).toMatchObject([{ id: next.id, status: 'applied' }])
     expect((await push(app, [bad])).json().results).toMatchObject([{ id: bad.id, status: 'rejected', duplicate: true, reason: { code: 'invalid' } }])
     expect((await db.query('SELECT id FROM places')).rows).toEqual([{ id: 'van1' }])
+  })
+
+  it("logs the dropped change's fault without the row it was about", async () => {
+    // Proves: a database error's detail ("Key (email)=(…) already exists") doesn't reach the log Railway keeps on the path
+    // of a dropped change, as it doesn't on a failed request's (audit, 20 October 2026, finding 88).
+    const plain = await pgliteDb()
+    await plain.exec("CREATE TABLE crew_emails (email text PRIMARY KEY); INSERT INTO crew_emails VALUES ('aoife.byrne@example.ie')")
+    const db = withFault(plain, (sql) => sql.startsWith('INSERT INTO places'), "INSERT INTO crew_emails VALUES ('aoife.byrne@example.ie')")
+    const lines: string[] = []
+    const app = await buildApp({ db, logger: true, logTo: { write: (line) => void lines.push(line) } })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    db.failNext = true
+    expect((await push(app, [mutation('place.upsert', A3)])).json().results).toMatchObject([{ status: 'rejected' }])
+    const dropped = lines.map((l) => JSON.parse(l)).find((l) => l.msg === 'Dropped a change the server could not apply')
+    expect(dropped).toMatchObject({ command: 'place.upsert', err: { code: '23505', table: 'crew_emails' } })
+    expect(lines.join('\n')).not.toContain('aoife')
   })
 
   it('takes a change whose time of making is not a time Postgres keeps, as made when it arrived', async () => {

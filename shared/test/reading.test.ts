@@ -18,6 +18,8 @@ import {
   sameReading,
   setsRates,
   timesheetAsRead,
+  readsAttachmentOf,
+  documentsRead,
   type Reading,
 } from '../src/reading.ts'
 import { MemoryStorage, SyncClient, type Transport } from '../src/sync/client.ts'
@@ -136,10 +138,10 @@ describe('what each role reads', () => {
 
   it('is everything for the office, directors and with roles off; for others, rates and links are narrowed', () => {
     for (const role of ['director', 'office', null] as const) expect(readsEverything(readingFor(role))).toBe(true)
-    expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio' })
+    expect(head).toEqual({ rates: false, links: 'department', personId: own, department: 'Audio', clientDocuments: false })
     expect(readingFor('head', { department: 'Audio', headsSeeRates: true })).toMatchObject({ rates: true, ratesBy: 'department' })
-    expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own', details: 'own', documents: 'own' })
-    expect(crew).toEqual({ rates: false, links: 'own', personId: own, details: 'phones', documents: 'own' })
+    expect(readingFor('freelancer')).toEqual({ rates: false, links: 'own', details: 'own', documents: 'own', clientDocuments: false })
+    expect(crew).toEqual({ rates: false, links: 'own', personId: own, details: 'phones', documents: 'own', clientDocuments: false })
   })
 
   it('leaves a rate and link out of a person, saying so, and never out of their own', () => {
@@ -167,6 +169,12 @@ describe('what each role reads', () => {
     } as unknown as Timesheet
     expect(timesheetAsRead(sheet, false, crew)).toMatchObject({ dayRateCents: null, extras: [{ what: 'Taxi', cents: 0 }], sent: { dayRateCents: null, extras: [{ cents: 0 }] }, amountsHidden: true })
     expect(timesheetAsRead(sheet, true, crew)).toBe(sheet)
+    // What was written on it goes as for time off (audit, 20 October 2026, finding 37), for a head with rates too.
+    const noted = { ...sheet, note: 'Left early, hospital', officeNote: 'No dinner' }
+    expect(timesheetAsRead(noted, false, crew)).toMatchObject({ note: '', officeNote: '' })
+    expect(timesheetAsRead(noted, false, readingFor('head', { department: 'Audio', headsSeeRates: true }), 'Audio')).toMatchObject({ note: 'Left early, hospital', dayRateCents: 30000 })
+    expect(timesheetAsRead(noted, true, crew)).toBe(noted)
+    expect(timesheetAsRead(noted, false, READS_EVERYTHING)).toBe(noted)
   })
 
   it('tells setting a rate or deciding a timesheet from the rest', () => {
@@ -231,6 +239,15 @@ describe('what staff crew and freelancers read of other people', () => {
     expect(personAsRead(person(own, { email: 'me@example.com' }), freelancer)).toMatchObject({ email: 'me@example.com' })
     expect(personAsRead(someone, head)).toMatchObject({ email: 'sean@example.com', notes: 'Bad back' })
     expect(personAsRead(someone, head).detailsHidden).toBeUndefined()
+  })
+
+  it("sends a client's documents only to the office and directors, and a venue's to everyone (audit, 20 October 2026, finding 39)", () => {
+    expect(readsAttachmentOf(crew, { owner: 'client' })).toBe(false)
+    expect(readsAttachmentOf(head, { owner: 'client' })).toBe(false)
+    expect(readsAttachmentOf(crew, { owner: 'venue' })).toBe(true)
+    expect(readsAttachmentOf(READS_EVERYTHING, { owner: 'client' })).toBe(true)
+    expect(documentsRead(crew)).toBe(own)
+    expect(documentsRead(head)).toBe(true)
   })
 
   it("sends only their own documents to staff crew and freelancers", () => {

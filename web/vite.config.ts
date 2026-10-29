@@ -20,6 +20,9 @@ function versionFile(): Plugin {
   }
 }
 
+/** The files of parts most phones never open, fetched the first time they're shown rather than with the app (finding 65). */
+const ON_FIRST_USE = ['leaflet', 'Map', 'Rack3D']
+
 export default defineConfig({
   define: {
     // Leaves Sentry's own debug logging out of the app.
@@ -64,9 +67,12 @@ export default defineConfig({
       workbox: {
         // The version file is kept with the files it came with, so a phone says the version it's running (version.ts).
         // Sentry's code is left out: it's only fetched while error reporting is on (errors.ts), and is kept then as it's
-        // fetched, below, rather than downloaded by every phone on every deploy for nothing.
+        // fetched, below, rather than downloaded by every phone on every deploy for nothing. So are the map (ADR 0057) and
+        // the rack in 3D (ADR 0076), which most phones never open: kept from the first time they're shown (lazyPart.tsx;
+        // audit, 20 October 2026, finding 65). The QR code reader stays: scanning works with no signal from the first time
+        // (ADR 0016), and the warehouse's iPhones need it.
         globPatterns: ['**/*.{js,css,html}', 'version.json'],
-        globIgnores: ['**/errorsSdk-*.js'],
+        globIgnores: ['**/errorsSdk-*.js', ...ON_FIRST_USE.map((name) => `**/${name}-*.{js,css}`)],
         // Freelancer links and calendar feeds come from the server, never the app shell.
         navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//],
         // Once Reload lets the new version in, it takes the open page straight away, so the reload lands on it.
@@ -79,6 +85,12 @@ export default defineConfig({
             urlPattern: /\/assets\/errorsSdk-[^/]+\.js$/,
             handler: 'CacheFirst',
             options: { cacheName: 'error-reporting', expiration: { maxEntries: 2 }, cacheableResponse: { statuses: [200] } },
+          },
+          // Kept as each is first fetched, the latest few of each: one deploy's and the next's.
+          {
+            urlPattern: new RegExp(`/assets/(${ON_FIRST_USE.join('|')})-[^/]+\\.(js|css)$`),
+            handler: 'CacheFirst',
+            options: { cacheName: 'on-first-use', expiration: { maxEntries: 12 }, cacheableResponse: { statuses: [200] } },
           },
           {
             urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,

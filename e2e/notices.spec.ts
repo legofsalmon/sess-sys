@@ -65,3 +65,30 @@ test('pops up a change someone else made to a job you made, counts it on the bel
   await popUps.click()
   await expect(popUps).toBeChecked()
 })
+
+test('looks for notifications once as the app opens, not on each move, and again only for a change that could be news', async ({ page, request }) => {
+  // Proves: the copy read, the list is looked for once; moving between screens doesn't look again; a change pulled in that no notification can be about (a place in the warehouse) costs no look, and one that can (a job) does (audit, 20 October 2026, finding 14).
+  const looks: string[] = []
+  page.on('request', (r) => new URL(r.url()).pathname === '/api/notices' && looks.push(r.url()))
+  await page.goto('/#home')
+  await expect(page.locator('.conn')).toHaveText('Up to date')
+  await expect.poll(() => looks.length).toBe(1)
+  for (const hash of ['#jobs', '#crew', '#stock', '#home']) {
+    await page.goto(`/${hash}`)
+    await expect(page.locator('.conn')).toHaveText('Up to date')
+  }
+  const push = async (name: string, args: object) => {
+    const pulled = page.waitForResponse((r) => r.url().includes('/api/sync/pull') && r.request().method() !== 'OPTIONS')
+    const createdAt = new Date().toISOString()
+    const res = await request.post('/api/sync/push', {
+      data: { clientId: `e2elooks${unique()}`, mutations: [{ id: `l${unique()}`, name, args, createdAt }], sentAt: createdAt },
+    })
+    expect((await res.json()).results[0].status).toBe('applied')
+    await pulled
+  }
+  await push('place.upsert', { id: `shelf-${unique()}`, name: `Shelf ${unique()}`, notes: '' })
+  await page.waitForTimeout(500)
+  expect(looks).toHaveLength(1)
+  await push('project.create', { id: `j${unique()}`, name: `Looks Gig ${unique()}`, clientId: null, venueId: null, status: 'enquiry', notes: '' })
+  await expect.poll(() => looks.length).toBe(2)
+})

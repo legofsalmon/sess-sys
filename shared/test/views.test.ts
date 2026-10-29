@@ -130,7 +130,8 @@ describe('crew: each call’s offers, gathered once', () => {
         .sort((a, b) => rank(a.status) - rank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '') || a.id.localeCompare(b.id))
       expect(c.offers).toEqual(plain)
       const heldByDay: Record<string, number> = {}
-      for (const d of c.days) heldByDay[d] = plain.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
+      // People, not offers: one person offered twice takes one place (audit, 20 October 2026, finding 25).
+      for (const d of c.days) heldByDay[d] = new Set(plain.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).map((o) => o.personId)).size
       expect(c.heldByDay).toEqual(heldByDay)
       expect(c.openDays).toEqual(c.days.filter((d) => heldByDay[d]! < c.needed))
       seen += c.offers.length

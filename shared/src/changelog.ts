@@ -28,12 +28,62 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.52.0',
+    version: '1.56.0',
     date: '2026-10-29',
     title: 'Cable labels for every product',
     what: 'Each product in Stock has a new Cable labels tab. It prints what the cable is, such as 10 m XLR, in big type on a wrap-round label, a flag label that says it on both sides, or a label for the bag or bin, two at a time by default for each end. It can carry the product’s stock code as a long thin barcode to run along the cable, or as a QR code, and scanning that code in the Stock search opens the product.',
     prs: [157],
     adrs: [95],
+  },
+  {
+    version: '1.55.1',
+    date: '2026-10-29',
+    title: 'Heavy jobs no longer hold everyone up',
+    what: "Bringing a season in from Google Calendar and downloading everything no longer hold up everyone else's phones for seconds. A deploy during the nightly backup no longer loses that night's backup or blocks Back up now for half an hour: the server makes it up a minute after it starts again.",
+    prs: [162],
+  },
+  {
+    version: '1.55.0',
+    date: '2026-10-29',
+    title: 'The warehouse screens are easier on a busy day',
+    what: "Back and Missing on the pick list are harder to mis-tap, and Missing can be undone. Reporting damage now says it worked. Repairs shows what can't go out first and can be narrowed to a department. Long counts and test lists fold, with Finish always in reach. A product with a price can now be removed. A job no longer stays under Coming back for good when an item lost on site is retired.",
+    prs: [161],
+  },
+  {
+    version: '1.54.0',
+    date: '2026-10-29',
+    title: 'Crew needed shows the next fortnight, and unanswered offers wait to be chased',
+    what: "Crew needed now shows the next fortnight, as Home counts it, with every later call a tap away, and today's booked calls with someone running late sit on their own line. Offers nobody has answered by their reply-by date now wait in Answers to check, with a way to ring. Also fixed: an old tab could accept a declined offer, a counter noted with no signal showed no rate, a freelancer's resend could hide the office's changed rate or drop a day the office added, and an approver could set their own leave allowance.",
+    prs: [160],
+  },
+  {
+    version: '1.53.0',
+    date: '2026-10-29',
+    title: 'The app opens on the shape of the screen, and phones fetch less',
+    what: "While the app opens it now shows the tabs and the shape of the screen, then says it's reading this phone's copy, instead of a blank 'Loading…'. Phones ask the server for notifications far less often, and no longer download the map or the 3D rack drawing until someone first opens one.",
+    prs: [159],
+  },
+  {
+    version: '1.52.1',
+    date: '2026-10-29',
+    title: 'Changes made on two devices at once no longer quietly overwrite each other',
+    what: "Two people changing the same kit line, stock count, product, quote, vehicle or the office's details on different devices no longer quietly lose one person's change: the app keeps what was changed elsewhere, or says so and keeps what you typed. Changes from a phone that has been offline send faster, and a phone catching up shows current records while its own changes are still sending.",
+    prs: [158],
+  },
+  {
+    version: '1.52.0',
+    date: '2026-10-29',
+    title: "Staff crew see their own work first, and nobody else's private details",
+    what: "Once roles are on, staff crew open Home on Me and Crew on People, see only their own timesheets, and can open their own page from Home or their person page. Your work says which bookings are confirmed and which only accepted. Other people's timesheet notes, what their documents are, and clients' documents are now kept to those who need them: venues' documents stay open to everyone.",
+    prs: [156],
+    adrs: [62],
+  },
+  {
+    version: '1.51.2',
+    date: '2026-10-29',
+    title: 'Writing to Google Calendar stays off unless switched on',
+    what: 'Nothing changes for anyone: the app still writes nothing to Google Calendar until it is switched on. The part that writes is now off unless told otherwise, so nothing added later can start writing by leaving the setting out.',
+    prs: [155],
   },
   {
     version: '1.51.1',

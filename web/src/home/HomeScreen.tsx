@@ -1,6 +1,9 @@
 import { canApproveLeave, crewByDay, crewFill, departmentOf, jobsByMonth, jobsByWeek, kitByDay, moneyByMonth, myWeeks, dayLabel, daysLabel, eachDay, firstName, leaveDaysLabel, money, moneyMonth, plural, spanLabel, STATUS_LABELS, type Department, type JobView, type PersonView, type View } from '@sh/shared'
 import { useState } from 'react'
 import { useMe } from '../crew/Leave.tsx'
+import { linkFor } from '../crew/Messages.tsx'
+import { STATUS } from '../crew/Calls.tsx'
+import { StatusPill } from '../StatusPill.tsx'
 import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
 import { JobRow } from '../jobs/JobsScreen.tsx'
@@ -61,8 +64,10 @@ export function HomeScreen() {
   const { me, pick } = useMe(view)
   const departments = departmentsIn(view.crew.people)
   const [saved, setSaved] = useState(load)
-  // Nothing chosen yet: a head of department starts on their own, everyone else on the company.
-  const shownFor: HomeFor = saved?.for ?? (me?.department ? 'department' : 'company')
+  // Nothing chosen yet: a role without crew (staff crew, a freelancer) starts on Me, their own work (audit, 20 October 2026,
+  // finding 34); a head of department on their own; everyone else on the company.
+  const mayCrew = useAccess().can('crew')
+  const shownFor: HomeFor = saved?.for ?? (!mayCrew ? 'me' : me?.department ? 'department' : 'company')
   const department = saved?.department ?? me?.department ?? departments[0]
   const choose = (next: Saved) => {
     saveHomeFor(next)
@@ -536,7 +541,8 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
   return (
     <>
       <section className="card">
-        <Heading icon="calendar">Your work{mine.length > 0 ? ` (${mine.length})` : ''}</Heading>
+        {/* Booked and only accepted said apart, as on their own page (audit, 20 October 2026, finding 36): an accepted day can still go to someone else. */}
+        <Heading icon="calendar">Your work{mine.length > 0 ? ` (${workCount(mine)})` : ''}</Heading>
         {mine.length === 0 && copying ? (
           <p className="empty">{STILL_ARRIVING}</p>
         ) : mine.length === 0 ? (
@@ -555,6 +561,9 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
                     </p>
                   </div>
                   <div className="side">
+                    <StatusPill tone={STATUS[o.status][1]} pending={o.pending}>
+                      {STATUS[o.status][0]}
+                    </StatusPill>
                     <small>{daysLabel(o.days.filter((d) => d >= today))}</small>
                     {c.callTime && <small>Call {c.callTime}</small>}
                   </div>
@@ -563,7 +572,22 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
             ))}
           </ul>
         )}
-        {asked > 0 && <p className="hint">{plural(asked, 'offer')} waiting on your answer, on your own link.</p>}
+        {/* Answered on their own page, so the way there is here (audit, 20 October 2026, finding 35). */}
+        {asked > 0 && (
+          <p className="hint">
+            {plural(asked, 'offer')} waiting on your answer
+            {linkFor(me) ? (
+              <>
+                {' · '}
+                <a className="link" href={linkFor(me)} target="_blank" rel="noreferrer">
+                  Open your page
+                </a>
+              </>
+            ) : (
+              ', on your own page.'
+            )}
+          </p>
+        )}
       </section>
       <Chart title="Your weeks" icon="calendar" series={DAYS} columns={myWeeks(view.crew.calls, me.id, today)} format={(n) => plural(n, 'day')} empty="No days booked in the next eight weeks." />
       {balance && (
@@ -633,4 +657,11 @@ function MySteps({ view, me, all }: { view: View; me: PersonView; all: boolean }
       {!all && more > 0 && <p className="hint">{plural(more, 'more step')} of yours on Me.</p>}
     </section>
   )
+}
+
+/** "3 confirmed, 2 accepted", or the one kind there is. */
+function workCount(mine: readonly { o: { status: string } }[]) {
+  const confirmed = mine.filter((m) => m.o.status === 'confirmed').length
+  const accepted = mine.length - confirmed
+  return [confirmed && `${confirmed} confirmed`, accepted && `${accepted} accepted`].filter(Boolean).join(', ')
 }
