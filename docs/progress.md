@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- Moved zod from 3 to 4 (PR #174), closing the high advisory on oversized
+- Moved zod from 3 to 4 (PR #177), closing the high advisory on oversized
   collections (finding 115 of the [20 October audit](audit-2026-10-20.md)).
   Number fields keep their own wording; a field left out altogether still
   says to reload for the newer app, now told apart by the input zod reports;
