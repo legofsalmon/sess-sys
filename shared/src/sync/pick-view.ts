@@ -209,6 +209,8 @@ export function movesView(
   const outState = new Map<string, OutState>()
   /** Items whose latest scan, or their case's, is a report of them missing. */
   const missingNow = new Set<string>()
+  /** Items retired while they were out. */
+  const gone = new Set<string>()
   const outByJob = new Map<string, AssetView[]>()
   for (const a of warehouse.assets.values()) {
     let best = last.get(a.id)
@@ -221,6 +223,12 @@ export function movesView(
     }
     if (best?.missing) missingNow.add(a.id)
     if (best?.direction !== 'out') continue
+    // Retired while out (lost on site, say) isn't out with the job any more, nor back: the out-with and late readings, and the
+    // server's own, keep to active items too (audit, 20 October 2026, finding 44).
+    if (a.status !== 'active') {
+      gone.add(a.id)
+      continue
+    }
     outState.set(a.id, { projectId: best.projectId, since: best.at, inCase: via })
     const list = outByJob.get(best.projectId) ?? []
     list.push(a)
@@ -296,7 +304,7 @@ export function movesView(
     }
     for (const id of sent.get(jobId) ?? []) {
       const a = warehouse.assets.get(id)
-      if (!a || outState.get(id)?.projectId === jobId) continue
+      if (!a || gone.has(id) || outState.get(id)?.projectId === jobId) continue
       if (missingNow.has(id)) row(a.modelId).missingItems.push(a)
       else row(a.modelId).backItems.push(a)
     }
