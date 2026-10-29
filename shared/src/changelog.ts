@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.64.0',
+    date: '2026-10-29',
+    title: "Heads see clients' documents",
+    what: "Heads of department can now see and open clients' documents, such as contracts and purchase orders, as the office and directors can. Staff crew and freelancers still don't.",
+    prs: [178],
+  },
+  {
     version: '1.63.5',
     date: '2026-10-29',
     title: 'A security update',

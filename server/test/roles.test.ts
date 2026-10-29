@@ -522,7 +522,7 @@ describe('what each role reads', () => {
     const { app, c, signIn, ok, pull } = await crewed()
     const h = { sh_session: await signIn(aine) }
     let feed = await pull(h)
-    expect(feed.reading).toEqual({ rates: false, links: 'department', personId: 'aine', department: 'Audio', clientDocuments: false })
+    expect(feed.reading).toEqual({ rates: false, links: 'department', personId: 'aine', department: 'Audio' })
     // Dara is in Audio, as she is; Niamh is in LX, and Colly and Seán in none.
     expect(leaks(feed, 'aine')).toEqual({ rates: [], links: ['dara'] })
     expect(feed.of('person', 'aine')).toMatchObject({ dayRateCents: 21000 })
@@ -699,16 +699,18 @@ describe('what each role reads', () => {
     expect(his).not.toContain('public liability insurance')
     expect(JSON.stringify((await app.inject({ url: '/api/history', cookies: c })).json())).toContain("Saved Dara Quinn's public liability insurance")
 
-    // 39: a venue's for everyone, a client's for the office and directors.
+    // 39: a venue's for everyone, a client's for the office, directors and heads.
     expect(feed.of('attachment', 'plan')).toMatchObject({ title: 'Ballroom floor plan' })
     expect(feed.of('attachment', 'po')).toBeUndefined()
     const po = await app.inject({ url: '/api/attachments/po/file', cookies: s })
     expect(po.statusCode).toBe(403)
-    expect(po.json().error).toMatch(/^Only the office and directors see clients' documents/)
+    expect(po.json().error).toMatch(/^Only the office, directors and heads of department see clients' documents/)
     expect((await app.inject({ url: '/api/attachments/plan/file', cookies: s })).statusCode).toBe(404)
     expect((await pull(c)).of('attachment', 'po')).toMatchObject({ title: 'Purchase order 4471' })
-    // A head of department, who has neither jobs nor money, isn't sent it either.
-    expect((await pull({ sh_session: await signIn(aine) })).of('attachment', 'po')).toBeUndefined()
+    // A head of department is sent it and can open it (Colly, 29 October).
+    const head = { sh_session: await signIn(aine) }
+    expect((await pull(head)).of('attachment', 'po')).toMatchObject({ title: 'Purchase order 4471' })
+    expect((await app.inject({ url: '/api/attachments/po/file', cookies: head })).statusCode).not.toBe(403)
   })
 
   it('tells the history without figures to a role without rates', async () => {
