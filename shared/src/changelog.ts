@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.59.0',
+    date: '2026-10-29',
+    title: "Home is easier to read when there's a lot on",
+    what: "Home is easier to read when there's a lot on. Needs attention puts what stops the next fortnight's work above the housekeeping. The week ahead is one line per job, with errands and meetings tucked behind one line. Me now shows your own day and any day in lieu waiting. Notifications group a change made to many jobs at once, or a day's changes to one job, into one line, so the bell no longer reads 99+ from the start.",
+    prs: [168],
+  },
+  {
     version: '1.54.0',
     date: '2026-10-29',
     title: 'Crew needed shows the next fortnight, and unanswered offers wait to be chased',
