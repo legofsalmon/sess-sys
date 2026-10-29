@@ -1,15 +1,19 @@
-import { dsDuration, dsTiming, makerOf, noticeLines, NOTICE_WHY_WORDS, plural, type Notice, type NoticeLine, type NoticesPage, type View } from '@sh/shared'
+import { dsDuration, dsTiming, makerOf, noticeLines, NOTICE_ENTITIES, NOTICE_WHY_WORDS, plural, type Notice, type NoticeLine, type NoticesPage, type View } from '@sh/shared'
 import { useSyncExternalStore } from 'react'
-import { currentAuth, markSignedOut } from './auth.ts'
+import { currentAuth, markSignedOut, onAuth } from './auth.ts'
 import { client } from './sync.ts'
 
 /**
  * Notifications (ADR 0058): what others changed lately on what's this
  * person's own, read from the server's history, so it needs signal like
- * the History tab does. Looked for again whenever the device's copy moves
- * on, which the server's poke sets off as soon as anyone changes anything,
- * so a change made in the office is here, and pops up, within a second or
- * two. In the app only: nothing is emailed, texted or pushed to anyone.
+ * the History tab does. Looked for once the device's copy has been read to
+ * the end, and again whenever a pull lands a change of a kind a
+ * notification can be about (a job, a call, an offer, a person's own
+ * records): the server's poke sets the pull off as soon as anyone changes
+ * anything, so a change made in the office is here, and pops up, within a
+ * second or two, while a warehouse's scans, or each page of a first copy,
+ * cost no look at all (audit, 20 October 2026, finding 14). In the app
+ * only: nothing is emailed, texted or pushed to anyone.
  *
  * Pop-ups are only for what arrives while the app is open: what came while
  * it was shut is counted on the bell instead, so opening the app never
@@ -265,12 +269,21 @@ export function dismissToast(id: string) {
   }, gone)
 }
 
-// Look again whenever the copy moves on: the server pokes every device when anyone changes anything.
-let cursor = -1
+// Look once the copy is read to the end, not at each page of it; then again only when a pull lands a change in a table a
+// notification can be about. The server pokes every device when anyone changes anything, and most changes are no one's news.
+let lookedAt: number | undefined
 client.subscribe((view) => {
-  if (view.cursor === cursor) return
-  cursor = view.cursor
-  void loadNotices()
+  if (view.copying || view.cursor === lookedAt) return
+  const pulled = client.takePulled()
+  const first = lookedAt === undefined
+  lookedAt = view.cursor
+  if (first || NOTICE_ENTITIES.some((e) => pulled.has(e))) void loadNotices()
+})
+// Signed in after the app opened, or back from the sign-in page: look now rather than at the next change.
+let wasIn = signedIn()
+onAuth(() => {
+  const isIn = signedIn()
+  if (isIn && !wasIn) void loadNotices()
+  wasIn = isIn
 })
 addEventListener('online', () => void loadNotices())
-void loadNotices()

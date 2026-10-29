@@ -136,6 +136,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .call-group > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
 .crew .call-group > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
 .crew .call-date { display: grid; gap: var(--space-6); }
+.crew h3.calls-part { margin: var(--space-10) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .call-date h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .call-date .job { padding: var(--space-4) var(--space-12) var(--space-8); border: 1px solid var(--line); border-radius: 10px; }
 .crew .job.call { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-10); align-items: start; }

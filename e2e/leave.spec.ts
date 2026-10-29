@@ -246,6 +246,8 @@ test('staff apply for leave, an approver approves it, and the planner and offers
   // An offer to her for those days warns, and needs "Offer anyway".
   await eoin.goto('/#crew')
   await expect(eoin.getByRole('status')).toHaveText('Up to date')
+  // Three weeks out is past the fortnight Crew needed shows at rest (audit, 20 October 2026, finding 23).
+  await eoin.getByRole('button', { name: /^Show all \d+ calls still to come$/ }).click()
   const call = eoin.locator('.call-group', { hasText: `Leave check ${id}` }).getByRole('article', { name: 'Driver' })
   await call.getByRole('button', { name: 'Offer…' }).click()
   await call.getByLabel('Offer to').selectOption({ label: `Nora Walsh ${id} · Level 1 ⚠` })

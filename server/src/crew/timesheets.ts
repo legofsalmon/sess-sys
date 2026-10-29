@@ -10,8 +10,9 @@ import { getCall, getOffer, getPerson } from './store.ts'
  *
  * - only a freelancer's confirmed booking, on a job going ahead, has one,
  *   and only from its first day;
- * - on their link, a freelancer ticks their own booked days; the office
- *   can put in any of the job's days, for work done beyond the booking;
+ * - on their link, a freelancer ticks their own booked days, and keeps any
+ *   the office already put on it; the office can put in any of the job's
+ *   days, for work done beyond the booking;
  * - once approved it's settled: the office reopens it to change it.
  */
 
@@ -98,11 +99,14 @@ export const timesheetHandlers: { [N in TimesheetCommand]: Handler<N> } = {
       if (why) throw new Refused({ code: 'conflict', message: why })
     }
     const days = [...new Set(a.days)].sort()
+    // On their link, their booked days and any the office already put on it: a resend after a reopen keeps a day the office added (audit, 20 October 2026, finding 83).
     if (ctx.via === 'link')
-      checkDays(days, offer.days, (d) => `${daysLabel(d)} ${d.length === 1 ? "wasn't one of your booked days" : "weren't among your booked days"}. Ask the office to add ${d.length === 1 ? 'it' : 'them'}.`)
+      checkDays(days, [...offer.days, ...(was?.days ?? [])], (d) => `${daysLabel(d)} ${d.length === 1 ? "wasn't one of your booked days" : "weren't among your booked days"}. Ask the office to add ${d.length === 1 ? 'it' : 'them'}.`)
     else checkDays(days, jobDays, notTheJobs(call))
+    // Only approval changes the record's rate. What was sent is always at the booking's rate, so after a reopen the page can still
+    // say the office changed it (audit, 20 October 2026, finding 82).
     const rate = was ? was.dayRateCents : offer.dayRateCents
-    const sent = { days, dayRateCents: rate, extras: a.extras }
+    const sent = { days, dayRateCents: offer.dayRateCents, extras: a.extras }
     await ctx.tx.query(
       `INSERT INTO timesheets (id, status, days, day_rate_cents, extras, sent, note, sent_at, sent_via)
        VALUES ($1, 'sent', $2, $3, $4, $5, $6, now(), $7)
