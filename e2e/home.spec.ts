@@ -196,7 +196,7 @@ test("Home at a phone's size: the soon over the housekeeping, the week ahead a l
     await expect(errands.locator('.job-row').first()).toBeVisible()
   }
 
-  const crewCalls = page.getByRole('link', { name: 'Crew calls', exact: true })
+  const crewCalls = page.getByRole('link', { name: 'Calls', exact: true })
   await expect(crewCalls).toHaveClass(/\blink\b/)
   expect((await crewCalls.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
