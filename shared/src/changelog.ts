@@ -28,12 +28,19 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.56.0',
+    version: '1.57.0',
     date: '2026-10-29',
     title: 'Cable labels for every product',
     what: 'Each product in Stock has a new Cable labels tab. It prints what the cable is, such as 10 m XLR, in big type on a wrap-round label, a flag label that says it on both sides, or a label for the bag or bin, two at a time by default for each end. It can carry the product’s stock code as a long thin barcode to run along the cable, or as a QR code, and scanning that code in the Stock search opens the product.',
     prs: [157],
     adrs: [95],
+  },
+  {
+    version: '1.56.0',
+    date: '2026-10-29',
+    title: "Stock puts today's work first",
+    what: "On Stock, the kit going out in the next two weeks now comes before kit still out, latest first. A barcode scanner works on the pick list, a count and testing without tapping the box first. An item found through its missing case says so, and can be taken out of the case. Kit can't be put into a case that's out on a job. Re-running the stock list says where its prices differ from yours, and adds up a product kept in two places.",
+    prs: [165],
   },
   {
     version: '1.55.1',

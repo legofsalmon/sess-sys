@@ -13,7 +13,7 @@ waiting on someone.
   XLR", in big type on a wrap-round (50 × 25 mm), flag (100 × 25 mm, both
   ends) or bag label, two by default, with the stock code as a Code 128
   barcode, a QR code, or none. A stock code scanned or typed in the Stock
-  search opens its product. App 1.56.0.
+  search opens its product. App 1.57.0.
 - Checked: typecheck, shared tests (the barcode's widths; decoded by
   zxing-cpp when written), e2e cable-labels.spec.ts plus the labels, stock
   and scan specs.
@@ -23,6 +23,22 @@ waiting on someone.
 - iPhones read only QR codes in the app's camera for now; Code 128 needs a
   1D reader in the fallback. One-tap printing to the ZT411 (no print
   dialog) waits on Colly's pick of the options in that thread.
+
+## 29 October 2026: Stock puts today's work first
+
+**Done**
+
+- Findings 97 to 106 of the [20 October audit](audit-2026-10-20.md)
+  (PR #165): going out before still out, twenty products on a desk, a
+  scanner that works without a tap, plainer words on setting numbers
+  aside, an item found through its case and taken back out, no packing
+  into a case that's out, a faster next label number, and a re-run stock
+  list that adds up and notes price differences. Finding 100 was already
+  fixed. ADRs 0017 and 0018 note it. App 1.56.0.
+- Left open: the catalogue's long page after Show all on a desk (finding
+  97), as search is the designed way in.
+- Checked: typecheck, shared, server and real-Postgres tests, and 17
+  browser test files.
 
 ## 29 October 2026: heavy jobs that held everyone up
 
