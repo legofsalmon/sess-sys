@@ -35,6 +35,11 @@ import { moduleVersion, runMigrations } from '../src/migrations.ts'
 import { PROJECTS } from '../src/projects/schema.ts'
 import { CORE, keptSyncTestTables, migrate, SYNC_TEST_GONE } from '../src/schema.ts'
 
+// A test restore boots a process and a database of its own, two or three a test: alone these take 10 to 18 s, and with
+// the whole suite and the browser tests beside them they came near 30 s and timed out (audit, 20 October 2026, finding
+// 110). This file's tests get 90 s; the rest of the suite keeps 30.
+vi.setConfig({ testTimeout: 90_000 })
+
 /**
  * Backups (ADR 0004): the file, the restore, the nightly run, what phones
  * do when the server's data has been put back from a backup, and the files
