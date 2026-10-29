@@ -44,6 +44,16 @@ describe('the vendored design system', () => {
     })
   }
 
+  it('is the version docs/design-system.md names', () => {
+    // CI can't reach the design system to say a copy is behind, so the page names the version synced and a copy left older fails here (audit, 20 October 2026, finding 112).
+    const named = /design-system \*\*(\d+\.\d+\.\d+)\*\*/.exec(readFileSync(join(ROOT, 'docs', 'design-system.md'), 'utf8'))?.[1]
+    expect(named, 'docs/design-system.md names the version synced').toBeDefined()
+    for (const file of FILES) {
+      const text = readFileSync(join(DS, file), 'utf8')
+      expect(/@letissier\/design-system (\S+) · /.exec(text)?.[1], file).toBe(named)
+    }
+  })
+
   it('defines every --ds- role the app reads', () => {
     // A misspelt role computes to nothing, silently: no colour at all.
     const css = readFileSync(join(DS, 'tokens.css'), 'utf8')

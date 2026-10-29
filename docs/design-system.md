@@ -14,7 +14,9 @@ which Colly's other apps take their colours from too; everything else here
 The built token files are vendored in `shared/src/ds/` by `npm run ds:sync`,
 stamped, and never edited here; `npm run ds:check` says whether they're
 behind (both need a checkout of the design-system repository beside this
-one). `web/src/app.css` points each name below at a shared role: the page,
+one). The copies are at design-system **0.9.0** (synced 29 October 2026),
+and `shared/test/designSystem.test.ts` fails when a copy's stamp differs
+from the version named here, so a sync updates this line too. `web/src/app.css` points each name below at a shared role: the page,
 cards, text, lines, and the green and amber. Two stay Session Hire's own, by
 Colly's choice: the red `accent` family, which marks the one thing to do
 next, and the burnt-orange **bad** tone, so red never means "broken". Their
