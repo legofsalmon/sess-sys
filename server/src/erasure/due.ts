@@ -1,7 +1,7 @@
 import { irishToday, leaveRecordKept } from '@sh/shared'
 import { clearOldLate } from '../crew/late.ts'
 import { getPerson } from '../crew/store.ts'
-import type { Db, Queryable } from '../db.ts'
+import { faultForLog, type Db, type Queryable } from '../db.ts'
 import { ERASED_WHEN_DUE_ACTION } from '../history.ts'
 import { serverChange } from '../kernel.ts'
 import { erasePerson, keptRecords, readErasure } from './places.ts'
@@ -114,7 +114,7 @@ export class DueErasures {
       } catch (err) {
         // Some may have gone before it failed: devices are told of those.
         this.options.changed()
-        this.options.log?.warn({ err }, 'Could not erase what was due of people erased on request, or clear old running late; trying again in an hour')
+        this.options.log?.warn({ err: faultForLog(err) }, 'Could not erase what was due of people erased on request, or clear old running late; trying again in an hour')
         this.options.report?.(err)
         return undefined
       }

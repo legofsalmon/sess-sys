@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { CalendarChoice, CalendarCheck, CalendarInvites, CalendarLink } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { clearCookie, publicOrigin, readCookie, setCookie } from '../http.ts'
 import { serverChange, type ServerAction } from '../kernel.ts'
@@ -77,7 +77,7 @@ export function registerCalendarRoutes(app: FastifyInstance, { db, google, sync,
     try {
       connected = await google.exchange({ code: req.query.code, codeVerifier: verifier, redirectUri: callbackUrl(req) })
     } catch (err) {
-      req.log.warn({ err }, 'Connecting Google Calendar failed')
+      req.log.warn({ err: faultForLog(err) }, 'Connecting Google Calendar failed')
       return back(reply, 'failed')
     }
     // Google lets people untick permissions on its consent page; without these the sync can't work.

@@ -707,9 +707,14 @@ export class SyncClient {
    * change of this device's own is applied and not yet read back: the cursor could pass it while the record it changed
    * waits for a later page, and the change would vanish from the screen until then. The rest of that read is the feed as
    * it is, which is always right, only longer.
+   *
+   * Except while the copy is read again up to where it had got (`held`): every change of its own still waiting was applied
+   * past that mark, so it stays laid over the copy while the latest of each record lands, and the read stays short. Read
+   * as the feed is, it walked every change from the first, landing each record's oldest version first, and the screens
+   * showed old records until it was done (audit, 20 October 2026, finding 22).
    */
   private latestOnly(): LatestOnly | undefined {
-    if (this.state.outbox.some((m) => m.appliedSeq !== undefined && m.appliedSeq > this.state.cursor)) {
+    if (this.state.held === undefined && this.state.outbox.some((m) => m.appliedSeq !== undefined && m.appliedSeq > this.state.cursor)) {
       delete this.state.latest
       return undefined
     }
