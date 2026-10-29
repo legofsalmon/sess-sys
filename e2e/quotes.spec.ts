@@ -84,6 +84,18 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(draft.locator('.save-state')).toHaveText('Saved')
   await expect(draft).toContainText('Marked sent, it becomes quote 1115')
 
+  // A line half typed when a call comes in can't save yet, but going to Crew and back keeps it (audit finding 27).
+  await draft.getByRole('button', { name: 'Add something else' }).click()
+  await draft.getByLabel('Line 4: price').fill('400')
+  await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await office.goto('/#crew')
+  await office.goBack()
+  await draft.getByRole('button', { name: 'Line 4: not named yet, change it' }).click()
+  await expect(draft.getByLabel('Line 4: price')).toHaveValue('400')
+  await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await draft.getByRole('button', { name: 'Remove line 4' }).click()
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
   // Printed as an A4 page to save as a PDF: only the quote is on the page. Not sent yet, it says it's a draft.
   await draft.getByRole('button', { name: 'Print a draft' }).click()
   const printed = office.locator('.print-sheet.quote-sheet')
