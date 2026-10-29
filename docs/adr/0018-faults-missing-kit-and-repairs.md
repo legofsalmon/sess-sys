@@ -86,3 +86,10 @@ labelled yet), not only for labelled items.
   out. So are faults reported on site by crew (Phase 5, with Crewbox).
 - Scans that don't match the plan are said as they happen and fixed by
   scanning; a separate list for sorting them out later isn't needed yet.
+
+Later (29 October 2026): an item reported missing twice over (two taps,
+or two phones) is one loss. The server still keeps every report, but a
+device shows them as one, the oldest standing for the rest, and finding
+it (a scan, Mark found on a count, or closing it on Repairs) closes them
+all; an item already missing isn't offered Report missing again (audit,
+20 October 2026, finding 45).

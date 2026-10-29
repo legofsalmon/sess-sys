@@ -56,3 +56,12 @@
   blanks, labels and colours.
 - The 3D view is about 140 kB more to download, once, when first shown.
 - Part 3 adds product photos on the panels and a printable rack sheet.
+
+## Later: fetched the first time it's shown (29 October 2026)
+
+The 3D drawing's code was in the files every phone fetched with the app on
+each deploy, about 116 kB on the wire, though only the office opens it
+(audit, 20 October 2026, finding 65). It now comes the first time it's shown
+and is kept from then (`web/src/lazyPart.tsx`). First shown with no signal, a
+line says it comes with signal, and Front and back and From the side work
+without it.

@@ -5,7 +5,7 @@ import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv, pa
 import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
 import { dirStore, storeFromEnv } from './backup/store.ts'
-import { dbFromEnv } from './db.ts'
+import { dbFromEnv, faultForLog } from './db.ts'
 import { eraseAgainFromStore } from './erasure/list.ts'
 import { nominatim } from './projects/places.ts'
 import { outsideLooks } from './status.ts'
@@ -70,7 +70,7 @@ async function main() {
       const again = await eraseAgainFromStore(db, backupStore, { everyone: false })
       if (again) app.log.warn({ erasedAgain: again }, 'People erased on request were back in this copy of the data, so they were erased again')
     } catch (err) {
-      app.log.warn({ err }, 'Could not check the list of erasures beside the backups')
+      app.log.warn({ err: faultForLog(err) }, 'Could not check the list of erasures beside the backups')
     }
     await app.erasures?.keep()
   }

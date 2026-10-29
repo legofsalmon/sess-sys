@@ -91,3 +91,17 @@ Colly prefers open tools that don't lock the company in.
   map can point at another provider of the same pictures without changing
   anything else.
 - The pin is in the export ("Download everything") with the venue.
+
+## Later: the map's code fetched the first time it's shown (29 October 2026)
+
+The map library, its styles and the map's own code were downloaded by every
+phone with the app, on its first visit and on any deploy that changed them,
+for a map most crew never open (audit, 20 October 2026, finding 65). They are
+now left out of the files fetched with the app and kept by the app's worker
+the first time a map is shown (`ON_FIRST_USE` in `web/vite.config.ts`,
+`web/src/lazyPart.tsx`). A venue whose map was opened before still shows it
+with no signal, as above. A phone that has never shown a map, or not since a
+deploy that changed its code, and has no signal, says "The map comes with
+signal" where the map would be; the venue's details, its directions link and
+the rest of the page still work, and the map comes by itself when the signal
+does.

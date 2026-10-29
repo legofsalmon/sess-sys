@@ -17,6 +17,68 @@ waiting on someone.
 - Checked: typecheck, shared, server and real-Postgres tests, and 11
   browser tests.
 
+
+## 29 October 2026: the warehouse's small hurts
+
+**Done**
+
+- Findings 40 to 46 and 93 to 96 of the [20 October
+  audit](audit-2026-10-20.md) (PR #161): Back and Missing apart with Undo,
+  numbers that don't break, damage reports confirmed, counts and Testing
+  folded with Finish in reach, Repairs grouped by what can't go out with a
+  department filter, clearer scan answers, a retired item off Coming back,
+  two missing reports as one loss, and a priced product removable. ADRs
+  0017, 0018 and 0042 note it. App 1.55.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 32
+  browser tests.
+
+
+## 29 October 2026: the office's crew day
+
+**Done**
+
+- Findings 23 to 26, 72, 73 and 81 to 84 of the [20 October
+  audit](audit-2026-10-20.md) (PR #160): Crew needed shows the next
+  fortnight with the rest a tap away and today's late calls on their own
+  line; unanswered offers past their reply-by day wait in Answers to
+  check; declined offers stay declined; counters noted offline show their
+  rate; mixed call lines name each state; Offer anyway says what can be
+  taken; resends keep the booking's rate and the office's days; approvers
+  can't set their own allowance while another can. ADRs 0002 and 0024 note
+  it. App 1.54.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 40
+  browser tests.
+
+
+## 29 October 2026: opening on the screen's shape, and less to fetch
+
+**Done**
+
+- Findings 11, 12 (in part), 14 and 65 of the [20 October
+  audit](audit-2026-10-20.md) (PR #159): the app opens on the tab bar and a
+  skeleton of the screen, then says it is reading the phone's copy;
+  notifications are looked for once the copy is read and then only after
+  news; the map and the 3D rack drawing are fetched the first time they are
+  shown; where the scans leave the kit is kept through a change to a job.
+  Finding 64 did not reproduce on current main. ADRs 0016, 0057 and 0076
+  note it. App 1.53.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 60
+  browser tests.
+
+## 29 October 2026: edits checked against what each device saw
+
+**Done**
+
+- Findings 15, 16, 20, 21, 22, 66, 67 and 88 of the [20 October
+  audit](audit-2026-10-20.md) (PR #158, Colly asked for all remaining
+  items): the rest of the edits that save typed text are checked against
+  what the device saw, pushes take fewer database trips and stop when the
+  phone has gone, refused changes skip the write lock, a bad pull cursor
+  gets a plain answer, and database faults are logged without their rows.
+  ADR 0049 notes what still applies in arrival order. App 1.52.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and 13
+  browser spec files.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**

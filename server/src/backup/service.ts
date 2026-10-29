@@ -1,7 +1,7 @@
 import { newId, type BackupRun, type BackupStatus } from '@sh/shared'
 import { fork } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { eraseAgainFromStore } from '../erasure/list.ts'
 import { encryptBackup } from './crypto.ts'
 import { BackupError, isEmptyDatabase, restoreBackup, writeBackup, type RestoreReport } from './format.ts'
@@ -180,7 +180,7 @@ export class Backups {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
       run = await this.finish(id, { status: 'failed', error })
-      log?.error({ err }, 'Backup failed')
+      log?.error({ err: faultForLog(err) }, 'Backup failed')
     }
     this.last = run
     if (run.status === 'ok') this.lastOk = run
@@ -263,7 +263,7 @@ export class Backups {
               () => true,
               () => true
             )
-            this.options.log?.error({ err }, 'Backup could not start')
+            this.options.log?.error({ err: faultForLog(err) }, 'Backup could not start')
             this.options.watch?.couldNotStart(err)
             return false
           })
@@ -285,7 +285,7 @@ export class Backups {
       for (const key of toThin(await store.list(PREFIX), this.now(), this.options.retention)) await store.delete(key)
     } catch (err) {
       // Too many old files is not worth failing a good backup over.
-      this.options.log?.warn({ err }, 'Could not thin out old backups')
+      this.options.log?.warn({ err: faultForLog(err) }, 'Could not thin out old backups')
     }
   }
 

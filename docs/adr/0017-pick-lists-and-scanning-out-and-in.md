@@ -95,3 +95,10 @@ filling up, so some of a job's kit will be counted, not labelled.
   keeps them all for now. If that gets slow, phones can keep just the
   recent ones.
 - Printing a pick list on paper comes later, with document templates.
+
+Later (29 October 2026): an item retired while it is out (lost on site,
+say) is no longer out with its job, nor back: the job leaves the
+still-out list, as the server's own reading of what is out already kept
+to active items. Retiring it stays allowed while it's out, since
+refusing would block the honest "lost on site" (audit, 20 October 2026,
+finding 44).

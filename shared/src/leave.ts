@@ -34,6 +34,8 @@ export interface LeaveAllowance {
   /** Days left over from the year before, written in by an approver. */
   carriedOver: number
   note: string
+  /** Set by the person themselves, as an approver with no other approver to ask (audit, 20 October 2026, finding 84). */
+  selfSet?: boolean
 }
 
 export interface LeaveRequest {
