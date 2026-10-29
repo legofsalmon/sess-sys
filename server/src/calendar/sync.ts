@@ -66,9 +66,11 @@ export interface CalendarSyncOptions {
   /** How long to wait before each try again after a run fails on something unexpected; for tests. */
   retryMs?: readonly number[]
   /**
-   * False keeps the app off Google Calendar altogether: nothing is put on,
-   * changed or taken off it, and nobody is invited, while calendars can
-   * still be read to bring jobs in. Set on the server with CALENDAR_WRITES.
+   * Only true lets the app onto Google Calendar. Left out or false, nothing
+   * is put on, changed or taken off it, and nobody is invited, while
+   * calendars can still be read to bring jobs in. Set on the server with
+   * CALENDAR_WRITES; off unless asked for, so a caller that forgets it
+   * can't write (audit, 20 October 2026, finding 107).
    */
   writes?: boolean
 }
@@ -166,7 +168,7 @@ export class CalendarSync {
 
   /** Whether the app may write to Google Calendar at all (CALENDAR_WRITES). */
   get writes(): boolean {
-    return this.options.writes !== false
+    return this.options.writes === true
   }
 
   /** At start-up: find out whether a calendar is connected, and catch up on anything missed while the server was down. */
