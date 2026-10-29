@@ -521,9 +521,13 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
   .top .state > .conn.offline { order: 1; white-space: normal; }
 }
 
-/* On paper (audit, P3): white round every sheet, whatever the screen's theme, so a dark page doesn't print round it with backgrounds on. */
+/* On paper (audit, P3): white round every sheet, whatever the screen's theme, so a dark page doesn't print round it with backgrounds on; and
+   the light colour scheme, or the browser paints the margins dark (audit, 20 October 2026, finding 60e). A screen printed as it is, with no
+   print sheet of its own, prints without the tab bar fixed over it (finding 61); theme.ts draws it light while the dialog is open. */
 @media print {
   html, body { background: #fff; }
+  :root, :root[data-theme] { color-scheme: light; }
+  .tabs { display: none !important; }
 }
 
 /* Admin › What's changed (ADR 0071): one entry per version, newest first. */

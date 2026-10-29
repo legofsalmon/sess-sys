@@ -77,12 +77,14 @@
 .warehouse .preview .label { box-shadow: 0 0 0 1px var(--line); border-radius: 1.5mm; }
 .warehouse .claim { padding: var(--space-12); border: 1px solid var(--accent); border-radius: 10px; }
 
-/* Printing: only the labels, a label to a page on a label printer or 65 to an A4 sheet. */
+/* Printing: only the print sheet, where its Print button has drawn one (labels a label to a page on a label printer or 65 to an A4 sheet, a
+   call sheet, a quote, a rack sheet). Any other screen prints as it is: hiding everything on every screen printed Cmd-P on a job as a blank
+   page (audit, 20 October 2026, finding 61). */
 .print-sheet { display: none; }
 @media print {
-  body > :not(.print-sheet) { display: none !important; }
+  body:has(> .print-sheet) > :not(.print-sheet) { display: none !important; }
   /* Not the room the tab bar leaves at the bottom, which would print a blank page after the last label. */
-  body { background: #fff; padding: 0 !important; }
+  body:has(> .print-sheet) { background: #fff; padding: 0 !important; }
   .print-sheet { display: block; }
   .print-sheet .page { break-after: page; }
   .print-sheet .page:last-child { break-after: auto; }

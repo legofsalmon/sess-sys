@@ -55,3 +55,13 @@ export function useTheme(): { theme: Theme; shown: 'dark' | 'light' } {
   }, [])
   return { theme, shown: theme === 'auto' ? (light ? 'light' : 'dark') : theme }
 }
+
+/**
+ * On paper, light whatever the screen's theme: a screen printed as it is (Cmd-P on a job, not its Print button) would otherwise come out
+ * as pale words on the white paper (audit, 20 October 2026, findings 60e and 61). Only while the print dialog is open; the choice kept is
+ * untouched. app.css also sets the light colour scheme under print, for a PDF made without the dialog.
+ */
+export function printLight() {
+  addEventListener('beforeprint', () => (document.documentElement.dataset.theme = 'light'))
+  addEventListener('afterprint', () => (document.documentElement.dataset.theme = current))
+}
