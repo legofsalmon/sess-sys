@@ -518,6 +518,9 @@ function Found(p: {
 /** The phase a day of a job is, when its title has no phase word: a Show for a gig, and the kind's own day otherwise. The server says the same. */
 const guessedPhase = (kind: ProjectKind) => ({ gig: 'Show', hire: 'Hire', errand: 'Errand', meeting: 'Meeting' })[kind]
 
+/** Who stays when the rest goes, said wherever the take-back is (audit, 20 October 2026, finding 53). */
+const keptWords = (kept: number) => `${plural(kept, 'person', 'people')} added from the invites ${kept === 1 ? 'stays' : 'stay'}: named, changed or used in the app since.`
+
 type BroughtState =
   | { state: 'loading' }
   | { state: 'failed'; text: string }
@@ -556,7 +559,10 @@ function Brought({ offline }: { offline: boolean }) {
     setS({ state: 'taking', brought: b })
     try {
       const done = await post<Omit<ImportBrought, 'blocked'>>('/api/calendar/import/take-back', {}, AS_LONG_AS_IT_TAKES)
-      setS({ state: 'taken', text: `Taken back: ${plural(done.jobs, 'job', 'jobs')}, ${plural(done.days, 'day', 'days')} and ${plural(done.crew, 'crew booking or offer', 'crew bookings and offers')}${done.people ? `, and ${plural(done.people, 'person', 'people')} added from the invites` : ''}. Look at the calendar again to bring it in afresh.` })
+      setS({
+        state: 'taken',
+        text: `Taken back: ${plural(done.jobs, 'job', 'jobs')}, ${plural(done.days, 'day', 'days')} and ${plural(done.crew, 'crew booking or offer', 'crew bookings and offers')}${done.people ? `, and ${plural(done.people, 'person', 'people')} added from the invites` : ''}.${done.kept > 0 ? ` ${keptWords(done.kept)}` : ''} Look at the calendar again to bring it in afresh.`,
+      })
     } catch (err) {
       // The card stays, saying what went wrong, so it can be tried again.
       setS({ state: 'ready', brought: b, problem: (err as Error).message })
@@ -571,7 +577,7 @@ function Brought({ offline }: { offline: boolean }) {
         <p>
           {plural(b.jobs, 'job', 'jobs')} over {plural(b.days, 'day', 'days')}, with {plural(b.crew, 'crew booking or offer', 'crew bookings and offers')}, from{' '}
           {b.calendars.join(' and ')}
-          {b.people > 0 && `, and ${plural(b.people, 'person', 'people')} added from the invites`}.
+          {b.people > 0 && `, and ${plural(b.people, 'person', 'people')} added from the invites`}.{b.kept > 0 && ` ${keptWords(b.kept)}`}
         </p>
       )}
       {b?.blocked ? (
@@ -590,7 +596,7 @@ function Brought({ offline }: { offline: boolean }) {
       {b && !b.blocked && (
         asking ? (
           <Confirm
-            question={`Take back ${plural(b.jobs, 'job', 'jobs')}, their crew bookings and offers${b.people ? ` and ${plural(b.people, 'person', 'people')} added from the invites` : ''}? Anything changed on those jobs in the app goes with them. The history keeps a record.`}
+            question={`Take back ${plural(b.jobs, 'job', 'jobs')}, their crew bookings and offers${b.people ? ` and ${plural(b.people, 'person', 'people')} added from the invites` : ''}? Anything changed on those jobs in the app goes with them.${b.kept > 0 ? ` ${keptWords(b.kept)}` : ''} The history keeps a record.`}
             yes="Take it all back"
             no="Keep it"
             onYes={take}
@@ -635,6 +641,7 @@ function Done({ preview, result, onAgain }: { preview: ImportPreview; result: Im
     result.venues && plural(result.venues, 'new venue', 'new venues'),
   ].filter(Boolean)
   const today = useToday()
+  const already = result.already ?? []
   const first = preview.jobs.map((j) => j.start).sort()[0] ?? today
   return (
     <section className="card" aria-label="Brought in">
@@ -643,9 +650,13 @@ function Done({ preview, result, onAgain }: { preview: ImportPreview; result: Im
           Brought in {brought.join(' and ')} from <b>{preview.calendar.name}</b>: {plural(result.days, 'day', 'days')}
           {also.length ? `, ${also.join(', ')}` : ''}.
         </p>
+      ) : already.length ? (
+        <p role="status">Nothing more was brought in.</p>
       ) : (
         <p role="status">Nothing was brought in: the calendar changed since it was read.</p>
       )}
+      {/* Sent twice, after a dropped connection, the second says what the first saved rather than that it has gone (audit, 20 October 2026, finding 52). */}
+      {already.length > 0 && <p className="hint">In the app already, so not brought in again: {already.join(', ')}.</p>}
       {result.missing.length > 0 && (
         <p className="alert">
           Not on the calendar any more, so not brought in: {result.missing.join(', ')}. Look again to see it as it is now.

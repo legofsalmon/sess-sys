@@ -334,7 +334,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
         people: preview.people.map((p: { email: string }) => ({ email: p.email, include: true })),
       }
       const brought = await post('/api/calendar/import/bring', choices)
-      expect(brought.json()).toEqual({ jobs: 1, added: 0, days: 2, venues: 1, people: 1, crew: 1, missing: [] })
+      expect(brought.json()).toEqual({ jobs: 1, added: 0, days: 2, venues: 1, people: 1, crew: 1, missing: [], already: [] })
       const { rows } = await db.query<{ name: string; source_calendar: string; phases: number; imported: number }>(
         `SELECT p.name, p.source_calendar, (SELECT count(*)::int FROM phases WHERE project_id = p.id) AS phases,
                 (SELECT count(*)::int FROM calendar_imports WHERE project_id = p.id) AS imported
