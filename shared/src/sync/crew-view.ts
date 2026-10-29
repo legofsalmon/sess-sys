@@ -407,8 +407,8 @@ function statusRank(s: Offer['status']) {
   return ['confirmed', 'accepted', 'countered', 'offered', 'pulled-out', 'declined', 'filled', 'cancelled'].indexOf(s)
 }
 
-/** Why an offer is in "Answers to check", and so what the office does next. */
-export type AnswerKind = 'accepted' | 'countered' | 'declined' | 'pulled-out'
+/** Why an offer is in "Answers to check", and so what the office does next: `no-reply` is an offer nobody answered by its reply-by day. */
+export type AnswerKind = 'accepted' | 'countered' | 'declined' | 'pulled-out' | 'no-reply'
 
 export interface AnswerToCheck {
   call: CallView
@@ -418,13 +418,16 @@ export interface AnswerToCheck {
   short: number
 }
 
-const ANSWER_ORDER: readonly AnswerKind[] = ['pulled-out', 'accepted', 'countered', 'declined']
+const ANSWER_ORDER: readonly AnswerKind[] = ['pulled-out', 'accepted', 'countered', 'declined', 'no-reply']
 
 /**
  * Answers the office hasn't dealt with, on calls still to come (audit
  * finding 9): a yes or a counter waits for Confirm or Withdraw; a decline or
  * a pull-out stays until the office taps Noted (offer.seen), since either
- * can leave the call short. The Crew tab's count is the length of this.
+ * can leave the call short. An offer still unanswered after its call's
+ * reply-by day is here too, until the office taps Noted, as chasing it is
+ * their day (audit, 20 October 2026, finding 24). The Crew tab's count is
+ * the length of this.
  */
 export function answersToCheck(crew: CrewView, today: string): AnswerToCheck[] {
   const out: AnswerToCheck[] = []
@@ -432,9 +435,10 @@ export function answersToCheck(crew: CrewView, today: string): AnswerToCheck[] {
     if (call.status !== 'open' || call.end < today) continue
     const short = Math.max(0, ...call.days.map((d) => call.needed - (call.heldByDay[d] ?? 0)))
     for (const offer of call.offers) {
-      const kind = offer.status as AnswerKind
+      const unanswered = offer.status === 'offered' && !!call.replyBy && call.replyBy < today
+      const kind = (unanswered ? 'no-reply' : offer.status) as AnswerKind
       if (!ANSWER_ORDER.includes(kind)) continue
-      if ((kind === 'declined' || kind === 'pulled-out') && offer.seenAt) continue
+      if ((kind === 'declined' || kind === 'pulled-out' || kind === 'no-reply') && offer.seenAt) continue
       out.push({ call, offer, kind, short })
     }
   }

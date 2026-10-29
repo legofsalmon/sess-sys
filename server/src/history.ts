@@ -529,6 +529,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const was = look('offer', a.id)?.status
       if (was === 'pulled-out') return `Noted that ${o.who} can't make ${o.what}`
       if (was === 'declined') return `Noted that ${o.who} declined ${o.what}`
+      if (was === 'offered') return `Noted that ${o.who} hasn't answered ${o.what}`
       return `Noted ${o.who}'s answer on ${o.what}`
     }
     case 'office.update':

@@ -1,10 +1,12 @@
 import {
   answersToCheck,
+  dayLabel,
   daysLabel,
   departmentOf,
   euro,
   firstName,
   offerOnCalendar,
+  telHref,
   sameDepartment,
   venueLabel,
   type AnswerKind,
@@ -356,38 +358,50 @@ export function CrewScreen() {
                     )),
                     ...toCheck.map(({ call: c, offer: o, kind, short, warning }) => (
                       <div className="row" key={o.id}>
-                        <div>
-                          <b>{o.person?.name ?? 'Someone'}</b>{' '}
-                          {kind === 'accepted'
-                            ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
-                            : kind === 'countered'
-                              ? o.rateHidden
-                                ? 'asks for a different rate'
-                                : `asks ${euro(o.counterRateCents)} a day (offered ${rateText(c.dayRateCents, c.rateHidden)})`
-                              : kind === 'declined'
-                                ? 'declined'
-                                : "can't make it any more"}
-                          <p>
-                            {c.project} · {c.role} · {daysLabel(o.days)}
-                            {(kind === 'declined' || kind === 'pulled-out') && (
-                              <>
-                                <br />
-                                {whatItNeeds(kind, o, short)}
-                              </>
-                            )}
-                            {o.note && (
-                              <>
-                                <br />“{o.note}”
-                              </>
-                            )}
-                            {warning && (
-                              <>
-                                <br />
-                                {warning}
-                              </>
-                            )}
-                          </p>
-                        </div>
+                        {kind === 'no-reply' ? (
+                          // Past its reply-by day with no answer (audit, 20 October 2026, finding 24): theirs to chase, so a way to ring is to hand.
+                          <div>
+                            No word from <b>{o.person?.name ?? 'someone'}</b> by {dayLabel(c.replyBy!)}
+                            <p>
+                              {c.project} · {c.role} · {daysLabel(o.days)}
+                              <br />
+                              {whatItNeeds(kind, o, short)}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <b>{o.person?.name ?? 'Someone'}</b>{' '}
+                            {kind === 'accepted'
+                              ? `accepted${o.respondedVia === 'calendar' ? ' on Google Calendar' : ''}`
+                              : kind === 'countered'
+                                ? o.rateHidden
+                                  ? 'asks for a different rate'
+                                  : `asks ${euro(o.counterRateCents)} a day (offered ${rateText(c.dayRateCents, c.rateHidden)})`
+                                : kind === 'declined'
+                                  ? 'declined'
+                                  : "can't make it any more"}
+                            <p>
+                              {c.project} · {c.role} · {daysLabel(o.days)}
+                              {(kind === 'declined' || kind === 'pulled-out') && (
+                                <>
+                                  <br />
+                                  {whatItNeeds(kind, o, short)}
+                                </>
+                              )}
+                              {o.note && (
+                                <>
+                                  <br />“{o.note}”
+                                </>
+                              )}
+                              {warning && (
+                                <>
+                                  <br />
+                                  {warning}
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        )}
                         {/* Settling an answer is crew's (audit finding 9): a role without it sees the answer, and nothing to press. */}
                         {!mayCrew ? null : (kind === 'accepted' || kind === 'countered') && turningDown === o.id ? (
                           <Confirm
@@ -423,6 +437,11 @@ export function CrewScreen() {
                           </div>
                         ) : (
                           <div className="actions">
+                            {kind === 'no-reply' && o.person?.phone && (
+                              <a className="button" href={telHref(o.person.phone)}>
+                                Ring
+                              </a>
+                            )}
                             <button
                               type="button"
                               onClick={() => void answers.run(() => client.mutate('offer.seen', { id: o.id }))}
