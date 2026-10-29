@@ -147,13 +147,19 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(office.getByText('An older version, kept as it went to the client. The newest is version 2.')).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  // Money: who owes, freelancers to pay, and the accountant's file.
+  // Money: what's accepted and unpaid, with VAT, invoiced apart from not invoiced yet (audit findings 29 and 71), a row
+  // a client with its quotes folded under it (finding 31); freelancers to pay, and the accountant's file.
   await office.goto('/#jobs/money')
-  const owed = office.getByRole('region', { name: 'Owed by clients' })
-  await expect(owed).toContainText('Shannonside Festivals€7,257.00')
-  await expect(owed).toContainText('Brightwater Conferences€3,044.25')
-  await expect(owed).toContainText('Liffey Brands€1,680.89')
-  await expect(owed).toContainText('invoiced')
+  await expect(office.locator('.money-facts')).toContainText(/Accepted, unpaid€[\d,.]+with VAT, of which €[\d,.]+ not invoiced yet/)
+  const owed = office.getByRole('region', { name: 'Accepted, unpaid' })
+  await expect(owed).toContainText('Shannonside Festivals')
+  await expect(owed).toContainText('Brightwater Conferences')
+  const invoiced = owed.getByRole('group', { name: 'Invoiced', exact: true })
+  await expect(invoiced).toContainText('Liffey Brands1 quote€1,680.89')
+  await expect(invoiced.getByRole('link', { name: 'Liffey Brands Launch' })).toBeHidden()
+  await invoiced.getByText('Liffey Brands', { exact: true }).click()
+  await expect(invoiced).toContainText('Version 2 · €1,680.89 with VAT · invoiced')
+  await expect(invoiced.getByRole('link', { name: 'Liffey Brands Launch' })).toBeVisible()
   await expect(office.getByRole('region', { name: 'Margin by job' })).toContainText('Liffey Brands Launch')
 
   const freelancers = office.getByRole('region', { name: 'Owed to freelancers' })

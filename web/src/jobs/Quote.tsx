@@ -173,6 +173,11 @@ export function QuoteCard({ job, view }: { job: JobView; view: View }) {
         </div>
       )}
       {jm && jm.margin !== null && <MarginLine margin={jm.margin} costs={jm.costs + jm.toCome} />}
+      {jm?.setAside && (
+        <p className="hint">
+          The job is {jm.job.status}, so its quote is set aside: it isn't counted as quoted, owed or in the margin unless it's invoiced, as a cancellation fee would be.
+        </p>
+      )}
       <a className={`button${shown ? '' : ' primary'}`} href={`#jobs/${encodeURIComponent(job.id)}/quote`}>
         {shown ? 'Open the quote' : 'Make a quote'}
       </a>
