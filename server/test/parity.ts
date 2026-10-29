@@ -26,17 +26,18 @@ const WAITING = /^pending|Pending$/
 /** Ids a device makes afresh each time it works something out, for lines not saved yet: kit from the notes. */
 const MADE_AFRESH = [/\.plan\.lines\.\d+\.id$/]
 
-/** Records listed only inside another, walked in full rather than shortened to their id. */
-const NESTED_IN_FULL = /^\.crew\.calls\.\d+\.offers\.\d+$/
-
 /**
  * Everything a screen could read of the view, as plain data: records in
  * full, and inside a record the records it points to by their id, which
- * are compared where they're listed themselves. Maps become their entries,
+ * are compared where they're listed themselves. A record listed only
+ * inside another (an offer in its call, a line in a quote, a contact) is
+ * walked in full there, so drift inside it can't hide behind its id
+ * (audit, 20 October 2026, finding 108). Maps become their entries,
  * functions and the waiting flags are left out, and times are the server's.
  */
 function shown(view: View, ignore: readonly string[] = []): unknown {
   const skip = new Set(['cursor', 'problems', 'connection', ...ignore])
+  const listed = listedIds(view)
   const walk = (v: unknown, inRecord: boolean, path: string): unknown => {
     if (typeof v === 'string') return ISO_TIME.test(v) ? '<time>' : v
     if (v === null || typeof v !== 'object') return typeof v === 'function' ? undefined : v
@@ -44,8 +45,7 @@ function shown(view: View, ignore: readonly string[] = []): unknown {
     if (v instanceof Set) return [...v].map((x, i) => walk(x, inRecord, `${path}.${i}`))
     if (Array.isArray(v)) return v.map((x, i) => walk(x, inRecord, `${path}.${i}`))
     const id = (v as { id?: unknown }).id
-    // An offer is listed only inside its call, so it's compared in full there (audit, 20 October 2026, finding 26).
-    if (inRecord && typeof id === 'string' && !NESTED_IN_FULL.test(path)) return `#${id}`
+    if (inRecord && typeof id === 'string' && listed.has(id)) return `#${id}`
     const out: Record<string, unknown> = {}
     for (const key of Object.keys(v).sort()) {
       if (skip.has(key) || WAITING.test(key) || MADE_AFRESH.some((re) => re.test(`${path}.${key}`))) continue
@@ -55,6 +55,24 @@ function shown(view: View, ignore: readonly string[] = []): unknown {
     return out
   }
   return walk(view, false, '')
+}
+
+/** The ids of the records the view lists itself, outside any other record: the ones a record inside another can stand for by id. */
+function listedIds(view: View): Set<string> {
+  const ids = new Set<string>()
+  const seen = new Set<object>()
+  const walk = (v: unknown): void => {
+    if (v === null || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const id = (v as { id?: unknown }).id
+    if (!(v instanceof Map) && !(v instanceof Set) && !Array.isArray(v) && typeof id === 'string') {
+      ids.add(id)
+      return
+    }
+    for (const x of v instanceof Map || v instanceof Set ? v.values() : Object.values(v)) walk(x)
+  }
+  walk(view)
+  return ids
 }
 
 /** The paths at which two shown views differ, with each side. */
@@ -114,6 +132,20 @@ async function run(k: Case) {
  * so does each person's Worked list, built from them.
  */
 const CALL_NAMES = /^\.crew\.calls\.\d+\.(project|phase|venue)$|\.worked\.\d+\.name$/
+
+/**
+ * Drift: text typed with spaces round it shows as typed until the server,
+ * which trims it, answers (audit, 20 October 2026, finding 63). These
+ * cases type it untidily on purpose (finding 108); once the shared parsers
+ * trim, take UNTIDY off them, and the regular expressions with it.
+ */
+const UNTIDY = {
+  /** A place's name, and the order places sort in by it. */
+  place: /^\.(warehouse\.places|counts\.week\.due)\.\d+\./,
+  serial: /\.serial$/,
+  fault: /^\.faults\.(all|open)\.\d+\.(note|repair)$/,
+  invoice: /\.invoiceRef$/,
+}
 
 const DELIVERY = { id: 'd1', kind: 'other' as const, what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '13.5' as const }
 
@@ -182,9 +214,11 @@ const CASES: Case[] = [
   c('model.update', { id: 'unused', rackMount: true, units: 1, rackPart: 'vent' }, { as: 'made a rack part', before: [m('model.create', { id: 'unused', name: 'Old vent', department: 'audio', category: 'Rack parts', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('model.update', { id: 'unused', rackMount: true, units: 2, rackWidth: 'third' }, { as: 'made rack-mount', before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('place.upsert', { id: 'van-shelf', name: 'Van shelf', notes: '' }),
+  c('place.upsert', { id: 'van-shelf', name: '  Van shelf ', notes: ' Top ' }, { as: 'untidy text', known: [UNTIDY.place] }),
   c('place.remove', { id: 'bay' }),
   c('asset.add', { id: 'a3', modelId: 'y10p', number: 'SH-000004', serial: 'Y3', placeId: 'bay', caseId: null, notes: '', fromCount: false }),
   c('asset.update', { id: 'a1', serial: 'Y1-B', notes: 'New grille' }),
+  c('asset.update', { id: 'a1', serial: ' Y1-B ', notes: 'New grille  ' }, { as: 'untidy text', known: [UNTIDY.serial] }),
   c('asset.move', { id: 'a1', placeId: null, caseId: 'r1' }, { as: 'into a case' }),
   c('asset.move', { id: 'a1', placeId: 'bay', caseId: null }, { as: 'to a place' }),
   c('asset.relabel', { id: 'a1', number: 'SH-000009' }),
@@ -212,6 +246,7 @@ const CASES: Case[] = [
   c('move.record', { id: newId(), projectId: 'gala', direction: 'out', assetId: null, modelId: 'xlr', qty: 6, at: new Date().toISOString() }, { as: 'counted kit out' }),
   c('fault.report', { id: 'f2', kind: 'missing', assetId: null, modelId: 'xlr', qty: 2, projectId: 'gala', usable: false, note: 'Not back from the gala', at: new Date().toISOString() }),
   c('fault.update', { id: 'f1', usable: false, note: 'Grille dented, cone torn', repair: 'Sent to d&b' }),
+  c('fault.update', { id: 'f1', usable: false, note: '  Grille dented ', repair: ' Sent to d&b ' }, { as: 'untidy text', known: [UNTIDY.fault] }),
   c('fault.close', { id: 'f1', outcome: 'fixed', at: new Date().toISOString() }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: true, at: new Date().toISOString(), by: 'Cian', note: '' }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: false, at: new Date().toISOString(), by: 'Cian', note: 'Earth fault' }, { as: 'failed' }),
@@ -286,6 +321,7 @@ const CASES: Case[] = [
   c('quote.answer', { id: 'q1', answer: 'declined', on: today }, { as: 'declined' }),
   c('quote.answer', { id: 'q1', answer: 'none', on: today }, { as: 'taken back', before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
   c('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
+  c('quote.invoiced', { id: 'q1', on: today, ref: '  SH-77  ' }, { as: 'untidy text', known: [UNTIDY.invoice], before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
   c('quote.paid', { id: 'q1', on: today }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today }), m('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' })] }),
   c('price.product', { modelId: 'xlr', dayCents: 300 }),
   c('price.product', { modelId: 'y10p', dayCents: null }, { as: 'taken off' }),
