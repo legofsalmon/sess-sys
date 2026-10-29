@@ -3,6 +3,26 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: a plan for Claude inside the app
+
+**Planned, nothing built**
+
+- Colly asked for Claude in the app in three roles: bringing enquiries in
+  during the early quote phase, a PA on email through a new
+  operations@sessionhire.com mailbox cc'd on mail, and later a business and
+  systems analyst. The plan is a [Claude Doc](https://claude.ai/artifact/6z9f5bSSAMGtZRvqmckD3h):
+  Claude only suggests and a person accepts through the same commands and
+  role rules; email starts read-only, with replies opened in Gmail for a
+  person to send; one switch per role under Admin, off to start; about
+  EUR 20 to 60 a month in use plus one Workspace licence.
+- Recommended order: enquiries into quotes first, then the mailbox, then
+  the weekly report.
+
+**Waiting on Colly**
+
+- Which role to start with, and whether Claude runs on Anthropic's own
+  service or through Google Cloud in an EU region.
+
 ## 29 October 2026: opening on the screen's shape, and less to fetch
 
 **Done**
