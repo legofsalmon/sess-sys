@@ -370,7 +370,8 @@ export function crewView(
       (a, b) => statusRank(a.status) - statusRank(b.status) || (a.person?.name ?? '').localeCompare(b.person?.name ?? '') || a.id.localeCompare(b.id)
     )
     const heldByDay: Record<string, number> = {}
-    for (const d of days) heldByDay[d] = own.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).length
+    // People, not offers, as the server counts them (audit, 20 October 2026, finding 25).
+    for (const d of days) heldByDay[d] = new Set(own.filter((o) => HOLDING.includes(o.status) && o.days.includes(d)).map((o) => o.personId)).size
     return { ...c, offers: own, days, heldByDay, openDays: days.filter((d) => heldByDay[d]! < c.needed) }
   })
 
