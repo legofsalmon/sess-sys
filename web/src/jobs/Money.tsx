@@ -43,6 +43,7 @@ import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
+import { Sideways } from '../more.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
@@ -347,7 +348,7 @@ function ByMonth({ m }: { m: MoneyView }) {
   return (
     <section className="card" aria-label="By month">
       <Heading icon="calendar">By month</Heading>
-      <div className="quote-table-wrap">
+      <Sideways className="quote-table-wrap">
         <table className="quote-table money-months">
           <thead>
             <tr>
@@ -370,7 +371,7 @@ function ByMonth({ m }: { m: MoneyView }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Sideways>
       <p className="hint">
         Quoted counts the quote that stands on each job, sent or accepted; confirmed, the accepted ones. A quote turned down isn't counted, nor one on a job cancelled or lost
         until it's invoiced.
@@ -522,7 +523,7 @@ function Margins({ m, today }: { m: MoneyView; today: string }) {
       <BelowZero jobs={m.jobs} />
       <ShowAll items={shown} limit={10} what="jobs" keep={({ j }) => j.margin !== null && j.margin < 0}>
         {(rows) => (
-          <div className="quote-table-wrap">
+          <Sideways className="quote-table-wrap">
             <table className="quote-table money-margins">
               <thead>
                 <tr>
@@ -558,7 +559,7 @@ function Margins({ m, today }: { m: MoneyView; today: string }) {
                 ])}
               </tbody>
             </table>
-          </div>
+          </Sideways>
         )}
       </ShowAll>
       <p className="hint">

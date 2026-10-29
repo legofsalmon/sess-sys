@@ -289,7 +289,7 @@ export function canApproveLeave(p: Pick<Person, 'kind' | 'archived' | 'approvesL
   return !!p && p.kind === 'staff' && !p.archived && p.approvesLeave === true
 }
 
-/** The person a signed-in account is, by email: the same match the Account tab's feed card makes. */
+/** The person a signed-in account is, by email: the same match the feed card on You makes. */
 export function personByEmail<P extends Pick<Person, 'email' | 'archived'>>(people: readonly P[], email: string): P | undefined {
   const wanted = email.trim().toLowerCase()
   return wanted ? people.find((p) => !p.archived && p.email?.trim().toLowerCase() === wanted) : undefined

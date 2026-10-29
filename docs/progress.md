@@ -16,6 +16,41 @@ waiting on someone.
 - Checked: typecheck, shared, server and parity tests, and the browser
   tests for quotes, timesheets, crew and vans.
 
+## 29 October 2026: Tidying behind the scenes
+
+**Done**
+
+- Findings 108, 109 and 111 to 115 of the [20 October
+  audit](audit-2026-10-20.md) (PR #171): the parity test compares nested
+  records in full and caught joined days keeping their old names offline
+  (fixed), and untidy typed text now settles to the same view on both sides; slow label waits get room; the docs say Admin rather than the
+  Account tab, freelancer rather than warehouse, and that the Google,
+  backups and Sentry keys were all set on 19 October; the field test no
+  longer says Start fresh now real data is live; the design system's files
+  match what main carries; nine unused parts deleted; one put-away form for places and
+  cases; and the security updates that need no major version. App 1.63.4.
+- Left open: splitting the six files over 900 lines (when next touched),
+  and the major upgrades (zod 4, now first since zod 3 has a high advisory
+  on oversized arrays; vitest 5; PGlite 0.5), as one dependency afternoon.
+- Checked: typecheck, shared, server, parity and real-Postgres tests, and
+  nine browser test files.
+
+## 29 October 2026: Easier on a phone, and printing any screen
+
+**Done**
+
+- Findings 13, 58 to 61, 63 and 74 to 78 of the [20 October
+  audit](audit-2026-10-20.md) (PR #170): one fade wherever a row or table
+  runs off the edge, 44 px taps on links, folds and small buttons, the
+  fortnight charts a week at a time on a phone, settled things quiet
+  rather than green, plainer words and a lasting bad-email line, any
+  screen printable in light, text trimmed on the phone as on the server,
+  the skills offers clear of the tab bar and out of the Tab order, a find
+  box on Venues, and rows focused with Tab kept clear of both bars. ADR
+  0067 notes it. App 1.63.3.
+- Checked: typecheck, shared, server and real-Postgres tests, and 26
+  browser test files including a new one for the fades.
+
 ## 29 October 2026: Current RMS quotes in the quote history
 
 **Done**

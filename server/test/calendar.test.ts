@@ -24,7 +24,7 @@ import { staff, WINDOWS } from './people.ts'
 
 /**
  * Confirmed jobs on Google Calendar (ADR 0008), as ops and crew would see
- * it: connecting an account from the Account tab, picking a calendar, and
+ * it: connecting an account from Admin, picking a calendar, and
  * the calendar then holding every day of every confirmed job from today on,
  * in the shape crew know, whatever happens to the job, to Google, or to the
  * server in between. Google is played by a stand-in that answers as the
@@ -108,7 +108,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
 
 type Setup = Awaited<ReturnType<typeof setup>>
 
-/** Connect Google Calendar from the Account tab: off to Google, allow, and back. */
+/** Connect Google Calendar from Admin: off to Google, allow, and back. */
 async function connect({ app, google, colly }: Setup, answer?: (authorizeUrl: string) => string): Promise<LightMyRequestResponse> {
   const start = await app.inject({ url: '/api/calendar/connect?client=collylaptop', cookies: colly.cookies })
   expect(start.statusCode).toBe(302)

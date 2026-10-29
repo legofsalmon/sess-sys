@@ -14,10 +14,11 @@ import {
 } from '@sh/shared'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { Confirm, Refusal, useAct } from '../act.tsx'
+import { act, Confirm, Refusal, useAct } from '../act.tsx'
 import { useAccess } from '../role.ts'
 import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
+import { CameraScanner, primeSound } from './Scanner.tsx'
 
 /**
  * What the Stock screens share: names for where things are, picking a place
@@ -221,6 +222,100 @@ export function ScanMisses({ misses, onDismiss }: { misses: readonly { id: numbe
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * Putting an item here by its number, scanned or typed, with the camera
+ * staying on for the next label (audit finding 18). One form for a place's
+ * "Put an item here" and a case's "Put an item in", so a fix to one lands
+ * on both (audit, 20 October 2026, finding 114): `why` says why an item
+ * can't go, `to` is where it goes, and `done` what's said once it has.
+ */
+export function PutByNumber({ w, heading, label, button, why, to, done }: {
+  w: WarehouseView
+  heading: string
+  /** What the line under the camera is called: "Put here". */
+  label: string
+  button: string
+  why: (item: AssetView) => string | undefined
+  to: { placeId: string | null; caseId: string | null }
+  done: (item: AssetView) => string
+}) {
+  const [number, setNumber] = useState('')
+  const [camera, setCamera] = useState(false)
+  const { error, refuse } = useAct()
+  const [moved, setMoved] = useState('')
+  // With the camera on, what wasn't done is kept in a list until dismissed, as the next label is read at once; typed, it's the line under the field.
+  const { misses, add, dismiss } = useScanMisses()
+  const put = (t: string, scanned = false) => {
+    setMoved('')
+    refuse('')
+    if (!t) return
+    const fail = (reason: string) => (scanned ? add(reason) : refuse(reason))
+    const { item, problem } = itemToPut(t, w)
+    if (!item) return fail(problem)
+    const not = why(item)
+    if (not) return fail(not)
+    void act(() => client.mutate('asset.move', { id: item.id, ...to })).then(
+      () => setMoved(done(item)),
+      (err: Error) => fail(`${item.number}: ${err.message}`)
+    )
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    put(number.trim())
+    setNumber('')
+  }
+  const close = () => {
+    setCamera(false)
+    setMoved('')
+    refuse('')
+  }
+  return (
+    <form className="grid-form" onSubmit={submit}>
+      <h3 className="wide">{heading}</h3>
+      <div className="wide scan-row">
+        <label>
+          Its number
+          <input
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            placeholder="e.g. SH-000123"
+            autoComplete="off"
+            autoCapitalize="characters"
+            enterKeyHint="done"
+          />
+        </label>
+        <button
+          type="button"
+          aria-pressed={camera}
+          onClick={() => {
+            if (!camera) primeSound()
+            if (camera) close()
+            else setCamera(true)
+          }}
+        >
+          Scan
+        </button>
+      </div>
+      {camera && (
+        <div className="wide">
+          <CameraScanner onRead={(code) => put(code.trim(), true)} onStop={close} small />
+        </div>
+      )}
+      <Refusal error={error} className="wide" />
+      <ScanMisses misses={misses} onDismiss={dismiss} />
+      {moved && !error && (
+        <ScanResult label={label} onClose={camera ? close : undefined}>
+          {moved}
+          {camera && ' Scan the next label.'}
+        </ScanResult>
+      )}
+      <button type="submit" className="wide">
+        {button}
+      </button>
+    </form>
   )
 }
 

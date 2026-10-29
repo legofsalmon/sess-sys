@@ -225,9 +225,11 @@ spike that decided it, and its test results, are in the ADR.
 
 The plan was that nobody's phone holds the whole company, each device
 syncing only its **scope** (a job, a fortnight's pick lists, a freelancer's
-own bookings). **That isn't built.** Every device signed in reads the whole
-change feed from the start, every job past and future, all the stock and
-every person, and the server cuts each record down to what the role reads
+own bookings). **That isn't built.** Every device signed in reads every
+job past and future, all the stock and every person: a new device reads
+the latest of each record rather than the whole feed from the start (since
+20 October, [ADR 0067](adr/0067-the-audits-p2-and-p3s.md)), and then each
+change as it comes. The server cuts each record down to what the role reads
 as it goes out (`server/src/reading.ts`, rules in `shared/src/reading.ts`).
 What's left out never reaches the phone:
 
@@ -397,8 +399,8 @@ says product and item; the code says model and asset.
   preferred), the name they go by, certificates by kind with an expiry,
   the company a freelancer trades through with its VAT and CRO numbers,
   and a "Worked" list built on each device from their bookings. The crew
-  list comes in from a spreadsheet through "Bring in a list" on the
-  Account tab: every row shown as the app read it, phones put in
+  list comes in from a spreadsheet through "Bring in a list" on
+  Admin: every row shown as the app read it, phones put in
   international form, problems fixed or skipped in place, rows matched
   to people already here by email then phone (a row for someone
   archived is marked, never applied), and all of it brought in through
@@ -487,14 +489,14 @@ right after the switch.
 
 **Built so far** ([ADR 0008](adr/0008-calendar-sync.md)): the app writes
 every day of every confirmed job, from today on, to one calendar picked on
-the Account tab, as one Google account connected by a member of staff. The
+Admin, as one Google account connected by a member of staff. The
 app leads. Event ids are worked out from the job, so a retried write never
 doubles an event, and the app's hidden mark keeps it to its own events. It
 runs when something changes and checks the calendar once a night, rather
 than watching it, so the database can sleep.
 
-With crew invites on ([ADR 0009](adr/0009-crew-invites.md), a switch on the
-Account tab that starts off), crew offered or booked are guests on their
+With crew invites on ([ADR 0009](adr/0009-crew-invites.md), a switch on
+Admin that starts off), crew offered or booked are guests on their
 days' events, and their Yes or No in Google counts as their answer to the
 offer, through the same rules as their private link. The server asks Google
 every two minutes which of its events changed since the last look (with a
@@ -561,7 +563,7 @@ Every person also gets a feed of their own bookings for any calendar app
 private link: it can go in a calendar they share without letting anyone
 answer for them, and a new link retires it. Freelancers find it on their
 page, the office copies it from the Crew tab, and staff who also work jobs
-find theirs on the Account tab. The server keeps every feed in memory and
+find theirs on You. The server keeps every feed in memory and
 builds them again only after a change, so calendar apps looking every
 hour don't keep the database awake. The server's log masks private link
 and feed addresses.
@@ -615,7 +617,7 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
   Phase 0 and **switched on 19 October 2026**, when the bucket and key
   were set; before then there were none. After a restore, devices reload
   their copy and send again what the backup missed.
-- Start fresh on the Account tab deletes everything but the staff
+- Start fresh on Admin deletes everything but the staff
   accounts, after a backup, to clear made-up data before the real data
   goes in ([ADR 0019](adr/0019-made-up-data-and-starting-fresh.md)).
   Devices reload their copy as after a restore, but drop what they had
@@ -641,8 +643,10 @@ file, is [crewbox-show-pack.md](crewbox-show-pack.md).
 
 - **Roles are built (11 October 2026,
   [ADR 0034](adr/0034-roles-and-what-each-can-change.md)):** director,
-  office and production, head of department, warehouse and staff crew,
-  from the personas; freelancers keep their link. A role decides what a
+  office and production, head of department and staff crew, from the
+  personas, and freelancer in place of warehouse since 18 October
+  ([ADR 0051](adr/0051-freelancer-in-place-of-warehouse.md)); freelancers
+  keep their link too. A role decides what a
   member of staff can change, checked by the server on every command and
   request, and the app offers only what it covers. They start off and come
   on when a director is named from Admin. What each role *reads* is

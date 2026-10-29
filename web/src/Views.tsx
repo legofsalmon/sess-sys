@@ -14,6 +14,7 @@
 
 import type { View } from '@sh/shared'
 import { useLayoutEffect, useRef } from 'react'
+import { useMoreEdges } from './more.tsx'
 
 export interface AreaPage {
   key: string
@@ -25,28 +26,16 @@ export interface AreaPage {
 
 export function Views({ label, pages, current }: { label: string; pages: readonly AreaPage[]; current: string }) {
   const row = useRef<HTMLElement>(null)
+  // The current page brought into view; the edge with more past it fades (more.tsx).
   useLayoutEffect(() => {
     const el = row.current
-    if (!el) return
-    // Which edges have more past them, for the fade.
-    const edges = () => {
-      const left = el.scrollLeft > 1
-      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
-      el.dataset.more = left && right ? 'both' : left ? 'left' : right ? 'right' : ''
-    }
-    const at = el.querySelector<HTMLElement>('[aria-current]')
-    if (at && (at.offsetLeft < el.scrollLeft || at.offsetLeft + at.offsetWidth > el.scrollLeft + el.clientWidth))
+    const at = el?.querySelector<HTMLElement>('[aria-current]')
+    if (el && at && (at.offsetLeft < el.scrollLeft || at.offsetLeft + at.offsetWidth > el.scrollLeft + el.clientWidth))
       el.scrollLeft = at.offsetLeft - (el.clientWidth - at.offsetWidth) / 2
-    edges()
-    el.addEventListener('scroll', edges, { passive: true })
-    addEventListener('resize', edges)
-    return () => {
-      el.removeEventListener('scroll', edges)
-      removeEventListener('resize', edges)
-    }
   }, [current])
+  useMoreEdges(row)
   return (
-    <nav className="views" aria-label={label} ref={row}>
+    <nav className="views more-edges" aria-label={label} ref={row}>
       {pages.map((p) => (
         <a key={p.key} href={p.href} aria-current={p.key === current ? 'page' : undefined}>
           {p.label}

@@ -24,6 +24,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { personHref } from '../crew/PersonScreen.tsx'
+import { useMoreEdges } from '../more.tsx'
 import { useAccess } from '../role.ts'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useUnderTop } from '../useUnderTop.ts'
@@ -118,6 +119,8 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
     const first = el?.querySelector<HTMLElement>('thead .today')
     if (el && names && first) el.scrollLeft = Math.max(0, first.offsetLeft - names.offsetWidth)
   }, [hash, shown])
+  // A week is wider than a phone: the edge with more days past it fades, as Money's tables do (audit, 20 October 2026, finding 77).
+  useMoreEdges(scroller, shown)
 
   return (
     <div className="app crew jobs plan">
@@ -167,7 +170,7 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
           </p>
         )}
         {lanes > 0 && (
-          <div className="scroller" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rowWord}`}>
+          <div className="scroller more-edges" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rowWord}`}>
             <table className={`timeline ${scale}`} style={{ '--days': days.length } as CSSProperties}>
               <colgroup>
                 <col className="names" />

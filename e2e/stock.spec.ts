@@ -231,7 +231,8 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await add.getByLabel("Where it's kept").fill(bay)
   await add.getByRole('button', { name: 'Add item' }).click()
   await add.getByRole('button', { name: 'Make the place' }).click()
-  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
   // The question answered, the number field is ready for the next label.
   await expect(add.getByLabel('Number', { exact: true })).toBeFocused()
   const number = (await add.locator('.added').textContent())!.slice(6, -1)
@@ -276,7 +277,8 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await newProduct(page, spot, 'numbered')
   await add.getByLabel("Where it's kept").fill(bay)
   await add.getByRole('button', { name: 'Add item' }).click()
-  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
   await add.locator('.added a').click()
   await page.getByRole('button', { name: 'Retire' }).click()
   await page.getByRole('radio', { name: 'Added by mistake' }).check()

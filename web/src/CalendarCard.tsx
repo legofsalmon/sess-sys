@@ -8,7 +8,7 @@ import { useToday } from './view.ts'
 import { useLate } from './useLate.ts'
 
 /**
- * Google Calendar (ADR 0008), as the Account tab shows it: connecting the
+ * Google Calendar (ADR 0008), as Admin shows it: connecting the
  * Google account that writes the jobs, choosing its calendar, how it is
  * going, crew invites (ADR 0009), and disconnecting. The connection reaches
  * every device through the sync like everything else, so all of them show

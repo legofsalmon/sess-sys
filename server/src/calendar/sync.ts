@@ -105,7 +105,7 @@ const problems = {
 /** The Calendar API is switched off in the app's Google Cloud project. */
 const apiOff = (err: GoogleError) => err.reason === 'accessNotConfigured' || err.reason === 'SERVICE_DISABLED'
 
-/** Stops a run, or a request from the Account tab: the calendar or the account needs a person, or Google needs time. */
+/** Stops a run, or a request from Admin: the calendar or the account needs a person, or Google needs time. */
 export class Halt extends Error {
   constructor(
     readonly why: 'revoked' | 'blocked' | 'busy',

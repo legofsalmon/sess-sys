@@ -35,6 +35,20 @@ export const CHANGELOG: readonly Release[] = [
     prs: [177],
   },
   {
+    version: '1.63.4',
+    date: '2026-10-29',
+    title: 'Tidying behind the scenes',
+    what: 'Tidying behind the scenes: the help pages describe the app as it is now, unused parts are gone, the put-away form is shared by places and cases, and some security updates. Joining two jobs with no signal now shows the joined days under their new names straight away.',
+    prs: [171],
+  },
+  {
+    version: '1.63.3',
+    date: '2026-10-29',
+    title: 'Easier on a phone, and printing any screen',
+    what: "On a phone, rows and tables that run off the edge now fade where there's more, and buttons and links are easier to tap. Pressing Cmd-P on any screen prints it rather than a blank page. Venues has a search box, and a few words and colours are more consistent.",
+    prs: [170],
+  },
+  {
     version: '1.63.2',
     date: '2026-10-29',
     title: 'Shared colours brought up to date',

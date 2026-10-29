@@ -5,7 +5,7 @@ import { size, when } from './format.ts'
 import { useLate } from './useLate.ts'
 
 /**
- * The nightly backup, as the Account tab shows it: when the last good one
+ * The nightly backup, as Admin shows it: when the last good one
  * was made, whether the last attempt worked, and "Back up now" for the
  * first run after setting up storage or before anything risky.
  */
