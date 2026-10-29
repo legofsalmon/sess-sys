@@ -585,3 +585,6 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
 .app .todo-item small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .app .todo-item.done a { color: var(--muted); text-decoration: line-through; }
+/* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
+.quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
+.quotes .from-rms h3 { margin: 0 0 var(--space-8); }
