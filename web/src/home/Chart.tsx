@@ -10,6 +10,9 @@ import { STILL_ARRIVING, useCopying } from './copying.ts'
  * its own: what's settled is plain ink, what isn't yet a lighter grey, and
  * only what's short is amber, so a healthy week is quiet. The line above
  * the chart says, in words, the column under the finger or the pointer.
+ * The colours are the design system's chart roles (charts.md), and the same
+ * numbers are one press away as a table, for a screen reader, a print and
+ * anyone who wants the figures.
  */
 
 /**
@@ -149,6 +152,32 @@ export function Chart({
               ))}
             </ul>
           )}
+          <details className="chart-table">
+            <summary>Show as table</summary>
+            <table>
+              <caption className="sr-only">{title}</caption>
+              <thead>
+                <tr>
+                  <td />
+                  {series.map((s) => (
+                    <th key={s.name} scope="col">
+                      {s.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {columns.map((c) => (
+                  <tr key={c.key} className={c.now ? 'now' : undefined}>
+                    <th scope="row">{c.name}</th>
+                    {c.parts.map((n, p) => (
+                      <td key={p}>{n > 0 ? format(n) : '–'}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
         </>
       )}
       {more}

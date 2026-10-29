@@ -28,15 +28,15 @@
 .preview .personas small { color: var(--muted); font-size: var(--text-hint); font-weight: 600; }
 .preview .personas span { color: var(--ink); font-weight: 400; font-size: var(--text-small); }
 
-/* Charts (ADR 0054): columns in HTML, coloured by the grammar. Settled is ink, not yet a lighter grey, short is amber. */
-.home .chart { --chart-settled: var(--on-line); --chart-pending: var(--field-line); --chart-short: var(--ds-warn); }
+/* Charts (ADR 0054): columns in HTML, coloured by the grammar in the design system's chart roles (charts.md). Settled is the chart mark, not yet the pending grey, short is amber. */
+.home .chart { --chart-settled: var(--ds-chart-mark); --chart-pending: var(--ds-chart-pending); --chart-short: var(--ds-warn); }
 .home .chart-readout { margin: 0; font-size: var(--text-small); color: var(--on-line); min-height: 1.3em; }
 .home .chart-plot { position: relative; padding-top: var(--space-16); }
 .home .chart-max { position: absolute; top: 0; left: 0; font-size: var(--text-pill); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* A hairline at the top of the scale and one along the baseline: the only grid. */
-.home .chart-columns { display: grid; gap: var(--space-2); background: linear-gradient(var(--line), var(--line)) top / 100% 1px no-repeat; }
+.home .chart-columns { display: grid; gap: var(--space-2); background: linear-gradient(var(--ds-chart-grid), var(--ds-chart-grid)) top / 100% 1px no-repeat; }
 .home .chart-col { display: grid; grid-template-rows: 120px auto; gap: var(--space-4); min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
-.home .chart-bar { display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--field-line); }
+.home .chart-bar { display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--ds-chart-axis); }
 .home .chart-stack { display: flex; flex-direction: column-reverse; gap: var(--space-2); width: min(24px, 70%); min-height: 3px; border-radius: 4px 4px 0 0; overflow: hidden; }
 .home .chart-part { min-height: 2px; }
 .home .chart-part.settled, .home .chart-swatch.settled { background: var(--chart-settled); }
@@ -59,6 +59,13 @@
   .home .chart-part.short, .home .chart-swatch.short { background: Highlight; }
 }
 .home .chart-more { justify-self: start; font-size: var(--text-link); }
+/* The same numbers as a table, folded under the chart like the week ahead's errands (charts.md: a table is one press away). */
+.home .chart-table summary { padding: var(--space-8) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.home .chart-table table { width: 100%; border-collapse: collapse; font-size: var(--text-small); font-variant-numeric: tabular-nums; }
+.home .chart-table th, .home .chart-table td { padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.home .chart-table th[scope='row'] { text-align: left; font-weight: 400; }
+.home .chart-table thead th { color: var(--muted); font-weight: 600; }
+.home .chart-table tr.now th[scope='row'] { font-weight: 700; }
 /* Working this week on a phone (audit, 20 October 2026, finding 80): the days go under the name, so the role and job aren't squeezed to a word a line beside them. */
 @media (max-width: 479px) {
   .home .working-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-12); }
