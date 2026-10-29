@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.57.0',
+    date: '2026-10-29',
+    title: "A freelancer's own page is quicker to read",
+    what: "A freelancer's own page opens faster on a weak signal. It shows the next few bookings in full and the rest a line each, and keeps the summary line in view. Dates say their year when it isn't obvious. A mistake in a rate or an extra is said beside it. Days off can't be in the past or longer than a year, overlapping ones merge, and days off over a booking say plainly that you're still booked on it.",
+    prs: [166],
+  },
+  {
     version: '1.56.0',
     date: '2026-10-29',
     title: "Stock puts today's work first",

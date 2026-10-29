@@ -174,7 +174,7 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
    * redirect, which could carry only the reason. The form's address ends in
    * its place on the page, so the browser lands there.
    */
-  const refused = async (req: Req, reply: FastifyReply, person: Person, what: Said | Refusal, kept: Kept, where: Pick<Flash, 'offer' | 'section'>) =>
+  const refused = async (req: Req, reply: FastifyReply, person: Person, what: Said | Refusal, kept: Kept, where: Pick<Flash, 'offer' | 'section' | 'field'>) =>
     noStore(reply)
       .code(422)
       .type('text/html')
@@ -281,8 +281,9 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
     const form = (req.body ?? new URLSearchParams()) as Form
     // A refusal keeps the days, extras and note as they were typed (rule 11).
     const call = await getCall(db, offer.callId)
-    const turnedDown = async (what: Said | Refusal) =>
-      call ? noStore(reply).code(422).type('text/html').send(await timesheetPage(req, person, offer, call, { ok: false, text: reasonOf(what) }, form)) : again(what)
+    // A refusal about one extra is said under that extra, by its place among the ones filled in (audit, 20 October 2026, finding 90).
+    const turnedDown = async (what: Said | Refusal, extra?: number) =>
+      call ? noStore(reply).code(422).type('text/html').send(await timesheetPage(req, person, offer, call, { ok: false, text: reasonOf(what), ...(extra !== undefined ? { extra } : {}) }, form)) : again(what)
     const days = form.getAll('days')
     if (days.length === 0) return turnedDown('tick-a-day-worked')
     const whats = form.getAll('what')
@@ -292,10 +293,10 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       const what = (whats[i] ?? '').trim().slice(0, 100)
       const typed = (euros[i] ?? '').trim()
       if (!what && !typed) continue
-      if (!what) return turnedDown('say-what-for')
+      if (!what) return turnedDown('say-what-for', extras.length)
       // As typed on a phone: "€12.50", "12,50" or "1,250" all read as a person means them (audit finding 15).
       const amount = parseEuro(typed)
-      if (amount.reason !== undefined || !amount.cents) return turnedDown('extra-amount')
+      if (amount.reason !== undefined || !amount.cents) return turnedDown('extra-amount', extras.length)
       extras.push({ what, cents: amount.cents })
     }
     if (extras.length > MAX_EXTRAS) return turnedDown('too-many-extras')
@@ -335,8 +336,10 @@ export function registerCrewLinks(app: FastifyInstance, db: Db, onChange: () => 
       if (person.kind === 'staff') return turnedDown('tap-yes-or-no')
       // "€300", "1,250" or "1 250,50" read as the person means them (audit finding 15); anything else says what to put in.
       const rate = parseEuro(form.get('rate') ?? '')
-      if (rate.reason !== undefined) return turnedDown('not-a-price')
-      if (!rate.cents) return turnedDown('no-rate')
+      // Said under the rate field, not at the top of the card (audit, 20 October 2026, finding 90).
+      const atRate = (what: Said) => refused(req, reply, person, what, { form: `offer:${offer.id}`, values: form }, { offer: offer.id, field: 'rate' })
+      if (rate.reason !== undefined) return atRate('not-a-price')
+      if (!rate.cents) return atRate('no-rate')
       result = await run(req, person.id, 'offer.respond', { id: offer.id, answer: 'counter', counterRateCents: rate.cents, days, note })
     } else return back(reply, person.linkToken, 'try-again')
 
