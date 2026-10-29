@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.52.0',
+    date: '2026-10-29',
+    title: "Staff crew see their own work first, and nobody else's private details",
+    what: "Once roles are on, staff crew open Home on Me and Crew on People, see only their own timesheets, and can open their own page from Home or their person page. Your work says which bookings are confirmed and which only accepted. Other people's timesheet notes, what their documents are, and clients' documents are now kept to those who need them: venues' documents stay open to everyone.",
+    prs: [156],
+    adrs: [62],
+  },
+  {
     version: '1.51.1',
     date: '2026-10-29',
     title: 'Only a director changes how a director signs in',

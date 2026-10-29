@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: staff crew's own work first, and others' details kept
+
+**Done**
+
+- Findings 34 to 39 of the [20 October audit](audit-2026-10-20.md) (PR #156,
+  Colly chose "Roles first"): a role without crew starts Home on Me and
+  Crew on People, with no Answers card and only its own timesheets; Home ›
+  Me links to their own page and says confirmed or accepted on each
+  booking; others' timesheet notes, documents' details in the history, and
+  clients' documents are held back on the server. ADR 0062 notes it. App
+  1.52.0.
+- Checked: typecheck, shared and server tests, and the browser tests for
+  Home, Crew, a person's page and timesheets.
+
 ## 29 October 2026: a director's sign-in is the directors' to change
 
 **Done**
