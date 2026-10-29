@@ -38,7 +38,7 @@ export function nominatim({ base = 'https://nominatim.openstreetmap.org', fetch:
     const url = new URL('/search', base)
     url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', countrycodes: 'ie,gb', 'accept-language': 'en' }).toString()
     const res = await get(url, {
-      headers: { 'user-agent': 'SessionHire/1.0 (+https://github.com/legofsalmon/sess-sys)', accept: 'application/json' },
+      headers: { 'user-agent': 'SessionHire/1.0 (+https://github.com/sessionhire/sess-sys)', accept: 'application/json' },
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) throw new Error(`The map search answered ${res.status}.`)
