@@ -321,6 +321,8 @@ export class SyncClient {
   private derived = new Derived()
   /** Each product's kit days, kept between builds of the kit (kit-view.ts). */
   private kitMemo: KitMemo = new Map()
+  /** The tables the server's changes have landed in since `takePulled` was last asked. */
+  private pulledInto = new Set<string>()
   /** The tables changed since the copy was last saved, so a save writes only those; all of them after anything else. */
   private dirty: Set<string> | 'all' = new Set()
   private readonly storage: Storage
@@ -403,6 +405,16 @@ export class SyncClient {
    * the server checks the same, so this only saves a change it would turn down.
    */
   guard?: (name: CommandName, args: unknown) => string | undefined
+
+  /**
+   * The tables the server's changes have landed in since this was last asked, and from now on none: what a pull brought,
+   * for whatever needs to look again only when something of a kind it cares about arrived (notices, in the web app).
+   */
+  takePulled(): ReadonlySet<string> {
+    const pulled = this.pulledInto
+    this.pulledInto = new Set()
+    return pulled
+  }
 
   /** Changes waiting to be sent, without building the view. */
   get pendingCount() {
@@ -753,6 +765,7 @@ export class SyncClient {
         }
         applyChange(this.state, change)
         this.touched(change.entity)
+        this.pulledInto.add(change.entity)
       }
       if (res.cursor > this.state.cursor) [this.state.cursor, changed] = [res.cursor, true]
       // Reading only the latest of each record, there's more to come; read to the end, or from a server that sent every change, it's done.
