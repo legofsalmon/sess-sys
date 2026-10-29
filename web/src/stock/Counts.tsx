@@ -24,6 +24,7 @@ import {
   type Ability,
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
+import { useScanKeys } from '../scanKeys.ts'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { useMe } from '../crew/Leave.tsx'
 import { Empty } from '../Empty.tsx'
@@ -316,6 +317,8 @@ function Counting({ view, d }: { view: View; d: CountDraft }) {
   const [said, setSaid] = useState<{ tone: Tone; text: string; at: number }>()
   const [typed, setTyped] = useState('')
   const [camera, setCamera] = useState(false)
+  // A scanner's first read goes to the scan field (audit, 20 October 2026, finding 98).
+  useScanKeys()
   const [discarding, setDiscarding] = useState(false)
   const { run, error } = useAct()
   const say = (tone: Tone, text: string) => setSaid({ tone, text, at: Date.now() })

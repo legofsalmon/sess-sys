@@ -195,10 +195,14 @@ test('a pick list: kit found, scanned and counted out, then back with no signal'
   await hold(page, speakers[0]!)
   await expect(said).toHaveText(`${speakers[0]} ${speaker} is already out with ${job}.`)
 
-  // A mic that isn't on the kit, from a scanner that types: out, with a warning.
+  // A mic that isn't on the kit, from a scanner that types: out, with a warning. Its keys go to the scan field from wherever focus
+  // is, here the Scan button (audit, 20 October 2026, finding 98).
   await hold(page, null)
-  await page.getByLabel('Number or serial').fill(micNumber!.toLowerCase())
-  await page.getByLabel('Number or serial').press('Enter')
+  await expect(page.getByLabel('Number or serial')).not.toBeFocused()
+  await page.keyboard.type(micNumber!.toLowerCase())
+  await expect(page.getByLabel('Number or serial')).toBeFocused()
+  await expect(page.getByLabel('Number or serial')).toHaveValue(micNumber!.toLowerCase())
+  await page.keyboard.press('Enter')
   await expect(said).toHaveText(`${micNumber} ${mic} out. It isn't on the kit for ${job}. Add it to the kit, or scan it back in if it isn't going.`)
   await expect(said).toHaveClass(/warn/)
   const micRow = pickRow(page, mic)

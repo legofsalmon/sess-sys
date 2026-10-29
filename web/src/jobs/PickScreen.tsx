@@ -23,6 +23,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useScanKeys } from '../scanKeys.ts'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
@@ -114,6 +115,8 @@ function Pick({ view, job }: { view: View; job: JobView }) {
   const dock = useUnderTop(mayMove)
   const say: Say = (tone, text, more) => setSaid({ tone, text, at: Date.now(), ...more })
   useWakeLock(mayMove)
+  // A scanner's first read goes to the scan field (audit, 20 October 2026, finding 98).
+  useScanKeys(mayMove)
 
   // A label or a maker's serial, read by the camera or typed by a scanner.
   // What's looked up before anything is recorded comes from the view on screen;
