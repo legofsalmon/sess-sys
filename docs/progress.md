@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - Findings 97 to 106 of the [20 October audit](audit-2026-10-20.md)
-  (PR #163): going out before still out, twenty products on a desk, a
+  (PR #165): going out before still out, twenty products on a desk, a
   scanner that works without a tap, plainer words on setting numbers
   aside, an item found through its case and taken back out, no packing
   into a case that's out, a faster next label number, and a re-run stock
