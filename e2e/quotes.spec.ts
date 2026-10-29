@@ -375,3 +375,26 @@ test("a line short of kit hires in what it's short of, transport is added at a c
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
+
+test("on a desk a line's amount and Remove sit inside the quote's card at every width (audit finding 28)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+  await page.goto('/#jobs')
+  await page.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await page.getByRole('tab', { name: 'Quote' }).click()
+  await page.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await page.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = page.getByRole('form', { name: 'Version 1, a draft' })
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  for (const width of [1024, 1200, 1280, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 })
+    const card = (await draft.boundingBox())!
+    expect(card.x + card.width, `at ${width}px`).toBeLessThanOrEqual(width)
+    for (const part of [draft.getByRole('button', { name: 'Remove line 1' }), draft.locator('.quote-line .amount').first()]) {
+      const box = (await part.boundingBox())!
+      expect(box.x + box.width, `at ${width}px`).toBeLessThanOrEqual(card.x + card.width)
+    }
+  }
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
