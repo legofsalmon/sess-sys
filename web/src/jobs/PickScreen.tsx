@@ -26,7 +26,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { mistakeLabel } from '../stock/common.tsx'
-import { faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
+import { closeFault, faultState, reportFault, ReportFault } from '../stock/Faults.tsx'
 import { dueText } from '../stock/Inspections.tsx'
 import { CameraScanner, primeSound } from '../stock/Scanner.tsx'
 import { kitOf } from '../home/standing.ts'
@@ -134,7 +134,7 @@ function Pick({ view, job }: { view: View; job: JobView }) {
     // Scanned, so it isn't missing any more; damaged, and it shouldn't go out.
     const fault = view.faults.stopping(a.id)
     const found = fault?.kind === 'missing'
-    if (found) await act(() => client.mutate('fault.close', { id: fault.id, outcome: 'found', at: new Date().toISOString() }))
+    if (found) await act(() => closeFault(fault, 'found'))
     if (found) notes.push("It was reported missing, so it's marked found.")
     else if (fault && mode === 'out') notes.push(`It's reported ${faultState(fault).toLowerCase()}${fault.note ? `: ${fault.note}` : ''}. Check it before it goes.`)
     // Failed or overdue its PAT or examination (ADR 0020): it shouldn't go.

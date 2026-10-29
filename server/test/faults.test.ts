@@ -354,6 +354,29 @@ describe('what a device shows', () => {
     ])
   })
 
+  it('takes an item reported missing twice as one loss, which one find ends', async () => {
+    // Proves: two missing reports on one item show as one on the repair list, and closing it with the others it stands
+    // for frees the item; the server keeps both (audit, 20 October 2026, finding 45).
+    const { app, y10p, speakers } = await warehouse()
+    const first = report('missing', { assetId: speakers[0]!, modelId: y10p.id }, { at: '2026-09-20T09:00:00.000Z' })
+    const again = report('missing', { assetId: speakers[0]!, modelId: y10p.id }, { at: '2026-09-20T09:01:00.000Z' })
+    await ok(app, 'fault.report', first)
+    await ok(app, 'fault.report', again)
+    const phone = await device(app)
+    let faults = phone.client.view().faults
+    expect(faults.ofAsset(speakers[0]!).filter((f) => f.open)).toHaveLength(2)
+    expect(faults.open.map((f) => f.id)).toEqual([first.id])
+    const stops = faults.stopping(speakers[0]!)!
+    expect(stops).toMatchObject({ id: first.id, alike: [again.id] })
+    for (const id of [stops.id, ...stops.alike]) await phone.client.mutate('fault.close', close(id, 'found'))
+    faults = phone.client.view().faults
+    expect(faults.stopping(speakers[0]!)).toBeUndefined()
+    expect(faults.open).toEqual([])
+    expect(faults.unusable(y10p.id)).toBe(0)
+    await phone.client.sync()
+    expect(phone.client.view().faults.all.filter((f) => f.assetId === speakers[0]).map((f) => f.outcome)).toEqual(['found', 'found'])
+  })
+
   it("kit reported missing from a job isn't out with it, nor back, until it's found", async () => {
     const { app, y10p, amp, rack, xlr, speakers, rackId, amps } = await warehouse()
     const nissan = await job(app, 'Nissan', 'confirmed', '2026-09-20', '2026-09-21')

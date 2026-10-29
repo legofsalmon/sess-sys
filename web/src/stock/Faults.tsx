@@ -43,6 +43,12 @@ export function faultState(f: FaultView): string {
   return f.usable ? 'Damaged, fit to go out' : "Damaged, can't go out"
 }
 
+/** Closes a fault, and with an item's missing report the others like it (audit, 20 October 2026, finding 45); run through act(). */
+export async function closeFault(f: FaultView, outcome: FaultOutcome) {
+  const at = new Date().toISOString()
+  for (const id of [f.id, ...f.alike]) await client.mutate('fault.close', { id, outcome, at })
+}
+
 /** One report as a change; whoever asks for it runs it through act(). */
 export const reportFault = (args: Omit<CommandInput<'fault.report'>, 'id' | 'at'>) =>
   client.mutate('fault.report', { id: newId(), at: new Date().toISOString(), ...args })
@@ -124,12 +130,25 @@ export function ReportFault({
 }
 
 /** Buttons to report damage or missing kit, and the form for whichever is chosen. */
-export function ReportButtons({ asset, model, projectId, most }: { asset?: AssetView; model: Model | undefined; projectId?: string | null; most?: number }) {
+export function ReportButtons({
+  asset,
+  model,
+  projectId,
+  most,
+  kinds = ['damaged', 'missing'],
+}: {
+  asset?: AssetView
+  model: Model | undefined
+  projectId?: string | null
+  most?: number
+  /** What can be reported: an item already missing isn't reported missing again (ADR 0030). */
+  kinds?: readonly FaultKind[]
+}) {
   const [kind, setKind] = useState<FaultKind>()
   return (
     <>
       <div className="actions">
-        {(['damaged', 'missing'] as const).map((k) => (
+        {kinds.map((k) => (
           <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(kind === k ? undefined : k)}>
             {k === 'damaged' ? 'Report damage' : 'Report missing'}
           </button>
@@ -142,7 +161,7 @@ export function ReportButtons({ asset, model, projectId, most }: { asset?: Asset
 
 /** An item's or a product's faults: the open ones, with what to do about them, then the rest. */
 export function FaultsCard({ faults, children, title = 'Faults' }: { faults: FaultView[]; children?: ReactNode; title?: string }) {
-  const open = faults.filter((f) => f.open)
+  const open = faults.filter((f) => f.open && !f.merged)
   const closed = faults.filter((f) => !f.open)
   return (
     <section className="card faults" aria-label={title}>
@@ -182,7 +201,7 @@ function FaultItem({ f, linked = false }: { f: FaultView; linked?: boolean }) {
   const maySort = useAccess().can('stock')
   const closeAs = (outcome: FaultOutcome) => {
     setClosing(undefined)
-    void run(() => client.mutate('fault.close', { id: f.id, outcome, at: new Date().toISOString() }))
+    void run(() => closeFault(f, outcome))
   }
   const what = faultWhat(f)
   const they = f.assetId ? 'It' : 'They'

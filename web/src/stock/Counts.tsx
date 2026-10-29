@@ -34,7 +34,7 @@ import { Pending } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { atLabel, numberLabel, ProductChoices } from './common.tsx'
-import { reportFault } from './Faults.tsx'
+import { closeFault, reportFault } from './Faults.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { Heading } from '../Icon.tsx'
 import { STOCK } from '../Up.tsx'
@@ -126,7 +126,8 @@ const itemName = (a: AssetView | undefined) => (a ? [numberLabel(a), a.model?.na
 const keptWords = (x: Partial<Where>, w: WarehouseView) => (x.placeId || x.caseId ? `kept ${atLabel({ placeId: x.placeId ?? null, caseId: x.caseId ?? null }, w)}` : 'not placed yet')
 const jobName = (view: View, id: string | null | undefined) => view.jobs.jobs.find((j) => j.id === id)?.name ?? 'a job'
 const isHere = (a: AssetView, x: Where) => (x.placeId ? a.placeId === x.placeId : a.caseId === x.caseId)
-const openMissing = (view: View, id: string) => view.faults.ofAsset(id).find((f) => f.open && f.kind === 'missing')
+/** An item's open missing report: the oldest, standing for any others (audit, 20 October 2026, finding 45). */
+const openMissing = (view: View, id: string) => view.faults.ofAsset(id).find((f) => f.open && f.kind === 'missing' && !f.merged)
 /** "10:05", in Irish time. */
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Dublin' })
 
@@ -833,7 +834,7 @@ function NotExpected({ view, c, at }: { view: View; c: CountView; at: Where }) {
             <Fix
               label={elsewhere ? 'Mark found and keep it here' : 'Mark found'}
               act={async () => {
-                await client.mutate('fault.close', { id: fault.id, outcome: 'found', at: new Date().toISOString() })
+                await closeFault(fault, 'found')
                 if (elsewhere) await client.mutate('asset.move', { id: a.id, ...at })
               }}
             />
