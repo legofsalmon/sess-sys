@@ -19,6 +19,53 @@ waiting on someone.
 - Checked: typecheck, shared, server and real-Postgres tests, and 35
   browser tests.
 
+
+## 29 October 2026: Stock puts today's work first
+
+**Done**
+
+- Findings 97 to 106 of the [20 October audit](audit-2026-10-20.md)
+  (PR #165): going out before still out, twenty products on a desk, a
+  scanner that works without a tap, plainer words on setting numbers
+  aside, an item found through its case and taken back out, no packing
+  into a case that's out, a faster next label number, and a re-run stock
+  list that adds up and notes price differences. Finding 100 was already
+  fixed. ADRs 0017 and 0018 note it. App 1.56.0.
+- Left open: the catalogue's long page after Show all on a desk (finding
+  97), as search is the designed way in.
+- Checked: typecheck, shared, server and real-Postgres tests, and 17
+  browser test files.
+
+## 29 October 2026: heavy jobs that held everyone up
+
+**Done**
+
+- Findings 17, 18, 19, 54 and 110 of the [20 October
+  audit](audit-2026-10-20.md) (PR #162): a calendar bring-in saves new
+  people and venues a few hundred at a time and plans once, a big calendar
+  off the main thread; the export and backup read each table in one go and
+  build the zip a slice at a time; a deploy waits for a backup in progress
+  and the next server makes up one it stopped; slow backup tests given
+  room. ADRs 0004, 0006 and 0011 note it. App 1.55.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and 11
+  browser tests.
+
+
+## 29 October 2026: the warehouse's small hurts
+
+**Done**
+
+- Findings 40 to 46 and 93 to 96 of the [20 October
+  audit](audit-2026-10-20.md) (PR #161): Back and Missing apart with Undo,
+  numbers that don't break, damage reports confirmed, counts and Testing
+  folded with Finish in reach, Repairs grouped by what can't go out with a
+  department filter, clearer scan answers, a retired item off Coming back,
+  two missing reports as one loss, and a priced product removable. ADRs
+  0017, 0018 and 0042 note it. App 1.55.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 32
+  browser tests.
+
+
 ## 29 October 2026: the office's crew day
 
 **Done**

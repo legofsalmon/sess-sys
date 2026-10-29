@@ -88,6 +88,34 @@ export async function outWithJobs(q: Queryable, modelId: string): Promise<{ what
   return [...items.map((r) => ({ what: r.number ?? 'an item', job: r.job })), ...counted.map((r) => ({ what: `${r.out.toLocaleString('en-IE')} counted`, job: r.job }))]
 }
 
+/**
+ * The job an item or case is out with now, by the rules above: the latest
+ * scan of it or of a case it's in was out, with no report of it missing
+ * from a job since. Nothing when it's in.
+ */
+export async function outWith(q: Queryable, assetId: string): Promise<{ projectId: string; job: string } | undefined> {
+  const { rows } = await q.query<{ projectId: string; job: string; direction: string }>(
+    `WITH RECURSIVE holders AS (
+       SELECT $1::text AS holder, 0 AS depth
+       UNION ALL
+       SELECT c.case_id, h.depth + 1 FROM holders h JOIN assets c ON c.id = h.holder
+        WHERE c.case_id IS NOT NULL AND h.depth < ${MAX_CASE_DEPTH}
+     ),
+     events AS (
+       SELECT project_id, direction, at, id FROM movements WHERE asset_id IN (SELECT holder FROM holders)
+       UNION ALL
+       SELECT project_id, 'in', at, id FROM faults
+        WHERE kind = 'missing' AND project_id IS NOT NULL AND asset_id IN (SELECT holder FROM holders)
+     )
+     SELECT e.project_id AS "projectId", p.name AS job, e.direction
+       FROM events e JOIN projects p ON p.id = e.project_id
+      ORDER BY e.at DESC, e.id DESC LIMIT 1`,
+    [assetId]
+  )
+  const r = rows[0]
+  return r?.direction === 'out' ? { projectId: r.projectId, job: r.job } : undefined
+}
+
 type MoveCommand = 'move.record'
 type Handler<N extends MoveCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 

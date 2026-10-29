@@ -35,6 +35,27 @@ export const CHANGELOG: readonly Release[] = [
     prs: [166],
   },
   {
+    version: '1.56.0',
+    date: '2026-10-29',
+    title: "Stock puts today's work first",
+    what: "On Stock, the kit going out in the next two weeks now comes before kit still out, latest first. A barcode scanner works on the pick list, a count and testing without tapping the box first. An item found through its missing case says so, and can be taken out of the case. Kit can't be put into a case that's out on a job. Re-running the stock list says where its prices differ from yours, and adds up a product kept in two places.",
+    prs: [165],
+  },
+  {
+    version: '1.55.1',
+    date: '2026-10-29',
+    title: 'Heavy jobs no longer hold everyone up',
+    what: "Bringing a season in from Google Calendar and downloading everything no longer hold up everyone else's phones for seconds. A deploy during the nightly backup no longer loses that night's backup or blocks Back up now for half an hour: the server makes it up a minute after it starts again.",
+    prs: [162],
+  },
+  {
+    version: '1.55.0',
+    date: '2026-10-29',
+    title: 'The warehouse screens are easier on a busy day',
+    what: "Back and Missing on the pick list are harder to mis-tap, and Missing can be undone. Reporting damage now says it worked. Repairs shows what can't go out first and can be narrowed to a department. Long counts and test lists fold, with Finish always in reach. A product with a price can now be removed. A job no longer stays under Coming back for good when an item lost on site is retired.",
+    prs: [161],
+  },
+  {
     version: '1.54.0',
     date: '2026-10-29',
     title: 'Crew needed shows the next fortnight, and unanswered offers wait to be chased',

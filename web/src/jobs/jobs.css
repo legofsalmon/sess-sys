@@ -215,7 +215,12 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .pick-row .count { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pick .pick-row.done .count { color: var(--good); }
 .pick .from { margin: 0; padding-left: var(--space-16); font-size: .9rem; font-variant-numeric: tabular-nums; }
-.pick .out-items li { display: flex; align-items: center; gap: var(--space-2); }
+/* Back and Missing apart, each a 44 px target, Missing the quieter (audit, 20 October 2026, finding 40). */
+.pick .out-items li { display: flex; align-items: center; gap: var(--space-12); }
+.pick .out-items button.link { min-width: 44px; min-height: 44px; padding-inline: var(--space-4); }
+.pick .out-items button.link.quiet { color: var(--muted); }
+/* A number never breaks at its hyphen (audit, 20 October 2026, finding 41). */
+.pick .from .number { white-space: nowrap; }
 .pick .count-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; }
 .pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1 0 100%; }
 .pick .count-row input { width: 7.5rem; }

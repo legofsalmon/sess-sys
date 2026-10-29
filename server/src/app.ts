@@ -656,7 +656,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get('/api/export.zip', { config: { needs: 'settings' } }, async (req, reply) => {
     const { everything, zip } = await takeTurns(async () => {
       const everything = await readEverything(db)
-      return { everything, zip: everythingZip(everything, req.user ?? undefined) }
+      return { everything, zip: await everythingZip(everything, req.user ?? undefined) }
     })
     return reply
       .type('application/zip')
@@ -703,7 +703,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook('onClose', async () => {
     rms.stop()
     await rms.done?.catch(() => {})
-    backups.stop()
+    // A backup under way is given a while to finish, or marked stopped so the next server makes it up (audit finding 54).
+    await backups.close()
     app.dueErasures.stop()
     app.fuelUpdates.stop()
     documents.stop()
