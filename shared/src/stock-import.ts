@@ -1057,12 +1057,19 @@ export function previewStockList(
   const modelRef = (g: Group): StockRef => (g.known ? { id: g.known.id } : { key: `product:${g.key}` })
   // Counted rows by product and where, so two rows counting one thing in one place are marked, and labelling takes from a count only the list leaves alone.
   const countedRows = new Map<string, Read>()
+  // With "Put all of it there" ticked, a product the list has at two places is all at the one typed: its rows are added up into
+  // the first one's count (audit, 20 October 2026, finding 105).
+  const countOf = new Map<Read, number>()
+  const addedInto = new Map<Read, Read>()
   for (const r of live) {
     const g = groupOf(r)
     if (!g || r.numbered || r.qty === null || g.isCase) continue
     const k = `${refKey(modelRef(g))}@${whereKey(whereOf.get(r)!)}`
     const first = countedRows.get(k)
-    if (first) r.problems.push({ field: null, text: `Row ${first.input.row} counts ${g.name} ${atSaid(first).replace(/ \(new (place|case)\)$/, '')} too. Add them up into one row, or skip one.` })
+    if (first && options.allAt && r.typedPlace && first.typedPlace) {
+      countOf.set(first, (countOf.get(first) ?? first.qty!) + r.qty)
+      addedInto.set(r, first)
+    } else if (first) r.problems.push({ field: null, text: `Row ${first.input.row} counts ${g.name} ${atSaid(first).replace(/ \(new (place|case)\)$/, '')} too. Add them up into one row, or skip one.` })
     else countedRows.set(k, r)
   }
   // Where the list counts each product, so a count elsewhere is one the list doesn't mention.
@@ -1250,10 +1257,13 @@ export function previewStockList(
       }
       if (r.patDue) r.asides.push("A PAT due day is kept on each item, so it isn't kept for counted stock.")
       const now = g.known && !w.place?.key && !w.case?.key ? (countNow.get(`${g.known.id}@${w.case ? `c:${w.case.id}` : `p:${w.place!.id}`}`) ?? 0) : 0
+      const into = addedInto.get(r)
+      if (into) s.does.push(`Added into row ${into.input.row}'s count ${atSaid(r)}`)
       if (countedRows.get(`${refKey(model)}@${whereKey(w)}`) !== r) continue
-      if (r.qty !== now) {
-        plan.counts.push({ row: r.input.row, model, where: w, qty: r.qty })
-        s.does.push(`Counts ${r.qty.toLocaleString('en-IE')} ${atSaid(r)}${now ? ` (${now.toLocaleString('en-IE')} there now)` : ''}`)
+      const qty = countOf.get(r) ?? r.qty
+      if (qty !== now) {
+        plan.counts.push({ row: r.input.row, model, where: w, qty })
+        s.does.push(`Counts ${qty.toLocaleString('en-IE')} ${atSaid(r)}${now ? ` (${now.toLocaleString('en-IE')} there now)` : ''}`)
         if (now) s.updates = true
       }
       // Counted at a place the list doesn't count it (audit, 20 October 2026, finding 7). Where the office typed the place

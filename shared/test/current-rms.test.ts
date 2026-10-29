@@ -96,6 +96,21 @@ describe('one place for all of it (ADR 0061)', () => {
     expect(where(false)).toEqual(['At Warehouse', 'At Bay D (new place)', 'In Cable trunk (new case)'])
     expect(where(true)).toEqual(['At Warehouse', 'At Warehouse', 'In Cable trunk (new case)'])
   })
+
+  it('adds up a product the list has at two places into one count there (audit, 20 October 2026, finding 105)', () => {
+    const two = [
+      { row: 2, cells: { product: 'Gaffer tape', quantity: '40', place: 'Bay A' } },
+      { row: 3, cells: { product: 'Gaffer tape', quantity: '15', place: 'Bay B' } },
+    ]
+    const all = previewStockList(two, none, { make: true, defaultPlace: 'Warehouse', allAt: true })
+    expect(all.rows.map((r) => [r.problems, r.does])).toEqual([
+      [[], ['New product, counted', 'Counts 55 at Warehouse']],
+      [[], ["Added into row 2's count at Warehouse"]],
+    ])
+    expect(all.plan.counts.map((c) => c.qty)).toEqual([55])
+    // Each at its own place, they stay two counts.
+    expect(previewStockList(two, none, { make: true, defaultPlace: 'Warehouse' }).plan.counts.map((c) => c.qty)).toEqual([40, 15])
+  })
 })
 
 describe('a second bring-in of the same list (audit, 20 October 2026, finding 7)', () => {
