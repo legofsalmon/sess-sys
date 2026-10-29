@@ -1,6 +1,6 @@
 import jsQR from 'jsqr'
 import { describe, expect, it } from 'vitest'
-import { labelPayload, labelsCsv, numberText, qrCode, runNumbers } from '../src/labels.ts'
+import { barcode, barcodeFits, labelPayload, labelsCsv, numberText, qrCode, runNumbers } from '../src/labels.ts'
 import { normaliseNumber } from '../src/stock.ts'
 
 /**
@@ -60,5 +60,23 @@ describe('labels', () => {
     expect(labelsCsv(runNumbers({ first: 101, count: 3 }))).toBe(
       'Number,QR code\r\nSH-000101,SH-000101\r\nSH-000102,SH-000102\r\nSH-000103,SH-000103\r\n'
     )
+  })
+})
+
+describe('cable label barcodes', () => {
+  it('draws Code 128 with its check value and stop', () => {
+    // Start B, "A" (33), check (104 + 33) % 103 = 34, stop: 11 + 11 + 11 + 13 modules.
+    const one = barcode('A')!
+    expect(one.width).toBe(46)
+    expect(one.path.startsWith('M0 0h2v1h-2z')).toBe(true)
+    // Every value is 11 modules wide, and the stop 13.
+    expect(barcode('XLR-10M')!.width).toBe(11 * (1 + 7 + 1) + 13)
+  })
+  it('takes only what fits', () => {
+    expect(barcodeFits('XLR-10M')).toBe(true)
+    expect(barcodeFits('')).toBe(false)
+    expect(barcodeFits('Ó Briain')).toBe(false)
+    expect(barcodeFits('x'.repeat(41))).toBe(false)
+    expect(barcode('Ó')).toBeNull()
   })
 })

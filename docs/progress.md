@@ -3,6 +3,27 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: cable labels
+
+**Done**
+
+- [ADR 0095](adr/0095-cable-labels.md), at Colly's ask after choosing a
+  Zebra ZT411 label printer (thread "Print labels straight from the app"):
+  every product has a Cable labels tab printing what it is, such as "10 m
+  XLR", in big type on a wrap-round (50 × 25 mm), flag (100 × 25 mm, both
+  ends) or bag label, two by default, with the stock code as a Code 128
+  barcode, a QR code, or none. A stock code scanned or typed in the Stock
+  search opens its product. App 1.60.0.
+- Checked: typecheck, shared tests (the barcode's widths; decoded by
+  zxing-cpp when written), e2e cable-labels.spec.ts plus the labels, stock
+  and scan specs.
+
+**Waiting**
+
+- iPhones read only QR codes in the app's camera for now; Code 128 needs a
+  1D reader in the fallback. One-tap printing to the ZT411 (no print
+  dialog) waits on Colly's pick of the options in that thread.
+
 ## 29 October 2026: Home at volume
 
 **Done**
