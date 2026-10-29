@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - [ADR 0097](adr/0097-claudes-to-do-list.md), the second part of Colly's
-  pick, coming "each weekday morning, and on request": with Claude on,
+  pick (PR #172), coming "each weekday morning, and on request": with Claude on,
   Home and the top of Notifications show a To do list for the office and
   directors. Claude puts in order the quotes to chase, enquiries with no
   quote sent, crew short in the next fortnight, accepted jobs not invoiced,
