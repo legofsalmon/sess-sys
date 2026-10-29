@@ -213,6 +213,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'messages.prompt': 'settings',
   // Whether the company uses timesheets (ADR 0090): a setting like messages to crew.
   'timesheets.use': 'settings',
+  // Whether Claude is offered inside the app (ADR 0096): a setting like timesheets.
+  'assistant.use': 'settings',
 
   'person.role': 'company',
   'person.erase': 'company',

@@ -3,6 +3,32 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Claude reads enquiries into quotes
+
+**Done**
+
+- [ADR 0096](adr/0096-claude-inside-the-app.md), the first part of Colly's
+  pick: New quote takes a pasted enquiry, which Claude reads into the job,
+  its days, what to ask the client, and the kit, crew and other lines,
+  matched to the stock list and priced from the price list on the device.
+  Each line is ticked to take, an unsure product offers those most like
+  it, and the start button says how many lines go on. A draft quote takes
+  "Ask Claude to change this quote", whose answer is shown as changes to
+  take or leave. Claude only suggests and contacts nobody; nothing is saved
+  until someone takes it. Off until the office turns it on under Admin ›
+  Company; the server counts what each ask cost (no words kept) and stops
+  at a monthly limit; Admin › Status says what's been spent.
+- Checked: typecheck, shared and server tests (Anthropic stood in for),
+  and a browser test with a stand-in for Anthropic's API.
+
+**Waiting on Colly**
+
+- An Anthropic API key, put in Railway's shserver as ANTHROPIC_API_KEY
+  (and CLAUDE_MONTHLY_LIMIT_USD if $50 a month isn't right), then Claude
+  turned on under Admin › Company.
+- Next: Claude's to-do list and notifications for the office and
+  directors.
+
 ## 29 October 2026: a plan for Claude inside the app
 
 **Planned, nothing built**

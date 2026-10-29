@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.58.0',
+    date: '2026-10-29',
+    title: 'Claude reads enquiries into quotes, and changes a quote when asked',
+    what: "Once the office turns Claude on under Admin › Company, New quote takes a pasted enquiry: Claude fills in the job, its days, what to ask the client and the kit and crew, matched to the stock list and priced from the price list, for you to check and start the quote with. On a draft quote, ask Claude in words to change it (\"two more radio mics and 10% off\") and take what it suggests. It only suggests: nothing is saved until you take it, and it contacts nobody. It's off to start, and stops for the month at a spending limit.",
+    prs: [0],
+    adrs: [96],
+  },
+  {
     version: '1.57.0',
     date: '2026-10-29',
     title: "A freelancer's own page is quicker to read",

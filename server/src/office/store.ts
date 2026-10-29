@@ -1,4 +1,4 @@
-import { MESSAGES_SETTING_ID, OFFICE_SETTING_ID, officeContact, READING_SETTING_ID, TIMESHEETS_SETTING_ID, type OfficeDetails, type Setting } from '@sh/shared'
+import { ASSISTANT_SETTING_ID, MESSAGES_SETTING_ID, OFFICE_SETTING_ID, officeContact, READING_SETTING_ID, TIMESHEETS_SETTING_ID, type OfficeDetails, type Setting } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading settings back as the entity devices see, and the office's details for the freelancer pages. */
@@ -16,10 +16,11 @@ const toSetting = (r: Row): Setting => ({
   ...(r.id === READING_SETTING_ID ? { headsSeeRates: r.heads_see_rates === true } : {}),
   ...(r.id === MESSAGES_SETTING_ID ? { promptMessages: r.prompt_messages === true } : {}),
   ...(r.id === TIMESHEETS_SETTING_ID ? { useTimesheets: r.use_timesheets === true } : {}),
+  ...(r.id === ASSISTANT_SETTING_ID ? { useAssistant: r.use_assistant === true } : {}),
 })
 
 export async function getSetting(q: Queryable, id: string) {
-  const { rows } = await q.query(`SELECT id, name, phone, email, vat_number, address, heads_see_rates, prompt_messages, use_timesheets FROM settings WHERE id = $1`, [id])
+  const { rows } = await q.query(`SELECT id, name, phone, email, vat_number, address, heads_see_rates, prompt_messages, use_timesheets, use_assistant FROM settings WHERE id = $1`, [id])
   return rows[0] ? toSetting(rows[0]) : undefined
 }
 
@@ -33,6 +34,12 @@ export async function headsSeeRates(q: Queryable): Promise<boolean> {
 export async function usesTimesheets(q: Queryable): Promise<boolean> {
   const { rows } = await q.query<{ use_timesheets: boolean | null }>(`SELECT use_timesheets FROM settings WHERE id = $1`, [TIMESHEETS_SETTING_ID])
   return rows[0]?.use_timesheets === true
+}
+
+/** Whether Claude is offered inside the app (ADR 0096); off unless the office said. */
+export async function usesAssistant(q: Queryable): Promise<boolean> {
+  const { rows } = await q.query<{ use_assistant: boolean | null }>(`SELECT use_assistant FROM settings WHERE id = $1`, [ASSISTANT_SETTING_ID])
+  return rows[0]?.use_assistant === true
 }
 
 /** The office's details when there's a phone or an email to show; null until they're set. */
