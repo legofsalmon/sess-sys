@@ -15,7 +15,7 @@ waiting on someone.
   screen printable in light, text trimmed on the phone as on the server,
   the skills offers clear of the tab bar and out of the Tab order, a find
   box on Venues, and rows focused with Tab kept clear of both bars. ADR
-  0067 notes it. App 1.59.2.
+  0067 notes it. App 1.60.2.
 - Checked: typecheck, shared, server and real-Postgres tests, and 26
   browser test files including a new one for the fades.
 
