@@ -166,7 +166,7 @@ const needs = z.array(z.enum(CERTIFICATE_KINDS)).max(CERTIFICATE_KINDS.length)
 export const certificate = z.object({ held: z.boolean().nullable(), expires: day.nullable(), note: text(200, 'The note') })
 export type Certificate = z.infer<typeof certificate>
 /** By kind; a kind that isn't there is unknown. */
-export const certificates = z.record(z.enum(CERTIFICATE_KINDS), certificate)
+export const certificates = z.partialRecord(z.enum(CERTIFICATE_KINDS), certificate)
 export type Certificates = z.infer<typeof certificates>
 
 /** The kinds that came with ADR 0028, which a version of the app from before can't send. */

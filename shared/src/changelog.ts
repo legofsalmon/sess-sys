@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.63.5',
+    date: '2026-10-29',
+    title: 'A security update',
+    what: 'A security update behind the scenes: the part that checks every change sent to the server is on its newest version, which closes a known weakness where a very large change could tie up the server. Nothing you see is different, and the messages about a wrong number read as before.',
+    prs: [174],
+  },
+  {
     version: '1.63.2',
     date: '2026-10-29',
     title: 'Shared colours brought up to date',

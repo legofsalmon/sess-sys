@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { day } from './day.ts'
-import { euroCents, needed, text } from './plain.ts'
+import { euroCents, needed, text, wrongType } from './plain.ts'
 import { DEPARTMENTS, type Department } from './stock.ts'
 
 /**
@@ -70,15 +70,15 @@ export const MAX_LINES = 300
 
 const DAYS_HINT = 'Days charged is a number of days, in halves, from 0.5 to 365.'
 const lineDays = z
-  .number({ invalid_type_error: DAYS_HINT, required_error: DAYS_HINT })
+  .number({ error: DAYS_HINT })
   .min(0.5, DAYS_HINT)
   .max(365, DAYS_HINT)
   .refine((n) => Number.isInteger(n * 2), DAYS_HINT)
 const QTY_HINT = 'How many is a whole number from 1 to 10,000.'
-const lineQty = z.number({ invalid_type_error: QTY_HINT, required_error: QTY_HINT }).int(QTY_HINT).min(1, QTY_HINT).max(10_000, QTY_HINT)
+const lineQty = z.number({ error: QTY_HINT }).int(QTY_HINT).min(1, QTY_HINT).max(10_000, QTY_HINT)
 const DISCOUNT_HINT = 'A discount is a percentage from 0 to 100, such as 10 or 12.5.'
 export const discountPct = z
-  .number({ invalid_type_error: DISCOUNT_HINT, required_error: DISCOUNT_HINT })
+  .number({ error: DISCOUNT_HINT })
   .min(0, DISCOUNT_HINT)
   .max(100, DISCOUNT_HINT)
   .refine((n) => Number.isInteger(n * 10), DISCOUNT_HINT)
@@ -86,19 +86,19 @@ export const discountPct = z
 const dayPrice = euroCents(100_000_00, 'A day price')
 const LINE_DISCOUNT_HINT = 'A line’s discount is a percentage from 0 to 100, such as 30 or 12.5.'
 const lineDiscount = z
-  .number({ invalid_type_error: LINE_DISCOUNT_HINT })
+  .number(wrongType(LINE_DISCOUNT_HINT))
   .min(0, LINE_DISCOUNT_HINT)
   .max(100, LINE_DISCOUNT_HINT)
   .refine((n) => Number.isInteger(n * 10), LINE_DISCOUNT_HINT)
 const OUT_HINT = 'Days out is a number of days, in halves, from 0.5 to 365.'
 const lineOut = z
-  .number({ invalid_type_error: OUT_HINT })
+  .number(wrongType(OUT_HINT))
   .min(0.5, OUT_HINT)
   .max(365, OUT_HINT)
   .refine((n) => Number.isInteger(n * 2), OUT_HINT)
 
 const SUBHIRE_HINT = 'How many are hired in is a whole number from 0 to 10,000.'
-const subhireQty = z.number({ invalid_type_error: SUBHIRE_HINT }).int(SUBHIRE_HINT).min(0, SUBHIRE_HINT).max(10_000, SUBHIRE_HINT)
+const subhireQty = z.number(wrongType(SUBHIRE_HINT)).int(SUBHIRE_HINT).min(0, SUBHIRE_HINT).max(10_000, SUBHIRE_HINT)
 /** What a line costs, up to what a whole quote could come to. */
 const lineCost = euroCents(10_000_000_00, 'What a line costs')
 export const SUPPLIER_LENGTH = 200
@@ -307,23 +307,23 @@ export const roleKey = (role: string) => role.trim().replace(/\s+/g, ' ').toLowe
 const lines = z.array(quoteLine).max(MAX_LINES, `A quote has room for ${MAX_LINES} lines.`)
 const answer = z.enum(['accepted', 'declined', 'none'])
 const VALID_HINT = 'Prices hold for a whole number of days from 1 to 365.'
-const validDays = z.number({ invalid_type_error: VALID_HINT }).int(VALID_HINT).min(1, VALID_HINT).max(365, VALID_HINT)
+const validDays = z.number(wrongType(VALID_HINT)).int(VALID_HINT).min(1, VALID_HINT).max(365, VALID_HINT)
 const DEPOSIT_HINT = 'A deposit is a whole percentage from 1 to 100, such as 25 or 50.'
-const depositPct = z.number({ invalid_type_error: DEPOSIT_HINT }).int(DEPOSIT_HINT).min(1, DEPOSIT_HINT).max(100, DEPOSIT_HINT)
+const depositPct = z.number(wrongType(DEPOSIT_HINT)).int(DEPOSIT_HINT).min(1, DEPOSIT_HINT).max(100, DEPOSIT_HINT)
 /** Up to eight figures, as Current RMS's are padded to ten. */
 export const MAX_QUOTE_NUMBER = 99_999_999
 const NUMBER_HINT = `A quote number is a whole number from 1 to ${MAX_QUOTE_NUMBER.toLocaleString('en-IE')}.`
-const quoteNumber = z.number({ invalid_type_error: NUMBER_HINT }).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
+const quoteNumber = z.number(wrongType(NUMBER_HINT)).int(NUMBER_HINT).min(1, NUMBER_HINT).max(MAX_QUOTE_NUMBER, NUMBER_HINT)
 /** A price agreed for the whole quote, before VAT. */
 const agreedCents = euroCents(10_000_000_00, 'The price agreed')
 const CAR_HINT = 'How many share a car is a whole number from 1 to 8.'
 const KM_HINT = 'The distance is a whole number of km from 0 to 2,000.'
-const travelKm = z.number({ invalid_type_error: KM_HINT }).int(KM_HINT).min(0, KM_HINT).max(2000, KM_HINT)
+const travelKm = z.number(wrongType(KM_HINT)).int(KM_HINT).min(0, KM_HINT).max(2000, KM_HINT)
 const FROM_HINT = 'Travel starts at a whole number of km from 0 to 1,000.'
 const FUEL_HINT = 'The fuel price is in cent a litre, from 50 to 500, such as 174.9.'
-const fuelPrice = z.number({ invalid_type_error: FUEL_HINT }).min(50, FUEL_HINT).max(500, FUEL_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), FUEL_HINT)
+const fuelPrice = z.number(wrongType(FUEL_HINT)).min(50, FUEL_HINT).max(500, FUEL_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), FUEL_HINT)
 const USE_HINT = 'What a vehicle uses is in litres for 100 km, from 1 to 40, such as 9.5.'
-const fuelUse = z.number({ invalid_type_error: USE_HINT }).min(1, USE_HINT).max(40, USE_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), USE_HINT)
+const fuelUse = z.number(wrongType(USE_HINT)).min(1, USE_HINT).max(40, USE_HINT).refine((n) => Number.isInteger(Math.round(n * 1000) / 100), USE_HINT)
 /** Different products in one package. */
 export const MOST_PACKAGE_ITEMS = 40
 /** The company's terms, printed under every quote. */
@@ -367,7 +367,7 @@ export const quoteCommandSchemas = {
    * price and what a vehicle uses, and the per diem for each of the crew a day. Null for a price not set.
    */
   'quoting.travel': z.object({
-    travelFromKm: z.number({ invalid_type_error: FROM_HINT }).int(FROM_HINT).min(0, FROM_HINT).max(1000, FROM_HINT),
+    travelFromKm: z.number(wrongType(FROM_HINT)).int(FROM_HINT).min(0, FROM_HINT).max(1000, FROM_HINT),
     fuelCentsPerLitre: fuelPrice.nullable(),
     litresPer100Km: fuelUse,
     perDiemCents: euroCents(1000_00, 'A per diem').nullable(),
@@ -376,7 +376,7 @@ export const quoteCommandSchemas = {
     fuelAuto: z.boolean().optional(),
     /** The AA survey a price read with "Read the AA's price" came from; null for one typed in. */
     fuelMonth: text(40, "The survey's month").nullable().optional(),
-    crewPerCar: z.number({ invalid_type_error: CAR_HINT }).int(CAR_HINT).min(1, CAR_HINT).max(8, CAR_HINT).optional(),
+    crewPerCar: z.number(wrongType(CAR_HINT)).int(CAR_HINT).min(1, CAR_HINT).max(8, CAR_HINT).optional(),
   }),
   /** A product's day price; null takes it off the price list. */
   'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable(), rate: z.enum(RATE_RULES).optional() }),

@@ -3,6 +3,19 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: zod 4
+
+**Done**
+
+- Moved zod from 3 to 4 (PR #174), closing the high advisory on oversized
+  collections (finding 115 of the [20 October audit](audit-2026-10-20.md)).
+  Number fields keep their own wording; a field left out altogether still
+  says to reload for the newer app, now told apart by the input zod reports;
+  certificate and vehicle check records are partial records. App 1.63.5.
+- Left open: vitest 5 and PGlite 0.5.
+- Checked: typecheck, shared, server and parity tests, and the browser
+  tests for quotes, timesheets, crew and vans.
+
 ## 29 October 2026: Current RMS quotes in the quote history
 
 **Done**
