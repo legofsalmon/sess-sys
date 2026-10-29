@@ -107,7 +107,7 @@ export interface MovesView {
   pickList(jobId: string): PickList | undefined
   /** Confirmed jobs on now or starting in the next 14 days, with kit to go out; soonest first. */
   soon: PickList[]
-  /** Jobs whose kit should be back by now (over, past their days to check it back, or not going ahead) with kit still out; the longest over first. */
+  /** Jobs whose kit should be back by now (over, past their days to check it back, or not going ahead) with kit still out; the latest over first, as the one just back is the one being worked on (audit, 20 October 2026, finding 99), and one with no dates last. */
   stillOut: PickList[]
   /**
    * How many of a product are out with jobs whose kit should be back by now
@@ -351,7 +351,7 @@ export function movesView(
       .filter(due)
       .map((id) => pickList(id))
       .filter((p): p is PickList => !!p && p.stillOut > 0)
-      .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
+      .sort((a, b) => (b.job.span?.end ?? '').localeCompare(a.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   const late = new Map<string, number>()
   for (const [id, items] of outByJob) {

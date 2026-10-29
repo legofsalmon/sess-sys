@@ -186,6 +186,7 @@ function RepairsScreen({ view }: { view: View }) {
 function StockCard({ view, current }: { view: View; current?: string }) {
   const w = view.warehouse
   const mayAdd = useAccess().can('stock')
+  const wide = useWide()
   const [department, setDepartment] = useState<Department | 'all'>('all')
   // Our own stock or dry hire (ADR 0075), once there's any dry hire to tell apart.
   const [whose, setWhose] = useState<'all' | 'ours' | 'dryHire'>('all')
@@ -354,7 +355,8 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           )}
         </Empty>
       )}
-      <ShowAll items={shown} limit={5} what="products" keep={(m) => m.id === current}>
+      {/* Search first; for a browse, twenty in the laptop's column, which has nothing under it, and five on a phone, where the pick lists are under it (audit, 20 October 2026, finding 97). */}
+      <ShowAll items={shown} limit={wide ? 20 : 5} what={department === 'all' ? 'products' : `${DEPARTMENT_LABELS[department].toLowerCase()} products`} keep={(m) => m.id === current}>
         {(rows) => (
           <ul className="job-list">
             {rows.map((m) => (
@@ -425,7 +427,7 @@ function ShortKit({ view }: { view: View }) {
   )
 }
 
-/** Jobs over with kit still out, and jobs going out in the next two weeks or on now, each opening its pick list (ADR 0017). */
+/** Jobs going out in the next two weeks or on now, and jobs over with kit still out, each opening its pick list (ADR 0017). */
 function PickLists({ view }: { view: View }) {
   const { soon, stillOut } = view.moves
   if (soon.length === 0 && stillOut.length === 0) return null
@@ -445,16 +447,19 @@ function PickLists({ view }: { view: View }) {
   return (
     <section className="card pick-lists" aria-label="Pick lists">
       <Heading icon="pick-list">Pick lists</Heading>
-      {stillOut.length > 0 && (
-        <>
-          <h3>Still out after the job</h3>
-          <ul className="job-list">{stillOut.map((p) => row(p, `${p.stillOut} still out`, 'bad'))}</ul>
-        </>
-      )}
+      {/* Today's work first, then what's late back, latest first with the rest on request (audit, 20 October 2026, finding 99; ADR 0017). */}
       {soon.length > 0 && (
         <>
           <h3>Going out in the next two weeks</h3>
           <ul className="job-list">{soon.map((p) => row(p, `${p.out} of ${p.need} out`, p.out >= p.need ? 'ok' : ''))}</ul>
+        </>
+      )}
+      {stillOut.length > 0 && (
+        <>
+          <h3>Still out after the job</h3>
+          <ShowAll items={stillOut} limit={5} what="jobs">
+            {(rows) => <ul className="job-list">{rows.map((p) => row(p, `${p.stillOut} still out`, 'bad'))}</ul>}
+          </ShowAll>
         </>
       )}
     </section>

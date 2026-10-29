@@ -322,6 +322,7 @@ describe('what a device shows', () => {
     expect(rows(van.client.view().moves.pickList(fuel))).toEqual([['d&b Y10P', 0, 1, 0]])
   })
 
+  // Still out is latest over first, so the job just back is at the top and January's are under Show all (audit, 20 October 2026, finding 99).
   it('lists jobs going out in the next two weeks, and jobs over with kit still out', async () => {
     const { app, y10p, xlr, speakers } = await warehouse()
     const on = await job(app, 'On now', 'confirmed', '2026-09-30', '2026-10-02')
@@ -330,10 +331,12 @@ describe('what a device shows', () => {
     const far = await job(app, 'Later', 'confirmed', '2026-10-15', '2026-10-15')
     const over = await job(app, 'Over', 'confirmed', '2026-09-20', '2026-09-21')
     const allBack = await job(app, 'All back', 'confirmed', '2026-09-22', '2026-09-22')
-    for (const id of [on, soon, quote, far, over, allBack]) await ok(app, 'kit.add', kit(id, y10p.id, 1))
+    const earlier = await job(app, 'Earlier', 'confirmed', '2026-09-10', '2026-09-11')
+    for (const id of [on, soon, quote, far, over, allBack, earlier]) await ok(app, 'kit.add', kit(id, y10p.id, 1))
     await ok(app, 'kit.add', kit(on, xlr.id, 4))
     await ok(app, 'move.record', scan(on, 'out', { assetId: speakers[0]!, modelId: y10p.id }))
     await ok(app, 'move.record', scan(over, 'out', { modelId: xlr.id, qty: 3 }))
+    await ok(app, 'move.record', scan(earlier, 'out', { modelId: xlr.id, qty: 2 }))
     await ok(app, 'move.record', scan(allBack, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
     await ok(app, 'move.record', scan(allBack, 'in', { assetId: speakers[1]!, modelId: y10p.id }))
 
@@ -343,6 +346,9 @@ describe('what a device shows', () => {
       ['On now', 5, 1],
       ['Soon', 1, 0],
     ])
-    expect(moves.stillOut.map((p) => [p.job.name, p.stillOut])).toEqual([['Over', 3]])
+    expect(moves.stillOut.map((p) => [p.job.name, p.stillOut])).toEqual([
+      ['Over', 3],
+      ['Earlier', 2],
+    ])
   })
 })
