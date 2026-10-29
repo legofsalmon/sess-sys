@@ -126,6 +126,7 @@ export async function numberUse(q: Queryable, number: string) {
  * isn't stuck on yet: a cancelled run's numbers among them, since its
  * labels may be printed.
  */
+// The greatest number in use comes off identifiers_sh_number (schema.ts), so the expression here must stay as the index has it.
 export async function nextNumber(q: Queryable): Promise<number> {
   const { rows } = await q.query<{ n: number }>(
     `SELECT greatest((SELECT max(substr(value, 4)::int) FROM identifiers WHERE kind = 'sh'),

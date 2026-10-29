@@ -192,3 +192,9 @@ work". Money is where that piece starts.
   field yet (ADR 0014), and staff are paid through payroll.
 - **No overdue flag on what's owed.** There are no payment terms to count
   from yet. Owed is listed most first, with the day each was invoiced.
+
+Later (29 October 2026): a product's price goes with the product.
+Removing a product, or marking it added by mistake, deletes its price
+and tells the devices; the price's key deletes with the product too.
+A quote keeps its lines whole, so nothing quoted is lost (audit,
+20 October 2026, finding 46).

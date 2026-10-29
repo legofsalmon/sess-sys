@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { commandSchemas, type Mutation } from '../src/commands.ts'
-import { MAX_OFFER_DAYS, movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, suggestedReplyBy, type CrewCall, type Offer } from '../src/crew.ts'
+import { dayLabel, daysLabel, MAX_OFFER_DAYS, movedCallSpan, offerDaysAfter, REPLY_BY_AFTER, suggestedReplyBy, type CrewCall, type Offer } from '../src/crew.ts'
 import { addDays } from '../src/sync/plan.ts'
 import type { Phase } from '../src/jobs.ts'
 import { crewView } from '../src/sync/crew-view.ts'
@@ -186,5 +186,21 @@ describe('an answer to an offer', () => {
     const over = accept(MAX_OFFER_DAYS + 1)
     expect(over.success).toBe(false)
     expect(over.error?.issues[0]?.message).toBe(`Up to ${MAX_OFFER_DAYS} days, please.`)
+  })
+})
+
+describe('dates on the link pages', () => {
+  it('carry the year outside this calendar year or more than six months off, and only then', () => {
+    // Proves (audit, 20 October 2026, finding 89): a page running from April to March, or a timesheet approved last year,
+    // says which year each date is; a date in the months around today reads as crew write it.
+    const today = '2026-10-20'
+    expect(dayLabel('2026-11-19', today)).toBe('Thu 19 Nov')
+    expect(dayLabel('2026-04-21', today)).toBe('Tue 21 Apr')
+    expect(dayLabel('2026-01-25', today)).toBe('Sun 25 Jan 2026')
+    expect(dayLabel('2027-01-25', today)).toBe('Mon 25 Jan 2027')
+    expect(dayLabel('2025-12-31', today)).toBe('Wed 31 Dec 2025')
+    expect(daysLabel(['2026-12-30', '2026-12-31', '2027-01-01'], today)).toBe('Wed 30 Dec to Fri 1 Jan 2027')
+    // Without today, as everywhere else in the app.
+    expect(dayLabel('2027-01-25')).toBe('Mon 25 Jan')
   })
 })
