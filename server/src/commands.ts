@@ -25,7 +25,7 @@ import { crewHandlers } from './crew/handlers.ts'
 import { lateHandlers } from './crew/late.ts'
 import { mergeHandlers } from './crew/merge.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
-import type { Db, Queryable } from './db.ts'
+import { faultForLog, type Db, type Queryable } from './db.ts'
 import { documentHandlers } from './documents/handlers.ts'
 import { attachmentHandlers } from './documents/attachments.ts'
 import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers.ts'
@@ -246,7 +246,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
         // dropped with a reason the person can read, recorded like any other
         // refusal so a resend gets the same answer, and logged and reported
         // by the command's name, never with what was in it.
-        log?.warn({ err, command: m.name }, 'Dropped a change the server could not apply')
+        log?.warn({ err: faultForLog(err), command: m.name }, 'Dropped a change the server could not apply')
         reportError(err, { area: 'commands', command: m.name })
         result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: DROPPED } }
       }

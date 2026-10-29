@@ -218,7 +218,7 @@ class QuietRequests extends LogController {
 
   override requestCompleted(error: Error | null | undefined, req: FastifyRequest, reply: FastifyReply) {
     const ms = reply.elapsedTime
-    if (error) reply.log.error({ req, res: reply, err: error, responseTime: Math.round(ms) }, 'Request errored')
+    if (error) reply.log.error({ req, res: reply, err: faultForLog(error), responseTime: Math.round(ms) }, 'Request errored')
     else if (reply.statusCode >= 400) reply.log.info({ req, res: reply, responseTime: Math.round(ms) }, 'Request failed')
     else if (ms >= this.slowMs) reply.log.warn({ req, res: reply, responseTime: Math.round(ms) }, 'Slow request')
   }
@@ -292,7 +292,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       const text = JSON.stringify(msg)
       for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
     } catch (err) {
-      app.log.error({ err }, 'Could not tell devices about a change')
+      app.log.error({ err: faultForLog(err) }, 'Could not tell devices about a change')
       reportError(err, { area: 'poke' })
     }
   }

@@ -120,6 +120,25 @@ describe('a fault the server did not expect', () => {
     expect((await db.query('SELECT id FROM places')).rows).toEqual([{ id: 'van1' }])
   })
 
+  it("logs the dropped change's fault without the row it was about", async () => {
+    // Proves: a database error's detail ("Key (email)=(…) already exists") doesn't reach the log Railway keeps on the path
+    // of a dropped change, as it doesn't on a failed request's (audit, 20 October 2026, finding 88).
+    const plain = await pgliteDb()
+    await plain.exec("CREATE TABLE crew_emails (email text PRIMARY KEY); INSERT INTO crew_emails VALUES ('aoife.byrne@example.ie')")
+    const db = withFault(plain, (sql) => sql.startsWith('INSERT INTO places'), "INSERT INTO crew_emails VALUES ('aoife.byrne@example.ie')")
+    const lines: string[] = []
+    const app = await buildApp({ db, logger: true, logTo: { write: (line) => void lines.push(line) } })
+    cleanup.push(async () => {
+      await app.close()
+      await db.close()
+    })
+    db.failNext = true
+    expect((await push(app, [mutation('place.upsert', A3)])).json().results).toMatchObject([{ status: 'rejected' }])
+    const dropped = lines.map((l) => JSON.parse(l)).find((l) => l.msg === 'Dropped a change the server could not apply')
+    expect(dropped).toMatchObject({ command: 'place.upsert', err: { code: '23505', table: 'crew_emails' } })
+    expect(lines.join('\n')).not.toContain('aoife')
+  })
+
   it('takes a change whose time of making is not a time Postgres keeps, as made when it arrived', async () => {
     // Proves: a bad createdAt, or one in a year Postgres has no room for, costs
     // that one change its device-clock time, not the whole push.
