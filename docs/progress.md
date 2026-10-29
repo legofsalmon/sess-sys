@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Stock puts today's work first
+
+**Done**
+
+- Findings 97 to 106 of the [20 October audit](audit-2026-10-20.md)
+  (PR #165): going out before still out, twenty products on a desk, a
+  scanner that works without a tap, plainer words on setting numbers
+  aside, an item found through its case and taken back out, no packing
+  into a case that's out, a faster next label number, and a re-run stock
+  list that adds up and notes price differences. Finding 100 was already
+  fixed. ADRs 0017 and 0018 note it. App 1.56.0.
+- Left open: the catalogue's long page after Show all on a desk (finding
+  97), as search is the designed way in.
+- Checked: typecheck, shared, server and real-Postgres tests, and 17
+  browser test files.
+
 ## 29 October 2026: heavy jobs that held everyone up
 
 **Done**
