@@ -1985,7 +1985,7 @@ has been a while, then link the sure ones on Match to jobs.
 
 - For showing the app as a proposal before the Google key is in, a
   `DEMO_PASSCODE` setting now locks a copy of the app behind one shared
-  passcode ([PR #61](https://github.com/legofsalmon/sess-sys/pull/61);
+  passcode ([PR #61](https://github.com/sessionhire/sess-sys/pull/61);
   [sign-in setup](sign-in-setup.md)). Freelancers' private links still
   open without it, and once the Google key is set Google sign-in takes
   over.
@@ -2005,7 +2005,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Done**
 
 - Colly chose "Merge it" for stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57),
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57),
   [Decision 0030](adr/0030-stocktakes-and-rolling-counts.md); see
   4 October). It was brought up to date with getting kit ready and back
   (7 October) first, and the full suite passed with both: the
@@ -2061,7 +2061,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Next**
 
 - Stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57)) took
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57)) took
   Decision 0030 first, so this is 0031. With both in, the rest of
   Phase 2 is the labelling rollout, which is work in the warehouse
   rather than in the app, and RFID later.

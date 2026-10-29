@@ -10,7 +10,7 @@ import { useView } from './view.ts'
  * itself is shared/src/changelog.ts.
  */
 
-const REPO = 'https://github.com/legofsalmon/sess-sys'
+const REPO = 'https://github.com/sessionhire/sess-sys'
 
 export const pad = (n: number) => String(n).padStart(4, '0')
 
