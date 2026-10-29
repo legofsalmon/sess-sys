@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: calendar writes off unless asked for
+
+**Done**
+
+- Finding 107 of the [20 October audit](audit-2026-10-20.md) (PR #155,
+  Colly chose "Roles first"): the calendar sync now writes only when told
+  to, rather than unless told not to, so a caller that forgets the setting
+  can't reach the real calendar. Live is unchanged (still read-only until
+  `CALENDAR_WRITES=on`). ADR 0008 notes it. App 1.51.2.
+- Checked: typecheck and the calendar, import, Postgres and status tests.
+
+**Next**
+
+- Findings 34 to 39: what staff crew read of other people, and where they
+  land.
+
 ## 29 October 2026: a director's sign-in is the directors' to change
 
 **Done**
