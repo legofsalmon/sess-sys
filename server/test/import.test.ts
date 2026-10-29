@@ -608,6 +608,37 @@ describe('bringing jobs in from Google Calendar', () => {
     expect(f.calls.filter((c) => c.phase === 'Build')).toHaveLength(1)
   })
 
+  it('writes forty new people and venues in a few statements, not several each, while it holds the write lock', async () => {
+    // Proves (audit, 20 October 2026, finding 17): new people and venues are written in bulk like the jobs, so a season
+    // with many of both holds the lock every device's change waits for about as long as one whose people are known.
+    const s = await setup()
+    await s.connect()
+    for (let i = 0; i < 40; i++)
+      s.google.add(OPS, {
+        summary: `Gig ${i} - Show`,
+        days: `2031-04-${String((i % 28) + 1).padStart(2, '0')}`,
+        location: `Hall ${i}, Main Street, Town ${i}`,
+        guests: [{ email: `crew${i}@gmail.com`, displayName: `Crew Member${i}`, responseStatus: 'accepted' }],
+      })
+    const preview = ok<ImportPreview>(await s.look(OPS))
+    expect(preview.people).toHaveLength(40)
+    const choices = { ...choose(preview), people: preview.people.map((p) => ({ email: p.email, include: true })) }
+    let statements = 0
+    const transaction = s.db.transaction.bind(s.db)
+    s.db.transaction = (fn) => transaction((tx) => fn({ ...tx, query: (sql, params) => (statements++, tx.query(sql, params)) }))
+    expect(ok<ImportResult>(await s.bring(choices))).toMatchObject({ jobs: 40, venues: 40, people: 40, crew: 40 })
+    expect(statements).toBeLessThan(40)
+
+    const f = await s.feed()
+    const crew = f.people.filter((p) => p.notes === PERSON_NOTE)
+    expect(crew).toHaveLength(40)
+    // Each as the command makes someone new: the name in two, a private link of their own, the usual level.
+    expect(crew.find((p) => p.email === 'crew7@gmail.com')).toMatchObject({ name: 'Crew Member7', firstName: 'Crew', lastName: 'Member7', kind: 'freelancer', skills: [], level: 1 })
+    expect(new Set(crew.map((p) => p.linkToken)).size).toBe(40)
+    expect(f.venues.find((v) => v.name === 'Hall 7')).toMatchObject({ address: 'Hall 7, Main Street, Town 7', notes: '' })
+    expect(f.projects.find((p) => p.name === 'Gig 7')!.venueId).toBe(f.venues.find((v) => v.name === 'Hall 7')!.id)
+  })
+
   it('gives each call the department most of its people are in, or none to give it later (ADR 0046)', async () => {
     const s = await setup()
     await s.connect()

@@ -1,5 +1,8 @@
 import {
+  DEFAULT_LEVEL,
   departmentInWords,
+  emailInUseRefusal,
+  namesAfter,
   withCapital,
   departmentOfPeople,
   addDays,
@@ -20,13 +23,13 @@ import {
 } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { crewHandlers } from '../crew/handlers.ts'
-import { getCalls, getOffers } from '../crew/store.ts'
+import { newLinkToken } from '../crew/handlers.ts'
+import { getCalls, getOffers, getPeople } from '../crew/store.ts'
 import type { Db, Queryable } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { emitAll, emitRemovedAll, Refused, serverChange, type Ctx } from '../kernel.ts'
 import { projectHandlers } from '../projects/handlers.ts'
-import { getPhases, getProjects, namesForCall } from '../projects/store.ts'
+import { getPhases, getProjects, getVenues, namesForCall } from '../projects/store.ts'
 import type { GoogleEvent } from './google.ts'
 import { GAP_DAYS, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
 import { Halt, type CalendarSync } from './sync.ts'
@@ -221,11 +224,11 @@ class NothingToBring extends Error {}
 /**
  * Save what the office ticked, in the order things refer to each other:
  * people, venues, jobs, phases, crew calls and offers, then each event-day
- * as brought in. People and venues go through the same rules as the
- * app's own commands; jobs are marked with the calendar they came from.
+ * as brought in. New people and venues are made as the app's own
+ * commands make them; jobs are marked with the calendar they came from.
  *
- * A season is thousands of rows, so jobs, phases, calls, offers and the
- * event-days are gathered first and written a few hundred per statement:
+ * A season is thousands of rows, so every kind of row is gathered first
+ * and written a few hundred per statement:
  * one round trip a row made a whole season take minutes, longer than the
  * app waits.
  */
@@ -237,37 +240,42 @@ async function bring(
   app: AppData,
   parts: ReadonlyMap<string, NameParts> = new Map()
 ): Promise<Omit<ImportResult, 'missing'>> {
+  // New people and venues are written a few hundred per statement too, as jobs are (audit, 20 October 2026, finding 17):
+  // through their commands one at a time, five or six trips each, they were most of a season's hold on the write lock.
+  // What person.upsert does for someone new is done here once for them all: the name split, a link of their own, and
+  // the check that nobody here already has the address, against the whole set.
   const personIds = new Map<string, string>()
-  for (const p of plan.people) {
-    if (!people.has(p.email)) continue
+  const newPeople: unknown[][] = []
+  const adding = plan.people.filter((p) => people.has(p.email))
+  if (adding.length) {
+    const emails = adding.map((p) => p.email.trim().toLowerCase())
+    const { rows: taken } = await ctx.tx.query<{ name: string }>(
+      `SELECT name FROM people WHERE NOT archived AND (lower(trim(email)) = ANY($1::text[]) OR other_emails ?| $1::text[]) ORDER BY id LIMIT 1`,
+      [emails]
+    )
+    if (taken[0]) throw new Refused({ code: 'conflict', message: emailInUseRefusal(taken[0].name) })
+  }
+  for (const p of adding) {
     const id = newId()
     const name = (p.name.trim() || p.email).slice(0, 200)
     // The two the office typed, while they still make the name the plan has; otherwise the name is split.
     const typed = parts.get(p.email.toLowerCase())
-    await crewHandlers['person.upsert'](ctx, {
-      id,
-      name,
-      ...(typed && fullName(typed) === name ? typed : {}),
-      kind: p.kind,
-      email: p.email,
-      phone: null,
-      skills: [],
-      dayRateCents: null,
-      notes: PERSON_NOTE,
-    })
+    const names = namesAfter({ name, ...(typed && fullName(typed) === name ? typed : {}) }, undefined)
+    newPeople.push([id, names.name, names.firstName, names.lastName, p.kind, p.email, '[]', PERSON_NOTE, newLinkToken(), DEFAULT_LEVEL, '{}'])
     personIds.set(p.email, id)
   }
 
   const venues = new Map(app.venues.map((v) => [v.id, { name: v.name, address: v.address }]))
   const venueIds = new Map<string, string>()
-  const venueId = async (v: VenueRef | null) => {
+  const newVenues: unknown[][] = []
+  const venueId = (v: VenueRef | null) => {
     if (!v) return null
     if ('id' in v) return v.id
     const known = venueIds.get(v.key)
     if (known) return known
     const id = newId()
     const venue = { name: v.name.slice(0, 200), address: v.address.slice(0, 500) }
-    await projectHandlers['venue.upsert'](ctx, { id, ...venue, notes: '' })
+    newVenues.push([id, venue.name, venue.address, ''])
     venueIds.set(v.key, id)
     venues.set(id, venue)
     return id
@@ -296,7 +304,7 @@ async function bring(
         throw new Refused({ code: 'conflict', message: `${was.name} has been ${was.status === 'lost' ? 'marked as lost' : 'cancelled'}, so it needs no crew.` })
     } else {
       projectId = newId()
-      jobVenue = await venueId(j.venue)
+      jobVenue = venueId(j.venue)
       rows.projects.push([projectId, withCapital(j.name).slice(0, 200), jobVenue, j.status, j.kind, j.notes, calendar.name])
       counts.jobs++
     }
@@ -318,7 +326,7 @@ async function bring(
         names = { phase: known?.phase ?? r.name.slice(0, 100), venue: known?.venue ?? '' }
       } else {
         phaseId = newId()
-        const phaseVenue = await venueId(r.venue)
+        const phaseVenue = venueId(r.venue)
         rows.phases.push([phaseId, projectId, r.name.slice(0, 100), start, end, phaseVenue, r.notes])
         names = { phase: r.name.slice(0, 100), venue: venueText(phaseVenue ?? jobVenue) }
       }
@@ -345,6 +353,10 @@ async function bring(
   }
 
   const ids = (list: unknown[][]) => list.map((r) => r[0] as string)
+  await insertRows(ctx.tx, 'people', ['id', 'name', 'first_name', 'last_name', 'kind', 'email', 'skills', 'notes', 'link_token', 'level', 'certificates'], newPeople)
+  await emitAll(ctx, 'person', (await getPeople(ctx.tx, ids(newPeople))).map((p) => ({ id: p.id, data: p })))
+  await insertRows(ctx.tx, 'venues', ['id', 'name', 'address', 'notes'], newVenues)
+  await emitAll(ctx, 'venue', (await getVenues(ctx.tx, ids(newVenues))).map((v) => ({ id: v.id, data: v })))
   await insertRows(ctx.tx, 'projects', ['id', 'name', 'venue_id', 'status', 'kind', 'notes', 'source_calendar'], rows.projects)
   await emitAll(ctx, 'project', (await getProjects(ctx.tx, ids(rows.projects))).map((p) => ({ id: p.id, data: p })))
   await insertRows(ctx.tx, 'phases', ['id', 'project_id', 'name', 'start_day', 'end_day', 'venue_id', 'notes'], rows.phases)

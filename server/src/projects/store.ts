@@ -57,6 +57,12 @@ export async function getVenue(q: Queryable, id: string) {
   const { rows } = await q.query(`SELECT ${VENUE} FROM venues WHERE id = $1`, [id])
   return rows[0] ? toVenue(rows[0]) : undefined
 }
+/** Several venues at once, in the order asked for. */
+export async function getVenues(q: Queryable, ids: readonly string[]) {
+  if (ids.length === 0) return []
+  const { rows } = await q.query(`SELECT ${VENUE} FROM venues WHERE id = ANY($1::text[])`, [ids])
+  return sortByIds(rows.map(toVenue), ids)
+}
 export async function getProject(q: Queryable, id: string, lock = false) {
   const { rows } = await q.query(`SELECT ${PROJECT} FROM projects WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id])
   return rows[0] ? toProject(rows[0]) : undefined
