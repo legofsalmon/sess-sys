@@ -28,6 +28,14 @@ const FRESH_FOR = 26 * HOUR
 const STALE_RUN = 30 * 60_000
 /** "Back up now" is refused this soon after another run. */
 const MANUAL_GAP = 5 * 60_000
+/**
+ * How long a server shutting down (a deploy, say) waits for a backup under
+ * way to finish, inside the 30 s Railway gives it (railway.json's
+ * drainingSeconds) before stopping it for good.
+ */
+const SHUTDOWN_WAIT = 25_000
+/** What a run cut short by a restart says, so the server that starts next makes it up. */
+export const STOPPED_BY_RESTART = 'Stopped partway by a restart. The server makes it up a minute after it starts again.'
 
 export interface Retention {
   days: number
@@ -63,6 +71,8 @@ export interface BackupsOptions {
   retention?: Retention
   /** Encrypts each file before it goes to the store (crypto.ts). Without it, the files are plain text inside. */
   key?: Buffer
+  /** How long `close` waits for a run under way; SHUTDOWN_WAIT unless a test says otherwise. */
+  shutdownWaitMs?: number
 }
 
 export class Busy extends Error {}
@@ -74,6 +84,8 @@ export class Backups {
   private nextAt: Date | undefined
   private failuresInARow = 0
   private stopped = false
+  /** The run under way on this server, if any. */
+  private running: { id: string; done: Promise<unknown> } | undefined
   private readonly now: () => Date
 
   constructor(
@@ -123,18 +135,30 @@ export class Backups {
           WHERE status = 'running' AND started_at < now() - make_interval(secs => $1)`,
         [STALE_RUN / 1000]
       )
+      // One stopped by a restart doesn't count as recent: it made nothing (finding 54).
       const { rows } = await tx.query<{ status: string; recent: boolean }>(
-        `SELECT status, started_at > now() - make_interval(secs => $1) AS recent FROM backup_runs ORDER BY started_at DESC LIMIT 1`,
-        [MANUAL_GAP / 1000]
+        `SELECT status, started_at > now() - make_interval(secs => $1) AND error IS DISTINCT FROM $2 AS recent FROM backup_runs ORDER BY started_at DESC LIMIT 1`,
+        [MANUAL_GAP / 1000, STOPPED_BY_RESTART]
       )
       const latest = rows[0]
       if (latest?.status === 'running') return false
       if (trigger === 'manual' && latest?.recent) return false
+      // A catch-up after a deploy whose server was still finishing the run when this one started, and finished it.
+      if (trigger === 'catch-up' && latest?.status === 'ok' && latest.recent) return false
       await tx.query(`INSERT INTO backup_runs (id, status, trigger) VALUES ($1, 'running', $2)`, [id, trigger])
       return true
     })
     if (!began) throw new Busy('A backup ran a moment ago or is running now. Try again in a few minutes.')
+    const done = this.carryOut(id, trigger, store)
+    this.running = { id, done }
+    try {
+      return await done
+    } finally {
+      if (this.running?.id === id) this.running = undefined
+    }
+  }
 
+  private async carryOut(id: string, trigger: BackupRun['trigger'], store: BackupStore): Promise<BackupRun> {
     const log = this.options.log
     const at = this.now()
     const watching = this.options.watch?.started(trigger)
@@ -169,7 +193,9 @@ export class Backups {
     if (!this.store || this.timer) return
     this.stopped = false
     const lastOk = this.lastOk?.finishedAt ? Date.parse(this.lastOk.finishedAt) : 0
-    const overdue = this.now().getTime() - lastOk > DAY
+    // A run the server before this one was finishing as it started, or stopped by a restart, is made up too (finding 54).
+    const cutShort = this.last?.status === 'running' || (this.last?.status === 'failed' && this.last.error === STOPPED_BY_RESTART)
+    const overdue = this.now().getTime() - lastOk > DAY || cutShort
     this.schedule(overdue ? new Date(this.now().getTime() + 60_000) : this.nextNightly(), overdue ? 'catch-up' : 'nightly')
   }
 
@@ -178,6 +204,34 @@ export class Backups {
     clearTimeout(this.timer)
     this.timer = undefined
     this.nextAt = undefined
+  }
+
+  /**
+   * The server is shutting down (a deploy, say): no more runs, and one under
+   * way is given a while to finish. One that doesn't is marked stopped by a
+   * restart, so the next server answers "Back up now" at once rather than
+   * after the half hour a run marked running is waited for, and makes it up
+   * a minute after it starts (audit, 20 October 2026, finding 54). Before,
+   * the run died with the process, said nothing, and stayed "running".
+   */
+  async close() {
+    this.stop()
+    const running = this.running
+    if (!running) return
+    const log = this.options.log
+    log?.info({ id: running.id }, 'Shutting down: waiting for the backup under way to finish')
+    let timer: NodeJS.Timeout | undefined
+    const finished = await Promise.race([
+      running.done.then(
+        () => true,
+        () => true
+      ),
+      new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), this.options.shutdownWaitMs ?? SHUTDOWN_WAIT))),
+    ])
+    clearTimeout(timer)
+    if (finished) return
+    await this.db.query(`UPDATE backup_runs SET status = 'failed', finished_at = now(), error = $2 WHERE id = $1 AND status = 'running'`, [running.id, STOPPED_BY_RESTART])
+    log?.warn({ id: running.id }, 'Backup stopped partway by the shutdown: the server that starts next makes it up')
   }
 
   /** The next nightly slot after now. */
@@ -203,8 +257,12 @@ export class Backups {
         void this.run(trigger)
           .then((run) => run.status === 'ok')
           .catch((err) => {
-            // Another run under way is fine; anything else (the database asleep or unreachable, say) is worth a retry.
-            if (err instanceof Busy) return true
+            // Another run under way, or just made by the server before this one, is fine, and read for the status; anything
+            // else (the database asleep or unreachable, say) is worth a retry.
+            if (err instanceof Busy) return this.load().then(
+              () => true,
+              () => true
+            )
             this.options.log?.error({ err }, 'Backup could not start')
             this.options.watch?.couldNotStart(err)
             return false
@@ -232,12 +290,13 @@ export class Backups {
   }
 
   private async finish(id: string, result: { status: 'ok' | 'failed'; key?: string; bytes?: number; rows?: number; error?: string }) {
+    // A run marked stopped by a shutdown that then fails anyway stays marked so, for the next server to make up (finding 54).
     const { rows } = await this.db.query<RunRow>(
       `UPDATE backup_runs SET status = $2, finished_at = now(), key = $3, bytes = $4, row_count = $5, error = $6
-        WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
+        WHERE id = $1 AND (status = 'running' OR $2 = 'ok') RETURNING ${RUN_COLUMNS}`,
       [id, result.status, result.key ?? null, result.bytes ?? null, result.rows ?? null, result.error?.slice(0, 500) ?? null]
     )
-    return fromRow(rows[0]!)
+    return fromRow(rows[0] ?? (await this.db.query<RunRow>(`SELECT ${RUN_COLUMNS} FROM backup_runs WHERE id = $1`, [id])).rows[0]!)
   }
 }
 

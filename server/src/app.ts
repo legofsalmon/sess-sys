@@ -677,7 +677,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook('onClose', async () => {
     rms.stop()
     await rms.done?.catch(() => {})
-    backups.stop()
+    // A backup under way is given a while to finish, or marked stopped so the next server makes it up (audit finding 54).
+    await backups.close()
     app.dueErasures.stop()
     app.fuelUpdates.stop()
     documents.stop()
