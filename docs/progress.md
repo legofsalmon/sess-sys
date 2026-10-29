@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: the warehouse's small hurts
+
+**Done**
+
+- Findings 40 to 46 and 93 to 96 of the [20 October
+  audit](audit-2026-10-20.md) (PR #161): Back and Missing apart with Undo,
+  numbers that don't break, damage reports confirmed, counts and Testing
+  folded with Finish in reach, Repairs grouped by what can't go out with a
+  department filter, clearer scan answers, a retired item off Coming back,
+  two missing reports as one loss, and a priced product removable. ADRs
+  0017, 0018 and 0042 note it. App 1.55.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 32
+  browser tests.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**
