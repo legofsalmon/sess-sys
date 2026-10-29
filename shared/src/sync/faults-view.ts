@@ -18,6 +18,14 @@ export interface FaultView extends Fault {
   job: JobView | undefined
   /** Keeps the kit from going out: open, and missing or not fit to use. */
   stops: boolean
+  /**
+   * An item reported missing twice over (two taps, or two phones) is one loss (ADR 0030: never missing twice): the oldest
+   * open report stands for them all, with the others' ids here, so closing it closes them too (audit, 20 October 2026,
+   * finding 45). The server keeps every report (ADR 0018).
+   */
+  alike: string[]
+  /** One of those others: shown, and closed, as part of the oldest. */
+  merged: boolean
 }
 
 export interface FaultsView {
@@ -27,7 +35,7 @@ export interface FaultsView {
    * whatever became of the product since.
    */
   all: FaultView[]
-  /** Open ones, oldest first: the repair list. */
+  /** Open ones, oldest first: the repair list, an item's missing reports as one. */
   open: FaultView[]
   /** An item's, newest first. */
   ofAsset(assetId: string): FaultView[]
@@ -103,9 +111,21 @@ export function faultsView(
         model: modelById.get(f.modelId),
         job: f.projectId ? jobById.get(f.projectId) : undefined,
         stops: open && (f.kind === 'missing' || !f.usable),
+        alike: [] as string[],
+        merged: false,
       }
     })
     .sort(newest)
+  const firstMissing = new Map<string, FaultView>()
+  for (let i = all.length - 1; i >= 0; i--) {
+    const f = all[i]!
+    if (!f.open || f.kind !== 'missing' || !f.assetId) continue
+    const first = firstMissing.get(f.assetId)
+    if (first) {
+      first.alike.push(f.id)
+      f.merged = true
+    } else firstMissing.set(f.assetId, f)
+  }
 
   // A product added by mistake takes its faults out of sight with it (audit finding 19): off the repair list and every page.
   const shown = all.filter((f) => !warehouse.mistakes.has(f.modelId))
@@ -126,7 +146,7 @@ export function faultsView(
 
   const ownStop = (assetId: string) => {
     const stops = (byAsset.get(assetId) ?? []).filter((f) => f.stops)
-    return stops.find((f) => f.kind === 'missing') ?? stops[0]
+    return stops.find((f) => f.kind === 'missing' && !f.merged) ?? stops[0]
   }
   // A case that's missing takes what's in it along.
   const stopping = (assetId: string) => {
@@ -151,7 +171,7 @@ export function faultsView(
 
   return {
     all,
-    open: shown.filter((f) => f.open).reverse(),
+    open: shown.filter((f) => f.open && !f.merged).reverse(),
     ofAsset: (id) => byAsset.get(id) ?? [],
     ofModel: (id) => byModel.get(id) ?? [],
     ofJob: (id) => byJob.get(id) ?? [],

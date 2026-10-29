@@ -17,7 +17,7 @@ import { queueFile } from '../documents/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
-import { movementsOf, outWithJobs } from './moves.ts'
+import { movementsOf, outWith, outWithJobs } from './moves.ts'
 import { clearLayout, inLayoutsReason, racksUsing, slotsIn } from './racks.ts'
 import {
   codeTaken,
@@ -203,6 +203,19 @@ async function checkWhere(ctx: Ctx, w: Where, moving?: { id: string; levels: num
   }
 }
 
+/**
+ * An item going into a case that's out with a job would be out with that job
+ * without a scan (audit, 20 October 2026, finding 103): the case is scanned
+ * back first. One already out with the same job can go in, as on site.
+ */
+async function checkCaseIn(ctx: Ctx, caseId: string | null, itemId?: string) {
+  if (!caseId) return
+  const out = await outWith(ctx.tx, caseId)
+  if (!out || (itemId && (await outWith(ctx.tx, itemId))?.projectId === out.projectId)) return
+  const c = await getAsset(ctx.tx, caseId)
+  throw new Refused({ code: 'conflict', message: `${c?.number || 'That case'} is out with ${out.job}; scan it back first.` })
+}
+
 /** The name of a place, or a case's number, for reasons. */
 async function whereName(ctx: Ctx, w: Where) {
   if (w.placeId) return (await getPlace(ctx.tx, w.placeId))?.name ?? 'there'
@@ -247,6 +260,16 @@ export async function retireItem(ctx: Ctx, id: string, reason: RetiredReason, no
     note.trim().slice(0, 500) || null,
   ])
   await emitAsset(ctx, id)
+}
+
+/**
+ * A product's price (ADR 0042) goes before the product does, and every device is told: it held the product back from
+ * being removed with a bare foreign-key error, and was left behind by one marked a mistake (audit, 20 October 2026,
+ * finding 46). Nothing quoted refers to it: a quote keeps its lines whole.
+ */
+async function dropPrice(ctx: Ctx, modelId: string) {
+  const { rows } = await ctx.tx.query('DELETE FROM product_prices WHERE model_id = $1 RETURNING 1', [modelId])
+  if (rows.length) await emitRemoved(ctx, 'productPrice', modelId)
 }
 
 export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
@@ -371,6 +394,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     // Its photo (ADR 0083) goes on the list of files to delete with it.
     const { rows: photo } = await ctx.tx.query<{ photo_key: string | null }>('SELECT photo_key FROM models WHERE id = $1', [a.id])
     if (photo[0]?.photo_key) await queueFile(ctx.tx, photo[0].photo_key, true)
+    await dropPrice(ctx, a.id)
     await ctx.tx.query('DELETE FROM models WHERE id = $1', [a.id])
     await emitRemoved(ctx, 'model', a.id)
   },
@@ -393,6 +417,8 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     for (const c of counts) await adjust(ctx, a.id, { placeId: c.place_id, caseId: c.case_id }, { to: 0 })
     // A rack's layout goes with it: it was never a rack.
     await clearLayout(ctx, a.id)
+    // Never stock, so never priced.
+    await dropPrice(ctx, a.id)
     await ctx.tx.query('UPDATE models SET mistake = true WHERE id = $1', [a.id])
     await emit(ctx, 'model', a.id, await getModel(ctx.tx, a.id))
   },
@@ -427,6 +453,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       throw new Refused({ code: 'conflict', message: `${m.name} is counted, not numbered. Change it to numbered to label them one by one.` })
     if (m.dryHire) throw new Refused({ code: 'conflict', message: dryHireRefusal(m.name) })
     await checkWhere(ctx, a)
+    await checkCaseIn(ctx, a.caseId)
     const number = await numberFor(ctx, a.number)
     const old = await oldNumberFor(ctx, a.oldNumber, a.id)
     await ctx.tx.query(
@@ -466,6 +493,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const asset = await mustActive(ctx, a.id)
     if (asset.placeId === a.placeId && asset.caseId === a.caseId) return
     await checkWhere(ctx, a, { id: a.id, levels: await levelsIn(ctx.tx, a.id) })
+    if (a.caseId !== asset.caseId) await checkCaseIn(ctx, a.caseId, a.id)
     await ctx.tx.query('UPDATE assets SET place_id = $2, case_id = $3 WHERE id = $1', [a.id, a.placeId, a.caseId])
     await emitAsset(ctx, a.id)
   },

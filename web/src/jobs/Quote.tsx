@@ -174,6 +174,11 @@ export function QuoteCard({ job, view }: { job: JobView; view: View }) {
         </div>
       )}
       {jm && jm.margin !== null && <MarginLine margin={jm.margin} costs={jm.costs + jm.toCome} />}
+      {jm?.setAside && (
+        <p className="hint">
+          The job is {jm.job.status}, so its quote is set aside: it isn't counted as quoted, owed or in the margin unless it's invoiced, as a cancellation fee would be.
+        </p>
+      )}
       <a className={`button${shown ? '' : ' primary'}`} href={`#jobs/${encodeURIComponent(job.id)}/quote`}>
         {shown ? 'Open the quote' : 'Make a quote'}
       </a>
@@ -545,6 +550,49 @@ const CHARGE_LABELS: Record<Charge, string> = { daily: 'a day', week3: '3 Day We
 /** How long the draft waits after the last key before it saves itself. */
 const SAVE_AFTER_MS = 1_200
 
+/**
+ * What's typed on a draft that can't save yet (a line with nothing to say what it's for, a price that isn't one) is kept on
+ * this device for the tab's life, as places.ts keeps scroll places, so going to another screen and coming back doesn't
+ * lose it (audit, 20 October 2026, finding 27). Kept against the draft as it's saved: once that changes, from here or
+ * another device, what was typed over the older one is let go. What can save saves itself, so nothing is kept for it.
+ */
+const TYPED_STORE = 'session-hire-quote-typed'
+interface Typed {
+  base: string
+  lines: LineDraft[]
+  meals: boolean
+  kmTyped: string
+  discount: string
+  agreed: string
+  notes: string
+  validFor: string
+  deposit: string
+}
+const baseOf = (q: QuoteView) =>
+  JSON.stringify([q.lines, q.discountPct, q.agreedCents ?? null, q.notes, q.validDays ?? null, q.depositPct ?? null, q.mealsProvided ?? false, q.travelKm ?? null])
+function readTyped(): Record<string, Typed> {
+  try {
+    return JSON.parse(sessionStorage.getItem(TYPED_STORE) ?? '{}') as Record<string, Typed>
+  } catch {
+    return {}
+  }
+}
+function typedOf(q: QuoteView): Typed | undefined {
+  const t = readTyped()[q.id]
+  return t && t.base === baseOf(q) && Array.isArray(t.lines) ? t : undefined
+}
+function keepTyped(id: string, t: Typed | undefined) {
+  const all = readTyped()
+  if (!t && !(id in all)) return
+  if (t) all[id] = t
+  else delete all[id]
+  try {
+    sessionStorage.setItem(TYPED_STORE, JSON.stringify(all))
+  } catch {
+    // Storage that's off or full keeps it for as long as the quote stays open.
+  }
+}
+
 /** The job's days, which a line added on the quote is charged for until changed. */
 const jobDays = (job: JobView) => (job.span ? Math.max(1, eachDay(job.span.start, job.span.end).length) : 1)
 
@@ -552,16 +600,18 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   const today = useToday()
   const m = view.money
   const under = useUnderTop<HTMLFormElement>(true)
+  // What was typed and couldn't save yet, when the quote was left (finding 27).
+  const [kept] = useState(() => typedOf(q))
   // Travel and subsistence (ADR 0086) aren't typed: they're worked out below from the rest, so they're kept apart.
-  const [lines, setLines] = useState<LineDraft[]>(() => q.lines.filter((l) => !l.extra).map(toDraft))
-  const [meals, setMeals] = useState(q.mealsProvided ?? false)
-  const [kmTyped, setKmTyped] = useState(q.travelKm == null ? '' : String(q.travelKm))
-  const [discount, setDiscount] = useState(String(q.discountPct))
+  const [lines, setLines] = useState<LineDraft[]>(() => kept?.lines ?? q.lines.filter((l) => !l.extra).map(toDraft))
+  const [meals, setMeals] = useState(kept?.meals ?? q.mealsProvided ?? false)
+  const [kmTyped, setKmTyped] = useState(kept?.kmTyped ?? (q.travelKm == null ? '' : String(q.travelKm)))
+  const [discount, setDiscount] = useState(kept?.discount ?? String(q.discountPct))
   // A price agreed for the whole (ADR 0085) stands in for the discount percentage while it's there.
-  const [agreed, setAgreed] = useState(q.agreedCents == null ? '' : euroText(q.agreedCents))
-  const [notes, setNotes] = useState(q.notes)
-  const [validFor, setValidFor] = useState(String(q.validDays ?? DEFAULT_VALID_DAYS))
-  const [deposit, setDeposit] = useState(q.depositPct ? String(q.depositPct) : '')
+  const [agreed, setAgreed] = useState(kept?.agreed ?? (q.agreedCents == null ? '' : euroText(q.agreedCents)))
+  const [notes, setNotes] = useState(kept?.notes ?? q.notes)
+  const [validFor, setValidFor] = useState(kept?.validFor ?? String(q.validDays ?? DEFAULT_VALID_DAYS))
+  const [deposit, setDeposit] = useState(kept?.deposit ?? (q.depositPct ? String(q.depositPct) : ''))
   const [kitDays, setKitDays] = useState('')
   const [sentOn, setSentOn] = useState(today)
   const [answering, setAnswering] = useState(false)
@@ -664,6 +714,9 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   }, [key])
   useEffect(() => () => flush(), [])
   const late = useLate(!!payload)
+  // Kept on the device while it can't save (finding 27), and let go once it can.
+  const typed = !saved && problem ? JSON.stringify({ base: baseOf(q), lines, meals, kmTyped, discount, agreed, notes, validFor, deposit } satisfies Typed) : ''
+  useEffect(() => keepTyped(q.id, typed ? (JSON.parse(typed) as Typed) : undefined), [typed])
 
   const days = jobDays(job)
   const addLine = (

@@ -17,7 +17,7 @@ import {
   type Transport,
 } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import { checkRestores } from '../src/backup/service.ts'
 import { dirStore, type BackupStore } from '../src/backup/store.ts'
@@ -26,6 +26,11 @@ import type { Db } from '../src/db.ts'
 import { scratchDb } from './scratch-db.ts'
 import { tablesInOrder } from '../src/tables.ts'
 import { IPHONE, server as signedInServer, staff } from './people.ts'
+
+// A test restore boots a process and a database of its own, two or three a test: alone these take 10 to 18 s, and with
+// the whole suite and the browser tests beside them they came near 30 s and timed out (audit, 20 October 2026, finding
+// 110). This file's tests get 90 s; the rest of the suite keeps 30.
+vi.setConfig({ testTimeout: 90_000 })
 
 /**
  * Made-up data and starting fresh (ADR 0019): trying the app before the real

@@ -128,6 +128,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .not-done-list .typed button { justify-self: start; }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
 .warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
+/* A link on the amber wash is ink, not brand red, which is under 4.5:1 there in the light theme (audit, 20 October 2026, finding 79). */
+.app .warn-line a, .app .warn-line button.link { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .confirm { display: grid; gap: var(--space-8); }
 .confirm .more { display: grid; gap: var(--space-8); }
 .confirm .more p { margin: 0; }

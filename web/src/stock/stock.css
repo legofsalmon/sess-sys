@@ -118,6 +118,10 @@
 .warehouse .fault a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .fault header > div > a { color: inherit; }
 .warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: .9rem; }
+/* The repair list's headings stay under the top bar while their faults scroll by (audit, 20 October 2026, finding 93). */
+.warehouse .repairs .repair-group { display: grid; gap: var(--space-8); }
+.warehouse .repairs .repair-group h3 { position: sticky; top: var(--under-top, 0px); z-index: 1; margin: 0; padding: var(--space-8) 0 var(--space-6); background: var(--panel); }
+.warehouse .fault button.sort-out { justify-self: start; min-height: 44px; color: var(--muted); }
 .warehouse .fault .repair { color: var(--muted); }
 .warehouse .fault .actions { margin: 0; }
 .warehouse .faults h3 { margin: var(--space-12) 0 var(--space-6); }
@@ -213,7 +217,9 @@
 .warehouse .count-field input { min-height: 52px; font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 .warehouse .count-field input::placeholder { font-size: var(--text-small); font-weight: 400; }
 .warehouse .add-product { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: end; padding-top: var(--space-10); border-top: 1px solid var(--line); }
-.warehouse .finish button.big { min-height: 56px; font-size: var(--text-body); width: 100%; }
+.warehouse .finish button.big, .warehouse .finish-bar button.big { min-height: 56px; font-size: var(--text-body); width: 100%; }
+/* Kept in reach above the tabs while scrolling a long count, as the bring-in's bar is (audit, 20 October 2026, finding 43). */
+.warehouse .finish-bar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 1; display: grid; gap: var(--space-8); padding: var(--space-10) 0; background: var(--bg); }
 .warehouse .finish .hint { text-align: center; }
 .warehouse .finish > button.link { justify-self: center; }
 .warehouse .count-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-10) 0; border-top: 1px solid var(--line); }

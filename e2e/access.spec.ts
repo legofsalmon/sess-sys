@@ -112,6 +112,43 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.locator('.call-group', { hasText: 'Harbour Lights Festival' }).getByRole('button', { name: /× Stagehand · Load in/ }).click()
     await expect(page.locator('.pill.cancelled').first()).toBeVisible()
     expect(await textContrast(page, '.pill.cancelled')).toBeGreaterThanOrEqual(4.5)
+    // A link on an amber warning line, such as the quote's "price list" one, reads at 4.5:1 on the wash in both themes (audit finding 79).
+    const onAmber = await page.evaluate(() => {
+      const line = document.createElement('p')
+      line.className = 'warn-line'
+      line.innerHTML = '<a href="#jobs/money/prices">price list</a> <button type="button" class="link">Hire them in</button>'
+      document.querySelector('.app')!.append(line)
+      // A colour easing over would be read part way: the themes are switched at once here.
+      const still = document.createElement('style')
+      still.textContent = '* { transition: none !important; }'
+      document.head.append(still)
+      const rgba = (c: string) => c.match(/[\d.]+/g)!.map(Number)
+      const root = document.documentElement
+      const was = root.dataset.theme
+      const out: (readonly [string, string, string])[] = []
+      for (const theme of ['light', 'dark']) {
+        root.dataset.theme = theme
+        // The wash is see-through: laid over the first colour painted behind it, as the eye sees it.
+        let under = getComputedStyle(document.body).backgroundColor
+        for (let e = line.parentElement; e; e = e.parentElement) {
+          const bg = getComputedStyle(e).backgroundColor
+          if ((rgba(bg)[3] ?? 1) > 0) {
+            under = bg
+            break
+          }
+        }
+        const [r, g, b, a = 1] = rgba(getComputedStyle(line).backgroundColor)
+        const [ur, ug, ub] = rgba(under)
+        const behind = `rgb(${[r! * a + ur! * (1 - a), g! * a + ug! * (1 - a), b! * a + ub! * (1 - a)].join(', ')})`
+        for (const el of line.children) out.push([theme, getComputedStyle(el).color, behind] as const)
+      }
+      if (was === undefined) delete root.dataset.theme
+      else root.dataset.theme = was
+      line.remove()
+      still.remove()
+      return out
+    })
+    for (const [theme, color, behind] of onAmber) expect(contrast(color, behind), `${theme}: ${color} on ${behind}`).toBeGreaterThanOrEqual(4.5)
 
     // The freelancer's pages, which crew use most, in the same light: each says what it is in the tab, has one main landmark, and its fields can be seen and are named.
     const { changes } = (await (await request.get('/api/sync/pull?after=0')).json()) as { changes: { entity: string; data: { name: string; linkToken: string } }[] }

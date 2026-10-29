@@ -212,6 +212,9 @@ export class OwnCalendars {
         try {
           await this.readNow(person_id)
         } catch (err) {
+          // A fault of the server's own (the worker not starting, the database on the way) marks nothing tried, so look
+          // again on the next tick rather than in three hours (audit, 20 October 2026, finding 86).
+          this.nextLook = Math.min(this.nextLook, Date.now())
           this.options.report?.(err)
         }
       }

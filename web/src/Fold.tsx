@@ -83,7 +83,7 @@ export function ShowAll<T>({
       {children(shown)}
       {shown.length < items.length && (
         <button type="button" className="link show-all" onClick={() => setAll(true)}>
-          Show all {items.length} {what}
+          Show all {items.length.toLocaleString('en-IE')} {what}
         </button>
       )}
     </>
