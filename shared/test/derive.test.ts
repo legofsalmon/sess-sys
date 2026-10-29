@@ -126,6 +126,14 @@ const steps: [string, (s: Awaited<ReturnType<typeof setUp>>) => Promise<unknown>
     },
   ],
   ['a kit line removed here', ({ phone }) => phone.mutate('kit.remove', { id: 'k52' })],
+  ['counted kit scanned out here', ({ phone }) => phone.mutate('move.record', { id: 'mv1', projectId: 'j1', direction: 'out', assetId: null, modelId: 'm1', qty: 2, at: '2026-10-01T08:00:00Z' })],
+  ['a job renamed with kit out', ({ phone }) => phone.mutate('project.update', { id: 'j1', name: 'Gala' })],
+  [
+    'counted kit reported missing from its job here',
+    ({ phone }) =>
+      phone.mutate('fault.report', { id: 'f1', kind: 'missing', assetId: null, modelId: 'm1', qty: 1, projectId: 'j1', usable: false, note: '', at: '2026-10-01T08:30:00Z' }),
+  ],
+  ['all of that sent', ({ phone }) => phone.sync()],
 ]
 
 describe('the view, kept between changes', () => {
@@ -163,6 +171,32 @@ describe('the view, kept between changes', () => {
     await phone.mutate('kit.update', { id: 'k00', qty: 6 })
     expect(phone.view().kit).not.toBe(kit)
     expect(phone.view().kit.byJob.get('j0')!.find((l) => l.id === 'k00')).toMatchObject({ qty: 6, pending: true })
+  })
+
+  it('keeps where the scans leave the kit through a change to a job, and not through a scan or kit reported missing', async () => {
+    // Proves: the moves' tallies read no job, so a change to one builds the pick lists again from them rather than going through every scan (audit, 20 October 2026, finding 12); a scan, or kit reported missing from a job, does build them again.
+    const { phone } = await setUp()
+    await phone.mutate('move.record', { id: 'mv1', projectId: 'j1', direction: 'out', assetId: null, modelId: 'm1', qty: 2, at: '2026-10-01T08:00:00Z' })
+    // The parts kept between builds, as the device holds them.
+    const tallies = () => {
+      void phone.view().moves
+      return (phone as unknown as { derived: { kept: Map<string, { value: unknown }> } }).derived.kept.get('moveTallies')!.value
+    }
+    // A kind of change a part hasn't had in front of it yet builds it again, once: then it's known to pass it over.
+    await phone.mutate('project.update', { id: 'j1', name: 'Gala Night' })
+    void tallies()
+    const before = tallies()
+    await phone.mutate('project.update', { id: 'j1', name: 'Gala' })
+    expect(tallies()).toBe(before)
+    expect(phone.view().moves.pickList('j1')!.job.name).toBe('Gala')
+    expect(phone.view().moves.countedOut('m1')).toBe(2)
+    await phone.mutate('move.record', { id: 'mv2', projectId: 'j1', direction: 'in', assetId: null, modelId: 'm1', qty: 1, at: '2026-10-01T09:00:00Z' })
+    expect(tallies()).not.toBe(before)
+    expect(phone.view().moves.countedOut('m1')).toBe(1)
+    const after = tallies()
+    await phone.mutate('fault.report', { id: 'f1', kind: 'missing', assetId: null, modelId: 'm1', qty: 1, projectId: 'j1', usable: false, note: '', at: '2026-10-01T09:30:00Z' })
+    expect(tallies()).not.toBe(after)
+    expect(phone.view().moves.countedOut('m1')).toBe(0)
   })
 
   it('works out the kit days again only for the products a change touches', async () => {
