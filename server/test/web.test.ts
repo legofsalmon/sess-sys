@@ -219,4 +219,35 @@ describe('what goes compressed (audit finding 6)', () => {
     expect(small.headers['content-encoding']).toBeUndefined()
     expect(small.json()).toEqual({ ok: true })
   })
+
+  it('compresses a freelancer’s link page, but not the calendar feed under it (audit, 20 October 2026, finding 47)', async () => {
+    // Proves: the link page, opened from a text on a weak signal, goes compressed to a phone that takes it and reads back
+    // the same; the feed at the link, fetched by calendar apps, goes as it always did.
+    const app = await serving()
+    const id = 'p-aoife'
+    const createdAt = new Date().toISOString()
+    await app.inject({
+      method: 'POST',
+      url: '/api/sync/push',
+      payload: { clientId: 'ops', mutations: [{ id: 'm1', name: 'person.upsert', args: { id, name: 'Aoife Byrne', kind: 'freelancer', email: null, phone: null, skills: [], dayRateCents: null, notes: '' }, createdAt }] },
+    })
+    const pulled = (await app.inject({ method: 'GET', url: '/api/sync/pull?after=0' })).json().changes
+    const token = pulled.find((c: { entity: string; id: string }) => c.entity === 'person' && c.id === id).data.linkToken as string
+
+    const plain = await app.inject({ method: 'GET', url: `/f/${token}` })
+    expect(plain.headers['content-encoding']).toBeUndefined()
+    expect(plain.body).toContain('Hi Aoife')
+    const br = await app.inject({ method: 'GET', url: `/f/${token}`, headers: { 'accept-encoding': 'gzip, deflate, br' } })
+    expect(br.headers['content-encoding']).toBe('br')
+    expect(br.headers['content-type']).toContain('text/html')
+    expect(br.headers['cache-control']).toBe('no-store')
+    // The same page: only the per-answer nonce and the days-off form's fresh id differ.
+    const unnonced = (html: string) => html.replace(/nonce="[^"]*"/g, '').replace(/name="id" value="[^"]*"/g, '')
+    expect(unnonced(brotliDecompressSync(br.rawPayload).toString())).toBe(unnonced(plain.body))
+    expect(br.rawPayload.length).toBeLessThan(plain.rawPayload.length / 2)
+
+    const feed = await app.inject({ method: 'GET', url: `/f/${token}/calendar.ics`, headers: { 'accept-encoding': 'gzip, deflate, br' } })
+    expect(feed.statusCode).toBe(200)
+    expect(feed.headers['content-encoding']).toBeUndefined()
+  })
 })

@@ -139,3 +139,12 @@ the rows near the screen, on Colly's ask.
   is back.
 - Node should be pinned to 22 on Railway (finding 25): the worker's tsx
   start was checked on Node 22 only.
+
+## Later: the link pages compressed too (29 October 2026)
+
+The freelancer's link pages (`/f/<token>` and the pages under it) are now
+compressed as `/api/*` is (audit, 20 October 2026, finding 47). They were
+left out with no reason given, and they are the one page opened on a weak
+signal from a text: a busy one was 52 KB plain and under 9 KB compressed.
+The calendar feed under the link and the documents' files are still left
+alone.

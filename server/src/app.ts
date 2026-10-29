@@ -265,9 +265,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // API: the app's own files are compressed once, when it's built (scripts/compress-web.mjs), and served as they are.
   // Only what compresses: the export's zip, documents' files and photos are compressed already, and are left alone by
   // their type; so is an answer under a kilobyte. The live connection is a WebSocket, which this never touches.
+  // The freelancer's link pages too (audit, 20 October 2026, finding 47): a busy one is 50 to 100 KB of HTML, a sixth of
+  // that compressed, and it is opened from a text on site or in a van. Not the calendar feed under the link (calendar
+  // apps fetch it on their own and it is kept as it always was), nor the documents' files.
   // Set before the plugin, so its own look at each route sees it.
+  const linkPage = (url: string) => url.startsWith('/f/:token') && url !== '/f/:token/calendar.ics' && !url.startsWith('/f/:token/documents')
   app.addHook('onRoute', (route) => {
-    if (!route.url.startsWith('/api/') || route.websocket) route.compress = false
+    if (!(route.url.startsWith('/api/') || linkPage(route.url)) || route.websocket) route.compress = false
   })
   // Brotli at a middling quality: nearly as small as its best, at a fraction of the time on the server's one thread.
   await app.register(compress, {
