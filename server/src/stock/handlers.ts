@@ -17,7 +17,7 @@ import { queueFile } from '../documents/store.ts'
 import { emit, emitRemoved, Refused, type Ctx } from '../kernel.ts'
 import { faultsOf } from './faults.ts'
 import { jobsWithKit } from './kit.ts'
-import { movementsOf, outWithJobs } from './moves.ts'
+import { movementsOf, outWith, outWithJobs } from './moves.ts'
 import { clearLayout, inLayoutsReason, racksUsing, slotsIn } from './racks.ts'
 import {
   codeTaken,
@@ -201,6 +201,19 @@ async function checkWhere(ctx: Ctx, w: Where, moving?: { id: string; levels: num
   if (chain.length + (moving?.levels ?? 1) > MAX_CASE_DEPTH) {
     throw new Refused({ code: 'conflict', message: `That would put kit more than ${MAX_CASE_DEPTH} cases deep. Take something out of a case first.` })
   }
+}
+
+/**
+ * An item going into a case that's out with a job would be out with that job
+ * without a scan (audit, 20 October 2026, finding 103): the case is scanned
+ * back first. One already out with the same job can go in, as on site.
+ */
+async function checkCaseIn(ctx: Ctx, caseId: string | null, itemId?: string) {
+  if (!caseId) return
+  const out = await outWith(ctx.tx, caseId)
+  if (!out || (itemId && (await outWith(ctx.tx, itemId))?.projectId === out.projectId)) return
+  const c = await getAsset(ctx.tx, caseId)
+  throw new Refused({ code: 'conflict', message: `${c?.number || 'That case'} is out with ${out.job}; scan it back first.` })
 }
 
 /** The name of a place, or a case's number, for reasons. */
@@ -427,6 +440,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
       throw new Refused({ code: 'conflict', message: `${m.name} is counted, not numbered. Change it to numbered to label them one by one.` })
     if (m.dryHire) throw new Refused({ code: 'conflict', message: dryHireRefusal(m.name) })
     await checkWhere(ctx, a)
+    await checkCaseIn(ctx, a.caseId)
     const number = await numberFor(ctx, a.number)
     const old = await oldNumberFor(ctx, a.oldNumber, a.id)
     await ctx.tx.query(
@@ -466,6 +480,7 @@ export const stockHandlers: { [N in StockCommand]: Handler<N> } = {
     const asset = await mustActive(ctx, a.id)
     if (asset.placeId === a.placeId && asset.caseId === a.caseId) return
     await checkWhere(ctx, a, { id: a.id, levels: await levelsIn(ctx.tx, a.id) })
+    if (a.caseId !== asset.caseId) await checkCaseIn(ctx, a.caseId, a.id)
     await ctx.tx.query('UPDATE assets SET place_id = $2, case_id = $3 WHERE id = $1', [a.id, a.placeId, a.caseId])
     await emitAsset(ctx, a.id)
   },

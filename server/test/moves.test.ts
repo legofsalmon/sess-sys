@@ -225,6 +225,25 @@ describe('scans', () => {
   })
 })
 
+describe('a case out with a job', () => {
+  it("takes nothing in until it's scanned back, unless what goes in is out with the same job (audit, 20 October 2026, finding 103)", async () => {
+    const { app, y10p, rack, speakers, rackId, number } = await warehouse()
+    const nissan = await job(app, 'Nissan', 'confirmed', '2026-09-20', '2026-09-21')
+    await ok(app, 'move.record', scan(nissan, 'out', { assetId: rackId, modelId: rack.id }))
+    // A speaker on the shelf would be out with Nissan without a scan.
+    expect(await refused(app, 'asset.move', { id: speakers[0]!, placeId: null, caseId: rackId })).toBe(`${number(rackId)} is out with Nissan; scan it back first.`)
+    expect(await refused(app, 'asset.add', { id: newId(), modelId: y10p.id, number: null, serial: '', placeId: null, caseId: rackId, notes: '', fromCount: false })).toBe(
+      `${number(rackId)} is out with Nissan; scan it back first.`
+    )
+    // One out with Nissan too goes in, as on site.
+    await ok(app, 'move.record', scan(nissan, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'asset.move', { id: speakers[1]!, placeId: null, caseId: rackId })
+    // Scanned back, the rack takes the speaker from the shelf.
+    await ok(app, 'move.record', scan(nissan, 'in', { assetId: rackId, modelId: rack.id }))
+    await ok(app, 'asset.move', { id: speakers[0]!, placeId: null, caseId: rackId })
+  })
+})
+
 describe('what a device shows', () => {
   it("a job's pick list: what it needs, where to find it, and what's out, a case taking what's in it along", async () => {
     const { app, y10p, amp, rack, xlr, speakers, rackId, amps, number } = await warehouse()
