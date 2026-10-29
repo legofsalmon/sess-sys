@@ -715,3 +715,21 @@ describe('a new device reads the records as they are, not every change ever made
     expect(phone.client.cursor).toBe(head)
   })
 })
+
+describe('a pull with a cursor the server never gave (audit, 20 October 2026, finding 67)', () => {
+  it('is turned away in words as a bad request, not answered as a fault of the server', async () => {
+    // Proves: a cursor past the database's biggest number, a decimal, a negative or a word is a 400 that says why, before the
+    // query that would refuse it and be reported; a missing or empty one still reads from the start.
+    const app = await server()
+    for (const after of ['99999999999999999999', '1.5', '-1', 'abc', '1e3']) {
+      const res = await app.inject({ method: 'GET', url: `/api/sync/pull?after=${after}` })
+      expect(res.statusCode, after).toBe(400)
+      expect(res.json()).toEqual({ error: "That isn't a change number this server gave." })
+    }
+    expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=0&latest=99999999999999999999' })).statusCode).toBe(400)
+    expect((await app.inject({ method: 'GET', url: '/api/sync/pull' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=0&latest=new' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=0&latest=0' })).statusCode).toBe(200)
+  })
+})

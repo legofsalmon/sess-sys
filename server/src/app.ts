@@ -486,8 +486,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // the page and the head is enough, and is harmless now: the device keeps its cursor and the next pull brings it. Often,
   // though, it says writes are slow to commit, and it is how finding 1 lost changes before it was fixed.
   const reportBehind = reportNowAndThen(10 * 60_000, options.report)
-  app.get<{ Querystring: { after?: string; latest?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
-    const after = Math.max(0, Number(req.query.after ?? 0) || 0)
+  app.get<{ Querystring: { after?: string; latest?: string } }>('/api/sync/pull', async (req, reply): Promise<PullResponse | void> => {
+    // A change number the server gave, or none: anything else is turned away in words before the query, which would refuse
+    // it as a fault of the server's and report it (audit, 20 October 2026, finding 67).
+    const number = (v: string | undefined) => (v === undefined || v === '' ? 0 : /^\d+$/.test(v) && Number.isSafeInteger(Number(v)) ? Number(v) : undefined)
+    const after = number(req.query.after)
+    if (after === undefined || (req.query.latest !== undefined && req.query.latest !== 'new' && number(req.query.latest) === undefined))
+      return reply.code(400).send({ error: "That isn't a change number this server gave." })
     // Pulls never take the write lock, and read on connections of their own, so a phone keeps hearing everyone else's
     // changes while a long one is written, rather than waiting behind the pushes queued for it (audit finding 7).
     const db = options.db.reads
