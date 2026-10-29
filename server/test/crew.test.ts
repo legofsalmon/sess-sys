@@ -218,7 +218,12 @@ describe('freelancer link', () => {
     const o = await offer(app, await call(app), aoife.id)
     const rate = (typed: string) => answer(app, aoife.linkToken, o.id, { answer: 'counter', picker: '1', days: ['2026-10-02'], rate: typed })
 
-    expect(await rate('lots')).toMatchObject({ ok: false, message: 'Put in a price like 250 or 1,250.50.' })
+    const lots = await rate('lots')
+    expect(lots).toMatchObject({ ok: false, message: 'Put in a price like 250 or 1,250.50.' })
+    // Said under the rate field, which is marked and joined to it, not at the top of the card (audit, 20 October 2026, finding 90).
+    const refusedCard = cardOf(lots.page, o.id)
+    expect(refusedCard).not.toContain('class="flash')
+    expect(refusedCard).toMatch(new RegExp(`<input name="rate" inputmode="decimal" aria-invalid="true" aria-describedby="rate-error-${o.id}" value="lots"></label><p class="field-error" id="rate-error-${o.id}" role="alert">`))
     expect(await rate('0')).toMatchObject({ ok: false, message: 'Put in the day rate you would do it for.' })
     expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'offered', counterRateCents: null })
 
@@ -354,6 +359,17 @@ describe('freelancer link', () => {
     expect(list).toContain(`You're booked on <a href="#o-${o.id}">Electric Picnic</a> that day. Days off don't take you off it: use Can't make it any more on that booking.`)
     expect(list.match(/class="clash"/g)).toHaveLength(1)
     expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'confirmed' })
+  })
+
+  it('says the year on a date in another year, and not on one this autumn (audit, 20 October 2026, finding 89)', async () => {
+    // Proves: the link page's dates carry the year where it isn't plain from today, so "5 Jan" is never a guess.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    await offer(app, await call(app, { project: 'New Year Gig', start: '2027-01-05', end: '2027-01-05' }), aoife.id)
+    await offer(app, await call(app), aoife.id)
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    expect(page).toContain('<dt>Dates</dt><dd>Tue 5 Jan 2027</dd>')
+    expect(page).toContain('<dt>Dates</dt><dd>Fri 2 Oct to Sun 4 Oct</dd>')
   })
 
   it('publishes bookings as a calendar feed any calendar app can subscribe to', async () => {
