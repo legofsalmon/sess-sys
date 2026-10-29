@@ -345,4 +345,21 @@ describe('what a device shows', () => {
     ])
     expect(moves.stillOut.map((p) => [p.job.name, p.stillOut])).toEqual([['Over', 3]])
   })
+
+  it('stops counting an item retired while it was out as out with its job, so the job leaves Coming back', async () => {
+    // Proves: an item lost on site and retired doesn't keep a job over on the still-out list for good (audit, 20 October 2026, finding 44).
+    const { app, y10p, speakers } = await warehouse()
+    const over = await job(app, 'Over', 'confirmed', '2026-09-20', '2026-09-21')
+    await ok(app, 'kit.add', kit(over, y10p.id, 2))
+    await ok(app, 'move.record', scan(over, 'out', { assetId: speakers[0]!, modelId: y10p.id }))
+    await ok(app, 'move.record', scan(over, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'move.record', scan(over, 'in', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'asset.retire', { id: speakers[0]!, reason: 'lost', note: 'Left at the venue' })
+    const office = await device(app)
+    const moves = office.client.view().moves
+    expect(moves.outOf(speakers[0]!)).toBeUndefined()
+    expect(moves.stillOut).toEqual([])
+    // Neither out nor back: the one that came back is still back.
+    expect(rows(moves.pickList(over))).toEqual([['d&b Y10P', 2, 0, 1]])
+  })
 })
