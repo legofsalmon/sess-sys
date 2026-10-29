@@ -13,7 +13,7 @@ waiting on someone.
   XLR", in big type on a wrap-round (50 × 25 mm), flag (100 × 25 mm, both
   ends) or bag label, two by default, with the stock code as a Code 128
   barcode, a QR code, or none. A stock code scanned or typed in the Stock
-  search opens its product. App 1.58.0.
+  search opens its product. App 1.59.0.
 - Checked: typecheck, shared tests (the barcode's widths; decoded by
   zxing-cpp when written), e2e cable-labels.spec.ts plus the labels, stock
   and scan specs.
@@ -23,6 +23,18 @@ waiting on someone.
 - iPhones read only QR codes in the app's camera for now; Code 128 needs a
   1D reader in the fallback. One-tap printing to the ZT411 (no print
   dialog) waits on Colly's pick of the options in that thread.
+
+## 29 October 2026: Money says what its figures are
+
+**Done**
+
+- Findings 27 to 31, 71 and 79 of the [20 October
+  audit](audit-2026-10-20.md) (PR #167): half-typed quote lines kept,
+  "Accepted, unpaid" with VAT split into invoiced and not, one rule for
+  cancelled and lost jobs, Margin by job by month with losses named, and
+  ink links on amber lines. Finding 28 was already fixed. ADR 0042 notes
+  it. App 1.58.0.
+- Checked: typecheck, shared and server tests, and 32 browser tests.
 
 ## 29 October 2026: a freelancer's own page
 
