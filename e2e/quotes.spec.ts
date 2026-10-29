@@ -84,6 +84,18 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(draft.locator('.save-state')).toHaveText('Saved')
   await expect(draft).toContainText('Marked sent, it becomes quote 1115')
 
+  // A line half typed when a call comes in can't save yet, but going to Crew and back keeps it (audit finding 27).
+  await draft.getByRole('button', { name: 'Add something else' }).click()
+  await draft.getByLabel('Line 4: price').fill('400')
+  await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await office.goto('/#crew')
+  await office.goBack()
+  await draft.getByRole('button', { name: 'Line 4: not named yet, change it' }).click()
+  await expect(draft.getByLabel('Line 4: price')).toHaveValue('400')
+  await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await draft.getByRole('button', { name: 'Remove line 4' }).click()
+  await expect(draft.locator('.save-state')).toHaveText('Saved')
+
   // Printed as an A4 page to save as a PDF: only the quote is on the page. Not sent yet, it says it's a draft.
   await draft.getByRole('button', { name: 'Print a draft' }).click()
   const printed = office.locator('.print-sheet.quote-sheet')
@@ -135,13 +147,19 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(office.getByText('An older version, kept as it went to the client. The newest is version 2.')).toBeVisible()
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
-  // Money: who owes, freelancers to pay, and the accountant's file.
+  // Money: what's accepted and unpaid, with VAT, invoiced apart from not invoiced yet (audit findings 29 and 71), a row
+  // a client with its quotes folded under it (finding 31); freelancers to pay, and the accountant's file.
   await office.goto('/#jobs/money')
-  const owed = office.getByRole('region', { name: 'Owed by clients' })
-  await expect(owed).toContainText('Shannonside Festivals€7,257.00')
-  await expect(owed).toContainText('Brightwater Conferences€3,044.25')
-  await expect(owed).toContainText('Liffey Brands€1,680.89')
-  await expect(owed).toContainText('invoiced')
+  await expect(office.locator('.money-facts')).toContainText(/Accepted, unpaid€[\d,.]+with VAT, of which €[\d,.]+ not invoiced yet/)
+  const owed = office.getByRole('region', { name: 'Accepted, unpaid' })
+  await expect(owed).toContainText('Shannonside Festivals')
+  await expect(owed).toContainText('Brightwater Conferences')
+  const invoiced = owed.getByRole('group', { name: 'Invoiced', exact: true })
+  await expect(invoiced).toContainText('Liffey Brands1 quote€1,680.89')
+  await expect(invoiced.getByRole('link', { name: 'Liffey Brands Launch' })).toBeHidden()
+  await invoiced.getByText('Liffey Brands', { exact: true }).click()
+  await expect(invoiced).toContainText('Version 2 · €1,680.89 with VAT · invoiced')
+  await expect(invoiced.getByRole('link', { name: 'Liffey Brands Launch' })).toBeVisible()
   await expect(office.getByRole('region', { name: 'Margin by job' })).toContainText('Liffey Brands Launch')
 
   const freelancers = office.getByRole('region', { name: 'Owed to freelancers' })
@@ -361,5 +379,28 @@ test("a line short of kit hires in what it's short of, transport is added at a c
   for (const word of ['Hire Co', 'hired in', 'Margin', 'makes', '€2,000.00', '€120.00']) await expect(printed).not.toContainText(word)
   await office.evaluate(() => dispatchEvent(new Event('afterprint')))
 
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
+
+test("on a desk a line's amount and Remove sit inside the quote's card at every width (audit finding 28)", async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+  await page.goto('/#jobs')
+  await page.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  await page.getByRole('tab', { name: 'Quote' }).click()
+  await page.getByRole('region', { name: 'Quote' }).getByRole('link', { name: 'Make a quote' }).click()
+  await page.getByRole('button', { name: 'Build it from the job' }).click()
+  const draft = page.getByRole('form', { name: 'Version 1, a draft' })
+  await draft.getByRole('button', { name: 'Line 1: Robe Spiider, change it' }).click()
+  for (const width of [1024, 1200, 1280, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 })
+    const card = (await draft.boundingBox())!
+    expect(card.x + card.width, `at ${width}px`).toBeLessThanOrEqual(width)
+    for (const part of [draft.getByRole('button', { name: 'Remove line 1' }), draft.locator('.quote-line .amount').first()]) {
+      const box = (await part.boundingBox())!
+      expect(box.x + box.width, `at ${width}px`).toBeLessThanOrEqual(card.x + card.width)
+    }
+  }
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })

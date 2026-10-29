@@ -28,12 +28,34 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.58.0',
+    version: '1.61.0',
     date: '2026-10-29',
     title: 'Claude reads enquiries into quotes, and changes a quote when asked',
     what: "Once the office turns Claude on under Admin › Company, New quote takes a pasted enquiry: Claude fills in the job, its days, what to ask the client and the kit and crew, matched to the stock list and priced from the price list, for you to check and start the quote with. On a draft quote, ask Claude in words to change it (\"two more radio mics and 10% off\") and take what it suggests. It only suggests: nothing is saved until you take it, and it contacts nobody. It's off to start, and stops for the month at a spending limit.",
     prs: [163],
     adrs: [96],
+  },
+  {
+    version: '1.60.0',
+    date: '2026-10-29',
+    title: 'Cable labels for every product',
+    what: 'Each product in Stock has a new Cable labels tab. It prints what the cable is, such as 10 m XLR, in big type on a wrap-round label, a flag label that says it on both sides, or a label for the bag or bin, two at a time by default for each end. It can carry the product’s stock code as a long thin barcode to run along the cable, or as a QR code, and scanning that code in the Stock search opens the product.',
+    prs: [157],
+    adrs: [95],
+  },
+  {
+    version: '1.59.0',
+    date: '2026-10-29',
+    title: "Home is easier to read when there's a lot on",
+    what: "Home is easier to read when there's a lot on. Needs attention puts what stops the next fortnight's work above the housekeeping. The week ahead is one line per job, with errands and meetings tucked behind one line. Me now shows your own day and any day in lieu waiting. Notifications group a change made to many jobs at once, or a day's changes to one job, into one line, so the bell no longer reads 99+ from the start.",
+    prs: [168],
+  },
+  {
+    version: '1.58.0',
+    date: '2026-10-29',
+    title: 'Money says what its figures are',
+    what: "Money now says what its biggest figure really is: quotes accepted and not yet paid, with VAT, split into those invoiced and those still to invoice, one row per client. Margin by job is by month with this month first, and names any job losing money, here and on Home. A cancelled or lost job's quote no longer counts anywhere until it's invoiced. A quote line half typed when you leave the screen is kept, and the link on amber warning lines is easier to read.",
+    prs: [167],
   },
   {
     version: '1.57.0',

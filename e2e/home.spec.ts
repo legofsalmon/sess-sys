@@ -154,3 +154,50 @@ test('Home draws the weeks, days and months ahead as charts, each column said in
   await expect(kit.getByRole('button').filter({ hasText: /./ })).toHaveCount(14)
   await expect(kit.getByRole('button', { name: /for confirmed jobs/ }).first()).toBeVisible()
 })
+
+test("Home at a phone's size: the soon over the housekeeping, the week ahead a line a job, and Me their own day", async ({ browser }) => {
+  // Proves (audit, 20 October 2026, findings 32, 33, 62, 69, 70, 80): Needs attention puts the next fortnight's work over the
+  // housekeeping; the week ahead lists a line a job, no enquiry, counted as listed, with errands and meetings behind one line;
+  // the links under the charts are links a thumb can reach; Working this week leaves the role and job room; and Me shows
+  // their own day and the day in lieu waiting beside the leave request.
+  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await page.goto('/')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Company' }).click()
+
+  const attention = page.locator('.standing')
+  await expect(attention.getByRole('heading', { level: 3 })).toHaveText(['The next fortnight', 'Housekeeping'])
+  await expect(attention.locator('.tiles:not(.housekeeping)').getByRole('link', { name: /kit lines? short for confirmed jobs?/ })).toBeVisible()
+  await expect(attention.locator('.tiles.housekeeping').getByRole('link', { name: /answers? to check/ })).toBeVisible()
+
+  const week = page.locator('.week-ahead')
+  const listed = week.locator(':scope > .job-list > li')
+  const count = await listed.count()
+  if (count > 0) await expect(week.getByRole('heading', { name: `The week ahead (${count})` })).toBeVisible()
+  await expect(week.locator('.job-row:not(.today-row)')).toHaveCount(0)
+  await expect(week.getByText('Enquiry', { exact: true })).toHaveCount(0)
+  for (const row of await listed.locator('.job-row').all()) expect((await row.boundingBox())!.height).toBeLessThan(60)
+  const errands = week.locator('details.errands')
+  if (await errands.count()) {
+    await expect(errands.locator('summary')).toHaveText(/^(and )?\d+ (errands?|meetings?)/i)
+    await errands.locator('summary').click()
+    await expect(errands.locator('.job-row').first()).toBeVisible()
+  }
+
+  const crewCalls = page.getByRole('link', { name: 'Crew calls', exact: true })
+  await expect(crewCalls).toHaveClass(/\blink\b/)
+  expect((await crewCalls.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+
+  await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Department' }).click()
+  await page.getByLabel('Department').selectOption('Audio')
+  const working = page.locator('.working-row').first()
+  await expect(working).toBeVisible()
+  expect((await working.locator(":scope > div:not(.side)").boundingBox())!.width).toBeGreaterThan(220)
+
+  await page.getByRole('group', { name: 'Show for' }).getByRole('button', { name: 'Me', exact: true }).click()
+  await page.getByLabel('Your name').selectOption({ label: 'Cian Murphy' })
+  await page.getByRole('button', { name: "That's me" }).click()
+  await expect(page.getByRole('heading', { name: /^Your day/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Today/ })).toHaveCount(0)
+  await expect(page.locator('section', { has: page.getByRole('heading', { name: 'Your leave' }) })).toContainText('1 request and 1 day in lieu waiting to be approved.')
+})

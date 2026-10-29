@@ -385,10 +385,19 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 .money .money-facts { grid-template-columns: repeat(auto-fit, minmax(9em, 1fr)); }
 .money .money-facts dd { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.money .owed { display: grid; gap: var(--space-6); padding-top: var(--space-8); }
-.money .owed + .owed { border-top: 1px solid var(--line); }
+.money .money-facts dd small { display: block; font-size: var(--text-small); font-weight: 400; color: var(--muted); }
+/* Accepted, unpaid in two groups, a row a client with its quotes folded under it (audit findings 29 and 31). */
+.money .owed-group { display: grid; gap: var(--space-4); }
+.money .owed-group + .owed-group { margin-top: var(--space-12); }
+.money .owed-group h3 { margin: 0; display: flex; justify-content: space-between; gap: var(--space-8); }
+.money .owed-group .hint { margin: 0; }
+.money .owed { border-top: 1px solid var(--line); }
+.money .owed summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-8); min-height: 44px; padding: var(--space-6) 0; cursor: pointer; }
+.money .owed summary b { flex: 1 1 10em; }
+.money .owed summary .count { color: var(--muted); font-size: var(--text-small); }
+.below-zero { margin: 0 0 var(--space-8); color: var(--bad); font-weight: 600; }
 .money .owed .amount, .money .price-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
-.money .owed ul.plain { list-style: none; margin: 0; padding: 0 0 0 var(--space-12); display: grid; gap: var(--space-6); }
+.money .owed ul.plain { list-style: none; margin: 0; padding: 0 0 var(--space-8) var(--space-12); display: grid; gap: var(--space-6); }
 .money .owed a { color: var(--accent-ink); font-weight: 600; }
 .money .price-group h3 { margin: var(--space-12) 0 var(--space-6); }
 .money .price-row { align-items: center; }
@@ -432,7 +441,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
 .quote-terms .with-unit input, .quote-terms input, .quote-extra .with-unit input, .office-form .with-unit input { max-width: 7em; }
 .version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
-.money .card .hint a, .quote-screen .hint a, .quote-screen .warn-line a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
+.money .card .hint a, .quote-screen .hint a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 
 /* Kit from the notes (ADR 0043): each line as the notes write it, over what it matched. */
 .jobs .note-line .written { font-weight: 600; overflow-wrap: anywhere; }
