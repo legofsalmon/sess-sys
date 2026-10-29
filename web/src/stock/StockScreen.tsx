@@ -239,12 +239,17 @@ function StockCard({ view, current }: { view: View; current?: string }) {
     setSearch('')
     if (!camera) searchField.current?.focus()
   }
-  // Read by the camera: an item's label or its maker's serial shows it under the camera, which stays on; a label on nothing yet asks what it's on.
+  // Read by the camera: an item's label or its maker's serial shows it under the camera, which stays on; a product's stock code opens the product; a label on nothing yet asks what it's on.
   const onRead = (code: string) => {
     const found = itemByCode(w, code)
+    // A cable label's code is its product's stock code (ADR 0095): straight to the product.
+    const read = code.trim().toLowerCase()
+    const coded = found ? [] : w.models.filter((m) => m.code && m.code.toLowerCase() === read)
     if (found) {
       setScanned(found.id)
       setSearch('')
+    } else if (coded.length === 1) {
+      location.hash = `#stock/product/${coded[0]!.id}`
     } else {
       setScanned('')
       setSearch(code)

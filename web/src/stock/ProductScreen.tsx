@@ -56,6 +56,7 @@ import { Thumb } from '../Picture.tsx'
 import { TabPanel, Tabs, useTab } from '../Tabs.tsx'
 import { kitIcon } from './kitIcon.ts'
 import { ProductPhoto } from './ProductPhoto.tsx'
+import { CableLabels } from './CableLabels.tsx'
 import { STOCK } from '../Up.tsx'
 import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, suppliersOf, weightPowerLabel, whoseFrom, WhoseFields, whoseTypedOf } from './Racks.tsx'
 
@@ -68,9 +69,9 @@ import { caseLabel, RackCard, sizeFrom, SizeFields, sizeLabel, sizeTypedOf, supp
  * marked as a mistake, which hides it and its items everywhere but the
  * history (audit finding 19).
  */
-/** A product's page in parts (ADR 0082), one at a time under its name: what it is, the jobs it's on, its items and what's counted, its faults. */
-type ProductPart = 'details' | 'jobs' | 'items' | 'faults'
-const PRODUCT_LABELS: Record<ProductPart, string> = { details: 'Details', jobs: 'On jobs', items: 'Items', faults: 'Faults' }
+/** A product's page in parts (ADR 0082), one at a time under its name: what it is, the jobs it's on, its items and what's counted, its faults, and cable labels for it (ADR 0095). */
+type ProductPart = 'details' | 'jobs' | 'items' | 'faults' | 'cables'
+const PRODUCT_LABELS: Record<ProductPart, string> = { details: 'Details', jobs: 'On jobs', items: 'Items', faults: 'Faults', cables: 'Cable labels' }
 
 export function ProductScreen({ view, id, part: asked, bare }: { view: View; id: string; part?: string; bare?: boolean }) {
   const w = view.warehouse
@@ -80,7 +81,7 @@ export function ProductScreen({ view, id, part: asked, bare }: { view: View; id:
   const faults = view.faults.ofModel(id)
   const showsFaults = !!m && (m.tracking === 'bulk' || m.countedTotal > 0 || faults.length > 0)
   // Dry hire stock (ADR 0075) has none of its own to list.
-  const parts: ProductPart[] = ['details', 'jobs', ...(m && !m.dryHire ? (['items'] as const) : []), ...(showsFaults ? (['faults'] as const) : [])]
+  const parts: ProductPart[] = ['details', 'jobs', ...(m && !m.dryHire ? (['items'] as const) : []), ...(showsFaults ? (['faults'] as const) : []), 'cables']
   const [part, pick] = useTab({ parts, asked, remember: 'sh.productPart', address: (p) => `#stock/product/${id}/${p}` })
   const onJobs = view.kit.byModel.get(id) ?? []
   if (!m)
@@ -130,6 +131,7 @@ export function ProductScreen({ view, id, part: asked, bare }: { view: View; id:
             <Counted m={m} w={w} />
           </>
         )}
+        {part === 'cables' && <CableLabels key={m.id} m={m} />}
         {part === 'faults' && (
           <FaultsCard faults={faults} title={m.tracking === 'bulk' ? 'Faults' : 'Faults in those not labelled yet'}>
             {m.countedTotal > 0 && <ReportButtons model={m} most={m.countedTotal} />}
