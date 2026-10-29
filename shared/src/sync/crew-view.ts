@@ -312,9 +312,13 @@ export function crewView(
         const o = offers.get(a.id)
         if (!o) break
         const status = a.answer === 'accept' ? 'accepted' : a.answer === 'decline' ? 'declined' : a.answer === 'pullOut' ? 'pulled-out' : 'countered'
-        const days = (a.answer === 'accept' || a.answer === 'counter') && a.days ? a.days : o.days
-        // A new answer is one the office hasn't seen yet.
-        offers.set(o.id, { ...o, status, days, note: a.note, seenAt: null, pending: true })
+        // A yes or a counter with no days chosen takes every day of the call, as on the server.
+        const call = calls.get(o.callId)
+        const days = a.answer === 'accept' || a.answer === 'counter' ? (a.days ? [...new Set(a.days)].sort() : call ? eachDay(call.start, call.end) : o.days) : o.days
+        // A new answer is one the office hasn't seen yet. The counter's rate, and when and how it was answered, as the server records them,
+        // so a Confirm queued behind a counter agrees its rate (audit, 20 October 2026, finding 26).
+        const counterRateCents = a.answer === 'counter' ? a.counterRateCents : a.answer === 'accept' ? null : o.counterRateCents
+        offers.set(o.id, { ...o, status, days, counterRateCents, note: a.note, respondedAt: m.createdAt, respondedVia: 'app', seenAt: null, pending: true })
         break
       }
       case 'offer.confirm': {
