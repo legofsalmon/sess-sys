@@ -146,10 +146,21 @@ export interface Plan {
   /**
    * The key of every job the calendar holds that isn't in the app yet, ticked
    * or not: what the import screen showed, read from the same plan rather
-   * than planned again without the choices (audit, 20 October 2026, finding 18).
+   * than planned again without the choices (audit, 20 October 2026, finding 18);
+   * and of every job chosen that is one of them still, by its events
+   * (audit, 20 October 2026, finding 52).
    */
   found: string[]
 }
+
+/**
+ * A job's key: its name and the first of its events as it was looked at, so
+ * a job found again with an earlier day added, or a later one, is still the
+ * job chosen (audit, 20 October 2026, finding 52). The name never holds "|".
+ */
+const jobKey = (name: string, uid: string) => `${name}|${uid}`
+/** The event a job's key names. */
+export const keyEvent = (key: string) => key.slice(key.indexOf('|') + 1)
 
 /** What the office chose on the import screen: names and kinds by job key, the jobs to bring in, and people's names by email. */
 export interface Chosen {
@@ -593,7 +604,7 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
       c.entries.push(e)
       continue
     }
-    const next: Cluster = { key: `${e.key}|${e.day}`, name: e.job, kind: e.kind, entries: [e], seen: [], existing: null }
+    const next: Cluster = { key: jobKey(e.key, e.event.uid), name: e.job, kind: e.kind, entries: [e], seen: [], existing: null }
     clusters.push(next)
     open.set(e.key, next)
   }
@@ -651,6 +662,19 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
       if (c.entries.length === 0) continue
     }
     kept.push(c)
+  }
+
+  // Each job chosen is the job found now that holds one of its events, whatever its first day is now (finding 52).
+  const asked = new Set<string>()
+  if (chosen) {
+    const byEvent = new Map<string, string[]>()
+    for (const k of new Set([...chosen.names.keys(), ...chosen.include])) byEvent.set(keyEvent(k), [...(byEvent.get(keyEvent(k)) ?? []), k])
+    for (const c of kept) {
+      const matched = [...new Set(c.seen.map((e) => e.event.uid))].flatMap((uid) => byEvent.get(uid) ?? [])
+      if (matched.length === 0) continue
+      for (const k of matched) asked.add(k)
+      c.key = matched.find((k) => chosen.include.has(k)) ?? matched[0]!
+    }
   }
 
   // What the office chose: which jobs, what kind each is, and names that bring two in as one.
@@ -902,6 +926,6 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
     people: [...newPeople.values()].map(({ jobKeys: _j, gigs: _g, ...p }) => p).sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.name.localeCompare(b.name)),
     leftOut: leftOut.list(),
     changed,
-    found: kept.map((c) => c.key),
+    found: [...new Set([...kept.map((c) => c.key), ...asked])],
   }
 }

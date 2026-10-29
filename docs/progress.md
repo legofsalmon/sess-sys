@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: Taking back a bring-in, safely
+
+**Done**
+
+- Findings 51, 52, 53 and 85 of the [20 October audit](audit-2026-10-20.md)
+  (PR #169): Take it all back refuses in words when a job has a quote or a
+  late note, and keeps people named, changed or used since; a job is known
+  by its events, so one that gained an earlier day still comes in and one
+  already brought in says so; Mac an and Nic na surnames split properly,
+  and those split before are mended on start-up. ADRs 0037 and 0066 note
+  it. App 1.60.1.
+- Checked: typecheck, shared, server and real-Postgres tests, and the
+  bring-in browser test.
+
 ## 29 October 2026: cable labels
 
 **Done**

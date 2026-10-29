@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.60.1',
+    date: '2026-10-29',
+    title: 'Taking back a bring-in, safely',
+    what: "Taking back a calendar bring-in now says why when it can't, and keeps anyone you've named or changed since. Bringing jobs in no longer says a job has gone from the calendar when it gained an earlier day or was already brought in. Irish surnames like Mac an tSaoi now split correctly into first and last names.",
+    prs: [169],
+  },
+  {
     version: '1.60.0',
     date: '2026-10-29',
     title: 'Cable labels for every product',
