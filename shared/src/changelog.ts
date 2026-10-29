@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.52.0',
+    date: '2026-10-29',
+    title: 'Cable labels for every product',
+    what: 'Each product in Stock has a new Cable labels tab. It prints what the cable is, such as 10 m XLR, in big type on a wrap-round label, a flag label that says it on both sides, or a label for the bag or bin, two at a time by default for each end. It can carry the product’s stock code as a long thin barcode to run along the cable, or as a QR code, and scanning that code in the Stock search opens the product.',
+    prs: [0],
+    adrs: [95],
+  },
+  {
     version: '1.51.1',
     date: '2026-10-29',
     title: 'Only a director changes how a director signs in',
