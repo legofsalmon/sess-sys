@@ -22,6 +22,7 @@ waiting on someone.
 
 - Which role to start with, and whether Claude runs on Anthropic's own
   service or through Google Cloud in an EU region.
+
 ## 29 October 2026: the office's crew day
 
 **Done**
