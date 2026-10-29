@@ -56,3 +56,11 @@ people. A client's contacts are still one name; that can follow if wanted.
 - Names split wrongly on deploy (a double-barrelled first name, a handle)
   are fixed one at a time on the person's page, under Change details.
 - The columns sit at the end of the people table, as Postgres adds them.
+
+Later (29 October 2026): "an" and "na" carry a last name on after a word
+that starts one, so "Pádraig Mac an tSaoi" is "Pádraig" and "Mac an
+tSaoi", where the first split made him "Pádraig Mac an" (audit, 20 October
+2026, finding 85). Alone they start nothing, so "Ana na Smith" splits as
+before. A one-off change on deploy mends anyone whose first name still ends
+in such a pair, so the check the audit asked for after deploy is done by
+the app; a first name the office has since corrected is left alone.

@@ -138,7 +138,9 @@ to `example.com`, so nothing made up reaches a real site.
   for the next job.
 - Links work on the live server now; files arrive with the bucket.
 - Who can open which, when roles arrive, is one check in
-  `server/src/documents/routes.ts`, as for people's documents.
+  `server/src/documents/routes.ts`, as for people's documents. Settled 29
+  October 2026 (ADR 0062): a venue's for everyone, a client's for the
+  office and directors.
 - Another kind of record that wants documents (a supplier, a vehicle)
   is a third column and a third list of kinds.
 - Left for later: crew seeing a venue's documents from their call sheet

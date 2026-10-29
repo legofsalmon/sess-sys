@@ -13,7 +13,7 @@ import {
 } from '@sh/shared'
 import { applyMutationIn } from '../commands.ts'
 import { getCall, getOffer } from '../crew/store.ts'
-import type { Db, Queryable } from '../db.ts'
+import { faultForLog, type Db, type Queryable } from '../db.ts'
 import { serverChange, type Ctx } from '../kernel.ts'
 import { open } from './crypto.ts'
 import { eventId, wantedEvents, type Wanted } from './events.ts'
@@ -66,9 +66,11 @@ export interface CalendarSyncOptions {
   /** How long to wait before each try again after a run fails on something unexpected; for tests. */
   retryMs?: readonly number[]
   /**
-   * False keeps the app off Google Calendar altogether: nothing is put on,
-   * changed or taken off it, and nobody is invited, while calendars can
-   * still be read to bring jobs in. Set on the server with CALENDAR_WRITES.
+   * Only true lets the app onto Google Calendar. Left out or false, nothing
+   * is put on, changed or taken off it, and nobody is invited, while
+   * calendars can still be read to bring jobs in. Set on the server with
+   * CALENDAR_WRITES; off unless asked for, so a caller that forgets it
+   * can't write (audit, 20 October 2026, finding 107).
    */
   writes?: boolean
 }
@@ -166,7 +168,7 @@ export class CalendarSync {
 
   /** Whether the app may write to Google Calendar at all (CALENDAR_WRITES). */
   get writes(): boolean {
-    return this.options.writes !== false
+    return this.options.writes === true
   }
 
   /** At start-up: find out whether a calendar is connected, and catch up on anything missed while the server was down. */
@@ -265,7 +267,7 @@ export class CalendarSync {
           if (err.why !== 'busy' && (await this.halted(link, err))) this.options.onChange?.()
         } else {
           this.options.report?.(err)
-          this.options.log?.error({ err }, 'Looking for crew answers on Google Calendar failed')
+          this.options.log?.error({ err: faultForLog(err) }, 'Looking for crew answers on Google Calendar failed')
         }
         return 0
       }
@@ -831,13 +833,13 @@ export class CalendarSync {
     const wait = (this.options.retryMs ?? FAULT_RETRY_MS)[this.faults]
     this.faults++
     if (wait === undefined || this.stopped) {
-      this.options.log?.error({ err, failures: this.faults }, 'Calendar sync failed again; it waits for the next change now')
+      this.options.log?.error({ err: faultForLog(err), failures: this.faults }, 'Calendar sync failed again; it waits for the next change now')
       throw err
     }
     clearTimeout(this.retryTimer)
     this.retryTimer = setTimeout(() => void this.run(check).catch(() => {}), wait)
     this.retryTimer.unref()
-    this.options.log?.error({ err, retryInSeconds: wait / 1000 }, 'Calendar sync failed; trying again later')
+    this.options.log?.error({ err: faultForLog(err), retryInSeconds: wait / 1000 }, 'Calendar sync failed; trying again later')
     throw err
   }
 

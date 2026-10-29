@@ -43,3 +43,14 @@ from the ones they answer to.
 - Once crew invites are on, changing the main email does to a calendar
   day's guests what changing it in Change details does: the main email is
   the one invited.
+
+## A director's addresses (audit, 20 October 2026, finding 10)
+
+The office could make a director's account its own in two steps: let its
+own address go, then give it to the director, or combine someone holding
+it into them. Now a director's email, type, main address and combining
+need a director (the company ability), and no command gives the address
+the sender signs in with to another person already on the Crew tab, even
+in the same push that let it go. A director may still combine her own
+two records, as she may change anyone's addresses. The office still
+corrects everyone else's addresses.

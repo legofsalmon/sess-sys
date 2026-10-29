@@ -70,6 +70,9 @@ export const GONE: readonly Gone[] = [
   // Their own calendar's address and their busy times (ADR 0044): about their life, not their work, so they go at once,
   // and the server stops reading it.
   { table: 'own_calendars', entity: 'ownCalendar' },
+  // Claude's to-do lists (ADR 0097), which devices never see: what Claude wrote can name anyone from a job's notes, so
+  // every list goes. The next one is written the next weekday morning, or when someone asks.
+  { table: 'assistant_lists', theirs: '$1::text IS NOT NULL' },
   // Their address on Google Calendar invites, which devices never see. While invites are on, a day still to come keeps
   // theirs until the calendar's next run takes them off its event, and that run removes the row: gone now, it would
   // leave them on the event as a guest added by hand. Past events in Google keep theirs (ADR 0027).

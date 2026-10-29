@@ -1,5 +1,7 @@
 import {
+  CLIENT_DOCUMENTS_REFUSAL,
   DOCUMENTS_REFUSAL,
+  readsAttachmentOf,
   readsDocumentOf,
   cleanText,
   DOCUMENT_KINDS,
@@ -159,6 +161,8 @@ export function registerDocumentRoutes(app: FastifyInstance, { db, files, onChan
     scope.get('/api/attachments/:id/file', async (req: AttachmentReq, reply) => {
       const doc = await getAttachment(db, req.params.id)
       if (!doc) return reply.code(404).send({ error: 'That document is no longer there.' })
+      // A client's is for roles with jobs or money, as the feed sends it (audit, 20 October 2026, finding 39); a venue's for everyone.
+      if (!readsAttachmentOf(await readingOf(db.reads, req.role, req.reader ?? {}), doc)) return reply.code(403).send({ error: CLIENT_DOCUMENTS_REFUSAL })
       const key = await attachmentFileKeyOf(db, doc.id)
       if (!key || !doc.file) return reply.code(404).send({ error: "There's no file for this document." })
       if (!files.on) return reply.code(409).send({ error: "The file is in the storage bucket, which isn't set up on this server." })

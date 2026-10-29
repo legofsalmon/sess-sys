@@ -67,6 +67,11 @@ export interface PickRow {
   unusable: number
   /** Where to find the ones that aren't out, by place: items that can't go out left out. */
   from: PickFrom[]
+  /**
+   * The items not out that can't go out, by place and why, so a pick with none to find says what's on the bench rather
+   * than only "none" (audit, 20 October 2026, finding 94).
+   */
+  held: { where: string; why: 'damaged' | 'missing' | 'test'; items: AssetView[] }[]
 }
 
 export interface PickList {
@@ -107,7 +112,7 @@ export interface MovesView {
   pickList(jobId: string): PickList | undefined
   /** Confirmed jobs on now or starting in the next 14 days, with kit to go out; soonest first. */
   soon: PickList[]
-  /** Jobs whose kit should be back by now (over, past their days to check it back, or not going ahead) with kit still out; the longest over first. */
+  /** Jobs whose kit should be back by now (over, past their days to check it back, or not going ahead) with kit still out; the latest over first, as the one just back is the one being worked on (audit, 20 October 2026, finding 99), and one with no dates last. */
   stillOut: PickList[]
   /**
    * How many of a product are out with jobs whose kit should be back by now
@@ -129,18 +134,33 @@ function whereKept(a: { at: { name: string } | undefined; inCase: AssetView | un
   return parts.length ? parts.join(', ') : 'Not said where'
 }
 
-export function movesView(
+/**
+ * Where every scan and count leaves the kit: each item's latest scan, what's out with each job, item by item and counted,
+ * and what's missing. None of it reads the jobs, so it's kept from one change to the next while the scans, the stock and
+ * the faults are as they were: a change to a job builds the pick lists again from it, not this (audit, 20 October 2026,
+ * finding 12).
+ */
+export interface MoveTallies {
+  moves: ReadonlyMap<string, MovementView>
+  /** Each job's items that have been out with it: scanned, or in a case scanned. */
+  sent: ReadonlyMap<string, ReadonlySet<string>>
+  /** Each job's counted kit, by product. */
+  counted: ReadonlyMap<string, ReadonlyMap<string, { out: number; back: number; missing: number }>>
+  outState: ReadonlyMap<string, OutState>
+  /** Items whose latest scan, or their case's, is a report of them missing. */
+  missingNow: ReadonlySet<string>
+  outByJob: ReadonlyMap<string, AssetView[]>
+  /** Items retired while they were out. */
+  gone: ReadonlySet<string>
+}
+
+export function moveTallies(
   entities: Partial<Tables>,
   outbox: readonly (Mutation & { appliedSeq?: number })[],
   cursor: number,
-  jobs: JobsView,
   warehouse: WarehouseView,
-  /** The kit on jobs, or how to get it: kit availability needs `lateOut` from here first, so it's read only once a pick list is. */
-  kitOrLater: KitView | (() => KitView),
-  today: string,
   faults?: FaultsView
-): MovesView {
-  const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
+): MoveTallies {
   const moves = new Map<string, MovementView>()
   for (const m of Object.values(entities.movement ?? {})) moves.set(m.id, { ...m, pending: false })
   for (const m of outbox) {
@@ -171,9 +191,7 @@ export function movesView(
   }
 
   const last = new Map<string, Event>()
-  /** Each job's items that have been out with it: scanned, or in a case scanned. */
   const sent = new Map<string, Set<string>>()
-  /** Each job's counted kit, by product. */
   const counted = new Map<string, Map<string, { out: number; back: number; missing: number }>>()
   const tally = (projectId: string, modelId: string) => {
     let byModel = counted.get(projectId)
@@ -207,8 +225,9 @@ export function movesView(
 
   // Each item's latest scan, or its case's, or that case's case's.
   const outState = new Map<string, OutState>()
-  /** Items whose latest scan, or their case's, is a report of them missing. */
   const missingNow = new Set<string>()
+  /** Items retired while they were out. */
+  const gone = new Set<string>()
   const outByJob = new Map<string, AssetView[]>()
   for (const a of warehouse.assets.values()) {
     let best = last.get(a.id)
@@ -221,11 +240,35 @@ export function movesView(
     }
     if (best?.missing) missingNow.add(a.id)
     if (best?.direction !== 'out') continue
+    // Retired while out (lost on site, say) isn't out with the job any more, nor back: the out-with and late readings, and the
+    // server's own, keep to active items too (audit, 20 October 2026, finding 44).
+    if (a.status !== 'active') {
+      gone.add(a.id)
+      continue
+    }
     outState.set(a.id, { projectId: best.projectId, since: best.at, inCase: via })
     const list = outByJob.get(best.projectId) ?? []
     list.push(a)
     outByJob.set(best.projectId, list)
   }
+  return { moves, sent, counted, outState, missingNow, outByJob, gone }
+}
+
+export function movesView(
+  entities: Partial<Tables>,
+  outbox: readonly (Mutation & { appliedSeq?: number })[],
+  cursor: number,
+  jobs: JobsView,
+  warehouse: WarehouseView,
+  /** The kit on jobs, or how to get it: kit availability needs `lateOut` from here first, so it's read only once a pick list is. */
+  kitOrLater: KitView | (() => KitView),
+  today: string,
+  faults?: FaultsView,
+  /** Kept from the last build while the scans, the stock and the faults are the same (`moveTallies`). */
+  tallies: MoveTallies = moveTallies(entities, outbox, cursor, warehouse, faults)
+): MovesView {
+  const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
+  const { moves, sent, counted, outState, missingNow, outByJob, gone } = tallies
 
   const jobById = new Map(jobs.jobs.map((j) => [j.id, j]))
   const modelById = new Map(warehouse.models.map((m) => [m.id, m]))
@@ -277,6 +320,7 @@ export function movesView(
           missing: 0,
           unusable: faults?.unusable(modelId) ?? 0,
           from: [],
+          held: [],
         }
         rows.set(modelId, r)
       }
@@ -296,7 +340,7 @@ export function movesView(
     }
     for (const id of sent.get(jobId) ?? []) {
       const a = warehouse.assets.get(id)
-      if (!a || outState.get(id)?.projectId === jobId) continue
+      if (!a || gone.has(id) || outState.get(id)?.projectId === jobId) continue
       if (missingNow.has(id)) row(a.modelId).missingItems.push(a)
       else row(a.modelId).backItems.push(a)
     }
@@ -310,7 +354,20 @@ export function movesView(
       // Where to find the rest: items not out with any job, and what's counted, place by place.
       const from = new Map<string, PickFrom>()
       const at = (where: string) => from.get(where) ?? (from.set(where, { where, items: [], counted: 0 }), from.get(where)!)
-      for (const a of r.model?.items ?? []) if (!outState.has(a.id) && !faults?.cantGoOut(a.id)) at(whereKept(a)).items.push(a)
+      const held = new Map<string, PickRow['held'][number]>()
+      for (const a of r.model?.items ?? []) {
+        if (outState.has(a.id)) continue
+        if (!faults?.cantGoOut(a.id)) {
+          at(whereKept(a)).items.push(a)
+          continue
+        }
+        const kind = faults.stopping(a.id)?.kind
+        const why = kind === 'missing' ? 'missing' : kind ? 'damaged' : 'test'
+        const where = why === 'missing' ? '' : whereKept(a)
+        const key = `${why} ${where}`
+        held.get(key)?.items.push(a) ?? held.set(key, { where, why, items: [a] })
+      }
+      r.held = [...held.values()].sort((a, b) => byWhere.compare(a.where, b.where) || a.why.localeCompare(b.why))
       for (const s of r.model?.counted ?? []) at(whereKept(s)).counted += s.qty
       r.from = [...from.values()].sort((a, b) => byWhere.compare(a.where, b.where))
     }
@@ -351,7 +408,7 @@ export function movesView(
       .filter(due)
       .map((id) => pickList(id))
       .filter((p): p is PickList => !!p && p.stillOut > 0)
-      .sort((a, b) => (a.job.span?.end ?? '').localeCompare(b.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
+      .sort((a, b) => (b.job.span?.end ?? '').localeCompare(a.job.span?.end ?? '') || a.job.name.localeCompare(b.job.name) || a.job.id.localeCompare(b.job.id))
 
   const late = new Map<string, number>()
   for (const [id, items] of outByJob) {

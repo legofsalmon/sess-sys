@@ -213,6 +213,8 @@ export const COMMAND_NEEDS: Record<CommandName, Ability> = {
   'messages.prompt': 'settings',
   // Whether the company uses timesheets (ADR 0090): a setting like messages to crew.
   'timesheets.use': 'settings',
+  // Whether Claude is offered inside the app (ADR 0096): a setting like timesheets.
+  'assistant.use': 'settings',
 
   'person.role': 'company',
   'person.erase': 'company',
@@ -306,13 +308,24 @@ export const sameEmail = (a: string | null | undefined, b: string | null | undef
  */
 export const holdsARole = (p: Pick<RolePerson, 'role'>) => p.role !== null && p.role !== 'crew' && p.role !== 'freelancer'
 
-/** Who can change the email or kind of someone who holds a role: a role that changes settings, or anyone while roles are off. */
-export const mayChangeWhoSignsIn = (role: Role | null | undefined) => !role || roleCan(role, 'settings')
+/**
+ * What changing the email, kind or addresses of someone holding a role
+ * needs: a director's needs a director (audit, 20 October 2026, finding 10),
+ * so the office can't make a director's account its own; anyone else's,
+ * a role that changes settings.
+ */
+export const signInAbility = (held: Role | null | undefined): Ability => (held === 'director' ? 'company' : 'settings')
+
+/** Who can change the email or kind of someone who holds `held`: a role with the ability it needs, or anyone while roles are off. */
+export const mayChangeWhoSignsIn = (role: Role | null | undefined, held?: Role | null) => !role || roleCan(role, signInAbility(held))
 
 /** Why someone can't change the email or kind of a person who holds a role. */
 export function whoSignsInRefusal(name: string, held: Role, role?: Role): string {
-  return `Only ${whoCan('settings')} can change ${name}'s email or type: it's how they sign in as ${ROLE_LABELS[held]}.${role ? ` Your role is ${ROLE_LABELS[role]}.` : ''}`
+  return `Only ${whoCan(signInAbility(held))} can change ${name}'s email or type: it's how they sign in as ${ROLE_LABELS[held]}.${role ? ` Your role is ${ROLE_LABELS[role]}.` : ''}`
 }
+
+/** Why the address someone signs in with can't be given to another person: their account would become that person (audit, 20 October 2026, finding 10). */
+export const ownAddressRefusal = (email: string) => `${email} is the address you sign in with, so it can't be given to someone else. Sign in with another address first, or ask a director.`
 
 /** Why an email someone else on the Crew tab has can't be given to another person: the account would find the wrong one. */
 export const emailInUseRefusal = (other: string) => `${other} already has that email. Each person needs their own, as it's how the app knows who signs in.`

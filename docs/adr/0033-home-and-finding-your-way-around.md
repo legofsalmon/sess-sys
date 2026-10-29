@@ -116,3 +116,29 @@ The personas, the flows they follow and the problems rated are in
   synced: it's a convenience, like the folds, not data.
 - Every screen built from cards gets the strip for nothing. A card with
   a heading that reads badly as a short label shows up as it is.
+
+## Later: the freelancer's page at real volume (29 October 2026)
+
+On the freelancer's link the glance line now stays at the top of the
+screen as the page scrolls, and only the next three bookings are drawn as
+full cards; the rest are one line each (job, role, days, status) that
+opens in place, with no script (audit, 20 October 2026, finding 48).
+
+## Later: Home at volume (29 October 2026)
+
+From the audit of 20 October (findings 32, 33, 69, 70):
+
+- **Needs attention** is two groups under one sentence: what stops the next
+  fortnight's work (running late, crew needed, kit short, can't go out,
+  still out, to pick) at full size, then the housekeeping (answers,
+  timesheets, leave, certificates, faults, tests, vehicle checks, counts)
+  smaller under it, so at volume, when nothing is zero, the soon still
+  stands out. Kit short counts only confirmed jobs whose kit is held in the
+  fortnight, as crew needed is counted for the fortnight.
+- **The week ahead** is a line a job, as Today is, with the day it starts;
+  it keeps Today's and the chart's rule (no enquiries), counts the gigs and
+  hires it lists, and folds the errands and meetings behind one line.
+- **Me** ends with their own day (a booking that takes in today, with its
+  call time and venue, or their leave), or "Nothing on today" and the next
+  booking, never the company's Today; and its leave line says a day in lieu
+  waiting to be approved beside the requests.

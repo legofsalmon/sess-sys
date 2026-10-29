@@ -1,4 +1,4 @@
-import { historyDays, historyTime, NOTICE_WHY_WORDS, plan, sortOutDays, type Notice } from '@sh/shared'
+import { historyDays, historyTime, makerOf, NOTICE_WHY_WORDS, plan, plural, sortOutDays, type Notice, type NoticeLine, type View } from '@sh/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth.ts'
 import { Empty } from './Empty.tsx'
@@ -6,9 +6,12 @@ import { Icon } from './Icon.tsx'
 import { Top } from './jobs/common.tsx'
 import { QuotesToChase } from './jobs/Money.tsx'
 import { SortOut } from './jobs/PlanScreen.tsx'
+import { TodoCard } from './TodoCard.tsx'
 import {
   dismissToast,
   isNew,
+  jobOfNotice,
+  linesOf,
   loadNotices,
   markAllRead,
   pauseToast,
@@ -16,7 +19,6 @@ import {
   resumeToast,
   setToastsOn,
   toastsOn,
-  unreadCount,
   useNotices,
   useToasts,
 } from './notices.ts'
@@ -99,8 +101,8 @@ export function NoticesScreen() {
   const seesMoney = access.can('money')
   const ahead = useMemo(() => (booksCrew ? plan(view, sortOutDays(today), today) : null), [booksCrew, view, today])
 
-  const byId = useMemo(() => new Map(notices.notices.map((n) => [n.id, n])), [notices.notices])
   const days = useMemo(() => historyDays(notices.notices), [notices.notices])
+  const lines = useMemo(() => linesOf(notices.notices, view), [notices.notices, view])
 
   return (
     <div className="app notices">
@@ -147,20 +149,23 @@ export function NoticesScreen() {
         )}
       </section>
 
+      <TodoCard view={view} />
       {ahead && <SortOut problems={ahead.problems} vanProblems={ahead.vanProblems} hint="Clashes and checks from today to four weeks out. Each goes once it's sorted." />}
       {seesMoney && <QuotesToChase view={view} />}
 
-      {days.map((d) => (
+      {days.map((d) => lines.some((l) => l.day === d.day) && (
         <section className="card day" key={d.day} aria-labelledby={`notices-${d.day}`}>
           <h2 id={`notices-${d.day}`}>{d.label}</h2>
           <ol className="entries">
-            {d.runs
-              .flatMap((r) => r.entries)
-              .map((e) => byId.get(e.id))
-              .filter((n): n is Notice => n !== undefined)
-              .map((n) => (
-                <NoticeRow key={n.id} notice={n} day={d.day} fresh={isNew(n, mark)} href={placeOf(n, view)} />
-              ))}
+            {lines
+              .filter((l) => l.day === d.day)
+              .map((l) =>
+                l.kind === 'one' ? (
+                  <NoticeRow key={l.id} notice={l.notices[0]!} day={d.day} fresh={isNew(l.notices[0]!, mark)} href={placeOf(l.notices[0]!, view)} />
+                ) : (
+                  <LineRow key={l.id} line={l} day={d.day} mark={mark} view={view} />
+                ),
+              )}
           </ol>
         </section>
       ))}
@@ -182,8 +187,59 @@ function NoticeRow({ notice: n, day, fresh, href }: { notice: Notice; day: strin
         {href ? <a href={href}>{n.what}</a> : n.what}
       </p>
       <span className="meta">
-        {n.who.name} · {NOTICE_WHY_WORDS[n.why]} · {historyTime(n.arrivedAt, day)}
+        {makerOf(n)} · {NOTICE_WHY_WORDS[n.why]} · {historyTime(n.arrivedAt, day)}
       </span>
+    </li>
+  )
+}
+
+/**
+ * Several changes as one line (audit, 20 October 2026, finding 68): a day's
+ * to one job, opening the job; or one maker's to many jobs at once. Each
+ * opens to show its changes.
+ */
+function LineRow({ line, day, mark, view }: { line: NoticeLine; day: string; mark: string | null; view: View }) {
+  const newest = line.notices[0]!
+  const oldest = line.notices.at(-1)!
+  const fresh = line.notices.some((n) => isNew(n, mark))
+  const makers = [...new Set(line.notices.map(makerOf))]
+  const whys = [...new Set(line.notices.map((n) => NOTICE_WHY_WORDS[n.why]))]
+  const jobId = line.kind === 'job' ? jobOfNotice(newest, view) : undefined
+  const job = jobId ? view.jobs.jobs.find((j) => j.id === jobId) : undefined
+  const from = historyTime(oldest.arrivedAt, day)
+  const to = historyTime(newest.arrivedAt, day)
+  const title = line.kind === 'job' ? `${plural(line.notices.length, 'change')} to ${job?.name ?? 'a job'}` : `${plural(line.notices.length, 'change')} to ${plural(line.jobs, 'job')} of yours at once`
+  return (
+    <li className={fresh ? 'entry notice new' : 'entry notice'}>
+      <p>
+        {fresh && (
+          <span className="new-mark">
+            <span className="dot" aria-hidden="true" />
+            New<span className="sr-only">: </span>
+          </span>
+        )}
+        {jobId ? <a href={`#jobs/${jobId}`}>{title}</a> : title}
+      </p>
+      <span className="meta">
+        {makers.length <= 2 ? makers.join(' and ') : `${makers[0]} and ${plural(makers.length - 1, 'other')}`} · {whys.join(', ')} · {from === to ? to : `${from} to ${to}`}
+      </span>
+      <details className="notice-fold">
+        <summary>Show {line.notices.length === 2 ? 'both' : `all ${line.notices.length}`}</summary>
+        <ol>
+          {line.notices.map((n) => {
+            const href = placeOf(n, view)
+            return (
+              <li key={n.id}>
+                {href ? <a href={href}>{n.what}</a> : n.what}
+                <span className="meta">
+                  {' '}
+                  · {makerOf(n)} · {historyTime(n.arrivedAt, day)}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      </details>
     </li>
   )
 }

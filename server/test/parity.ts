@@ -26,6 +26,9 @@ const WAITING = /^pending|Pending$/
 /** Ids a device makes afresh each time it works something out, for lines not saved yet: kit from the notes. */
 const MADE_AFRESH = [/\.plan\.lines\.\d+\.id$/]
 
+/** Records listed only inside another, walked in full rather than shortened to their id. */
+const NESTED_IN_FULL = /^\.crew\.calls\.\d+\.offers\.\d+$/
+
 /**
  * Everything a screen could read of the view, as plain data: records in
  * full, and inside a record the records it points to by their id, which
@@ -41,7 +44,8 @@ function shown(view: View, ignore: readonly string[] = []): unknown {
     if (v instanceof Set) return [...v].map((x, i) => walk(x, inRecord, `${path}.${i}`))
     if (Array.isArray(v)) return v.map((x, i) => walk(x, inRecord, `${path}.${i}`))
     const id = (v as { id?: unknown }).id
-    if (inRecord && typeof id === 'string') return `#${id}`
+    // An offer is listed only inside its call, so it's compared in full there (audit, 20 October 2026, finding 26).
+    if (inRecord && typeof id === 'string' && !NESTED_IN_FULL.test(path)) return `#${id}`
     const out: Record<string, unknown> = {}
     for (const key of Object.keys(v).sort()) {
       if (skip.has(key) || WAITING.test(key) || MADE_AFRESH.some((re) => re.test(`${path}.${key}`))) continue
@@ -69,6 +73,8 @@ interface Case<N extends CommandName = CommandName> {
   args: CommandInput<N>
   /** Made on the server first, as the office would. */
   before?: Mutation[]
+  /** Made on the same phone with no signal just before the change, so both wait together. */
+  queued?: Mutation[]
   /** Fields only the server can fill in, left out of the comparison. */
   ignore?: string[]
   /** Drift found and not put right yet: each must still be there, so whoever fixes it takes it off. */
@@ -86,6 +92,7 @@ async function run(k: Case) {
   if (k.before?.length) await ok(app, ...k.before)
   const { client, signal } = await phone(app)
   signal.on = false
+  for (const q of k.queued ?? []) await client.mutate(q.name, q.args as never)
   await client.mutate(k.name, k.args as never)
   const waiting = shown(client.view(), k.ignore)
   signal.on = true
@@ -130,6 +137,7 @@ const CASES: Case[] = [
   c('offer.respond', { id: 'eimear-sound', answer: 'counter', counterRateCents: 36000, days: null, note: '' }, { as: 'countered' }),
   c('offer.respond', { id: 'dara-sound', answer: 'pullOut', note: 'Sick' }, { as: 'pulled out' }),
   c('offer.confirm', { id: 'eimear-sound' }, { before: [m('offer.respond', { id: 'eimear-sound', answer: 'accept', days: null, note: '' })] }),
+  c('offer.confirm', { id: 'eimear-sound' }, { as: 'a counter noted and agreed with no signal', queued: [m('offer.respond', { id: 'eimear-sound', answer: 'counter', counterRateCents: 36000, days: null, note: 'Long days' })] }),
   c('offer.cancel', { id: 'eimear-sound' }),
   c('offer.seen', { id: 'eimear-sound' }, { before: [m('offer.respond', { id: 'eimear-sound', answer: 'decline', note: '' })] }),
   c('person.merge', { id: 'dara', from: ['niamh'] }, { before: [person('niamh', 'Dara Q', 'freelancer', { email: 'dq@example.com' })] }),
@@ -236,6 +244,7 @@ const CASES: Case[] = [
   c('reading.heads', { rates: true }),
   c('messages.prompt', { on: false }),
   c('timesheets.use', { on: true }),
+  c('assistant.use', { on: true }),
 
   // Leave and time in lieu.
   c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(40), note: 'Family' }),

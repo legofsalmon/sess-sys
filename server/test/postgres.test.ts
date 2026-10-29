@@ -218,7 +218,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
     const app = await buildApp({
       db,
       auth: { provider: {} as IdentityProvider, domains: ['sessionhire.com'], emails: [] },
-      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, gapMs: 0, settleMs: 3_600_000, now },
+      calendar: { clientId: google.clientId, clientSecret: google.clientSecret, fetch: google.fetch, writes: true, gapMs: 0, settleMs: 3_600_000, now },
     })
     try {
       const colly = await staff(app, db, 'Colly Hewson', IPHONE, 'phone-c0ffee')
@@ -334,7 +334,7 @@ describe.skipIf(!url)('real Postgres, many devices at once', () => {
         people: preview.people.map((p: { email: string }) => ({ email: p.email, include: true })),
       }
       const brought = await post('/api/calendar/import/bring', choices)
-      expect(brought.json()).toEqual({ jobs: 1, added: 0, days: 2, venues: 1, people: 1, crew: 1, missing: [] })
+      expect(brought.json()).toEqual({ jobs: 1, added: 0, days: 2, venues: 1, people: 1, crew: 1, missing: [], already: [] })
       const { rows } = await db.query<{ name: string; source_calendar: string; phases: number; imported: number }>(
         `SELECT p.name, p.source_calendar, (SELECT count(*)::int FROM phases WHERE project_id = p.id) AS phases,
                 (SELECT count(*)::int FROM calendar_imports WHERE project_id = p.id) AS imported
@@ -719,8 +719,8 @@ describe.skipIf(!url)('real Postgres, a long change holding the write lock (audi
       let release: (() => Promise<void>) | undefined
       const transaction = db.transaction.bind(db)
       let calls = 0
-      db.transaction = async (fn) => {
-        const result = await transaction(fn)
+      db.transaction = async (fn, o) => {
+        const result = await transaction(fn, o)
         if (++calls === 1) release = await holdWriteLock()
         return result
       }
@@ -729,6 +729,32 @@ describe.skipIf(!url)('real Postgres, a long change holding the write lock (audi
       const body = answer.json()
       expect(body.busy).toBe(true)
       expect(body.results.map((r: MutationResult) => [r.id, r.status])).toEqual([[expect.any(String), 'applied']])
+    } finally {
+      await app.close()
+      await db.close()
+    }
+  })
+
+  it('turns down a change in a shape it does not take without waiting for the lock, and writes it down', async () => {
+    // Proves: a change refused on its shape is answered and kept in the history while a long change holds the write lock,
+    // rather than taking the lock to be refused (audit, 20 October 2026, finding 66); the change after it waits and is busy.
+    const db = postgresDb(url!)
+    await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+    const app = await buildApp({ db, pushLockWaitMs: 500 })
+    try {
+      const release = await holdWriteLock()
+      const bad = m('place.upsert', { id: 'x', name: 'Bay X', notes: null })
+      let answer
+      try {
+        answer = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'phone', mutations: [bad, place('a')], partial: true } })
+      } finally {
+        await release()
+      }
+      expect(answer.json()).toMatchObject({ busy: true, results: [{ id: bad.id, status: 'rejected', reason: { code: 'invalid' } }] })
+      expect((await db.query('SELECT status FROM mutations WHERE id = $1', [bad.id])).rows).toEqual([{ status: 'rejected' }])
+      // Sent again, it's answered as the first time.
+      const again = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'phone', mutations: [bad], partial: true } })
+      expect(again.json().results).toMatchObject([{ id: bad.id, status: 'rejected', duplicate: true }])
     } finally {
       await app.close()
       await db.close()

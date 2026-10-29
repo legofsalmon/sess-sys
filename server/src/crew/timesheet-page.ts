@@ -1,5 +1,5 @@
-import { dayLabel, daysLabel, euro, MAX_EXTRAS, timesheetChanges, timesheetTotal, type CrewCall, type Offer, type OfficeDetails, type Timesheet } from '@sh/shared'
-import { CSS, flash, officeBlock } from './page.ts'
+import { dayLabel, daysLabel, euro, irishToday, MAX_EXTRAS, timesheetChanges, timesheetTotal, type CrewCall, type Offer, type OfficeDetails, type Timesheet } from '@sh/shared'
+import { CSS, fieldError, flash, invalid, officeBlock } from './page.ts'
 import { SHEET_CSS } from './sheet.ts'
 
 /**
@@ -14,8 +14,8 @@ const h = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 const lines = (s: string) => h(s).replace(/\n/g, '<br>')
 const euroInput = (c: number) => (c / 100).toFixed(c % 100 === 0 ? 0 : 2)
-/** "Wed 30 Sep", in Ireland. */
-const on = (iso: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }))
+/** "Wed 30 Sep", in Ireland; with its year when that isn't plain from today (audit, 20 October 2026, finding 89). */
+const on = (iso: string) => dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Dublin' }), irishToday())
 
 export interface TimesheetPage {
   offer: Offer
@@ -26,7 +26,8 @@ export interface TimesheetPage {
   /** Staff are paid through payroll, so their page carries no rate (audit finding 21). */
   staff: boolean
   base: string
-  flash?: { ok: boolean; text: string }
+  /** A message; a refusal about one extra says which, by its place among those filled in, to be said under it. */
+  flash?: { ok: boolean; text: string; extra?: number }
   /** What a refused post typed (rule 11), drawn back into the form so nothing is lost. */
   kept?: URLSearchParams
   /** The office's phone and email, once set. */
@@ -53,10 +54,14 @@ export function renderTimesheet(d: TimesheetPage): string {
   <header class="top"><span class="mark">SH</span><div><b>Session Hire</b><small>Timesheet</small></div></header>
   ${officeBlock(d.office)}
   <a class="back" href="${h(d.base)}">‹ Your work</a>
-  ${d.flash ? flash(d.flash) : ''}
+  ${
+    // Once sent, the line under the heading says so with the total; the thanks after Send would say it again
+    // (audit, 20 October 2026, finding 91). A refusal about one extra is said under that extra (finding 90).
+    d.flash && !(d.flash.ok && t?.status === 'sent') && d.flash.extra === undefined ? flash(d.flash) : ''
+  }
   <section class="head">
     <h1>${h(call.project)}${call.phase ? ` <span>${h(call.phase)}</span>` : ''}</h1>
-    <p class="when">${h(call.role)}, ${h(daysLabel(offer.days))}</p>
+    <p class="when">${h(call.role)}, ${h(daysLabel(offer.days, irishToday()))}</p>
     ${d.staff ? '' : `<p class="small">${rate === null ? 'Day rate to agree with the office.' : `${h(euro(rate))} a day${t && t.dayRateCents !== offer.dayRateCents ? '' : ', as agreed'}.`}</p>`}
   </section>
   ${!t && d.why ? `<p class="flash warn">${h(d.why)}</p>` : t?.status === 'approved' ? approved(t) : form(d, action)}
@@ -74,7 +79,7 @@ function approved(t: Timesheet): string {
   const n = t.days.length
   return `<section class="you"><h2>Approved: ${h(euro(total))}</h2>
     <ul class="extras-list">
-      <li>${n} day${n === 1 ? '' : 's'} at ${h(euro(t.dayRateCents))}, ${h(daysLabel(t.days))} <span>${h(euro(fees))}</span></li>
+      <li>${n} day${n === 1 ? '' : 's'} at ${h(euro(t.dayRateCents))}, ${h(daysLabel(t.days, irishToday()))} <span>${h(euro(fees))}</span></li>
       ${t.extras.map((e) => `<li>${h(e.what)} <span>${h(euro(e.cents))}</span></li>`).join('')}
     </ul>
     ${changes.length ? `<p>The office changed what you sent:</p><ul class="changes">${changes.map((c) => `<li>${h(c)}</li>`).join('')}</ul>` : ''}
@@ -97,21 +102,25 @@ function form(d: TimesheetPage, action: string): string {
   const rows = [...extras, ...Array.from({ length: blanks }, () => ({ what: '', euro: '' }))]
   return `${
     t
-      ? `<p class="flash ok">Sent to the office on ${h(on(t.sentAt))}: ${h(euro(timesheetTotal(t).total))} in all. They'll check it; you can change it until they approve it.</p>`
+      ? `<p class="flash ok" role="status">Sent to the office on ${h(on(t.sentAt))}: ${h(euro(timesheetTotal(t).total))} in all. They'll check it; you can change it until they approve it.</p>`
       : ''
   }
   <form method="post" action="${action}" class="timesheet">
     <input type="hidden" name="picker" value="1">
-    <fieldset class="days"><legend>Days you worked</legend>${[...d.offer.days]
+    <fieldset class="days"><legend>Days you worked</legend>${[...new Set([...d.offer.days, ...(t?.days ?? [])])]
       .sort()
-      .map((day) => `<label><input type="checkbox" name="days" value="${day}"${ticked.has(day) ? ' checked' : ''}> ${h(dayLabel(day))}</label>`)
+      .map((day) => `<label><input type="checkbox" name="days" value="${day}"${ticked.has(day) ? ' checked' : ''}> ${h(dayLabel(day, irishToday()))}</label>`)
       .join('')}</fieldset>
     <fieldset class="extras"><legend>Extras</legend>
       <p class="small">Parking, tolls, mileage, or anything else the office agreed. Keep the receipts. Leave a row empty if you don't need it.</p>
       ${rows
         .map(
-          (r, i) =>
-            `<div class="extra"><label><span>What</span> <input name="what" maxlength="100" value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal" value="${h(r.euro)}"></label></div>`
+          (r, i) => {
+            // The extra a refusal is about: the field it names marked, and the words under the row.
+            const wrong = d.flash && !d.flash.ok && d.flash.extra === i ? `extra-error-${i}` : undefined
+            const which = wrong ? (r.what.trim() ? 'euro' : 'what') : undefined
+            return `<div class="extra"><label><span>What</span> <input name="what" maxlength="100"${which === 'what' ? invalid(wrong!) : ''} value="${h(r.what)}"${i === 0 && !r.what ? ' placeholder="e.g. Parking"' : ''}></label><label><span>€</span> <input name="euro" inputmode="decimal"${which === 'euro' ? invalid(wrong!) : ''} value="${h(r.euro)}"></label></div>${wrong ? fieldError(wrong, d.flash!.text) : ''}`
+          }
         )
         .join('')}
     </fieldset>

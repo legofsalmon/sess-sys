@@ -97,6 +97,11 @@ const MIGRATIONS: string[] = [
     jsonb_build_object('id', id, 'personId', person_id, 'year', year, 'days', days, 'carriedOver', carried_over, 'note', note)
   FROM moved ORDER BY id;
   `,
+  // Whether the approver who last set an allowance set their own, so the Leave screen and the history can say so: an
+  // approver sets their own only when nobody else can (audit, 20 October 2026, finding 84).
+  `
+  ALTER TABLE leave_allowances ADD COLUMN IF NOT EXISTS self_set boolean NOT NULL DEFAULT false;
+  `,
 ]
 
 export const LEAVE: Module = { versionTable: 'leave_schema_version', migrations: MIGRATIONS }

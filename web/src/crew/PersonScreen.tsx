@@ -13,7 +13,7 @@ import {
   type View,
 } from '@sh/shared'
 import { CERTIFICATE_SOON_DAYS, certificateName, daysBetween, dayLabel, whatsappNumber } from '@sh/shared'
-import { holdsARole, ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
+import { holdsARole, ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, signInAbility, type Role } from '@sh/shared'
 import { useId, useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -68,7 +68,10 @@ export function PersonScreen({
 }) {
   const person = view.crew.people.find((p) => p.id === id)
   const up = { steps: [CREW, PEOPLE], here: person?.name }
-  const parts = PERSON_PARTS.filter((p) => p !== 'link' || (person && !person.archived))
+  const access = useAccess()
+  // Their link is the office's to send; their own is anyone's to open (audit, 20 October 2026, finding 35).
+  const own = !!person && person.id === access.personId
+  const parts = PERSON_PARTS.filter((p) => p !== 'link' || (person && !person.archived && (own || access.can('crew'))))
   const [part, pick] = useTab({ parts, asked, remember: 'sh.personPart', address: (p) => `${personHref(id)}/${p}` })
   if (!person)
     return (
@@ -91,7 +94,7 @@ export function PersonScreen({
     >
       <Reach person={person} />
       <Warnings person={person} view={view} />
-      <Tabs label={`About ${person.name}`} id="person" parts={parts} labels={PERSON_LABELS} current={part} counts={{ worked: person.worked.length || undefined }} onPick={pick} />
+      <Tabs label={`About ${person.name}`} id="person" parts={parts} labels={own ? { ...PERSON_LABELS, link: 'Your page' } : PERSON_LABELS} current={part} counts={{ worked: person.worked.length || undefined }} onPick={pick} />
       <TabPanel id="person" current={part}>
         {part === 'coming' && (
           <>
@@ -182,7 +185,7 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   const mayEdit = access.can('crew') && !person.archived
   const role = roleOfPerson(person)
   // Their main email is how they're written to; for someone with a role, only who changes settings changes it, as with the email itself.
-  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can('settings'))
+  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can(signInAbility(person.role)))
   const [editing, setEditing] = useState(false)
   const { run, error } = useAct()
   const phone = person.phone?.trim()
@@ -465,7 +468,10 @@ function ComingUp({ person, view, onArchived }: { person: PersonView; view: View
 
 /** Their private link and calendar feed (ADR 0002, ADR 0012): open it as they see it, copy it to send, or replace it. */
 function TheirLink({ person }: { person: PersonView }) {
-  const mayEdit = useAccess().can('crew')
+  const access = useAccess()
+  const mayEdit = access.can('crew')
+  // Their own page, for someone who doesn't send links: open it and take the calendar address, as the reading sends them both.
+  const own = person.id === access.personId
   // Which address was just copied, said on its button (rule 10).
   const [copied, setCopied] = useState<'link' | 'feed' | undefined>()
   const copy = (what: 'link' | 'feed', text: string) => void navigator.clipboard?.writeText(text).then(() => setCopied(what))
@@ -473,7 +479,27 @@ function TheirLink({ person }: { person: PersonView }) {
   const { run, error } = useAct()
   const link = linkFor(person)
   const feed = useFeedAddress(person.linkToken)
-  if (!mayEdit) return null
+  if (!mayEdit && !own) return null
+  if (!mayEdit)
+    return (
+      <section className="card" aria-label="Your page">
+        <Heading icon="link">Your page</Heading>
+        <p className="hint">Where you answer offers, mark days off and send documents. Your bookings go to your own calendar from there too.</p>
+        <div className="actions">
+          {link && (
+            <a className="button" href={link} target="_blank" rel="noreferrer">
+              Open your page
+            </a>
+          )}
+          {feed && (
+            <button type="button" onClick={() => copy('feed', feed)}>
+              {copied === 'feed' ? 'Copied' : 'Copy calendar address'}
+            </button>
+          )}
+        </div>
+        {!link && <p className="hint">Your page isn't made yet. The office can make it.</p>}
+      </section>
+    )
   return (
     <section className="card" aria-label="Their link">
       <Heading icon="link">Their link</Heading>

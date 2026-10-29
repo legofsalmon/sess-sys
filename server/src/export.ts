@@ -1,9 +1,9 @@
 import { waitLabel, type HistoryEntry } from '@sh/shared'
-import { strToU8, zipSync } from 'fflate'
+import { strToU8, Zip, ZipDeflate } from 'fflate'
 import type { Db } from './db.ts'
 import { readAllHistory } from './history.ts'
 import { MODULES } from './modules.ts'
-import { columnsOf, forEachRow, ident, tablesInOrder, useCanonicalOutput } from './tables.ts'
+import { forEachRow, ident, tableLayout, tablesInOrder, useCanonicalOutput } from './tables.ts'
 
 /**
  * Everything the company has in the app, in one file it can open without the
@@ -54,17 +54,24 @@ export async function readEverything(db: Db, now = new Date()): Promise<Everythi
     await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
     await useCanonicalOutput(tx)
     const tables: Table[] = []
-    for (const name of await tablesInOrder(tx)) {
-      if (NOT_EXPORTED.has(name)) continue
+    const names = (await tablesInOrder(tx)).filter((name) => !NOT_EXPORTED.has(name))
+    // Each table's columns, keys and size asked for once for them all (audit, 20 October 2026, finding 19).
+    const layout = await tableLayout(tx, names)
+    for (const name of names) {
       const secret = new Set(SECRET_COLUMNS[name] ?? [])
-      const columns = (await columnsOf(tx, name)).filter((c) => !secret.has(c.name))
+      const columns = layout.columns.get(name)!.filter((c) => !secret.has(c.name))
       const rows: Row[] = []
-      await forEachRow(tx, name, (json) => {
-        const row = JSON.parse(json) as Row
-        for (const c of secret) delete row[c]
-        if (name === 'changes') withoutSecretFields(row)
-        rows.push(row)
-      })
+      await forEachRow(
+        tx,
+        name,
+        (json) => {
+          const row = JSON.parse(json) as Row
+          for (const c of secret) delete row[c]
+          if (name === 'changes') withoutSecretFields(row)
+          rows.push(row)
+        },
+        layout
+      )
       tables.push({ name, columns, rows })
     }
     return { exportedAt: now, tables, history: await readAllHistory(tx) }
@@ -91,16 +98,81 @@ export function everythingJson(e: Everything) {
   return { exportedAt: e.exportedAt.toISOString(), ...Object.fromEntries(e.tables.map((t) => [t.name, t.rows])) }
 }
 
-/** The one file: README, the history, a spreadsheet per table, and all of it as JSON. */
-export function everythingZip(e: Everything, by?: { name: string; email: string }): Uint8Array {
-  const files: Record<string, Uint8Array> = {
-    'README.txt': strToU8(readme(e, by)),
-    'history.csv': strToU8(historyCsv(e.history)),
+/**
+ * The one file: README, the history, a spreadsheet per table, and all of it
+ * as JSON. Made a slice at a time, letting the server answer everyone else
+ * between slices, where it was made in one go and held every device up for
+ * seconds (audit, 20 October 2026, finding 19); and each table's rows are
+ * let go once its spreadsheet and its part of the JSON are written, so the
+ * tables in `e` are empty afterwards.
+ */
+export async function everythingZip(e: Everything, by?: { name: string; email: string }): Promise<Uint8Array> {
+  const out: Uint8Array[] = []
+  let failed: Error | undefined
+  const zip = new Zip((err, data) => {
+    if (err) failed = err
+    else out.push(data)
+  })
+  const options = { level: 6 as const, mtime: e.exportedAt }
+  let since = 0
+  /** A file in the zip, written in pieces; a pause for everyone else every megabyte or so. */
+  const file = (name: string) => {
+    const entry = new ZipDeflate(name, options)
+    zip.add(entry)
+    return {
+      async write(text: string) {
+        entry.push(strToU8(text))
+        since += text.length
+        if (since > 1_000_000) {
+          since = 0
+          await breathe()
+        }
+      },
+      end: () => entry.push(new Uint8Array(0), true),
+    }
   }
-  for (const t of byName(e.tables)) files[`tables/${t.name}.csv`] = strToU8(tableCsv(t))
-  files['everything.json'] = strToU8(JSON.stringify(everythingJson(e), null, 1))
-  return zipSync(files, { level: 6, mtime: e.exportedAt })
+  const whole = async (name: string, text: string) => {
+    const f = file(name)
+    await f.write(text)
+    f.end()
+  }
+
+  await whole('README.txt', readme(e, by))
+  await whole('history.csv', historyCsv(e.history))
+  // everything.json as JSON.stringify(everythingJson(e), null, 1) writes it, a table at a time, with each table's
+  // spreadsheet beside it; the spreadsheets come out after it in the file, alphabetical among themselves.
+  const json = file('everything.json')
+  await json.write(`{\n "exportedAt": ${JSON.stringify(e.exportedAt.toISOString())}`)
+  const sheets = new Map(byName(e.tables).map((t) => [t.name, file(`tables/${t.name}.csv`)]))
+  for (const t of e.tables) {
+    await json.write(`,\n ${JSON.stringify(t.name)}: ${t.rows.length ? '[\n' : '[]'}`)
+    const sheet = sheets.get(t.name)!
+    await sheet.write(csv(t.columns.map((c) => c.name), []))
+    for (let at = 0; at < t.rows.length; at += SLICE) {
+      const slice = t.rows.slice(at, at + SLICE)
+      await json.write(`${at ? ',\n' : ''}${slice.map((r) => `  ${JSON.stringify(r, null, 1).replace(/\n/g, '\n  ')}`).join(',\n')}`)
+      await sheet.write(slice.map((r) => `${csvLine(t.columns.map((c) => cell(r[c.name], c.type)))}\r\n`).join(''))
+    }
+    if (t.rows.length) await json.write('\n ]')
+    sheet.end()
+    t.rows = []
+  }
+  await json.write('\n}')
+  json.end()
+  zip.end()
+  if (failed) throw failed
+  const zipped = new Uint8Array(out.reduce((n, c) => n + c.length, 0))
+  let at = 0
+  for (const c of out) {
+    zipped.set(c, at)
+    at += c.length
+  }
+  return zipped
 }
+
+/** Rows turned into text at a time while making the zip. */
+const SLICE = 2000
+const breathe = () => new Promise<void>((resolve) => setImmediate(resolve))
 
 /** Alphabetical, for people; `everything.json` keeps each table after the ones it refers to, for loading elsewhere. */
 const byName = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name))
@@ -155,13 +227,6 @@ function csvLine(cells: string[]): string {
 /** With the mark Excel needs to read UTF-8, so names like Seán come through. */
 function csv(header: string[], rows: string[][]): string {
   return `﻿${[header, ...rows].map(csvLine).join('\r\n')}\r\n`
-}
-
-function tableCsv(t: Table): string {
-  return csv(
-    t.columns.map((c) => c.name),
-    t.rows.map((r) => t.columns.map((c) => cell(r[c.name], c.type)))
-  )
 }
 
 function historyCsv(history: HistoryEntry[]): string {
@@ -257,6 +322,8 @@ const ABOUT: Record<string, string> = {
     "Kit the crew asked to be bought: what, how many and details, a link, the department, who asked (or the name a list brought in gave) and on which day, where it's at (asked for, agreed, ordered, arrived, not buying) and the office's notes.",
   purchase_votes: 'Who voted for each request on the purchase list, one vote each.',
   // Current RMS, read through its API (ADR 0078).
+  assistant_lists: "Claude's to-do lists for the office and directors (ADR 0097), the last two weeks of them: when each was written, whether in the morning or on request, its summary, and each thing on it with when it was ticked done.",
+  assistant_uses: 'Each time Claude was asked (ADR 0096): when, what for, the model, how many tokens went in and out, and what it cost in US cents. Not the words asked or answered, and not who asked.',
   rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
   rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",
   rms_matches: 'Each opportunity read from Current RMS that the office linked to its job: the job, who linked it and when.',

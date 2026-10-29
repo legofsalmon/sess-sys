@@ -43,7 +43,7 @@ describe('the status of everything the app relies on (ADR 0093)', () => {
     const app = await server({ outside: { maps: async () => {}, latest: async () => APP_VERSION } })
     const s = await read(app)
     expect(s.version).toBe(APP_VERSION)
-    expect(s.checks.map((c) => c.id)).toEqual(['server', 'updates', 'database', 'sign-in', 'errors', 'live', 'backups', 'storage', 'calendar', 'own-calendars', 'current-rms', 'fuel', 'maps'])
+    expect(s.checks.map((c) => c.id)).toEqual(['server', 'updates', 'database', 'sign-in', 'errors', 'live', 'backups', 'storage', 'calendar', 'own-calendars', 'current-rms', 'claude', 'fuel', 'maps'])
     expect(check(s, 'updates')).toMatchObject({ state: 'ok' })
     // Tests keep the database in memory, which the live app never should.
     expect(check(s, 'database')).toMatchObject({ state: 'bad', says: expect.stringMatching(/memory/), todo: expect.stringMatching(/DATABASE_URL/) })
@@ -54,6 +54,7 @@ describe('the status of everything the app relies on (ADR 0093)', () => {
     expect(check(s, 'calendar')).toMatchObject({ state: 'off' })
     expect(check(s, 'own-calendars')).toMatchObject({ state: 'off' })
     expect(check(s, 'current-rms')).toMatchObject({ state: 'off', todo: expect.stringMatching(/CURRENT_RMS_API_KEY/) })
+    expect(check(s, 'claude')).toMatchObject({ state: 'off', todo: expect.stringMatching(/ANTHROPIC_API_KEY/) })
     expect(check(s, 'fuel')).toMatchObject({ state: 'ok' })
     expect(check(s, 'maps')).toMatchObject({ state: 'ok' })
     for (const c of s.checks) if (c.state === 'bad' || c.state === 'warn') expect(c.todo, c.id).toBeTruthy()

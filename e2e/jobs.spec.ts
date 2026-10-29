@@ -87,6 +87,8 @@ test('a job with its phases and crew, renamed for the crew too', async ({ browse
   await expect(office.getByRole('heading', { name: renamed })).toBeVisible()
   await expect(office.locator('.conn')).toHaveText('Up to date')
   await office.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name: 'Crew' }).click()
+  // The job's call is past the fortnight Crew needed shows at rest (audit, 20 October 2026, finding 23).
+  await office.getByRole('button', { name: /^Show all \d+ calls still to come$/ }).click()
   // Grouped by job (audit finding 16): the job's name and Open job on the group, the call as one line under it.
   const group = office.locator('.call-group', { hasText: renamed })
   await expect(group.locator('header b')).toHaveText(renamed)

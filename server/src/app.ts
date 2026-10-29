@@ -1,7 +1,7 @@
 import compress from '@fastify/compress'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
-import { APP_VERSION, FEED, MONEY_ENTITY_NAMES, plural, pushRequest, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
+import { APP_VERSION, FEED, MONEY_ENTITY_NAMES, plural, pushRequest, documentsRead, readsEverything, readsEveryRate, roleSeesMoney, type Change, type Beat, type ClientConfig, type EntityName, type MutationResult, type Poke, type PullResponse, type PushResponse } from '@sh/shared'
 import Fastify, { LogController, type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import { readFileSync } from 'node:fs'
 import { join, sep } from 'node:path'
@@ -17,7 +17,7 @@ import { Google } from './calendar/google.ts'
 import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
-import { applyMutationIn, currentSeq } from './commands.ts'
+import { applyMutationIn, currentSeq, recordRefusal, refusedOnSight } from './commands.ts'
 import { clearedSince, startedFresh } from './data/fresh.ts'
 import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
@@ -36,7 +36,7 @@ import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { appShellPolicy, inlineScripts, pagePolicy, publicOrigin, requestForLog } from './http.ts'
-import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
+import { CHARACTERS, isCharacterError, isLockBusy } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { registerNoticeRoutes } from './notices.ts'
 import { reportError, reportNowAndThen, type ErrorReporting } from './monitoring.ts'
@@ -50,6 +50,9 @@ import { aaFuel, FuelUpdates, registerFuelRoutes, type FuelLookup } from './fina
 import { RmsApi, type RmsConfig } from './rms/api.ts'
 import { RmsReader } from './rms/reader.ts'
 import { registerRmsRoutes } from './rms/routes.ts'
+import type { ClaudeConfig } from './assistant/claude.ts'
+import { Assistant, registerAssistantRoutes } from './assistant/routes.ts'
+import { Todo } from './assistant/todo.ts'
 import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
@@ -136,6 +139,8 @@ export interface AppOptions {
   fuel?: FuelLookup
   /** Current RMS's API, read only (ADR 0078): the subdomain and key. Without it Admin says it isn't set up. */
   currentRms?: RmsConfig
+  /** Claude inside the app (ADR 0096): Anthropic's key, the model and the monthly limit. Without it, Admin says it isn't set up. */
+  claude?: ClaudeConfig
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
   /** Admin › Status's looks outside the server (ADR 0093): the map search and GitHub. Without them, those two say so. */
@@ -167,6 +172,8 @@ declare module 'fastify' {
     ownCalendars: OwnCalendars
     /** Reading Current RMS (ADR 0078), run from Admin. */
     rms: RmsReader
+    /** Claude's to-do list each weekday morning (ADR 0097); the caller starts it once the server is listening. */
+    assistantTodo: Todo
   }
 }
 
@@ -218,7 +225,7 @@ class QuietRequests extends LogController {
 
   override requestCompleted(error: Error | null | undefined, req: FastifyRequest, reply: FastifyReply) {
     const ms = reply.elapsedTime
-    if (error) reply.log.error({ req, res: reply, err: error, responseTime: Math.round(ms) }, 'Request errored')
+    if (error) reply.log.error({ req, res: reply, err: faultForLog(error), responseTime: Math.round(ms) }, 'Request errored')
     else if (reply.statusCode >= 400) reply.log.info({ req, res: reply, responseTime: Math.round(ms) }, 'Request failed')
     else if (ms >= this.slowMs) reply.log.warn({ req, res: reply, responseTime: Math.round(ms) }, 'Slow request')
   }
@@ -265,9 +272,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // API: the app's own files are compressed once, when it's built (scripts/compress-web.mjs), and served as they are.
   // Only what compresses: the export's zip, documents' files and photos are compressed already, and are left alone by
   // their type; so is an answer under a kilobyte. The live connection is a WebSocket, which this never touches.
+  // The freelancer's link pages too (audit, 20 October 2026, finding 47): a busy one is 50 to 100 KB of HTML, a sixth of
+  // that compressed, and it is opened from a text on site or in a van. Not the calendar feed under the link (calendar
+  // apps fetch it on their own and it is kept as it always was), nor the documents' files.
   // Set before the plugin, so its own look at each route sees it.
+  const linkPage = (url: string) => url.startsWith('/f/:token') && url !== '/f/:token/calendar.ics' && !url.startsWith('/f/:token/documents')
   app.addHook('onRoute', (route) => {
-    if (!route.url.startsWith('/api/') || route.websocket) route.compress = false
+    if (!(route.url.startsWith('/api/') || linkPage(route.url)) || route.websocket) route.compress = false
   })
   // Brotli at a middling quality: nearly as small as its best, at a fraction of the time on the server's one thread.
   await app.register(compress, {
@@ -292,7 +303,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       const text = JSON.stringify(msg)
       for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(text)
     } catch (err) {
-      app.log.error({ err }, 'Could not tell devices about a change')
+      app.log.error({ err: faultForLog(err) }, 'Could not tell devices about a change')
       reportError(err, { area: 'poke' })
     }
   }
@@ -441,8 +452,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return []
       })
     const answered = new Map(seen.map((r) => [r.id, r.result]))
+    // The device gave up waiting, or lost its signal: what's done stays done, and the rest isn't worked through for nobody,
+    // holding the write lock from everyone else's pushes. Its resend is answered as duplicates for what was applied
+    // (audit, 20 October 2026, finding 16).
+    let gone = false
+    const left = () => void (gone ||= !reply.raw.writableEnded)
+    reply.raw.once('close', left)
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) {
+      if (gone || req.raw.socket?.destroyed) {
+        req.log.info({ answered: results.length, waiting: mutations.length - results.length }, 'Push stopped part way: the device is no longer waiting for the answer')
+        break
+      }
       // Out of time for a device that takes part of an answer: the rest go again in its next push, after these.
       if (partial && results.length > 0 && Date.now() - started > pushBudgetMs) break
       const before = answered.get(m.id)
@@ -450,13 +471,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         results.push({ ...before, duplicate: true })
         continue
       }
+      // Turned down on sight (its role, or its shape): written down without waiting for the write lock (finding 66).
+      const onSight = refusedOnSight(m as never, from)
       const result = await db
-        .transaction(async (tx) => {
-          await takeWriteLock(tx, pushLockWaitMs)
-          // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
-          if (generation && (await clearedSince(tx, generation))) return 'stale' as const
-          return applyMutationIn(tx, clientId, m as never, from, req.log)
-        })
+        .transaction(
+          async (tx) => {
+            // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
+            if (generation && (await clearedSince(tx, generation))) return 'stale' as const
+            if (onSight) return recordRefusal(tx, clientId, m as never, from, onSight)
+            // The lock was taken as the transaction began (finding 15).
+            return applyMutationIn(tx, clientId, m as never, from, req.log, { own: true })
+          },
+          onSight ? {} : { writeLockMs: pushLockWaitMs }
+        )
         .catch((err: unknown): MutationResult | 'busy' => {
           // A long change holds the write lock: this one and the rest go again shortly, and what's done is answered now.
           if (isLockBusy(err)) return 'busy'
@@ -478,6 +505,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
       results.push(result)
     }
+    reply.raw.off('close', left)
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
     return stale ? { results: [], stale } : busy ? { results, busy } : { results }
   })
@@ -486,8 +514,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // the page and the head is enough, and is harmless now: the device keeps its cursor and the next pull brings it. Often,
   // though, it says writes are slow to commit, and it is how finding 1 lost changes before it was fixed.
   const reportBehind = reportNowAndThen(10 * 60_000, options.report)
-  app.get<{ Querystring: { after?: string; latest?: string } }>('/api/sync/pull', async (req): Promise<PullResponse> => {
-    const after = Math.max(0, Number(req.query.after ?? 0) || 0)
+  app.get<{ Querystring: { after?: string; latest?: string } }>('/api/sync/pull', async (req, reply): Promise<PullResponse | void> => {
+    // A change number the server gave, or none: anything else is turned away in words before the query, which would refuse
+    // it as a fault of the server's and report it (audit, 20 October 2026, finding 67).
+    const number = (v: string | undefined) => (v === undefined || v === '' ? 0 : /^\d+$/.test(v) && Number.isSafeInteger(Number(v)) ? Number(v) : undefined)
+    const after = number(req.query.after)
+    if (after === undefined || (req.query.latest !== undefined && req.query.latest !== 'new' && number(req.query.latest) === undefined))
+      return reply.code(400).send({ error: "That isn't a change number this server gave." })
     // Pulls never take the write lock, and read on connections of their own, so a phone keeps hearing everyone else's
     // changes while a long one is written, rather than waiting behind the pushes queued for it (audit finding 7).
     const db = options.db.reads
@@ -589,9 +622,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const rms = new RmsReader(db, options.currentRms && new RmsApi(options.currentRms), app.log)
   app.decorate('rms', rms)
   registerRmsRoutes(app, { db, reader: rms })
+  const assistant = new Assistant(db, options.claude)
+  const todo = new Todo(db, assistant, app.log)
+  app.decorate('assistantTodo', todo)
+  registerAssistantRoutes(app, { assistant, todo })
   registerStatusRoutes(
     app,
-    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
+    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
   )
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
@@ -600,7 +637,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       // Read by every member of staff, so in words without crew pay for a role that doesn't see it (ADR 0046), nor for a
       // head who sees only their department's (ADR 0062): the history names everyone's.
       const reading = await readingOf(db, req.role, req.reader ?? {})
-      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, readsEveryRate(reading), (reading.details ?? 'all') === 'all')
+      return await readHistory(db, { ...req.query, limit: Number(req.query.limit) || undefined }, readsEveryRate(reading), (reading.details ?? 'all') === 'all', documentsRead(reading))
     } catch (err) {
       if (err instanceof BadCursor) return reply.code(400).send({ error: err.message })
       throw err
@@ -630,7 +667,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get('/api/export.zip', { config: { needs: 'settings' } }, async (req, reply) => {
     const { everything, zip } = await takeTurns(async () => {
       const everything = await readEverything(db)
-      return { everything, zip: everythingZip(everything, req.user ?? undefined) }
+      return { everything, zip: await everythingZip(everything, req.user ?? undefined) }
     })
     return reply
       .type('application/zip')
@@ -677,9 +714,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook('onClose', async () => {
     rms.stop()
     await rms.done?.catch(() => {})
-    backups.stop()
+    // A backup under way is given a while to finish, or marked stopped so the next server makes it up (audit finding 54).
+    await backups.close()
     app.dueErasures.stop()
     app.fuelUpdates.stop()
+    app.assistantTodo.stop()
     documents.stop()
     calendarSync?.stop()
     ownCalendars.stop()

@@ -135,6 +135,9 @@ test('a place counted with no signal, its differences put right, and the week mo
   await expect(page.getByRole('heading', { level: 1, name: `Counting ${bay}` })).toBeVisible()
   await expect(tally).toHaveText('1 of 3 found')
   await expect(page.locator('.said-list')).toContainText(`${stray} ${speaker} Found here, kept at ${other}.`)
+  // How many of each product are still to find, and Finish kept in reach at the foot of the screen (audit, 20 October 2026, finding 43).
+  await expect(page.locator('.group-name', { hasText: speaker }).first()).toHaveText(`${speaker} · 2 to find`)
+  await expect(page.locator('.finish-bar')).toHaveCSS('position', 'sticky')
 
   // The rest with no signal: the second speaker, and 17 cables, typed without the record shown beside them.
   await context.setOffline(true)

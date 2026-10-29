@@ -3,7 +3,7 @@ import { createGzip, gunzipSync } from 'node:zlib'
 import type { Db, Queryable } from '../db.ts'
 import { moduleVersion } from '../migrations.ts'
 import { MODULES, migrateAll, migrateAllTo } from '../modules.ts'
-import { forEachRow, ident, tablesInOrder as listTables, useCanonicalOutput } from '../tables.ts'
+import { forEachRow, ident, tableLayout, tablesInOrder as listTables, useCanonicalOutput, type TableLayout } from '../tables.ts'
 import { decryptBackup, isEncrypted } from './crypto.ts'
 
 /**
@@ -100,9 +100,11 @@ export async function writeBackup(db: Db, { now = new Date(), commit }: { now?: 
       const header: BackupHeader = { format: FORMAT, version: 1, createdAt: now.toISOString(), schemas, tables, ...(commit ? { commit } : {}) }
       await write(`H\t${JSON.stringify(header)}`)
       const summary: BackupSummary = { tables: {} }
+      // Each table's keys and size asked for once for them all (audit, 20 October 2026, finding 19).
+      const layout = await tableLayout(tx, tables)
       for (const table of tables) {
         await write(`T\t${table}`)
-        summary.tables[table] = await eachRow(tx, table, write)
+        summary.tables[table] = await eachRow(tx, table, layout, write)
       }
       await write(`E\t${JSON.stringify(summary)}`)
       return { header, summary }
@@ -246,8 +248,9 @@ export async function restoreChecked(db: Db, { header, sections, summary }: Chec
       }
     }
     await useCanonicalOutput(tx)
+    const layout = await tableLayout(tx, header.tables)
     for (const table of header.tables) {
-      const got = await eachRow(tx, table)
+      const got = await eachRow(tx, table, layout)
       const want = summary.tables[table]!
       if (got.rows !== want.rows || got.sha256 !== want.sha256) {
         throw new BackupError(`${table} didn't come back exactly as it was backed up, so nothing was restored.`)
@@ -286,14 +289,14 @@ export async function isEmptyDatabase(q: Queryable): Promise<boolean> {
 }
 
 /** Every row of a table as JSON text, in a fixed order, with a count and a checksum. */
-async function eachRow(tx: Queryable, table: string, onRow?: (row: string) => Promise<void>): Promise<TableSummary> {
+async function eachRow(tx: Queryable, table: string, layout: TableLayout, onRow?: (row: string) => Promise<void>): Promise<TableSummary> {
   const hash = createHash('sha256')
   let rows = 0
   await forEachRow(tx, table, async (j) => {
     hash.update(j).update('\n')
     rows++
     if (onRow) await onRow(j)
-  })
+  }, layout)
   return { rows, sha256: hash.digest('hex') }
 }
 

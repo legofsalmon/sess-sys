@@ -266,3 +266,10 @@ it.
   rather than days; who the senior staff are, as a role rather than a
   flag; and an approver telling the person their request was decided,
   through the Send panel, as the office tells freelancers.
+
+Later (29 October 2026): nobody decides their own request, and now
+nobody sets their own allowance or carry-over while another active
+approver can. In an office with one approver it still goes through, so
+the year isn't stuck, and the allowance is marked as set by the person
+themselves, on the Leave screen's allowance row and in the history
+(audit, 20 October 2026, finding 84).

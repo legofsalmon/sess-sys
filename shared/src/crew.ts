@@ -208,6 +208,13 @@ const familyName = z.string().transform((s) => s.trim()).pipe(text(100, 'The las
 const PARTICLES = ['ó', 'ní', 'nic', 'mac', 'mc', 'ua', 'uí', 'mhic', 'o', 'de', 'van', 'von', 'der', 'den', 'da', 'di', 'du', 'le', 'la', 'del', 'della', 'st', 'st.']
 export const NAME_PARTICLES: readonly string[] = [...new Set(PARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
 const PARTICLE = new Set(NAME_PARTICLES)
+/**
+ * "an" and "na", which carry a last name on after a word that starts one: "Pádraig Mac an tSaoi", "Seosamh Mac na
+ * Mara". Only after one, so a first name is never cut short by them alone (audit, 20 October 2026, finding 85).
+ */
+const ARTICLES = ['an', 'na']
+export const NAME_ARTICLES: readonly string[] = [...new Set(ARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
+const ARTICLE = new Set(NAME_ARTICLES)
 
 export interface NameParts {
   firstName: string
@@ -216,7 +223,7 @@ export interface NameParts {
 
 /**
  * A whole name as a first and a last name: the last word is the last name,
- * with any words before it that start one ("Ó", "Mac", "van"); one word is a
+ * with any words before it that start one ("Ó", "Mac", "van", "Mac an"); one word is a
  * first name alone. Names typed before the two were asked for are split this
  * way, and the office corrects any it gets wrong.
  */
@@ -224,7 +231,11 @@ export function splitName(name: string): NameParts {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length < 2) return { firstName: words[0] ?? '', lastName: '' }
   let i = words.length - 1
-  while (i > 1 && PARTICLE.has(words[i - 1]!)) i--
+  for (;;) {
+    if (i > 1 && PARTICLE.has(words[i - 1]!)) i--
+    else if (i > 2 && ARTICLE.has(words[i - 1]!) && PARTICLE.has(words[i - 2]!)) i -= 2
+    else break
+  }
   return { firstName: words.slice(0, i).join(' '), lastName: words.slice(i).join(' ') }
 }
 
@@ -710,18 +721,27 @@ export function offerDaysAfter(held: readonly string[], oldDays: readonly string
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** "Fri 3 Oct", the way crew write dates. Built by hand so it reads the same on every phone. */
-export function dayLabel(d: string): string {
+/**
+ * "Fri 3 Oct", the way crew write dates. Built by hand so it reads the same on every phone. Given today, a day outside
+ * this calendar year or more than six months from today carries its year, "Sun 25 Jan 2026", so a page that runs from
+ * April to March, or a timesheet approved last year, says which year it means (audit, 20 October 2026, finding 89).
+ */
+export function dayLabel(d: string, today?: string): string {
   const date = new Date(`${d}T12:00:00Z`)
-  return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
+  const label = `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
+  return today && (d.slice(0, 4) !== today.slice(0, 4) || Math.abs(daysBetween(today, d)) > HALF_A_YEAR) ? `${label} ${d.slice(0, 4)}` : label
 }
 
-export function daysLabel(days: string[]): string {
+/** More than this many days from today, a date says its year. */
+const HALF_A_YEAR = 183
+
+export function daysLabel(days: string[], today?: string): string {
   if (days.length === 0) return ''
   const sorted = [...days].sort()
   const all = eachDay(sorted[0]!, sorted[sorted.length - 1]!)
-  if (all.length === sorted.length && sorted.length > 1) return `${dayLabel(sorted[0]!)} to ${dayLabel(sorted[sorted.length - 1]!)}`
-  return sorted.map(dayLabel).join(', ')
+  const label = (d: string) => dayLabel(d, today)
+  if (all.length === sorted.length && sorted.length > 1) return `${label(sorted[0]!)} to ${label(sorted[sorted.length - 1]!)}`
+  return sorted.map(label).join(', ')
 }
 
 export function euro(c: number | null | undefined): string {

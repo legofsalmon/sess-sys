@@ -1,5 +1,8 @@
 import {
+  DEFAULT_LEVEL,
   departmentInWords,
+  emailInUseRefusal,
+  namesAfter,
   withCapital,
   departmentOfPeople,
   addDays,
@@ -20,15 +23,16 @@ import {
 } from '@sh/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { crewHandlers } from '../crew/handlers.ts'
-import { getCalls, getOffers } from '../crew/store.ts'
+import { newLinkToken } from '../crew/handlers.ts'
+import { getCalls, getOffers, getPeople } from '../crew/store.ts'
 import type { Db, Queryable } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { emitAll, emitRemovedAll, Refused, serverChange, type Ctx } from '../kernel.ts'
 import { projectHandlers } from '../projects/handlers.ts'
-import { getPhases, getProjects, namesForCall } from '../projects/store.ts'
+import { getPhases, getProjects, getVenues, namesForCall } from '../projects/store.ts'
 import type { GoogleEvent } from './google.ts'
-import { GAP_DAYS, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
+import { Worker } from 'node:worker_threads'
+import { GAP_DAYS, keyEvent, planImport, type AppData, type Chosen, type Plan, type PlanJob, type PlanOptions, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
 import { Halt, type CalendarSync } from './sync.ts'
 
 /**
@@ -56,7 +60,7 @@ const day = z.string().refine(isDay, 'Choose the first day to bring jobs in from
 const lookBody = z.object({ calendarId: z.string().min(1, 'Choose a calendar.').max(1024), from: day })
 const bringBody = lookBody.extend({
   jobs: z
-    .array(z.object({ key: z.string().min(1).max(400), name: z.string().max(200).transform(cleanText), kind: z.enum(PROJECT_KINDS).optional(), include: z.boolean() }))
+    .array(z.object({ key: z.string().min(1).max(2000), name: z.string().max(200).transform(cleanText), kind: z.enum(PROJECT_KINDS).optional(), include: z.boolean() }))
     .max(5000),
   people: z
     .array(
@@ -215,17 +219,44 @@ function preview(plan: Plan, calendar: ImportCalendar, from: string, to: string)
   }
 }
 
+/** From this many events a plan is made in a worker thread: a few hundred plan in a moment, a season in a second or more. */
+export const PLAN_APART_FROM = 300
+
+/**
+ * planImport in a worker thread of its own for a big calendar, so a
+ * season's plan doesn't hold up every device's pull and push while it's
+ * made (audit, 20 October 2026, finding 18). A small one is planned here,
+ * which is quicker than starting a thread; so is one whose worker can't
+ * run, as it was before.
+ */
+export async function planApart(events: readonly SourceEvent[], app: AppData, options: PlanOptions, chosen?: Chosen, { from = PLAN_APART_FROM } = {}): Promise<Plan> {
+  if (events.length < from) return planImport(events, app, options, chosen)
+  try {
+    return await new Promise<Plan>((resolve, reject) => {
+      const worker = new Worker(new URL('./plan-worker.mjs', import.meta.url), { workerData: { events, app, options, chosen }, resourceLimits: { maxOldGenerationSizeMb: 512 } })
+      worker.once('message', (plan: Plan) => {
+        resolve(plan)
+        void worker.terminate()
+      })
+      worker.once('error', reject)
+      worker.once('exit', () => reject(new Error('The plan worker stopped without answering.')))
+    })
+  } catch {
+    return planImport(events, app, options, chosen)
+  }
+}
+
 /** Nothing ticked is there any more, so nothing is saved and the history has no empty entry. */
 class NothingToBring extends Error {}
 
 /**
  * Save what the office ticked, in the order things refer to each other:
  * people, venues, jobs, phases, crew calls and offers, then each event-day
- * as brought in. People and venues go through the same rules as the
- * app's own commands; jobs are marked with the calendar they came from.
+ * as brought in. New people and venues are made as the app's own
+ * commands make them; jobs are marked with the calendar they came from.
  *
- * A season is thousands of rows, so jobs, phases, calls, offers and the
- * event-days are gathered first and written a few hundred per statement:
+ * A season is thousands of rows, so every kind of row is gathered first
+ * and written a few hundred per statement:
  * one round trip a row made a whole season take minutes, longer than the
  * app waits.
  */
@@ -236,38 +267,43 @@ async function bring(
   calendar: ImportCalendar,
   app: AppData,
   parts: ReadonlyMap<string, NameParts> = new Map()
-): Promise<Omit<ImportResult, 'missing'>> {
+): Promise<Omit<ImportResult, 'missing' | 'already'>> {
+  // New people and venues are written a few hundred per statement too, as jobs are (audit, 20 October 2026, finding 17):
+  // through their commands one at a time, five or six trips each, they were most of a season's hold on the write lock.
+  // What person.upsert does for someone new is done here once for them all: the name split, a link of their own, and
+  // the check that nobody here already has the address, against the whole set.
   const personIds = new Map<string, string>()
-  for (const p of plan.people) {
-    if (!people.has(p.email)) continue
+  const newPeople: unknown[][] = []
+  const adding = plan.people.filter((p) => people.has(p.email))
+  if (adding.length) {
+    const emails = adding.map((p) => p.email.trim().toLowerCase())
+    const { rows: taken } = await ctx.tx.query<{ name: string }>(
+      `SELECT name FROM people WHERE NOT archived AND (lower(trim(email)) = ANY($1::text[]) OR other_emails ?| $1::text[]) ORDER BY id LIMIT 1`,
+      [emails]
+    )
+    if (taken[0]) throw new Refused({ code: 'conflict', message: emailInUseRefusal(taken[0].name) })
+  }
+  for (const p of adding) {
     const id = newId()
     const name = (p.name.trim() || p.email).slice(0, 200)
     // The two the office typed, while they still make the name the plan has; otherwise the name is split.
     const typed = parts.get(p.email.toLowerCase())
-    await crewHandlers['person.upsert'](ctx, {
-      id,
-      name,
-      ...(typed && fullName(typed) === name ? typed : {}),
-      kind: p.kind,
-      email: p.email,
-      phone: null,
-      skills: [],
-      dayRateCents: null,
-      notes: PERSON_NOTE,
-    })
+    const names = namesAfter({ name, ...(typed && fullName(typed) === name ? typed : {}) }, undefined)
+    newPeople.push([id, names.name, names.firstName, names.lastName, p.kind, p.email, '[]', PERSON_NOTE, newLinkToken(), DEFAULT_LEVEL, '{}'])
     personIds.set(p.email, id)
   }
 
   const venues = new Map(app.venues.map((v) => [v.id, { name: v.name, address: v.address }]))
   const venueIds = new Map<string, string>()
-  const venueId = async (v: VenueRef | null) => {
+  const newVenues: unknown[][] = []
+  const venueId = (v: VenueRef | null) => {
     if (!v) return null
     if ('id' in v) return v.id
     const known = venueIds.get(v.key)
     if (known) return known
     const id = newId()
     const venue = { name: v.name.slice(0, 200), address: v.address.slice(0, 500) }
-    await projectHandlers['venue.upsert'](ctx, { id, ...venue, notes: '' })
+    newVenues.push([id, venue.name, venue.address, ''])
     venueIds.set(v.key, id)
     venues.set(id, venue)
     return id
@@ -296,7 +332,7 @@ async function bring(
         throw new Refused({ code: 'conflict', message: `${was.name} has been ${was.status === 'lost' ? 'marked as lost' : 'cancelled'}, so it needs no crew.` })
     } else {
       projectId = newId()
-      jobVenue = await venueId(j.venue)
+      jobVenue = venueId(j.venue)
       rows.projects.push([projectId, withCapital(j.name).slice(0, 200), jobVenue, j.status, j.kind, j.notes, calendar.name])
       counts.jobs++
     }
@@ -318,7 +354,7 @@ async function bring(
         names = { phase: known?.phase ?? r.name.slice(0, 100), venue: known?.venue ?? '' }
       } else {
         phaseId = newId()
-        const phaseVenue = await venueId(r.venue)
+        const phaseVenue = venueId(r.venue)
         rows.phases.push([phaseId, projectId, r.name.slice(0, 100), start, end, phaseVenue, r.notes])
         names = { phase: r.name.slice(0, 100), venue: venueText(phaseVenue ?? jobVenue) }
       }
@@ -345,6 +381,10 @@ async function bring(
   }
 
   const ids = (list: unknown[][]) => list.map((r) => r[0] as string)
+  await insertRows(ctx.tx, 'people', ['id', 'name', 'first_name', 'last_name', 'kind', 'email', 'skills', 'notes', 'link_token', 'level', 'certificates'], newPeople)
+  await emitAll(ctx, 'person', (await getPeople(ctx.tx, ids(newPeople))).map((p) => ({ id: p.id, data: p })))
+  await insertRows(ctx.tx, 'venues', ['id', 'name', 'address', 'notes'], newVenues)
+  await emitAll(ctx, 'venue', (await getVenues(ctx.tx, ids(newVenues))).map((v) => ({ id: v.id, data: v })))
   await insertRows(ctx.tx, 'projects', ['id', 'name', 'venue_id', 'status', 'kind', 'notes', 'source_calendar'], rows.projects)
   await emitAll(ctx, 'project', (await getProjects(ctx.tx, ids(rows.projects))).map((p) => ({ id: p.id, data: p })))
   await insertRows(ctx.tx, 'phases', ['id', 'project_id', 'name', 'start_day', 'end_day', 'venue_id', 'notes'], rows.phases)
@@ -374,6 +414,7 @@ async function brought(q: Queryable): Promise<ImportBrought> {
   const days = await one(`SELECT coalesce(sum(end_day - start_day + 1), 0) AS n FROM phases ph JOIN projects p ON p.id = ph.project_id WHERE p.source_calendar IS NOT NULL`)
   const crew = await one(`SELECT count(*) AS n FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL`)
   const people = (await importedPeopleToGo(q)).length
+  const kept = Number((await q.query<{ n: string }>(`SELECT count(*) AS n FROM people WHERE notes = $1`, [PERSON_NOTE])).rows[0]!.n) - people
   const calendars = (await q.query<{ source_calendar: string }>(`SELECT DISTINCT source_calendar FROM projects WHERE source_calendar IS NOT NULL ORDER BY 1`)).rows.map((r) => r.source_calendar)
   const acted = [
     [`SELECT count(*) AS n FROM offers o JOIN crew_calls c ON c.id = o.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL AND o.responded_via IN ('link', 'app', 'ops')`, 'answers to offers'],
@@ -384,6 +425,9 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     [`SELECT count(*) AS n FROM faults f JOIN projects p ON p.id = f.project_id WHERE p.source_calendar IS NOT NULL`, 'faults on jobs'],
     [`SELECT count(*) AS n FROM vehicle_bookings b JOIN projects p ON p.id = b.project_id WHERE p.source_calendar IS NOT NULL`, 'vehicles booked'],
     [`SELECT count(*) AS n FROM job_steps s JOIN projects p ON p.id = s.project_id WHERE p.source_calendar IS NOT NULL`, 'steps given out or ticked'],
+    // A quote, or crew saying they'll be late, is acted on as kit is (audit, 20 October 2026, finding 51).
+    [`SELECT count(*) AS n FROM quotes q JOIN projects p ON p.id = q.project_id WHERE p.source_calendar IS NOT NULL`, 'quotes'],
+    [`SELECT count(*) AS n FROM running_late r JOIN crew_calls c ON c.id = r.call_id JOIN projects p ON p.id = c.project_id WHERE p.source_calendar IS NOT NULL`, 'crew running late'],
   ] as const
   const found: string[] = []
   for (const [sql, what] of acted) if ((await one(sql)) > 0) found.push(what)
@@ -392,16 +436,22 @@ async function brought(q: Queryable): Promise<ImportBrought> {
     days,
     crew,
     people,
+    kept,
     calendars,
     blocked: found.length ? `These jobs have been worked on in the app since (${found.join(', ')}), so they can't be taken back as a whole.` : null,
   }
 }
 
-/** People added from the invites that nothing but the bring-in refers to: no answer, timesheet, document, leave, day off, lateness or contact duty of their own. */
+/**
+ * People added from the invites that nothing but the bring-in refers to: no answer, timesheet, document, leave, day off,
+ * lateness or contact duty of their own; and that nobody has changed since, which the history shows as a change to them
+ * by anything but a bring-in. A name typed on Tidy up keeps its person (audit, 20 October 2026, finding 53).
+ */
 async function importedPeopleToGo(q: Queryable): Promise<string[]> {
   const { rows } = await q.query<{ id: string }>(
     `SELECT p.id FROM people p
       WHERE p.notes = $1
+        AND NOT EXISTS (SELECT 1 FROM changes ch JOIN mutations m ON m.id = ch.mutation_id WHERE ch.entity_id = p.id AND ch.entity = 'person' AND m.name <> $2)
         AND NOT EXISTS (SELECT 1 FROM offers o WHERE o.person_id = p.id AND (o.responded_via IS NULL OR o.responded_via <> 'calendar') AND o.status <> 'offered')
         AND NOT EXISTS (SELECT 1 FROM offers o JOIN crew_calls c ON c.id = o.call_id LEFT JOIN projects j ON j.id = c.project_id WHERE o.person_id = p.id AND j.source_calendar IS NULL)
         AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.person_id = p.id)
@@ -414,17 +464,22 @@ async function importedPeopleToGo(q: Queryable): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM job_steps s WHERE s.owner_id = p.id OR s.done_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM purchase_requests r WHERE r.asked_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM purchase_votes v WHERE v.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM leave_allowances a WHERE a.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM leave_requests l WHERE l.decided_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM lieu_entries l WHERE l.decided_by = p.id)
+        AND NOT EXISTS (SELECT 1 FROM own_calendars oc WHERE oc.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM counts ct WHERE ct.counted_by = p.id)
         AND NOT EXISTS (SELECT 1 FROM erasures e WHERE e.person_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM person_merges pm WHERE pm.into_id = p.id)
         AND NOT EXISTS (SELECT 1 FROM calendar_link cl WHERE cl.state <> 'off' AND lower(trim(cl.account_email)) = lower(trim(coalesce(p.email, ''))))
       ORDER BY p.id`,
-    [PERSON_NOTE]
+    [PERSON_NOTE, IMPORT_ACTION]
   )
   return rows.map((r) => r.id)
 }
 
 /** Take back everything the bring-ins made, in the reverse of the order it was saved, telling devices each record is gone. */
-async function takeBack(ctx: Ctx): Promise<Omit<ImportBrought, 'blocked' | 'calendars'>> {
+async function takeBack(ctx: Ctx): Promise<Omit<ImportBrought, 'blocked' | 'calendars' | 'kept'>> {
   const ids = async (sql: string) => (await ctx.tx.query<{ id: string }>(sql)).rows.map((r) => r.id)
   const jobs = await ids(`SELECT id FROM projects WHERE source_calendar IS NOT NULL ORDER BY id`)
   const phases = await ids(`SELECT ph.id FROM phases ph JOIN projects p ON p.id = ph.project_id WHERE p.source_calendar IS NOT NULL ORDER BY ph.id`)
@@ -489,7 +544,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
           const was = await brought(ctx.tx)
           if (was.blocked) throw new Refused({ code: 'conflict', message: was.blocked })
           if (was.jobs === 0) throw new Refused({ code: 'not-found', message: 'Nothing brought in from Google Calendar is in the app.' })
-          const done = await takeBack(ctx)
+          const done = { ...(await takeBack(ctx)), kept: was.kept }
           await ctx.tx.query('UPDATE mutations SET args = $2 WHERE id = $1', [ctx.mutationId, JSON.stringify({ ...done, calendars: was.calendars })])
           return { ...done, calendars: was.calendars }
         }
@@ -499,6 +554,12 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
       return result
     } catch (err) {
       if (err instanceof Refused) return reply.code(409).send({ error: err.message })
+      // Something added to the app since that refers to a job or person brought in, which the lists above don't know
+      // of yet: said in words, and nothing is taken back (audit, 20 October 2026, finding 51).
+      if ((err as { code?: unknown }).code === '23503') {
+        req.log.warn({ detail: (err as { detail?: unknown }).detail }, 'Calendar import: take-back met something still referring to what was brought in')
+        return reply.code(409).send({ error: "Something in the app still refers to these jobs or people, so they can't be taken back as a whole." })
+      }
       throw err
     }
   })
@@ -521,7 +582,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Choose a calendar and a day to start from.' })
     const read = await look(req, reply, parsed.data)
     if ('sent' in read) return read.sent
-    const plan = planImport(read.events, await readApp(db, read.from, read.to), { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today })
+    const plan = await planApart(read.events, await readApp(db, read.from, read.to), { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today })
     return preview(plan, read.calendar, read.from, read.to)
   })
 
@@ -546,11 +607,11 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     )
     const client = typeof req.query.client === 'string' && /^[a-z0-9]{1,64}$/.test(req.query.client) ? req.query.client : undefined
     const options = { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today }
-    /** The plan for what's ticked, and every job the calendar holds that isn't in the app yet. */
-    const plans = (app: AppData) => ({
-      plan: planImport(read.events, app, options, { names, kinds, include, people: personNames }),
-      found: new Set(planImport(read.events, app, options).jobs.map((j) => j.key)),
-    })
+    /** The plan for what's ticked, which also says every job chosen that the calendar still holds as new (finding 52). */
+    const plans = async (app: AppData) => {
+      const plan = await planApart(read.events, app, options, { names, kinds, include, people: personNames })
+      return { plan, found: new Set(plan.found) }
+    }
     // Planned first outside the write lock, which every device's change waits for (audit finding 7): a season is
     // thousands of events. Inside the lock the app is read again, and only when it has changed since is the plan made
     // again, so two people bringing in at once still can't bring the same events in twice.
@@ -563,9 +624,10 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     // rows per statement, so it's short; a push that meets it answers "busy" and goes again shortly, and pulls don't
     // wait for it at all.
     const before = await readApp(db.reads, read.from, read.to)
-    const planned = plans(before)
+    const planned = await plans(before)
     let missing: string[] = []
-    let result: Omit<ImportResult, 'missing'>
+    let already: string[] = []
+    let result: Omit<ImportResult, 'missing' | 'already'>
     try {
       result = await serverChange(
         db,
@@ -573,8 +635,13 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
         async (ctx) => {
           // Planned again inside the lock, so two people bringing in at once can't bring the same events in twice.
           const app = await readApp(ctx.tx, read.from, read.to)
-          const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : plans(app)
-          missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
+          const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : await plans(app)
+          // A job chosen that isn't new any more is in the app already, brought in by a bring-in sent before or made since,
+          // while its events are still on the calendar; otherwise it has gone from it (audit, 20 October 2026, finding 52).
+          const gone = choices.jobs.filter((j) => j.include && !found.has(j.key))
+          const known = new Set([...app.imported.map((i) => i.uid), ...read.events.filter((e) => !e.cancelled).map((e) => e.uid)])
+          already = gone.filter((j) => known.has(keyEvent(j.key))).map((j) => j.name || j.key)
+          missing = gone.filter((j) => !known.has(keyEvent(j.key))).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
           const done = await bring(ctx, plan, people, read.calendar, app, personParts)
           // The history keeps the first day asked for and what was left out, which the screen showed and is gone once brought in (audit finding 10).
@@ -586,10 +653,10 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     } catch (err) {
       if (err instanceof Refused) return reply.code(409).send({ error: err.message })
       if (!(err instanceof NothingToBring)) throw err
-      return { jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing }
+      return { jobs: 0, added: 0, days: 0, venues: 0, people: 0, crew: 0, missing, already }
     }
-    req.log.info({ ...result, missing: missing.length }, 'Calendar import: brought jobs in')
+    req.log.info({ ...result, missing: missing.length, already: already.length }, 'Calendar import: brought jobs in')
     onChange()
-    return { ...result, missing }
+    return { ...result, missing, already }
   })
 }

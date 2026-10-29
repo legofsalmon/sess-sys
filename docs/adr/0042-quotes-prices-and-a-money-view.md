@@ -76,6 +76,19 @@ client is a download that a person sends.
    it is worked out on the device from its own copy, with the person's
    own waiting changes laid over it, so it works with no signal like the
    rest of the app.
+
+   Later (29 October 2026, audit of 20 October, findings 29, 30, 31 and
+   71): the figure stays as decided, but it's named for what it is,
+   **Accepted, unpaid**, with VAT, saying how much of it isn't invoiced
+   yet, and listed in two groups, Invoiced and Not invoiced yet, a row a
+   client with its quotes folded under it. "Owed" read as invoiced
+   receivables when most of it hadn't been asked for. A cancelled or lost
+   job's quote counts nowhere (quoted, confirmed, accepted and unpaid, or
+   the job's margin) until it's invoiced, as a cancellation fee is; the
+   job's Quote card says it's set aside. The months already left it out
+   and who owes didn't. Margin by job is by the month each job starts,
+   this month first, the first ten shown, with a sentence above (and on
+   Home) naming any job below zero.
 7. **Files for the accountant**, made on the device for a period
    (Revenue's two-month VAT periods, or a year). There are three: the
    invoices, a row for each VAT rate on each, by the day invoiced; VAT by
@@ -179,3 +192,9 @@ work". Money is where that piece starts.
   field yet (ADR 0014), and staff are paid through payroll.
 - **No overdue flag on what's owed.** There are no payment terms to count
   from yet. Owed is listed most first, with the day each was invoiced.
+
+Later (29 October 2026): a product's price goes with the product.
+Removing a product, or marking it added by mistake, deletes its price
+and tells the devices; the price's key deletes with the product too.
+A quote keeps its lines whole, so nothing quoted is lost (audit,
+20 October 2026, finding 46).

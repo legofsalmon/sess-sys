@@ -25,6 +25,8 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS vat_number text, ADD COLUMN IF NOT EXISTS address text;`,
   // Whether the company uses timesheets (ADR 0090): on the "timesheets" row, off until the office says.
   `ALTER TABLE settings ADD COLUMN IF NOT EXISTS use_timesheets boolean;`,
+  // Whether Claude is offered inside the app (ADR 0096): on the "assistant" row, off until the office says.
+  `ALTER TABLE settings ADD COLUMN IF NOT EXISTS use_assistant boolean;`,
 ]
 
 export const OFFICE: Module = { versionTable: 'office_schema_version', migrations: MIGRATIONS }

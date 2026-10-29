@@ -1,7 +1,7 @@
 import { irishToday } from '@sh/shared'
 import type { BackupStore } from '../backup/store.ts'
 import { getPerson } from '../crew/store.ts'
-import type { Db, Queryable } from '../db.ts'
+import { faultForLog, type Db, type Queryable } from '../db.ts'
 import { ERASED_AGAIN_ACTION } from '../history.ts'
 import { serverChange } from '../kernel.ts'
 import { erasePerson, readErasure } from './places.ts'
@@ -87,7 +87,7 @@ export class ErasureList {
 
   keep(): Promise<void> {
     // One at a time, so two changes close together can't write over each other's list.
-    this.writing = this.writing.then(() => this.write()).catch((err) => this.log?.warn({ err }, 'Could not keep the list of erasures beside the backups'))
+    this.writing = this.writing.then(() => this.write()).catch((err) => this.log?.warn({ err: faultForLog(err) }, 'Could not keep the list of erasures beside the backups'))
     return this.writing
   }
 

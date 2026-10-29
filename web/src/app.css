@@ -126,6 +126,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .not-done-list .typed button { justify-self: start; }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
 .warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
+/* A link on the amber wash is ink, not brand red, which is under 4.5:1 there in the light theme (audit, 20 October 2026, finding 79). */
+.app .warn-line a, .app .warn-line button.link { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .confirm { display: grid; gap: var(--space-8); }
 .confirm .more { display: grid; gap: var(--space-8); }
 .confirm .more p { margin: 0; }
@@ -490,6 +492,9 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .notice .new-mark { display: inline-flex; align-items: center; gap: var(--space-4); margin-right: var(--space-6); color: var(--accent-ink); font-size: var(--text-hint); font-weight: 700; }
 .notice .new-mark .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent-fill); }
 .notice.new p { font-weight: 600; }
+/* A line of several changes (audit, 20 October 2026, finding 68): what they were, behind a tap. */
+.notice-fold summary { padding: var(--space-8) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.notice-fold ol { list-style: none; margin: 0; padding: 0 0 0 var(--space-12); border-left: 2px solid var(--line); display: grid; gap: var(--space-6); font-size: var(--text-small); }
 
 /*
  * Links (audit, P3): one look everywhere, a link in words and a button drawn as one alike: the accent's ink, semibold and underlined,
@@ -541,3 +546,16 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .status-check-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
 .status-check p { margin: 0; }
 .status-todo { font-size: var(--text-small); }
+
+/*
+ * While the app opens (Opening.tsx; audit, 20 October 2026, finding 11): the screen's shape in the design system's skeleton,
+ * a line, a row or a block, pulsing in place, so reduced motion keeps it (its components.md). The region holding it is busy.
+ */
+.opening-shape { display: grid; gap: var(--space-14); }
+.skeleton { display: block; height: 1rem; border-radius: var(--radius-control); background: var(--ds-surface-inset); animation: skeleton-pulse var(--ds-motion-cycle-pulse) var(--ds-ease-standard) infinite; }
+.skeleton.row { height: 44px; }
+.skeleton.block { height: 132px; border-radius: var(--radius-card); }
+.opening .top .skeleton { height: 1.4rem; }
+/* The line that says what it's doing keeps its room before it's said, so the shape under it never jumps. */
+.opening > .hint { margin: 0; min-height: 1.5em; }
+@keyframes skeleton-pulse { 50% { opacity: .4; } }

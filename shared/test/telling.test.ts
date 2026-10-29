@@ -110,6 +110,24 @@ describe('answers to check', () => {
   })
 })
 
+describe('offers nobody has answered', () => {
+  it('wait in the queue once their reply-by day has passed, until the office notes them or an answer comes', () => {
+    // Proves: an offer still unanswered after its call's reply-by day is in "Answers to check" until Noted, and an answer
+    // after that brings it back as the answer (audit, 20 October 2026, finding 24).
+    const entities = {
+      person: { aoife: person('aoife', 'Aoife Byrne'), niall: person('niall', 'Niall Kerr') },
+      crewCall: { late: { ...call('late', '2026-10-10', '2026-10-11'), replyBy: '2026-09-30' }, soon: { ...call('soon', '2026-10-10', '2026-10-11'), replyBy: '2026-10-01' } },
+      offer: { quiet: offer('quiet', 'late', 'aoife', 'offered'), waiting: offer('waiting', 'soon', 'niall', 'offered') },
+    }
+    // Reply by yesterday is past; reply by today still has the day to run.
+    expect(answersToCheck(crewView(entities, [], 0), today).map((a) => [a.offer.id, a.kind, a.short])).toEqual([['quiet', 'no-reply', 2]])
+    const noted = crewView(entities, [m('offer.seen', { id: 'quiet' })], 0)
+    expect(answersToCheck(noted, today)).toEqual([])
+    const answered = crewView(entities, [m('offer.seen', { id: 'quiet' }), m('offer.respond', { id: 'quiet', answer: 'decline', note: '' })], 0)
+    expect(answersToCheck(answered, today).map((a) => [a.offer.id, a.kind])).toEqual([['quiet', 'declined']])
+  })
+})
+
 describe('the message after what the office did', () => {
   const aoife = person('aoife', 'Aoife Byrne')
   const show = call('show', '2026-10-10', '2026-10-11')
@@ -219,10 +237,10 @@ describe('the office’s details', () => {
 
   it('lay this device’s own change over what the server said', () => {
     const entities = { setting: { office: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: null } } }
-    expect(officeView(entities, [], 0)).toEqual({ details: entities.setting.office, pending: false, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false })
+    expect(officeView(entities, [], 0)).toEqual({ details: entities.setting.office, pending: false, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false, useAssistant: false, assistantPending: false })
     const changed = officeView(entities, [m('office.update', { name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' })], 0)
-    expect(changed).toEqual({ details: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' }, pending: true, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false })
-    expect(officeView({}, [], 0)).toEqual({ details: undefined, pending: false, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false })
+    expect(changed).toEqual({ details: { id: 'office', name: 'Session Hire office', phone: '01 234 5678', email: 'office@sessionhire.com' }, pending: true, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false, useAssistant: false, assistantPending: false })
+    expect(officeView({}, [], 0)).toEqual({ details: undefined, pending: false, headsSeeRates: false, headsPending: false, promptMessages: false, messagesPending: false, useTimesheets: false, timesheetsPending: false, useAssistant: false, assistantPending: false })
   })
 
   it("say whether heads of department see rates (ADR 0046), with this device's own choice over the server's", () => {
@@ -239,9 +257,16 @@ describe('the office’s details', () => {
   })
 
   it('uses timesheets only once the office said so (ADR 0090)', () => {
-    expect(officeView({}, [], 0)).toMatchObject({ useTimesheets: false, timesheetsPending: false })
+    expect(officeView({}, [], 0)).toMatchObject({ useTimesheets: false, timesheetsPending: false, useAssistant: false, assistantPending: false })
     const entities = { setting: { timesheets: { id: 'timesheets', name: '', phone: null, email: null, useTimesheets: true } } }
     expect(officeView(entities, [], 0)).toMatchObject({ useTimesheets: true, timesheetsPending: false })
     expect(officeView(entities, [m('timesheets.use', { on: false })], 0)).toMatchObject({ useTimesheets: false, timesheetsPending: true, messagesPending: false })
+  })
+
+  it('offers Claude only once the office said so (ADR 0096)', () => {
+    expect(officeView({}, [], 0)).toMatchObject({ useAssistant: false, assistantPending: false })
+    const entities = { setting: { assistant: { id: 'assistant', name: '', phone: null, email: null, useAssistant: true } } }
+    expect(officeView(entities, [], 0)).toMatchObject({ useAssistant: true, assistantPending: false })
+    expect(officeView(entities, [m('assistant.use', { on: false })], 0)).toMatchObject({ useAssistant: false, assistantPending: true, timesheetsPending: false })
   })
 })

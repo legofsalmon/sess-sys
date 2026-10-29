@@ -12,9 +12,9 @@ const base = import.meta.env.VITE_API_BASE ?? ''
 
 export type Loaded<T> = { state: 'loading' } | { state: 'offline' } | { state: 'gone'; error: string } | { state: 'ready'; data: T }
 
-async function ask<T>(url: string, init?: RequestInit): Promise<Loaded<T>> {
+async function ask<T>(url: string, init?: RequestInit, ms = 15_000): Promise<Loaded<T>> {
   try {
-    const res = await fetch(`${base}${url}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000), ...init })
+    const res = await fetch(`${base}${url}`, { cache: 'no-store', signal: AbortSignal.timeout(ms), ...init })
     if (res.status === 401) {
       markSignedOut()
       return { state: 'offline' }
@@ -27,7 +27,8 @@ async function ask<T>(url: string, init?: RequestInit): Promise<Loaded<T>> {
 }
 
 export const getJson = <T>(url: string) => ask<T>(url)
-export const postJson = <T>(url: string, body: unknown) => ask<T>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+/** A post; one asking Claude (ADR 0096) waits up to `ms` for its answer, longer than the 15 seconds anything else waits. */
+export const postJson = <T>(url: string, body: unknown, ms?: number) => ask<T>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, ms)
 
 /** Asked once each time the key changes, and again when `again` moves. */
 export function useAsked<T>(on: boolean, key: string, asking: () => Promise<Loaded<T>>, again = 0): Loaded<T> {

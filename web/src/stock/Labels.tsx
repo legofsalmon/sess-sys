@@ -14,7 +14,7 @@ import {
   type View,
   type WarehouseView,
 } from '@sh/shared'
-import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { when } from '../format.ts'
@@ -107,13 +107,11 @@ export function Label({ number, caption, layout }: { number: string; caption?: s
 }
 
 /**
- * Print labels on this device: a layout to suit the printer, the first few
- * at their real size, and all of them once Print is pressed. Only while
- * printing are they all on the page, and the printed page holds nothing
- * else.
+ * Whether labels are printing, and the way to start: the browser's print
+ * dialog opens once they're on the page, and they come off it when it
+ * closes.
  */
-export function PrintLabels({ numbers, caption }: { numbers: readonly string[]; caption?: string }) {
-  const [layout, setLayout] = useState<Layout>(savedLayout)
+export function usePrinting(): [boolean, (on: boolean) => void] {
   const [printing, setPrinting] = useState(false)
   useEffect(() => {
     if (!printing) return
@@ -126,6 +124,29 @@ export function PrintLabels({ numbers, caption }: { numbers: readonly string[]; 
       removeEventListener('afterprint', done)
     }
   }, [printing])
+  return [printing, setPrinting]
+}
+
+/** What prints: the labels alone, a page the size given, with nothing else of the app on it. */
+export function PrintSheet({ className, page, children }: { className: string; page: string; children: ReactNode }) {
+  return createPortal(
+    <div className={`print-sheet ${className}`}>
+      <style>{`@page { size: ${page}; margin: 0; }`}</style>
+      {children}
+    </div>,
+    document.body
+  )
+}
+
+/**
+ * Print labels on this device: a layout to suit the printer, the first few
+ * at their real size, and all of them once Print is pressed. Only while
+ * printing are they all on the page, and the printed page holds nothing
+ * else.
+ */
+export function PrintLabels({ numbers, caption }: { numbers: readonly string[]; caption?: string }) {
+  const [layout, setLayout] = useState<Layout>(savedLayout)
+  const [printing, setPrinting] = usePrinting()
   const choose = (l: Layout) => {
     setLayout(l)
     try {
@@ -157,20 +178,17 @@ export function PrintLabels({ numbers, caption }: { numbers: readonly string[]; 
       <button type="button" className="primary" disabled={numbers.length === 0 || printing} onClick={() => setPrinting(true)}>
         {numbers.length === 1 ? 'Print the label' : `Print ${plural(numbers.length, 'label')}`}
       </button>
-      {printing &&
-        createPortal(
-          <div className={`print-sheet ${layout}`}>
-            <style>{`@page { size: ${page}; margin: 0; }`}</style>
-            {pages.map((p) => (
-              <div key={p[0]} className="page">
-                {p.map((n) => (
-                  <Label key={n} number={n} caption={caption} layout={layout} />
-                ))}
-              </div>
-            ))}
-          </div>,
-          document.body
-        )}
+      {printing && (
+        <PrintSheet className={layout} page={page}>
+          {pages.map((p) => (
+            <div key={p[0]} className="page">
+              {p.map((n) => (
+                <Label key={n} number={n} caption={caption} layout={layout} />
+              ))}
+            </div>
+          ))}
+        </PrintSheet>
+      )}
     </div>
   )
 }
@@ -321,8 +339,9 @@ function SetAside({ labels }: { labels: LabelsView }) {
       {asking !== undefined ? (
         <Confirm
           className="wide"
-          question={`Reserve ${plural(asking, 'number')}? Nothing else gets them. The run can be cancelled until one of its labels is on an item.`}
-          yes="Reserve them"
+          // One verb for the one action, and what cancelling can't undo (audit, 20 October 2026, finding 101; ADR 0015).
+          question={`Set aside ${plural(asking, 'number')}? Nothing else gets them. The numbers stay used even if the run is cancelled later.`}
+          yes="Set them aside"
           no="Not yet"
           onYes={() => reserve(asking)}
           onNo={() => setAsking(undefined)}

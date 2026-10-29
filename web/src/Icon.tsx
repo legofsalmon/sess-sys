@@ -1,5 +1,6 @@
 import { createElement } from 'react'
-import { iconFrame, icons, type IconName } from '@sh/shared'
+// From the design system's file itself rather than all of the shared code, so the bar can be drawn while the app opens (Opening.tsx).
+import { iconFrame, icons, type IconName } from '../../shared/src/ds/icons.js'
 
 export type { IconName }
 

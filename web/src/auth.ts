@@ -47,6 +47,12 @@ function set(next: Auth) {
 /** The same, outside a screen: the change guard reads it (ADR 0034). */
 export const currentAuth = (): Auth => current
 
+/** Told of every answer, outside a screen: notifications look again when someone signs in (notices.ts). */
+export function onAuth(fn: (auth: Auth) => void): () => void {
+  listeners.add(fn)
+  return () => void listeners.delete(fn)
+}
+
 export function useAuth(): Auth {
   const [auth, setAuth] = useState(current)
   useEffect(() => {

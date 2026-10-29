@@ -86,3 +86,17 @@ labelled yet), not only for labelled items.
   out. So are faults reported on site by crew (Phase 5, with Crewbox).
 - Scans that don't match the plan are said as they happen and fixed by
   scanning; a separate list for sorting them out later isn't needed yet.
+
+Later (29 October 2026): an item reported missing twice over (two taps,
+or two phones) is one loss. The server still keeps every report, but a
+device shows them as one, the oldest standing for the rest, and finding
+it (a scan, Mark found on a count, or closing it on Repairs) closes them
+all; an item already missing isn't offered Report missing again (audit,
+20 October 2026, finding 45).
+
+Later (29 October 2026): scanning an item whose case was reported missing
+still marks the case found, as for a sealed case. The answer names the case
+("SH-000200, the case it's kept in, was reported missing; it's marked found
+since this was in it") and offers "It's not in SH-000200 any more", which
+takes the item out of the case and reports the case missing again with its
+note: a closed report is never reopened (audit, 20 October 2026, finding 102).

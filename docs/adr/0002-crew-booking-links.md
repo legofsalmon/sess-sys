@@ -66,3 +66,24 @@ freelancers to sign up for anything.
 - Reading freelancers' own free/busy (Google, Outlook or iCal) is a later
   step; days off are marked by the freelancer on their link or by ops for now.
   *Built 17 October 2026: [ADR 0044](0044-freelancers-own-calendars-read-only.md).*
+
+Later (29 October 2026): nobody holds two jobs on the same day stands,
+override or not. "Offer anyway" over someone's booking still sends the
+offer, but they can only take the days not on the other job unless they
+pull out of it first, and the office's checkbox now says so in those
+words, where before it read the same as for days off (audit, 20 October
+2026, finding 81). So the clashes ADR 0010's planner lists come from days
+off, marked after a booking or overridden; an overridden offer over a
+booking shows there as "check" while it waits.
+
+## Later: days off over a booking, and checked dates (29 October 2026)
+
+The rule stays one-way: an offer over marked days is refused, and days off
+marked over a booking someone already holds are still added, since a person
+may well be away for the rest of the span. They no longer pass quietly
+(audit, 20 October 2026, finding 50): the row on their link says they are
+still booked on that job, and that "Can't make it any more" on the booking
+is the way off it. Days off that overlap ones already marked become one row
+with both notes (approved leave is left as it is). From the link a first
+day already gone, and from anywhere a span over 366 days (a phase's cap),
+is refused; the office can still backdate.

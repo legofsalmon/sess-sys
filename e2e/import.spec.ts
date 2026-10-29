@@ -189,11 +189,11 @@ async function signedIn(page: Page) {
   })
   // What the first bring-in put in, until it's taken back (ADR 0037).
   await page.route(/\/api\/calendar\/import\/brought/, (route) =>
-    route.fulfill({ json: calls.takenBack ? { jobs: 0, days: 0, crew: 0, people: 0, calendars: [], blocked: null } : { jobs: 141, days: 157, crew: 179, people: 36, calendars: ['Adam', 'Olan'], blocked: null } })
+    route.fulfill({ json: calls.takenBack ? { jobs: 0, days: 0, crew: 0, people: 0, kept: 0, calendars: [], blocked: null } : { jobs: 141, days: 157, crew: 179, people: 36, kept: 4, calendars: ['Adam', 'Olan'], blocked: null } })
   )
   await page.route(/\/api\/calendar\/import\/take-back/, (route) => {
     calls.takenBack++
-    return route.fulfill({ json: { jobs: 141, days: 157, crew: 179, people: 36, calendars: ['Adam', 'Olan'] } })
+    return route.fulfill({ json: { jobs: 141, days: 157, crew: 179, people: 36, kept: 4, calendars: ['Adam', 'Olan'] } })
   })
   return calls
 }
@@ -216,7 +216,10 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   await expect(form.getByLabel('First day')).toHaveValue(threeMonthsBack)
   // The first bring-in is still in, and can be taken back to come in again with corrections.
   const brought = page.getByRole('region', { name: 'Brought in so far' })
-  await expect(brought).toContainText('141 jobs over 157 days, with 179 crew bookings and offers, from Adam and Olan, and 36 people added from the invites.')
+  // Those named on Tidy up since stay, and it says so (audit, 20 October 2026, finding 53).
+  await expect(brought).toContainText(
+    '141 jobs over 157 days, with 179 crew bookings and offers, from Adam and Olan, and 36 people added from the invites. 4 people added from the invites stay: named, changed or used in the app since.'
+  )
   await page.screenshot(shot('import-choose'))
   await form.getByRole('button', { name: 'Look at the calendar' }).click()
   // The request goes a moment after the press.
@@ -326,10 +329,10 @@ test('bringing in the jobs on an organiser’s calendar: look, choose, bring in'
   // Taking the first bring-in back: asked in the app, done in one go, and then the calendar can come in again.
   await page.getByRole('button', { name: 'Look at another calendar' }).click()
   await brought.getByRole('button', { name: 'Take it all back' }).click()
-  const takeBack = page.getByRole('group', { name: /^Take back 141 jobs, their crew bookings and offers and 36 people added from the invites\?/ })
+  const takeBack = page.getByRole('group', { name: /^Take back 141 jobs, their crew bookings and offers and 36 people added from the invites\? .* 4 people added from the invites stay/ })
   await takeBack.getByRole('button', { name: 'Take it all back' }).click()
   await expect(page.getByRole('region', { name: 'Taken back' }).getByRole('status')).toHaveText(
-    'Taken back: 141 jobs, 157 days and 179 crew bookings and offers, and 36 people added from the invites. Look at the calendar again to bring it in afresh.'
+    'Taken back: 141 jobs, 157 days and 179 crew bookings and offers, and 36 people added from the invites. 4 people added from the invites stay: named, changed or used in the app since. Look at the calendar again to bring it in afresh.'
   )
   expect(calls.takenBack).toBe(1)
 

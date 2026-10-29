@@ -41,7 +41,7 @@ afterEach(async () => {
   cleanup = []
 })
 
-async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean; retryMs?: number[]; writes?: boolean } = {}) {
+async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: boolean; retryMs?: number[]; writes?: boolean | null } = {}) {
   const db = await pgliteDb()
   const google = new FakeGoogle()
   let now = new Date(`${TODAY}T10:00:00Z`)
@@ -60,7 +60,7 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
       }
       return db.query(sql, params)
     },
-    transaction: (fn) => (queries.count++, db.transaction(fn)),
+    transaction: (fn, o) => (queries.count++, db.transaction(fn, o)),
   }
   const app = await buildApp({
     db: counted,
@@ -77,7 +77,9 @@ async function setup(opts: { settleMs?: number; pollMs?: number; calendar?: bool
             settleMs: opts.settleMs ?? 3_600_000,
             pollMs: opts.pollMs ?? 0,
             retryMs: opts.retryMs,
-            writes: opts.writes,
+            // These tests write to the fake calendar unless they say not to; the server itself writes only when asked (finding 107).
+            // null leaves the option out, as a caller that forgets it would.
+            ...(opts.writes === null ? {} : { writes: opts.writes ?? true }),
             now: () => now,
           },
         }),
@@ -478,6 +480,17 @@ describe('with writing switched off (CALENDAR_WRITES)', () => {
     await s.sync()
     expect((await feed(s)).link?.state).toBe('off')
     expect(eventWrites(s.google.calls)).toEqual([])
+  })
+})
+
+describe('with nothing said about writing', () => {
+  it('writes nothing, as for a caller that forgets the switch (audit, 20 October 2026, finding 107)', async () => {
+    const s = await setup({ writes: null })
+    await nissan(s)
+    await connectTo(s)
+    expect(await s.check()).toMatchObject({ written: 0, problem: expect.stringContaining('switched off') })
+    expect(eventWrites(s.google.calls)).toEqual([])
+    expect((await s.app.inject({ url: '/api/health' })).json().calendar).toBe('read-only')
   })
 })
 

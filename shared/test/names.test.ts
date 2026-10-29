@@ -9,6 +9,11 @@ describe('a name in two', () => {
     expect(splitName('Seán Ó Briain')).toEqual({ firstName: 'Seán', lastName: 'Ó Briain' })
     expect(splitName('Áine Nic Dhonnchadha')).toEqual({ firstName: 'Áine', lastName: 'Nic Dhonnchadha' })
     expect(splitName('Jan van der Berg')).toEqual({ firstName: 'Jan', lastName: 'van der Berg' })
+    // "an" and "na" carry a last name on after a word that starts one, and only then (audit, 20 October 2026, finding 85).
+    expect(splitName('Pádraig Mac an tSaoi')).toEqual({ firstName: 'Pádraig', lastName: 'Mac an tSaoi' })
+    expect(splitName('Seosamh Mac na Mara')).toEqual({ firstName: 'Seosamh', lastName: 'Mac na Mara' })
+    expect(splitName('Máire Ní an Bhaird')).toEqual({ firstName: 'Máire', lastName: 'Ní an Bhaird' })
+    expect(splitName('Ana na Smith')).toEqual({ firstName: 'Ana na', lastName: 'Smith' })
     expect(splitName('  Dara   Quinn ')).toEqual({ firstName: 'Dara', lastName: 'Quinn' })
     // There's always a first name: one word is one, and so is a word that would start a last name.
     expect(splitName('Ó Briain')).toEqual({ firstName: 'Ó', lastName: 'Briain' })

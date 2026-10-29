@@ -218,7 +218,12 @@ describe('freelancer link', () => {
     const o = await offer(app, await call(app), aoife.id)
     const rate = (typed: string) => answer(app, aoife.linkToken, o.id, { answer: 'counter', picker: '1', days: ['2026-10-02'], rate: typed })
 
-    expect(await rate('lots')).toMatchObject({ ok: false, message: 'Put in a price like 250 or 1,250.50.' })
+    const lots = await rate('lots')
+    expect(lots).toMatchObject({ ok: false, message: 'Put in a price like 250 or 1,250.50.' })
+    // Said under the rate field, which is marked and joined to it, not at the top of the card (audit, 20 October 2026, finding 90).
+    const refusedCard = cardOf(lots.page, o.id)
+    expect(refusedCard).not.toContain('class="flash')
+    expect(refusedCard).toMatch(new RegExp(`<input name="rate" inputmode="decimal" aria-invalid="true" aria-describedby="rate-error-${o.id}" value="lots"></label><p class="field-error" id="rate-error-${o.id}" role="alert">`))
     expect(await rate('0')).toMatchObject({ ok: false, message: 'Put in the day rate you would do it for.' })
     expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'offered', counterRateCents: null })
 
@@ -318,6 +323,79 @@ describe('freelancer link', () => {
     const forced = await offer(app, c, aoife.id, true)
     expect(forced.result.status).toBe('applied')
     expect(await entity<Offer>(app, 'offer', forced.id)).toMatchObject({ override: true })
+  })
+
+  it('checks days off from the link: none gone by, none past a year, overlaps as one row, and a booking said beside them', async () => {
+    // Proves (audit, 20 October 2026, finding 50): the link refuses a first day already gone and a span past a year, while
+    // the office can still backdate; overlapping days off become one row with both notes; and days off over a booking they
+    // hold say beside the row that they're still booked and where to pull out, the booking staying as it was.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const away = (payload: string) =>
+      app.inject({ method: 'POST', url: `/f/${aoife.linkToken}/away`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload })
+    const past = await away('start=2020-01-01&end=2020-01-03')
+    expect(past.statusCode).toBe(422)
+    expect(flashOf(past.body)).toMatchObject({ ok: false, message: 'The first day off has gone by. Pick today or a day after it.' })
+    expect(past.body).toContain('value="2020-01-01"')
+    expect(flashOf((await away('start=2026-10-01&end=2999-12-31')).body)).toMatchObject({ ok: false, message: 'Days off can be at most 366 days at a time.' })
+    // The office's own path can still backdate, but not for ever either.
+    expect(await send(app, 'unavailability.add', { id: newId(), personId: aoife.id, start: '2026-09-01', end: '2026-09-02', note: '' })).toMatchObject({ status: 'applied' })
+    expect(await send(app, 'unavailability.add', { id: newId(), personId: aoife.id, start: '2020-01-01', end: '2025-08-01', note: '' })).toMatchObject({ status: 'rejected' })
+
+    expect((await away('start=2026-10-10&end=2026-10-14&note=On+tour')).statusCode).toBe(303)
+    expect((await away('start=2026-10-13&end=2026-10-16&note=Wedding')).statusCode).toBe(303)
+    const { rows } = await lastDb.query<{ start_day: string; end_day: string; note: string }>(
+      "SELECT start_day::text, end_day::text, note FROM unavailability WHERE start_day >= '2026-10-01'"
+    )
+    expect(rows).toEqual([{ start_day: '2026-10-10', end_day: '2026-10-16', note: 'On tour; Wedding' }])
+
+    // Booked on a job, then days off over one of its days: added, said beside the row, and the booking still holds.
+    const o = await offer(app, await call(app, { start: '2026-10-20', end: '2026-10-21' }), aoife.id)
+    await answer(app, aoife.linkToken, o.id, { answer: 'accept', picker: '1', days: ['2026-10-20', '2026-10-21'] })
+    await send(app, 'offer.confirm', { id: o.id })
+    expect((await away('start=2026-10-21&end=2026-10-22')).statusCode).toBe(303)
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    const list = page.slice(page.indexOf('<section id="away">'), page.indexOf('class="add-away"'))
+    expect(list).toContain(`You're booked on <a href="#o-${o.id}">Electric Picnic</a> that day. Days off don't take you off it: use Can't make it any more on that booking.`)
+    expect(list.match(/class="clash"/g)).toHaveLength(1)
+    expect(await entity<Offer>(app, 'offer', o.id)).toMatchObject({ status: 'confirmed' })
+  })
+
+  it('says the year on a date in another year, and not on one this autumn (audit, 20 October 2026, finding 89)', async () => {
+    // Proves: the link page's dates carry the year where it isn't plain from today, so "5 Jan" is never a guess.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    await offer(app, await call(app, { project: 'New Year Gig', start: '2027-01-05', end: '2027-01-05' }), aoife.id)
+    await offer(app, await call(app), aoife.id)
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    expect(page).toContain('<dt>Dates</dt><dd>Tue 5 Jan 2027</dd>')
+    expect(page).toContain('<dt>Dates</dt><dd>Fri 2 Oct to Sun 4 Oct</dd>')
+  })
+
+  it('draws the next three bookings in full and the rest as a line each, opening in place (audit, 20 October 2026, finding 48)', async () => {
+    // Proves: at volume the page doesn't draw every booking as a full card; the soonest three are, and the rest fold to
+    // the job, role, days and status, opening with no script; one a refused post is about opens by itself.
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const booked: string[] = []
+    // Made out of order, so the page has to put them soonest first.
+    for (const n of [9, 3, 7, 1, 5]) {
+      const dayOf = `2026-10-${String(10 + n).padStart(2, '0')}`
+      const o = await offer(app, await call(app, { project: `Gig ${n}`, start: dayOf, end: dayOf }), aoife.id)
+      await answer(app, aoife.linkToken, o.id, { answer: 'accept' })
+      await send(app, 'offer.confirm', { id: o.id })
+      booked[n] = o.id
+    }
+    const page = (await app.inject({ url: `/f/${aoife.linkToken}` })).body
+    const section = page.slice(page.indexOf('<section id="bookings">'), page.indexOf('<section id="away">'))
+    const full = [...section.matchAll(/<article class="offer confirmed" id="o-(\w+)">/g)].map((m) => m[1])
+    expect(full.slice(0, 3)).toEqual([booked[1], booked[3], booked[5]])
+    expect(section).toContain('2 more bookings after these, a line each: tap one to open it.')
+    expect(section.match(/<details class="later">/g)).toHaveLength(2)
+    expect(section).toContain('<summary><b>Gig 7</b> · Audio tech · Sat 17 Oct <span class="tag confirmed">Confirmed</span></summary>')
+    expect(section.indexOf('Gig 7')).toBeLessThan(section.indexOf('Gig 9'))
+    // The glance line stays in view as the page scrolls.
+    expect(page).toMatch(/\.glance\{[^}]*position:sticky/)
   })
 
   it('publishes bookings as a calendar feed any calendar app can subscribe to', async () => {
@@ -530,7 +608,11 @@ describe('booking rules', () => {
 
     const late = await answer(app, people[0]!.linkToken, offers[0]!.id, { answer: 'accept' })
     expect(late.ok).toBe(false)
-    expect(late.message).toMatch(/filled/)
+    // The refusal names the job, since its card has already gone down to "Declined and withdrawn" and the page is drawn
+    // from the top, where the message is (audit, 20 October 2026, finding 49).
+    expect(late.message).toBe('Sorry, Electric Picnic, Audio tech, Sat 10 Oct has just been filled by someone else.')
+    expect(late.page.indexOf('has just been filled')).toBeLessThan(late.page.indexOf('<h2>Offers waiting on you</h2>'))
+    expect(late.page.slice(late.page.indexOf('<h2>Declined and withdrawn</h2>'))).toContain('Electric Picnic')
   })
 
   it('never double books a person, however the two acceptances arrive', async () => {
@@ -563,6 +645,41 @@ describe('booking rules', () => {
     const gig = await call(app, { project: 'Vicar Street', start: '2026-10-03', end: '2026-10-03' })
     const b = await offer(app, gig, aoife.id)
     expect(b.result).toMatchObject({ status: 'rejected', reason: { code: 'clash' } })
+  })
+
+  it('keeps a declined offer declined, and one person to one place', async () => {
+    // Proves: an Accept or a counter from an old tab on a declined offer is refused in the page's own words, so a re-offer can't book the same person twice (audit, 20 October 2026, finding 25).
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const niall = await person(app, 'Niall Kerr')
+    const c = await call(app, { needed: 2, start: '2026-10-10', end: '2026-10-10' })
+    const old = await offer(app, c, aoife.id)
+    expect(await answer(app, aoife.linkToken, old.id, { answer: 'decline' })).toMatchObject({ ok: true })
+    const again = await offer(app, c, aoife.id)
+    expect(again.result.status).toBe('applied')
+    const stale = await send(app, 'offer.respond', { id: old.id, answer: 'accept', days: null, note: '' })
+    expect(stale).toMatchObject({ status: 'rejected', reason: { message: expect.stringContaining('only the office can offer it to you again') } })
+    const counter = await send(app, 'offer.respond', { id: old.id, answer: 'counter', counterRateCents: 30000, days: null, note: '' })
+    expect(counter.status).toBe('rejected')
+    expect((await entity<Offer>(app, 'offer', old.id)).status).toBe('declined')
+    expect(await answer(app, aoife.linkToken, again.id, { answer: 'accept' })).toMatchObject({ ok: true })
+    // The second place is still Niall's to take.
+    const n = await offer(app, c, niall.id)
+    expect(await answer(app, niall.linkToken, n.id, { answer: 'accept' })).toMatchObject({ ok: true })
+  })
+
+  it('counts people, not offers, on a day', async () => {
+    // Proves: two offers held by one person, however they came about, take one place, and a second accept by the same person is refused (audit, 20 October 2026, finding 25).
+    const app = await server()
+    const aoife = await person(app, 'Aoife Byrne')
+    const c = await call(app, { needed: 2, start: '2026-10-10', end: '2026-10-10' })
+    const a = await offer(app, c, aoife.id)
+    expect(await answer(app, aoife.linkToken, a.id, { answer: 'accept' })).toMatchObject({ ok: true })
+    // An offer row made by hand, as an old bug might have left: the same person offered twice.
+    const b = newId()
+    await lastDb.query(`INSERT INTO offers (id, call_id, person_id, status, days, day_rate_cents, override) VALUES ($1, $2, $3, 'offered', $4, 25000, false)`, [b, c, aoife.id, JSON.stringify(['2026-10-10'])])
+    const twice = await send(app, 'offer.respond', { id: b, answer: 'accept', days: null, note: '' })
+    expect(twice).toMatchObject({ status: 'rejected', reason: { message: expect.stringContaining('already booked on this job') } })
   })
 
   it('withdraws every open offer when a job is cancelled', async () => {
