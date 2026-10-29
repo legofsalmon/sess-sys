@@ -88,7 +88,7 @@ async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string
       code: 'filled',
       message: open.length
         ? `Sorry, ${daysLabel(full)} ${full.length === 1 ? 'has' : 'have'} just been filled. Still open: ${daysLabel(open)}.`
-        : 'Sorry, this has just been filled by someone else.',
+        : `Sorry, ${jobNamed(call, days)} has just been filled by someone else.`,
     })
   }
   const clash = await heldElsewhere(ctx.tx, offer.personId, days, call.id)
@@ -99,6 +99,12 @@ async function checkCanHold(ctx: Ctx, call: CrewCall, offer: Offer, days: string
     })
   }
 }
+
+/**
+ * The job a refusal is about, by name ("Harbour Lights Festival, Driver, Thu 19 Nov"): with two or three offers waiting,
+ * "this" doesn't say which one went, and its card has already moved down the page (audit, 20 October 2026, finding 49).
+ */
+const jobNamed = (call: CrewCall, days: string[]) => `${call.project}, ${call.role}, ${daysLabel(days.length ? days : eachDay(call.start, call.end))}`
 
 /** Once every day of a call is covered, tell everyone still waiting. */
 async function closeIfFull(ctx: Ctx, call: CrewCall) {
@@ -538,8 +544,8 @@ export const crewHandlers: { [N in CrewCommand]: Handler<N> } = {
       await setOffer(ctx, offer.id, { ...answered, status: 'pulled-out' })
       return
     }
-    if (offer.status === 'filled') throw new Refused({ code: 'filled', message: 'Sorry, this has already been filled by someone else.' })
-    if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: 'This offer was withdrawn.' })
+    if (offer.status === 'filled') throw new Refused({ code: 'filled', message: `Sorry, ${jobNamed(call, offer.days)} has just been filled by someone else.` })
+    if (offer.status === 'cancelled') throw new Refused({ code: 'conflict', message: `Sorry, the office has withdrawn ${jobNamed(call, offer.days)}.` })
     // Pulled out is over: the office offers it afresh if they can do it after all.
     if (offer.status === 'pulled-out') throw new Refused({ code: 'conflict', message: "You've pulled out of this one. Ask the office if you can do it after all." })
     if (offer.status === 'confirmed')

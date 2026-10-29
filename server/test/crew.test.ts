@@ -530,7 +530,11 @@ describe('booking rules', () => {
 
     const late = await answer(app, people[0]!.linkToken, offers[0]!.id, { answer: 'accept' })
     expect(late.ok).toBe(false)
-    expect(late.message).toMatch(/filled/)
+    // The refusal names the job, since its card has already gone down to "Declined and withdrawn" and the page is drawn
+    // from the top, where the message is (audit, 20 October 2026, finding 49).
+    expect(late.message).toBe('Sorry, Electric Picnic, Audio tech, Sat 10 Oct has just been filled by someone else.')
+    expect(late.page.indexOf('has just been filled')).toBeLessThan(late.page.indexOf('<h2>Offers waiting on you</h2>'))
+    expect(late.page.slice(late.page.indexOf('<h2>Declined and withdrawn</h2>'))).toContain('Electric Picnic')
   })
 
   it('never double books a person, however the two acceptances arrive', async () => {
