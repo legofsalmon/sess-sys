@@ -37,10 +37,13 @@ test('a big call says how many it holds in words, and names the first eight acro
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
   await office.goto('/#crew')
   await expect(office.getByRole('status')).toHaveText('Up to date')
+  // Next June is past the fortnight Crew needed shows at rest (audit, 20 October 2026, finding 23).
+  await office.getByRole('button', { name: /^Show all \d+ calls still to come$/ }).click()
   const call = office.locator('.call-group', { hasText: `Volume Fest ${id}` }).getByRole('article', { name: '40 × Stagehand' })
   await expect(call.locator('.pill').first()).toHaveText('25 of 40, both days')
   const who = call.locator('.who-line > span:last-child')
-  await expect(who).toHaveText(new RegExp(`^StagehandA Volume${id}, .*StagehandH Volume${id} and 17 more$`))
+  // Booked and not-yet-booked on one call, each says theirs (audit, 20 October 2026, finding 72): the first eight are booked.
+  await expect(who).toHaveText(new RegExp(`^StagehandA Volume${id} \\(booked\\), .*StagehandH Volume${id} \\(booked\\) and 17 more$`))
   await expect(who).not.toContainText('StagehandI')
   // Across the card, not a column of one word a line beside the pill.
   const [line, card] = await Promise.all([call.locator('.who-line').boundingBox(), call.boundingBox()])

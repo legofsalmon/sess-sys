@@ -6,6 +6,7 @@ import './jobs/jobs.css'
 import './home/home.css'
 import { followMovedAddresses } from './addresses.ts'
 import { startErrorReporting } from './errors.ts'
+import { Opening } from './Opening.tsx'
 import { keepPlaces } from './places.ts'
 import { watchForUpdates } from './update.tsx'
 
@@ -33,16 +34,11 @@ function CouldNotStart({ why }: { why: string }) {
   )
 }
 
-// The app waits on its copy of the data before it draws anything (sync.ts),
-// which on a slow IndexedDB can be a while: a word meanwhile, rather than a
-// white page. And that's why the shell is loaded here rather than imported:
-// should it fail, for whatever reason storage.ts hasn't caught, the page
-// still says something.
-root.render(
-  <div className="app">
-    <p className="hint">Loading…</p>
-  </div>
-)
+// The app waits on its copy of the data before it draws the screens (sync.ts), which on a slow phone can be seconds: the
+// places and the screen's shape meanwhile, never a word alone (Opening.tsx; audit, 20 October 2026, finding 11). And
+// that's why the shell is loaded here rather than imported: should it fail, for whatever reason storage.ts hasn't
+// caught, the page still says something.
+root.render(<Opening />)
 import('./Shell.tsx').then(
   ({ Shell }) =>
     root.render(

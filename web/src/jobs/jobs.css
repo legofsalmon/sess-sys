@@ -463,6 +463,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  * white map never lights up a dark room. Its box keeps the map's own layers (a thousand deep) under the page's bar.
  */
 .jobs .map { isolation: isolate; height: 240px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); font: inherit; }
+/* The map's code not on this phone yet, with no signal to fetch it (lazyPart.tsx): said where the map would be. */
+.jobs .map .map-missing { margin: 0; padding: var(--space-14); }
 .jobs .map.tall { height: 320px; }
 @media (min-width: 900px) {
   .jobs .map { height: 300px; }

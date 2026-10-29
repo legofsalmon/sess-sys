@@ -63,6 +63,23 @@ export const STATUS: Record<OfferView['status'], [string, PillTone]> = {
   'pulled-out': ["Can't make it", 'cancelled'],
 }
 
+/** The other jobs someone holds on any of these days, and which days: what an offer over a booking can't have. */
+function heldOn(crew: CrewView, personId: string, days: readonly string[], exceptCallId: string) {
+  const jobs = new Set<string>()
+  const held = new Set<string>()
+  for (const c of crew.calls) {
+    if (c.id === exceptCallId || c.status !== 'open') continue
+    for (const o of c.offers) {
+      if (o.personId !== personId || !HOLDING.includes(o.status)) continue
+      const hit = o.days.filter((d) => days.includes(d))
+      if (!hit.length) continue
+      jobs.add(c.project)
+      for (const d of hit) held.add(d)
+    }
+  }
+  return { jobs: [...jobs], days: [...held] }
+}
+
 /** The picker's order (ADR 0025): by department, then the highest level first, then by name. */
 function byDepartmentThenLevel(a: PersonView, b: PersonView): number {
   if (dept(a) !== dept(b)) {
@@ -125,12 +142,14 @@ export function CallCard({
   const filled = call.openDays.length === 0
   const live = call.status === 'open'
   const invites = calendar.link?.state === 'on' && calendar.link.invites === true
-  // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn, Niamh Kelly (offered)". The first few at rest, then
+  // Who's on it, with their answer where it isn't yet a booking: "Dara Quinn (booked), Niamh Kelly (offered)". The first few at rest, then
   // "and 17 more", which opening the line lists (audit of 18 October, finding 20).
+  // Booked and not yet booked side by side, everyone's state is said, so "(offered)" can't read as the pair's (audit, 20 October 2026, finding 72).
   const onIt = call.offers.filter((o) => o.person && ON_CALL.includes(o.status))
+  const mixed = onIt.some((o) => o.status === 'confirmed') && onIt.some((o) => o.status !== 'confirmed')
   const who = onIt
     .slice(0, WHO_SHOWN)
-    .map((o) => `${o.person!.name}${o.status === 'confirmed' ? '' : ` (${STATUS[o.status][0].toLowerCase()})`}`)
+    .map((o) => `${o.person!.name}${o.status === 'confirmed' ? (mixed ? ' (booked)' : '') : ` (${STATUS[o.status][0].toLowerCase()})`}`)
     .join(', ')
   const more = onIt.length - WHO_SHOWN
 
@@ -507,6 +526,15 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   const candidates = everyone.filter((p) => applicants || p.level !== APPLICANT_LEVEL).sort(byDepartmentThenLevel)
   const chosen = candidates.find((p) => p.id === personId)
   const conflicts = chosen ? personConflicts(crew, chosen.id, call.days, call.id) : []
+  // Offering anyway over a booking sends an offer they can only take the free days of: nobody holds two jobs on a day (ADR 0002),
+  // so the checkbox says so, rather than reading as it does for days off (audit, 20 October 2026, finding 81).
+  const bookedOn = chosen ? heldOn(crew, chosen.id, call.days, call.id) : { jobs: [], days: [] }
+  const onlyFree =
+    chosen && bookedOn.jobs.length > 0
+      ? bookedOn.days.length >= call.days.length
+        ? `${firstName(chosen)} can't take any of it unless they pull out of ${bookedOn.jobs.join(' and ')}.`
+        : `${firstName(chosen)} can only take the days not on ${bookedOn.jobs.join(' or ')} unless they pull out of ${bookedOn.jobs.length === 1 ? 'it' : 'them'}.`
+      : ''
   // Busy in their own calendar (ADR 0044): said, never in the way. It may be something they can move, and they may still say yes.
   const own = useView().ownCalendars
   const busy = chosen ? own.warning(chosen.id, call.days) : null
@@ -592,7 +620,8 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
         <label className="warn">
           <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
           <span>
-            {conflicts.join('. ')}. <b>Offer anyway</b>
+            {conflicts.join('. ')}. {onlyFree && `${onlyFree} `}
+            <b>Offer anyway</b>
           </span>
         </label>
       )}
@@ -608,7 +637,8 @@ export function OfferForm({ call, crew, onShare }: { call: CallView; crew: CrewV
   )
 }
 
-export function NewCall() {
+/** `onMade` hears each call's id as it's asked for, so the list can keep it in view whatever its days. */
+export function NewCall({ onMade }: { onMade?: (id: string) => void } = {}) {
   const today = useToday()
   const view = useView()
   const seesRates = useSeesRates()
@@ -641,9 +671,11 @@ export function NewCall() {
     // Ready for the next call on the same job and days; a refusal brings what was typed back, unless the next thing has been typed since.
     const cleared = { ...blank, project: f.project, venue: f.venue, start: f.start, end: f.end }
     setF(cleared)
+    const id = newId()
+    onMade?.(id)
     void run(() =>
       client.mutate('call.create', {
-        id: newId(),
+        id,
         project: f.project.trim(),
         phase: f.phase.trim(),
         venue: f.venue.trim(),

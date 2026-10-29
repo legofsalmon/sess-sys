@@ -54,7 +54,7 @@ test('a call needing IPAF marks who lacks it in the picker, and Offer says why i
   await call.getByRole('button', { name: 'Offer', exact: true }).click()
   await expect(call.getByRole('alert')).toHaveText("Laoise Keane has no IPAF, which this call needs. Update their card if that's changed.")
   // Nothing was sent: the call still lists only Pádraig and Róisín, and nothing waits to sync.
-  await expect(call.locator('.who-line')).toContainText('Pádraig Kenny, Róisín Farrell (offered)')
+  await expect(call.locator('.who-line')).toContainText('Pádraig Kenny (booked), Róisín Farrell (offered)')
   await expect(office.getByRole('status')).toHaveText('Up to date')
 
   // Someone whose certificates aren't known can be offered it, with a warning first.

@@ -1,12 +1,13 @@
 import { directionsLink, pinFromText, plural, type FoundPlace, type Pin, type PlacesFound, type VenueView } from '@sh/shared'
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Heading } from '../Icon.tsx'
+import { lazyPart } from '../lazyPart.tsx'
 import { useAccess } from '../role.ts'
 import { ask } from '../server.ts'
 import { client } from '../sync.ts'
 import { useLate } from '../useLate.ts'
-import type { Mark } from './Map.tsx'
+import type { default as MapPart, Mark } from './Map.tsx'
 
 /**
  * Venues on the map (ADR 0057): a venue's own map on its page, and every
@@ -17,15 +18,16 @@ import type { Mark } from './Map.tsx'
  * coordinates, or tapping the map where it is.
  */
 
-/** Leaflet and the map's own styles load only on the pages with a map. */
-const MapView = lazy(() => import('./Map.tsx'))
+/** Leaflet and the map's own styles load only on the pages with a map, and are kept from the first (lazyPart.tsx). */
+const MapView = lazyPart(() => import('./Map.tsx'))
 
-function LazyMap(props: Parameters<typeof MapView>[0]) {
-  return (
-    <Suspense fallback={<div className={`map waiting${props.tall ? ' tall' : ''}`} aria-label={props.label} role="region" />}>
-      <MapView {...props} />
-    </Suspense>
+function LazyMap(props: ComponentProps<typeof MapPart>) {
+  const box = (words?: string) => (
+    <div className={`map waiting${props.tall ? ' tall' : ''}`} aria-label={props.label} role="region">
+      {words && <p className="hint map-missing">{words}</p>}
+    </div>
   )
+  return <MapView {...props} waiting={box()} missing={box("The map comes with signal: it hasn't been opened on this phone before.")} />
 }
 
 const markOf = (v: VenueView & { pin: Pin }, line?: string): Mark => ({ id: v.id, name: v.name, pin: v.pin, href: `#jobs/venues/${encodeURIComponent(v.id)}`, line })
