@@ -10,11 +10,11 @@ waiting on someone.
 - Findings 108, 109 and 111 to 115 of the [20 October
   audit](audit-2026-10-20.md) (PR #171): the parity test compares nested
   records in full and caught joined days keeping their old names offline
-  (fixed); slow label waits get room; the docs say Admin rather than the
+  (fixed), and untidy typed text now settles to the same view on both sides; slow label waits get room; the docs say Admin rather than the
   Account tab, freelancer rather than warehouse, and that the Google,
   backups and Sentry keys were all set on 19 October; the field test no
   longer says Start fresh now real data is live; the design system's files
-  are at 0.9.0; nine unused parts deleted; one put-away form for places and
+  match what main carries; nine unused parts deleted; one put-away form for places and
   cases; and the security updates that need no major version. App 1.63.4.
 - Left open: splitting the six files over 900 lines (when next touched),
   and the major upgrades (zod 4, now first since zod 3 has a high advisory

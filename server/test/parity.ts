@@ -133,20 +133,6 @@ async function run(k: Case) {
  */
 const CALL_NAMES = /^\.crew\.calls\.\d+\.(project|phase|venue)$|\.worked\.\d+\.name$/
 
-/**
- * Drift: text typed with spaces round it shows as typed until the server,
- * which trims it, answers (audit, 20 October 2026, finding 63). These
- * cases type it untidily on purpose (finding 108); once the shared parsers
- * trim, take UNTIDY off them, and the regular expressions with it.
- */
-const UNTIDY = {
-  /** A place's name, and the order places sort in by it. */
-  place: /^\.(warehouse\.places|counts\.week\.due)\.\d+\./,
-  serial: /\.serial$/,
-  fault: /^\.faults\.(all|open)\.\d+\.(note|repair)$/,
-  invoice: /\.invoiceRef$/,
-}
-
 const DELIVERY = { id: 'd1', kind: 'other' as const, what: 'Delivery', ref: null, group: '', qty: 1, days: 1, unitCents: 15000, vat: '13.5' as const }
 
 const CASES: Case[] = [
@@ -214,11 +200,11 @@ const CASES: Case[] = [
   c('model.update', { id: 'unused', rackMount: true, units: 1, rackPart: 'vent' }, { as: 'made a rack part', before: [m('model.create', { id: 'unused', name: 'Old vent', department: 'audio', category: 'Rack parts', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('model.update', { id: 'unused', rackMount: true, units: 2, rackWidth: 'third' }, { as: 'made rack-mount', before: [m('model.create', { id: 'unused', name: 'Old desk', department: 'audio', category: 'Desks', tracking: 'bulk', isCase: false, valueCents: null, notes: '' })] }),
   c('place.upsert', { id: 'van-shelf', name: 'Van shelf', notes: '' }),
-  c('place.upsert', { id: 'van-shelf', name: '  Van shelf ', notes: ' Top ' }, { as: 'untidy text', known: [UNTIDY.place] }),
+  c('place.upsert', { id: 'van-shelf', name: '  Van shelf ', notes: ' Top ' }, { as: 'untidy text' }),
   c('place.remove', { id: 'bay' }),
   c('asset.add', { id: 'a3', modelId: 'y10p', number: 'SH-000004', serial: 'Y3', placeId: 'bay', caseId: null, notes: '', fromCount: false }),
   c('asset.update', { id: 'a1', serial: 'Y1-B', notes: 'New grille' }),
-  c('asset.update', { id: 'a1', serial: ' Y1-B ', notes: 'New grille  ' }, { as: 'untidy text', known: [UNTIDY.serial] }),
+  c('asset.update', { id: 'a1', serial: ' Y1-B ', notes: 'New grille  ' }, { as: 'untidy text' }),
   c('asset.move', { id: 'a1', placeId: null, caseId: 'r1' }, { as: 'into a case' }),
   c('asset.move', { id: 'a1', placeId: 'bay', caseId: null }, { as: 'to a place' }),
   c('asset.relabel', { id: 'a1', number: 'SH-000009' }),
@@ -246,7 +232,7 @@ const CASES: Case[] = [
   c('move.record', { id: newId(), projectId: 'gala', direction: 'out', assetId: null, modelId: 'xlr', qty: 6, at: new Date().toISOString() }, { as: 'counted kit out' }),
   c('fault.report', { id: 'f2', kind: 'missing', assetId: null, modelId: 'xlr', qty: 2, projectId: 'gala', usable: false, note: 'Not back from the gala', at: new Date().toISOString() }),
   c('fault.update', { id: 'f1', usable: false, note: 'Grille dented, cone torn', repair: 'Sent to d&b' }),
-  c('fault.update', { id: 'f1', usable: false, note: '  Grille dented ', repair: ' Sent to d&b ' }, { as: 'untidy text', known: [UNTIDY.fault] }),
+  c('fault.update', { id: 'f1', usable: false, note: '  Grille dented ', repair: ' Sent to d&b ' }, { as: 'untidy text' }),
   c('fault.close', { id: 'f1', outcome: 'fixed', at: new Date().toISOString() }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: true, at: new Date().toISOString(), by: 'Cian', note: '' }),
   c('inspection.record', { id: newId(), assetId: 'a1', kind: 'pat', passed: false, at: new Date().toISOString(), by: 'Cian', note: 'Earth fault' }, { as: 'failed' }),
@@ -322,7 +308,7 @@ const CASES: Case[] = [
   c('quote.answer', { id: 'q1', answer: 'declined', on: today }, { as: 'declined' }),
   c('quote.answer', { id: 'q1', answer: 'none', on: today }, { as: 'taken back', before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
   c('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
-  c('quote.invoiced', { id: 'q1', on: today, ref: '  SH-77  ' }, { as: 'untidy text', known: [UNTIDY.invoice], before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
+  c('quote.invoiced', { id: 'q1', on: today, ref: '  SH-77  ' }, { as: 'untidy text', before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today })] }),
   c('quote.paid', { id: 'q1', on: today }, { before: [m('quote.answer', { id: 'q1', answer: 'accepted', on: today }), m('quote.invoiced', { id: 'q1', on: today, ref: 'SH-1042' })] }),
   c('price.product', { modelId: 'xlr', dayCents: 300 }),
   c('price.product', { modelId: 'y10p', dayCents: null }, { as: 'taken off' }),
