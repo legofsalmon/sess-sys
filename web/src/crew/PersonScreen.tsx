@@ -13,7 +13,7 @@ import {
   type View,
 } from '@sh/shared'
 import { CERTIFICATE_SOON_DAYS, certificateName, daysBetween, dayLabel, whatsappNumber } from '@sh/shared'
-import { holdsARole, ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, type Role } from '@sh/shared'
+import { holdsARole, ROLE_LABELS, ROLE_LINES, ROLES, roleOfPerson, signInAbility, type Role } from '@sh/shared'
 import { useId, useState } from 'react'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
@@ -182,7 +182,7 @@ function Who({ person, view }: { person: PersonView; view: View }) {
   const mayEdit = access.can('crew') && !person.archived
   const role = roleOfPerson(person)
   // Their main email is how they're written to; for someone with a role, only who changes settings changes it, as with the email itself.
-  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can('settings'))
+  const mayMakeMain = mayEdit && (!holdsARole(person) || access.can(signInAbility(person.role)))
   const [editing, setEditing] = useState(false)
   const { run, error } = useAct()
   const phone = person.phone?.trim()

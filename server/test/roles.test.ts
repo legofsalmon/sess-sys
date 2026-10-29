@@ -253,6 +253,45 @@ describe('roles', () => {
     expect(now.changes.some((ch: { entity: string }) => ch.entity === 'quote')).toBe(true)
   })
 
+  it("keep a director's email and addresses to directors, and nobody's sign-in address to anyone else, even in one push (audit, 20 October 2026, finding 10)", async () => {
+    const { app, signIn, c } = await company()
+    await send(app, c, 'person.role', { id: 'sean', role: 'office' })
+    await send(app, c, 'person.upsert', staff('dara', 'Dara Kelly', 'dara@sessionhire.com'))
+    await send(app, c, 'person.role', { id: 'dara', role: 'head' })
+    const s = { sh_session: await signIn(sean) }
+    const pushAll = async (cookies: Record<string, string>, ...mutations: [string, unknown][]) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/sync/push',
+        cookies,
+        payload: { clientId: 'phone', mutations: mutations.map(([name, args]) => ({ id: newId(), name, args, createdAt: new Date().toISOString() })) },
+      })
+      return (res.json().results as { status: string; reason?: { code: string; message: string } }[]).map((r) => r.reason?.message ?? r.status)
+    }
+
+    // The office can't change the director's email, type or main address, nor combine someone into her.
+    const moved = await send(app, s, 'person.upsert', staff('colly', 'Colly', 'sean@elsewhere.ie'))
+    expect(moved.reason?.message).toBe("Only directors can change Colly's email or type: it's how they sign in as Director. Your role is Office and production.")
+    expect((await send(app, s, 'person.contact', { id: 'colly', email: 'sean@elsewhere.ie' })).reason?.code).toBe('forbidden')
+    await send(app, s, 'person.upsert', staff('spare', 'Spare', 'spare@sessionhire.com'))
+    expect((await send(app, s, 'person.merge', { id: 'colly', from: ['spare'] })).reason?.message).toBe('Colly signs in as Director, so only directors can combine them with someone. Your role is Office and production.')
+
+    // The audit's way in, in one push: let his own address go, then give it to someone else. Refused, for a head as for the director.
+    expect(
+      await pushAll(s, ['person.upsert', staff('sean', 'Seán Ó Briain', 'sean@elsewhere.ie')], ['person.upsert', staff('dara', 'Dara Kelly', 'sean@sessionhire.com')])
+    ).toEqual(['applied', "sean@sessionhire.com is the address you sign in with, so it can't be given to someone else. Sign in with another address first, or ask a director."])
+    // Nor by combining someone holding it into another person.
+    expect((await send(app, c, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@sessionhire.com'))).status).toBe('applied')
+    expect((await app.inject({ url: '/api/me', cookies: s })).json()).toMatchObject({ role: 'office' })
+    await send(app, c, 'person.upsert', staff('ana', 'Ana Byrne', 'ana@sessionhire.com'))
+    await send(app, c, 'person.role', { id: 'ana', role: 'office' })
+    expect((await send(app, s, 'person.merge', { id: 'ana', from: ['sean'] })).reason?.message).toMatch(/^sean@sessionhire\.com is the address you sign in with/)
+
+    // The office still corrects a head's address, and its own; a director still changes hers.
+    expect((await send(app, s, 'person.contact', { id: 'dara', email: 'dara.kelly@sessionhire.com' })).status).toBe('applied')
+    expect((await send(app, c, 'person.contact', { id: 'colly', email: 'colly.hewson@sessionhire.com' })).status).toBe('applied')
+  })
+
   it('give a role only to staff, and leave who approves time off to a director', async () => {
     const { app, signIn, c } = await company()
     await send(app, c, 'person.upsert', { ...staff('dara', 'Dara Kelly', null), kind: 'freelancer' })
@@ -276,7 +315,7 @@ describe('roles', () => {
     // A head can't move the director's account, take it, or move his own.
     const moved = await send(app, s, 'person.upsert', staff('colly', 'Colly', 'sean.two@sessionhire.com'))
     expect(moved).toMatchObject({ status: 'rejected', reason: { code: 'forbidden' } })
-    expect(said(moved)).toBe("Only the office and directors can change Colly's email or type: it's how they sign in as Director. Your role is Head of department.")
+    expect(said(moved)).toBe("Only directors can change Colly's email or type: it's how they sign in as Director. Your role is Head of department.")
     expect((await send(app, s, 'person.upsert', staff('colly', 'Colly', 'colly@sessionhire.com', { kind: 'freelancer' }))).reason?.code).toBe('forbidden')
     expect((await send(app, s, 'person.contact', { id: 'colly', email: 'sean.two@sessionhire.com' })).reason?.code).toBe('forbidden')
     expect(said(await send(app, s, 'person.upsert', staff('sean', 'Seán Ó Briain', 'sean@elsewhere.ie')))).toMatch(/^Only the office and directors can change Seán Ó Briain's email or type/)
