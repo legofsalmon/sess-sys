@@ -225,6 +225,25 @@ describe('scans', () => {
   })
 })
 
+describe('a case out with a job', () => {
+  it("takes nothing in until it's scanned back, unless what goes in is out with the same job (audit, 20 October 2026, finding 103)", async () => {
+    const { app, y10p, rack, speakers, rackId, number } = await warehouse()
+    const nissan = await job(app, 'Nissan', 'confirmed', '2026-09-20', '2026-09-21')
+    await ok(app, 'move.record', scan(nissan, 'out', { assetId: rackId, modelId: rack.id }))
+    // A speaker on the shelf would be out with Nissan without a scan.
+    expect(await refused(app, 'asset.move', { id: speakers[0]!, placeId: null, caseId: rackId })).toBe(`${number(rackId)} is out with Nissan; scan it back first.`)
+    expect(await refused(app, 'asset.add', { id: newId(), modelId: y10p.id, number: null, serial: '', placeId: null, caseId: rackId, notes: '', fromCount: false })).toBe(
+      `${number(rackId)} is out with Nissan; scan it back first.`
+    )
+    // One out with Nissan too goes in, as on site.
+    await ok(app, 'move.record', scan(nissan, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'asset.move', { id: speakers[1]!, placeId: null, caseId: rackId })
+    // Scanned back, the rack takes the speaker from the shelf.
+    await ok(app, 'move.record', scan(nissan, 'in', { assetId: rackId, modelId: rack.id }))
+    await ok(app, 'asset.move', { id: speakers[0]!, placeId: null, caseId: rackId })
+  })
+})
+
 describe('what a device shows', () => {
   it("a job's pick list: what it needs, where to find it, and what's out, a case taking what's in it along", async () => {
     const { app, y10p, amp, rack, xlr, speakers, rackId, amps, number } = await warehouse()
@@ -322,6 +341,7 @@ describe('what a device shows', () => {
     expect(rows(van.client.view().moves.pickList(fuel))).toEqual([['d&b Y10P', 0, 1, 0]])
   })
 
+  // Still out is latest over first, so the job just back is at the top and January's are under Show all (audit, 20 October 2026, finding 99).
   it('lists jobs going out in the next two weeks, and jobs over with kit still out', async () => {
     const { app, y10p, xlr, speakers } = await warehouse()
     const on = await job(app, 'On now', 'confirmed', '2026-09-30', '2026-10-02')
@@ -330,10 +350,12 @@ describe('what a device shows', () => {
     const far = await job(app, 'Later', 'confirmed', '2026-10-15', '2026-10-15')
     const over = await job(app, 'Over', 'confirmed', '2026-09-20', '2026-09-21')
     const allBack = await job(app, 'All back', 'confirmed', '2026-09-22', '2026-09-22')
-    for (const id of [on, soon, quote, far, over, allBack]) await ok(app, 'kit.add', kit(id, y10p.id, 1))
+    const earlier = await job(app, 'Earlier', 'confirmed', '2026-09-10', '2026-09-11')
+    for (const id of [on, soon, quote, far, over, allBack, earlier]) await ok(app, 'kit.add', kit(id, y10p.id, 1))
     await ok(app, 'kit.add', kit(on, xlr.id, 4))
     await ok(app, 'move.record', scan(on, 'out', { assetId: speakers[0]!, modelId: y10p.id }))
     await ok(app, 'move.record', scan(over, 'out', { modelId: xlr.id, qty: 3 }))
+    await ok(app, 'move.record', scan(earlier, 'out', { modelId: xlr.id, qty: 2 }))
     await ok(app, 'move.record', scan(allBack, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
     await ok(app, 'move.record', scan(allBack, 'in', { assetId: speakers[1]!, modelId: y10p.id }))
 
@@ -343,6 +365,26 @@ describe('what a device shows', () => {
       ['On now', 5, 1],
       ['Soon', 1, 0],
     ])
-    expect(moves.stillOut.map((p) => [p.job.name, p.stillOut])).toEqual([['Over', 3]])
+    expect(moves.stillOut.map((p) => [p.job.name, p.stillOut])).toEqual([
+      ['Over', 3],
+      ['Earlier', 2],
+    ])
+  })
+
+  it('stops counting an item retired while it was out as out with its job, so the job leaves Coming back', async () => {
+    // Proves: an item lost on site and retired doesn't keep a job over on the still-out list for good (audit, 20 October 2026, finding 44).
+    const { app, y10p, speakers } = await warehouse()
+    const over = await job(app, 'Over', 'confirmed', '2026-09-20', '2026-09-21')
+    await ok(app, 'kit.add', kit(over, y10p.id, 2))
+    await ok(app, 'move.record', scan(over, 'out', { assetId: speakers[0]!, modelId: y10p.id }))
+    await ok(app, 'move.record', scan(over, 'out', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'move.record', scan(over, 'in', { assetId: speakers[1]!, modelId: y10p.id }))
+    await ok(app, 'asset.retire', { id: speakers[0]!, reason: 'lost', note: 'Left at the venue' })
+    const office = await device(app)
+    const moves = office.client.view().moves
+    expect(moves.outOf(speakers[0]!)).toBeUndefined()
+    expect(moves.stillOut).toEqual([])
+    // Neither out nor back: the one that came back is still back.
+    expect(rows(moves.pickList(over))).toEqual([['d&b Y10P', 2, 0, 1]])
   })
 })

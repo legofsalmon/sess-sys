@@ -145,7 +145,9 @@ export interface Plan {
   changed: ImportChanged[]
   /**
    * The key of every job the calendar holds that isn't in the app yet, ticked
-   * or not, and of every job chosen that is one of them still, by its events
+   * or not: what the import screen showed, read from the same plan rather
+   * than planned again without the choices (audit, 20 October 2026, finding 18);
+   * and of every job chosen that is one of them still, by its events
    * (audit, 20 October 2026, finding 52).
    */
   found: string[]
@@ -618,16 +620,25 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
     const key = nameKey(parseTitle(i.title).job)
     broughtIn.set(key, (broughtIn.get(key) ?? new Set()).add(i.projectId))
   }
+  // The app's jobs by name and by id, looked up rather than searched for each job found (audit, 20 October 2026, finding
+  // 18): a season is a few thousand events against several hundred jobs.
+  const jobAt = new Map(app.jobs.map((j, i) => [j, i]))
+  const jobsNamed = new Map<string, AppData['jobs']>()
+  for (const j of app.jobs) {
+    const k = nameKey(j.name)
+    jobsNamed.set(k, [...(jobsNamed.get(k) ?? []), j])
+  }
+  const jobById = new Map(app.jobs.map((j) => [j.id, j]))
   const kept: Cluster[] = []
   for (const c of clusters) {
     const first = c.entries[0]!.day
     const last = c.entries.at(-1)!.day
     const key = c.entries[0]!.key
-    const near = app.jobs.filter(
-      (j) =>
-        (nameKey(j.name) === key || broughtIn.get(key)?.has(j.id)) &&
-        j.phases.some((p) => p.end >= addDays(first, -GAP_DAYS) && p.start <= addDays(last, GAP_DAYS))
-    )
+    const named = new Set([...(jobsNamed.get(key) ?? []), ...[...(broughtIn.get(key) ?? [])].flatMap((id) => jobById.get(id) ?? [])])
+    // In the order the app listed them, as when each was searched for.
+    const near = [...named]
+      .sort((a, b) => jobAt.get(a)! - jobAt.get(b)!)
+      .filter((j) => j.phases.some((p) => p.end >= addDays(first, -GAP_DAYS) && p.start <= addDays(last, GAP_DAYS)))
     const job = near[0]
     if (job && (job.status === 'cancelled' || job.status === 'lost')) {
       for (const e of c.entries) leftOut.add('stopped', e.event.title, e.phases.length)
@@ -701,18 +712,33 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
     }
   }
 
-  // Venues: one per place, shared between jobs.
+  // Venues: one per place, shared between jobs. The app's by name and by address, the first of each, and each place
+  // looked up once (finding 18).
+  const venueNamed = new Map<string, number>()
+  const venueAt = new Map<string, number>()
+  app.venues.forEach((v, i) => {
+    if (!venueNamed.has(nameKey(v.name))) venueNamed.set(nameKey(v.name), i)
+    if (v.address && !venueAt.has(nameKey(v.address))) venueAt.set(nameKey(v.address), i)
+  })
   const newVenues = new Map<string, VenueRef>()
+  const places = new Map<string, VenueRef | null>()
   const venueOf = (location: string): VenueRef | null => {
+    if (places.has(location)) return places.get(location)!
     const place = location.replace(/\s+/g, ' ').trim()
-    if (!place) return null
-    const name = place.split(',')[0]!.trim() || place
-    const key = nameKey(name)
-    const known = app.venues.find((v) => nameKey(v.name) === key || (v.address && nameKey(v.address) === nameKey(place)))
-    if (known) return { id: known.id, name: known.name }
-    const made = newVenues.get(key) ?? { key, name, address: place === name ? '' : place }
-    newVenues.set(key, made)
-    return made
+    let found: VenueRef | null = null
+    if (place) {
+      const name = place.split(',')[0]!.trim() || place
+      const key = nameKey(name)
+      const at = Math.min(venueNamed.get(key) ?? Infinity, venueAt.get(nameKey(place)) ?? Infinity)
+      const known = app.venues[at]
+      if (known) found = { id: known.id, name: known.name }
+      else {
+        found = newVenues.get(key) ?? { key, name, address: place === name ? '' : place }
+        newVenues.set(key, found)
+      }
+    }
+    places.set(location, found)
+    return found
   }
   const venueKey = (v: VenueRef | null) => (v === null ? '' : 'id' in v ? `id:${v.id}` : `new:${v.key}`)
 
@@ -883,7 +909,7 @@ export function planImport(events: readonly SourceEvent[], app: AppData, { accou
   for (const [uid, all] of imported) {
     const rows = all.filter((r) => r.calendarId === calendarId)
     if (!rows.some((r) => r.day >= from && r.day < to)) continue
-    const job = app.jobs.find((j) => j.id === rows[0]!.projectId)
+    const job = jobById.get(rows[0]!.projectId)
     if (!job || job.status === 'cancelled' || job.status === 'lost') continue
     const was = [...new Set(rows.map((r) => r.day))].sort()
     const ev = now.get(uid)

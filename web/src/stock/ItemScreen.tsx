@@ -83,7 +83,14 @@ export function ItemScreen({ view, id, bare }: { view: View; id: string; bare?: 
     >
       <Summary a={a} w={w} view={view} />
       <FaultsCard faults={view.faults.ofAsset(a.id)}>
-        {a.status === 'active' && <ReportButtons asset={a} model={a.model} projectId={view.moves.outOf(a.id)?.projectId ?? null} />}
+        {a.status === 'active' && (
+          <ReportButtons
+            asset={a}
+            model={a.model}
+            projectId={view.moves.outOf(a.id)?.projectId ?? null}
+            kinds={view.faults.ofAsset(a.id).some((f) => f.open && f.kind === 'missing') ? ['damaged'] : undefined}
+          />
+        )}
       </FaultsCard>
       <InspectionsCard view={view} a={a} />
       <CertificatesCard view={view} a={a} />

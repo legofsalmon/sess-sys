@@ -12,6 +12,7 @@ import {
   type View,
 } from '@sh/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useScanKeys } from '../scanKeys.ts'
 import { act, Refusal, useAct } from '../act.tsx'
 import { Top } from '../jobs/common.tsx'
 import { useAccess } from '../role.ts'
@@ -21,7 +22,7 @@ import { useToday } from '../view.ts'
 import { dateLabel, mistakeLabel, numberLabel, ScanMisses, useScanMisses } from './common.tsx'
 import { CameraScanner, primeSound } from './Scanner.tsx'
 import { StockViews } from '../Views.tsx'
-import { Fold } from '../Fold.tsx'
+import { Fold, ShowAll } from '../Fold.tsx'
 import { Split } from '../Split.tsx'
 import { Heading } from '../Icon.tsx'
 import { inKitOf, Narrowed, useNarrowed } from '../Narrowed.tsx'
@@ -258,8 +259,11 @@ function RecordOne({ a, kinds, onDone }: { a: AssetView; kinds: InspectionKind[]
   )
 }
 
-/** The Stock tab's list of what's failed, overdue or due in the next 30 days, and what's not recorded yet. */
-export function InspectionsDue({ view }: { view: View }) {
+/**
+ * The Stock tab's list of what's failed, overdue or due in the next 30 days, and what's not recorded yet: ten of each until
+ * Show all, anything just tested here kept in view (audit, 20 October 2026, finding 96).
+ */
+export function InspectionsDue({ view, recent }: { view: View; recent?: ReadonlySet<string> }) {
   // Opened from a count on Home for a department, that department's kit, as Home counted it (audit, 20 October 2026, finding 4).
   const [department, widen] = useNarrowed('#stock/testing')
   const attention = view.inspections.attention.filter((d) => inKitOf(department)(d.asset.model))
@@ -268,6 +272,7 @@ export function InspectionsDue({ view }: { view: View }) {
   if (!needed && view.inspections.certificatesDue.length === 0) return null
   const stopped = attention.filter((d) => d.state !== 'soon')
   const soon = attention.filter((d) => d.state === 'soon')
+  const keep = (d: Due) => !!recent?.has(d.asset.id)
   const row = (d: Due) => (
     <li key={`${d.asset.id}-${d.kind}`}>
       <a className="job-row" href={`#stock/item/${d.asset.id}`}>
@@ -294,14 +299,18 @@ export function InspectionsDue({ view }: { view: View }) {
       {stopped.length === 0 && soon.length === 0 && certsDue.length === 0 && <p className="empty">Nothing failed, overdue or due in the next 30 days.</p>}
       {stopped.length > 0 && (
         <>
-          <h3>Can't go out</h3>
-          <ul className="job-list">{stopped.map(row)}</ul>
+          <h3>Can't go out ({stopped.length.toLocaleString('en-IE')})</h3>
+          <ShowAll items={stopped} limit={10} what="items" keep={keep}>
+            {(shown) => <ul className="job-list">{shown.map(row)}</ul>}
+          </ShowAll>
         </>
       )}
       {soon.length > 0 && (
         <>
-          <h3>Due in the next 30 days</h3>
-          <ul className="job-list">{soon.map(row)}</ul>
+          <h3>Due in the next 30 days ({soon.length.toLocaleString('en-IE')})</h3>
+          <ShowAll items={soon} limit={10} what="items" keep={keep}>
+            {(shown) => <ul className="job-list">{shown.map(row)}</ul>}
+          </ShowAll>
         </>
       )}
       {certsDue.length > 0 && (
@@ -402,6 +411,8 @@ export function TestingScreen({ view }: { view: View }) {
   const [day, setDay] = useState(today)
   const [typed, setTyped] = useState('')
   const [camera, setCamera] = useState(false)
+  // A scanner's first read goes to the scan field (audit, 20 October 2026, finding 98).
+  useScanKeys()
   const [said, setSaid] = useState<Said>()
   const [done, setDone] = useState<{ a: AssetView; passed: boolean; at: number; kind: InspectionKind; day: string }[]>([])
   const [held, setHeld] = useState<Held>()
@@ -564,7 +575,7 @@ export function TestingScreen({ view }: { view: View }) {
               </div>
               <div className="grid-form">
                 <label>
-                  By <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="Who's testing" maxLength={200} />
+                  By <input value={by} onChange={(e) => setBy(e.target.value)} maxLength={200} />
                 </label>
                 <label>
                   When <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value || today)} />
@@ -575,7 +586,7 @@ export function TestingScreen({ view }: { view: View }) {
                   type="search"
                   enterKeyHint="go"
                   autoComplete="off"
-                  placeholder="Scan or type a number"
+                  placeholder="SH-000123"
                   value={typed}
                   onChange={(e) => setTyped(e.target.value)}
                   aria-label="Number or serial"
@@ -625,7 +636,7 @@ export function TestingScreen({ view }: { view: View }) {
             {mayTest && <RoundCertificate view={view} done={done} kind={kind} day={day} />}
           </section>
         )}
-        <InspectionsDue view={view} />
+        <InspectionsDue view={view} recent={new Set(done.map((d) => d.a.id))} />
       </Split>
     </div>
   )

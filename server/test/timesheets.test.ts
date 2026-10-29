@@ -177,8 +177,10 @@ describe('a timesheet from a private link', () => {
       ['note', 'Receipts in the post.'],
     ])
     expect(sent.ok).toBe(true)
-    expect(sent.message).toContain("it's gone to the office")
-    expect(sent.back.html).toContain('€683.50 in all')
+    // Said once, with the total, not twice in two green boxes (audit, 20 October 2026, finding 91).
+    expect(sent.message).toMatch(/^Sent to the office on .*: €683.50 in all\. They'll check it; you can change it until they approve it\.$/)
+    expect(sent.back.html).not.toContain("it's gone to the office")
+    expect(sent.back.html.match(/class="flash /g)).toHaveLength(1)
     expect(sent.back.html).toContain('value="Mileage"')
     expect(sent.back.html).toContain('value="25.50"')
     expect(sent.back.html).toContain('Update what you sent')
@@ -220,6 +222,14 @@ describe('a timesheet from a private link', () => {
     // The message is one of the page's own, so it can't name the extra typed (audit finding 21).
     const lots = await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', 'Tolls'], ['euro', 'lots'], ['note', 'Left at 2am']])
     expect(lots.message).toBe('Put in the amount for each extra, in euro.')
+    // Said under the extra it's about, with its amount marked, not at the top of the page (audit, 20 October 2026, finding 90).
+    expect(lots.back.html).not.toContain('class="flash')
+    expect(lots.back.html).toContain(
+      '<input name="euro" inputmode="decimal" aria-invalid="true" aria-describedby="extra-error-0" value="lots"></label></div><p class="field-error" id="extra-error-0" role="alert">Put in the amount for each extra, in euro.</p>'
+    )
+    const second = await post(app, `/f/${dara}/timesheet/dara-sound`, [['days', day(-1)], ['what', 'Tolls'], ['euro', '4'], ['what', ''], ['euro', '12']])
+    expect(second.back.html).toContain('<input name="what" maxlength="100" aria-invalid="true" aria-describedby="extra-error-1" value="">')
+    expect(second.back.html.match(/aria-invalid="true"/g)).toHaveLength(1)
     // Drawn again at once with everything typed still in the form, to fix the one thing (rule 11).
     expect(lots.back.html).toContain('value="Tolls"')
     expect(lots.back.html).toContain('value="lots"')

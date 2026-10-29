@@ -154,3 +154,12 @@ Still in arrival order: commands that set one thing outright (a status,
 a decision, a move, a price, a rack slot, a step's tick, a vote), where
 the last word is the one that should stand, and documents' and
 certificates' details, which are saved with their file.
+
+## Later: the link pages compressed too (29 October 2026)
+
+The freelancer's link pages (`/f/<token>` and the pages under it) are now
+compressed as `/api/*` is (audit, 20 October 2026, finding 47). They were
+left out with no reason given, and they are the one page opened on a weak
+signal from a text: a busy one was 52 KB plain and under 9 KB compressed.
+The calendar feed under the link and the documents' files are still left
+alone.

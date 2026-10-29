@@ -721,18 +721,27 @@ export function offerDaysAfter(held: readonly string[], oldDays: readonly string
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** "Fri 3 Oct", the way crew write dates. Built by hand so it reads the same on every phone. */
-export function dayLabel(d: string): string {
+/**
+ * "Fri 3 Oct", the way crew write dates. Built by hand so it reads the same on every phone. Given today, a day outside
+ * this calendar year or more than six months from today carries its year, "Sun 25 Jan 2026", so a page that runs from
+ * April to March, or a timesheet approved last year, says which year it means (audit, 20 October 2026, finding 89).
+ */
+export function dayLabel(d: string, today?: string): string {
   const date = new Date(`${d}T12:00:00Z`)
-  return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
+  const label = `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
+  return today && (d.slice(0, 4) !== today.slice(0, 4) || Math.abs(daysBetween(today, d)) > HALF_A_YEAR) ? `${label} ${d.slice(0, 4)}` : label
 }
 
-export function daysLabel(days: string[]): string {
+/** More than this many days from today, a date says its year. */
+const HALF_A_YEAR = 183
+
+export function daysLabel(days: string[], today?: string): string {
   if (days.length === 0) return ''
   const sorted = [...days].sort()
   const all = eachDay(sorted[0]!, sorted[sorted.length - 1]!)
-  if (all.length === sorted.length && sorted.length > 1) return `${dayLabel(sorted[0]!)} to ${dayLabel(sorted[sorted.length - 1]!)}`
-  return sorted.map(dayLabel).join(', ')
+  const label = (d: string) => dayLabel(d, today)
+  if (all.length === sorted.length && sorted.length > 1) return `${label(sorted[0]!)} to ${label(sorted[sorted.length - 1]!)}`
+  return sorted.map(label).join(', ')
 }
 
 export function euro(c: number | null | undefined): string {

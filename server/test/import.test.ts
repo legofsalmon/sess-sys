@@ -17,7 +17,7 @@ import type { LightMyRequestResponse } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.ts'
 import type { IdentityProvider } from '../src/auth/google.ts'
-import { PERSON_NOTE, TAKE_BACK_ACTION } from '../src/calendar/import.ts'
+import { PERSON_NOTE, planApart, TAKE_BACK_ACTION } from '../src/calendar/import.ts'
 import { isMailbox, nameFromEmail, nameKey, parseTitle, planImport, plainText, type AppData, type SourceEvent } from '../src/calendar/import-plan.ts'
 import { pgliteDb } from '../src/db.ts'
 import { everythingJson, readEverything } from '../src/export.ts'
@@ -150,6 +150,38 @@ describe('planning', () => {
   const empty: AppData = { people: [], venues: [], jobs: [], imported: [] }
   const opts = { account: 'ops@sessionhire.com', calendarId: 'ops@sessionhire.com', from: '2031-01-01', to: '2033-01-01', today: '2031-03-05' }
   const phases = (j: { runs: { name: string; days: string[] }[] }) => j.runs.map((r) => `${r.name} ${r.days[0]}${r.days.length > 1 ? `–${r.days.at(-1)}` : ''}`)
+
+  it('plans a season once, saying what the calendar holds besides what was ticked, and the same in a worker thread', async () => {
+    // Proves (audit, 20 October 2026, finding 18): the bring-in plans once, not again without the choices to learn what
+    // the calendar holds, and a big calendar is planned off the server's own thread with the same result.
+    const app: AppData = {
+      ...empty,
+      venues: Array.from({ length: 40 }, (_, i) => ({ id: `v${i}`, name: `Hall ${i}`, address: `Hall ${i}, Street ${i}` })),
+      jobs: Array.from({ length: 60 }, (_, i) => ({
+        id: `j${i}`,
+        name: `Gig ${i}`,
+        status: 'confirmed' as const,
+        kind: 'gig' as const,
+        venueId: null,
+        sourceCalendar: i % 2 ? 'ops@sessionhire.com' : null,
+        phases: [{ id: `p${i}`, name: 'Show', start: '2031-06-01', end: '2031-06-01' }],
+      })),
+    }
+    const events = Array.from({ length: 400 }, (_, i) =>
+      ev(`Gig ${i % 120} - ${i % 3 ? 'Show' : 'Build'}`, `2031-06-${String((i % 20) + 1).padStart(2, '0')}`, {
+        location: `Hall ${i % 50}, Street ${i % 50}`,
+        guests: [{ email: `crew${i % 30}@gmail.com`, name: null, answer: 'accepted', notCrew: false }],
+      })
+    )
+    const shown = planImport(events, app, opts)
+    expect(shown.found).toEqual(shown.jobs.map((j) => j.key))
+    const ticked = shown.jobs.filter((_, i) => i % 2).map((j) => j.key)
+    const chosen = { names: new Map<string, string>(), include: new Set(ticked) }
+    const plan = planImport(events, app, opts, chosen)
+    expect(plan.jobs.map((j) => j.key)).toEqual(ticked)
+    expect(plan.found).toEqual(shown.found)
+    expect(await planApart(events, app, opts, chosen, { from: 0 })).toEqual(plan)
+  })
 
   it('makes one job of a name’s days, and a phase of each run of days, unless a fortnight apart', () => {
     const plan = planImport(
@@ -606,6 +638,37 @@ describe('bringing jobs in from Google Calendar', () => {
     const phases = f.phases.map((p) => `${p.projectId} ${p.name} ${p.start}`)
     expect(new Set(phases).size).toBe(phases.length)
     expect(f.calls.filter((c) => c.phase === 'Build')).toHaveLength(1)
+  })
+
+  it('writes forty new people and venues in a few statements, not several each, while it holds the write lock', async () => {
+    // Proves (audit, 20 October 2026, finding 17): new people and venues are written in bulk like the jobs, so a season
+    // with many of both holds the lock every device's change waits for about as long as one whose people are known.
+    const s = await setup()
+    await s.connect()
+    for (let i = 0; i < 40; i++)
+      s.google.add(OPS, {
+        summary: `Gig ${i} - Show`,
+        days: `2031-04-${String((i % 28) + 1).padStart(2, '0')}`,
+        location: `Hall ${i}, Main Street, Town ${i}`,
+        guests: [{ email: `crew${i}@gmail.com`, displayName: `Crew Member${i}`, responseStatus: 'accepted' }],
+      })
+    const preview = ok<ImportPreview>(await s.look(OPS))
+    expect(preview.people).toHaveLength(40)
+    const choices = { ...choose(preview), people: preview.people.map((p) => ({ email: p.email, include: true })) }
+    let statements = 0
+    const transaction = s.db.transaction.bind(s.db)
+    s.db.transaction = (fn) => transaction((tx) => fn({ ...tx, query: (sql, params) => (statements++, tx.query(sql, params)) }))
+    expect(ok<ImportResult>(await s.bring(choices))).toMatchObject({ jobs: 40, venues: 40, people: 40, crew: 40 })
+    expect(statements).toBeLessThan(40)
+
+    const f = await s.feed()
+    const crew = f.people.filter((p) => p.notes === PERSON_NOTE)
+    expect(crew).toHaveLength(40)
+    // Each as the command makes someone new: the name in two, a private link of their own, the usual level.
+    expect(crew.find((p) => p.email === 'crew7@gmail.com')).toMatchObject({ name: 'Crew Member7', firstName: 'Crew', lastName: 'Member7', kind: 'freelancer', skills: [], level: 1 })
+    expect(new Set(crew.map((p) => p.linkToken)).size).toBe(40)
+    expect(f.venues.find((v) => v.name === 'Hall 7')).toMatchObject({ address: 'Hall 7, Main Street, Town 7', notes: '' })
+    expect(f.projects.find((p) => p.name === 'Gig 7')!.venueId).toBe(f.venues.find((v) => v.name === 'Hall 7')!.id)
   })
 
   it('gives each call the department most of its people are in, or none to give it later (ADR 0046)', async () => {

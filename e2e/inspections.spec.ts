@@ -88,6 +88,12 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
   // Stock's Testing page lists it, and the two not recorded yet.
   await page.goto('/#stock/testing')
   const due = page.getByRole('region', { name: 'Inspections due' })
+  // Ten of each until Show all (audit, 20 October 2026, finding 96); other runs' kit can fill the first ten.
+  const showAll = async () => {
+    await expect(due.locator('h3').first()).toBeVisible()
+    for (const more of await due.getByRole('button', { name: /^Show all \d+ items$/ }).all()) await more.click()
+  }
+  await showAll()
   await expect(due.locator('li', { hasText: speakers[0]! })).toContainText('PAT overdue since')
   await expect(due).toContainText(`2 × ${speaker}`)
 
@@ -121,6 +127,7 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
 
   // The one that failed can't go out.
   await page.goto('/#stock/testing')
+  await showAll()
   await expect(due.locator('li', { hasText: speakers[0]! })).toHaveCount(0)
   await expect(due.locator('li', { hasText: speakers[1]! })).toContainText('PAT failed on')
   await expect(due).not.toContainText('Not recorded yet')
