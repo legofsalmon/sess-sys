@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-29',
     title: "Stock puts today's work first",
     what: "On Stock, the kit going out in the next two weeks now comes before kit still out, latest first. A barcode scanner works on the pick list, a count and testing without tapping the box first. An item found through its missing case says so, and can be taken out of the case. Kit can't be put into a case that's out on a job. Re-running the stock list says where its prices differ from yours, and adds up a product kept in two places.",
-    prs: [163],
+    prs: [165],
   },
   {
     version: '1.52.0',
