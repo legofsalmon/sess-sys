@@ -126,7 +126,8 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
   const timesheets = view.timesheets.toApprove.filter((r) => by.person(r.person) && !r.amountsHidden).length
   const leave = view.leave.queue.filter((q) => by.person(q.person)).length
   const certificates = runningOut(view.crew.people, view.documents.all, today).filter((r) => by.person(r.person)).length
-  const short = view.kit.short.filter((l) => by.kit(l.model?.department))
+  // Kit short for confirmed jobs whose kit is held in the fortnight, as crew needed is counted (audit, 20 October 2026, finding 33).
+  const short = view.kit.short.filter((l) => by.kit(l.model?.department) && l.hold === 'held' && l.held && l.held.start <= fortnight)
   const tomorrow = addDays(today, 1)
   const toPick = view.moves.soon.filter((p) => p.job.span && p.job.span.start <= tomorrow && p.out < p.need).length
   const stillOut = view.moves.stillOut.length
@@ -148,7 +149,7 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
     { key: 'certificates', count: certificates, label: certificates === 1 ? 'certificate or document running out' : 'certificates and documents running out', href: '#crew/people' },
     { key: 'to-pick', count: toPick, label: toPick === 1 ? 'job to pick for today or tomorrow' : 'jobs to pick for today or tomorrow', href: '#stock', part: 'Pick lists' },
     { key: 'still-out', count: stillOut, label: stillOut === 1 ? 'job with kit still out after it' : 'jobs with kit still out after them', href: '#stock', bad: true, part: 'Still out after the job' },
-    { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short' : 'kit lines short', href: '#stock', bad: short.some((l) => l.hold === 'held'), part: 'Kit short' },
+    { key: 'kit-short', count: short.length, label: short.length === 1 ? 'kit line short for a confirmed job' : 'kit lines short for confirmed jobs', href: '#stock', bad: true, part: 'Kit short' },
     { key: 'faults', count: faults.length, label: faults.length === 1 ? 'fault open' : 'faults open', href: '#stock/repairs', bad: faults.some((f) => f.stops) },
     { key: 'cant-go', count: cantGo, label: cantGo === 1 ? "item can't go out until tested" : "items can't go out until tested", href: '#stock/testing', bad: true, part: 'Inspections due' },
     { key: 'tests-soon', count: tests.length - cantGo, label: 'inspections due in 30 days', href: '#stock/testing', part: 'Inspections due' },
@@ -159,6 +160,13 @@ export function tiles(view: View, today: string, me: PersonView | undefined, can
   const offered = (t: Tile) => (t.key !== 'timesheets' || view.office.useTimesheets) && (NEEDS[t.key] === 'approve-leave' ? approver : can(NEEDS[t.key] as Ability))
   return Object.fromEntries(all.filter(offered).map((t) => [t.key, t]))
 }
+
+/**
+ * What stops the next fortnight's work, drawn first and full size; the rest
+ * is housekeeping, smaller and under it (audit, 20 October 2026, finding
+ * 33), so at volume, when nothing is zero, the soon still stands out.
+ */
+export const SOON: ReadonlySet<string> = new Set(['late', 'crew-needed', 'kit-short', 'cant-go', 'still-out', 'to-pick'])
 
 /** Which counts each view of Home shows, in order: the first is what that person reaches for first. */
 export const TILES_FOR: Record<HomeFor, readonly string[]> = {

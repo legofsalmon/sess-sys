@@ -8,7 +8,7 @@ import { Empty } from '../Empty.tsx'
 import { Top } from '../jobs/common.tsx'
 import { kitShort } from '../jobs/Kit.tsx'
 import { useToday, useView } from '../view.ts'
-import { addDays, departmentsIn, jobsOn, kitOf, narrower, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
+import { addDays, departmentsIn, jobsOn, kitOf, narrower, SOON, TILES_FOR, tiles, weekAhead, type HomeFor, type Tile } from './standing.ts'
 import { Heading } from '../Icon.tsx'
 import { Avatar, photoOf } from '../Picture.tsx'
 import { arrive } from '../arrival.ts'
@@ -110,10 +110,28 @@ export function HomeScreen() {
   )
 }
 
-/** The counts that aren't nothing, as tiles; a word when all are. */
-function Tiles({ all, keys, title = 'Needs attention', clear, department }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string }) {
+/**
+ * The counts that aren't nothing, as tiles; a word when all are. Grouped, what
+ * stops the next fortnight's work comes first and the housekeeping after,
+ * smaller (audit, 20 October 2026, finding 33).
+ */
+function Tiles({ all, keys, title = 'Needs attention', clear, department, grouped = true }: { all: Record<string, Tile>; keys: readonly string[]; title?: string; clear: string; department?: string; grouped?: boolean }) {
   const shown = keys.map((k) => all[k]!).filter((t) => t && t.count > 0)
   const copying = useCopying()
+  const soon = grouped ? shown.filter((t) => SOON.has(t.key)) : shown
+  const rest = grouped ? shown.filter((t) => !SOON.has(t.key)) : []
+  const list = (tiles: Tile[], className = 'tiles') => (
+    <ul className={className}>
+      {tiles.map((t) => (
+        <li key={t.key}>
+          <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
+            <b>{t.count.toLocaleString('en-IE')}</b>
+            <span>{t.label}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
   return (
     <section className="card standing">
       <h2>{title}</h2>
@@ -121,17 +139,24 @@ function Tiles({ all, keys, title = 'Needs attention', clear, department }: { al
         <p className="all-clear">{STILL_ARRIVING}</p>
       ) : shown.length === 0 ? (
         <p className="all-clear">{clear}</p>
+      ) : !grouped ? (
+        list(shown)
       ) : (
-        <ul className="tiles">
-          {shown.map((t) => (
-            <li key={t.key}>
-              <a className={`tile${t.bad ? ' bad' : ''}`} href={t.href} onClick={() => arrive({ hash: t.href, part: t.part, department })}>
-                <b>{t.count.toLocaleString('en-IE')}</b>
-                <span>{t.label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="hint">What stops the next fortnight's work first, then the housekeeping. Each goes once it's sorted.</p>
+          {soon.length > 0 && (
+            <>
+              <h3>The next fortnight</h3>
+              {list(soon)}
+            </>
+          )}
+          {rest.length > 0 && (
+            <>
+              <h3>Housekeeping</h3>
+              {list(rest, 'tiles housekeeping')}
+            </>
+          )}
+        </>
       )}
     </section>
   )
@@ -632,7 +657,7 @@ function ForMe({ view, today, me, onPick }: { view: View; today: string; me: Per
           </a>
         </section>
       )}
-      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." />}
+      {approver && <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.me} title="Waiting on you" clear="No time off waiting on you." grouped={false} />}
       <YourDay view={view} today={today} me={me} mine={mine} />
     </>
   )

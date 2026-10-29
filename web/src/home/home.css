@@ -67,3 +67,9 @@
 /* The week ahead's errands and meetings, folded behind one line (audit, 20 October 2026, finding 32). */
 .home .errands summary { display: flex; align-items: center; min-height: 44px; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
 .home .errands[open] summary { margin-bottom: var(--space-4); }
+/* Needs attention in two groups (audit, 20 October 2026, finding 33): the next fortnight's full size, the housekeeping smaller under it. */
+.home .standing h3 { margin: var(--space-6) 0 0; color: var(--muted); font-size: var(--text-small); font-weight: 700; }
+.home .standing .hint { margin: 0; }
+.home .tiles.housekeeping { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.home .tiles.housekeeping .tile { min-height: 64px; padding: var(--space-8) var(--space-10); }
+.home .tiles.housekeeping .tile b { font-size: 1.25rem; }
