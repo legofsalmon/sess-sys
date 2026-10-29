@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.51.2',
+    date: '2026-10-29',
+    title: 'Writing to Google Calendar stays off unless switched on',
+    what: 'Nothing changes for anyone: the app still writes nothing to Google Calendar until it is switched on. The part that writes is now off unless told otherwise, so nothing added later can start writing by leaving the setting out.',
+    prs: [155],
+  },
+  {
     version: '1.51.1',
     date: '2026-10-29',
     title: 'Only a director changes how a director signs in',
