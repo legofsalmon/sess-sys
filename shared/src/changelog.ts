@@ -28,12 +28,27 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.63.0',
+    version: '1.64.0',
     date: '2026-10-29',
     title: 'Claude drafts quotes from the operations mailbox',
     what: "Once operations@sessionhire.com is connected under Admin › Company, Claude reads the mail copied to it every five minutes. A new enquiry becomes a job and a draft quote, filled in from the thread, and Claude keeps the draft up to date as the mail goes on until someone changes it; after that it offers what new mail changes, to take or leave on the quote. Quotes lists what it read under From the operations mailbox. It can only read the mailbox, never send. Leave operations@ off a mail to keep it private. Asking Claude in words to change a quote is gone, and pasting an enquiry is now folded away on New quote.",
     prs: [173],
     adrs: [98],
+  },
+  {
+    version: '1.63.0',
+    date: '2026-10-29',
+    title: 'Old Current RMS quotes in the quote history',
+    what: 'Quotes now shows the quotes from before the app, from Current RMS, under the app’s own, newest first, so the history reads as one. The same search finds them, and Sent, Accepted and Turned down narrow them too: accepted means it became an order that wasn’t cancelled. Each says whether it went ahead, and one matched to a job links to that job’s quote. They’re read only, as Current RMS had them, and need signal.',
+    prs: [154],
+    adrs: [92],
+  },
+  {
+    version: '1.62.1',
+    date: '2026-10-29',
+    title: "The app's code now lives under Session Hire's own account",
+    what: "The app's code moved to Session Hire's own GitHub account. The links on What's changed, the System status check for the newest version, and the name the app gives when it looks up addresses and fuel prices now point there.",
+    prs: [174],
   },
   {
     version: '1.62.0',

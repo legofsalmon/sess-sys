@@ -593,3 +593,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .app .from-mailbox li small { color: var(--muted); font-size: var(--text-hint); }
 .app .mailbox { display: grid; gap: var(--space-8); margin-top: var(--space-12); }
 .app .mailbox h3 { margin: 0; }
+
+/* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
+.quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
+.quotes .from-rms h3 { margin: 0 0 var(--space-8); }

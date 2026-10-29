@@ -27,6 +27,21 @@ waiting on someone.
   the mailbox's redirect address to the Google key, then connect it under
   Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
+## 29 October 2026: Current RMS quotes in the quote history
+
+**Done**
+
+- Colly asked for the Current RMS quotes to be in the quote history rather
+  than hidden. Quotes now lists them under the app's own ("Before this
+  app, from Current RMS"), found by the same search, narrowed by the same
+  choices (Accepted = went ahead, Turned down = didn't, Sent = still to
+  come), each with how it went and its linked job's quote. Note 8 on
+  [ADR 0092](adr/0092-current-rms-history-on-quotes.md). App 1.63.0.
+- Checked: typecheck, server tests (the went filter and links), browser
+  tests (rms-history.spec.ts, quotes-page.spec.ts, quote-follow-up.spec.ts).
+
+**Waiting on** nobody.
+
 ## 29 October 2026: Claude's to-do list
 
 **Done**
@@ -2009,7 +2024,7 @@ has been a while, then link the sure ones on Match to jobs.
 
 - For showing the app as a proposal before the Google key is in, a
   `DEMO_PASSCODE` setting now locks a copy of the app behind one shared
-  passcode ([PR #61](https://github.com/legofsalmon/sess-sys/pull/61);
+  passcode ([PR #61](https://github.com/sessionhire/sess-sys/pull/61);
   [sign-in setup](sign-in-setup.md)). Freelancers' private links still
   open without it, and once the Google key is set Google sign-in takes
   over.
@@ -2029,7 +2044,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Done**
 
 - Colly chose "Merge it" for stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57),
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57),
   [Decision 0030](adr/0030-stocktakes-and-rolling-counts.md); see
   4 October). It was brought up to date with getting kit ready and back
   (7 October) first, and the full suite passed with both: the
@@ -2085,7 +2100,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Next**
 
 - Stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57)) took
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57)) took
   Decision 0030 first, so this is 0031. With both in, the rest of
   Phase 2 is the labelling rollout, which is work in the warehouse
   rather than in the app, and RFID later.

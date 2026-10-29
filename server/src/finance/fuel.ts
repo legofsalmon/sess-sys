@@ -46,7 +46,7 @@ export function aaFuel({ url = AA_FUEL_URL, fetch: get = fetch }: { url?: string
   let kept: { at: number; found: FuelPriceFound } | undefined
   return async () => {
     if (kept && Date.now() - kept.at < HOUR) return kept.found
-    const res = await get(url, { headers: { 'user-agent': 'SessionHire/1.0 (+https://github.com/legofsalmon/sess-sys)', accept: 'text/html' }, signal: AbortSignal.timeout(10_000) })
+    const res = await get(url, { headers: { 'user-agent': 'SessionHire/1.0 (+https://github.com/sessionhire/sess-sys)', accept: 'text/html' }, signal: AbortSignal.timeout(10_000) })
     if (!res.ok) throw new Error(`The AA's page answered ${res.status}.`)
     const found = readAaPage(await res.text())
     if (!found) throw new Error("The AA's page didn't read as the survey.")

@@ -43,7 +43,7 @@ export interface OutsideLooks {
 
 /** The real ones: the map search's own status page, and the changelog on GitHub's main. */
 export function outsideLooks({ mapsBase, latestUrl, fetch: get = fetch }: { mapsBase?: string; latestUrl?: string; fetch?: typeof fetch } = {}): OutsideLooks {
-  const headers = { 'user-agent': 'SessionHire/1.0 (+https://github.com/legofsalmon/sess-sys)' }
+  const headers = { 'user-agent': 'SessionHire/1.0 (+https://github.com/sessionhire/sess-sys)' }
   return {
     maps: async () => {
       const res = await get(new URL('/status', mapsBase ?? 'https://nominatim.openstreetmap.org'), { headers, signal: AbortSignal.timeout(LOOK_MS) })
@@ -59,7 +59,7 @@ export function outsideLooks({ mapsBase, latestUrl, fetch: get = fetch }: { maps
   }
 }
 
-export const LATEST_URL = 'https://raw.githubusercontent.com/legofsalmon/sess-sys/main/shared/src/changelog.ts'
+export const LATEST_URL = 'https://raw.githubusercontent.com/sessionhire/sess-sys/main/shared/src/changelog.ts'
 
 export interface StatusSources {
   db: Db
