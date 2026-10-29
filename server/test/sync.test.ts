@@ -1,7 +1,9 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { request } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { emptySnapshot, FEED, MemoryStorage, type LatestOnly, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
+import { emptySnapshot, FEED, MemoryStorage, newId, type LatestOnly, PUSH_LIMIT, PUSH_SLICE, SyncClient, type PullResponse, type PushRequest, type PushResponse, type Snapshot, type Transport } from '@sh/shared'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildApp, type AppOptions } from '../src/app.ts'
@@ -382,7 +384,7 @@ function steppedDb(db: Db, before: (sql: string) => Promise<void>): Db {
     },
     exec: (sql) => q.exec(sql),
   })
-  return { ...db, ...stepped(db), reads: stepped(db.reads), transaction: (fn) => db.transaction((tx) => fn(stepped(tx))) }
+  return { ...db, ...stepped(db), reads: stepped(db.reads), transaction: (fn, o) => db.transaction((tx) => fn(stepped(tx)), o) }
 }
 
 describe('a pull answered while another change lands (audit, 18 October 2026)', () => {
@@ -731,5 +733,65 @@ describe('a pull with a cursor the server never gave (audit, 20 October 2026, fi
     expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=' })).statusCode).toBe(200)
     expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=0&latest=new' })).statusCode).toBe(200)
     expect((await app.inject({ method: 'GET', url: '/api/sync/pull?after=0&latest=0' })).statusCode).toBe(200)
+  })
+})
+
+describe('a push, in trips to the database (audit, 20 October 2026, finding 15)', () => {
+  it('takes the lock once, with the transaction, and writes the change down in one statement that also finds a resend', async () => {
+    // Proves: a change in a push takes the write lock once, as its transaction begins; there is no separate look for it
+    // having been applied (the history's insert finds that), and no statement to let go of its savepoint.
+    const plain = await pgliteDb()
+    cleanup.push(() => plain.close())
+    const sql: string[] = []
+    const counted = (q: Queryable): Queryable => ({
+      query: (text, params) => (sql.push(text), q.query(text, params)),
+      exec: (text) => (sql.push(text), q.exec(text)),
+    })
+    const db: Db = { ...plain, transaction: (fn, o) => plain.transaction((tx) => fn(counted(tx)), o) }
+    const app = await server(db)
+    const place = { id: newId(), name: 'place.upsert', args: { id: 'a3', name: 'Bay A3', notes: '' }, createdAt: new Date().toISOString() }
+    // The lock goes with the transaction's beginning, outside what the change itself sends.
+    sql.length = 0
+    const res = await app.inject({ method: 'POST', url: '/api/sync/push', payload: { clientId: 'phone', mutations: [place] } })
+    expect(res.json().results).toMatchObject([{ status: 'applied' }])
+    expect(sql.filter((s) => s.includes('pg_advisory_xact_lock'))).toEqual([])
+    expect(sql.filter((s) => s.startsWith('SELECT result FROM mutations'))).toEqual([])
+    expect(sql.filter((s) => s.startsWith('RELEASE'))).toEqual([])
+    expect(sql.filter((s) => s.includes('INSERT INTO mutations'))).toHaveLength(1)
+    // A resend that got past the push's own look (one sent twice at once, say) is still answered as the first time.
+    sql.length = 0
+    const again = await db.transaction(async (tx) => (await import('../src/commands.ts')).applyMutationIn(tx, 'phone', place as never, {}, undefined, { own: true }))
+    expect(again).toMatchObject({ status: 'applied', duplicate: true })
+  })
+})
+
+describe('a push the device has given up on (audit, 20 October 2026, finding 16)', () => {
+  it('stops at the next change once the request is gone, keeping what was applied, and says so in the log', async () => {
+    // Proves: a push sent without the partial mark, cut off by the device part way, isn't worked through to its end for
+    // nobody: the server stops, what it applied stays applied, and the log says it stopped.
+    const plain = await pgliteDb()
+    cleanup.push(() => plain.close())
+    // Each change slowed, as at a distance.
+    const slow = (q: Queryable): Queryable => ({ query: async (text, params) => (await new Promise((r) => setTimeout(r, 5)), q.query(text, params)), exec: (t) => q.exec(t) })
+    const db: Db = { ...plain, transaction: (fn, o) => plain.transaction((tx) => fn(slow(tx)), o) }
+    const lines: string[] = []
+    const app = await server(db, { logger: true, logTo: { write: (line) => void lines.push(line) } })
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    const { port } = app.server.address() as AddressInfo
+    const mutations = Array.from({ length: 300 }, (_, i) => ({ id: newId(), name: 'place.upsert', args: { id: `p${i}`, name: `Bay ${i}`, notes: '' }, createdAt: new Date().toISOString() }))
+    const body = JSON.stringify({ clientId: 'old-phone', mutations })
+    const req = request({ host: '127.0.0.1', port, path: '/api/sync/push', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } })
+    req.on('error', () => {})
+    req.end(body)
+    const applied = async () => Number((await plain.query<{ n: number }>(`SELECT count(*)::int AS n FROM mutations WHERE client_id = 'old-phone'`)).rows[0]!.n)
+    while ((await applied()) < 5) await new Promise((r) => setTimeout(r, 20))
+    req.destroy()
+    // The change under way finishes; then nothing more is worked through.
+    await new Promise((r) => setTimeout(r, 500))
+    const stopped = await applied()
+    await new Promise((r) => setTimeout(r, 500))
+    expect(await applied()).toBe(stopped)
+    expect(stopped).toBeLessThan(mutations.length)
+    expect(lines.map((l) => JSON.parse(l)).find((l) => l.msg?.startsWith('Push stopped part way'))).toMatchObject({ answered: stopped, waiting: mutations.length - stopped })
   })
 })

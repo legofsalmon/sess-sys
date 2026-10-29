@@ -51,7 +51,7 @@ function withFault(db: Db, statement: (sql: string) => boolean, fault = 'SELECT 
   const faulty: Db & { failNext: boolean } = {
     ...db,
     failNext: false,
-    transaction: (fn) =>
+    transaction: (fn, o) =>
       db.transaction((tx) => {
         const query: Queryable['query'] = <T>(sql: string, params?: unknown[]) => {
           if (faulty.failNext && statement(sql)) {
@@ -61,7 +61,7 @@ function withFault(db: Db, statement: (sql: string) => boolean, fault = 'SELECT 
           return tx.query<T>(sql, params)
         }
         return fn({ ...tx, query })
-      }),
+      }, o),
   }
   return faulty
 }

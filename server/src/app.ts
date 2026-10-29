@@ -17,7 +17,7 @@ import { Google } from './calendar/google.ts'
 import { registerImportRoutes } from './calendar/import.ts'
 import { registerCalendarRoutes } from './calendar/routes.ts'
 import { CalendarSync, type CalendarSyncOptions } from './calendar/sync.ts'
-import { applyMutationIn, currentSeq } from './commands.ts'
+import { applyMutationIn, currentSeq, recordRefusal, refusedOnSight } from './commands.ts'
 import { clearedSince, startedFresh } from './data/fresh.ts'
 import { registerDataRoutes } from './data/routes.ts'
 import { Feeds, type FeedsOptions } from './crew/feeds.ts'
@@ -36,7 +36,7 @@ import { ErasureList } from './erasure/list.ts'
 import { everythingJson, everythingZip, exportRowCount, readEverything, zipName } from './export.ts'
 import { BadCursor, readHistory, recordExport } from './history.ts'
 import { appShellPolicy, inlineScripts, pagePolicy, publicOrigin, requestForLog } from './http.ts'
-import { CHARACTERS, isCharacterError, isLockBusy, takeWriteLock } from './kernel.ts'
+import { CHARACTERS, isCharacterError, isLockBusy } from './kernel.ts'
 import { migrateAll } from './modules.ts'
 import { registerNoticeRoutes } from './notices.ts'
 import { reportError, reportNowAndThen, type ErrorReporting } from './monitoring.ts'
@@ -441,8 +441,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return []
       })
     const answered = new Map(seen.map((r) => [r.id, r.result]))
+    // The device gave up waiting, or lost its signal: what's done stays done, and the rest isn't worked through for nobody,
+    // holding the write lock from everyone else's pushes. Its resend is answered as duplicates for what was applied
+    // (audit, 20 October 2026, finding 16).
+    let gone = false
+    const left = () => void (gone ||= !reply.raw.writableEnded)
+    reply.raw.once('close', left)
     // In order: a device's later request may depend on an earlier one.
     for (const m of mutations) {
+      if (gone || req.raw.socket?.destroyed) {
+        req.log.info({ answered: results.length, waiting: mutations.length - results.length }, 'Push stopped part way: the device is no longer waiting for the answer')
+        break
+      }
       // Out of time for a device that takes part of an answer: the rest go again in its next push, after these.
       if (partial && results.length > 0 && Date.now() - started > pushBudgetMs) break
       const before = answered.get(m.id)
@@ -450,13 +460,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         results.push({ ...before, duplicate: true })
         continue
       }
+      // Turned down on sight (its role, or its shape): written down without waiting for the write lock (finding 66).
+      const onSight = refusedOnSight(m as never, from)
       const result = await db
-        .transaction(async (tx) => {
-          await takeWriteLock(tx, pushLockWaitMs)
-          // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
-          if (generation && (await clearedSince(tx, generation))) return 'stale' as const
-          return applyMutationIn(tx, clientId, m as never, from, req.log)
-        })
+        .transaction(
+          async (tx) => {
+            // Made on a copy of the data from before someone started fresh (ADR 0019): none of it belongs any more.
+            if (generation && (await clearedSince(tx, generation))) return 'stale' as const
+            if (onSight) return recordRefusal(tx, clientId, m as never, from, onSight)
+            // The lock was taken as the transaction began (finding 15).
+            return applyMutationIn(tx, clientId, m as never, from, req.log, { own: true })
+          },
+          onSight ? {} : { writeLockMs: pushLockWaitMs }
+        )
         .catch((err: unknown): MutationResult | 'busy' => {
           // A long change holds the write lock: this one and the rest go again shortly, and what's done is answered now.
           if (isLockBusy(err)) return 'busy'
@@ -478,6 +494,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
       results.push(result)
     }
+    reply.raw.off('close', left)
     if (results.some((r) => r.status === 'applied' && !r.duplicate)) changed()
     return stale ? { results: [], stale } : busy ? { results, busy } : { results }
   })
