@@ -1,4 +1,4 @@
-import { nameParts, OFFICE_SETTING_ID, stockId, type CommandName, type EntityName, type Mutation, type Where } from '@sh/shared'
+import { nameParts, OFFICE_SETTING_ID, QUOTE_SETTINGS_ID, stockId, type CommandName, type EntityName, type Mutation, type Where } from '@sh/shared'
 import type { Queryable } from './db.ts'
 import { Refused } from './kernel.ts'
 
@@ -190,6 +190,28 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
     fields: { name: 'name', phone: 'phone number', email: 'email address', vatNumber: 'VAT number', address: 'address' },
     what: () => "the office's details",
     idOf: () => OFFICE_SETTING_ID,
+  },
+  'quoting.update': {
+    entity: 'quoteSettings',
+    fields: { nextNumber: 'next quote number', terms: 'terms', bank: 'bank details' },
+    what: () => 'what every quote says',
+    idOf: () => QUOTE_SETTINGS_ID,
+  },
+  'place.upsert': { entity: 'place', fields: { name: 'name', notes: 'notes' }, what: named('place') },
+  'package.save': {
+    entity: 'package',
+    fields: { name: 'name', department: 'department', dayCents: 'price', rate: 'rate', items: 'kit in it', notes: 'notes' },
+    what: named('package'),
+  },
+  'vehicleBooking.update': {
+    entity: 'vehicleBooking',
+    fields: { vehicleId: 'vehicle', phaseId: 'phase', start: 'first day', end: 'last day', driverId: 'driver', notes: 'note' },
+    what: () => 'this booking',
+  },
+  'purchase.update': {
+    entity: 'purchaseRequest',
+    fields: { title: 'title', details: 'details', link: 'link', department: 'department' },
+    what: (d) => (typeof d?.title === 'string' && d.title ? `the request for ${d.title}` : 'this request'),
   },
 }
 
