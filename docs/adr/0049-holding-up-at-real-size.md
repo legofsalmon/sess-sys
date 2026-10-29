@@ -139,3 +139,18 @@ the rows near the screen, on Colly's ask.
   is back.
 - Node should be pinned to 22 on Railway (finding 25): the worker's tsx
   start was checked on Node 22 only.
+
+## Later: the rest of the edits checked (29 October 2026)
+
+The 20 October audit (findings 20 and 21) found the gap above still open
+and the person and call entries missing three fields. `server/src/seen.ts`
+now checks a job's kit lines, stock counts (found by product and place,
+as the count's id is built), products, places, items, faults, label runs,
+vehicles and their bookings, quotes, packages, what every quote says,
+purchase requests and the office's details, and a person's "approves
+leave" and a call's certificates and department. Empty text and none
+count as the same, as the office's VAT number and address are kept.
+Still in arrival order: commands that set one thing outright (a status,
+a decision, a move, a price, a rack slot, a step's tick, a vote), where
+the last word is the one that should stand, and documents' and
+certificates' details, which are saved with their file.

@@ -299,6 +299,26 @@ export interface HistoryPage {
  * contact on the day or a driver), or a job they made in the app.
  */
 export const NOTICE_WHY = ['you', 'sent', 'on', 'made'] as const
+/**
+ * The tables a notification can be about: the server's notifications are changes to these (server/src/notices.ts). A pull
+ * that lands a change in none of them can't have brought one, so a phone needn't ask (audit, 20 October 2026, finding 14).
+ */
+export const NOTICE_ENTITIES: readonly EntityName[] = [
+  'person',
+  'offer',
+  'timesheet',
+  'leaveRequest',
+  'lieuEntry',
+  'leaveAllowance',
+  'unavailability',
+  'document',
+  'vehicleBooking',
+  'jobStep',
+  'purchaseRequest',
+  'project',
+  'phase',
+  'crewCall',
+]
 export type NoticeWhy = (typeof NOTICE_WHY)[number]
 export const NOTICE_WHY_WORDS: Record<NoticeWhy, string> = {
   you: 'About you',

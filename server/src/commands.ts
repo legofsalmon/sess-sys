@@ -25,7 +25,7 @@ import { crewHandlers } from './crew/handlers.ts'
 import { lateHandlers } from './crew/late.ts'
 import { mergeHandlers } from './crew/merge.ts'
 import { timesheetHandlers } from './crew/timesheets.ts'
-import type { Db, Queryable } from './db.ts'
+import { faultForLog, type Db, type Queryable } from './db.ts'
 import { documentHandlers } from './documents/handlers.ts'
 import { attachmentHandlers } from './documents/attachments.ts'
 import { argsToStore, erasureHandlers, refuseIfErased } from './erasure/handlers.ts'
@@ -159,21 +159,86 @@ export async function applyMutation(db: Db, clientId: string, m: Mutation, from:
 }
 
 /**
+ * A change turned down before anything is read: one this version doesn't have, one the sender's role can't make, or one
+ * not in the shape the server takes. Checked before the write lock is taken, as none of them needs it (audit, 20 October
+ * 2026, finding 66). Undefined for one that goes on to be checked against the data.
+ */
+export function refusedOnSight(m: Mutation, from: From = {}): MutationResult | undefined {
+  // A command this version doesn't have, such as the old sync test's (ADR 0001), from a phone still on an older version.
+  if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
+  // A role that can't make this kind of change is told so, whatever is in it (ADR 0034).
+  if (from.role && !roleMayRun(from.role, m.name))
+    return { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
+  const parsed = commandSchemas[m.name].safeParse(m.args)
+  if (!parsed.success) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: invalidMessage(parsed.error.issues[0]) } }
+  return undefined
+}
+
+/** Whether a change refused on sight is kept in the history: all are but one this version doesn't have (see `recordMutation`). */
+const kept = (m: Mutation) => Object.hasOwn(commandSchemas, m.name)
+
+/**
+ * Write a command's row in the history, unless it's there already: the row of the first time, when a resend got here
+ * first or a push before this one applied it. One trip for both (audit, 20 October 2026, finding 15). About someone
+ * erased on request, only what erasing keeps is stored, even of a change turned down (ADR 0027); its text is cleaned as
+ * the schema will clean it, so a NUL from an older version of the app can't fail the push.
+ */
+async function recordMutation(tx: Queryable, clientId: string, m: Mutation, from: From, result: MutationResult | undefined): Promise<MutationResult | undefined> {
+  const stored = cleanArgs(await argsToStore(tx, m.name, m.args))
+  const { rows } = await tx.query(
+    `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
+     VALUES ($1, $2, $3, $4, $5, coalesce($6::timestamptz, clock_timestamp()), $7, $8, clock_timestamp(), $9, $10)
+     ON CONFLICT (id) DO NOTHING RETURNING id`,
+    [
+      m.id,
+      clientId,
+      from.userId ?? null,
+      m.name,
+      JSON.stringify(stored),
+      timestampOrNull(m.createdAt),
+      from.sentAt ?? null,
+      from.device ?? null,
+      result?.status ?? 'applied',
+      JSON.stringify(result ?? {}),
+    ]
+  )
+  if (rows[0]) return undefined
+  const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
+  return { ...seen.rows[0]!.result, duplicate: true }
+}
+
+/**
+ * A change refused on sight, written down as turned down (the history keeps it) without the write lock: it writes
+ * nothing to the change feed. A resend gets the first answer back, as for any other.
+ */
+export async function recordRefusal(tx: Queryable, clientId: string, m: Mutation, from: From, result: MutationResult): Promise<MutationResult> {
+  // Nothing is kept of one this version doesn't have: a resend gets the same answer anyway.
+  if (!kept(m)) return result
+  return (await recordMutation(tx, clientId, m, from, result)) ?? result
+}
+
+/**
  * The same, as part of a transaction the caller already has, so the
  * command stands or falls with the caller's other changes: the calendar
  * sync records a crew member's answer and acts on it together.
+ *
+ * With `own`, the transaction is this one change's alone and the caller took the write lock as it began, as a push does:
+ * the lock isn't asked for again, and the savepoint is left to the commit (audit, 20 October 2026, finding 15).
  */
-export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutation, from: From = {}, log?: Log): Promise<MutationResult> {
+export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutation, from: From = {}, log?: Log, opts: { own?: boolean } = {}): Promise<MutationResult> {
   // One writer at a time; see `emit`. At Session Hire's volume (a few
   // people, hundreds of jobs a year) this costs nothing.
-  await tx.query('SELECT pg_advisory_xact_lock(7331)')
+  if (!opts.own) await tx.query('SELECT pg_advisory_xact_lock(7331)')
 
-  const seen = await tx.query<{ result: MutationResult }>('SELECT result FROM mutations WHERE id = $1', [m.id])
-  if (seen.rows[0]) return { ...seen.rows[0].result, duplicate: true }
-  // A command this version doesn't have, such as the old sync test's (ADR 0001), from a phone still on
-  // an older version. It can never apply, so it's turned down in words and nothing is kept, the history
-  // included: a resend gets the same answer anyway, and the rest of the push carries on.
-  if (!Object.hasOwn(commandSchemas, m.name)) return { id: m.id, status: 'rejected', reason: { code: 'invalid', message: UNKNOWN } }
+  // Turned down on sight, it's still written down, unless this version doesn't have it: it can never apply, so it's
+  // turned down in words and nothing is kept, the history included, and the rest of the push carries on.
+  const onSight = refusedOnSight(m, from)
+  if (onSight) return kept(m) ? ((await recordMutation(tx, clientId, m, from, onSight)) ?? onSight) : onSight
+  // Record the mutation first so the changes it writes can point at it, or answer as the first time for one seen before.
+  // Arrival is read after taking the lock, so the history's order is the order changes were made in.
+  const before = await recordMutation(tx, clientId, m, from, undefined)
+  if (before) return before
+  const parsed = commandSchemas[m.name].safeParse(m.args) as { success: true; data: unknown }
 
   // Whether the sender reads crew rates (ADR 0046): a head of department only when a director lets them, and then only
   // their own department's (ADR 0062), so for a change to another department's call, booking or person, not at all.
@@ -190,23 +255,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
     ...(seesRates ? {} : { seesRates: false }),
   }
   let result: MutationResult
-  // Record the mutation first so the changes it writes can point at it.
-  // Arrival is read after taking the lock, so the history's order is the order changes were made in.
-  // About someone erased on request, only what erasing keeps is stored, even of a change turned down (ADR 0027).
-  // Its text is cleaned as the schema will clean it, so a NUL from an older version of the app can't fail the push.
-  const stored = cleanArgs(await argsToStore(tx, m.name, m.args))
-  await tx.query(
-    `INSERT INTO mutations (id, client_id, user_id, name, args, created_at, sent_at, device, received_at, status, result)
-     VALUES ($1, $2, $3, $4, $5, coalesce($6::timestamptz, clock_timestamp()), $7, $8, clock_timestamp(), 'applied', '{}')`,
-    [m.id, clientId, from.userId ?? null, m.name, JSON.stringify(stored), timestampOrNull(m.createdAt), from.sentAt ?? null, from.device ?? null]
-  )
-  const parsed = commandSchemas[m.name].safeParse(m.args)
-  // A role that can't make this kind of change is told so, whatever is in it (ADR 0034).
-  if (from.role && !roleMayRun(from.role, m.name)) {
-    result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: refusalFor(from.role, COMMAND_NEEDS[m.name]) } }
-  } else if (!parsed.success) {
-    result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: invalidMessage(parsed.error.issues[0]) } }
-  } else if (!seesRates && setsRates(m.name, parsed.data)) {
+  if (!seesRates && setsRates(m.name, parsed.data)) {
     // Setting crew pay, or deciding a timesheet, is for a role that reads rates (ADR 0046).
     result = { id: m.id, status: 'rejected', reason: { code: 'forbidden', message: reading.rates ? RATES_REFUSAL_DEPARTMENT : RATES_REFUSAL } }
   } else if (!(await mayChangeLink(tx, reading, m.name, parsed.data))) {
@@ -219,7 +268,8 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
       // An edit made against an older copy isn't saved over what someone else has changed since (seen.ts).
       const args = await notOverwriting(tx, clientId, m, parsed.data as Record<string, unknown>, { seesRates })
       await (handlers[m.name] as Handler<CommandName>)(ctx, args as never)
-      await tx.query('RELEASE SAVEPOINT cmd')
+      // A transaction of its own commits what's under the savepoint anyway: one trip fewer.
+      if (!opts.own) await tx.query('RELEASE SAVEPOINT cmd')
       if (ctx.seq === 0) ctx.seq = await currentSeq(tx)
       result = { id: m.id, status: 'applied', seq: ctx.seq }
     } catch (err) {
@@ -246,7 +296,7 @@ export async function applyMutationIn(tx: Queryable, clientId: string, m: Mutati
         // dropped with a reason the person can read, recorded like any other
         // refusal so a resend gets the same answer, and logged and reported
         // by the command's name, never with what was in it.
-        log?.warn({ err, command: m.name }, 'Dropped a change the server could not apply')
+        log?.warn({ err: faultForLog(err), command: m.name }, 'Dropped a change the server could not apply')
         reportError(err, { area: 'commands', command: m.name })
         result = { id: m.id, status: 'rejected', reason: { code: 'invalid', message: DROPPED } }
       }

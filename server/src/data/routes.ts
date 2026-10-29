@@ -1,7 +1,7 @@
 import { irishToday, START_FRESH_WORDS, type DataStatus } from '@sh/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { Busy, type Backups } from '../backup/service.ts'
-import type { Db } from '../db.ts'
+import { faultForLog, type Db } from '../db.ts'
 import { describeDevice } from '../devices.ts'
 import { putMadeUpFiles } from '../documents/actions.ts'
 import type { DocumentFiles } from '../documents/files.ts'
@@ -35,7 +35,7 @@ export function registerDataRoutes(app: FastifyInstance, { db, backups, document
     }
     // Made-up files for the made-up documents, where there's a store to keep them in (ADR 0029). Made up, so a store
     // that won't take them leaves the documents as details only, as on a server with no bucket.
-    await putMadeUpFiles(db, documents, irishToday(), { userId: req.user?.id, clientId: req.query.client }).catch((err) => req.log.warn({ err }, 'Could not put in the made-up documents\' files'))
+    await putMadeUpFiles(db, documents, irishToday(), { userId: req.user?.id, clientId: req.query.client }).catch((err) => req.log.warn({ err: faultForLog(err) }, 'Could not put in the made-up documents\' files'))
     onChange()
     return status()
   })

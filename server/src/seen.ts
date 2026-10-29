@@ -1,4 +1,4 @@
-import { nameParts, type CommandName, type EntityName, type Mutation } from '@sh/shared'
+import { nameParts, OFFICE_SETTING_ID, QUOTE_SETTINGS_ID, stockId, type CommandName, type EntityName, type Mutation, type Where } from '@sh/shared'
 import type { Queryable } from './db.ts'
 import { Refused } from './kernel.ts'
 
@@ -34,6 +34,8 @@ interface Checked {
   what: (data: Record<string, unknown> | undefined) => string
   /** A copy as it reads now, for a field a copy from before it existed lacks. */
   read?: (data: Record<string, unknown>) => Record<string, unknown>
+  /** The record's id in the feed, for a change that doesn't carry it as `id`: the office's one record, a count by product and place. */
+  idOf?: (args: Record<string, unknown>) => string | undefined
 }
 
 const named = (kind: string) => (d: Record<string, unknown> | undefined) => (typeof d?.name === 'string' && d.name ? `the ${kind} ${d.name}` : `this ${kind}`)
@@ -78,6 +80,7 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
       knownAs: 'name they go by',
       certificates: 'certificates',
       company: 'company details',
+      approvesLeave: 'leave approver setting',
     },
     what: (d) => (typeof d?.name === 'string' && d.name ? d.name : 'this person'),
     // A copy from before the name was asked for in two (ADR 0066) reads as split, as the server reads the row.
@@ -97,17 +100,128 @@ const CHECKED: Partial<Record<CommandName, Checked>> = {
       project: "job's name",
       phase: 'phase',
       venue: 'venue',
+      needsCertificates: 'certificates needed',
+      department: 'department',
     },
     what: (d) => (typeof d?.role === 'string' && typeof d.project === 'string' ? `the call for ${d.role} on ${d.project}` : 'this call'),
+    // A call synced before certificates were asked for needs none.
+    read: (d) => ({ ...d, needsCertificates: d.needsCertificates ?? [] }),
+  },
+  // The rest that save typed text or a whole record (audit, 20 October 2026, finding 20). Two people on a job's kit or a
+  // stock count at once is the warehouse's normal day, and arrival order lost one of them without a word.
+  'kit.update': {
+    entity: 'kitLine',
+    fields: { phaseId: 'phase', modelId: 'product', qty: 'quantity', subhireQty: 'quantity hired in', supplier: 'supplier', notes: 'notes' },
+    what: () => 'this line of kit',
+  },
+  'stock.set': {
+    entity: 'stock',
+    fields: { qty: 'count' },
+    what: () => 'this product in this place',
+    // A count is kept by product and place, so its id is built from those, as the handler builds it.
+    idOf: (a) => (typeof a.modelId === 'string' ? stockId(a.modelId, a as unknown as Where) : undefined),
+  },
+  'model.update': {
+    entity: 'model',
+    fields: {
+      name: 'name',
+      department: 'department',
+      category: 'category',
+      tracking: 'tracking',
+      isCase: 'case setting',
+      valueCents: 'value',
+      notes: 'notes',
+      patMonths: 'months between PAT tests',
+      liftingMonths: 'months between lifting checks',
+      aliases: 'other names',
+      listId: 'list',
+      isRack: 'rack setting',
+      code: 'stock code',
+      units: 'rack units',
+      depthMm: 'depth',
+      weightKg: 'weight',
+      powerW: 'power',
+      dryHire: 'dry hire setting',
+      supplier: 'supplier',
+      hireDayCents: 'hire price',
+      rackMount: 'rack mounting',
+      rackWidth: 'rack width',
+      caseWidthMm: 'case width',
+      caseHeightMm: 'case height',
+      caseDepthMm: 'case depth',
+      castors: 'castors setting',
+      powerLimitA: 'power limit',
+      rackPart: 'rack part setting',
+    },
+    what: named('product'),
+  },
+  'asset.update': {
+    entity: 'asset',
+    fields: { modelId: 'product', serial: 'serial', notes: 'notes', oldNumber: 'old number', patDue: 'PAT due day' },
+    what: (d) => (typeof d?.number === 'string' && d.number ? d.number : 'this item'),
+  },
+  'fault.update': { entity: 'fault', fields: { usable: 'usable mark', note: 'description', repair: 'repair notes' }, what: () => 'this fault' },
+  'labels.update': {
+    entity: 'labelRun',
+    fields: { name: 'name', notes: 'notes' },
+    what: (d) => (typeof d?.name === 'string' && d.name ? `the labels ${d.name}` : 'this run of labels'),
+  },
+  'vehicle.save': {
+    entity: 'vehicle',
+    fields: { name: 'name', registration: 'registration', kind: 'type', seats: 'seats', payloadKg: 'payload', notes: 'notes', checks: 'checks' },
+    what: named('vehicle'),
+  },
+  'quote.save': {
+    entity: 'quote',
+    fields: {
+      lines: 'lines',
+      discountPct: 'discount',
+      notes: 'notes for the client',
+      validDays: 'days the prices hold',
+      depositPct: 'deposit',
+      agreedCents: 'agreed price',
+      mealsProvided: 'meals',
+      travelKm: 'travel distance',
+    },
+    what: (d) => (typeof d?.version === 'number' ? `version ${d.version} of this quote` : 'this quote'),
+  },
+  'office.update': {
+    entity: 'setting',
+    fields: { name: 'name', phone: 'phone number', email: 'email address', vatNumber: 'VAT number', address: 'address' },
+    what: () => "the office's details",
+    idOf: () => OFFICE_SETTING_ID,
+  },
+  'quoting.update': {
+    entity: 'quoteSettings',
+    fields: { nextNumber: 'next quote number', terms: 'terms', bank: 'bank details' },
+    what: () => 'what every quote says',
+    idOf: () => QUOTE_SETTINGS_ID,
+  },
+  'place.upsert': { entity: 'place', fields: { name: 'name', notes: 'notes' }, what: named('place') },
+  'package.save': {
+    entity: 'package',
+    fields: { name: 'name', department: 'department', dayCents: 'price', rate: 'rate', items: 'kit in it', notes: 'notes' },
+    what: named('package'),
+  },
+  'vehicleBooking.update': {
+    entity: 'vehicleBooking',
+    fields: { vehicleId: 'vehicle', phaseId: 'phase', start: 'first day', end: 'last day', driverId: 'driver', notes: 'note' },
+    what: () => 'this booking',
+  },
+  'purchase.update': {
+    entity: 'purchaseRequest',
+    fields: { title: 'title', details: 'details', link: 'link', department: 'department' },
+    what: (d) => (typeof d?.title === 'string' && d.title ? `the request for ${d.title}` : 'this request'),
   },
 }
 
-/** The same value, whatever order a record's keys came back in; missing and null are the same. */
+/** The same value, whatever order a record's keys came back in; missing, null and empty text are the same. */
 function same(a: unknown, b: unknown): boolean {
   return canonical(a) === canonical(b)
 }
 function canonical(v: unknown): string {
-  if (v === undefined || v === null) return 'null'
+  // Empty text too: the office's VAT number sent as "" is kept as none.
+  if (v === undefined || v === null || v === '') return 'null'
   if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
   if (typeof v === 'object')
     return `{${Object.keys(v)
@@ -133,7 +247,8 @@ export async function notOverwriting<A extends Record<string, unknown>>(
   opts: { seesRates: boolean }
 ): Promise<A> {
   const checked = CHECKED[m.name as CommandName]
-  if (!checked || m.seen === undefined || typeof args.id !== 'string') return args
+  const id = checked?.idOf ? checked.idOf(args) : args.id
+  if (!checked || m.seen === undefined || typeof id !== 'string') return args
   const fields = Object.keys(checked.fields).filter((f) => args[f] !== undefined && (f !== 'dayRateCents' || opts.seesRates))
   if (!fields.length) return args
 
@@ -143,12 +258,12 @@ export async function notOverwriting<A extends Record<string, unknown>>(
        FROM changes c LEFT JOIN mutations m ON m.id = c.mutation_id
       WHERE c.entity_id = $2 AND c.entity = $1 AND c.seq > $4
       ORDER BY c.seq`,
-    [checked.entity, args.id, clientId, m.seen]
+    [checked.entity, id, clientId, m.seen]
   )
   if (!since.some((r) => !r.own)) return args
   const { rows: before } = await tx.query<{ data: Record<string, unknown> | null }>(
     `SELECT data FROM changes WHERE entity_id = $2 AND entity = $1 AND seq <= $3 ORDER BY seq DESC LIMIT 1`,
-    [checked.entity, args.id, m.seen]
+    [checked.entity, id, m.seen]
   )
 
   // What the person was looking at (the copy, with this device's own changes over it), and what others have changed since.

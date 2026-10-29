@@ -35,6 +35,20 @@ export const CHANGELOG: readonly Release[] = [
     prs: [160],
   },
   {
+    version: '1.53.0',
+    date: '2026-10-29',
+    title: 'The app opens on the shape of the screen, and phones fetch less',
+    what: "While the app opens it now shows the tabs and the shape of the screen, then says it's reading this phone's copy, instead of a blank 'Loading…'. Phones ask the server for notifications far less often, and no longer download the map or the 3D rack drawing until someone first opens one.",
+    prs: [159],
+  },
+  {
+    version: '1.52.1',
+    date: '2026-10-29',
+    title: 'Changes made on two devices at once no longer quietly overwrite each other',
+    what: "Two people changing the same kit line, stock count, product, quote, vehicle or the office's details on different devices no longer quietly lose one person's change: the app keeps what was changed elsewhere, or says so and keeps what you typed. Changes from a phone that has been offline send faster, and a phone catching up shows current records while its own changes are still sending.",
+    prs: [158],
+  },
+  {
     version: '1.52.0',
     date: '2026-10-29',
     title: "Staff crew see their own work first, and nobody else's private details",
