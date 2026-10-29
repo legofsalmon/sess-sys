@@ -557,3 +557,29 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Matching past quotes to jobs (ADR 0092). */
 .rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
 .rms-match .match-row select { flex: 1 1 18em; min-width: 0; }
+
+/* Claude inside the app (ADR 0096): what it suggests sits apart, in no colour of its own, labelled as Claude's. */
+.from-enquiry textarea, .ask-claude textarea { width: 100%; }
+.from-enquiry .actions, .ask-claude .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); margin-top: var(--space-6); }
+.ask-claude { margin: var(--space-8) 0; }
+.claude-advice { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--ds-surface-inset); margin: var(--space-8) 0; }
+.claude-advice h3 { margin: var(--space-8) 0 var(--space-4); font-size: var(--text-body); }
+.claude-advice p, .claude-advice ul { margin: 0 0 var(--space-6); }
+.by-claude { color: var(--muted); font-size: var(--text-small); }
+.app .claude-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+/* Each line ticks as the shared tick does: a 44px row, the box beside what it is. */
+.app .claude-lines label.take { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; color: var(--ink); font-size: var(--text-body); cursor: pointer; }
+.app .claude-lines label.take input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .claude-lines label.take small { display: block; color: var(--muted); font-size: var(--text-hint); }
+.app .claude-line.left b { color: var(--muted); font-weight: normal; }
+.app .claude-line .grid-form { margin: 0 0 var(--space-8) calc(22px + var(--space-10)); }
+
+/* Claude's to-do list (ADR 0097): the shared tick's 44px rows, the box beside a link to the job. */
+.app .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+.app .todo-item { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; }
+.app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .todo-item small { display: block; color: var(--muted); font-size: var(--text-hint); }
+.app .todo-item.done a { color: var(--muted); text-decoration: line-through; }
+/* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
+.quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
+.quotes .from-rms h3 { margin: 0 0 var(--space-8); }

@@ -244,6 +244,7 @@ const CASES: Case[] = [
   c('reading.heads', { rates: true }),
   c('messages.prompt', { on: false }),
   c('timesheets.use', { on: true }),
+  c('assistant.use', { on: true }),
 
   // Leave and time in lieu.
   c('leave.request', { id: 'more-hol', personId: 'aoife', type: 'annual', ...leaveSpanFrom(40), note: 'Family' }),

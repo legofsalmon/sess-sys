@@ -18,8 +18,8 @@
     "typecheck": "npm run typecheck -w shared -w server -w web && tsc -p e2e",
     "test": "npm test -w shared -w server",
     "build:web": "npm run build -w web",
-    "ds:sync": "node ../design-system/scripts/sync.mjs --to shared/src/ds --files tokens.css,tokens.js,tokens.d.ts,icons.js,icons.d.ts",
-    "ds:check": "node ../design-system/scripts/sync.mjs --check shared/src/ds"
+    "ds:sync": "node shared/src/ds/ds-check.mjs shared/src/ds --sync --offline",
+    "ds:check": "node shared/src/ds/ds-check.mjs shared/src/ds --reads web/src server/src web/index.html"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

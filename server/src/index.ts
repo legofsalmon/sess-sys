@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
+import type { ClaudeConfig } from './assistant/claude.ts'
+import { DEFAULT_MODEL } from '@sh/shared'
 import { assertSignInKept, authFromEnv, googleClientFromEnv, passcodeFromEnv, passcodeWarning } from './auth/config.ts'
 import { backupKeyFromEnv } from './backup/crypto.ts'
 import { restoreFrom } from './backup/service.ts'
@@ -60,6 +62,7 @@ async function main() {
     ownCalendars: process.env.OWN_CALENDAR_TEST_HOSTS ? { testHosts: process.env.OWN_CALENDAR_TEST_HOSTS.split(',').map((h) => h.trim()).filter(Boolean) } : undefined,
     // Current RMS, read only (ADR 0078). Colly saved the key as CURRENT_CMS_KEY, 23 October 2026; the subdomain is the company's own.
     currentRms: currentRmsKey() ? { subdomain: process.env.CURRENT_RMS_SUBDOMAIN?.trim() || 'sessionhire', apiKey: currentRmsKey()! } : undefined,
+    claude: claudeConfig(),
     calendar: google ? { ...google, appUrl: process.env.PUBLIC_URL?.replace(/\/$/, ''), writes: process.env.CALENDAR_WRITES?.trim().toLowerCase() === 'on' } : undefined,
   })
   await assertSignInKept(db, auth)
@@ -88,6 +91,7 @@ async function main() {
   void app.documents.start()
   // The fuel price from each new month of the AA's survey (ADR 0086). Not waited for: it reads their page.
   void app.fuelUpdates.start()
+  app.assistantTodo.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
   else if (passcode) {
@@ -135,4 +139,16 @@ async function main() {
 /** The Current RMS API key, by the name it was saved under on Railway or the name it was meant to have. */
 function currentRmsKey(): string | undefined {
   return (process.env.CURRENT_RMS_API_KEY || process.env.CURRENT_CMS_KEY)?.trim() || undefined
+}
+
+/**
+ * Claude inside the app (ADR 0096): ANTHROPIC_API_KEY, with CLAUDE_MODEL to
+ * choose another model and CLAUDE_MONTHLY_LIMIT_USD for what it may spend
+ * in a month, $50 unless said.
+ */
+function claudeConfig(): ClaudeConfig | undefined {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!apiKey) return undefined
+  const limit = Number(process.env.CLAUDE_MONTHLY_LIMIT_USD?.trim() || '50')
+  return { apiKey, model: process.env.CLAUDE_MODEL?.trim() || DEFAULT_MODEL, limitCents: Number.isFinite(limit) && limit >= 0 ? Math.round(limit * 100) : 5_000 }
 }

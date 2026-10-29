@@ -10,6 +10,7 @@ import type { DocumentFiles } from './documents/files.ts'
 import type { FuelLookup } from './finance/fuel.ts'
 import { getQuoteSettings } from './finance/store.ts'
 import type { RmsReader } from './rms/reader.ts'
+import type { Assistant } from './assistant/routes.ts'
 
 /**
  * Admin › Status (ADR 0093): everything the app relies on, looked at together, each in words with what to do when it
@@ -41,7 +42,7 @@ export interface OutsideLooks {
 
 /** The real ones: the map search's own status page, and the changelog on GitHub's main. */
 export function outsideLooks({ mapsBase, latestUrl, fetch: get = fetch }: { mapsBase?: string; latestUrl?: string; fetch?: typeof fetch } = {}): OutsideLooks {
-  const headers = { 'user-agent': 'SessionHire/1.0 (+https://github.com/legofsalmon/sess-sys)' }
+  const headers = { 'user-agent': 'SessionHire/1.0 (+https://github.com/sessionhire/sess-sys)' }
   return {
     maps: async () => {
       const res = await get(new URL('/status', mapsBase ?? 'https://nominatim.openstreetmap.org'), { headers, signal: AbortSignal.timeout(LOOK_MS) })
@@ -57,7 +58,7 @@ export function outsideLooks({ mapsBase, latestUrl, fetch: get = fetch }: { maps
   }
 }
 
-export const LATEST_URL = 'https://raw.githubusercontent.com/legofsalmon/sess-sys/main/shared/src/changelog.ts'
+export const LATEST_URL = 'https://raw.githubusercontent.com/sessionhire/sess-sys/main/shared/src/changelog.ts'
 
 export interface StatusSources {
   db: Db
@@ -69,6 +70,8 @@ export interface StatusSources {
   documents: DocumentFiles
   calendar?: CalendarSync
   rms: RmsReader
+  /** Claude inside the app (ADR 0096); a test without it has no Claude check. */
+  assistant?: Assistant
   fuel: FuelLookup
   outside: OutsideLooks
   commit?: string
@@ -125,6 +128,7 @@ export class Status {
       this.calendar(),
       this.ownCalendars(),
       this.currentRms(),
+      this.claude(),
       this.fuel(),
       this.maps(),
     ].map((p, i) => p.catch((err): StatusCheck => ({ id: `check-${i}`, group: 'app', name: 'A check', state: 'bad', says: `This check went wrong itself: ${why(err)}` })))
@@ -301,6 +305,18 @@ export class Status {
     } catch (err) {
       return { ...base, state: 'bad', says: `Current RMS isn't answering: ${why(err)}`, todo: 'Check CURRENT_RMS_API_KEY in Railway is still the key in Current RMS’s System Setup › Integrations.', at }
     }
+  }
+
+  /** Claude (ADR 0096) isn't asked anything here, since each ask costs: only whether it's set up, on, and what it's spent. */
+  private async claude(): Promise<StatusCheck> {
+    const base = { id: 'claude', group: 'outside' as const, name: 'Claude' }
+    const a = this.s.assistant
+    if (!a?.config) return { ...base, state: 'off', says: 'Not set up.', todo: 'Set ANTHROPIC_API_KEY in Railway to offer Claude on the quote screens.' }
+    const s = await a.status()
+    const spent = `$${(s.spentCents / 100).toFixed(2)} of $${(s.limitCents / 100).toFixed(2)} this month, asked ${plural(s.uses, 'time')}`
+    if (!s.on) return { ...base, state: 'off', says: `Set up, and turned off. ${spent}.`, todo: 'Turn it on under Admin › Company to offer it.' }
+    if (s.spentCents >= s.limitCents) return { ...base, state: 'warn', says: `This month’s limit is used: ${spent}.`, todo: 'It starts again on the 1st, or raise CLAUDE_MONTHLY_LIMIT_USD in Railway.' }
+    return { ...base, state: 'ok', says: `On, using ${s.model}: ${spent}.` }
   }
 
   private async fuel(): Promise<StatusCheck> {

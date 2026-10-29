@@ -11,6 +11,7 @@ import { MessagesCard } from './MessagesCard.tsx'
 import { OfficeCard } from './OfficeCard.tsx'
 import { QuotingCard } from './QuotingCard.tsx'
 import { TimesheetsUseCard } from './TimesheetsUseCard.tsx'
+import { AssistantCard } from './AssistantCard.tsx'
 import { TravelCard } from './TravelCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { StatusPanel } from './StatusPanel.tsx'
@@ -79,6 +80,7 @@ export function AccountScreen() {
                 {settings && access.can('money') && <TravelCard money={view.money} />}
                 {settings && <MessagesCard office={view.office} />}
                 {settings && <TimesheetsUseCard office={view.office} />}
+                {settings && access.can('money') && <AssistantCard office={view.office} />}
                 {company && !access.rolesOff && <ReadingCard office={view.office} />}
               </>
             )}

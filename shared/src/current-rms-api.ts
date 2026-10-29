@@ -117,6 +117,8 @@ export interface RmsOpportunityPage {
   opportunities: RmsOpportunity[]
   /** How many match, for "Showing 50 of 812". */
   total: number
+  /** The job each one on the page is linked to (ADR 0092), by opportunity id, where it is. */
+  links?: Record<number, string>
 }
 
 export interface RmsOpportunityWithLines {

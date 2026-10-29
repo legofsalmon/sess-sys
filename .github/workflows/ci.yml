@@ -49,6 +49,10 @@ jobs:
       - name: Shared tests
         if: matrix.shard == 1
         run: npm test -w shared
+      # Whether shared/src/ds is behind the published design system: a warning, never a failure.
+      - name: Design system copies current
+        if: matrix.shard == 1
+        run: npm run ds:check
       - name: Blueprint builds
         if: matrix.shard == 1
         run: npm run build:hub

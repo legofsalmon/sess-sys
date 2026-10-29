@@ -16,6 +16,7 @@ import { arrive } from '../arrival.ts'
 import { useAccess } from '../role.ts'
 import { Chart, type Series } from './Chart.tsx'
 import { Copying, STILL_ARRIVING, useCopying } from './copying.ts'
+import { TodoCard } from '../TodoCard.tsx'
 
 /**
  * Home (ADR 0033): how things stand, for whoever is looking. One screen,
@@ -265,6 +266,7 @@ function ForCompany({ view, today, me }: { view: View; today: string; me: Person
     <>
       {/* What needs someone first, then what's on (audit finding 22). */}
       <Tiles all={tiles(view, today, me, can)} keys={TILES_FOR.company} clear="Nothing waiting on anyone. Everything else is as it should be." />
+      <TodoCard view={view} />
       <Today view={view} today={today} />
       <Chart title="Jobs by week" icon="calendar" series={JOBS} columns={jobsByWeek(view.jobs.jobs, today)} empty="No gigs or hires in the next eight weeks." />
       <CrewChart view={view} today={today} />

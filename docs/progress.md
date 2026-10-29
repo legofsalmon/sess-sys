@@ -19,6 +19,89 @@ waiting on someone.
 - Checked: typecheck, shared, server and real-Postgres tests, and 26
   browser test files including a new one for the fades.
 
+## 29 October 2026: Current RMS quotes in the quote history
+
+**Done**
+
+- Colly asked for the Current RMS quotes to be in the quote history rather
+  than hidden. Quotes now lists them under the app's own ("Before this
+  app, from Current RMS"), found by the same search, narrowed by the same
+  choices (Accepted = went ahead, Turned down = didn't, Sent = still to
+  come), each with how it went and its linked job's quote. Note 8 on
+  [ADR 0092](adr/0092-current-rms-history-on-quotes.md). App 1.63.0.
+- Checked: typecheck, server tests (the went filter and links), browser
+  tests (rms-history.spec.ts, quotes-page.spec.ts, quote-follow-up.spec.ts).
+
+**Waiting on** nobody.
+
+## 29 October 2026: Claude's to-do list
+
+**Done**
+
+- [ADR 0097](adr/0097-claudes-to-do-list.md), the second part of Colly's
+  pick (PR #172), coming "each weekday morning, and on request": with Claude on,
+  Home and the top of Notifications show a To do list for the office and
+  directors. Claude puts in order the quotes to chase, enquiries with no
+  quote sent, crew short in the next fortnight, accepted jobs not invoiced,
+  and dates in jobs' notes; each thing links to its job and ticks done for
+  everyone. Lists are kept two weeks; erasing anyone deletes them all.
+- Checked: typecheck, server tests for the list (written and ticked,
+  refused while off, due on weekdays from 7am), erasure and export, and the
+  browser test with the stand-in.
+
+**Waiting on**
+
+- Colly: the Anthropic key in Railway's shserver, then Claude turned on
+  under Admin › Company. The first morning list comes the weekday after.
+
+## 29 October 2026: Claude reads enquiries into quotes
+
+**Done**
+
+- [ADR 0096](adr/0096-claude-inside-the-app.md), the first part of Colly's
+  pick: New quote takes a pasted enquiry, which Claude reads into the job,
+  its days, what to ask the client, and the kit, crew and other lines,
+  matched to the stock list and priced from the price list on the device.
+  Each line is ticked to take, an unsure product offers those most like
+  it, and the start button says how many lines go on. A draft quote takes
+  "Ask Claude to change this quote", whose answer is shown as changes to
+  take or leave. Claude only suggests and contacts nobody; nothing is saved
+  until someone takes it. Off until the office turns it on under Admin ›
+  Company; the server counts what each ask cost (no words kept) and stops
+  at a monthly limit; Admin › Status says what's been spent.
+- Checked: typecheck, shared and server tests (Anthropic stood in for),
+  and a browser test with a stand-in for Anthropic's API.
+
+**Waiting on Colly**
+
+- An Anthropic API key, put in Railway's shserver as ANTHROPIC_API_KEY
+  (and CLAUDE_MONTHLY_LIMIT_USD if $50 a month isn't right), then Claude
+  turned on under Admin › Company.
+- Next: Claude's to-do list and notifications for the office and
+  directors.
+
+## 29 October 2026: a plan for Claude inside the app
+
+**Planned, nothing built**
+
+- Colly asked for Claude in the app in three roles: bringing enquiries in
+  during the early quote phase, a PA on email through a new
+  operations@sessionhire.com mailbox cc'd on mail, and later a business and
+  systems analyst. The plan is a [Claude Doc](https://claude.ai/artifact/6z9f5bSSAMGtZRvqmckD3h):
+  Claude only suggests and a person accepts through the same commands and
+  role rules; email starts read-only, with replies opened in Gmail for a
+  person to send; one switch per role under Admin, off to start; about
+  EUR 20 to 60 a month in use plus one Workspace licence.
+- Recommended order: enquiries into quotes first, then the mailbox, then
+  the weekly report.
+
+**Colly's pick**
+
+- Claude stays inside the app only: no mailbox and no email for now. It
+  acts as a PA for the office and directors with a to-do list and
+  notifications in the app, and helps start, change and update quotes in
+  this early phase. Building that next.
+
 ## 29 October 2026: Taking back a bring-in, safely
 
 **Done**
@@ -1933,7 +2016,7 @@ has been a while, then link the sure ones on Match to jobs.
 
 - For showing the app as a proposal before the Google key is in, a
   `DEMO_PASSCODE` setting now locks a copy of the app behind one shared
-  passcode ([PR #61](https://github.com/legofsalmon/sess-sys/pull/61);
+  passcode ([PR #61](https://github.com/sessionhire/sess-sys/pull/61);
   [sign-in setup](sign-in-setup.md)). Freelancers' private links still
   open without it, and once the Google key is set Google sign-in takes
   over.
@@ -1953,7 +2036,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Done**
 
 - Colly chose "Merge it" for stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57),
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57),
   [Decision 0030](adr/0030-stocktakes-and-rolling-counts.md); see
   4 October). It was brought up to date with getting kit ready and back
   (7 October) first, and the full suite passed with both: the
@@ -2009,7 +2092,7 @@ has been a while, then link the sure ones on Match to jobs.
 **Next**
 
 - Stocktakes and rolling counts
-  ([PR #57](https://github.com/legofsalmon/sess-sys/pull/57)) took
+  ([PR #57](https://github.com/sessionhire/sess-sys/pull/57)) took
   Decision 0030 first, so this is 0031. With both in, the rest of
   Phase 2 is the labelling rollout, which is work in the warehouse
   rather than in the app, and RFID later.

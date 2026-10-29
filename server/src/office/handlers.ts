@@ -1,4 +1,4 @@
-import { MESSAGES_SETTING_ID, OFFICE_SETTING_ID, READING_SETTING_ID, TIMESHEETS_SETTING_ID, type CommandArgs } from '@sh/shared'
+import { ASSISTANT_SETTING_ID, MESSAGES_SETTING_ID, OFFICE_SETTING_ID, READING_SETTING_ID, TIMESHEETS_SETTING_ID, type CommandArgs } from '@sh/shared'
 import { emit, type Ctx } from '../kernel.ts'
 import { getSetting } from './store.ts'
 
@@ -7,7 +7,7 @@ import { getSetting } from './store.ts'
  * on every freelancer page. One office, so the command replaces them whole.
  */
 
-type OfficeCommand = 'office.update' | 'reading.heads' | 'messages.prompt' | 'timesheets.use'
+type OfficeCommand = 'office.update' | 'reading.heads' | 'messages.prompt' | 'timesheets.use' | 'assistant.use'
 type Handler<N extends OfficeCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
@@ -55,5 +55,15 @@ export const officeHandlers: { [N in OfficeCommand]: Handler<N> } = {
       [TIMESHEETS_SETTING_ID, a.on]
     )
     await emit(ctx, 'setting', TIMESHEETS_SETTING_ID, await getSetting(ctx.tx, TIMESHEETS_SETTING_ID))
+  },
+
+  /** Whether Claude is offered inside the app (ADR 0096). Only shows or hides it: nothing Claude suggested and someone took changes. */
+  async 'assistant.use'(ctx, a) {
+    await ctx.tx.query(
+      `INSERT INTO settings (id, use_assistant) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET use_assistant = EXCLUDED.use_assistant, updated_at = now()`,
+      [ASSISTANT_SETTING_ID, a.on]
+    )
+    await emit(ctx, 'setting', ASSISTANT_SETTING_ID, await getSetting(ctx.tx, ASSISTANT_SETTING_ID))
   },
 }

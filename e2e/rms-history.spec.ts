@@ -92,3 +92,49 @@ test('the office matches past quotes to jobs and prices a line from what it was 
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
+
+test('the quotes from Current RMS are kept under the app’s own on Quotes, found and narrowed the same way', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  await office.goto('/#jobs')
+  await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
+  const jobId = decodeURIComponent(/#jobs\/([^/]+)/.exec(office.url())![1]!)
+
+  const asked: string[] = []
+  await office.route(/\/api\/rms\/opportunities\?/, (route) => {
+    const url = new URL(route.request().url())
+    asked.push(url.search)
+    const went = url.searchParams.get('went')
+    const all = [
+      { ...opp(1, '1043', 'Liffey Brands launch', 'Liffey Brands', 'Order', 'Completed', '2025-03-01', 204000), endsAt: '2025-03-02T10:00:00.000Z' },
+      opp(2, '1001', 'Expo stand', 'Other Co', 'Quotation', 'Lost', '2025-02-01', 50000),
+    ]
+    const opportunities = went === 'ahead' ? all.slice(0, 1) : all
+    return route.fulfill({ json: { opportunities, total: opportunities.length, links: { 1: jobId } } })
+  })
+  await office.goto('/#quotes')
+  const all = office.getByRole('region', { name: 'All quotes' })
+  const rms = all.getByRole('group', { name: 'From Current RMS' })
+  await expect(rms.getByRole('heading', { name: 'Before this app, from Current RMS' })).toBeVisible()
+  await expect(rms.getByRole('listitem')).toHaveCount(2)
+  const launch = rms.getByRole('listitem').filter({ hasText: 'Liffey Brands launch' })
+  await expect(launch).toContainText('1 Mar 2025 to 2 Mar 2025 · No. 1043')
+  await expect(launch).toContainText('Went ahead')
+  await expect(launch.getByRole('link', { name: 'Liffey Brands Launch', exact: true })).toHaveAttribute('href', `#jobs/${encodeURIComponent(jobId)}/quote`)
+  await expect(rms.getByRole('listitem').filter({ hasText: 'Expo stand' })).toContainText("Didn't go ahead")
+
+  // Accepted asks for those that went ahead; Not sent has none from Current RMS.
+  await all.getByRole('group', { name: 'Show' }).getByRole('button', { name: /^Accepted/ }).click()
+  await expect(rms.getByRole('listitem')).toHaveCount(1)
+  expect(asked.at(-1)).toContain('went=ahead')
+  await all.getByRole('group', { name: 'Show' }).getByRole('button', { name: /^Not sent/ }).click()
+  await expect(rms).toHaveCount(0)
+
+  // The search looks through them too.
+  await all.getByRole('group', { name: 'Show' }).getByRole('button', { name: /^All/ }).click()
+  await all.getByLabel('Find a quote').fill('expo')
+  await expect.poll(() => asked.at(-1)).toContain('q=expo')
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})
