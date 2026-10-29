@@ -127,3 +127,8 @@ its reason; a separate feed keeps every change that followed. But:
 - The export is for reading and for moving elsewhere. To put the system
   back as it was, use a backup ([ADR 0004](0004-backups.md)), which keeps
   the link secrets this file leaves out, so freelancers' links keep working.
+- Later (29 October 2026, audit of 20 October, finding 19): the download
+  reads every table in a few dozen trips, and the zip is made a slice at a
+  time with pauses for everyone else, letting each table's rows go once
+  they're written, rather than in one go that held every device up for
+  seconds. Downloads and backups already take turns (finding 9).

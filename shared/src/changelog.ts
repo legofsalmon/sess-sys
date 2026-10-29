@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.55.1',
+    date: '2026-10-29',
+    title: 'Heavy jobs no longer hold everyone up',
+    what: "Bringing a season in from Google Calendar and downloading everything no longer hold up everyone else's phones for seconds. A deploy during the nightly backup no longer loses that night's backup or blocks Back up now for half an hour: the server makes it up a minute after it starts again.",
+    prs: [162],
+  },
+  {
     version: '1.55.0',
     date: '2026-10-29',
     title: 'The warehouse screens are easier on a busy day',

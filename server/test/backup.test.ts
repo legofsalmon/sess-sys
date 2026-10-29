@@ -25,7 +25,7 @@ import { migrateAuth } from '../src/auth/schema.ts'
 import { createSession, upsertUser } from '../src/auth/sessions.ts'
 import { backupKeyFromEnv, isEncrypted } from '../src/backup/crypto.ts'
 import { newGeneration, readGeneration, restoreBackup, writeBackup } from '../src/backup/format.ts'
-import { backupKey, Backups, checkRestores, keyDate, latestKey, restoreFrom, toThin } from '../src/backup/service.ts'
+import { backupKey, Backups, Busy, checkRestores, keyDate, latestKey, restoreFrom, STOPPED_BY_RESTART, toThin } from '../src/backup/service.ts'
 import { takeTurns } from '../src/turns.ts'
 import { dirStore, s3Store, s3Url, storeFromEnv, type BackupStore } from '../src/backup/store.ts'
 import { CREW, migrateCrew } from '../src/crew/schema.ts'
@@ -34,6 +34,11 @@ import { scratchDb } from './scratch-db.ts'
 import { moduleVersion, runMigrations } from '../src/migrations.ts'
 import { PROJECTS } from '../src/projects/schema.ts'
 import { CORE, keptSyncTestTables, migrate, SYNC_TEST_GONE } from '../src/schema.ts'
+
+// A test restore boots a process and a database of its own, two or three a test: alone these take 10 to 18 s, and with
+// the whole suite and the browser tests beside them they came near 30 s and timed out (audit, 20 October 2026, finding
+// 110). This file's tests get 90 s; the rest of the suite keeps 30.
+vi.setConfig({ testTimeout: 90_000 })
 
 /**
  * Backups (ADR 0004): the file, the restore, the nightly run, what phones
@@ -393,6 +398,40 @@ describe('the nightly backup', () => {
     expect((await app.inject({ method: 'GET', url: '/api/health' })).json().backups).toEqual({ last: null, fresh: false })
     const { rows } = await db.query(`SELECT status, error FROM backup_runs WHERE id = 'crashed'`)
     expect(rows[0]).toEqual({ status: 'failed', error: 'Stopped partway (the server restarted).' })
+  })
+
+  it('lets a run finish as the server shuts down, or marks it stopped, and the next server makes it up', async () => {
+    // Proves (audit, 20 October 2026, finding 54): a deploy during the nightly run no longer abandons it silently with
+    // its row left "running", which turned "Back up now" away for half an hour and left the night without a backup.
+    const db = await database()
+    await server(db)
+    let release: (() => void) | undefined
+    const slow: BackupStore = { ...dirStore(folder()), put: () => new Promise<void>((_, reject) => (release = () => reject(new Error('The process ended.')))) }
+    const before = await new Backups(db, slow, { shutdownWaitMs: 50 }).load()
+    const run = before.run('nightly')
+    while (!release) await new Promise((r) => setTimeout(r, 10))
+    await before.close()
+    const { rows } = await db.query<{ status: string; error: string }>(`SELECT status, error FROM backup_runs`)
+    expect(rows).toEqual([{ status: 'failed', error: STOPPED_BY_RESTART }])
+    // Here the process goes on, so the run ends; it stays marked as the shutdown stopped it.
+    release!()
+    expect(await run).toMatchObject({ status: 'failed', error: STOPPED_BY_RESTART })
+
+    // The next server makes it up a minute after it starts, and "Back up now" works at once.
+    const now = new Date()
+    const after = await new Backups(db, dirStore(folder()), { now: () => now }).load()
+    cleanup.push(() => after.stop())
+    after.start()
+    expect(after.status().next).toBe(new Date(now.getTime() + 60_000).toISOString())
+    expect(await after.run('manual')).toMatchObject({ status: 'ok' })
+    // Had the server before finished the run itself, the catch-up would find it made, and leave it at that.
+    await expect(after.run('catch-up')).rejects.toThrow(Busy)
+
+    // One that finishes in the time it's given is waited for.
+    const quick = await new Backups(db, dirStore(folder())).load()
+    const made = quick.run('nightly')
+    await quick.close()
+    expect(await made).toMatchObject({ status: 'ok', trigger: 'nightly' })
   })
 
   it('runs at 2am UTC, and soon after start-up when the last good one is over a day old', async () => {
