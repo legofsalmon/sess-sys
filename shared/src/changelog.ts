@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-29',
     title: 'Old Current RMS quotes in the quote history',
     what: 'Quotes now shows the quotes from before the app, from Current RMS, under the app’s own, newest first, so the history reads as one. The same search finds them, and Sent, Accepted and Turned down narrow them too: accepted means it became an order that wasn’t cancelled. Each says whether it went ahead, and one matched to a job links to that job’s quote. They’re read only, as Current RMS had them, and need signal.',
-    prs: [0],
+    prs: [154],
     adrs: [92],
   },
   {
