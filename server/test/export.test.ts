@@ -100,6 +100,7 @@ describe('download everything', () => {
     const tables = [
       'assets',
       'assistant_lists',
+      'assistant_mailbox',
       'assistant_uses',
       'attachments',
       'backup_runs',
@@ -130,6 +131,9 @@ describe('download everything', () => {
       'leave_requests',
       'leave_years',
       'lieu_entries',
+      'mail_notes',
+      'mail_seen',
+      'mail_threads',
       'models',
       'movements',
       'mutations',

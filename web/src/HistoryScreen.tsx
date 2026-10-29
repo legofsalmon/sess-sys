@@ -217,7 +217,7 @@ function Run({ run: r, day, open, onToggle }: { run: HistoryRun; day: string; op
 
 /** One change. In a run the run's line says whose it is, and which device when there was only the one. */
 function Entry({ entry: e, day, inRun }: { entry: HistoryEntry; day: string; inRun?: { device: boolean } }) {
-  const how = e.who.kind === 'link' ? 'on their private link' : e.who.kind === 'calendar' ? 'on Google Calendar' : ''
+  const how = e.who.kind === 'link' ? 'on their private link' : e.who.kind === 'calendar' ? 'on Google Calendar' : e.who.kind === 'claude' ? 'from the operations mailbox' : ''
   // No name for "Someone": the top of the page says why there are none.
   const who = inRun || e.who.kind === 'unknown' ? how : [e.who.name, how].filter(Boolean).join(', ')
   const device = !inRun || inRun.device ? deviceWords(e) : ''

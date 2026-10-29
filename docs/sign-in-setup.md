@@ -236,6 +236,46 @@ Whoever keeps building and setting the app up goes in `SYSTEM_ADMINS`
 (step 2) before handing the directing over: an address there can change
 everything whatever their role, and nobody can take that away in the app.
 
+## 9. Connect the operations mailbox for Claude
+
+Claude reads operations@sessionhire.com and drafts quotes from the mail
+copied to it ([Decision 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md)).
+It can only read: it never sends, replies, deletes or files anything there.
+Copy operations@ on client mail to share a thread; leave it off to keep one
+private.
+
+1. **Make the mailbox.** In the Google Admin console
+   ([admin.google.com](https://admin.google.com)), **Directory**, **Users**,
+   **Add new user**: first name **Operations**, email
+   **operations@sessionhire.com**. It needs a licence like any user. Not a
+   group or an alias: the app can't read a group, and an alias would let
+   Claude read that person's own mail. Sign in as it once to set its
+   password.
+2. **Let the Google key read mail.** In
+   [console.cloud.google.com](https://console.cloud.google.com), project
+   **Session Hire**:
+   - Search for **Gmail API**, open it and press **Enable**.
+   - **Google Auth Platform**, **Clients**, **Session Hire app**: under
+     **Authorised redirect URIs** add
+     `https://shserver-production.up.railway.app/api/assistant/mailbox/callback`
+     and save. The Client ID and secret stay the same.
+   - Keep the audience **Internal**, so only company accounts can be
+     connected and Google doesn't need to review the app.
+3. **Claude's key.** In Railway, **shserver**, **Variables**, check
+   `ANTHROPIC_API_KEY` is there (from console.anthropic.com). Optional:
+   `CLAUDE_MONTHLY_LIMIT_USD` (50 unless set).
+4. **Turn it on.** In the app, **Admin**, **Company**, **Claude**: **Turn
+   Claude on**, then **Connect operations@** and sign in to Google as
+   operations@sessionhire.com (use a private window if your own account
+   gets in the way), and allow it to read mail.
+5. **Check it.** Admin › Company shows "Reading operations@sessionhire.com",
+   and Admin › Status shows the operations mailbox. Within about five
+   minutes, enquiries from the last week show on **Quotes** under "From the
+   operations mailbox", each with a draft quote.
+
+To stop it, press **Disconnect** under Admin › Company (the app hands the
+key back to Google), or turn Claude off.
+
 ## Good to know
 
 - Google is the only way in for staff (ADR 0052). A member of staff's own

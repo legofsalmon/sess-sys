@@ -327,7 +327,11 @@ faults reported on site are waiting in the warehouse repair queue on return.
   report and the mailbox wait for later. Enquiries and quote changes built
   29 October 2026 ([ADR 0096](adr/0096-claude-inside-the-app.md)), and the
   to-do list each weekday morning and on request the same day
-  ([ADR 0097](adr/0097-claudes-to-do-list.md)).
+  ([ADR 0097](adr/0097-claudes-to-do-list.md)). Later that day Colly chose the mailbox
+  after all: Claude reads operations@sessionhire.com, copied on client mail
+  (left off to keep a thread private), and drafts quotes from the threads
+  ([ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md)); asking
+  Claude in words went, and pasting an enquiry stays as the second way.
 
 ## Decisions to make before the build starts
 

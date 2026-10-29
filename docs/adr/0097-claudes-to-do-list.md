@@ -64,3 +64,9 @@ and whenever someone asks.
 
 - Whether heads of department get a list for their own department.
 - A weekly business report, when Colly wants it (the plan's third role).
+
+## Later
+
+- 29 October 2026, [ADR 0098](0098-claude-drafts-quotes-from-the-mailbox.md):
+  the list is also told of client mail in the operations mailbox that has
+  waited a day or more for a reply.

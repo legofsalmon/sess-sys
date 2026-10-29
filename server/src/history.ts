@@ -42,6 +42,7 @@ import { aliasesOf } from '@sh/shared'
 import { RACK_PART_LABELS, type RackPart } from '@sh/shared'
 import { ATTACHMENT_FILE_ACTION, ATTACHMENT_KINDS, ATTACHMENT_TITLES, attachmentTitleInSentence } from '@sh/shared'
 import { ITEM_CERTIFICATE_FILE_ACTION, ITEM_CERTIFICATE_KINDS, ITEM_CERTIFICATE_LABELS } from '@sh/shared'
+import { CLAUDE_CLIENT } from '@sh/shared'
 import type { Queryable } from './db.ts'
 
 /**
@@ -235,11 +236,13 @@ export async function toEntries(q: Queryable, rows: Row[], rates = true, notes =
         ? { kind: 'link', name: r.link_name ?? 'A freelancer', key: r.client_id }
         : calendar
           ? { kind: 'calendar', name: r.link_name ?? 'A freelancer', key: `link:${r.client_id.slice(9)}` }
-          : r.user_id
-            ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
-            : { kind: 'unknown', name: 'Someone' },
+          : r.client_id === CLAUDE_CLIENT
+            ? { kind: 'claude', name: 'Claude', key: 'claude' }
+            : r.user_id
+              ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
+              : { kind: 'unknown', name: 'Someone' },
       ...(r.device ? { device: r.device } : {}),
-      ...(link || calendar || r.client_id === 'server' ? {} : { deviceCode: r.client_id.slice(-6) }),
+      ...(link || calendar || r.client_id === 'server' || r.client_id === CLAUDE_CLIENT ? {} : { deviceCode: r.client_id.slice(-6) }),
       madeAt: r.made,
       arrivedAt: r.received,
       ...(waited === undefined ? {} : { waitedSeconds: waited }),

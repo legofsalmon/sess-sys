@@ -78,8 +78,15 @@ export async function factsFor(q: Queryable, today: string): Promise<Record<stri
   const notes = live
     .filter((r) => r.notes?.trim() && (!r.first_day || day(r.first_day)! <= notesTo))
     .map((r) => ({ jobId: r.id, job: r.name, status: r.status, notes: String(r.notes).trim().slice(0, NOTE_LENGTH) }))
+  // Mail cc'd to operations@ (ADR 0098) whose last word is the client's, over a day old and not yet answered.
+  const { rows: waitingMail } = await q.query<Row>(
+    `SELECT t.project_id, p.name AS job, n.subject, t.last_at FROM mail_threads t JOIN projects p ON p.id = t.project_id LEFT JOIN mail_notes n ON n.thread_id = t.id
+     WHERE t.last_outside AND t.last_at < $1::date AND t.last_at >= $1::date - 14 ORDER BY t.last_at LIMIT $2`,
+    [today, MOST_FACTS]
+  )
   return {
     today,
+    emailsWaitingForAReply: waitingMail.map((r) => ({ jobId: r.project_id, job: r.job, subject: r.subject ?? '', since: day(r.last_at) })),
     enquiriesWithNoQuoteSent: noQuote.slice(0, MOST_FACTS),
     quotesWaitingForAnAnswer: waiting.slice(0, MOST_FACTS),
     acceptedNotInvoiced: notInvoiced.slice(0, MOST_FACTS),
@@ -92,7 +99,7 @@ export function todoSystem(): string {
   return [
     'Session Hire is an event production and equipment hire company in Ireland. You are the office’s assistant inside its app, writing the to-do list for the office and directors this morning.',
     'You are given facts from the app as JSON. Write the few things most worth doing today, most pressing first, at most twelve:',
-    '- A job soon with crew still to book, a quote waiting a week or more for an answer, an enquiry for a job coming up with no quote sent, an accepted job not invoiced, or a date or promise in a job’s notes that falls due.',
+    '- An email from a client waiting a day or more for a reply, a job soon with crew still to book, a quote waiting a week or more for an answer, an enquiry for a job coming up with no quote sent, an accepted job not invoiced, or a date or promise in a job’s notes that falls due.',
     '- Leave out what can wait; leave out anything the facts don’t show. Never make up a job, a date or an amount.',
     '- Title: what to do, starting with a verb, such as "Book a second sound engineer for Harbour launch". Why: one plain sentence, with the date or amount that makes it matter.',
     '- jobId: the jobId of the job it’s about, exactly as given, or "" for none. where: quote for anything about the quote or invoice, crew for booking crew, kit for kit, job otherwise.',

@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.63.0',
+    date: '2026-10-29',
+    title: 'Claude drafts quotes from the operations mailbox',
+    what: "Once operations@sessionhire.com is connected under Admin › Company, Claude reads the mail copied to it every five minutes. A new enquiry becomes a job and a draft quote, filled in from the thread, and Claude keeps the draft up to date as the mail goes on until someone changes it; after that it offers what new mail changes, to take or leave on the quote. Quotes lists what it read under From the operations mailbox. It can only read the mailbox, never send. Leave operations@ off a mail to keep it private. Asking Claude in words to change a quote is gone, and pasting an enquiry is now folded away on New quote.",
+    prs: [],
+    adrs: [98],
+  },
+  {
     version: '1.62.0',
     date: '2026-10-29',
     title: 'A to-do list from Claude each weekday morning',

@@ -78,7 +78,7 @@ import { JOBS } from '../Up.tsx'
 import { useLate } from '../useLate.ts'
 import { useToday } from '../view.ts'
 import { useUnderTop } from '../useUnderTop.ts'
-import { AdviceCard, AskClaude, useClaude, type Advice } from './Claude.tsx'
+import { MailOnQuote, useClaude, type Advice } from './Claude.tsx'
 import { Top } from './common.tsx'
 import { clientWords, getJson, useAsked, useLastCharged, type RmsJob } from './rms.ts'
 
@@ -810,13 +810,10 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
   // Every line counts here, finished or not, so one being typed isn't offered again as new on the job.
   const asLines = lines.map((l): QuoteLine => ({ id: l.id, kind: l.kind, what: l.what, ref: l.ref, group: l.group, qty: num(l.qty), days: 1, unitCents: 0, vat: l.vat }))
   const changes = changesFromJob(asLines, source.kit, source.crew, { product: m.productPrice, role: m.rolePrice, rate: m.productRate }, newId)
-  // Claude (ADR 0096) is shown the lines as they read, and what it suggests is taken here as if typed.
+  // What the mail asks for since the draft was changed (ADR 0098) is shown against the lines as they read, and taken here as if typed.
   const claude = useClaude(view)
-  const [advice, setAdvice] = useState<Advice>()
   const asked: AskedLine[] = good.map((l) => ({ id: l.id, kind: l.kind, what: l.what, group: l.group, qty: l.qty, days: l.out ?? l.days, per: l.per ?? 'day', unitCents: l.unitCents, discountPct: l.discountPct ?? 0 }))
-  const takeAdvice = () => {
-    const a = advice
-    if (!a) return
+  const takeAdvice = (a: Advice) => {
     setLines((ls) => [
       ...ls
         .filter((l) => !a.remove[l.id])
@@ -835,7 +832,6 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
       ...a.add.filter((x) => x.take).map((x) => toDraft(suggestionLine(x.s, newId()))),
     ])
     if (a.discount && a.advice.discountPct !== null) setDiscount(String(a.advice.discountPct))
-    setAdvice(undefined)
   }
 
   return (
@@ -869,12 +865,7 @@ function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobVi
       </div>
 
       <JobChangesCard changes={changes} quoteId={q.id} onTake={(next) => setLines((ls) => next(ls))} />
-      {claude.offered &&
-        (advice ? (
-          <AdviceCard view={view} a={advice} lines={asked} discountPct={pctOk ? pct : 0} onChange={setAdvice} onTake={takeAdvice} onLeave={() => setAdvice(undefined)} />
-        ) : (
-          <AskClaude view={view} status={claude.status} name={job.name} jobDays={days} discountPct={pctOk ? pct : 0} lines={asked} onAdvice={setAdvice} />
-        ))}
+      {claude.offered && <MailOnQuote view={view} projectId={job.id} jobDays={days} lines={asked} discountPct={pctOk ? pct : 0} onTake={takeAdvice} />}
 
       {lines.length === 0 && <Empty>No lines yet. Add kit, crew or anything else the quote is for.</Empty>}
       {groups.map((g) => (
