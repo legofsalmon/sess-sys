@@ -31,7 +31,8 @@ import { emitAll, emitRemovedAll, Refused, serverChange, type Ctx } from '../ker
 import { projectHandlers } from '../projects/handlers.ts'
 import { getPhases, getProjects, getVenues, namesForCall } from '../projects/store.ts'
 import type { GoogleEvent } from './google.ts'
-import { GAP_DAYS, planImport, type AppData, type Plan, type PlanJob, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
+import { Worker } from 'node:worker_threads'
+import { GAP_DAYS, planImport, type AppData, type Chosen, type Plan, type PlanJob, type PlanOptions, type PlanRun, type SourceEvent, type VenueRef } from './import-plan.ts'
 import { Halt, type CalendarSync } from './sync.ts'
 
 /**
@@ -215,6 +216,33 @@ function preview(plan: Plan, calendar: ImportCalendar, from: string, to: string)
     people: plan.people,
     leftOut: plan.leftOut,
     changed: plan.changed,
+  }
+}
+
+/** From this many events a plan is made in a worker thread: a few hundred plan in a moment, a season in a second or more. */
+export const PLAN_APART_FROM = 300
+
+/**
+ * planImport in a worker thread of its own for a big calendar, so a
+ * season's plan doesn't hold up every device's pull and push while it's
+ * made (audit, 20 October 2026, finding 18). A small one is planned here,
+ * which is quicker than starting a thread; so is one whose worker can't
+ * run, as it was before.
+ */
+export async function planApart(events: readonly SourceEvent[], app: AppData, options: PlanOptions, chosen?: Chosen, { from = PLAN_APART_FROM } = {}): Promise<Plan> {
+  if (events.length < from) return planImport(events, app, options, chosen)
+  try {
+    return await new Promise<Plan>((resolve, reject) => {
+      const worker = new Worker(new URL('./plan-worker.mjs', import.meta.url), { workerData: { events, app, options, chosen }, resourceLimits: { maxOldGenerationSizeMb: 512 } })
+      worker.once('message', (plan: Plan) => {
+        resolve(plan)
+        void worker.terminate()
+      })
+      worker.once('error', reject)
+      worker.once('exit', () => reject(new Error('The plan worker stopped without answering.')))
+    })
+  } catch {
+    return planImport(events, app, options, chosen)
   }
 }
 
@@ -533,7 +561,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Choose a calendar and a day to start from.' })
     const read = await look(req, reply, parsed.data)
     if ('sent' in read) return read.sent
-    const plan = planImport(read.events, await readApp(db, read.from, read.to), { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today })
+    const plan = await planApart(read.events, await readApp(db, read.from, read.to), { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today })
     return preview(plan, read.calendar, read.from, read.to)
   })
 
@@ -558,11 +586,11 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     )
     const client = typeof req.query.client === 'string' && /^[a-z0-9]{1,64}$/.test(req.query.client) ? req.query.client : undefined
     const options = { account: read.account, calendarId: read.calendar.id, from: read.from, to: read.to, today: read.today }
-    /** The plan for what's ticked, and every job the calendar holds that isn't in the app yet. */
-    const plans = (app: AppData) => ({
-      plan: planImport(read.events, app, options, { names, kinds, include, people: personNames }),
-      found: new Set(planImport(read.events, app, options).jobs.map((j) => j.key)),
-    })
+    /** The plan for what's ticked, which also says every job the calendar holds that isn't in the app yet (finding 18). */
+    const plans = async (app: AppData) => {
+      const plan = await planApart(read.events, app, options, { names, kinds, include, people: personNames })
+      return { plan, found: new Set(plan.found) }
+    }
     // Planned first outside the write lock, which every device's change waits for (audit finding 7): a season is
     // thousands of events. Inside the lock the app is read again, and only when it has changed since is the plan made
     // again, so two people bringing in at once still can't bring the same events in twice.
@@ -575,7 +603,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
     // rows per statement, so it's short; a push that meets it answers "busy" and goes again shortly, and pulls don't
     // wait for it at all.
     const before = await readApp(db.reads, read.from, read.to)
-    const planned = plans(before)
+    const planned = await plans(before)
     let missing: string[] = []
     let result: Omit<ImportResult, 'missing'>
     try {
@@ -585,7 +613,7 @@ export function registerImportRoutes(app: FastifyInstance, { db, sync, onChange 
         async (ctx) => {
           // Planned again inside the lock, so two people bringing in at once can't bring the same events in twice.
           const app = await readApp(ctx.tx, read.from, read.to)
-          const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : plans(app)
+          const { plan, found } = JSON.stringify(app) === JSON.stringify(before) ? planned : await plans(app)
           missing = choices.jobs.filter((j) => j.include && !found.has(j.key)).map((j) => j.name || j.key)
           if (plan.jobs.length === 0) throw new NothingToBring()
           const done = await bring(ctx, plan, people, read.calendar, app, personParts)
