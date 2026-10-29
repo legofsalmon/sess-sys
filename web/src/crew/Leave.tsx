@@ -34,7 +34,6 @@ import { Pending, StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { useToday } from '../view.ts'
 import { CrewViews } from './CrewViews.tsx'
-import { Heading } from '../Icon.tsx'
 import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 
 /**
@@ -107,30 +106,6 @@ function LeavePill({ status, pending }: { status: LeaveStatus; pending: boolean 
 
 const days = (n: number) => leaveDaysLabel(n)
 
-/** On the Crew tab: the way in, with what's waiting for an approver. */
-export function LeaveCard({ view }: { view: View }) {
-  const { me } = useMe(view)
-  const today = useToday()
-  const waiting = me && canApproveLeave(me) ? view.leave.queue.length : 0
-  const balance = me?.kind === 'staff' ? view.leave.balance(me.id, yearOf(today)) : undefined
-  return (
-    <section className="card leave-card" aria-label="Leave">
-      <Heading icon="leave">Leave</Heading>
-      <p className="hint">
-        {balance ? `${me!.name}: ${days(balance.annual.left)} of annual leave left this year, ${days(balance.lieu.left)} in lieu to take.` : "Annual leave and days in lieu for staff: apply, see what's left, and approve."}
-        {waiting > 0 && (
-          <>
-            {' '}
-            <b>{waiting === 1 ? '1 request to approve.' : `${waiting} requests to approve.`}</b>
-          </>
-        )}
-      </p>
-      <a className="button" href="#crew/leave">
-        Open leave
-      </a>
-    </section>
-  )
-}
 
 export function LeaveScreen({ view }: { view: View }) {
   const { me, signedIn, email, pick, clear } = useMe(view)

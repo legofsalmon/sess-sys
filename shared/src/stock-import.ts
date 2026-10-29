@@ -484,11 +484,6 @@ export interface StockListReading extends StockListPreview {
   notRead: string[]
 }
 
-/** A row as the office sends it back: fixed where it needed fixing, or skipped, with what the preview said it does, so the server can tell when that has changed. */
-export interface StockListChoice extends StockListRow {
-  skip: boolean
-  does: string[]
-}
 
 /** What one call bringing the rows in did. */
 export interface StockListResult {

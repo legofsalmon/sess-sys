@@ -6,7 +6,6 @@ import {
   canApproveLeave,
   leaveBalance,
   leaveDays,
-  leaveLabel,
   leaveSpanLabel,
   nearYears,
   noOpenReason,
@@ -248,5 +247,3 @@ function workedOn(crew: CrewView, e: LieuEntry): string[] {
   return out
 }
 
-/** The note a request's days off carry, for the planner and the feed. */
-export const leaveNote = (r: Pick<LeaveRequest, 'type' | 'days'>) => leaveLabel(r.type, r.days)

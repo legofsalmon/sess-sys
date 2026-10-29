@@ -27,7 +27,6 @@ import { atLabel, findWhere, ProductChoices, useNewPlace, WhereChoices, whereNam
 import { LABELS, STOCK } from '../Up.tsx'
 import { StockViews } from '../Views.tsx'
 import { Split } from '../Split.tsx'
-import { Heading } from '../Icon.tsx'
 
 /**
  * Labels (ADR 0015). Numbers are set aside a run at a time (#stock/labels),
@@ -175,34 +174,6 @@ export function PrintLabels({ numbers, caption }: { numbers: readonly string[]; 
   )
 }
 
-/** Labels on the Stock tab: how far they've got, and the way to print more. */
-export function LabelsCard({ labels }: { labels: LabelsView }) {
-  const setAside = labels.runs.reduce((n, r) => n + r.count, 0)
-  const used = labels.runs.reduce((n, r) => n + r.used, 0)
-  return (
-    <section className="card" aria-label="Labels">
-      <Heading icon="label">Labels</Heading>
-      <p className="hint">
-        {labels.runs.length === 0 ? (
-          'Set numbers aside to print labels here or to send to a label maker. Scan or type a label in the search above to put it on an item.'
-        ) : (
-          <>
-            {plural(setAside, 'number')} set aside for printing, {used.toLocaleString('en-IE')} of them on items so far.
-            {labels.next && (
-              <>
-                {' '}
-                The next free number is <span className="nowrap">{labels.next}</span>.
-              </>
-            )}
-          </>
-        )}
-      </p>
-      <a className="button" href="#stock/labels">
-        Print labels
-      </a>
-    </section>
-  )
-}
 
 /** Every run of numbers set aside, and setting more aside. */
 export function LabelsScreen({ view }: { view: View }) {
