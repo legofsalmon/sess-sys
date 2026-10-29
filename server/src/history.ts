@@ -529,6 +529,7 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       const was = look('offer', a.id)?.status
       if (was === 'pulled-out') return `Noted that ${o.who} can't make ${o.what}`
       if (was === 'declined') return `Noted that ${o.who} declined ${o.what}`
+      if (was === 'offered') return `Noted that ${o.who} hasn't answered ${o.what}`
       return `Noted ${o.who}'s answer on ${o.what}`
     }
     case 'office.update':
@@ -859,6 +860,8 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       // An erased person's keeps no figures (ADR 0027). Their allowance may still be on record, but it holds the last
       // figures set, not necessarily these.
       const to = typeof a.days === 'number' ? ` to ${a.days} day${a.days === 1 ? '' : 's'}, ${a.carriedOver} carried over` : ''
+      // Their own, said plainly: only an approver with nobody else to ask can (audit, 20 October 2026, finding 84).
+      if (a.by && a.by === a.personId) return `${person(a.by)} set their own ${a.year} allowance${to}`
       return `${a.by ? `${person(a.by)} set` : 'Set'} ${person(a.personId)}'s ${a.year} allowance${to}`
     }
     case 'leave.open':
