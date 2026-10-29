@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 29 October 2026: the office's crew day
+
+**Done**
+
+- Findings 23 to 26, 72, 73 and 81 to 84 of the [20 October
+  audit](audit-2026-10-20.md) (PR #160): Crew needed shows the next
+  fortnight with the rest a tap away and today's late calls on their own
+  line; unanswered offers past their reply-by day wait in Answers to
+  check; declined offers stay declined; counters noted offline show their
+  rate; mixed call lines name each state; Offer anyway says what can be
+  taken; resends keep the booking's rate and the office's days; approvers
+  can't set their own allowance while another can. ADRs 0002 and 0024 note
+  it. App 1.54.0.
+- Checked: typecheck, shared, server and real-Postgres tests, and 40
+  browser tests.
+
 ## 29 October 2026: staff crew's own work first, and others' details kept
 
 **Done**
