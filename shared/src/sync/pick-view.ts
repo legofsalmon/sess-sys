@@ -150,6 +150,8 @@ export interface MoveTallies {
   /** Items whose latest scan, or their case's, is a report of them missing. */
   missingNow: ReadonlySet<string>
   outByJob: ReadonlyMap<string, AssetView[]>
+  /** Items retired while they were out. */
+  gone: ReadonlySet<string>
 }
 
 export function moveTallies(
@@ -249,7 +251,7 @@ export function moveTallies(
     list.push(a)
     outByJob.set(best.projectId, list)
   }
-  return { moves, sent, counted, outState, missingNow, outByJob }
+  return { moves, sent, counted, outState, missingNow, outByJob, gone }
 }
 
 export function movesView(
@@ -266,7 +268,7 @@ export function movesView(
   tallies: MoveTallies = moveTallies(entities, outbox, cursor, warehouse, faults)
 ): MovesView {
   const kitOf = () => (typeof kitOrLater === 'function' ? kitOrLater() : kitOrLater)
-  const { moves, sent, counted, outState, missingNow, outByJob } = tallies
+  const { moves, sent, counted, outState, missingNow, outByJob, gone } = tallies
 
   const jobById = new Map(jobs.jobs.map((j) => [j.id, j]))
   const modelById = new Map(warehouse.models.map((m) => [m.id, m]))
