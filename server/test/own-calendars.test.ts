@@ -350,6 +350,9 @@ describe('sharing their own calendar', () => {
     const before = await page()
     // Said before anything is pasted: what's kept, and that nothing is written.
     expect(before).toContain("We keep only the times you're busy: never what, where or who with. Nothing is ever added to your calendar")
+    // A plain button: the red fill marks the thing to do next, and this is an ask (audit, 20 October 2026, finding 92).
+    expect(before).toContain("<button>Share when I'm busy</button>")
+    expect(before).not.toMatch(/class="yes"[^>]*>Share when/)
 
     const shared = await post('/calendar', { address: cal.url(SECRET_PATH) })
     expect(shared.statusCode).toBe(303)

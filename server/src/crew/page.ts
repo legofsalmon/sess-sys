@@ -441,10 +441,12 @@ function ownCalendarBlock(d: PageData): string {
   // What a refused share typed, back in the field (rule 11): it's their own page, kept from every cache.
   const typed = keptIn(d, 'calendar')
   const cal = d.ownCalendar
+  // Its button is plain, never the red fill (audit, 20 October 2026, finding 92): the fill marks the thing to do next,
+  // answering, arriving or sending, and sharing a calendar is something asked of them, not their next step.
   const field = (label: string, button: string) => `<form method="post" action="${d.base}/calendar#calendar" class="share-cal">
       <label>${label} <input name="address" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="2000" placeholder="e.g. webcal://… or https://….ics" value="${h(typed?.get('address'))}"></label>
       ${WHERE_TO_FIND}
-      <button${cal ? '' : ' class="yes"'}>${button}</button>
+      <button>${button}</button>
     </form>`
   const promise = 'We keep only the times you\'re busy: never what, where or who with. Nothing is ever added to your calendar, and Session Hire bookings in it aren\'t counted.'
   if (!cal)
