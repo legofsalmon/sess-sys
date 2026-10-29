@@ -93,7 +93,6 @@ export function checkOf(v: Pick<Vehicle, 'kind' | 'checks'>, kind: CheckKind): V
 export const offRoad = z
   .object({ since: day, until: day.nullable(), note: text(500, 'Why') })
   .refine((o) => o.until === null || o.since <= o.until, { message: "It can't be back before it goes off the road." })
-export type OffRoad = z.infer<typeof offRoad>
 
 export const vehicle = z.object({
   id,

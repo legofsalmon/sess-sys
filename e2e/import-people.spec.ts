@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 /**
  * Bringing in the crew list (ADR 0025) end to end, with sign-in off: from
- * the Account tab, choose a small made-up spreadsheet with one
+ * Admin, choose a small made-up spreadsheet with one
  * company-domain email, one phone the app can't read and one applicant;
  * fix the phone in place, a key at a time, with the field staying put as
  * the problem clears; bring them in past the question; and see them on the

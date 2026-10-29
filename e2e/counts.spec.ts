@@ -54,7 +54,8 @@ async function newItems(page: Page, where: string, count: number) {
     await add.getByRole('button', { name: 'Add item' }).click()
     await makePlace(page)
     if (previous) await expect(add.locator('.added')).not.toHaveText(previous)
-    await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+    // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+    await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
     previous = await add.locator('.added').textContent()
     numbers.push(previous!.slice(6, -1))
   }

@@ -10,10 +10,10 @@ one phone and one laptop (or two phones).
 It should say `"db":"postgres"`. If it says `memory` or has no `db` at all,
 stop and tell Claude: anything entered would be lost on the next restart.
 
-The app has no sign-in yet, so anyone with the address can use it. Keep the
-address to the people testing, and use made-up jobs and kit only. To have
-plenty to look at, tap **Put in made-up data** on the Account tab first:
-every screen then says "made-up data" beside its name.
+Sign in on both, with your Google address (staff) or your own link
+(a freelancer). The app holds the company's real jobs, crew and stock
+now, so use the test product below and nothing else, and never **Start
+fresh**: it would delete everything real.
 
 ## Set up
 
@@ -45,7 +45,7 @@ every screen then says "made-up data" beside its name.
 - Whether the phone ever showed something different from the laptop once
   both had signal.
 
-Send the notes to Claude in the project thread. When you're done, clear
-everything on the Account tab: open **Start fresh**, type "delete
-everything" and tap **Delete everything**. Every phone empties itself, and
-the app is ready for the real data.
+Send the notes to Claude in the project thread. When you're done, take the
+test kit out again: on Test speaker's page tap **Remove product** (it says
+what to do first if anything stops it), and **Remove place** on Bay T1,
+Van T1 and Van T2.

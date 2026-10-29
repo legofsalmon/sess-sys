@@ -8,7 +8,7 @@ import type { DocumentFiles } from '../documents/files.ts'
 import { dataStatus, DataRefused, fillWithMadeUpData, startFresh, type Who } from './fresh.ts'
 
 /**
- * For the Account tab (ADR 0019): whether the app holds made-up data,
+ * For Admin (ADR 0019): whether the app holds made-up data,
  * putting it in, and starting fresh. All of it needs sign-in like the rest
  * of the API, and `client` is the app's device code, for the history.
  */

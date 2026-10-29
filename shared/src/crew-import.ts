@@ -76,10 +76,6 @@ export interface CrewListPreview {
   officeDomain: string | null
 }
 
-/** A row as the office sends it back: fixed where it needed fixing, or skipped, with who the preview said it updates, so the server can tell when that has changed under them. */
-export interface CrewListChoice extends CrewListPreviewRow {
-  skip: boolean
-}
 
 export interface CrewListResult {
   added: number

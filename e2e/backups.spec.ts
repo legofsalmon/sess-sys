@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * The Backups card on the Account tab. The test server has no backup
+ * The Backups card on Admin. The test server has no backup
  * storage, so it shows backups as off; a server with storage is played by
  * answering the backup calls here.
  */

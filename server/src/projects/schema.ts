@@ -1,5 +1,5 @@
 import type { Db } from '../db.ts'
-import { runMigrations, type Module } from '../migrations.ts'
+import type { Module } from '../migrations.ts'
 
 /**
  * Jobs (ADR 0007): clients, venues, jobs (projects) and their phases.
@@ -79,7 +79,3 @@ const MIGRATIONS: string[] = [
 ]
 
 export const PROJECTS: Module = { versionTable: 'projects_schema_version', migrations: MIGRATIONS }
-
-export function migrateProjects(db: Db, upTo?: number) {
-  return runMigrations(db, PROJECTS, upTo)
-}

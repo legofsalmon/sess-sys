@@ -83,7 +83,7 @@ restore it without the key.
    backup.
 2. In Railway, open **shserver**, **Variables**, and add `BACKUP_KEY` with
    that value. Let Railway deploy.
-3. The Backups card on the Account tab now says each file is encrypted,
+3. The Backups card on Admin now says each file is encrypted,
    and new files in the bucket end in `.backup.gz.enc`.
 
 Backups made before the key was set stay as they were, plain text inside,

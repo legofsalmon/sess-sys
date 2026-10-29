@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { Busy, type Backups } from './service.ts'
 
 /**
- * For the Account screen: when the last backup was made, and "Back up now"
+ * For Admin: when the last backup was made, and "Back up now"
  * for the first run after setting up storage, or before a risky change.
  * Both need sign-in like the rest of the API.
  */

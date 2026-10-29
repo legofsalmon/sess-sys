@@ -59,7 +59,7 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS calendar_days_day ON calendar_days (day);
   `,
-  // Crew invites (ADR 0009). `invites` is the switch on the Account tab.
+  // Crew invites (ADR 0009). `invites` is the switch on Admin.
   // `calendar_guests` is everyone the app has put on an event because of an
   // offer, with the address it used and their last answer; guests added by
   // hand in Google are not here, and are left alone.

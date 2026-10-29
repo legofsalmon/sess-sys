@@ -99,7 +99,7 @@ second email or phone a person has used.
 
 ## How the import should work
 
-- **A "Bring in a list" step on the Account tab**, like bringing in the
+- **A "Bring in a list" step on Admin**, like bringing in the
   old calendar: upload the file, see each row as the app read it with
   anything it couldn't read marked (a phone it can't make international,
   a missing name), fix in place or skip, then bring it in. Rows match

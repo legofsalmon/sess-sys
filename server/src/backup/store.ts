@@ -10,7 +10,7 @@ import { dirname, join, relative, sep } from 'node:path'
  * for local development and tests.
  */
 export interface BackupStore {
-  /** Where the backups go, for logs and the Account screen; never includes a secret. */
+  /** Where the backups go, for logs and Admin; never includes a secret. */
   where: string
   put(key: string, data: Buffer): Promise<void>
   get(key: string): Promise<Buffer>

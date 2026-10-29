@@ -229,8 +229,9 @@ step 7, before the rest of the office signs in.
    person counts as staff crew.
 2. Signed in yourself, open **You** and tap **Switch roles on**. You become
    the director.
-3. On the **Crew** tab, give the office, heads of department and warehouse
-   their roles on their own person.
+3. On the **Crew** tab, give the office and heads of department their
+   roles on their own person. Whoever runs the warehouse is a head of
+   department ([ADR 0051](adr/0051-freelancer-in-place-of-warehouse.md)).
 
 Whoever keeps building and setting the app up goes in `SYSTEM_ADMINS`
 (step 2) before handing the directing over: an address there can change
