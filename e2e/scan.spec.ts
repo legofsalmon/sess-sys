@@ -108,7 +108,8 @@ test('scanning labels with the camera: looking one up, and labelling a shelf', a
   await add.getByLabel('Serial').fill(serial)
   await add.getByRole('button', { name: 'Add item' }).click()
   await page.getByRole('button', { name: 'Make the place' }).click()
-  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
   const item = (await add.locator('.added').textContent())!.slice(6, -1)
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
