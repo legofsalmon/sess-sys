@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.63.1',
+    date: '2026-10-29',
+    title: 'The colour checks use the design system’s own',
+    what: 'Behind the scenes only: the check that the shared colours were copied in untouched is now the one every app of Colly’s uses, and it says when they’re out of date. Nothing on screen changes.',
+    prs: [0],
+  },
+  {
     version: '1.63.0',
     date: '2026-10-29',
     title: 'Old Current RMS quotes in the quote history',
