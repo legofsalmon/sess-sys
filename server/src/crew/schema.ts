@@ -1,4 +1,4 @@
-import { NAME_PARTICLES } from '@sh/shared'
+import { NAME_ARTICLES, NAME_PARTICLES } from '@sh/shared'
 import type { Db } from '../db.ts'
 import { runMigrations, type Module } from '../migrations.ts'
 
@@ -227,6 +227,31 @@ const MIGRATIONS: string[] = [
   // can be named and leave the list.
   `
   ALTER TABLE people ADD COLUMN IF NOT EXISTS name_checked boolean NOT NULL DEFAULT false;
+  `,
+  // "an" and "na" carry a last name on after a word that starts one, which the split above didn't know: "Pádraig Mac
+  // an tSaoi" came out as "Pádraig Mac an" and "tSaoi" (audit, 20 October 2026, finding 85). Anyone whose first name
+  // still ends that way has the two words moved back onto the last name, with any words before them that start one,
+  // as splitName now splits it. A first name the office has since changed no longer ends that way and is left alone.
+  `
+  CREATE FUNCTION sh_resplit_name(first text, last text, particles text[], OUT first_name text, OUT last_name text) LANGUAGE plpgsql AS $$
+  DECLARE
+    words text[] := string_to_array(first, ' ');
+    n integer := coalesce(array_length(words, 1), 0);
+    i integer := n - 1;
+  BEGIN
+    WHILE i > 2 AND words[i - 1] = ANY(particles) LOOP
+      i := i - 1;
+    END LOOP;
+    first_name := array_to_string(words[1:i - 1], ' ');
+    last_name := array_to_string(words[i:n], ' ') || ' ' || last;
+  END
+  $$;
+  UPDATE people SET (first_name, last_name) = (SELECT s.first_name, s.last_name FROM sh_resplit_name(first_name, last_name, ARRAY[${NAME_PARTICLES.map((w) => `'${w}'`).join(', ')}]::text[]) s)
+   WHERE last_name <> ''
+     AND cardinality(string_to_array(first_name, ' ')) >= 3
+     AND (string_to_array(first_name, ' '))[cardinality(string_to_array(first_name, ' '))] = ANY(ARRAY[${NAME_ARTICLES.map((w) => `'${w}'`).join(', ')}]::text[])
+     AND (string_to_array(first_name, ' '))[cardinality(string_to_array(first_name, ' ')) - 1] = ANY(ARRAY[${NAME_PARTICLES.map((w) => `'${w}'`).join(', ')}]::text[]);
+  DROP FUNCTION sh_resplit_name(text, text, text[]);
   `,
 ]
 

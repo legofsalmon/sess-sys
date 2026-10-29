@@ -59,7 +59,7 @@ async function setup() {
   await line(2, 2, 'Robe Spiider', 5500)
   await line(3, 3, 'Robe Spiider ', 7000)
   await line(4, 3, 'Audio technician', 40000)
-  return { app }
+  return { app, db }
 }
 
 describe("Current RMS's history (ADR 0092)", () => {
@@ -97,5 +97,26 @@ describe("Current RMS's history (ADR 0092)", () => {
       ['Brightwater Events Ltd', 2, 50],
       ['Other Co', 1, 100],
     ])
+  })
+
+  it('lists the past quotes by whether they went ahead, each with the job it’s linked to, for the Quotes page', async () => {
+    const { app, db } = await setup()
+    // Still to come, so open; and a quote whose days are past with no order, which didn't go ahead.
+    await db.query(`INSERT INTO rms_opportunities (id, number, subject, client, state, status, starts_at, ends_at) VALUES (4, '1100', 'Next year', 'Other Co', 'Quotation', 'Provisional', '2099-01-01T10:00:00Z', '2099-01-01T10:00:00Z')`)
+    await db.query(`INSERT INTO rms_opportunities (id, number, subject, client, state, status, starts_at, ends_at) VALUES (5, '0900', 'Long ago', 'Other Co', 'Quotation', 'Provisional', '2024-01-01T10:00:00Z', '2024-01-01T10:00:00Z')`)
+    await app.inject({ method: 'POST', url: '/api/rms/matches', payload: { links: [{ opportunityId: 1, projectId: 'gala' }] } })
+    const page = async (went = '') => {
+      const res = await app.inject({ url: `/api/rms/opportunities?q=${went ? `&went=${went}` : ''}` })
+      if (res.statusCode !== 200) throw new Error(res.body)
+      return res.json()
+    }
+    const numbers = (p: { opportunities: { number: string }[] }) => p.opportunities.map((o) => o.number)
+    expect(numbers(await page())).toEqual(['1100', '1043', '1001', '0990', '0900'])
+    expect((await page()).links).toEqual({ 1: 'gala' })
+    expect(numbers(await page('ahead'))).toEqual(['1043', '1001'])
+    expect(numbers(await page('not'))).toEqual(['0990', '0900'])
+    expect(numbers(await page('open'))).toEqual(['1100'])
+    expect((await page('open')).total).toBe(1)
+    expect(numbers(await page('sideways'))).toHaveLength(5)
   })
 })

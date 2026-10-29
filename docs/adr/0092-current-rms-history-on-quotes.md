@@ -57,6 +57,16 @@ with their dates long past.
    admins), answered by the server from its copy, so it needs signal. The
    hints and the card say nothing without it; the quote works as before.
 
+8. **In the quote history (29 October 2026, Colly: "keep the current rms
+   quotes in the quote history rather than have them hidden").** Quotes
+   (`#quotes`, ADR 0088) lists them under the app's own, newest first,
+   fifty at a time, as "Before this app, from Current RMS". The page's
+   search finds them, and its choices narrow them by the rule in 4: Sent is
+   still to come, Accepted went ahead, Turned down didn't, Not sent has
+   none (`/api/rms/opportunities?went=`). Each has a pill for how it went
+   and, when linked, the job's quote. They stay read only, and on the
+   server, so they need signal; Past quotes keeps its own page.
+
 ## Consequences
 
 - Pricing from history takes a press, not a trip to Current RMS, and the

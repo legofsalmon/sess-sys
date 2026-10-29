@@ -9,11 +9,14 @@ import { defineConfig } from '@playwright/test'
  * files go in a folder of their own (ADR 0029), so the server has them
  * while it has no backups, as the Backups card's tests expect. The map
  * search (ADR 0057) points nowhere, so no test ever asks OpenStreetMap, and
- * nor does the AA's fuel price page (ADR 0086).
+ * nor does the AA's fuel price page (ADR 0086). Claude (ADR 0096) is a
+ * stand-in the Claude test starts, so no test ever asks Anthropic.
  */
 const port = process.env.E2E_PORT ?? '3099'
 /** A stand-in calendar host the own-calendar test starts (ADR 0044): the one address on this machine the server may read. */
 const standIn = `127.0.0.1:${Number(port) + 1000}`
+/** A stand-in for Anthropic's API the Claude test starts (ADR 0096). */
+const claudeStandIn = `http://127.0.0.1:${Number(port) + 1001}`
 
 export default defineConfig({
   testDir: 'e2e',
@@ -26,7 +29,7 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
   webServer: {
-    command: `rm -rf .e2e-data/${port} .e2e-data/${port}-documents && mkdir -p .e2e-data && DATA_DIR=$PWD/.e2e-data/${port} DOCUMENTS_DIR=$PWD/.e2e-data/${port}-documents PORT=${port} OWN_CALENDAR_TEST_HOSTS=${standIn} NOMINATIM_URL=http://127.0.0.1:9 AA_FUEL_URL=http://127.0.0.1:9 LATEST_VERSION_URL=http://127.0.0.1:9 npm start -w server`,
+    command: `rm -rf .e2e-data/${port} .e2e-data/${port}-documents && mkdir -p .e2e-data && DATA_DIR=$PWD/.e2e-data/${port} DOCUMENTS_DIR=$PWD/.e2e-data/${port}-documents PORT=${port} OWN_CALENDAR_TEST_HOSTS=${standIn} NOMINATIM_URL=http://127.0.0.1:9 AA_FUEL_URL=http://127.0.0.1:9 LATEST_VERSION_URL=http://127.0.0.1:9 ANTHROPIC_API_KEY=e2e-stand-in ANTHROPIC_BASE_URL=${claudeStandIn} npm start -w server`,
     url: `http://localhost:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,

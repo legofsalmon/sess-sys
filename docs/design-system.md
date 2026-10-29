@@ -12,11 +12,11 @@ and Figma gets updated.
 which Colly's other apps take their colours from too; everything else here
 (layout, type, spacing, corners, components) is still Session Hire's own.
 The built token files are vendored in `shared/src/ds/` by `npm run ds:sync`,
-stamped, and never edited here; `npm run ds:check` says whether they're
-behind (both need a checkout of the design-system repository beside this
-one). The copies are at design-system **0.9.0** (synced 29 October 2026),
-and `shared/test/designSystem.test.ts` fails when a copy's stamp differs
-from the version named here, so a sync updates this line too. `web/src/app.css` points each name below at a shared role: the page,
+stamped, and never edited here: the design system's own checker, vendored
+with them as `ds-check.mjs`, fails the shared tests on a hand edit. `npm run
+ds:check` says whether they're behind the published design system, and CI
+runs it as a warning (`ds:sync` needs a checkout of the design-system
+repository beside this one). `web/src/app.css` points each name below at a shared role: the page,
 cards, text, lines, and the green and amber. Two stay Session Hire's own, by
 Colly's choice: the red `accent` family, which marks the one thing to do
 next, and the burnt-orange **bad** tone, so red never means "broken". Their

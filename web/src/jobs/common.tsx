@@ -8,6 +8,7 @@ import { StatusPill, type PillTone } from '../StatusPill.tsx'
 import { client } from '../sync.ts'
 import { ThemeButton } from '../ThemeButton.tsx'
 import { Up, type Trail } from '../Up.tsx'
+import { useTopBar } from '../useUnderTop.ts'
 
 /** What the Jobs screens share, and Stock and Crew too: the header, a record's page, and picking or adding a client or venue by name. */
 
@@ -71,9 +72,10 @@ export function Top({
   const waiting = view.pendingCount
   const notDone = useNotDone(view)
   const seenAs = useSeenAs()
+  const bar = useTopBar()
   return (
     <>
-      <header className="top">
+      <header className="top" ref={bar}>
         <div className="brand">
           <span className="mark">SH</span>
           <span>
@@ -100,7 +102,7 @@ export function Top({
           <span className={`conn ${view.connection === 'offline' ? 'offline' : waiting || view.copying ? 'syncing' : 'online'}`} role="status">
             {connWords(view)}
           </span>
-          <NoticesButton />
+          <NoticesButton view={view} />
           <ThemeButton />
         </div>
         {up && <Up {...up} />}

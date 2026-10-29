@@ -24,6 +24,8 @@ export const READING_SETTING_ID = 'reading'
 export const MESSAGES_SETTING_ID = 'messages'
 /** Whether the company uses timesheets (ADR 0090): the fourth setting, with only `useTimesheets` to it. */
 export const TIMESHEETS_SETTING_ID = 'timesheets'
+/** Whether Claude is offered inside the app (ADR 0096): the fifth setting, with only `useAssistant` to it. */
+export const ASSISTANT_SETTING_ID = 'assistant'
 
 export const setting = z.object({
   id,
@@ -50,6 +52,13 @@ export const setting = z.object({
    * no freelancer is asked for one. What's kept stays kept.
    */
   useTimesheets: z.boolean().optional(),
+  /**
+   * On the "assistant" setting (ADR 0096): whether Claude is offered to the
+   * office and directors, to read an enquiry into a quote and suggest
+   * changes to one. Off until the office says, since what's asked is sent
+   * to Anthropic.
+   */
+  useAssistant: z.boolean().optional(),
 })
 export type Setting = z.infer<typeof setting>
 
@@ -77,6 +86,8 @@ export const officeCommandSchemas = {
   'messages.prompt': z.object({ on: z.boolean() }),
   /** Whether the company uses timesheets (ADR 0090). The office's to decide, under Admin. */
   'timesheets.use': z.object({ on: z.boolean() }),
+  /** Whether Claude is offered inside the app (ADR 0096). The office's to decide, under Admin. */
+  'assistant.use': z.object({ on: z.boolean() }),
 } as const
 
 /** The details when there is a way back in them: a phone or an email. A name alone is nothing to show. */
