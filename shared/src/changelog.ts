@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.67.0',
+    version: '1.68.0',
     date: '2026-10-30',
     title: 'A clearer quote form',
     what: "A draft quote is easier to read and fill in. What it comes to stays at the top with anything that needs a look, such as a line with no price, and pressing that opens the line. Each line is a row that opens to change, with its numbers on one row and the cost side folded underneath. Travel and subsistence are rows like any other. The terms and Mark as sent sit beside the lines on a laptop. A line isn't marked wrong until you've left it, and the unit (€, %, days) sits in the box so there's less to type.",
     prs: [185],
     adrs: [100],
+  },
+  {
+    version: '1.67.0',
+    date: '2026-10-30',
+    title: "The job's kit fills in from its quote",
+    what: "A job made from a past Current RMS quote, or with New quote, now gets the quote's kit on its kit list straight away: each product, the pieces of each package, and how many are hired in. Change, add or take off any of it on the Kit card as usual. When the quote later has kit the list hasn't got, the Kit card says what and adds it all in one press. Nothing is taken off the list when it comes off the quote.",
+    prs: [190],
+    adrs: [102],
   },
   {
     version: '1.66.0',

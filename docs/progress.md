@@ -15,7 +15,7 @@ waiting on someone.
   the box; the cost side folded under the line and saying what it holds;
   travel and subsistence as rows; terms and sending beside the lines on a
   laptop; a line faulted only once it's left. Every feature, name and saved
-  shape kept. App 1.67.0 (PRs #183 and #189 took 1.65.0 and 1.66.0 first).
+  shape kept. App 1.68.0 (PRs #183, #189 and #190 took 1.65.0 to 1.67.0 first).
 - Checked: typecheck, the shared and server tests, the web build, and the
   browser tests for quotes, quote follow-up, Current RMS history, Claude,
   access and the shell. Looked at on a phone and a laptop in both themes.
@@ -25,6 +25,20 @@ waiting on someone.
 - PR #173 (the operations mailbox) replaces Ask Claude on the draft with a
   card of what the mail asks for.
 - The six learnings for the design system, as a PR there.
+## 30 October 2026: The job's kit from its quote
+
+**Done**
+
+- Colly asked for the kit to fill in from what was quoted, still to be
+  changed, added to and taken off (ADR 0102 point 7). Jobs made from a past
+  quote or by New quote get the quote's kit (products and package pieces,
+  hired in as quoted) on the kit list; the Kit card offers what the newest
+  quote has that the list hasn't, in one press; the quote's "The job has
+  changed" card no longer offers that kit back as new.
+- Checked: typecheck, unit tests (kitFromQuote, changesFromJob), the past
+  quote browser test now checks the kit list, and the kit, quote and
+  Claude browser tests.
+
 ## 30 October 2026: A job from a past quote
 
 **Done**
