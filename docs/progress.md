@@ -15,7 +15,7 @@ waiting on someone.
   sending marks the quote sent and numbers it; each email that went is
   listed on the quote with its PDF, and in the history. The mailbox
   connection (ADR 0098) now asks Google to send as well as read and moves
-  to Admin › Connections. App 1.68.0.
+  to Admin › Connections. App 1.69.0.
 - Checked: typecheck, the shared and server tests (a new server test sends
   through a stood-in Gmail and reads the email back), and the browser tests
   for quotes and Claude. The PDF looked at as an image.
@@ -39,7 +39,7 @@ waiting on someone.
   the box; the cost side folded under the line and saying what it holds;
   travel and subsistence as rows; terms and sending beside the lines on a
   laptop; a line faulted only once it's left. Every feature, name and saved
-  shape kept. App 1.66.0 (PR #183, filter and sort, took 1.65.0 first).
+  shape kept. App 1.67.0 (PRs #183 and #189 took 1.65.0 and 1.66.0 first).
 - Checked: typecheck, the shared and server tests, the web build, and the
   browser tests for quotes, quote follow-up, Current RMS history, Claude,
   access and the shell. Looked at on a phone and a laptop in both themes.
@@ -49,6 +49,48 @@ waiting on someone.
 - PR #173 (the operations mailbox) replaces Ask Claude on the draft with a
   card of what the mail asks for.
 - The six learnings for the design system, as a PR there.
+## 29 October 2026: Claude drafts quotes from the operations mailbox
+
+**Done**
+
+- [ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md), Colly's
+  change of flow: Claude reads operations@sessionhire.com (read only) every
+  five minutes once it's connected under Admin › Company. A new enquiry
+  becomes a job and a draft quote as Claude, kept up to date as the thread
+  goes on until a person changes it; then the new mail's changes are offered
+  on the quote to take or leave. Quotes lists what was read under "From the
+  operations mailbox", Admin › Status checks the connection, and the to-do
+  list hears of client mail waiting for a reply. Asking Claude in words is
+  gone; pasting an enquiry is folded away on New quote.
+- Checked: typecheck, server tests with a pretend Gmail (enquiry drafted,
+  kept up to date, changes offered after an edit, jobs linked, newsletters
+  skipped, off and disconnect), export, erasure and status, and the browser
+  test for the quote, Quotes and Admin.
+
+**Waiting on**
+
+- Colly: make operations@ a Workspace user, turn on the Gmail API and add
+  the mailbox's redirect address to the Google key, then connect it under
+  Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox)).
+
+## 30 October 2026: A job from a past quote
+
+**Done**
+
+- Colly asked for an action on the quotes from Current RMS to make a job
+  from one, to try the app on real jobs (ADR 0102, changing ADR 0092's
+  "link and look up only"). "Make a job from this" on a past quote's page,
+  and "Make a job from it" on each unlinked one on Quotes: the job's name,
+  client, venue, days and status as Current RMS had them, and its draft
+  quote with each priced line matched to the stock list where it's the same
+  product and charged as it was there (price, rate rule, days, discount);
+  lines charged nothing offered unticked; a total agreed on the whole kept.
+  The past quote is linked to the new job. App 1.66.0 (takes the next number
+  after #185, #173 and #188).
+- Checked: typecheck, unit tests (rms-job.test.ts), a browser test from
+  the Quotes page to the job's quote, and the quote, Claude, layout and
+  access browser tests.
+
 ## 30 October 2026: Filter and sort on the long lists
 
 **Done**
@@ -166,29 +208,6 @@ waiting on someone.
   0067 notes it. App 1.63.3.
 - Checked: typecheck, shared, server and real-Postgres tests, and 26
   browser test files including a new one for the fades.
-## 29 October 2026: Claude drafts quotes from the operations mailbox
-
-**Done**
-
-- [ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md), Colly's
-  change of flow: Claude reads operations@sessionhire.com (read only) every
-  five minutes once it's connected under Admin › Company. A new enquiry
-  becomes a job and a draft quote as Claude, kept up to date as the thread
-  goes on until a person changes it; then the new mail's changes are offered
-  on the quote to take or leave. Quotes lists what was read under "From the
-  operations mailbox", Admin › Status checks the connection, and the to-do
-  list hears of client mail waiting for a reply. Asking Claude in words is
-  gone; pasting an enquiry is folded away on New quote.
-- Checked: typecheck, server tests with a pretend Gmail (enquiry drafted,
-  kept up to date, changes offered after an edit, jobs linked, newsletters
-  skipped, off and disconnect), export, erasure and status, and the browser
-  test for the quote, Quotes and Admin.
-
-**Waiting on**
-
-- Colly: make operations@ a Workspace user, turn on the Gmail API and add
-  the mailbox's redirect address to the Google key, then connect it under
-  Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox)).
 
 ## 29 October 2026: Current RMS quotes in the quote history
 
