@@ -27,6 +27,24 @@ waiting on someone.
   the mailbox's redirect address to the Google key, then connect it under
   Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
+## 30 October 2026: A job from a past quote
+
+**Done**
+
+- Colly asked for an action on the quotes from Current RMS to make a job
+  from one, to try the app on real jobs (ADR 0102, changing ADR 0092's
+  "link and look up only"). "Make a job from this" on a past quote's page,
+  and "Make a job from it" on each unlinked one on Quotes: the job's name,
+  client, venue, days and status as Current RMS had them, and its draft
+  quote with each priced line matched to the stock list where it's the same
+  product and charged as it was there (price, rate rule, days, discount);
+  lines charged nothing offered unticked; a total agreed on the whole kept.
+  The past quote is linked to the new job. App 1.66.0 (takes the next number
+  after #185, #173 and #188).
+- Checked: typecheck, unit tests (rms-job.test.ts), a browser test from
+  the Quotes page to the job's quote, and the quote, Claude, layout and
+  access browser tests.
+
 ## 30 October 2026: Filter and sort on the long lists
 
 **Done**
