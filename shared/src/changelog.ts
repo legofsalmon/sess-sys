@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-30',
     title: 'The planner scrolls with the page on a phone',
     what: "On a phone, the week and month planner no longer scrolls up and down inside its own box, where a thumb got caught. Its rows now make the page longer, so scrolling down moves the whole page; swiping sideways still moves through the days. On a computer it stays as it was.",
-    prs: [0],
+    prs: [184],
   },
   {
     version: '1.64.3',
