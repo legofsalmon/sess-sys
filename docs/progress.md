@@ -3,6 +3,22 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 October 2026: Major upgrades
+
+**Done**
+
+- The rest of finding 115 of the [20 October audit](audit-2026-10-20.md)
+  (PR #180): vitest 3 to 5 (both critical tinypool advisories gone), PGlite
+  0.3 to 0.5, vite 7 to 8 with the React plugin 5 to 6, @fastify/compress 8
+  to 9, concurrently 9 to 10. npm audit now shows only four low ones, all
+  in deepmerge under vite-plugin-pwa's workbox, used only while building;
+  deepmerge has no fixed version and vite-plugin-pwa 2 carries the same
+  one, so it stays at 1 until there is. App 1.64.1.
+- Left open: TypeScript 7 (later), vite-plugin-pwa 2 (when it clears the
+  advisory).
+- Checked: typecheck, shared and server tests, the web build and every
+  browser test.
+
 ## 29 October 2026: Heads see clients' documents
 
 **Done**
