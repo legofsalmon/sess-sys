@@ -226,6 +226,8 @@ describe('Claude reading the operations mailbox (ADR 0098)', () => {
 describe('reading an email', () => {
   it('takes the text part, or the HTML as text, without what it quotes', () => {
     expect(bodyOf({ mimeType: 'text/html', body: { data: b64('<p>Hi&nbsp;there</p><p>Two <b>mics</b></p>') } })).toBe('Hi there\nTwo mics')
+    // Markup is read tag by tag: style and script never show, an entity is decoded once, and nothing is ever HTML again.
+    expect(bodyOf({ mimeType: 'text/html', body: { data: b64('<html><head><title>Quote</title><style>p { color: red }</style></head><body><h2>Hello</h2><script>if (a < b) { x() }</script><div>Fish &amp;amp; chips, 3 &lt; 4<br>Line two</div><!-- a note --></body></html>') } })).toBe('Hello\nFish &amp; chips, 3 < 4\nLine two')
     expect(withoutQuoted('Yes please.\n\nOn Tue, 3 Mar 2027, Adam <adam@sessionhire.com> wrote:\n> Shall we?')).toBe('Yes please.')
     expect(withoutQuoted('Fine\n-----Original Message-----\nFrom: x')).toBe('Fine')
   })
