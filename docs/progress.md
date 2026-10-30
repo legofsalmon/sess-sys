@@ -130,6 +130,29 @@ waiting on someone.
   0067 notes it. App 1.63.3.
 - Checked: typecheck, shared, server and real-Postgres tests, and 26
   browser test files including a new one for the fades.
+## 29 October 2026: Claude drafts quotes from the operations mailbox
+
+**Done**
+
+- [ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md), Colly's
+  change of flow: Claude reads operations@sessionhire.com (read only) every
+  five minutes once it's connected under Admin › Company. A new enquiry
+  becomes a job and a draft quote as Claude, kept up to date as the thread
+  goes on until a person changes it; then the new mail's changes are offered
+  on the quote to take or leave. Quotes lists what was read under "From the
+  operations mailbox", Admin › Status checks the connection, and the to-do
+  list hears of client mail waiting for a reply. Asking Claude in words is
+  gone; pasting an enquiry is folded away on New quote.
+- Checked: typecheck, server tests with a pretend Gmail (enquiry drafted,
+  kept up to date, changes offered after an edit, jobs linked, newsletters
+  skipped, off and disconnect), export, erasure and status, and the browser
+  test for the quote, Quotes and Admin.
+
+**Waiting on**
+
+- Colly: make operations@ a Workspace user, turn on the Gmail API and add
+  the mailbox's redirect address to the Google key, then connect it under
+  Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
 ## 29 October 2026: Current RMS quotes in the quote history
 

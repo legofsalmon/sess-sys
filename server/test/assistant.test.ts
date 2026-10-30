@@ -122,33 +122,6 @@ describe('Claude inside the app', () => {
     const res = (await enquiry(app)).json() as EnquiryReading
     expect(res).toMatchObject({ start: '', kit: [{ qty: 1, what: 'Mics', department: 'other' }], questions: [] })
   })
-
-  it('suggests changes to a quote only to the lines it was shown', async () => {
-    const advice: QuoteAdvice = {
-      note: 'Two more mics, and 10% off the lighting.',
-      add: [{ kind: 'kit', what: 'Shure SM58', department: 'audio', qty: 2, days: null, per: 'day', priceCents: null }],
-      remove: ['made-up', 'l2'],
-      change: [
-        { lineId: 'l1', qty: null, days: null, discountPct: 10, priceCents: null },
-        { lineId: 'l1x', qty: 3, days: null, discountPct: null, priceCents: null },
-        { lineId: 'l3', qty: 1, days: null, discountPct: null, priceCents: null },
-      ],
-      discountPct: null,
-    }
-    const { app, asked } = await setup({ answer: advice })
-    await ok(app, m('assistant.use', { on: true }))
-    const line = (id: string, what: string) => ({ id, kind: 'kit' as const, what, group: 'Lighting', qty: 1, days: 2, per: 'day' as const, unitCents: 5_000, discountPct: 0 })
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/assistant/quote',
-      payload: { ask: 'Add two SM58s and take 10% off the lighting', name: 'Nissan launch', jobDays: 2, discountPct: 0, lines: [line('l1', 'Robe Spiider'), line('l2', 'Haze'), line('l3', 'Par')] },
-    })
-    expect(res.statusCode).toBe(200)
-    // Only l2 of those taken off is on the quote; l1x isn't, and l3's change changes nothing.
-    expect(res.json()).toMatchObject({ remove: ['l2'], change: [{ lineId: 'l1', discountPct: 10 }], add: [{ what: 'Shure SM58' }] })
-    expect(asked[0]!.user).toContain('<ask>\nAdd two SM58s')
-    expect(asked[0]!.user).toContain('"id":"l1"')
-  })
 })
 
 describe('Claude’s to-do list (ADR 0097)', () => {

@@ -43,7 +43,7 @@ import { client } from '../sync.ts'
 import { useLate } from '../useLate.ts'
 import { useToday } from '../view.ts'
 import { useUnderTop } from '../useUnderTop.ts'
-import { AdviceCard, AskClaude, useClaude, type Advice } from './Claude.tsx'
+import { MailOnQuote, useClaude, type Advice } from './Claude.tsx'
 import { useLastCharged } from './rms.ts'
 import { QuotePill } from './QuoteStatus.tsx'
 import { checkLine, num, sameLine, toDraft, type LineDraft } from './lineDraft.ts'
@@ -150,7 +150,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   // The line just shut, which keeps the focus so the keyboard carries on from it.
   const [shut, setShut] = useState<string>()
   const [removed, setRemoved] = useState<{ line: LineDraft; at: number }>()
-  const [adding, setAdding] = useState<'kit' | 'crew' | 'package' | 'transport' | 'claude'>()
+  const [adding, setAdding] = useState<'kit' | 'crew' | 'package' | 'transport'>()
   // A fault shows only once what holds it has been left (design system rule 18): a line left, or a terms field left. What
   // came back from the device's keeping was left when the screen was, so it shows at once.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set(kept ? [...kept.lines.map((l) => l.id), ...TERM_KEYS] : []))
@@ -365,13 +365,10 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   // Every line counts here, finished or not, so one being typed isn't offered again as new on the job.
   const asLines = lines.map((l): QuoteLine => ({ id: l.id, kind: l.kind, what: l.what, ref: l.ref, group: l.group, qty: num(l.qty), days: 1, unitCents: 0, vat: l.vat }))
   const changes = changesFromJob(asLines, source.kit, source.crew, { product: m.productPrice, role: m.rolePrice, rate: m.productRate }, newId)
-  // Claude (ADR 0096) is shown the lines as they read, and what it suggests is taken here as if typed.
+  // What the mail asks for since the draft was changed (ADR 0098) is shown against the lines as they read, and taken here as if typed.
   const claude = useClaude(view)
-  const [advice, setAdvice] = useState<Advice>()
   const asked: AskedLine[] = good.map((l) => ({ id: l.id, kind: l.kind, what: l.what, group: l.group, qty: l.qty, days: l.out ?? l.days, per: l.per ?? 'day', unitCents: l.unitCents, discountPct: l.discountPct ?? 0 }))
-  const takeAdvice = () => {
-    const a = advice
-    if (!a) return
+  const takeAdvice = (a: Advice) => {
     setLines((ls) => [
       ...ls
         .filter((l) => !a.remove[l.id])
@@ -390,8 +387,6 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
       ...a.add.filter((x) => x.take).map((x) => toDraft(suggestionLine(x.s, newId()))),
     ])
     if (a.discount && a.advice.discountPct !== null) setDiscount(String(a.advice.discountPct))
-    setAdvice(undefined)
-    setAdding(undefined)
   }
   // "Not saved yet" leads to what stops it: the line opens, or the terms field takes the focus, and its fault is said.
   const goToProblem = () => {
@@ -483,6 +478,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
         </div>
 
         <JobChangesCard changes={changes} quoteId={q.id} onTake={(next) => setLines((ls) => next(ls))} />
+        {claude.offered && <MailOnQuote view={view} projectId={job.id} jobDays={days} lines={asked} discountPct={pctOk ? pct : 0} onTake={takeAdvice} />}
 
         {lines.length === 0 && <Empty>No lines yet. Add kit, crew or anything else the quote is for.</Empty>}
         {groups.map((g) => (
@@ -553,27 +549,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
         />
 
         <div className="quote-add" role="group" aria-label="Add to the quote">
-          {advice ? (
-            <AdviceCard
-              view={view}
-              a={advice}
-              lines={asked}
-              discountPct={pctOk ? pct : 0}
-              onChange={setAdvice}
-              onTake={takeAdvice}
-              onLeave={() => {
-                setAdvice(undefined)
-                setAdding(undefined)
-              }}
-            />
-          ) : adding === 'claude' ? (
-            <div className="adding ask">
-              <AskClaude view={view} status={claude.status} name={job.name} jobDays={days} discountPct={pctOk ? pct : 0} lines={asked} onAdvice={setAdvice} />
-              <button type="button" className="link" onClick={() => setAdding(undefined)}>
-                Cancel
-              </button>
-            </div>
-          ) : adding === 'kit' ? (
+          {adding === 'kit' ? (
             <div className="adding">
               <ProductPicker label="Kit to add" products={view.warehouse.models} value="" onPick={addKit} hint="Priced from the price list, for the job's days." />
               <button type="button" className="link" onClick={() => setAdding(undefined)}>
@@ -614,11 +590,6 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
                 <Icon name="add" />
                 Add something else
               </button>
-              {claude.offered && (
-                <button type="button" onClick={() => setAdding('claude')}>
-                  Ask Claude
-                </button>
-              )}
             </>
           )}
         </div>
