@@ -11,6 +11,8 @@ waiting on someone.
   the catalogue's Show all is windowed as Jobs is (ADR 0050), so 300
   products build a few dozen rows rather than a 30,000 px page; search
   first and the first twenty on a laptop (five on a phone) as before.
+  Show all (every list) now keeps the page where it was: with the button
+  below the fold the browser had carried the page to the list's end.
   App 1.64.2.
 - Checked: typecheck, a new browser test with 150 products, and the
   stock and screens browser tests.
