@@ -80,9 +80,10 @@ Every feature stays. What changes is order, weight and timing.
    centre, so within the 50 km travel starts after"). Opening the travel
    row shows the distance; opening the subsistence row shows the Meals
    provided switch. The paragraph explaining how they are worked out goes.
-6. **The add row** holds Add kit, Add crew, Add a package, Add transport,
-   Add something else and, when the office has turned Claude on, Ask
-   Claude. The picker, or Claude's box, takes the row's place. The rare
+6. **The add row** holds Add kit, Add crew, Add a package, Add transport
+   and Add something else (and held Ask Claude until ADR 0098 took asking
+   in words away: what the mailbox asks for is now a card under the lines).
+   The picker takes the row's place. The rare
    things fold behind quiet links: "Charge all kit for the same days…"
    under the add row, "Discount every line…" at the end of a group's head.
 7. **Terms and sending stand beside the lines** in a card of their own from
@@ -136,8 +137,10 @@ Every feature stays. What changes is order, weight and timing.
   left, and that "Not saved yet" opens it.
 - The Quotes page, the price list, packages, Admin's cards and the A4 sheet
   are untouched; the Quotes page is being given filter and sort in PR #183.
-- PR #173 (Claude reading the operations mailbox) replaces Ask Claude on
-  the draft; it now has one slot in the add row to take over.
+- PR #173 (Claude reading the operations mailbox, ADR 0098) replaced Ask
+  Claude on the draft with a card of what the mail asks for, under the
+  lines. ADR 0101 then put Send to the client in the Send section, with
+  Mark as sent as a quiet link beside it.
 - Six learnings go to the design system (a line-item editor as a part; a
   worked-out line's absence as a row state; issue chips that lead to the
   first row; validation timing for a list of drafts; the unit-in-the-box

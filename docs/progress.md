@@ -3,29 +3,29 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
-## 29 October 2026: Claude drafts quotes from the operations mailbox
+## 30 October 2026: Send a quote to the client by email
 
 **Done**
 
-- [ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md), Colly's
-  change of flow: Claude reads operations@sessionhire.com (read only) every
-  five minutes once it's connected under Admin › Company. A new enquiry
-  becomes a job and a draft quote as Claude, kept up to date as the thread
-  goes on until a person changes it; then the new mail's changes are offered
-  on the quote to take or leave. Quotes lists what was read under "From the
-  operations mailbox", Admin › Status checks the connection, and the to-do
-  list hears of client mail waiting for a reply. Asking Claude in words is
-  gone; pasting an enquiry is folded away on New quote.
-- Checked: typecheck, server tests with a pretend Gmail (enquiry drafted,
-  kept up to date, changes offered after an edit, jobs linked, newsletters
-  skipped, off and disconnect), export, erasure and status, and the browser
-  test for the quote, Quotes and Admin.
+- [ADR 0101](adr/0101-sending-a-quote-to-the-client-by-email.md) (PR #188):
+  Send to the client on a quote, once the office turns it on under Admin ›
+  Connections › The operations mailbox. The compose box is filled in from
+  the quote and the client's contacts; the quote goes from operations@
+  with its PDF, drawn on the server to say what the printed page says;
+  sending marks the quote sent and numbers it; each email that went is
+  listed on the quote with its PDF, and in the history. The mailbox
+  connection (ADR 0098) now asks Google to send as well as read and moves
+  to Admin › Connections. App 1.71.0.
+- Checked: typecheck, the shared and server tests (a new server test sends
+  through a stood-in Gmail and reads the email back), and the browser tests
+  for quotes and Claude. The PDF looked at as an image.
 
-**Waiting on**
+**Waiting**
 
-- Colly: make operations@ a Workspace user, turn on the Gmail API and add
-  the mailbox's redirect address to the Google key, then connect it under
-  Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
+- Colly to connect operations@ again once this is live, allowing sending,
+  and to turn the switch on when ready. Stacked on PR #185 (the quote form)
+  and PR #173 (the mailbox); the version numbers move if either lands
+  under a different one.
 
 ## 30 October 2026: The quote form, redrawn
 
@@ -49,6 +49,30 @@ waiting on someone.
 - PR #173 (the operations mailbox) replaces Ask Claude on the draft with a
   card of what the mail asks for.
 - The six learnings for the design system, as a PR there.
+## 29 October 2026: Claude drafts quotes from the operations mailbox
+
+**Done**
+
+- [ADR 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md), Colly's
+  change of flow: Claude reads operations@sessionhire.com (read only) every
+  five minutes once it's connected under Admin › Company. A new enquiry
+  becomes a job and a draft quote as Claude, kept up to date as the thread
+  goes on until a person changes it; then the new mail's changes are offered
+  on the quote to take or leave. Quotes lists what was read under "From the
+  operations mailbox", Admin › Status checks the connection, and the to-do
+  list hears of client mail waiting for a reply. Asking Claude in words is
+  gone; pasting an enquiry is folded away on New quote.
+- Checked: typecheck, server tests with a pretend Gmail (enquiry drafted,
+  kept up to date, changes offered after an edit, jobs linked, newsletters
+  skipped, off and disconnect), export, erasure and status, and the browser
+  test for the quote, Quotes and Admin.
+
+**Waiting on**
+
+- Colly: make operations@ a Workspace user, turn on the Gmail API and add
+  the mailbox's redirect address to the Google key, then connect it under
+  Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox)).
+
 ## 30 October 2026: The job's kit from its quote
 
 **Done**

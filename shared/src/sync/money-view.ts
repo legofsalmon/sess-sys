@@ -21,6 +21,7 @@ import {
   type Package,
   type ProductPrice,
   type Quote,
+  type QuoteEmail,
   type QuoteEntities,
   type QuoteSettings,
   type RateRule,
@@ -50,6 +51,8 @@ export interface QuoteView extends Quote {
   totals: QuoteTotals
   /** The job's newest version. An older one is kept to read, as it went to the client. */
   latest: boolean
+  /** The emails it went to the client in (ADR 0101), newest first; none for one sent another way. */
+  emails: QuoteEmail[]
 }
 
 /** A freelancer's approved timesheet as a cost, and whether they've been paid. */
@@ -166,6 +169,13 @@ export function moneyView(
   const discounts = new Map<string, ClientDiscount & { pending?: boolean }>(Object.values(entities.clientDiscount ?? {}).map((d) => [d.id, d]))
   const packages = new Map<string, Package & { pending: boolean }>(Object.values(entities.package ?? {}).map((p) => [p.id, { ...p, pending: false }]))
   const paid = new Map<string, CostPaid & { pending?: boolean }>(Object.values(entities.costPaid ?? {}).map((c) => [c.id, c]))
+  // The emails each quote went in (ADR 0101), newest first; the server alone makes them, so none is ever waiting here.
+  const emails = new Map<string, QuoteEmail[]>()
+  for (const e of Object.values(entities.quoteEmail ?? {}).sort((x, y) => y.at.localeCompare(x.at) || y.id.localeCompare(x.id))) {
+    const list = emails.get(e.quoteId) ?? []
+    list.push(e)
+    emails.set(e.quoteId, list)
+  }
   let quoting: QuoteSettings & { pending: boolean } = {
     ...{ id: QUOTE_SETTINGS_ID, nextNumber: null, terms: '', bank: '' },
     ...entities.quoteSettings?.[QUOTE_SETTINGS_ID],
@@ -287,6 +297,11 @@ export function moneyView(
         quoting = { ...quoting, id: QUOTE_SETTINGS_ID, nextNumber: a.nextNumber, terms: a.terms, bank: a.bank, pending: true }
         break
       }
+      case 'quoting.email': {
+        const a = m.args as CommandArgs<'quoting.email'>
+        quoting = { ...quoting, emailQuotes: a.on, pending: true }
+        break
+      }
       case 'quoting.travel': {
         const a = m.args as CommandArgs<'quoting.travel'>
         // The day the fuel price was set moves only when the price does, as on the server.
@@ -322,7 +337,7 @@ export function moneyView(
   const byJob = new Map<string, QuoteView[]>()
   for (const q of quotes.values()) {
     const list = byJob.get(q.projectId) ?? []
-    list.push({ ...q, totals: quoteTotals(q), latest: false })
+    list.push({ ...q, totals: quoteTotals(q), latest: false, emails: emails.get(q.id) ?? [] })
     byJob.set(q.projectId, list)
   }
   const views = new Map<string, QuoteView>()

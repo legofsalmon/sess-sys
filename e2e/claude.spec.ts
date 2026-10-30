@@ -91,8 +91,10 @@ test('the office turns Claude on, pastes an enquiry, and sees what the mailbox a
   await toggle.click()
   await expect(toggle).toBeChecked()
   await expect(card).toContainText('This month: $0.00 of $50.00')
-  // This test server has no Google key, so the mailbox can't be connected here.
-  await expect(card.getByRole('group', { name: 'The operations mailbox' })).toContainText('needs the Google key')
+  // The mailbox is connected under Connections (ADR 0101); this test server has no Google key, so it can't be here.
+  await expect(card).toContainText('once that’s connected under Connections')
+  await office.goto('/#admin/connections')
+  await expect(office.getByRole('region', { name: 'The operations mailbox' })).toContainText('needs the Google key')
 
   await office.goto('/#quotes')
   await quotes.getByRole('button', { name: 'New quote' }).click()

@@ -5,15 +5,15 @@ import { faultForLog } from '../db.ts'
 import { clearCookie, publicOrigin, readCookie, setCookie } from '../http.ts'
 import { seal } from '../calendar/crypto.ts'
 import type { Google } from '../calendar/google.ts'
-import { GMAIL_SCOPES } from './gmail.ts'
+import { GMAIL_READ_SCOPE, GMAIL_SCOPES } from './gmail.ts'
 import type { Mailbox } from './mailbox.ts'
 
 /**
- * Connecting the operations mailbox under Admin › Company (ADR 0098): off
- * to Google to sign in as operations@ and let the app read its mail, back
- * again, and disconnect; and what Claude read, for Quotes and each job's
- * quote. Connecting is for those who change settings; reading what Claude
- * read is money, like the rest of Claude.
+ * Connecting the operations mailbox under Admin (ADR 0098, 0101): off to
+ * Google to sign in as operations@ and let the app read its mail and send
+ * from it, back again, and disconnect; and what Claude read, for Quotes
+ * and each job's quote. Connecting is for those who change settings;
+ * reading what Claude read is money, like the rest of Claude.
  */
 
 const ATTEMPT_COOKIE = 'sh_mailbox'
@@ -23,7 +23,7 @@ type Outcome = 'connected' | 'cancelled' | 'failed' | 'missing' | 'off'
 
 export function registerMailboxRoutes(app: FastifyInstance, { mailbox, google, secret }: { mailbox: Mailbox; google: Google | undefined; secret: string | undefined }) {
   const callbackUrl = (req: FastifyRequest) => `${publicOrigin(req)}/api/assistant/mailbox/callback`
-  const back = (reply: FastifyReply, outcome: Outcome) => reply.redirect(`/?mailbox=${outcome}#admin`, 303)
+  const back = (reply: FastifyReply, outcome: Outcome) => reply.redirect(`/?mailbox=${outcome}#admin/connections`, 303)
 
   app.get('/api/assistant/mailbox', { config: { needs: 'money' } }, async (_req, reply): Promise<MailboxStatus> => {
     reply.header('cache-control', 'no-store')
@@ -55,12 +55,19 @@ export function registerMailboxRoutes(app: FastifyInstance, { mailbox, google, s
       req.log.warn({ err: faultForLog(err) }, 'Connecting the operations mailbox failed')
       return back(reply, 'failed')
     }
-    if (!GMAIL_SCOPES.every((s) => connected.scopes.includes(s)) || !connected.refreshToken) {
+    // Reading is what the connection is for; sending (ADR 0101) is kept if it was allowed, and asked for again if not.
+    if (!connected.scopes.includes(GMAIL_READ_SCOPE) || !connected.refreshToken) {
       await google.revoke(connected.refreshToken ?? connected.accessToken)
       return back(reply, connected.refreshToken ? 'missing' : 'failed')
     }
     const { identity } = connected
-    await mailbox.connected({ email: identity.email, sub: identity.subject, sealedKey: seal(secret, connected.refreshToken, identity.subject), by: req.user?.id ?? null })
+    await mailbox.connected({
+      email: identity.email,
+      sub: identity.subject,
+      sealedKey: seal(secret, connected.refreshToken, identity.subject),
+      by: req.user?.id ?? null,
+      scopes: connected.scopes.filter((s) => (GMAIL_SCOPES as readonly string[]).includes(s)),
+    })
     return back(reply, 'connected')
   })
 

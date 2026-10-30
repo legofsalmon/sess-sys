@@ -49,6 +49,7 @@ import { QuotePill } from './QuoteStatus.tsx'
 import { checkLine, num, sameLine, toDraft, type LineDraft } from './lineDraft.ts'
 import { GroupDiscount, KitNote, LastCharged, lastOf, LineEditor, lineMargin, linesShort, LineSummary, rmsNames, UnitBox } from './QuoteLine.tsx'
 import { Totals } from './QuoteSheet.tsx'
+import { SendQuote } from './QuoteEmail.tsx'
 import { AddCrew, AddPackage, AddTransport, JobChangesCard, transportWords, TRAVEL_ROW, TravelAndSubsistence } from './QuoteAdd.tsx'
 
 /**
@@ -142,6 +143,9 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   const [discounting, setDiscounting] = useState<string>()
   const [sentOn, setSentOn] = useState(today)
   const [answering, setAnswering] = useState(false)
+  // Sending by email (ADR 0101), once the office has turned it on: the compose box, or the quiet way to say it went another way.
+  const canEmail = !!m.quoting.emailQuotes
+  const [sending, setSending] = useState<'email' | 'other'>()
   // One row is open to change at a time, a line's or a worked-out one's; the rest read as a list, as they'll print.
   const [open, setOpen] = useState<string>()
   // Which field the open line starts on, and whether its cost fold is wanted open: set by whatever opened it.
@@ -727,34 +731,56 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
         <h3 className="quote-head">Send</h3>
         <Refusal error={error} />
         {!saved && problem && (problemShown ? <p className="warn-line">{problem} It saves once that's put right.</p> : <p className="hint">Not saved yet{faultAt >= 0 ? `: line ${faultAt + 1} isn't finished.` : '.'}</p>)}
-        {saved && q.lines.length > 0 && (
-          <div className="quote-send">
-            <label>
-              Sent to the client on
-              <input type="date" value={sentOn} max={irishToday()} onChange={(e) => setSentOn(e.target.value)} />
-            </label>
-            <button type="button" className="primary" onClick={() => void run(() => markSent(q.id, job, sentOn || today))}>
-              Mark as sent
-            </button>
-          </div>
+        {saved && q.lines.length > 0 && sending === 'email' ? (
+          <SendQuote q={q} onSent={() => setSending(undefined)} onCancel={() => setSending(undefined)} />
+        ) : (
+          <>
+            {saved && q.lines.length > 0 && (!canEmail || sending === 'other') && (
+              <div className="quote-send">
+                <label>
+                  Sent to the client on
+                  <input type="date" value={sentOn} max={irishToday()} onChange={(e) => setSentOn(e.target.value)} />
+                </label>
+                <button type="button" className={canEmail ? undefined : 'primary'} onClick={() => void run(() => markSent(q.id, job, sentOn || today))}>
+                  Mark as sent
+                </button>
+              </div>
+            )}
+            <div className="actions">
+              {saved && q.lines.length > 0 && canEmail && (
+                <button type="button" className="primary" onClick={() => setSending('email')}>
+                  Send to the client
+                </button>
+              )}
+              <button type="button" onClick={onPrint} disabled={!saved}>
+                Print a draft
+              </button>
+              {saved && q.lines.length > 0 && canEmail && sending !== 'other' && (
+                <button type="button" className="link quiet" onClick={() => setSending('other')}>
+                  Sent another way? Mark as sent
+                </button>
+              )}
+              {saved &&
+                q.lines.length > 0 &&
+                (!answering ? (
+                  <button type="button" className="link quiet" onClick={() => setAnswering(true)}>
+                    Accepted already, by phone?
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => void run(() => client.mutate('quote.answer', { id: q.id, answer: 'accepted', on: sentOn || today }))}>
+                    Record it as accepted
+                  </button>
+                ))}
+            </div>
+            {saved && q.lines.length > 0 && (
+              <p className="hint">
+                {canEmail
+                  ? `Sent to the client, it goes by email from the operations mailbox with the quote as a PDF, becomes quote ${nextNumber}, and stays as it is.`
+                  : `Marked sent, it becomes quote ${nextNumber} and stays as it is. Print it as a PDF and send it yourself: the app sends nothing.`}
+              </p>
+            )}
+          </>
         )}
-        <div className="actions">
-          <button type="button" onClick={onPrint} disabled={!saved}>
-            Print a draft
-          </button>
-          {saved &&
-            q.lines.length > 0 &&
-            (!answering ? (
-              <button type="button" className="link quiet" onClick={() => setAnswering(true)}>
-                Accepted already, by phone?
-              </button>
-            ) : (
-              <button type="button" onClick={() => void run(() => client.mutate('quote.answer', { id: q.id, answer: 'accepted', on: sentOn || today }))}>
-                Record it as accepted
-              </button>
-            ))}
-        </div>
-        {saved && q.lines.length > 0 && <p className="hint">Marked sent, it becomes quote {nextNumber} and stays as it is. Print it as a PDF and send it yourself: the app sends nothing.</p>}
       </section>
     </form>
   )

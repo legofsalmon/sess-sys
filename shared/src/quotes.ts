@@ -232,6 +232,12 @@ export interface QuoteSettings {
   fuelMonth?: string | null
   /** How many of the crew share a car to a job (ADR 0086): each car load is a trip. One unless set. */
   crewPerCar?: number
+  /**
+   * Whether a quote can be sent to the client by email from the operations mailbox, with its PDF attached (ADR 0101).
+   * Off until the office turns it on under Admin, as every way the app reaches anyone outside is (ADR 0048). Left out by
+   * a server from before it.
+   */
+  emailQuotes?: boolean
 }
 export const QUOTE_SETTINGS_ID = 'quoting'
 
@@ -284,6 +290,28 @@ export interface PackageItem {
   qty: number
 }
 
+/**
+ * A quote emailed to the client from the operations mailbox (ADR 0101): who it went to, when, by whom, and under what
+ * subject, so the quote's page says what the client was sent and when. One record a send; sending again makes another.
+ * The PDF that went, and the message's words, stay on the server, read back by their own route.
+ */
+export interface QuoteEmail {
+  id: string
+  quoteId: string
+  projectId: string
+  /** The quote's version and number as they were when it went. */
+  version: number
+  number: number | null
+  /** When it went, by the server's clock. */
+  at: string
+  /** Who pressed Send: their name, or nothing while sign-in is off. */
+  by: string
+  /** The address it went from, and the ones it went to. */
+  from: string
+  to: string[]
+  subject: string
+}
+
 export interface QuoteEntities {
   package: Package
   quote: Quote
@@ -292,13 +320,14 @@ export interface QuoteEntities {
   clientDiscount: ClientDiscount
   costPaid: CostPaid
   quoteSettings: QuoteSettings
+  quoteEmail: QuoteEmail
 }
 /**
  * Money's records. A role that can't see money (ADR 0042) is sent none of
  * them, so they never reach its phone: the server leaves them out of its
  * change feed.
  */
-export const QUOTE_ENTITY_NAMES = ['quote', 'package', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid', 'quoteSettings'] as const
+export const QUOTE_ENTITY_NAMES = ['quote', 'package', 'productPrice', 'rolePrice', 'clientDiscount', 'costPaid', 'quoteSettings', 'quoteEmail'] as const
 export const MONEY_ENTITY_NAMES: readonly string[] = QUOTE_ENTITY_NAMES
 
 /** The same role however it's typed: "Audio Tech " and "audio tech" are one price. */
@@ -378,6 +407,8 @@ export const quoteCommandSchemas = {
     fuelMonth: text(40, "The survey's month").nullable().optional(),
     crewPerCar: z.number(wrongType(CAR_HINT)).int(CAR_HINT).min(1, CAR_HINT).max(8, CAR_HINT).optional(),
   }),
+  /** Whether quotes can be sent to the client by email from the operations mailbox (ADR 0101). The office's to decide, under Admin. */
+  'quoting.email': z.object({ on: z.boolean() }),
   /** A product's day price; null takes it off the price list. */
   'price.product': z.object({ modelId: id, dayCents: dayPrice.nullable(), rate: z.enum(RATE_RULES).optional() }),
   /**
@@ -718,6 +749,38 @@ export function csvText(header: readonly string[], rows: readonly (readonly stri
 
 /** Cents as an accountant's spreadsheet wants a sum: 1250.00, with no euro sign. */
 export const amount = (cents: number) => (cents / 100).toFixed(2)
+
+// Sending a quote by email (ADR 0101).
+
+/** How many addresses a quote goes to at most, and how long the subject and the message can be. */
+export const QUOTE_EMAIL_LIMITS = { to: 10, subject: 200, message: 4000 } as const
+const emailAddress = z.string().trim().email('That email address doesn’t look right.').max(200, 'An email address can be up to 200 characters.')
+/** What the office sends: the addresses, the subject and the message above the attached PDF, as typed in the compose box. */
+export const quoteEmailSend = z.object({
+  to: z.array(emailAddress).min(1, 'Say who it goes to.').max(QUOTE_EMAIL_LIMITS.to, `Up to ${QUOTE_EMAIL_LIMITS.to} addresses, please.`),
+  subject: needed(QUOTE_EMAIL_LIMITS.subject, 'The subject', 'A subject'),
+  message: text(QUOTE_EMAIL_LIMITS.message, 'The message'),
+  /** The quote number the compose box showed, so a number given to another quote in the meantime is caught; null for none shown. */
+  number: z.number().int().positive().nullable().optional(),
+})
+export type QuoteEmailSend = z.infer<typeof quoteEmailSend>
+
+/** What the compose box starts with, from the server. */
+export interface QuoteEmailPrefill {
+  /** The client's contacts' addresses. */
+  to: string[]
+  subject: string
+  message: string
+  /** The address it goes from, once the mailbox is connected. */
+  from: string | null
+  /** The PDF's name as it will be attached. */
+  fileName: string
+  /** The number the quote has, or will get when it goes. */
+  number: number
+  /** Whether it can go now; when not, why not, in words. */
+  canSend: boolean
+  why: string | null
+}
 
 // The printed quote (ADR 0084).
 

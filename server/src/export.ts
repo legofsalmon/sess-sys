@@ -30,6 +30,8 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * times stay in.
  */
 const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], person_merges: ['link_token'], calendar_link: ['refresh_token'], assistant_mailbox: ['refresh_token'], own_calendars: ['address'] }
+/** Not secret, but no use in a spreadsheet and far too big for one: the PDF that went with each emailed quote (ADR 0101). The backups keep it. */
+SECRET_COLUMNS.quote_emails = ['pdf_base64']
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>
@@ -308,7 +310,9 @@ const ABOUT: Record<string, string> = {
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   quotes:
     "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, how many days its prices hold and any deposit, when it was sent and the quote number it was given then, the client's answer, and the invoice and payment the office recorded for it.",
-  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details.",
+  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details; and whether quotes can be emailed to clients from the operations mailbox.",
+  quote_emails:
+    "Each quote emailed to a client from the operations mailbox: which quote, its version and number as sent, when, by whom, from and to which addresses, the subject and the message. The PDF that went is left out of this file; the app's own copy is on the quote's page.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages, and the VAT number and address printed on quotes; whether heads of department see crew rates; and whether the app prompts messages to crew.",

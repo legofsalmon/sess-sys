@@ -12,6 +12,7 @@ import { OfficeCard } from './OfficeCard.tsx'
 import { QuotingCard } from './QuotingCard.tsx'
 import { TimesheetsUseCard } from './TimesheetsUseCard.tsx'
 import { AssistantCard } from './AssistantCard.tsx'
+import { MailboxCard } from './MailboxCard.tsx'
 import { TravelCard } from './TravelCard.tsx'
 import { ReadingCard } from './ReadingCard.tsx'
 import { StatusPanel } from './StatusPanel.tsx'
@@ -87,6 +88,7 @@ export function AccountScreen() {
             {part === 'connections' && (
               <>
                 <CalendarCard view={view} available={auth.status === 'signed-in'} />
+                {access.can('money') && <MailboxCard money={view.money} />}
                 {access.can('money') && <CurrentRmsCard />}
               </>
             )}

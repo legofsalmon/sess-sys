@@ -437,4 +437,6 @@ export interface MailboxStatus {
   connectedAt: string | null
   lookedAt: string | null
   threads: number
+  /** Connected with sending allowed (ADR 0101), so quotes can go from it; false for a connection made to read only. */
+  canSend: boolean
 }

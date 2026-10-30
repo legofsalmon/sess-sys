@@ -333,7 +333,7 @@ export class Status {
     if (s.state !== 'on') return { ...base, state: 'off', says: 'Not connected.', todo: 'Connect operations@ under Admin › Company for Claude to draft quotes from its mail.' }
     const looked = s.lookedAt ? `last read ${new Date(s.lookedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'not read yet'
     if (s.problem) return { ...base, state: 'warn', says: `Reading ${s.account}, ${looked}, but the last look stopped: ${s.problem}`, todo: 'It tries again every five minutes.', at: s.lookedAt }
-    return { ...base, state: 'ok', says: `Reading ${s.account}, read only, ${looked}.`, at: s.lookedAt }
+    return { ...base, state: 'ok', says: `Reading ${s.account}, ${looked}${s.canSend ? ', and quotes can be sent from it' : '; connected to read only, so quotes can’t be sent from it'}.`, at: s.lookedAt }
   }
 
   private async fuel(): Promise<StatusCheck> {

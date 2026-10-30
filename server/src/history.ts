@@ -1,4 +1,5 @@
-import { CLAUDE_CLIENT, newId, OFFLINE_AFTER_SECONDS, type HistoryEntry, type HistoryPage } from '@sh/shared'
+import { newId, OFFLINE_AFTER_SECONDS, type HistoryEntry, type HistoryPage } from '@sh/shared'
+import { CLAUDE_CLIENT } from '@sh/shared'
 import type { Queryable } from './db.ts'
 import { describe, EXPORT_COMMAND, type Data, type DocumentsRead, type Look } from './history-words.ts'
 
@@ -11,6 +12,7 @@ export {
   IMPORT_PEOPLE_ACTION,
   IMPORT_STOCK_ACTION,
   LATE_CLEARED_ACTION,
+  QUOTE_EMAIL_ACTION,
   type DocumentsRead,
 } from './history-words.ts'
 

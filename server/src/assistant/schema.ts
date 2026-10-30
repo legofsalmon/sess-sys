@@ -74,6 +74,11 @@ const MIGRATIONS: string[] = [
     at         timestamptz NOT NULL DEFAULT now()
   );
   `,
+  // What Google let the app do with the mailbox when it was connected (ADR 0101): read, and perhaps send. A connection
+  // made before this, to read only, has none listed and can't send until it's connected again.
+  `
+  ALTER TABLE assistant_mailbox ADD COLUMN IF NOT EXISTS scopes text[] NOT NULL DEFAULT '{}';
+  `,
 ]
 
 export const ASSISTANT: Module = { versionTable: 'assistant_schema_version', migrations: MIGRATIONS }

@@ -30,7 +30,7 @@ import { open } from '../calendar/crypto.ts'
 import { GoogleError, type Google } from '../calendar/google.ts'
 import { applyMutation } from '../commands.ts'
 import type { Db, Queryable } from '../db.ts'
-import { Gmail, type Mail } from './gmail.ts'
+import { Gmail, GMAIL_SEND_SCOPE, type Mail } from './gmail.ts'
 import { COMPANY, enquiryRules, adviceRules, NOT_INSTRUCTIONS, type Assistant } from './routes.ts'
 
 /**
@@ -42,8 +42,9 @@ import { COMPANY, enquiryRules, adviceRules, NOT_INSTRUCTIONS, type Assistant } 
  * keeps that draft up to date until someone changes it. After that, what
  * the latest mail asks for is offered on the quote to take or leave. Mail
  * about a job already in the app is linked to it. Mail not cc'd to
- * operations@ is never seen, and the app never sends, replies to or files
- * anything there: it can only read.
+ * operations@ is never seen. The one thing the app sends from the mailbox
+ * is a quote the office presses Send on (ADR 0101); it never replies to
+ * or files anything there.
  */
 
 /** How often the mailbox is looked at. */
@@ -102,21 +103,55 @@ export class Mailbox {
       connectedAt: r?.connected_at ? new Date(r.connected_at).toISOString() : null,
       lookedAt: r?.looked_at ? new Date(r.looked_at).toISOString() : null,
       threads: rows[0]?.n ?? 0,
+      canSend: r?.state === 'on' && maySend(r),
     }
   }
 
-  /** The account as connected, its key locked; reading starts a week back the first time, and carries on where it was after. */
-  async connected(c: { email: string; sub: string; sealedKey: string; by: string | null }) {
+  /**
+   * The account as connected, its key locked, with what Google let the app do (ADR 0101: reading, and sending if it was
+   * allowed); reading starts a week back the first time, and carries on where it was after.
+   */
+  async connected(c: { email: string; sub: string; sealedKey: string; by: string | null; scopes?: readonly string[] }) {
     const before = await this.row()
     const from = before?.read_after && before.account_sub === c.sub ? before.read_after : new Date(this.now().getTime() - BACK_DAYS * 86_400_000)
     await this.db.query(
-      `INSERT INTO assistant_mailbox (id, state, account_email, account_sub, refresh_token, problem, connected_by, connected_at, read_after)
-       VALUES ($1, 'on', $2, $3, $4, NULL, $5, $6, $7)
-       ON CONFLICT (id) DO UPDATE SET state = 'on', account_email = $2, account_sub = $3, refresh_token = $4, problem = NULL, connected_by = $5, connected_at = $6, read_after = $7`,
-      [MAILBOX_ID, c.email, c.sub, c.sealedKey, c.by, this.now(), from]
+      `INSERT INTO assistant_mailbox (id, state, account_email, account_sub, refresh_token, problem, connected_by, connected_at, read_after, scopes)
+       VALUES ($1, 'on', $2, $3, $4, NULL, $5, $6, $7, $8)
+       ON CONFLICT (id) DO UPDATE SET state = 'on', account_email = $2, account_sub = $3, refresh_token = $4, problem = NULL, connected_by = $5, connected_at = $6, read_after = $7, scopes = $8`,
+      [MAILBOX_ID, c.email, c.sub, c.sealedKey, c.by, this.now(), from, [...(c.scopes ?? [])]]
     )
     this.access = undefined
     void this.look().catch(() => undefined)
+  }
+
+  /**
+   * The connected account and a token to send a quote from it (ADR 0101), or why it can't send just now, in words for
+   * the person who pressed Send.
+   */
+  async sender(): Promise<{ ok: true; token: string; account: string } | { ok: false; why: string }> {
+    if (!this.available) return { ok: false, why: 'The server has no Google key, so the operations mailbox can’t be connected.' }
+    const r = await this.row()
+    if (r?.state === 'reconnect') return { ok: false, why: r.problem ?? 'The operations mailbox needs connecting again under Admin.' }
+    if (r?.state !== 'on') return { ok: false, why: 'The operations mailbox isn’t connected. Connect it under Admin › Connections.' }
+    if (!maySend(r)) return { ok: false, why: 'The operations mailbox was connected to read only. Connect it again under Admin › Connections and allow sending.' }
+    try {
+      return { ok: true, token: await this.token(r), account: r.account_email }
+    } catch (err) {
+      await this.stopped(err, 'send')
+      throw err
+    }
+  }
+
+  /** Google stopped letting the app at the mailbox: said on Admin and Status until it's connected again. Anything else passes. */
+  async stopped(err: unknown, doing: 'read' | 'send'): Promise<void> {
+    if (!(err instanceof GoogleError) || (err.problem !== 'revoked' && err.problem !== 'access')) return
+    await this.db.query(`UPDATE assistant_mailbox SET state = 'reconnect', problem = $2 WHERE id = $1`, [
+      MAILBOX_ID,
+      err.problem === 'access'
+        ? `Google won’t let the app ${doing === 'send' ? 'send from' : 'read'} the mailbox: check the Gmail API is on, then connect it again${doing === 'send' ? ' and allow sending' : ''}.`
+        : 'Google no longer accepts the app’s key for the mailbox. Connect it again.',
+    ])
+    this.access = undefined
   }
 
   /** Stops reading and hands the key back. What was read stays, linked to its jobs. */
@@ -163,13 +198,7 @@ export class Mailbox {
       }
       await this.db.query('UPDATE assistant_mailbox SET looked_at = $2, problem = NULL WHERE id = $1', [MAILBOX_ID, this.now()])
     } catch (err) {
-      if (err instanceof GoogleError && (err.problem === 'revoked' || err.problem === 'access')) {
-        await this.db.query(`UPDATE assistant_mailbox SET state = 'reconnect', problem = $2 WHERE id = $1`, [
-          MAILBOX_ID,
-          err.problem === 'access' ? 'Google won’t let the app read the mailbox: check the Gmail API is on, then connect it again.' : 'Google no longer accepts the app’s key for the mailbox. Connect it again.',
-        ])
-        this.access = undefined
-      }
+      await this.stopped(err, 'read')
       throw err
     } finally {
       if (read) this.onChange()
@@ -335,6 +364,8 @@ interface Notes {
   advice: QuoteAdvice | null
 }
 
+/** Whether the connection was made with sending allowed (ADR 0101); one from before scopes were kept wasn't. */
+const maySend = (r: Row) => Array.isArray(r.scopes) && r.scopes.includes(GMAIL_SEND_SCOPE)
 const isOwn = (from: string) => new RegExp(`@${OWN_DOMAIN.replace('.', '\\.')}>?\\s*$`, 'i').test(from.trim())
 /** "Aoife Byrne <aoife@liffey.ie>" as Aoife Byrne, or the address when there's no name. */
 export const senderOf = (from: string) => (from.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] ?? from.replace(/[<>]/g, '')).trim().slice(0, 200)

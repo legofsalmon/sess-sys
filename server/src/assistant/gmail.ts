@@ -1,13 +1,17 @@
 import { GoogleError } from '../calendar/google.ts'
 
 /**
- * Reading the operations mailbox (ADR 0098): Gmail's API, read only. The
- * app asks Google for nothing more than to read the mail, so it can't
- * send, reply, delete or file anything there. Everything goes through
- * `fetch`, so tests can stand in a pretend Gmail.
+ * The operations mailbox through Gmail's API: read for Claude (ADR 0098),
+ * and sending a quote to the client from it (ADR 0101). The app asks
+ * Google for those two things and nothing more, so it can't reply to,
+ * delete or file anything there. Everything goes through `fetch`, so
+ * tests can stand in a pretend Gmail.
  */
 
-export const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'] as const
+export const GMAIL_READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
+/** What the app asks for when the mailbox is connected: reading is needed, sending is kept if it was allowed. */
+export const GMAIL_SCOPES = [GMAIL_READ_SCOPE, GMAIL_SEND_SCOPE] as const
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
 /** One email as Claude is shown it. */
@@ -67,6 +71,26 @@ export class Gmail {
     return (r.messages ?? []).map(mailOf)
   }
 
+  /**
+   * Sends a whole message, as the bytes of an email with its headers and parts (ADR 0101), from the connected account;
+   * Gmail keeps it in the account's Sent. Says what Gmail called it and its thread.
+   */
+  async send(token: string, raw: Buffer): Promise<{ id: string; threadId: string }> {
+    let res: Response
+    try {
+      res = await this.fetch(`${this.api}/messages/send`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ raw: raw.toString('base64url') }),
+        signal: AbortSignal.timeout(30_000),
+      })
+    } catch {
+      throw new GoogleError('busy', 0, 'unreachable', "Couldn't reach Gmail")
+    }
+    if (res.ok) return (await res.json()) as { id: string; threadId: string }
+    throw answered(res.status)
+  }
+
   private async get<T>(token: string, path: string): Promise<T> {
     let res: Response
     try {
@@ -75,10 +99,13 @@ export class Gmail {
       throw new GoogleError('busy', 0, 'unreachable', "Couldn't reach Gmail")
     }
     if (res.ok) return (await res.json()) as T
-    const status = res.status
-    throw new GoogleError(status === 401 ? 'expired' : status === 429 || status >= 500 ? 'busy' : status === 403 ? 'access' : status === 404 ? 'gone' : 'refused', status, '', `Gmail answered ${status}`)
+    throw answered(res.status)
   }
 }
+
+/** Gmail's answer as the app's own kinds of trouble: a key gone stale, too busy, not allowed, nothing there. */
+const answered = (status: number) =>
+  new GoogleError(status === 401 ? 'expired' : status === 429 || status >= 500 ? 'busy' : status === 403 ? 'access' : status === 404 ? 'gone' : 'refused', status, '', `Gmail answered ${status}`)
 
 const header = (p: Part | undefined, name: string) => p?.headers?.find((h) => h.name.toLowerCase() === name)?.value ?? ''
 const decode = (data: string) => Buffer.from(data, 'base64url').toString('utf8')
