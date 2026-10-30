@@ -71,7 +71,7 @@ const GROUP_DEPARTMENTS: Record<string, Department> = {
   'pipe & drape': 'staging',
   'pipe & drpae': 'staging',
 }
-const departmentOfGroup = (group: string): Department => departmentNamed(group) ?? GROUP_DEPARTMENTS[group.trim().toLowerCase()] ?? 'other'
+export const departmentOfGroup = (group: string): Department => departmentNamed(group) ?? GROUP_DEPARTMENTS[group.trim().toLowerCase()] ?? 'other'
 
 /** "150.0" as the stock list writes money; nothing for nought, which Current RMS writes where nothing was put in. */
 function money(cell: string | undefined): string {

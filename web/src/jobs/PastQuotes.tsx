@@ -1,9 +1,31 @@
-import { money, plural, rmsDepth, type RmsClientStats, type RmsLine, type RmsMatches, type RmsMatchRow, type RmsOpportunity, type RmsOpportunityPage, type RmsOpportunityWithLines, type View } from '@sh/shared'
-import { useEffect, useState } from 'react'
+import {
+  irishToday,
+  money,
+  newId,
+  plural,
+  rmsDepth,
+  rmsJobDraft,
+  rmsSuggestions,
+  STATUS_LABELS,
+  suggestionLine,
+  type RmsClientStats,
+  type RmsLine,
+  type RmsMatches,
+  type RmsMatchRow,
+  type RmsOffered,
+  type RmsOpportunity,
+  type RmsOpportunityPage,
+  type RmsOpportunityWithLines,
+  type View,
+} from '@sh/shared'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { useAccess } from '../role.ts'
+import { client } from '../sync.ts'
 import { JOBS, MONEY, type Step } from '../Up.tsx'
-import { Top } from './common.tsx'
+import { pricingOf, Suggestions, takingWords } from './Claude.tsx'
+import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
 import { NotYours } from './Money.tsx'
 import { clientWords, getJson, postJson, useAsked, type Loaded } from './rms.ts'
 
@@ -182,8 +204,11 @@ function LineRow({ l }: { l: RmsLine }) {
   )
 }
 
-export function PastQuoteScreen({ view, id }: { view: View; id: string }) {
+export function PastQuoteScreen({ view, id: asked }: { view: View; id: string }) {
   const can = useAccess().can('money')
+  // #jobs/money/current-rms/<id>/job opens it with the job being made (ADR 0102), as the Quotes page's "Make a job" does.
+  const id = asked.replace(/\/job$/, '')
+  const [making, setMaking] = useState(asked !== id)
   const loaded = useAsked<RmsOpportunityWithLines>(can, id, () => getJson(`/api/rms/opportunities/${encodeURIComponent(id)}`))
 
   if (!can) return <NotYours view={view} here="Past quote" />
@@ -225,6 +250,13 @@ export function PastQuoteScreen({ view, id }: { view: View; id: string }) {
               )}
               <a href="#jobs/money/current-rms/match">Match to jobs</a>
             </p>
+            {!making && (
+              <div className="actions">
+                <button type="button" className={loaded.data.job ? 'secondary' : 'primary'} onClick={() => setMaking(true)}>
+                  {loaded.data.job ? 'Make another job from this' : 'Make a job from this'}
+                </button>
+              </div>
+            )}
             <dl className="facts money-facts">
               <div>
                 <dt>Before VAT</dt>
@@ -264,9 +296,128 @@ export function PastQuoteScreen({ view, id }: { view: View; id: string }) {
             )}
             <p className="hint">Prices before VAT, as Current RMS worked them out.</p>
           </section>
+          {making && <MakeJob view={view} past={loaded.data} onCancel={() => setMaking(false)} />}
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * A job made from a past quote (ADR 0102): the job as Current RMS had it, made here as an enquiry or a confirmed job
+ * with its days as one Show, and its first draft quote with the lines ticked, each matched to the stock list where it's
+ * plainly the same product and charged as it was there. Nothing is made until the office presses it, and nothing in
+ * Current RMS changes. A past quote not linked to a job yet is linked to this one, so the quote shows what was charged.
+ */
+function MakeJob({ view, past, onCancel }: { view: View; past: RmsOpportunityWithLines; onCancel: () => void }) {
+  const o = past.opportunity
+  const { clients, venues } = view.jobs
+  const today = irishToday()
+  const first = useMemo(() => rmsJobDraft(o, past.lines, clients.map((c) => c.name), today), [o, past.lines, clients, today])
+  const [f, setF] = useState(first)
+  const [agree, setAgree] = useState(first.agreedCents !== null)
+  const pricing = pricingOf(view)
+  // Matched once, when the form opens, so the choices made on each line stay as the stock list syncs.
+  const [lines, setLines] = useState<RmsOffered[]>(() => rmsSuggestions(past.lines, pricing))
+  const { run, error } = useAct()
+  // Brought into view as it opens, below the past quote's lines.
+  const here = useRef<HTMLElement>(null)
+  useEffect(() => {
+    here.current?.scrollIntoView({ block: 'start' })
+  }, [])
+  const taking = lines.filter((x) => x.take)
+  const matched = taking.filter((x) => x.s.modelId).length
+  const kit = taking.filter((x) => x.s.kind === 'kit').length
+  const left = lines.length - taking.length
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!f.name.trim()) return
+    const id = newId()
+    void run(async () => {
+      const clientId = await clientNamed(f.client, clients)
+      const venueId = await venueNamed(f.venue, venues)
+      const notes = `Made from ${o.number ? `quote ${o.number}` : 'a quote'} in Current RMS.`
+      await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: f.status, kind: 'gig', notes })
+      await client.mutate('phase.add', { id: newId(), projectId: id, name: 'Show', start: f.start, end: f.end < f.start ? f.start : f.end, venueId: null, notes: '' })
+      await client.mutate('quote.save', {
+        id: newId(),
+        projectId: id,
+        lines: taking.map((x) => suggestionLine(x.s, newId())),
+        discountPct: 0,
+        notes: '',
+        ...(agree && f.agreedCents !== null ? { agreedCents: f.agreedCents } : {}),
+      })
+      // Linked once the job is on the server, so the quote shows what Current RMS charged; Match to jobs can do it after if not.
+      if (!past.job) {
+        await client.sync().catch(() => undefined)
+        await postJson('/api/rms/matches', { links: [{ opportunityId: o.id, projectId: id }] })
+      }
+    }).then((ok) => ok && (location.hash = `#jobs/${encodeURIComponent(id)}/quote`))
+  }
+  return (
+    <section className="card" aria-label="Make a job from this" ref={here}>
+      <h2>Make a job from this</h2>
+      <p className="hint">
+        The job and a draft quote, as Current RMS had them. Check each before you make it.
+        {f.end < today && ' The days are past: change them for a job still to come.'}
+      </p>
+      <form className="grid-form new-quote" onSubmit={submit}>
+        <label className="wide">
+          What's the job? <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
+        </label>
+        <label>
+          Client <input list="rms-job-clients" value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })} placeholder="Pick or add one" />
+        </label>
+        <label>
+          Venue <input list="rms-job-venues" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="Pick or add one" />
+        </label>
+        <label>
+          From <input type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value, end: f.end < e.target.value ? e.target.value : f.end })} required />
+        </label>
+        <label>
+          To <input type="date" value={f.end} min={f.start} onChange={(e) => setF({ ...f, end: e.target.value })} required />
+        </label>
+        <label>
+          Make it
+          <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as 'enquiry' | 'confirmed' })}>
+            <option value="enquiry">{STATUS_LABELS.enquiry}</option>
+            <option value="confirmed">{STATUS_LABELS.confirmed}</option>
+          </select>
+        </label>
+        {lines.length > 0 ? (
+          <section className="wide" aria-label="Lines for the quote">
+            <h3>Lines for the quote</h3>
+            <p className="hint">
+              {matched} of {plural(kit, 'kit line')} found in the stock list; the rest go on as written. Each is charged as it was in
+              Current RMS: the same price, rate, days and discount.
+              {left > 0 && ` ${left} charged nothing there ${left === 1 ? 'is' : 'are'} left unticked.`}
+            </p>
+            <Suggestions view={view} items={lines} onChange={(next) => setLines(next as RmsOffered[])} />
+          </section>
+        ) : (
+          <p className="hint wide">No lines were read for this one, so the quote starts empty.</p>
+        )}
+        {f.agreedCents !== null && (
+          <label className="wide tick">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> Agree the same total, {money(f.agreedCents)} before VAT, as was agreed in Current RMS
+          </label>
+        )}
+        <p className="hint wide">
+          Added to Jobs as {f.status === 'confirmed' ? 'a confirmed job' : 'an enquiry'}, with the quote as a draft to change and send. Nothing changes in Current RMS.
+        </p>
+        <Refusal error={error} className="wide" />
+        <div className="actions wide">
+          <button type="submit" className="primary">
+            {taking.length ? `Make the job, with ${takingWords(lines)} on the quote` : 'Make the job'}
+          </button>
+          <button type="button" className="link" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+        <Choices id="rms-job-clients" names={clients} />
+        <Choices id="rms-job-venues" names={venues} />
+      </form>
+    </section>
   )
 }
 

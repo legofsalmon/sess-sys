@@ -1,4 +1,6 @@
 import {
+  RATE_LABELS,
+  RATE_UNIT,
   adviceSuggestions,
   assistantBlocked,
   changeWords,
@@ -139,7 +141,9 @@ export function Suggestions({ view, items, onChange }: { view: View; items: Offe
                     s.group || 'Other',
                     s.what !== s.said ? `written “${s.said}”` : '',
                     s.per === 'once' ? 'once' : `${s.days} ${s.days === 1 ? 'day' : 'days'}`,
-                    s.cents === undefined ? 'no price yet' : `${money(s.cents)}${s.per === 'once' ? '' : ' a day'}`,
+                    s.rate ? RATE_LABELS[s.rate] : '',
+                    s.cents === undefined ? 'no price yet' : `${money(s.cents)}${s.per === 'once' ? '' : s.rate && RATE_UNIT[s.rate] === 'week' ? ' a week' : ' a day'}`,
+                    s.discountPct ? `${s.discountPct}% off` : '',
                   ]
                     .filter(Boolean)
                     .join(' · ')}

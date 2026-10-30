@@ -206,6 +206,10 @@ export interface Suggestion {
   /** From the price list, or as the person said; undefined when there's no price yet. */
   cents: number | undefined
   rate: RateRule | null
+  /** What it was charged before, on a past quote from Current RMS (ADR 0102): kept whichever product is chosen for it. */
+  charged?: number
+  /** Off this line alone, as that past quote had it. */
+  discountPct?: number
 }
 
 /** A kit line: matched to the stock list, named and priced as the product is when it's found. */
@@ -218,7 +222,9 @@ export function kitSuggestion(p: Pricing, key: string, said: string, dept: Depar
 /** The same suggestion with a product chosen for it, or none: its name, department and price follow the product. */
 export function withModel(p: Pricing, s: Suggestion, modelId: string | null, said?: number | null): Suggestion {
   const m = modelId ? p.model(modelId) : undefined
-  if (!m) return { ...s, modelId: null, what: s.said, cents: said ?? (s.modelId ? undefined : s.cents), rate: null }
+  if (!m) return { ...s, modelId: null, what: s.said, cents: said ?? s.charged ?? (s.modelId ? undefined : s.cents), rate: s.charged === undefined ? null : s.rate }
+  // A price charged before keeps the rule it was charged by; one from the price list takes the product's.
+  if (s.charged !== undefined) return { ...s, modelId, what: m.name, group: DEPARTMENT_LABELS[m.department], cents: said ?? s.charged }
   const rate = p.productRate(modelId!)
   return { ...s, modelId, what: m.name, group: DEPARTMENT_LABELS[m.department], cents: said ?? p.productPrice(modelId!), rate: rate && rate !== 'daily' ? rate : null }
 }
@@ -271,6 +277,7 @@ export function suggestionLine(s: Suggestion, id: string): QuoteLine {
     per: s.per,
     modelId: s.modelId,
     ...(s.rate && s.per === 'day' ? { rate: s.rate, out: s.days } : {}),
+    ...(s.discountPct ? { discountPct: s.discountPct } : {}),
   }
 }
 
