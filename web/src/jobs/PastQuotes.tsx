@@ -26,6 +26,7 @@ import { client } from '../sync.ts'
 import { JOBS, MONEY, type Step } from '../Up.tsx'
 import { pricingOf, Suggestions, takingWords } from './Claude.tsx'
 import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
+import { addKitFromQuote, kitToAdd } from './Kit.tsx'
 import { NotYours } from './Money.tsx'
 import { clientWords, getJson, postJson, useAsked, type Loaded } from './rms.ts'
 
@@ -339,14 +340,17 @@ function MakeJob({ view, past, onCancel }: { view: View; past: RmsOpportunityWit
       const notes = `Made from ${o.number ? `quote ${o.number}` : 'a quote'} in Current RMS.`
       await client.mutate('project.create', { id, name: f.name.trim(), clientId, venueId, status: f.status, kind: 'gig', notes })
       await client.mutate('phase.add', { id: newId(), projectId: id, name: 'Show', start: f.start, end: f.end < f.start ? f.start : f.end, venueId: null, notes: '' })
+      const quoteLines = taking.map((x) => suggestionLine(x.s, newId()))
       await client.mutate('quote.save', {
         id: newId(),
         projectId: id,
-        lines: taking.map((x) => suggestionLine(x.s, newId())),
+        lines: quoteLines,
         discountPct: 0,
         notes: '',
         ...(agree && f.agreedCents !== null ? { agreedCents: f.agreedCents } : {}),
       })
+      // The kit quoted goes on the job's kit list too, to change there as any kit is.
+      await addKitFromQuote(id, kitToAdd(view, quoteLines, id))
       // Linked once the job is on the server, so the quote shows what Current RMS charged; Match to jobs can do it after if not.
       if (!past.job) {
         await client.sync().catch(() => undefined)
@@ -403,7 +407,8 @@ function MakeJob({ view, past, onCancel }: { view: View; past: RmsOpportunityWit
           </label>
         )}
         <p className="hint wide">
-          Added to Jobs as {f.status === 'confirmed' ? 'a confirmed job' : 'an enquiry'}, with the quote as a draft to change and send. Nothing changes in Current RMS.
+          Added to Jobs as {f.status === 'confirmed' ? 'a confirmed job' : 'an enquiry'}, with the quote as a draft to change and send, and the kit from the stock list on the
+          job's kit list. Nothing changes in Current RMS.
         </p>
         <Refusal error={error} className="wide" />
         <div className="actions wide">

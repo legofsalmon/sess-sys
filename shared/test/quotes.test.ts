@@ -199,6 +199,12 @@ describe('a quote against its job as the job changes', () => {
     expect(now.gone.map((l) => l.what)).toEqual(['Rigger'])
     expect(now.changed.map((c) => [c.line.what, c.line.qty, c.qty])).toEqual([['d&b Y10P', 8, 10]])
   })
+  it("doesn't offer kit put on the job from the quote, on a line of its own or in a package (ADR 0102)", () => {
+    const typed = line({ id: 't', kind: 'kit', what: 'd&b Y10P', modelId: 'y10p', qty: 8 })
+    const fromQuote = [{ id: 'k9', modelId: 'y10p', name: 'd&b Y10P', group: 'Audio', qty: 8, days: 3 }, { id: 'k8', modelId: 'sm58', name: 'Shure SM58', group: 'Audio', qty: 4, days: 3 }]
+    expect(changesFromJob([typed], fromQuote, [], prices, ids, new Set(['sm58']))).toEqual({ added: [], gone: [], changed: [] })
+    expect(changesFromJob([typed], fromQuote, [], prices, ids).added.map((l) => l.what)).toEqual(['Shure SM58'])
+  })
 })
 
 describe('VAT periods', () => {
