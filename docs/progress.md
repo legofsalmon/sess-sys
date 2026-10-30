@@ -27,6 +27,28 @@ waiting on someone.
   the mailbox's redirect address to the Google key, then connect it under
   Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
+## 30 October 2026: The quote form, redrawn
+
+**Done**
+
+- [ADR 0100](adr/0100-the-quote-form-redrawn.md) (PR #185): the draft
+  quote redrawn after an in-depth review against the design system and the
+  form research (25 findings, five major). A readout strip that stays in
+  view with amber chips that open the first line needing a look; lines as
+  rows that open one at a time, the numbers on one row with the unit in
+  the box; the cost side folded under the line and saying what it holds;
+  travel and subsistence as rows; terms and sending beside the lines on a
+  laptop; a line faulted only once it's left. Every feature, name and saved
+  shape kept. App 1.69.0 (PRs #183 and #189 to #191 took 1.65.0 to 1.68.0 first).
+- Checked: typecheck, the shared and server tests, the web build, and the
+  browser tests for quotes, quote follow-up, Current RMS history, Claude,
+  access and the shell. Looked at on a phone and a laptop in both themes.
+
+**Waiting**
+
+- PR #173 (the operations mailbox) replaces Ask Claude on the draft with a
+  card of what the mail asks for.
+- The six learnings for the design system, as a PR there.
 ## 30 October 2026: The job's kit from its quote
 
 **Done**

@@ -87,12 +87,18 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   // A line half typed when a call comes in can't save yet, but going to Crew and back keeps it (audit finding 27).
   await draft.getByRole('button', { name: 'Add something else' }).click()
   await draft.getByLabel('Line 4: price').fill('400')
+  // Nothing faults the line while it's still being typed (design system rule 18): the readout says it's not saved, quietly.
   await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await expect(draft.locator('.line-problem')).toHaveCount(0)
+  await expect(draft.locator('.warn-line')).toHaveCount(0)
   await office.goto('/#crew')
   await office.goBack()
-  await draft.getByRole('button', { name: 'Line 4: not named yet, change it' }).click()
+  // Back, the line was left, so what stops the draft saving is said, and "Not saved yet" leads to the line.
+  await expect(draft.getByRole('button', { name: 'Line 4: not named yet, change it' })).toBeVisible()
+  await expect(draft.locator('.warn-line')).toContainText("Line 4: say what it's for.")
+  await draft.getByRole('button', { name: 'Not saved yet' }).click()
   await expect(draft.getByLabel('Line 4: price')).toHaveValue('400')
-  await expect(draft.locator('.save-state')).toHaveText('Not saved yet')
+  await expect(draft.locator('.line-problem')).toHaveText("Line 4: say what it's for.")
   await draft.getByRole('button', { name: 'Remove line 4' }).click()
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
@@ -275,12 +281,15 @@ test("the crew's travel to a venue far from Dublin, and their subsistence unless
   // The crew's subsistence comes in by itself; the venue is in Dublin, so there's no travel until it's said to be 200 km.
   await expect(extras).toContainText(/Crew subsistence, \d+ crew days?/)
   await expect(extras).toContainText('No travel')
+  // Each is a row like a line: pressing it opens the one thing the office says about this job for it.
+  await extras.getByRole('button', { name: /^No travel/ }).click()
   await extras.getByLabel('Distance each way from Dublin city centre, km').fill('200')
   await expect(extras).toContainText(/Crew travel, 200 km each way from Dublin, \d+ car trips?/)
   await expect(extras).toContainText('€69.96')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
   // The job feeds the crew: no subsistence.
+  await extras.getByRole('button', { name: /^Crew subsistence/ }).click()
   await extras.getByRole('switch', { name: /Meals provided/ }).check()
   await expect(extras).toContainText('No subsistence')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
