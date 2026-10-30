@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-30',
     title: 'More room between things, and Home fits a phone',
     what: "The space between things now follows one pattern on every screen: close together inside a group, more between groups, and the most between the cards on a page, so each card and the lines in it read apart. On a phone, Home no longer runs off the right-hand edge.",
-    prs: [0],
+    prs: [187],
   },
   {
     version: '1.65.0',
