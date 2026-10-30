@@ -8,6 +8,7 @@
   line), [ADR 0031](0031-getting-kit-ready-and-back.md) (when kit is held),
   [ADR 0042](0042-quotes-prices-and-a-money-view.md) (quotes),
   [ADR 0087](0087-packages.md) (packages).
+- **Amended:** 30 October 2026 by [ADR 0100](0100-the-quote-form-redrawn.md): the cost side folds under the open line as "Cost and margin, not printed", its summary saying what it holds; it opens on its own for transport and typed lines, anything hired in, a cost typed, or the "no cost yet" chip in the readout.
 
 ## Context
 

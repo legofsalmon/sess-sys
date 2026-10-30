@@ -134,7 +134,8 @@ test('the office starts a quote from an enquiry Claude read, then has Claude cha
   await expect(draft).toContainText('Delivery and collection')
   await expect(draft).not.toContainText('Hazer')
 
-  // Asked to change it, Claude suggests; nothing changes until it's taken.
+  // Asked to change it, Claude suggests; nothing changes until it's taken. The box opens from the add row.
+  await draft.getByRole('button', { name: 'Ask Claude' }).click()
   await draft.getByLabel('Ask Claude to change this quote').fill('Two more Y10Ps, four SM58s, and 10% off')
   await draft.getByRole('button', { name: 'Ask Claude' }).click()
   const advice = draft.getByRole('region', { name: 'Suggested by Claude' })

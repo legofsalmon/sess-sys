@@ -284,83 +284,142 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick .scan-failed p, .pick .scan-failed ul { margin: 0; }
 .pick .scan-failed ul { padding-left: var(--space-16); }
 
-/* Quotes and money (ADR 0042): the lines as a table, typed in a row each while a draft, the sums under them, and the A4 page. */
-.quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
-.quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
-.quote-screen .quote-draft { container-type: inline-size; }
-.quote-screen .quote-line { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(5.5em, 1.2fr) minmax(0, 0.8fr); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
-.quote-screen .quote-line label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
-.quote-screen .quote-line label input, .quote-screen .quote-line label select { min-width: 0; width: 100%; color: var(--ink); }
-.quote-screen .quote-line .what, .quote-screen .quote-line .line-problem { grid-column: 1 / -1; }
-.quote-screen .quote-line .link.vat { grid-column: 1 / 3; justify-self: start; align-self: center; font-size: var(--text-small); }
-.quote-screen .quote-line .vat-rate { grid-column: 1 / 3; }
-.quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
-.quote-screen .quote-line .amount small { display: block; font-weight: 400; }
-.quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
-.quote-screen .quote-line .last-charged { grid-column: 1 / -1; font-size: var(--text-small); }
-.quote-screen .quote-line .last-charged p { margin: 0; }
-.quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
-.quote-screen .quote-line.unpriced input[aria-invalid] { border-color: var(--warn); }
-.quote-screen .quote-line .warn, .quote-screen .quote-summary .warn, .quote-screen .quote-line-shut.needs .how { color: var(--warn); }
-/* Where the draft has the room, a line is one row, like the table it prints as. */
-@container (min-width: 860px) {
-  .quote-screen .quote-line { grid-template-columns: minmax(10em, 3fr) minmax(4em, 0.8fr) minmax(5em, 1fr) minmax(8em, 1.3fr) minmax(4em, 0.8fr) minmax(6em, 1fr) minmax(6em, 1fr) auto; }
-  .quote-screen .quote-line .what, .quote-screen .quote-line .link.vat, .quote-screen .quote-line .vat-rate, .quote-screen .quote-line .amount, .quote-screen .quote-line .line-actions { grid-column: auto; }
-  /* Under the cost side (ADR 0089), Remove and Done end the line on a row of their own. */
-  .quote-screen .quote-line .line-cost ~ .line-actions { grid-column: 1 / -1; justify-self: end; }
-  .quote-screen .quote-line .last-charged { grid-column: 1 / -1; }
+/*
+ * Quotes and money (ADR 0042; the draft redrawn in ADR 0100). A draft is its lines as rows that open one at a time to
+ * change, under a readout of what it comes to that stays in view with what needs a look, and beside them the terms
+ * and the sending, their own card from 1200px. A sent version is the lines as a table, the sums under them, and the
+ * A4 page.
+ */
+.quote-draft { display: grid; gap: var(--space-14); min-width: 0; }
+.quote-draft > .card { gap: var(--space-10); min-width: 0; }
+.quote-draft > .quote-main { container-type: inline-size; }
+@media (min-width: 1200px) {
+  .quote-draft { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); align-items: start; }
 }
-/* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
-.quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
-.quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
-.quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
-/* The cost side (ADR 0089): whether there's kit enough, under a line; hired in and what it costs, never printed; and a director's margin. */
-.quote-screen .quote-line-row { display: grid; gap: var(--space-4); }
-.quote-screen .quote-line-row .kit-note { margin: 0 0 var(--space-6); }
+/* Label capitals head each group of lines, the terms and the sending; a rare action sits at a head's end as a quiet link. */
+.quote-screen .quote-group { display: grid; gap: 0; min-width: 0; }
+.quote-screen .group-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-8); min-height: 28px; padding-top: var(--space-4); }
+.quote-screen .quote-group h3, .quote-screen .quote-head { margin: 0; font-size: var(--text-pill); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.quote-screen .quote-head { padding-top: var(--space-4); }
+.quote-screen .quote-side > .quote-head:first-child { padding-top: 0; }
+.quote-screen button.link.quiet { color: var(--on-line); font-weight: 600; font-size: var(--text-hint); text-decoration-color: var(--field-line); }
+.quote-screen .group-head button.link.quiet { margin-block: calc(-1 * var(--space-8)); }
+.quote-screen .quote-main > button.link.quiet { justify-self: start; }
+/* A line reads as a row to press: what, how it's charged, what it comes to, and the mark that says it opens. */
+.quote-screen .quote-line-row { display: grid; gap: 0; min-width: 0; }
+.quote-screen .quote-line-row + .quote-line-row { border-top: 1px solid var(--line); }
+.quote-screen .quote-line-row > .kit-note { margin: 0 0 var(--space-8); }
+.quote-screen .quote-line-shut { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'what amount mark' 'how amount mark'; column-gap: var(--space-10); row-gap: var(--space-2); align-items: center; width: calc(100% + 2 * var(--space-8)); margin-inline: calc(-1 * var(--space-8)); min-height: 44px; padding: var(--space-8); border: 0; border-radius: var(--radius-control); background: none; color: var(--ink); font: inherit; text-align: left; }
+.quote-screen .quote-line-shut .what { grid-area: what; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.quote-screen .quote-line-shut .how { grid-area: how; min-width: 0; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-line-shut .amount { grid-area: amount; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quote-screen .quote-line-shut .amount .line-margin { display: block; text-align: right; }
+.quote-screen .quote-line-shut .opener { grid-area: mark; width: 16px; height: 16px; color: var(--muted); }
+.quote-screen .quote-line-shut.needs .how, .quote-screen .quote-line .warn { color: var(--warn); }
+.quote-screen .quote-line-row.open > .quote-line-shut { background-image: linear-gradient(var(--ds-wash-pressed), var(--ds-wash-pressed)); }
+/* Open, a line is a panel inset in the card: what it is across the top, its numbers in two rows of three on a phone and one row where there's the room. */
+.quote-screen .quote-line { display: grid; gap: var(--space-10); min-width: 0; margin: var(--space-4) 0 var(--space-8); padding: var(--space-12); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
+.quote-screen .quote-line > label, .quote-screen .quote-line .numbers label, .quote-screen .quote-line .vat-cell, .quote-screen .cost-fields label { display: grid; gap: var(--space-2); min-width: 0; font-size: var(--text-hint); color: var(--muted); }
+.quote-screen .quote-line input, .quote-screen .quote-line select { min-width: 0; width: 100%; color: var(--ink); }
+.quote-screen .quote-line .numbers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: 'qty days price' 'charged charged discount' 'vat vat amount'; gap: var(--space-8); align-items: end; }
+.quote-screen .quote-line .numbers label, .quote-screen .quote-line .vat-cell { white-space: nowrap; }
+.quote-screen .quote-line .qty { grid-area: qty; }
+.quote-screen .quote-line .days { grid-area: days; }
+.quote-screen .quote-line .price { grid-area: price; }
+.quote-screen .quote-line .price.wide { grid-area: auto / days-start / auto / price-end; }
+.quote-screen .quote-line .charged { grid-area: charged; }
+.quote-screen .quote-line .discount { grid-area: discount; }
+.quote-screen .quote-line .vat { grid-area: vat; }
+.quote-screen .quote-line .vat-cell .link { justify-self: start; min-height: 44px; padding: 0; font-size: var(--text-body); font-weight: 600; }
+.quote-screen .quote-line .amount { grid-area: amount; display: grid; align-content: center; min-height: 44px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quote-screen .quote-line .amount small { font-weight: 400; font-size: var(--text-hint); color: var(--muted); }
+@container (min-width: 700px) {
+  .quote-screen .quote-line .line-cost summary .words { flex: 0 1 auto; }
+  .quote-screen .quote-line .line-cost summary small { order: 3; }
+  .quote-screen .quote-line .numbers { grid-template-columns: minmax(4.5em, .8fr) minmax(4.5em, .8fr) minmax(6.5em, 1.1fr) minmax(8em, 1.3fr) minmax(5em, .9fr) minmax(4.5em, .8fr) minmax(6em, auto); grid-template-areas: 'qty days price charged discount vat amount'; }
+}
+/* A number with its unit in the box: € before it, % or km or days after, never typed. */
+.quote-screen .unit-box { display: flex; align-items: center; min-width: 0; min-height: 44px; border: 1px solid var(--field-line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); }
+.quote-screen .unit-box input:not([type='checkbox']) { flex: 1 1 0; width: 100%; min-width: 0; min-height: 42px; border: 0; background: transparent; }
+.quote-screen .unit-box input:focus-visible { outline: none; }
+.quote-screen .unit-box:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.quote-screen .unit-box .unit { flex: none; padding-inline: 0 var(--space-10); color: var(--muted); font-size: var(--text-small); }
+.quote-screen .unit-box.before .unit { padding-inline: var(--space-10) 0; }
+.quote-screen .unit-box.before input { padding-inline-start: var(--space-4); }
+.quote-screen .unit-box.needs, .quote-screen .unit-box:has(input[aria-invalid='true']), .quote-screen .quote-line input[aria-invalid='true'] { border-color: var(--warn); }
+/* A fault sits by its cause, in the warn ink, once the field or the line has been left (rule 18). */
+.quote-screen .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
+.quote-screen small.error { color: var(--warn); }
+/* Whether there's kit enough, under a line; what it was last charged in Current RMS; and the cost side folded under the line (ADR 0089), never printed. */
 .quote-screen .kit-note { font-size: var(--text-hint); }
 .quote-screen .kit-note .link { font-weight: 600; }
-.quote-screen .quote-line .kit-note, .quote-screen .quote-line .line-cost { grid-column: 1 / -1; }
-.quote-screen .line-cost { border: 0; border-top: 1px dashed var(--line); margin: 0; padding: var(--space-8) 0 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8) var(--space-12); }
-.quote-screen .line-cost legend { float: left; width: 100%; padding: 0; font-size: var(--text-small); color: var(--muted); }
-.quote-screen .line-cost label { flex: 0 1 9em; }
-.quote-screen .line-cost label.supplier { flex: 1 1 14em; }
-.quote-screen .line-cost label:last-of-type { flex: 0 1 16em; }
-.quote-screen .line-cost .line-margin { margin-left: auto; align-self: center; }
-.quote-screen .line-cost small { color: var(--muted); }
+.quote-screen .quote-line .last-charged { font-size: var(--text-small); }
+.quote-screen .quote-line .last-charged p { margin: 0; }
+.quote-screen .line-cost { border-top: 1px dashed var(--line); padding-top: var(--space-4); }
+.quote-screen .line-cost summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-8); min-height: 44px; padding: var(--space-6) 0; list-style: none; cursor: pointer; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .line-cost summary::-webkit-details-marker { display: none; }
+.quote-screen .line-cost summary .chevron { width: 16px; height: 16px; align-self: center; transition: transform var(--ds-duration-base) var(--ds-ease-standard); }
+.quote-screen .line-cost[open] summary .chevron { transform: rotate(90deg); }
+.quote-screen .line-cost summary b { color: var(--ink); font-weight: 600; }
+.quote-screen .line-cost summary .bad { color: var(--bad); }
+.quote-screen .line-cost summary small { margin-left: auto; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; }
+.quote-screen .line-cost summary .words { flex: 1 1 100%; }
+.quote-screen .cost-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9em, 1fr)); gap: var(--space-8); align-items: start; padding: var(--space-4) 0 var(--space-6); }
+.quote-screen .cost-fields label.supplier { grid-column: 1 / -1; }
+.quote-screen .cost-fields small { color: var(--muted); }
 .quote-screen .line-margin { margin: 0; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
 .quote-screen .line-margin.bad, .quote-screen .margin-words.bad b { color: var(--bad); }
-.quote-screen .quote-line-shut .amount .line-margin { display: block; text-align: right; }
 .quote-screen .margin-words small { color: var(--muted); }
 .quote-screen .quote-margin { margin: 0; }
-/* Travel and subsistence (ADR 0086): worked out, not typed, so each reads as a shut line, with what the office says about the job under it. */
-.quote-screen .quote-extra { display: grid; gap: var(--space-8); padding-bottom: var(--space-8); }
-.quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); padding: var(--space-8) 0; border-top: 1px solid var(--line); min-height: 44px; }
-.quote-screen .quote-extra .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
-.quote-screen .quote-extra .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
-.quote-screen .quote-extra .signal b, .quote-screen .quote-extra .signal small { display: block; }
-.quote-screen .quote-extra .extra-km { max-width: 22em; }
+.quote-screen .line-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-12); }
+/* Travel and subsistence (ADR 0086) are worked out, not typed, so each is a row like a line; open, it holds the one thing the office says about this job for it. */
+.quote-screen .quote-line.extra-open > .field { max-width: 18em; }
+.quote-screen .quote-line .signal { background: none; border: 0; padding: 0; }
+.quote-screen .quote-line .signal b, .quote-screen .quote-line .signal small { display: block; }
 .office-form .fuel-field { display: grid; gap: var(--space-8); align-content: start; }
 .office-form .fuel-field button { justify-self: start; }
-/* What it comes to stays in view under the top bar while the lines are changed. */
-.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+/* What it comes to stays in view under the top bar while the lines are changed, with what needs a look as a way to the first such line. */
+.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: grid; gap: var(--space-6); margin: 0 calc(-1 * var(--space-14)); padding: var(--space-8) var(--space-14); background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.quote-screen .quote-summary .figures { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); }
+.quote-screen .quote-summary .figure { display: inline-flex; align-items: baseline; gap: var(--space-6); white-space: nowrap; }
+.quote-screen .quote-summary .figure small { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.quote-screen .quote-summary .figure.lead b { font-size: var(--text-title); }
+.quote-screen .quote-summary .figure.bad b { color: var(--bad); }
+.quote-screen .quote-summary .figure .pct { color: var(--muted); font-size: var(--text-small); }
 .quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
-.quote-screen .undo-line { margin: 0; font-size: var(--text-small); }
-.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.quote-screen .quote-summary .save-state .link.quiet { margin-block: calc(-1 * var(--space-12)); font-size: var(--text-small); }
+.quote-screen .quote-summary .chips { display: flex; flex-wrap: wrap; gap: var(--space-6); }
+.quote-screen .quote-summary .chip { position: relative; min-height: 32px; padding: var(--space-2) var(--space-10); border: 1px solid var(--warn); border-radius: var(--radius-full); background: var(--warn-soft); color: var(--warn); font-size: var(--text-pill); font-weight: 700; }
+.quote-screen .quote-summary .chip::before { content: ''; position: absolute; inset: -6px 0; }
+@media (hover: hover) {
+  .quote-screen .quote-summary .chip:hover { border-color: var(--warn); }
+}
+.quote-screen .undo-line { margin: 0; padding: var(--space-6) 0; font-size: var(--text-small); }
+/* Adding to the quote: a row of what can be added, which the picker or Claude's box takes the place of. */
+.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--space-6); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.quote-screen .quote-add > button { display: inline-flex; align-items: center; gap: var(--space-4); }
+.quote-screen .quote-add > button .icon { width: 16px; height: 16px; }
 .quote-screen .quote-add .adding { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); width: 100%; }
 .quote-screen .quote-add .adding > :first-child { flex: 1 1 16em; }
+.quote-screen .quote-add .adding.ask { display: grid; justify-items: start; }
+.quote-screen .quote-add .ask-claude, .quote-screen .quote-add .claude-advice { width: 100%; margin: 0; }
 .quote-screen .job-changes { border: 1px solid var(--warn); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--warn-soft); }
 .quote-screen .job-changes p, .quote-screen .job-changes ul { margin: 0 0 var(--space-6); }
 .quote-screen .job-changes ul { padding-left: var(--space-16); }
-.quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
-.quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
-.quote-screen .kit-days-all input { width: 4.5em; }
-.quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
-.quote-screen .group-discount label { display: inline-flex; align-items: center; gap: var(--space-6); }
-.quote-screen .group-discount input { width: 4.5em; color: var(--ink); }
+.quote-screen .kit-days-all, .quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
+.quote-screen .group-discount { padding-bottom: var(--space-8); }
+.quote-screen .kit-days-all label, .quote-screen .group-discount label { display: grid; gap: var(--space-2); font-size: var(--text-hint); color: var(--muted); }
+.quote-screen .kit-days-all .unit-box, .quote-screen .group-discount .unit-box { width: 8em; }
+.quote-screen .kit-days-all .hint { flex-basis: 100%; }
+/* The terms, two short fields to a row, then the sums and the sending. */
+.quote-screen .quote-terms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-12); }
+.quote-screen .quote-terms .field { min-width: 0; align-content: start; }
 .quote-screen .agreed-note { margin: var(--space-2) 0 0; color: var(--ink); }
+.quote-screen .quote-side .quote-totals { margin-top: var(--space-4); }
 .quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
-.quote-screen .quote-send label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
-.quote-screen .quote-send .hint { flex-basis: 100%; }
+.quote-screen .quote-send label { flex: 1 1 10em; display: grid; gap: var(--space-2); font-size: var(--text-hint); color: var(--muted); }
+.quote-screen .quote-send input { width: 100%; }
+.quote-screen .quote-side .actions .link.quiet { margin-left: auto; }
 .quote-table-wrap { overflow-x: auto; }
 .quote-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .quote-table th, .quote-table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -430,11 +489,9 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-sheet .sheet-terms h2 { font-size: 10pt; margin: 0 0 2pt; }
   .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
-/* The printed quote's terms on the draft (ADR 0084): two short fields side by side. */
-.quote-terms { display: flex; flex-wrap: wrap; gap: var(--space-12); }
-.quote-terms .field { flex: 1 1 14em; }
-.quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
-.quote-terms .with-unit input, .quote-terms input, .quote-extra .with-unit input, .office-form .with-unit input { max-width: 7em; }
+/* Admin's travel card: a number with its unit beside it. */
+.office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
+.office-form .with-unit input { max-width: 7em; }
 .version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
 .money .card .hint a, .quote-screen .hint a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 
