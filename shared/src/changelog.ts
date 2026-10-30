@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-30',
     title: 'A clearer quote form',
     what: "A draft quote is easier to read and fill in. What it comes to stays at the top with anything that needs a look, such as a line with no price, and pressing that opens the line. Each line is a row that opens to change, with its numbers on one row and the cost side folded underneath. Travel and subsistence are rows like any other. The terms and Mark as sent sit beside the lines on a laptop. A line isn't marked wrong until you've left it, and the unit (€, %, days) sits in the box so there's less to type.",
-    prs: [184],
+    prs: [185],
     adrs: [100],
   },
   {

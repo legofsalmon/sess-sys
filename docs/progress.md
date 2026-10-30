@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0100](adr/0100-the-quote-form-redrawn.md) (PR #184): the draft
+- [ADR 0100](adr/0100-the-quote-form-redrawn.md) (PR #185): the draft
   quote redrawn after an in-depth review against the design system and the
   form research (25 findings, five major). A readout strip that stays in
   view with amber chips that open the first line needing a look; lines as
