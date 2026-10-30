@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 October 2026: Filter and sort on the long lists
+
+**Done**
+
+- Colly asked for a filter and sort system on the long lists (ADR 0099,
+  PR #183): one shared part under the search on Jobs, Quotes, People, the
+  catalogue, Venues and Clients. Sort select, Filter button with a select
+  per filter (each choice with its count), filters that are on as chips
+  that take them off, "N of M" and Clear filters. Kept for the tab's life;
+  the order kept on the device. Clients get a search. App 1.65.0.
+- Checked: typecheck, unit tests for the orders, filters and counts, a
+  new browser test (lists.spec.ts), the layout test's department filter,
+  and the whole browser suite.
+
 ## 30 October 2026: The big files split
 
 **Done**

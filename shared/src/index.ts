@@ -80,6 +80,7 @@ export * from './sync/vehicles-view.ts'
 export * from './sync/steps-view.ts'
 export * from './sync/racks-view.ts'
 export * from './sync/purchases-view.ts'
+export * from './lists.ts'
 // The shared design system's colour roles, by theme (vendored in ds/; see web/src/app.css for how the app names them).
 export { color as dsColor, duration as dsDuration, timing as dsTiming } from './ds/tokens.js'
 export { ownColours } from './own-colours.ts'

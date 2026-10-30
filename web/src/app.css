@@ -267,6 +267,23 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .app .filters { display: flex; gap: var(--space-6); flex-wrap: wrap; }
 .app .filters button { display: inline-flex; align-items: center; gap: var(--space-6); }
 .app .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+/* Filter and sort on a long list (ADR 0099, ListTools.tsx): Sort and Filter on one line under the search, the filters' selects in a grid
+   when open, and the filters that are on as chips that take them off, so a short list always says why it's short. */
+.app .list-tools { display: grid; gap: var(--space-8); }
+.app .list-tools-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.app .list-sort { display: inline-flex; align-items: center; gap: var(--space-6); color: var(--muted); font-size: var(--text-small); }
+.app .list-sort select { color: var(--ink); }
+.app .list-filter-button { display: inline-flex; align-items: center; gap: var(--space-6); }
+.app .list-filter-button[aria-expanded='true'] { background: var(--ds-surface-inset); }
+.app .list-tools .icon { width: 18px; height: 18px; flex: none; }
+.app .list-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: var(--space-8) var(--space-12); padding: var(--space-10); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
+.app .list-filters[hidden] { display: none; }
+.app .list-filters label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.app .list-filters select { color: var(--ink); width: 100%; }
+.app .list-active { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6) var(--space-8); font-size: var(--text-small); }
+.app .list-chip { display: inline-flex; align-items: center; gap: var(--space-4); min-height: 36px; padding: var(--space-4) var(--space-10); border-radius: 999px; background: var(--ink); color: var(--bg); border-color: var(--ink); font-size: var(--text-small); }
+.app .list-chip .icon { width: 14px; height: 14px; }
+.app .list-count { color: var(--muted); }
 .menu .places { display: grid; gap: var(--space-14); }
 .menu .job-row { justify-content: flex-start; }
 .menu .job-row > div:not(.side) { flex: 1; min-width: 0; }

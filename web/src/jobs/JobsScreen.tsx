@@ -20,6 +20,14 @@ import {
   type ProjectStatus,
   type VenueView,
   type View,
+  activeFilters,
+  jobFilters,
+  jobSorts,
+  listed,
+  sortOf,
+  PLACE_SORTS,
+  placeFilters,
+  type PlaceForList,
 } from '@sh/shared'
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
@@ -48,6 +56,7 @@ import { Heading, Icon } from '../Icon.tsx'
 import { plain, wordsOf } from '../crew/People.tsx'
 import { JOBS } from '../Up.tsx'
 import { useWindowed } from '../windowed.ts'
+import { ListTools, useListChoices } from '../ListTools.tsx'
 
 /**
  * Jobs (ADR 0007): every job, who it's for, where and when, made of phases.
@@ -158,18 +167,58 @@ function JobsRest({ view, phone = false }: { view: View; phone?: boolean }) {
   )
 }
 
-/** Every client, on a page along Jobs' row (ADR 0041): each opens its own page, with its documents and its jobs. */
+/** A client or venue in its list, with what the list counts and filters by (ADR 0099). */
+type Placed<T> = PlaceForList & { of: T }
+
+/** What a list of clients or venues counts of each: its jobs, the latest one's first day, the ones still to come, its documents. */
+function placed<T extends { id: string; name: string }>(items: readonly T[], jobsOf: (item: T) => readonly JobView[], docs: (item: T) => number, today: string, pinned?: (item: T) => boolean): Placed<T>[] {
+  return items.map((of) => {
+    const jobs = jobsOf(of)
+    return {
+      of,
+      name: of.name,
+      jobs: jobs.length,
+      lastJob: jobs.reduce<string | undefined>((last, j) => (j.span && (!last || j.span.start > last) ? j.span.start : last), undefined),
+      comingUp: jobs.filter((j) => j.span && j.span.end >= today).length,
+      docs: docs(of),
+      pinned: pinned?.(of),
+    }
+  })
+}
+
+/**
+ * Every client, on a page along Jobs' row (ADR 0041): each opens its own page, with its documents and its jobs. Found by name or a
+ * contact's, and filtered and sorted as the other long lists are (ADR 0099).
+ */
 function ClientsScreen({ view }: { view: View }) {
   const { jobs, clients } = view.jobs
+  const today = useToday()
+  const [find, setFind] = useState('')
+  const [choices, setChoices] = useListChoices('clients')
+  const filters = useMemo(() => placeFilters(false), [])
+  const all = useMemo(
+    () => placed(clients, (c) => jobs.filter((j) => j.clientId === c.id), (c) => view.attachments.of('client', c.id).length, today),
+    [clients, jobs, view.attachments, today],
+  )
+  const words = wordsOf(find)
+  const searched = words.length ? all.filter((c) => words.every((w) => plain([c.of.name, ...c.of.contacts.map((x) => x.name)].join(' ')).includes(w))) : all
+  const shown = listed(searched, filters, PLACE_SORTS, choices)
   return (
     <div className="app crew jobs">
       <Top view={view} views={<JobViews current="clients" />} heading="Clients" />
-      <section className="card plain">
+      <section className="card plain" aria-label="Every client">
         {clients.length === 0 && <Empty>Clients are added as you type them into a job.</Empty>}
+        {clients.length > 0 && (
+          <>
+            <input className="search" type="search" placeholder="Name or contact" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a client" />
+            <ListTools name="clients" items={searched} filters={filters} sorts={PLACE_SORTS} choices={choices} onChange={setChoices} shown={shown.length} what="clients" />
+          </>
+        )}
+        {clients.length > 0 && shown.length === 0 && <p className="empty">No client matches.</p>}
         <ul className="job-list">
-          {clients.map((c) => (
-            <li key={c.id}>
-              <ClientRow c={c} jobs={jobs.filter((j) => j.clientId === c.id).length} docs={view.attachments.of('client', c.id).length} />
+          {shown.map((c) => (
+            <li key={c.of.id}>
+              <ClientRow c={c.of} jobs={c.jobs} docs={c.docs} />
             </li>
           ))}
         </ul>
@@ -180,25 +229,39 @@ function ClientsScreen({ view }: { view: View }) {
 
 /**
  * Every venue, on a page along Jobs' row (ADR 0041), with a map of them all above the list (ADR 0057). Sixty and more is a long
- * list, so it has People's find box at its top, by name or address with or without the fadas (audit, 20 October 2026, finding 76).
+ * list, so it has People's find box at its top, by name or address with or without the fadas (audit, 20 October 2026, finding 76),
+ * and the long lists' filter and sort (ADR 0099).
  */
 function VenuesScreen({ view }: { view: View }) {
   const { jobs, venues } = view.jobs
+  const today = useToday()
   const [find, setFind] = useState('')
+  const [choices, setChoices] = useListChoices('venues')
+  const filters = useMemo(() => placeFilters(true), [])
+  const all = useMemo(
+    () => placed(venues, (v) => jobsAt(jobs, v.id), (v) => view.attachments.of('venue', v.id).length, today, (v) => !!v.pin),
+    [venues, jobs, view.attachments, today],
+  )
   const words = wordsOf(find)
-  const shown = words.length ? venues.filter((v) => words.every((w) => plain([v.name, v.address].filter(Boolean).join(' ')).includes(w))) : venues
+  const searched = words.length ? all.filter((v) => words.every((w) => plain([v.of.name, v.of.address].filter(Boolean).join(' ')).includes(w))) : all
+  const shown = listed(searched, filters, PLACE_SORTS, choices)
   return (
     <div className="app crew jobs">
       <Top view={view} views={<JobViews current="venues" />} heading="Venues" />
       <VenuesMapCard venues={venues} jobsAt={(id) => jobsAt(jobs, id).length} />
       <section className="card plain" aria-label="Every venue">
         {venues.length === 0 && <Empty>Venues are added as you type them into a job.</Empty>}
-        {venues.length > 0 && <input className="search" type="search" placeholder="Name or address" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a venue" />}
+        {venues.length > 0 && (
+          <>
+            <input className="search" type="search" placeholder="Name or address" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a venue" />
+            <ListTools name="venues" items={searched} filters={filters} sorts={PLACE_SORTS} choices={choices} onChange={setChoices} shown={shown.length} what="venues" />
+          </>
+        )}
         {venues.length > 0 && shown.length === 0 && <p className="empty">No venue matches.</p>}
         <ul className="job-list">
           {shown.map((v) => (
-            <li key={v.id}>
-              <VenueRow v={v} jobs={jobsAt(jobs, v.id).length} docs={view.attachments.of('venue', v.id).length} />
+            <li key={v.of.id}>
+              <VenueRow v={v.of} jobs={v.jobs} docs={v.docs} />
             </li>
           ))}
         </ul>
@@ -274,21 +337,28 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
     return counted
   }, [jobs, day])
   const count = (f: Filter) => counts.get(f) ?? 0
-  const { rows, shownCount, listedCount } = useMemo(() => {
+  // Filter and sort (ADR 0099): the filters narrow the tab chosen above them, and the order is the tab's own until another is picked.
+  const [choices, setChoices] = useListChoices('jobs')
+  const sorts = useMemo(() => jobSorts(filter !== 'coming'), [filter])
+  const filters = useMemo(() => jobFilters((j) => !!kitShort(view.kit.byJob.get(j.id)), filter === 'stopped'), [view.kit.byJob, filter])
+  const { rows, shownCount, listedCount, searched } = useMemo(() => {
     const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
     const matches = (j: JobView) => {
       const text = [j.name, j.client?.name, j.venue?.name, ...j.phases.map((p) => p.venue?.name)].filter(Boolean).join(' ').toLowerCase()
       return words.every((w) => text.includes(w))
     }
-    const shown = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
-    // Past jobs newest first; everything else soonest first.
-    if (filter === 'past') shown.reverse()
-    // The next fortnight, and the ones with no dates yet, until Show all; a search looks through them all.
-    const soonOnly = filter === 'coming' && !all && words.length === 0
+    const searched = jobs.filter((j) => filterOf(j, day) === filter && matches(j))
+    const shown = listed(searched, filters, sorts, choices)
+    const byDate = sortOf(sorts, choices.sort)?.key === 'date'
+    const narrowed = activeFilters(filters, choices.filters).length > 0
+    // The next fortnight, and the ones with no dates yet, until Show all; a search or a filter looks through them all, as does another order.
+    const soonOnly = filter === 'coming' && !all && words.length === 0 && !narrowed && byDate
     const soonEnd = addDays(day, SOON_DAYS)
-    const listed = soonOnly ? shown.filter((j) => !j.span || j.span.start < soonEnd) : shown
-    return { rows: byWeek(listed, day), shownCount: shown.length, listedCount: listed.length }
-  }, [jobs, day, filter, search, all])
+    const listedJobs = soonOnly ? shown.filter((j) => !j.span || j.span.start < soonEnd) : shown
+    // Under the heading of their week while they're by date; in any other order a week heading would come round again and again.
+    const rows: Row[] = byDate ? byWeek(listedJobs, day) : listedJobs.map((job, n) => ({ job, n }))
+    return { rows, shownCount: shown.length, listedCount: listedJobs.length, searched }
+  }, [jobs, day, filter, search, all, filters, sorts, choices])
   const win = useWindowed('jobs', rows, rowKey, 110)
 
   return (
@@ -309,7 +379,9 @@ function JobsCard({ view, phone = false }: { view: View; phone?: boolean }) {
           </button>
         ))}
       </div>
-      {shownCount === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
+      {jobs.length > 0 && <ListTools name="jobs" items={searched} filters={filters} sorts={sorts} choices={choices} onChange={setChoices} shown={shownCount} what="jobs" />}
+      {shownCount === 0 && searched.length > 0 && <p className="empty">No job here matches those filters.</p>}
+      {searched.length === 0 && <Empty>{jobs.length === 0 && 'Add the first one under New job.'}</Empty>}
       {shownCount > 0 && listedCount === 0 && <p className="hint">Nothing in the next fortnight.</p>}
       {/* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, and Back finds its place by them (places.ts). */}
       <ul className="job-list windowed" ref={win.list} style={win.style}>

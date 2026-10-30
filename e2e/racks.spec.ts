@@ -181,10 +181,11 @@ test('the rack designer: kit dragged in from ours and dry hire, moved, taken out
   await page.getByRole('button', { name: 'Save product' }).click()
   await expect(page.getByText('rack-mount, 3U, half width, 400 mm deep')).toBeVisible()
 
-  // The catalogue tells ours from dry hire.
+  // The catalogue tells ours from dry hire, behind Filter (ADR 0099).
   await page.goto('/#stock')
-  const whose = page.getByRole('group', { name: 'Whose' })
-  await whose.getByRole('button', { name: /^Dry hire/ }).click()
+  const catalogue = page.getByRole('region', { name: 'Catalogue' })
+  await catalogue.getByRole('button', { name: 'Filter', exact: true }).click()
+  await catalogue.getByLabel('Whose').selectOption('dryHire')
   await page.getByLabel('Find', { exact: true }).fill(id)
   await expect(page.getByRole('link', { name: new RegExp(`^${haze}`) })).toContainText('Dry hire from PRG')
   await expect(page.getByRole('link', { name: new RegExp(`^${amp}`) })).toHaveCount(0)
