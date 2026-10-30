@@ -1,4 +1,4 @@
-import { euroText, parseEuro, type LinePer, type LineKind, type QuoteLine, type VatRate, chargedFor, type RateRule, SUPPLIER_LENGTH } from '@sh/shared'
+import { euroText, parseEuro, type LinePer, type LineKind, type QuoteLine, type VatRate, chargedFor, type RateRule, SUPPLIER_LENGTH, RATE_LABELS } from '@sh/shared'
 
 /**
  * A quote's line as it's being typed (ADR 0042): the numbers as text until
@@ -75,51 +75,68 @@ export const sameLine = (a: QuoteLine, b: QuoteLine) =>
   (a.extra ?? null) === (b.extra ?? null)
 export const num = (s: string) => Number(s.trim().replace(',', '.'))
 
-/** What a typed line comes to, or why it can't be saved. */
-export function readLine(d: LineDraft, n: number): QuoteLine | string {
+/** The field of a typed line that stops it saving, so the error can sit by its cause (design system rule 18). */
+export type LineField = 'what' | 'price' | 'qty' | 'out' | 'days' | 'discount' | 'subhire' | 'cost'
+export interface LineFault {
+  field: LineField
+  why: string
+}
+
+/** What a typed line comes to, or the field that stops it and why. */
+export function checkLine(d: LineDraft, n: number): { line: QuoteLine; fault?: undefined } | { line?: undefined; fault: LineFault } {
   const price = parseEuro(d.price)
   const where = `Line ${n}${d.what.trim() ? ` (${d.what.trim()})` : ''}`
-  if (!d.what.trim()) return `Line ${n}: say what it's for.`
-  if (price.reason) return `${where}: ${price.reason}`
+  const fault = (field: LineField, why: string) => ({ fault: { field, why } })
+  if (!d.what.trim()) return fault('what', `Line ${n}: say what it's for.`)
+  if (price.reason) return fault('price', `${where}: ${price.reason}`)
   const qty = num(d.qty)
-  if (!Number.isInteger(qty) || qty < 1 || qty > 10_000) return `${where}: how many is a whole number from 1 to 10,000.`
+  if (!Number.isInteger(qty) || qty < 1 || qty > 10_000) return fault('qty', `${where}: how many is a whole number from 1 to 10,000.`)
   // Charged by a rule (ADR 0085), the days charged are what the rule makes of the days out.
   const ruled = d.per === 'day' && d.rate !== null
   const out = ruled ? num(d.out) : undefined
-  if (out !== undefined && !(out >= 0.5 && out <= 365 && Number.isInteger(out * 2))) return `${where}: days out is a number of days, in halves, from 0.5 to 365.`
+  if (out !== undefined && !(out >= 0.5 && out <= 365 && Number.isInteger(out * 2))) return fault('out', `${where}: days out is a number of days, in halves, from 0.5 to 365.`)
   // Charged once, a line keeps 1 for its days, so a device from before this reads the same amount.
   const days = d.per === 'once' ? 1 : out !== undefined ? chargedFor(d.rate!, out) : num(d.days)
-  if (!(days >= 0.5 && days <= 365 && Number.isInteger(days * 2))) return `${where}: days charged is a number of days, in halves, from 0.5 to 365.`
+  if (!(days >= 0.5 && days <= 365 && Number.isInteger(days * 2))) return fault('days', `${where}: days charged is a number of days, in halves, from 0.5 to 365.`)
   const off = d.discount.trim() ? num(d.discount.replace(/%$/, '')) : 0
-  if (!(off >= 0 && off <= 100 && Number.isInteger(off * 10))) return `${where}: a line's discount is a percentage from 0 to 100, such as 30 or 12.5.`
+  if (!(off >= 0 && off <= 100 && Number.isInteger(off * 10))) return fault('discount', `${where}: a line's discount is a percentage from 0 to 100, such as 30 or 12.5.`)
   const hired = d.kind === 'kit' && d.subhire.trim() ? num(d.subhire) : 0
-  if (!(Number.isInteger(hired) && hired >= 0 && hired <= qty)) return `${where}: how many are hired in is a whole number, no more than the ${qty} on the line.`
+  if (!(Number.isInteger(hired) && hired >= 0 && hired <= qty)) return fault('subhire', `${where}: how many are hired in is a whole number, no more than the ${qty} on the line.`)
   const cost = d.cost.trim() ? parseEuro(d.cost) : undefined
-  if (cost?.reason) return `${where}: what it costs us: ${cost.reason}`
+  if (cost?.reason) return fault('cost', `${where}: what it costs us: ${cost.reason}`)
   const supplier = hired ? d.supplier.trim().slice(0, SUPPLIER_LENGTH) : ''
   return {
-    id: d.id,
-    kind: d.kind,
-    what: d.what.trim(),
-    ref: d.ref,
-    group: d.group,
-    qty,
-    days,
-    unitCents: price.cents ?? 0,
-    vat: d.vat,
-    per: d.per,
-    modelId: d.modelId,
-    ...(ruled ? { rate: d.rate!, out } : {}),
-    ...(off ? { discountPct: off } : {}),
-    ...(d.packageId ? { packageId: d.packageId } : {}),
-    ...(d.includes ? { includes: d.includes } : {}),
-    ...(hired ? { subhireQty: hired } : {}),
-    ...(supplier ? { supplier } : {}),
-    ...(cost?.cents != null ? { costCents: cost.cents } : {}),
+    line: {
+      id: d.id,
+      kind: d.kind,
+      what: d.what.trim(),
+      ref: d.ref,
+      group: d.group,
+      qty,
+      days,
+      unitCents: price.cents ?? 0,
+      vat: d.vat,
+      per: d.per,
+      modelId: d.modelId,
+      ...(ruled ? { rate: d.rate!, out } : {}),
+      ...(off ? { discountPct: off } : {}),
+      ...(d.packageId ? { packageId: d.packageId } : {}),
+      ...(d.includes ? { includes: d.includes } : {}),
+      ...(hired ? { subhireQty: hired } : {}),
+      ...(supplier ? { supplier } : {}),
+      ...(cost?.cents != null ? { costCents: cost.cents } : {}),
+    },
   }
+}
+
+/** What a typed line comes to, or why it can't be saved. */
+export function readLine(d: LineDraft, n: number): QuoteLine | string {
+  const c = checkLine(d, n)
+  return c.fault ? c.fault.why : c.line
 }
 
 /** How a line is charged, as one choice: by the day, by a rule, or once. */
 export type Charge = 'daily' | 'week3' | 'weekly' | 'once'
 export const chargeOf = (l: Pick<LineDraft, 'per' | 'rate'>): Charge => (l.per === 'once' ? 'once' : (l.rate ?? 'daily'))
-export const CHARGE_LABELS: Record<Charge, string> = { daily: 'a day', week3: '3 Day Week', weekly: 'a week', once: 'once' }
+/** Named as the price list names its rules, so the two read the same. */
+export const CHARGE_LABELS: Record<Charge, string> = { ...RATE_LABELS, once: 'Once' }

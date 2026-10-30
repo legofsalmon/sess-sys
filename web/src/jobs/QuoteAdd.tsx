@@ -1,6 +1,8 @@
 import { lineCents, money, type JobChanges, RATE_UNIT, type Package, FUEL_PRICE_FRESH_DAYS, type Extras, VEHICLE_KIND_LABELS } from '@sh/shared'
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { Icon } from '../Icon.tsx'
 import { toDraft, type LineDraft } from './lineDraft.ts'
+import { UnitBox } from './QuoteLine.tsx'
 
 /**
  * What's added to a draft quote beside its kit and crew (ADR 0042, ADR
@@ -11,48 +13,90 @@ import { toDraft, type LineDraft } from './lineDraft.ts'
 /** Days since a day, for how old the fuel price is. */
 const daysSince = (from: string, today: string) => Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000)
 
+/** The ids the two worked-out rows open under, beside the lines' own, so one row is open at a time. */
+export const TRAVEL_ROW = 'extra:travel'
+export const SUBSISTENCE_ROW = 'extra:subsistence'
+
 /**
- * The crew's travel and subsistence (ADR 0086), worked out by the quote: the lines it comes to, or why there isn't one,
- * with the two things the office says about this job: the distance, if the map's is wrong, and whether the job gives
- * the crew their meals.
+ * The crew's travel and subsistence (ADR 0086), worked out by the quote, as two rows like any line: the line each comes
+ * to, or why there isn't one. Pressing a row opens the one thing the office says about this job for it: the distance,
+ * if the map's is wrong, and whether the job gives the crew their meals.
  */
-export function TravelAndSubsistence(p: { extras: Extras; meals: boolean; setMeals: (b: boolean) => void; km: string; setKm: (s: string) => void; fuelSetOn: string | null; today: string }) {
+export function TravelAndSubsistence(p: {
+  extras: Extras
+  meals: boolean
+  setMeals: (b: boolean) => void
+  km: string
+  setKm: (s: string) => void
+  kmProblem: string | undefined
+  onLeaveKm: () => void
+  fuelSetOn: string | null
+  today: string
+  open: string | undefined
+  setOpen: (id: string | undefined) => void
+}) {
   const { travel, subsistence, lines } = p.extras
+  const kmId = useId()
   const line = (extra: 'travel' | 'subsistence') => lines.find((l) => l.extra === extra)
   const t = line('travel')
   const s = line('subsistence')
   const old = t && p.fuelSetOn && daysSince(p.fuelSetOn, p.today) > FUEL_PRICE_FRESH_DAYS
+  const row = (id: string, what: string, how: string, amount: string, label: string, body: ReactNode) => {
+    const open = p.open === id
+    return (
+      <div className={`quote-line-row extra${open ? ' open' : ''}`}>
+        <button type="button" className="quote-line-shut" aria-expanded={open} aria-label={label} onClick={() => p.setOpen(open ? undefined : id)}>
+          <span className="what">{what}</span>
+          <span className="how">{how}</span>
+          <span className="amount">{amount}</span>
+          <Icon name="edit" className="opener" />
+        </button>
+        {open && <div className="quote-line extra-open">{body}</div>}
+      </div>
+    )
+  }
   return (
-    <fieldset className="quote-group quote-extras">
-      <legend>Travel and subsistence</legend>
-      <div className="quote-extra">
-        <div className="extra-line">
-          <span className="what">{t ? t.what : 'No travel'}</span>
-          <span className="how">{t ? `${t.qty} × ${money(t.unitCents)}, a car's fuel there and back` : travel.none}</span>
-          <span className="amount">{t ? money(lineCents(t)) : '–'}</span>
-        </div>
+    <section className="quote-group quote-extras" role="group" aria-label="Travel and subsistence">
+      <div className="group-head">
+        <h3>Travel and subsistence</h3>
+      </div>
+      {row(
+        TRAVEL_ROW,
+        t ? t.what : 'No travel',
+        t ? `${t.qty} × ${money(t.unitCents)}, a car's fuel there and back` : (travel.none ?? ''),
+        t ? money(lineCents(t)) : '–',
+        `${t ? t.what : 'No travel'}: change the distance`,
         <label className="field extra-km">
           Distance each way
-          <span className="with-unit">
-            <input inputMode="numeric" value={p.km} onChange={(e) => p.setKm(e.target.value)} placeholder={travel.from === 'none' ? 'km' : String(travel.km)} aria-label="Distance each way from Dublin city centre, km" />
-            km
-          </span>
-          <small>
-            {p.km.trim()
-              ? 'As typed. Clear it to take it from the map again.'
-              : travel.from === 'map'
-                ? "From the venue's pin, a fifth more than a straight line for the roads. Type the real distance if it's out."
-                : 'From Dublin city centre to the venue.'}
-          </small>
+          <UnitBox unit="km">
+            <input
+              inputMode="numeric"
+              value={p.km}
+              onChange={(e) => p.setKm(e.target.value)}
+              onBlur={p.onLeaveKm}
+              placeholder={travel.from === 'none' ? '' : String(travel.km)}
+              aria-label="Distance each way from Dublin city centre, km"
+              aria-invalid={p.kmProblem ? true : undefined}
+              aria-describedby={p.kmProblem ? kmId : undefined}
+              autoFocus
+            />
+          </UnitBox>
+          {p.kmProblem ? (
+            <small className="error" id={kmId}>
+              {p.kmProblem}
+            </small>
+          ) : (
+            <small>{p.km.trim() ? 'As typed. Clear it to take it from the map again.' : travel.from === 'map' ? "From the map. Type the real distance if it's out." : 'From Dublin city centre to the venue.'}</small>
+          )}
         </label>
-        {old && <p className="warn-line">The fuel price was set {daysSince(p.fuelSetOn!, p.today)} days ago. Check it in Admin › Company.</p>}
-      </div>
-      <div className="quote-extra">
-        <div className="extra-line">
-          <span className="what">{s ? s.what : 'No subsistence'}</span>
-          <span className="how">{s ? `${s.qty} × ${money(s.unitCents)} a day` : subsistence.none}</span>
-          <span className="amount">{s ? money(lineCents(s)) : '–'}</span>
-        </div>
+      )}
+      {old && <p className="kit-note warn-line">The fuel price was set {daysSince(p.fuelSetOn!, p.today)} days ago. Check it in Admin › Company.</p>}
+      {row(
+        SUBSISTENCE_ROW,
+        s ? s.what : 'No subsistence',
+        s ? `${s.qty} × ${money(s.unitCents)} a day` : (subsistence.none ?? ''),
+        s ? money(lineCents(s)) : '–',
+        `${s ? s.what : 'No subsistence'}: say if meals are provided`,
         <label className="signal">
           <input type="checkbox" role="switch" checked={p.meals} onChange={(e) => p.setMeals(e.target.checked)} />
           <span>
@@ -60,9 +104,8 @@ export function TravelAndSubsistence(p: { extras: Extras; meals: boolean; setMea
             <small>{p.meals ? 'The job gives the crew their meals, so no subsistence is charged.' : 'On if the job gives the crew their meals.'}</small>
           </span>
         </label>
-      </div>
-      <p className="hint">Worked out from the crew lines, the venue and Admin's rates, and kept up to date as they change.</p>
-    </fieldset>
+      )}
+    </section>
   )
 }
 
@@ -85,7 +128,7 @@ export function AddTransport({ vans, onAdd, onCancel }: { vans: { id: string; wh
           ))}
           <option value="">Transport, typed</option>
         </select>
-        <small>Charged once, with what it costs us beside it, which isn't printed.</small>
+        <small>Charged once. What it costs us goes beside it, not printed.</small>
       </label>
       <button type="button" onClick={() => onAdd(van ? van.what : 'Transport', van ? van.id : null)}>
         Add

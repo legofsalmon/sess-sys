@@ -33,9 +33,10 @@ import {
   type AskedLine,
   MOST_LAST_CHARGED_NAMES,
 } from '@sh/shared'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
+import { Icon } from '../Icon.tsx'
 import { ProductPicker } from '../ProductPicker.tsx'
 import { useAccess } from '../role.ts'
 import { client } from '../sync.ts'
@@ -45,26 +46,17 @@ import { useUnderTop } from '../useUnderTop.ts'
 import { AdviceCard, AskClaude, useClaude, type Advice } from './Claude.tsx'
 import { useLastCharged } from './rms.ts'
 import { QuotePill } from './QuoteStatus.tsx'
-import { num, readLine, sameLine, toDraft, type LineDraft } from './lineDraft.ts'
-import {
-  CostFields,
-  GroupDiscount,
-  KitNote,
-  LastCharged,
-  lastOf,
-  LineEditor,
-  lineMargin,
-  linesShort,
-  LineSummary,
-  MarginWords,
-  rmsNames,
-} from './QuoteLine.tsx'
+import { checkLine, num, sameLine, toDraft, type LineDraft } from './lineDraft.ts'
+import { GroupDiscount, KitNote, LastCharged, lastOf, LineEditor, lineMargin, linesShort, LineSummary, rmsNames, UnitBox } from './QuoteLine.tsx'
 import { Totals } from './QuoteSheet.tsx'
-import { AddCrew, AddPackage, AddTransport, JobChangesCard, transportWords, TravelAndSubsistence } from './QuoteAdd.tsx'
+import { AddCrew, AddPackage, AddTransport, JobChangesCard, transportWords, TRAVEL_ROW, TravelAndSubsistence } from './QuoteAdd.tsx'
 
 /**
- * A quote while it's a draft (ADR 0042): every line open to change, saving
- * itself as it's typed, and marked sent when it goes to the client.
+ * A quote while it's a draft (ADR 0042, redrawn in ADR 0100): the lines as
+ * rows that open one at a time to change, a readout of what it comes to that
+ * stays in view with what needs a look, the terms and the sending beside
+ * them, saving itself as it's typed, and marked sent when it goes to the
+ * client.
  */
 
 /**
@@ -75,9 +67,6 @@ async function markSent(id: string, job: JobView, on: string) {
   await client.mutate('quote.sent', { id, on })
   if (job.status === 'enquiry') await client.mutate('project.update', { id: job.id, status: 'quoted' })
 }
-
-/** A tidy figure under the lines' total to offer as an agreed price: down to the nearest €50. */
-const roundDown = (cents: number) => Math.floor(cents / 5000) * 5000
 
 /** How long the draft waits after the last key before it saves itself. */
 const SAVE_AFTER_MS = 1_200
@@ -128,6 +117,10 @@ function keepTyped(id: string, t: Typed | undefined) {
 /** The job's days, which a line added on the quote is charged for until changed. */
 const jobDays = (job: JobView) => (job.span ? Math.max(1, eachDay(job.span.start, job.span.end).length) : 1)
 
+/** The fields of the terms that can be wrong, in the order their faults are said; `km` is the distance on the travel row. */
+type TermKey = 'agreed' | 'km' | 'discount' | 'validFor' | 'deposit'
+const TERM_KEYS: readonly TermKey[] = ['agreed', 'km', 'discount', 'validFor', 'deposit']
+
 export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job: JobView; onPrint: () => void }) {
   const today = useToday()
   const m = view.money
@@ -145,22 +138,40 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   const [validFor, setValidFor] = useState(kept?.validFor ?? String(q.validDays ?? DEFAULT_VALID_DAYS))
   const [deposit, setDeposit] = useState(kept?.deposit ?? (q.depositPct ? String(q.depositPct) : ''))
   const [kitDays, setKitDays] = useState('')
+  const [kitDaysOpen, setKitDaysOpen] = useState(false)
+  const [discounting, setDiscounting] = useState<string>()
   const [sentOn, setSentOn] = useState(today)
   const [answering, setAnswering] = useState(false)
-  // One line is open to change at a time; the rest read as a list, as they'll print.
+  // One row is open to change at a time, a line's or a worked-out one's; the rest read as a list, as they'll print.
   const [open, setOpen] = useState<string>()
+  // Which field the open line starts on, and whether its cost fold is wanted open: set by whatever opened it.
+  const [focusField, setFocusField] = useState<'what' | 'price'>('what')
+  const [wantCost, setWantCost] = useState(false)
   // The line just shut, which keeps the focus so the keyboard carries on from it.
   const [shut, setShut] = useState<string>()
   const [removed, setRemoved] = useState<{ line: LineDraft; at: number }>()
-  const [adding, setAdding] = useState<'kit' | 'crew' | 'package' | 'transport'>()
+  const [adding, setAdding] = useState<'kit' | 'crew' | 'package' | 'transport' | 'claude'>()
+  // A fault shows only once what holds it has been left (design system rule 18): a line left, or a terms field left. What
+  // came back from the device's keeping was left when the screen was, so it shows at once.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set(kept ? [...kept.lines.map((l) => l.id), ...TERM_KEYS] : []))
+  const touch = (k: string) => setTouched((s) => (s.has(k) ? s : new Set(s).add(k)))
   const { run, error, refuse } = useAct()
   const set = (id: string, changes: Partial<LineDraft>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...changes } : l)))
+  const openLine = (id: string | undefined, focus: 'what' | 'price' = 'what', cost = false) => {
+    if (open && open !== id) touch(open)
+    setFocusField(focus)
+    setWantCost(cost)
+    setOpen(id)
+  }
+  const termIds = useId()
+  const termRefs = useRef<Partial<Record<TermKey, HTMLInputElement | null>>>({})
 
   // What it comes to as typed, with anything not yet a number left out.
-  const read = lines.map((l, i) => readLine(l, i + 1))
+  const parsed = lines.map((l, i) => checkLine(l, i + 1))
+  const faultAt = parsed.findIndex((c) => c.fault)
   const pct = num(discount)
   const pctOk = pct >= 0 && pct <= 100 && Number.isInteger(pct * 10)
-  const good = read.filter((l): l is QuoteLine => typeof l !== 'string')
+  const good = parsed.flatMap((c) => (c.line ? [c.line] : []))
   const agreedRead = agreed.trim() ? parseEuro(agreed) : undefined
   const agreedCents = agreedRead?.cents ?? null
   const kmRead = kmTyped.trim() ? num(kmTyped) : null
@@ -180,25 +191,34 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   const validOk = Number.isInteger(valid) && valid >= 1 && valid <= 365
   const dep = deposit.trim() ? num(deposit) : null
   const depOk = dep === null || (Number.isInteger(dep) && dep >= 1 && dep <= 100)
-  const problem =
-    read.find((l): l is string => typeof l === 'string') ??
-    (agreedRead?.reason
-      ? `The price agreed: ${agreedRead.reason}`
-      : agreedCents !== null && agreedCents > totals.subtotal
-        ? `The price agreed is more than the lines come to (${money(totals.subtotal)}). Agree a lower price, or change the lines.`
-        : !kmOk
-        ? 'The distance is a whole number of km from 0 to 2,000, or nothing to take it from the map.'
-        : !pctOk
-      ? 'A discount is a percentage from 0 to 100, such as 10 or 12.5.'
-      : !validOk
-        ? 'Prices hold for a whole number of days from 1 to 365.'
-        : !depOk
-          ? 'A deposit is a whole percentage from 1 to 100, such as 25 or 50, or nothing for none.'
-          : undefined)
+  const termProblems: Partial<Record<TermKey, string>> = {}
+  if (agreedRead?.reason) termProblems.agreed = `The price agreed: ${agreedRead.reason}`
+  else if (agreedCents !== null && agreedCents > totals.subtotal) termProblems.agreed = `The price agreed is more than the lines come to (${money(totals.subtotal)}). Agree a lower price, or change the lines.`
+  if (!kmOk) termProblems.km = 'The distance is a whole number of km from 0 to 2,000, or nothing to take it from the map.'
+  if (!pctOk) termProblems.discount = 'A discount is a percentage from 0 to 100, such as 10 or 12.5.'
+  if (!validOk) termProblems.validFor = 'Prices hold for a whole number of days from 1 to 365.'
+  if (!depOk) termProblems.deposit = 'A deposit is a whole percentage from 1 to 100, such as 25 or 50, or nothing for none.'
+  const termKey = TERM_KEYS.find((k) => termProblems[k])
+  // The first thing that stops the draft saving, where it is, and whether it's been left so it may be said.
+  const problem = parsed[faultAt]?.fault?.why ?? (termKey ? termProblems[termKey] : undefined)
+  const problemKey = faultAt >= 0 ? lines[faultAt]!.id : termKey
+  const problemShown = problemKey !== undefined && touched.has(problemKey)
+  const termErr = (k: TermKey) => (touched.has(k) ? termProblems[k] : undefined)
+  const bad = (k: TermKey) => (termErr(k) ? { 'aria-invalid': true, 'aria-describedby': `${termIds}-${k}` } : {})
+  const termNote = (k: TermKey, hint: ReactNode) => {
+    const err = termErr(k)
+    if (err)
+      return (
+        <small className="error" id={`${termIds}-${k}`}>
+          {err}
+        </small>
+      )
+    return hint ? <small>{hint}</small> : null
+  }
   // Saved: what's typed comes to what the draft holds.
   const saved =
-    read.length + extras.lines.length === q.lines.length &&
-    read.every((l) => typeof l !== 'string') &&
+    parsed.length + extras.lines.length === q.lines.length &&
+    faultAt < 0 &&
     all.every((l, i) => sameLine(l, q.lines[i]!)) &&
     meals === (q.mealsProvided ?? false) &&
     kmRead === (q.travelKm ?? null) &&
@@ -207,7 +227,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
     q.notes.trim() === notes.trim() &&
     valid === (q.validDays ?? DEFAULT_VALID_DAYS) &&
     dep === (q.depositPct ?? null)
-  const unpriced = good.filter((l) => l.unitCents === 0).length
+  const unpricedLines = good.filter((l) => l.unitCents === 0)
   // Whether there's enough of each product on the job's days (ADR 0089), as the job's kit is checked.
   const checks = quoteKit(job, quoteWants(good, (id) => m.package(id)?.items), today, {
     kit: view.kit,
@@ -215,11 +235,12 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
     unusable: view.faults.unusable,
     lateOut: view.moves.lateOut,
   })
-  const shortLines = good.filter((l) => linesShort(l, checks, m.package(l.packageId ?? '')?.items).length > 0).length
+  const shortLines = good.filter((l) => linesShort(l, checks, m.package(l.packageId ?? '')?.items).length > 0)
   // What it makes (ADR 0089), for the office and directors, who see quotes at all.
   const boss = useAccess().can('money')
   const costOf = (l: QuoteLine) => lineCostOf(l, l.kind === 'crew' ? m.bookedRate(job.id, l) : undefined)
   const margin = quoteMargin(totals.net, all.map(costOf))
+  const noCostLines = boss ? good.filter((l) => costOf(l) === undefined) : []
   // What each line was last charged in Current RMS (ADR 0092), by the names it goes by there.
   const namesOf = (l: LineDraft) => rmsNames(l, (id) => view.warehouse.models.find((x) => x.id === id))
   const last = useLastCharged(boss, job.id, lines.flatMap(namesOf).slice(0, MOST_LAST_CHARGED_NAMES))
@@ -256,7 +277,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   ) => {
     const id = newId()
     setLines((ls) => [...ls, { rate: null, out: l.days, discount: '', packageId: null, includes: '', subhire: '', supplier: '', cost: '', id, ...l }])
-    setOpen(id)
+    openLine(id)
     setAdding(undefined)
   }
   const addKit = (modelId: string) => {
@@ -318,7 +339,7 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   // A short line hires in what it's short of (ADR 0089), then opens for who from and what it costs.
   const hireIn = (l: LineDraft, n: number) => {
     set(l.id, { subhire: String(Math.min(num(l.qty), (num(l.subhire) || 0) + n)) })
-    setOpen(l.id)
+    openLine(l.id, 'what', true)
   }
   const undoRemove = () => {
     if (!removed) return
@@ -331,9 +352,13 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
     // Lines charged by a rule work theirs out from their days out (ADR 0085), so this is for those charged by the day.
     setLines((ls) => ls.map((l) => (l.kind === 'kit' && l.per === 'day' && !l.rate ? { ...l, days: String(d) } : l)))
     setKitDays('')
+    setKitDaysOpen(false)
   }
   // A department's discount (ADR 0085) is put on each of its lines, so each line still says what it's charged.
-  const groupDiscount = (group: string, off: string) => setLines((ls) => ls.map((l) => (l.group === group ? { ...l, discount: off } : l)))
+  const groupDiscount = (group: string, off: string) => {
+    setLines((ls) => ls.map((l) => (l.group === group ? { ...l, discount: off } : l)))
+    setDiscounting(undefined)
+  }
   const groups = linesByGroup(lines)
   const kitLines = lines.filter((l) => l.kind === 'kit' && l.per === 'day' && !l.rate).length
   const source = m.sourceOf(job.id)
@@ -368,213 +393,398 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
     ])
     if (a.discount && a.advice.discountPct !== null) setDiscount(String(a.advice.discountPct))
     setAdvice(undefined)
+    setAdding(undefined)
   }
+  // "Not saved yet" leads to what stops it: the line opens, or the terms field takes the focus, and its fault is said.
+  const goToProblem = () => {
+    if (problemKey === undefined) return
+    touch(problemKey)
+    if (faultAt >= 0) return openLine(problemKey)
+    if (problemKey === 'km') return openLine(TRAVEL_ROW)
+    termRefs.current[problemKey as TermKey]?.focus()
+  }
+  const full = lines.length >= MAX_LINES
+  const nextNumber = m.quotesOf(job.id).find((v) => v.number)?.number ?? m.nextNumber
+  const undoLine = removed && (
+    <p className="undo-line" aria-live="polite">
+      Removed “{removed.line.what || 'a line'}”.{' '}
+      <button type="button" className="link" onClick={undoRemove}>
+        Undo
+      </button>
+    </p>
+  )
+  const removedGroup = removed ? linesByGroup([removed.line])[0]!.group : undefined
 
   return (
     <form
       ref={under}
-      className="card quote-draft"
+      className="quote-draft"
       aria-label={`Version ${q.version}, a draft`}
       onSubmit={(e: FormEvent) => {
         e.preventDefault()
         flush()
       }}
     >
-      <header className="title">
-        <h2>Version {q.version}</h2>
-        <QuotePill q={q} />
-      </header>
-      {/* What it comes to, in view while the lines are changed below. */}
-      <div className="quote-summary" role="group" aria-label="What it comes to">
-        <span>
-          Before VAT <b>{money(totals.net)}</b>
-        </span>
-        <span>
-          Total <b>{money(totals.gross)}</b>
-        </span>
-        {unpriced > 0 && <span className="warn">{plural(unpriced, 'line')} with no price</span>}
-        {shortLines > 0 && <span className="warn">{plural(shortLines, 'line')} short of kit</span>}
-        {boss && <MarginWords margin={margin} />}
-        <span className="save-state" aria-live="polite">
-          {problem ? 'Not saved yet' : payload ? (late ? 'Saving…' : '') : q.pending ? 'Saved on this device' : 'Saved'}
-        </span>
-      </div>
-
-      <JobChangesCard changes={changes} quoteId={q.id} onTake={(next) => setLines((ls) => next(ls))} />
-      {claude.offered &&
-        (advice ? (
-          <AdviceCard view={view} a={advice} lines={asked} discountPct={pctOk ? pct : 0} onChange={setAdvice} onTake={takeAdvice} onLeave={() => setAdvice(undefined)} />
-        ) : (
-          <AskClaude view={view} status={claude.status} name={job.name} jobDays={days} discountPct={pctOk ? pct : 0} lines={asked} onAdvice={setAdvice} />
-        ))}
-
-      {lines.length === 0 && <Empty>No lines yet. Add kit, crew or anything else the quote is for.</Empty>}
-      {groups.map((g) => (
-        <fieldset key={g.group} className="quote-group">
-          <legend>{g.group}</legend>
-          {g.lines.map((l) => {
-            const n = lines.indexOf(l) + 1
-            const r = read[n - 1]
-            const done = r !== undefined && typeof r !== 'string' ? r : undefined
-            const kit = done && <KitNote l={done} checks={checks} items={m.package(l.packageId ?? '')?.items} names={(id) => view.warehouse.models.find((x) => x.id === id)?.name} onHire={l.modelId ? (k) => hireIn(l, k) : undefined} full={open === l.id} />
-            const cost = done ? costOf(done) : undefined
-            return open !== l.id ? (
-              <div key={l.id} className="quote-line-row">
-                <LineSummary l={l} n={n} r={r} onOpen={() => setOpen(l.id)} focus={shut === l.id} margin={boss && done ? lineMargin(done, cost) : undefined} />
-                {kit}
-              </div>
-            ) : (
-              <LineEditor key={l.id} l={l} n={n} r={r} set={(c) => set(l.id, c)} onRemove={() => remove(l)} onDone={() => {
-                  setShut(l.id)
-                  setOpen(undefined)
-                }}
-                kit={kit}
-                cost={<CostFields l={l} n={n} r={done} cost={cost} boss={boss} suppliers={view.kit.suppliers} set={(c) => set(l.id, c)} />}
-                last={<LastCharged found={lastOf(last, namesOf(l))} n={n} price={l.price} onUse={(cents) => set(l.id, { price: euroText(cents) })} />}
-              />
-            )
-          })}
-          {g.lines.length > 1 && <GroupDiscount group={g.group} onApply={(off) => groupDiscount(g.group, off)} refuse={refuse} />}
-        </fieldset>
-      ))}
-      <TravelAndSubsistence extras={extras} meals={meals} setMeals={setMeals} km={kmTyped} setKm={setKmTyped} fuelSetOn={m.quoting.fuelSetOn ?? null} today={today} />
-      {removed && (
-        <p className="undo-line" aria-live="polite">
-          Removed “{removed.line.what || 'a line'}”.{' '}
-          <button type="button" className="link" onClick={undoRemove}>
-            Undo
-          </button>
-        </p>
-      )}
-
-      <div className="quote-add" role="group" aria-label="Add to the quote">
-        {adding === 'kit' ? (
-          <div className="adding">
-            <ProductPicker label="Kit to add" products={view.warehouse.models} value="" onPick={addKit} hint="Priced from the price list, for the job's days." />
-            <button type="button" className="link" onClick={() => setAdding(undefined)}>
-              Cancel
-            </button>
-          </div>
-        ) : adding === 'package' ? (
-          <AddPackage packages={m.packages} onAdd={addPackage} onCancel={() => setAdding(undefined)} />
-        ) : adding === 'transport' ? (
-          <AddTransport
-            vans={vans.map((b) => ({ id: b.id, what: transportWords(b.vehicle!.kind, !!b.driver), name: `${b.vehicle!.name}${b.driver ? `, ${b.driver.name} driving` : ''}` }))}
-            onAdd={addTransport}
-            onCancel={() => setAdding(undefined)}
-          />
-        ) : adding === 'crew' ? (
-          <AddCrew roles={m.roles.map((r) => r.role)} onAdd={addCrew} onCancel={() => setAdding(undefined)} />
-        ) : (
-          <>
-            <button type="button" onClick={() => setAdding('kit')} disabled={lines.length >= MAX_LINES}>
-              Add kit
-            </button>
-            {m.packages.length > 0 && (
-              <button type="button" onClick={() => setAdding('package')} disabled={lines.length >= MAX_LINES}>
-                Add a package
-              </button>
+      <section className="card quote-main">
+        <header className="title">
+          <h2>Version {q.version}</h2>
+          <QuotePill q={q} />
+        </header>
+        {/* What it comes to, in view while the lines are changed below, with what needs a look: each a way to the first such line. */}
+        <div className="quote-summary" role="group" aria-label="What it comes to">
+          <div className="figures">
+            <span className="figure lead">
+              <small>Before VAT</small> <b>{money(totals.net)}</b>
+            </span>
+            <span className="figure">
+              <small>Total</small> <b>{money(totals.gross)}</b>
+            </span>
+            {boss && (
+              <span className={`figure${margin.margin < 0 ? ' bad' : ''}`}>
+                <small>Margin</small> <b>{money(margin.margin)}</b>
+                {margin.pct !== null && <span className="pct">{pctWord(margin.pct)}</span>}
+              </span>
             )}
-            <button type="button" onClick={() => setAdding('crew')} disabled={lines.length >= MAX_LINES}>
-              Add crew
-            </button>
-            <button type="button" onClick={() => setAdding('transport')} disabled={lines.length >= MAX_LINES}>
-              Add transport
-            </button>
-            <button type="button" onClick={addOther} disabled={lines.length >= MAX_LINES}>
-              Add something else
-            </button>
-          </>
-        )}
-      </div>
-      {kitLines > 0 && (
-        <div className="kit-days-all">
-          <label>
-            Charge all kit for
-            <input inputMode="decimal" value={kitDays} onChange={(e) => setKitDays(e.target.value)} placeholder="3" aria-label="Days charged for all kit" />
-            days
-          </label>
-          <button type="button" onClick={allKitDays} disabled={!kitDays.trim()}>
-            Apply
-          </button>
-          <p className="hint">A week's hire charged as three days, say. Each line's days can still be changed on its own.</p>
+            <span className="save-state" aria-live="polite">
+              {problem ? (
+                <button type="button" className="link quiet" onClick={goToProblem}>
+                  Not saved yet
+                </button>
+              ) : payload ? (
+                late ? (
+                  'Saving…'
+                ) : (
+                  ''
+                )
+              ) : q.pending ? (
+                'Saved on this device'
+              ) : (
+                'Saved'
+              )}
+            </span>
+          </div>
+          {unpricedLines.length + shortLines.length + noCostLines.length > 0 && (
+            <div className="chips">
+              {unpricedLines.length > 0 && (
+                <button type="button" className="chip" onClick={() => openLine(unpricedLines[0]!.id, 'price')}>
+                  {plural(unpricedLines.length, 'line')} with no price
+                </button>
+              )}
+              {shortLines.length > 0 && (
+                <button type="button" className="chip" onClick={() => openLine(shortLines[0]!.id)}>
+                  {plural(shortLines.length, 'line')} short of kit
+                </button>
+              )}
+              {noCostLines.length > 0 && (
+                <button type="button" className="chip" onClick={() => openLine(noCostLines[0]!.id, 'what', true)}>
+                  {plural(noCostLines.length, 'line')} with no cost yet
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      )}
-      <div className="quote-terms quote-discount">
-        {agreedCents === null ? (
+
+        <JobChangesCard changes={changes} quoteId={q.id} onTake={(next) => setLines((ls) => next(ls))} />
+
+        {lines.length === 0 && <Empty>No lines yet. Add kit, crew or anything else the quote is for.</Empty>}
+        {groups.map((g) => (
+          <section key={g.group} className="quote-group" role="group" aria-label={g.group}>
+            <div className="group-head">
+              <h3>{g.group}</h3>
+              {g.lines.length > 1 && discounting !== g.group && (
+                <button type="button" className="link quiet" onClick={() => setDiscounting(g.group)}>
+                  Discount every line…
+                </button>
+              )}
+            </div>
+            {discounting === g.group && <GroupDiscount group={g.group} onApply={(off) => groupDiscount(g.group, off)} onCancel={() => setDiscounting(undefined)} refuse={refuse} />}
+            {g.lines.map((l) => {
+              const n = lines.indexOf(l) + 1
+              const c = parsed[n - 1]!
+              const done = c.line
+              const kit = done && <KitNote l={done} checks={checks} items={m.package(l.packageId ?? '')?.items} names={(id) => view.warehouse.models.find((x) => x.id === id)?.name} onHire={l.modelId ? (k) => hireIn(l, k) : undefined} full={open === l.id} />
+              const cost = done ? costOf(done) : undefined
+              return open !== l.id ? (
+                <div key={l.id} className="quote-line-row">
+                  <LineSummary l={l} n={n} done={done} onOpen={() => openLine(l.id)} focus={shut === l.id} margin={boss && done ? lineMargin(done, cost) : undefined} />
+                  {kit}
+                </div>
+              ) : (
+                <div key={l.id} className="quote-line-row open">
+                  <LineEditor
+                    l={l}
+                    n={n}
+                    done={done}
+                    fault={c.fault}
+                    left={touched.has(l.id)}
+                    focus={focusField}
+                    set={(ch) => set(l.id, ch)}
+                    onRemove={() => remove(l)}
+                    onDone={() => {
+                      touch(l.id)
+                      setShut(l.id)
+                      setOpen(undefined)
+                    }}
+                    onLeave={() => touch(l.id)}
+                    kit={kit}
+                    last={<LastCharged found={lastOf(last, namesOf(l))} n={n} price={l.price} onUse={(cents) => set(l.id, { price: euroText(cents) })} />}
+                    cost={cost}
+                    boss={boss}
+                    suppliers={view.kit.suppliers}
+                    wantCost={wantCost}
+                  />
+                </div>
+              )
+            })}
+            {removedGroup === g.group && undoLine}
+          </section>
+        ))}
+        {removed && !groups.some((g) => g.group === removedGroup) && undoLine}
+        <TravelAndSubsistence
+          extras={extras}
+          meals={meals}
+          setMeals={setMeals}
+          km={kmTyped}
+          setKm={setKmTyped}
+          kmProblem={termErr('km')}
+          onLeaveKm={() => touch('km')}
+          fuelSetOn={m.quoting.fuelSetOn ?? null}
+          today={today}
+          open={open}
+          setOpen={openLine}
+        />
+
+        <div className="quote-add" role="group" aria-label="Add to the quote">
+          {advice ? (
+            <AdviceCard
+              view={view}
+              a={advice}
+              lines={asked}
+              discountPct={pctOk ? pct : 0}
+              onChange={setAdvice}
+              onTake={takeAdvice}
+              onLeave={() => {
+                setAdvice(undefined)
+                setAdding(undefined)
+              }}
+            />
+          ) : adding === 'claude' ? (
+            <div className="adding ask">
+              <AskClaude view={view} status={claude.status} name={job.name} jobDays={days} discountPct={pctOk ? pct : 0} lines={asked} onAdvice={setAdvice} />
+              <button type="button" className="link" onClick={() => setAdding(undefined)}>
+                Cancel
+              </button>
+            </div>
+          ) : adding === 'kit' ? (
+            <div className="adding">
+              <ProductPicker label="Kit to add" products={view.warehouse.models} value="" onPick={addKit} hint="Priced from the price list, for the job's days." />
+              <button type="button" className="link" onClick={() => setAdding(undefined)}>
+                Cancel
+              </button>
+            </div>
+          ) : adding === 'package' ? (
+            <AddPackage packages={m.packages} onAdd={addPackage} onCancel={() => setAdding(undefined)} />
+          ) : adding === 'transport' ? (
+            <AddTransport
+              vans={vans.map((b) => ({ id: b.id, what: transportWords(b.vehicle!.kind, !!b.driver), name: `${b.vehicle!.name}${b.driver ? `, ${b.driver.name} driving` : ''}` }))}
+              onAdd={addTransport}
+              onCancel={() => setAdding(undefined)}
+            />
+          ) : adding === 'crew' ? (
+            <AddCrew roles={m.roles.map((r) => r.role)} onAdd={addCrew} onCancel={() => setAdding(undefined)} />
+          ) : (
+            <>
+              <button type="button" onClick={() => setAdding('kit')} disabled={full}>
+                <Icon name="add" />
+                Add kit
+              </button>
+              <button type="button" onClick={() => setAdding('crew')} disabled={full}>
+                <Icon name="add" />
+                Add crew
+              </button>
+              {m.packages.length > 0 && (
+                <button type="button" onClick={() => setAdding('package')} disabled={full}>
+                  <Icon name="add" />
+                  Add a package
+                </button>
+              )}
+              <button type="button" onClick={() => setAdding('transport')} disabled={full}>
+                <Icon name="add" />
+                Add transport
+              </button>
+              <button type="button" onClick={addOther} disabled={full}>
+                <Icon name="add" />
+                Add something else
+              </button>
+              {claude.offered && (
+                <button type="button" onClick={() => setAdding('claude')}>
+                  Ask Claude
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        {kitLines > 0 &&
+          (kitDaysOpen ? (
+            <div className="kit-days-all">
+              <label>
+                Charge all kit for
+                <UnitBox unit="days">
+                  <input
+                    inputMode="decimal"
+                    value={kitDays}
+                    onChange={(e) => setKitDays(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        allKitDays()
+                      }
+                    }}
+                    placeholder="3"
+                    aria-label="Days charged for all kit"
+                    autoFocus
+                  />
+                </UnitBox>
+              </label>
+              <button type="button" onClick={allKitDays} disabled={!kitDays.trim()}>
+                Apply
+              </button>
+              <button type="button" className="link" onClick={() => setKitDaysOpen(false)}>
+                Cancel
+              </button>
+              <p className="hint">A week's hire charged as three days, say. Each line's days can still be changed on its own.</p>
+            </div>
+          ) : (
+            <button type="button" className="link quiet" onClick={() => setKitDaysOpen(true)}>
+              Charge all kit for the same days…
+            </button>
+          ))}
+      </section>
+
+      <section className="card quote-side">
+        <h3 className="quote-head">Terms</h3>
+        <div className="quote-terms quote-discount">
+          {agreedCents === null ? (
+            <label className="field">
+              Discount
+              <UnitBox unit="%">
+                <input
+                  inputMode="decimal"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  onBlur={() => touch('discount')}
+                  ref={(el) => {
+                    termRefs.current.discount = el
+                  }}
+                  aria-label="Discount, %"
+                  {...bad('discount')}
+                />
+              </UnitBox>
+              {termNote('discount', m.discountOf(job.clientId) !== undefined && `${job.client?.name} usually gets ${pctWord(m.discountOf(job.clientId)!)} off.`)}
+            </label>
+          ) : (
+            <div className="field">
+              Discount
+              <p className="agreed-note">
+                {money(totals.discount)} off, {pctWord(totals.discountPct)}, to come to the price agreed.
+              </p>
+            </div>
+          )}
           <label className="field">
-            Discount, %
-            <input inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} aria-label="Discount, %" />
-            {m.discountOf(job.clientId) !== undefined && <small>{job.client?.name} usually gets {pctWord(m.discountOf(job.clientId)!)} off.</small>}
+            Agree a total
+            <UnitBox unit="€" before>
+              <input
+                inputMode="decimal"
+                value={agreed}
+                onChange={(e) => setAgreed(e.target.value)}
+                onBlur={() => touch('agreed')}
+                ref={(el) => {
+                  termRefs.current.agreed = el
+                }}
+                placeholder="None"
+                aria-label="Agreed price before VAT, €"
+                {...bad('agreed')}
+              />
+            </UnitBox>
+            {termNote('agreed', agreed.trim() ? 'Before VAT. Clear it to go back to a percentage.' : 'Before VAT: the discount becomes whatever comes to it.')}
           </label>
-        ) : (
-          <div className="field">
-            Discount
-            <p className="agreed-note">
-              {money(totals.discount)} off, {pctWord(totals.discountPct)}, to come to the price agreed.
-            </p>
+        </div>
+        <div className="quote-terms">
+          <label className="field">
+            Prices hold for
+            <UnitBox unit="days">
+              <input
+                inputMode="numeric"
+                value={validFor}
+                onChange={(e) => setValidFor(e.target.value)}
+                onBlur={() => touch('validFor')}
+                ref={(el) => {
+                  termRefs.current.validFor = el
+                }}
+                aria-label="Prices hold for, days"
+                {...bad('validFor')}
+              />
+            </UnitBox>
+            {termNote('validFor', `Printed as valid until ${dayLabel(validUntil({ sentOn: null, validDays: validOk ? valid : DEFAULT_VALID_DAYS }, today))} if sent today.`)}
+          </label>
+          <label className="field">
+            Deposit
+            <UnitBox unit="%">
+              <input
+                inputMode="numeric"
+                value={deposit}
+                onChange={(e) => setDeposit(e.target.value)}
+                onBlur={() => touch('deposit')}
+                ref={(el) => {
+                  termRefs.current.deposit = el
+                }}
+                placeholder="None"
+                aria-label="Deposit, %"
+                {...bad('deposit')}
+              />
+            </UnitBox>
+            {termNote('deposit', dep !== null && depOk && `${money(depositCents(totals.gross, dep))} before the job, of ${money(totals.gross)}.`)}
+          </label>
+        </div>
+        <label className="field">
+          Notes for the client
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={3} placeholder="Load in from 8am. Prices include delivery to the venue." />
+        </label>
+
+        <Totals totals={totals} agreed={agreedCents !== null} />
+
+        <h3 className="quote-head">Send</h3>
+        <Refusal error={error} />
+        {!saved && problem && (problemShown ? <p className="warn-line">{problem} It saves once that's put right.</p> : <p className="hint">Not saved yet{faultAt >= 0 ? `: line ${faultAt + 1} isn't finished.` : '.'}</p>)}
+        {saved && q.lines.length > 0 && (
+          <div className="quote-send">
+            <label>
+              Sent to the client on
+              <input type="date" value={sentOn} max={irishToday()} onChange={(e) => setSentOn(e.target.value)} />
+            </label>
+            <button type="button" className="primary" onClick={() => void run(() => markSent(q.id, job, sentOn || today))}>
+              Mark as sent
+            </button>
           </div>
         )}
-        <label className="field">
-          Agree a total
-          <span className="with-unit">
-            €
-            <input inputMode="decimal" value={agreed} onChange={(e) => setAgreed(e.target.value)} placeholder="None" aria-label="Agreed price before VAT, €" />
-          </span>
-          <small>{agreed.trim() ? 'Before VAT. Clear it to go back to a discount percentage.' : `The price agreed before VAT, say ${money(roundDown(totals.subtotal))}. The discount becomes whatever comes to it.`}</small>
-        </label>
-      </div>
-      <label className="field">
-        Notes for the client
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={3} placeholder="Load in from 8am. Prices include delivery to the venue." />
-      </label>
-      <div className="quote-terms">
-        <label className="field">
-          Prices hold for
-          <span className="with-unit">
-            <input inputMode="numeric" value={validFor} onChange={(e) => setValidFor(e.target.value)} aria-label="Prices hold for, days" />
-            days
-          </span>
-          <small>Printed as “Valid until” {dayLabel(validUntil({ sentOn: null, validDays: validOk ? valid : DEFAULT_VALID_DAYS }, today))}, counted from the day it's sent.</small>
-        </label>
-        <label className="field">
-          Deposit, %
-          <input inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="None" aria-label="Deposit, %" />
-          {dep !== null && depOk && <small>{money(depositCents(totals.gross, dep))} before the job, of {money(totals.gross)}.</small>}
-        </label>
-      </div>
-      <Totals totals={totals} agreed={agreedCents !== null} />
-      <Refusal error={error} />
-      <div className="actions">
-        <button type="button" onClick={onPrint} disabled={!saved}>
-          Print a draft
-        </button>
-      </div>
-      {!saved && problem && <p className="warn-line">{problem} It saves once that's put right.</p>}
-      {saved && q.lines.length > 0 && (
-        <div className="quote-send">
-          <label>
-            Sent to the client on
-            <input type="date" value={sentOn} max={irishToday()} onChange={(e) => setSentOn(e.target.value)} />
-          </label>
-          <button type="button" className="primary" onClick={() => void run(() => markSent(q.id, job, sentOn || today))}>
-            Mark as sent
+        <div className="actions">
+          <button type="button" onClick={onPrint} disabled={!saved}>
+            Print a draft
           </button>
-          {!answering ? (
-            <button type="button" className="link" onClick={() => setAnswering(true)}>
-              Accepted already, by phone?
-            </button>
-          ) : (
-            <button type="button" onClick={() => void run(() => client.mutate('quote.answer', { id: q.id, answer: 'accepted', on: sentOn || today }))}>
-              Record it as accepted
-            </button>
-          )}
-          <p className="hint">
-            Marked sent, it becomes quote {m.quotesOf(job.id).find((v) => v.number)?.number ?? m.nextNumber} and stays as it is. Then print it as a PDF and send it yourself: the app sends
-            nothing.
-          </p>
+          {saved &&
+            q.lines.length > 0 &&
+            (!answering ? (
+              <button type="button" className="link quiet" onClick={() => setAnswering(true)}>
+                Accepted already, by phone?
+              </button>
+            ) : (
+              <button type="button" onClick={() => void run(() => client.mutate('quote.answer', { id: q.id, answer: 'accepted', on: sentOn || today }))}>
+                Record it as accepted
+              </button>
+            ))}
         </div>
-      )}
+        {saved && q.lines.length > 0 && <p className="hint">Marked sent, it becomes quote {nextNumber} and stays as it is. Print it as a PDF and send it yourself: the app sends nothing.</p>}
+      </section>
     </form>
   )
 }

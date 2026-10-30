@@ -13,6 +13,7 @@
   [ADR 0080](0080-a-quote-that-saves-itself-and-keeps-up-with-the-job.md) (the
   editor), [ADR 0085](0085-rate-rules-discounts-and-an-agreed-price.md)
   (discounts and an agreed price).
+- **Amended:** 30 October 2026 by [ADR 0100](0100-the-quote-form-redrawn.md): travel and subsistence are two rows like any line, with the reason there isn't one in the row; pressing a row opens the distance, or the Meals provided switch. The paragraph explaining how they're worked out goes.
 
 ## Context
 
