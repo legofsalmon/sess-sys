@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.65.0',
+    date: '2026-10-30',
+    title: 'Filter and sort on the long lists',
+    what: "Jobs, Quotes, People, the stock catalogue, Venues and Clients each have a Sort and a Filter under their search, the same on every list. Put jobs in order by date, name, client or most crew still needed, and narrow them by status, kind, crew still needed or kit short; quotes by biggest total or job date; people by last name, department or level, and narrow to staff, freelancers or a level; products by category or how many are in stock. Each choice says how many it would show, a filter that's on shows as a chip you can tap to take off, and the list says how many of how many are showing. Clients have a search now too.",
+    prs: [0],
+    adrs: [99],
+  },
+  {
     version: '1.64.3',
     date: '2026-10-30',
     title: 'Tidier code behind the scenes',

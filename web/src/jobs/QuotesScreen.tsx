@@ -16,6 +16,10 @@ import {
   type RmsOpportunityPage,
   type RmsOutcome,
   type View,
+  activeFilters,
+  listed,
+  QUOTE_SORTS,
+  quoteFilters,
 } from '@sh/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { Empty } from '../Empty.tsx'
@@ -23,7 +27,8 @@ import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
 import { useAccess } from '../role.ts'
 import { StatusPill, type PillTone } from '../StatusPill.tsx'
-import { useView } from '../view.ts'
+import { useToday, useView } from '../view.ts'
+import { ListTools, useListChoices } from '../ListTools.tsx'
 import { Top } from './common.tsx'
 import { ToFollowUp } from './Money.tsx'
 import { QuotePill } from './Quote.tsx'
@@ -61,7 +66,13 @@ function AllQuotes({ view }: { view: View }) {
   const [search, setSearch] = useState('')
   const rows = useMemo(() => quoteRows(view.money), [view.money])
   const count = (s: QuoteShow) => rows.filter((r) => quoteRowShown(r, s, '')).length
-  const shown = rows.filter((r) => quoteRowShown(r, show, search))
+  // Filter and sort (ADR 0099) on the quotes made here; the ones from Current RMS are kept on the server, newest first, by the same search and choice.
+  const today = useToday()
+  const [choices, setChoices] = useListChoices('quotes')
+  const filters = useMemo(() => quoteFilters(today), [today])
+  const searched = rows.filter((r) => quoteRowShown(r, show, search))
+  const shown = listed(searched, filters, QUOTE_SORTS, choices)
+  const narrowed = activeFilters(filters, choices.filters).length > 0
   return (
     <section className="card quote-list" aria-label="All quotes">
       <Heading icon="document">All quotes</Heading>
@@ -73,10 +84,11 @@ function AllQuotes({ view }: { view: View }) {
           </button>
         ))}
       </div>
+      {rows.length > 0 && <ListTools name="quotes" items={searched} filters={filters} sorts={QUOTE_SORTS} choices={choices} onChange={setChoices} shown={shown.length} what="quotes" />}
       {rows.length === 0 && <Empty>No quotes made here yet. Start one under New quote, or from a job's page.</Empty>}
       {rows.length > 0 && shown.length === 0 && <p className="hint">No quote made here matches that.</p>}
-      {/* A search looks through them all; otherwise the last thirty changed, until Show all. */}
-      <ShowAll key={`${show} ${search}`} items={shown} limit={search.trim() ? shown.length : 30} what="quotes">
+      {/* A search or a filter looks through them all; otherwise the first thirty in the order chosen, until Show all. */}
+      <ShowAll key={`${show} ${search} ${choices.sort} ${JSON.stringify(choices.filters)}`} items={shown} limit={search.trim() || narrowed ? shown.length : 30} what="quotes">
         {(list) => (
           <ul className="plain">
             {list.map((r) => (

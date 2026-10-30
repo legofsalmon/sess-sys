@@ -171,11 +171,14 @@ test('the people list finds someone as the picker does, shows its first ten, and
   await list.getByText('Archived').click()
   await expect(list.locator('details.archived')).toContainText(name('Lorcan'))
 
-  // The department filter still narrows the list, with the search empty.
+  // The department filter still narrows the list, with the search empty (ADR 0099: behind Filter, and said as a chip while it's on).
   await find.fill('')
-  await list.getByLabel('Department').selectOption(dept)
+  await list.getByRole('button', { name: 'Filter', exact: true }).click()
+  await list.getByLabel('Department').selectOption(dept.toLowerCase())
   await expect(rows).toHaveCount(12)
-  await list.getByLabel('Department').selectOption('')
+  await expect(list.getByRole('button', { name: `Take off the filter Department: ${dept}` })).toBeVisible()
+  await list.getByRole('button', { name: 'Clear filters' }).click()
+  await expect(list.getByLabel('Department')).toHaveValue('')
 
   // Someone just added stays in view, whatever the search and the fold, until the tab is next opened.
   await office.reload()
