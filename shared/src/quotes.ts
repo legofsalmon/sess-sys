@@ -654,11 +654,24 @@ export interface JobChanges {
  * the kit line or crew call each was built from. Only how many is compared:
  * the days and prices on a quote are the office's to change, and a job's
  * dates moving says nothing about what the client is charged for.
+ *
+ * Kit put on the job from the quote (ADR 0102) wasn't built into a line, so
+ * a product the quote already has, on a line of its own or in one of its
+ * packages, isn't offered again as new.
  */
-export function changesFromJob(lines: readonly QuoteLine[], kit: readonly KitToQuote[], crew: readonly CrewToQuote[], prices: PriceList, newId: () => string): JobChanges {
+export function changesFromJob(
+  lines: readonly QuoteLine[],
+  kit: readonly KitToQuote[],
+  crew: readonly CrewToQuote[],
+  prices: PriceList,
+  newId: () => string,
+  packaged: ReadonlySet<string> = new Set()
+): JobChanges {
   const refs = new Map(lines.filter((l) => l.ref && l.kind !== 'other').map((l) => [l.ref!, l]))
+  const kitIds = new Set(kit.map((k) => k.id))
+  const quoted = new Set([...packaged, ...lines.filter((l) => l.kind === 'kit' && l.modelId && !(l.ref && kitIds.has(l.ref))).map((l) => l.modelId!)])
   const fresh = linesFor(
-    kit.filter((k) => !refs.has(k.id)),
+    kit.filter((k) => !refs.has(k.id) && !quoted.has(k.modelId)),
     crew.filter((c) => !refs.has(c.id)),
     prices,
     newId

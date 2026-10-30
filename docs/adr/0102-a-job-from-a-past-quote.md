@@ -58,13 +58,30 @@ app on real jobs, and the quickest way is from a quote it already wrote.
 6. **Nothing in Current RMS changes**, and the past quote stays as it was.
    It's for those who see money, and needs signal, as the past quotes do.
 
+7. **The job's kit list fills from the quote (30 October 2026, Colly: "Can
+   you set the kit to auto populate from what was quoted? With the ability
+   to amend/add/remove also").**
+   - A job made from a past quote, or by New quote, gets its quote's kit on
+     its kit list as it's made: each product on a kit line, and the pieces
+     of each package, for the whole job, with how many are hired in and who
+     from, noted "From the quote" (`kitFromQuote`).
+   - After that, the Kit card shows what the job's newest quote has that
+     the kit list hasn't, "On the quote but not the kit list yet", with one
+     press to add it. It only ever adds: kit the warehouse took off or cut
+     down isn't put back without that press, and nothing is taken off the
+     list when the quote drops it, since the list is the warehouse's to
+     change. It's offered to those who can change kit and see quotes.
+   - Kit on the list is changed, added to and taken off as any kit is.
+   - The quote's "The job has changed" card no longer offers kit as new
+     when the quote has that product already, on a line of its own or in a
+     package, so filling the list doesn't make the quote offer it again.
+
 ## Consequences
 
 - The calendars are no longer the one source of jobs from Current RMS's
   history: the office chooses which old quotes become jobs, one at a time.
 - A line's days are as Current RMS had them; when the job's days change,
   the office changes the lines on the quote.
-- Kit on the quote isn't put on the job's kit list: the office adds it from
-  the job, as for any quote started from nothing.
+- Kit on the quote is put on the job's kit list: see 7.
 - A copy of an old job keeps its old prices until changed; "Last charged"
   and the price list are a press away on the quote.

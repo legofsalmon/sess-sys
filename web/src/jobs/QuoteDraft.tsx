@@ -367,8 +367,10 @@ export function Draft({ q, view, job, onPrint }: { q: QuoteView; view: View; job
   const kitLines = lines.filter((l) => l.kind === 'kit' && l.per === 'day' && !l.rate).length
   const source = m.sourceOf(job.id)
   // Every line counts here, finished or not, so one being typed isn't offered again as new on the job.
-  const asLines = lines.map((l): QuoteLine => ({ id: l.id, kind: l.kind, what: l.what, ref: l.ref, group: l.group, qty: num(l.qty), days: 1, unitCents: 0, vat: l.vat }))
-  const changes = changesFromJob(asLines, source.kit, source.crew, { product: m.productPrice, role: m.rolePrice, rate: m.productRate }, newId)
+  const asLines = lines.map((l): QuoteLine => ({ id: l.id, kind: l.kind, what: l.what, ref: l.ref, group: l.group, qty: num(l.qty), days: 1, unitCents: 0, vat: l.vat, modelId: l.modelId }))
+  // The products in the quote's packages, so kit put on the job from them isn't offered again (ADR 0102).
+  const packaged = new Set(lines.flatMap((l) => (l.packageId ? (m.package(l.packageId)?.items ?? []).map((i) => i.modelId) : [])))
+  const changes = changesFromJob(asLines, source.kit, source.crew, { product: m.productPrice, role: m.rolePrice, rate: m.productRate }, newId, packaged)
   // What the mail asks for since the draft was changed (ADR 0098) is shown against the lines as they read, and taken here as if typed.
   const claude = useClaude(view)
   const asked: AskedLine[] = good.map((l) => ({ id: l.id, kind: l.kind, what: l.what, group: l.group, qty: l.qty, days: l.out ?? l.days, per: l.per ?? 'day', unitCents: l.unitCents, discountPct: l.discountPct ?? 0 }))

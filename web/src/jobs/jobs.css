@@ -34,6 +34,8 @@
 .jobs .short-kit { display: grid; gap: var(--space-8); justify-items: start; }
 .jobs .short-kit > * { margin: 0; }
 .jobs .short-kit > .kit-state, .jobs .short-kit > form { justify-self: stretch; }
+.jobs .kit-from-quote { display: grid; gap: var(--space-8); justify-items: start; padding-block: var(--space-8); border-bottom: 1px solid var(--line); }
+.jobs .kit-from-quote > * { margin: 0; }
 .jobs .short-kit .short-list { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .jobs .short-kit .short-list legend { padding: 0; margin-bottom: var(--space-4); font-weight: 700; }
 .jobs .short-kit .short-list .hint { margin: 0 0 var(--space-4); }

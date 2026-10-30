@@ -51,6 +51,7 @@ import { JOBS, MONEY } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { ByClaude, FromEnquiry, offer, pricingOf, Suggestions, takingWords, useClaude, type Offered } from './Claude.tsx'
 import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
+import { addKitFromQuote, kitToAdd } from './Kit.tsx'
 import { PackagesCard } from './Packages.tsx'
 import { JobViews } from './PlanScreen.tsx'
 import { InStep, QuotePill } from './Quote.tsx'
@@ -279,6 +280,8 @@ function NewQuote({ view, onCancel }: { view: View; onCancel: () => void }) {
         await client.mutate('phase.add', { id: newId(), projectId: id, name: ph.name, start: ph.start, end: ph.end, venueId: null, notes: '' })
       const quoteLines = taking.map((x) => suggestionLine(x.s, newId())).slice(0, MAX_LINES)
       await client.mutate('quote.save', { id: newId(), projectId: id, lines: quoteLines, discountPct: view.money.discountOf(clientId) ?? 0, notes: '' })
+      // Its kit on the job's kit list as well (ADR 0102), to change there as any kit is.
+      await addKitFromQuote(id, kitToAdd(view, quoteLines, id))
     }).then((ok) => ok && (location.hash = `#jobs/${encodeURIComponent(id)}/quote`))
   }
   return (
