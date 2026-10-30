@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - Colly asked for a filter and sort system on the long lists (ADR 0099,
-  PR #0): one shared part under the search on Jobs, Quotes, People, the
+  PR #183): one shared part under the search on Jobs, Quotes, People, the
   catalogue, Venues and Clients. Sort select, Filter button with a select
   per filter (each choice with its count), filters that are on as chips
   that take them off, "N of M" and Clear filters. Kept for the tab's life;
