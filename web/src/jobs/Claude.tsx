@@ -9,17 +9,19 @@ import {
   money,
   plural,
   withModel,
-  ASK_LENGTH,
   ENQUIRY_LENGTH,
   type AskedLine,
   type AssistantStatus,
   type EnquiryReading,
+  type MailThread,
   type Pricing,
   type QuoteAdvice,
   type Suggestion,
   type View,
 } from '@sh/shared'
 import { useState } from 'react'
+import { when } from '../format.ts'
+import { Heading } from '../Icon.tsx'
 import { ProductPicker } from '../ProductPicker.tsx'
 import { useAccess } from '../role.ts'
 import { useLate } from '../useLate.ts'
@@ -204,71 +206,15 @@ export interface Advice {
   discount: boolean
 }
 
-/** Asking Claude to change the quote, in words. */
-export function AskClaude({
-  view,
-  status,
-  name,
-  jobDays,
-  discountPct,
-  lines,
-  onAdvice,
-}: {
-  view: View
-  status: Loaded<AssistantStatus>
-  name: string
-  jobDays: number
-  discountPct: number
-  lines: AskedLine[]
-  onAdvice: (a: Advice) => void
-}) {
-  const [ask, setAsk] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const late = useLate(busy)
-  const no = blocked(status)
-  const send = async () => {
-    setBusy(true)
-    setError('')
-    const { data, error } = await asking<QuoteAdvice>('/api/assistant/quote', { ask, name, jobDays, discountPct, lines })
-    setBusy(false)
-    if (!data) return setError(error ?? '')
-    setAsk('')
-    onAdvice({
-      advice: data,
-      add: offer(adviceSuggestions(data, pricingOf(view), jobDays)),
-      remove: Object.fromEntries(data.remove.map((id) => [id, true])),
-      change: Object.fromEntries(data.change.map((c) => [c.lineId, true])),
-      discount: data.discountPct !== null,
-    })
+/** What a thread's mail asks to change on a quote, ready for the card: each line ticked to take. */
+export function toAdvice(view: View, data: QuoteAdvice, jobDays: number): Advice {
+  return {
+    advice: data,
+    add: offer(adviceSuggestions(data, pricingOf(view), jobDays)),
+    remove: Object.fromEntries(data.remove.map((id) => [id, true])),
+    change: Object.fromEntries(data.change.map((c) => [c.lineId, true])),
+    discount: data.discountPct !== null,
   }
-  return (
-    <section className="ask-claude" aria-label="Ask Claude">
-      <label>
-        Ask Claude to change this quote
-        <textarea
-          rows={2}
-          maxLength={ASK_LENGTH}
-          value={ask}
-          onChange={(e) => setAsk(e.target.value)}
-          placeholder="Such as: add two more radio mics, make it three days, and take 10% off the lighting."
-        />
-      </label>
-      <div className="actions">
-        <button type="button" onClick={() => void send()} disabled={busy || !!no || ask.trim().length < 3}>
-          {late ? 'Asking…' : 'Ask Claude'}
-        </button>
-        <span className="hint" aria-live="polite">
-          {busy ? (late ? 'Claude is looking at the quote.' : '') : (no ?? 'Claude suggests; nothing changes until you take it.')}
-        </span>
-      </div>
-      {error && (
-        <p className="alert" role="alert">
-          {error}
-        </p>
-      )}
-    </section>
-  )
 }
 
 /** Claude's suggestions for the quote: each ticked to take, then taken in one press, or left. */
@@ -356,6 +302,103 @@ export function AdviceCard({
           {nothing ? 'Close' : 'Leave it as it is'}
         </button>
       </div>
+    </section>
+  )
+}
+
+// --- The operations mailbox (ADR 0098) --------------------------------------------
+
+/** The mail Claude read, for the screens that show it; asked again when `again` changes. */
+export function useMail(offered: boolean, projectId?: string, again = 0): Loaded<{ threads: MailThread[] }> {
+  return useAsked(offered, `mail-${projectId ?? ''}`, () => getJson<{ threads: MailThread[] }>(`/api/assistant/mail${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`), again)
+}
+
+/** "Aoife Byrne, 3 mails, the last today at 09:12". */
+const threadWords = (t: MailThread) => `${t.from || 'Someone'}, ${plural(t.messages, 'mail')}, the last ${when(t.lastAt)}`
+
+/**
+ * On a draft quote: the email threads about its job, what Claude read in them, and what the latest mail asks to change
+ * on a quote someone has changed, to take in one press or leave.
+ */
+export function MailOnQuote({ view, projectId, jobDays, lines, discountPct, onTake }: { view: View; projectId: string; jobDays: number; lines: AskedLine[]; discountPct: number; onTake: (a: Advice) => void }) {
+  const [again, setAgain] = useState(0)
+  const mail = useMail(true, projectId, again)
+  const [shown, setShown] = useState<Record<string, Advice>>({})
+  const threads = mail.state === 'ready' ? mail.data.threads : []
+  if (!threads.length) return null
+  const done = async (t: MailThread) => {
+    await postJson(`/api/assistant/mail/${encodeURIComponent(t.id)}/done`, {})
+    setShown(({ [t.id]: _, ...rest }) => rest)
+    setAgain((n) => n + 1)
+  }
+  return (
+    <>
+      {threads.map((t) => {
+        const a = t.advice ? (shown[t.id] ?? toAdvice(view, t.advice, jobDays)) : undefined
+        return (
+          <section key={t.id} className="claude-advice" aria-label={`From the email “${t.subject}”`}>
+            <ByClaude>{t.drafting ? 'Drafted by Claude from the email thread, and kept up to date with it until someone changes the quote.' : 'Read by Claude in the email thread.'}</ByClaude>
+            <p>
+              <b>{t.subject || 'No subject'}</b>
+              <br />
+              <small className="hint">{threadWords(t)}</small>
+            </p>
+            {t.summary && <p>{t.summary}</p>}
+            {t.questions.length > 0 && (
+              <>
+                <h3>To ask the client</h3>
+                <ul>
+                  {t.questions.map((q) => (
+                    <li key={q}>{q}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {a && (
+              <AdviceCard
+                view={view}
+                a={a}
+                lines={lines}
+                discountPct={discountPct}
+                onChange={(next) => setShown({ ...shown, [t.id]: next })}
+                onTake={() => {
+                  onTake(a)
+                  void done(t)
+                }}
+                onLeave={() => void done(t)}
+              />
+            )}
+          </section>
+        )
+      })}
+    </>
+  )
+}
+
+/** On Quotes: the threads Claude read in the last month that are enquiries or about a job, each opening its quote. */
+export function FromMailbox({ view }: { view: View }) {
+  const { offered } = useClaude(view)
+  const mail = useMail(offered)
+  const threads = mail.state === 'ready' ? mail.data.threads : []
+  if (!offered || !threads.length) return null
+  const job = (id: string | null) => (id ? view.jobs.jobs.find((j) => j.id === id) : undefined)
+  return (
+    <section className="card from-mailbox" aria-label="From the operations mailbox">
+      <Heading icon="mail">From the operations mailbox</Heading>
+      <p className="hint">Mail cc’d to operations@ in the last month. Claude drafts a quote for each new enquiry and keeps it up to date until someone changes it. Mail not cc’d there isn’t seen.</p>
+      <ul>
+        {threads.map((t) => {
+          const j = job(t.projectId)
+          return (
+            <li key={t.id}>
+              {j ? <a href={`#jobs/${encodeURIComponent(j.id)}/quote`}>{t.subject || j.name}</a> : <b>{t.subject || 'No subject'}</b>}
+              <small>
+                {[j ? (t.kind === 'enquiry' ? `New enquiry: ${j.name}` : j.name) : '', threadWords(t), t.drafting ? 'drafted by Claude' : t.advice ? 'changes to look at' : ''].filter(Boolean).join(' · ')}
+              </small>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

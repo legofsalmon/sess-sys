@@ -646,6 +646,15 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
 .app .todo-item small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .app .todo-item.done a { color: var(--muted); text-decoration: line-through; }
+
+/* The operations mailbox (ADR 0098): the paste box folded away as the second way in, and the threads on Quotes. */
+.app .paste-enquiry summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: var(--text-small); font-weight: 600; }
+.app .from-mailbox ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-10); }
+.app .from-mailbox li { display: grid; gap: var(--space-2); }
+.app .from-mailbox li small { color: var(--muted); font-size: var(--text-hint); }
+.app .mailbox { display: grid; gap: var(--space-8); margin-top: var(--space-12); }
+.app .mailbox h3 { margin: 0; }
+
 /* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
 .quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
 .quotes .from-rms h3 { margin: 0 0 var(--space-8); }

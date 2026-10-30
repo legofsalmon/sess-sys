@@ -73,6 +73,10 @@ export const GONE: readonly Gone[] = [
   // Claude's to-do lists (ADR 0097), which devices never see: what Claude wrote can name anyone from a job's notes, so
   // every list goes. The next one is written the next weekday morning, or when someone asks.
   { table: 'assistant_lists', theirs: '$1::text IS NOT NULL' },
+  // What Claude read in the operations mailbox (ADR 0098), which devices never see: a thread's subject, sender, summary
+  // and questions can name anyone, so all of it goes. The threads stay linked to their jobs, and the mail is still in
+  // Gmail, read again when the thread next grows.
+  { table: 'mail_notes', theirs: '$1::text IS NOT NULL' },
   // Their address on Google Calendar invites, which devices never see. While invites are on, a day still to come keeps
   // theirs until the calendar's next run takes them off its event, and that run removes the row: gone now, it would
   // leave them on the event as a guest added by hand. Past events in Google keep theirs (ADR 0027).

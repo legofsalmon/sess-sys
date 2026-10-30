@@ -2,13 +2,14 @@ import { createServer, type Server } from 'node:http'
 import { expect, test } from '@playwright/test'
 
 /**
- * Claude inside the app (ADR 0096): the office turns it on under Admin,
- * pastes an enquiry into New quote, checks what Claude read and the lines
- * it suggests (choosing a product for one it wasn't sure of, leaving one
- * out), and starts the quote with them; then asks Claude to change the
- * draft, and takes what it suggests. Anthropic is a stand-in here, started
- * on the port the server was told. Uses the made-up data (ADR 0019), so it
- * starts fresh before and after.
+ * Claude inside the app (ADR 0096, 0098): the office turns it on under
+ * Admin, pastes an enquiry into New quote, checks what Claude read and the
+ * lines it suggests (choosing a product for one it wasn't sure of, leaving
+ * one out), and starts the quote with them; then takes what the mail in
+ * the operations mailbox asks for, and finds the thread on Quotes.
+ * Anthropic is a stand-in here, started on the port the server was told,
+ * and the mailbox's answers are played in the page. Uses the made-up data
+ * (ADR 0019), so it starts fresh before and after.
  */
 
 const phoneSize = { width: 390, height: 844 }
@@ -45,21 +46,11 @@ test.beforeAll(async () => {
       if (req.method !== 'POST' || !req.url?.startsWith('/v1/messages')) return res.writeHead(404).end()
       const sent = JSON.parse(body) as { model: string; system: string; messages: { content: string }[] }
       asked.push({ system: sent.system, user: sent.messages[0]!.content })
-      // The quote's ask names its lines by id; the first Y10P line gets two more.
-      const lines = sent.messages[0]!.content.match(/"id":"([^"]+)","kind":"kit","what":"d&b Y10P"/)
       // The to-do list names the first job in the facts, by its id.
       const job = sent.messages[0]!.content.match(/"jobId":"([^"]+)","job":"([^"]+)"/)
       const answer = sent.system.includes('writing the to-do list')
         ? { summary: 'One quote to chase.', items: [{ jobId: job?.[1] ?? '', where: 'quote', title: `Chase the quote for ${job?.[2] ?? 'the job'}`, why: 'Sent over a week ago with no answer.' }, { jobId: 'not-a-job', where: 'crew', title: 'Book a lighting tech', why: '' }] }
-        : sent.system.includes('Read the enquiry')
-        ? reading
-        : {
-            note: 'Two more Y10Ps, and 10% off the whole quote.',
-            add: [{ kind: 'kit', what: 'SM58', department: 'audio', qty: 4, days: null, per: 'day', priceCents: null }],
-            remove: [],
-            change: lines ? [{ lineId: lines[1], qty: 8, days: null, discountPct: null, priceCents: null }] : [],
-            discountPct: 10,
-          }
+        : reading
       res.writeHead(200, { 'content-type': 'application/json' }).end(
         JSON.stringify({
           id: 'msg_stand_in',
@@ -81,7 +72,7 @@ test.afterAll(async ({ request }) => {
   await request.post('/api/data/start-fresh', fresh)
 })
 
-test('the office starts a quote from an enquiry Claude read, then has Claude change it', async ({ browser, request }) => {
+test('the office turns Claude on, pastes an enquiry, and sees what the mailbox asks for on the quote', async ({ browser, request }) => {
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
   expect((await request.post('/api/data/made-up')).ok()).toBe(true)
   const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
@@ -95,15 +86,19 @@ test('the office starts a quote from an enquiry Claude read, then has Claude cha
   // Turned on under Admin › Company.
   await office.goto('/#admin')
   const card = office.getByRole('region', { name: 'Claude' })
-  const toggle = card.getByRole('switch', { name: /Offer Claude/ })
+  const toggle = card.getByRole('switch', { name: /Turn Claude on/ })
   await expect(toggle).not.toBeChecked()
   await toggle.click()
   await expect(toggle).toBeChecked()
   await expect(card).toContainText('This month: $0.00 of $50.00')
+  // This test server has no Google key, so the mailbox can't be connected here.
+  await expect(card.getByRole('group', { name: 'The operations mailbox' })).toContainText('needs the Google key')
 
   await office.goto('/#quotes')
   await quotes.getByRole('button', { name: 'New quote' }).click()
   const form = quotes.getByRole('form', { name: 'New quote' })
+  // Pasting is the second way in, folded away: enquiries cc'd to operations@ are drafted by themselves.
+  await form.getByText('Or paste an enquiry for Claude to read').click()
   await form.getByLabel('Paste an enquiry').fill('Hi, we have a launch at the Printworks on 4 and 5 March. Could you quote for 6 Y10Ps, 4 Spider moving heads, a hazer and two stagehands, delivered? Thanks, Liffey Brands')
   await form.getByRole('button', { name: 'Read it with Claude' }).click()
 
@@ -127,6 +122,33 @@ test('the office starts a quote from an enquiry Claude read, then has Claude cha
   await hazer.getByRole('checkbox').uncheck()
   await expect(lines.getByRole('listitem').filter({ hasText: 'Stagehand' })).toContainText('2 days')
 
+  // The mailbox is played here: what the server would say Claude read. Its own reading is tested in server/test/mailbox.test.ts.
+  const mailDone: string[] = []
+  let advised = true
+  const thread = (projectId: string | null) => ({
+    id: 't1',
+    subject: 'Launch in March',
+    from: 'Aoife Byrne',
+    lastAt: new Date().toISOString(),
+    messages: 3,
+    kind: 'enquiry',
+    projectId,
+    summary: 'A product launch for about 300 people.',
+    questions: ['What time can we get in?'],
+    drafting: false,
+    advice: advised ? { note: 'Four SM58s and 10% off.', add: [{ kind: 'kit', what: 'SM58', department: 'audio', qty: 4, days: null, per: 'day', priceCents: null }], remove: [], change: [], discountPct: 10 } : null,
+  })
+  let jobId: string | null = null
+  await office.route('**/api/assistant/mail?projectId=*', (route) => {
+    jobId = new URL(route.request().url()).searchParams.get('projectId')
+    return route.fulfill({ json: { threads: [thread(jobId)] } })
+  })
+  await office.route('**/api/assistant/mail', (route) => route.fulfill({ json: { threads: [thread(jobId)] } }))
+  await office.route('**/api/assistant/mail/*/done', (route) => {
+    mailDone.push(route.request().url().split('/').at(-2)!)
+    advised = false
+    return route.fulfill({ json: { ok: true } })
+  })
   await form.getByRole('button', { name: /Start the quote with 4 lines/ }).click()
   await expect(office).toHaveURL(/#jobs\/[^/]+\/quote$/)
   const draft = office.getByRole('form', { name: 'Version 1, a draft' })
@@ -134,24 +156,30 @@ test('the office starts a quote from an enquiry Claude read, then has Claude cha
   await expect(draft).toContainText('Delivery and collection')
   await expect(draft).not.toContainText('Hazer')
 
-  // Asked to change it, Claude suggests; nothing changes until it's taken. The box opens from the add row.
-  await draft.getByRole('button', { name: 'Ask Claude' }).click()
-  await draft.getByLabel('Ask Claude to change this quote').fill('Two more Y10Ps, four SM58s, and 10% off')
-  await draft.getByRole('button', { name: 'Ask Claude' }).click()
+  // What the thread in the operations mailbox asks for since someone changed the draft (ADR 0098): offered to take or leave.
   const advice = draft.getByRole('region', { name: 'Suggested by Claude' })
-  await expect(advice).toContainText('Two more Y10Ps')
-  await expect(advice).toContainText('6 to 8')
+  await expect(advice).toContainText('Four SM58s and 10% off')
   await expect(advice).toContainText('Discount on the whole quote: 0% to 10%')
   await expect(advice.getByRole('listitem').filter({ hasText: '4 × Shure SM58' })).toBeVisible()
-  await advice.getByRole('button', { name: 'Make these 3 changes' }).click()
+  const fromMail = draft.getByRole('region', { name: 'From the email “Launch in March”' })
+  await expect(fromMail).toContainText('Aoife Byrne, 3 mails')
+  await expect(fromMail).toContainText('What time can we get in?')
+  await advice.getByRole('button', { name: 'Make these 2 changes' }).click()
   await expect(advice).toHaveCount(0)
+  expect(mailDone).toEqual(['t1'])
   await expect(draft).toContainText('Shure SM58')
   await expect(draft.getByLabel('Discount, %', { exact: true })).toHaveValue('10')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
 
   // What it cost is counted under Admin.
   await office.goto('/#admin')
-  await expect(card).toContainText('asked 2 times')
+  await expect(card).toContainText('asked once')
+
+  // On Quotes, the threads Claude read, each opening its job's quote.
+  await office.goto('/#quotes')
+  const mailbox = office.getByRole('region', { name: 'From the operations mailbox' })
+  await expect(mailbox.getByRole('link', { name: 'Launch in March' })).toHaveAttribute('href', `#jobs/${jobId}/quote`)
+  await expect(mailbox).toContainText('New enquiry: Harbour launch')
 
   // Claude's to-do list (ADR 0097): none yet this morning, written on request, each thing a link and a tick.
   await office.goto('/#notifications')

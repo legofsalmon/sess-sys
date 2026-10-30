@@ -23,6 +23,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { Empty } from '../Empty.tsx'
+import { FromMailbox } from './Claude.tsx'
 import { ShowAll } from '../Fold.tsx'
 import { Heading } from '../Icon.tsx'
 import { useAccess } from '../role.ts'
@@ -55,6 +56,7 @@ export function QuotesScreen() {
   return (
     <div className="app crew jobs money quotes">
       <Top view={view} title="Quotes" root heading="Quotes" />
+      <FromMailbox view={view} />
       <ToFollowUp view={view} />
       <AllQuotes view={view} />
     </div>

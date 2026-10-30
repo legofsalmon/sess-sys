@@ -151,12 +151,12 @@ export class Google {
    * Where to send the person to connect an account. `offline` and `consent`
    * make Google hand over a lasting key every time, not just the first.
    */
-  authorizeUrl({ state, codeChallenge, redirectUri, loginHint }: { state: string; codeChallenge: string; redirectUri: string; loginHint?: string }): string {
+  authorizeUrl({ state, codeChallenge, redirectUri, loginHint, scopes = CALENDAR_SCOPES }: { state: string; codeChallenge: string; redirectUri: string; loginHint?: string; scopes?: readonly string[] }): string {
     const q = new URLSearchParams({
       client_id: this.options.clientId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: ['openid', 'email', ...CALENDAR_SCOPES].join(' '),
+      scope: ['openid', 'email', ...scopes].join(' '),
       state,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
