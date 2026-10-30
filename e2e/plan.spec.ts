@@ -189,6 +189,9 @@ test('a week by job on a phone, then by person with its clashes', async ({ brows
   await expect(phone.getByRole('rowheader', { name: named('Seán Murphy') })).toHaveCount(0)
   await phone.getByLabel(/Show everyone/).check()
   await expect(phone.getByRole('rowheader', { name: named('Seán Murphy') })).toBeVisible()
+  // Its rows add to the page's height: the planner has no box of its own to scroll up and down, however many rows it has.
+  const frame = await phone.locator('.scroller').evaluate(el => ({ cap: getComputedStyle(el).maxHeight, inner: el.scrollHeight - el.clientHeight }))
+  expect(frame).toEqual({ cap: 'none', inner: 0 })
   await phone.getByLabel(/Show everyone/).uncheck()
 
   // The clash's job opens from the list.
