@@ -20,6 +20,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
+import { useWindowed } from '../windowed.ts'
 import { Beside, JobStatusPill, Top, useHash } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { Pending } from '../StatusPill.tsx'
@@ -362,25 +363,7 @@ function StockCard({ view, current }: { view: View; current?: string }) {
       )}
       {/* Search first; for a browse, twenty in the laptop's column, which has nothing under it, and five on a phone, where the pick lists are under it (audit, 20 October 2026, finding 97). */}
       <ShowAll items={shown} limit={wide ? 20 : 5} what={department === 'all' ? 'products' : `${DEPARTMENT_LABELS[department].toLowerCase()} products`} keep={(m) => m.id === current}>
-        {(rows) => (
-          <ul className="job-list">
-            {rows.map((m) => (
-              <li key={m.id}>
-                <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
-                  <Thumb icon={kitIcon(m)} src={productPhotoOf(m)} />
-                  <div>
-                    <b>{m.name}</b>
-                    <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
-                  </div>
-                  <div className="side">
-                    <Pending pending={m.pending} />
-                    <small>{amountLabel(m)}</small>
-                  </div>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+        {(rows) => <ProductRows rows={rows} current={current} />}
       </ShowAll>
       {/* A new product starts in the department the list is narrowed to. */}
       {mayAdd && (
@@ -389,6 +372,34 @@ function StockCard({ view, current }: { view: View; current?: string }) {
         </Fold>
       )}
     </section>
+  )
+}
+
+/**
+ * The products listed, drawn only near the screen (audit, 20 October 2026,
+ * finding 97): Show all on three hundred products builds a few dozen rows,
+ * as Jobs does (ADR 0050), and Back finds its place by them (places.ts).
+ */
+function ProductRows({ rows, current }: { rows: readonly ModelView[]; current: string | undefined }) {
+  const win = useWindowed('products', rows, (m) => m.id, 64)
+  return (
+    <ul className="job-list windowed" ref={win.list} style={win.style}>
+      {win.rows.map((m, i) => (
+        <li key={m.id} ref={win.row(m.id)} data-place={m.id} aria-setsize={rows.length} aria-posinset={win.start + i + 1}>
+          <a className="job-row" href={`#stock/product/${m.id}`} aria-current={m.id === current ? 'page' : undefined}>
+            <Thumb icon={kitIcon(m)} src={productPhotoOf(m)} />
+            <div>
+              <b>{m.name}</b>
+              <p>{[m.category, DEPARTMENT_LABELS[m.department]].filter(Boolean).join(' · ')}</p>
+            </div>
+            <div className="side">
+              <Pending pending={m.pending} />
+              <small>{amountLabel(m)}</small>
+            </div>
+          </a>
+        </li>
+      ))}
+    </ul>
   )
 }
 

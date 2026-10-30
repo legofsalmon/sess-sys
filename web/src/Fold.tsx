@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { scrollerOf } from './windowed.ts'
 
 /**
  * Two ways to keep a screen short on a phone (audit finding 16): a form
@@ -78,14 +79,32 @@ export function ShowAll<T>({
 }) {
   const [all, setAll] = useState(false)
   const shown = all || items.length <= limit ? items : items.filter((x, i) => i < limit || keep?.(x))
+  // Where the page was when Show all was tapped (audit, 20 October 2026, finding 97): the rest of the list opens below what was
+  // being read. Left to itself the browser keeps whatever was under the list on the screen, which carries the page to the list's end.
+  const was = useRef<{ scroller: HTMLElement | null; top: number } | null>(null)
+  useLayoutEffect(() => {
+    const at = was.current
+    if (!all || !at) return
+    was.current = null
+    const back = () => (at.scroller ? (at.scroller.scrollTop = at.top) : scrollTo(scrollX, at.top))
+    back()
+    const frame = requestAnimationFrame(back)
+    return () => cancelAnimationFrame(frame)
+  }, [all])
+  const showAll = (button: HTMLElement) => {
+    const scroller = scrollerOf(button)
+    was.current = { scroller, top: scroller ? scroller.scrollTop : scrollY }
+    setAll(true)
+  }
   return (
     <>
       {children(shown)}
       {shown.length < items.length && (
-        <button type="button" className="link show-all" onClick={() => setAll(true)}>
+        <button type="button" className="link show-all" onClick={(e) => showAll(e.currentTarget)}>
           Show all {items.length.toLocaleString('en-IE')} {what}
         </button>
       )}
     </>
   )
 }
+

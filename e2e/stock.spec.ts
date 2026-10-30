@@ -180,9 +180,12 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   await ready(page)
-  // The catalogue shows its first few (five on a phone, twenty on a laptop), with the rest behind "Show all" (audit finding 16).
-  const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
-  if (await all.count()) await all.click()
+  // The catalogue shows its first few (five on a phone, twenty on a laptop), with the rest behind "Show all" (audit finding 16), drawn
+  // only near the screen (finding 97); with other tests' products about, this test's two are found by name.
+  if (process.env.SHOTS) {
+    const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
+    if (await all.count()) await all.click()
+  } else await page.getByLabel('Find').fill(id)
   await expect(page.locator('.job-row', { hasText: speaker })).toContainText('2 items · 4 not labelled yet')
   await expect(page.locator('.job-row', { hasText: cable })).toContainText('8 counted')
   await page.screenshot(shot('stock-list'))

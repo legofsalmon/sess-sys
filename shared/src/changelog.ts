@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.64.2',
+    date: '2026-10-30',
+    title: 'A long stock list that keeps up',
+    what: "Stock's Show all on a long catalogue is quick now: it builds only the products near the screen and the next ones as you scroll, as Jobs does. Searching still finds any product at once. And Show all anywhere in the app now opens the rest of the list where you were, rather than jumping to its end.",
+    prs: [181],
+  },
+  {
     version: '1.64.1',
     date: '2026-10-30',
     title: 'Tools brought up to date',

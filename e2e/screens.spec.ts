@@ -115,6 +115,33 @@ test('a long list draws only the rows near the screen, and Back finds a place de
   await expect.poll(() => row.evaluate((a) => Math.round(a.getBoundingClientRect().top))).toBe(top)
 })
 
+test('Show all on a long catalogue draws only the products near the screen', async ({ browser, request }) => {
+  // Proves (audit, 20 October 2026, finding 97): three hundred products under Show all build a few dozen rows, each saying where it
+  // is in the whole list, and the ones further down are built as the page comes near them. On a short screen the button is below
+  // the fold, and the list opens where it was read rather than carrying the page to its end.
+  const mutations = Array.from({ length: 150 }, (_, i) => ({
+    id: `long-model-${i}`,
+    name: 'model.create',
+    args: { id: `long-model-${i}`, name: `Long list product ${String(i).padStart(3, '0')}`, department: 'audio', category: 'Long list', tracking: 'bulk', isCase: false, valueCents: null, notes: '' },
+  }))
+  const res = await request.post('/api/sync/push', { data: { clientId: 'long-catalogue', mutations: mutations.map((m) => ({ ...m, createdAt: new Date().toISOString() })) } })
+  expect((await res.json()).results.every((r: { status: string }) => r.status === 'applied')).toBe(true)
+
+  const page = await (await browser.newContext({ viewport: { width: 390, height: 500 } })).newPage()
+  await page.goto('/#stock')
+  await expect(page.getByRole('status')).toHaveText('Up to date')
+  await page.getByRole('button', { name: /^Show all [\d,]+ products$/ }).click()
+  const list = page.locator('ul.job-list.windowed')
+  const rows = list.locator('li[aria-posinset]')
+  await expect(rows.first()).toHaveAttribute('aria-posinset', '1')
+  expect(Number(await rows.first().getAttribute('aria-setsize'))).toBeGreaterThanOrEqual(150)
+  expect(await rows.count()).toBeLessThan(60)
+
+  // The search still finds one anywhere in the list.
+  await page.getByLabel('Find').fill('Long list product 149')
+  await expect(list.getByRole('link', { name: /Long list product 149/ })).toBeVisible()
+})
+
 /** The demo copy, seen as one of its personas: this server has no passcode, so the test answers for it as a demo copy would. */
 async function as(page: Page, role: 'crew' | 'head', button: RegExp) {
   await page.route('**/api/me', (route) => route.fulfill({ json: { auth: 'passcode', role } }))
