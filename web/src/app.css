@@ -37,17 +37,15 @@
   --on-accent: #ffffff;
   --bad: #a8480f;
   --bad-soft: #f9e4d6;
-  /* Spacing and radius, named as in Figma. */
-  --space-2: 2px;
-  --space-4: 4px;
-  --space-6: 6px;
-  --space-8: 8px;
-  --space-10: 10px;
-  --space-12: 12px;
-  --space-14: 14px;
-  --space-16: 16px;
-  --space-20: 20px;
-  --space-40: 40px;
+  /* Space is the design system's 4px grid (--ds-space-N is N × 4px), so a step off it is a bug, not taste. Which step goes where is by
+     job, so a page has a rhythm: tight inside a group, about twice that between groups, more again between the parts of a page. Each
+     job is named here once (the design system's layout roles), and the stylesheets use a role before a step. */
+  --inline: var(--ds-space-2); /* between things side by side: an icon and its words, buttons in a row */
+  --stack: var(--ds-space-1); /* between the lines of one group: a label and its field, a heading and the line under it */
+  --group: var(--ds-space-3); /* between groups inside a part: a card's heading and its list, one row or field and the next */
+  --section: var(--ds-space-6); /* between the parts of a page: card and card, the page's head and what's under it */
+  --inset: var(--ds-space-4); /* inside a card or panel, from its edge */
+  --gutter: var(--ds-space-4); /* the page's edge on a phone */
   --radius-control: 8px;
   --radius-tab: 10px;
   --radius-card: 12px;
@@ -76,16 +74,17 @@
 /* The page stops at its end: iOS otherwise lets it be dragged on past the last card, and the bar pinned to the bottom drifts up with it, loose over a gap. */
 html { overscroll-behavior-y: none; background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--ink); }
-.app { max-width: 640px; margin: 0 auto; padding: max(var(--space-12), env(safe-area-inset-top)) var(--space-16) var(--space-40); display: grid; gap: var(--space-14); }
+/* One column that never grows past the screen: a long name in the bar ends in … rather than pushing the page wider than the phone. */
+.app { max-width: 640px; margin: 0 auto; padding: max(var(--ds-space-3), env(safe-area-inset-top)) var(--gutter) var(--ds-space-10); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--section); }
 /* The name takes what the sync state leaves: the state keeps its one line, and a long screen name ends in … rather than wrapping, so nothing under the bar moves when the state changes. */
-.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-12); position: sticky; top: 0; background: var(--bg); padding-block: var(--space-8); z-index: 2; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--ds-space-3); position: sticky; top: 0; background: var(--bg); padding-block: var(--ds-space-2); z-index: 2; }
 /* A new version arrived while the app was open: one line fixed at the top until they reload. The page and its sticky header move down under it, so it hides nothing. */
-.update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--space-12); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--space-16) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+.update { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; justify-content: center; align-items: center; gap: var(--ds-space-3); min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--ds-space-4) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
 /* Its words wrap when there's more to say, such as changes a reload would lose; the button stays whole. */
 .update > span { white-space: normal; }
-.update ~ main .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--space-12)); }
+.update ~ main .app { padding-top: calc(56px + env(safe-area-inset-top) + var(--ds-space-3)); }
 .update ~ main .app .top { top: calc(56px + env(safe-area-inset-top)); }
-.brand { display: flex; gap: var(--space-10); align-items: center; min-width: 0; }
+.brand { display: flex; gap: var(--ds-space-3); align-items: center; min-width: 0; }
 .brand > span:last-child { min-width: 0; }
 .brand b, .brand small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand b { display: block; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
@@ -102,7 +101,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .theme-button { flex: none; display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
 .theme-button .icon { width: 22px; height: 22px; }
 .mark { flex: none; width: 36px; height: 36px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
-.conn { font-size: var(--text-status); font-weight: 600; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); white-space: nowrap; }
+.conn { font-size: var(--text-status); font-weight: 600; padding: var(--ds-space-1) var(--ds-space-3); border-radius: var(--radius-full); white-space: nowrap; }
 /* Up to date is healthy, so it's quiet (the design system's "healthy is quiet"): muted words with no bubble round them. Only what's waiting or a lost signal gets a pill. */
 .conn.online { padding-inline: 0; background: transparent; color: var(--muted); font-weight: 500; }
 /* Changes on their way: nobody has to act, so quiet grey and dashed, never amber. */
@@ -114,35 +113,37 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 @media (max-width: 479px) {
   .top .top-date ~ .conn.online { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
-.top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-6); }
+.top .state { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: var(--ds-space-2); }
 /* Changes the server turned down (audit finding 11), counted on every screen beside what's waiting: the bad tone, never the brand red. Pressing it opens the list under the top bar. */
-.top .not-done { min-height: 0; padding: var(--space-4) var(--space-10); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
+.top .not-done { min-height: 0; padding: var(--ds-space-1) var(--ds-space-3); border-radius: var(--radius-full); border: 1px solid transparent; background: var(--bad-soft); color: var(--bad); font-size: var(--text-status); font-weight: 700; white-space: nowrap; }
 .top .not-done[aria-expanded='true'] { border-color: var(--bad); }
 /* The list is part of the bar, under its row and never over it, so the badge and the screen's name stay in view wherever the page is scrolled to. */
 .not-done-list { grid-column: 1 / -1; max-height: 60vh; overflow: auto; }
 .not-done-list .row > div { flex: 1; min-width: 60%; }
 .not-done-list .meta { font-size: var(--text-hint); }
 /* What was typed into a change turned down, folded under its reason, to copy (problems.tsx). */
-.not-done-list .typed { display: grid; gap: var(--space-8); margin-top: var(--space-6); }
+.not-done-list .typed { display: grid; gap: var(--ds-space-2); margin-top: var(--ds-space-2); }
 .not-done-list .typed summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .not-done-list .typed button { justify-self: start; }
 /* A question before something that can't be undone (act.tsx), where the action was: what will happen, in words, and the two ways on. */
-.warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
+.warn-line { margin: 0; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 /* A link on the amber wash is ink, not brand red, which is under 4.5:1 there in the light theme (audit, 20 October 2026, finding 79). */
 .app .warn-line a, .app .warn-line button.link { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
-.confirm { display: grid; gap: var(--space-8); }
-.confirm .more { display: grid; gap: var(--space-8); }
+.confirm { display: grid; gap: var(--ds-space-2); }
+.confirm .more { display: grid; gap: var(--ds-space-2); }
 .confirm .more p { margin: 0; }
-.signal { display: flex; gap: var(--space-12); align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-12) var(--space-14); cursor: pointer; }
-.signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--space-2); }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--space-14); display: grid; gap: var(--space-10); }
+.signal { display: flex; gap: var(--ds-space-3); align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--ds-space-3) var(--ds-space-4); cursor: pointer; }
+.signal input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: var(--ds-space-half); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--inset); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--group); }
 .card h2 { margin: 0; font-size: var(--text-heading); font-weight: 700; }
+/* A heading and the line saying what it is are one group: the line sits under it, not a group away. */
+.card h2 + :is(p, .hint) { margin-top: calc(var(--stack) - var(--group)); }
 /* The page's own main thing (its list, its form) stands straight on the page under its title, not in a box of its own: a box is for a part
    that stands beside it. Two levels of boxes at most, as the design system's navigation page has it. */
 .card.plain { background: none; border: 0; border-radius: 0; padding: 0; }
 /* Icons and pictures, from the shared design system's set and its imagery rules: in the ink they sit in, beside their words. */
 .icon { flex: none; width: 1.25em; height: 1.25em; vertical-align: middle; }
-.card h2.with-icon, .card h1.with-icon { display: flex; align-items: center; gap: var(--space-8); }
+.card h2.with-icon, .card h1.with-icon { display: flex; align-items: center; gap: var(--ds-space-2); }
 .card h2.with-icon .icon { width: 18px; height: 18px; }
 .card h1.with-icon .icon { width: 22px; height: 22px; }
 .thumb, .avatar { --pic: 44px; flex: none; display: inline-grid; place-items: center; width: var(--pic); height: var(--pic); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); color: var(--muted); }
@@ -160,30 +161,30 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .app .job-row > .thumb, .app .job-row > .avatar, .warehouse .item-row > .thumb { align-self: flex-start; }
 .app .job-row > :is(.thumb, .avatar) + div, .warehouse .item-row > .thumb + div { flex: 1; min-width: 0; }
 /* The picture at the top of a thing's or a person's own page, beside its name. */
-.pictured { display: flex; align-items: center; gap: var(--space-14); }
+.pictured { display: flex; align-items: center; gap: var(--ds-space-4); }
 .pictured > :not(.thumb, .avatar) { min-width: 0; }
 .attention { border-color: var(--bad); }
 .attention h2 { color: var(--bad); }
-.row { display: flex; justify-content: space-between; gap: var(--space-12); align-items: flex-start; padding-top: var(--space-10); border-top: 1px solid var(--line); flex-wrap: wrap; }
+.row { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; padding-top: var(--group); border-top: 1px solid var(--line); flex-wrap: wrap; }
 .row:first-of-type { border-top: 0; padding-top: 0; }
-.row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.actions { display: flex; gap: var(--space-6); flex-wrap: wrap; align-items: center; }
+.row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.actions { display: flex; gap: var(--ds-space-2); flex-wrap: wrap; align-items: center; }
 /* The one status pill (StatusPill.tsx): amber when someone has to act, outlined and quiet when settled, grey when off, the bad tone for a clash, and dashed grey while waiting to sync.
    Settled is quiet, not green (the design system's "healthy is quiet"): a confirmed job, a filled call or approved leave is working as expected, so the colour is left for what still needs someone. Each keeps its word and a solid edge, so it still reads apart from off and from waiting. */
-.pill { font-size: var(--text-pill); font-weight: 700; padding: var(--space-2) var(--space-8); border: 1px solid transparent; border-radius: var(--radius-full); white-space: nowrap; }
+.pill { font-size: var(--text-pill); font-weight: 700; padding: var(--ds-space-half) var(--ds-space-2); border: 1px solid transparent; border-radius: var(--radius-full); white-space: nowrap; }
 .pill.pending { background: var(--warn-soft); color: var(--warn); }
 .pill.confirmed { background: transparent; color: var(--on-line); border-color: var(--line); }
 .pill.cancelled { background: var(--line); color: var(--on-line); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.waiting { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
-button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 /* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
 /* Focus on everything a keyboard reaches, links, text boxes and folds included: the same 2px ring outside the edge (design system rule 4). */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* 16px in every field, whatever the label round it is set in: iOS zooms the page into a field set any smaller. */
-input, select { font: inherit; font-size: var(--text-body); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
+input, select { font: inherit; font-size: var(--text-body); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); min-width: 0; }
 .hint, .empty { margin: 0; color: var(--muted); font-size: var(--text-hint); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
@@ -195,16 +196,16 @@ input, select { font: inherit; font-size: var(--text-body); padding: var(--space
 
 /* What every area's pages share (audit finding 24), once under .crew and .jobs, which Stock borrowed: the way back, a record's title and facts, lists of rows, filters, the grid form and a row that opens. */
 /* Tall enough to tap with a thumb (audit finding 22): the words sit where they did, the target grew round them. */
-.app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--space-4) 0; }
+.app .back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; justify-self: start; padding: var(--ds-space-1) 0; }
 /* An area's pages in one row (Views.tsx), first under the bar: the current one filled. Each takes an equal share where they fit; where they don't,
    as on a phone, the row stays one line and scrolls sideways, the current page brought into view, and the edge with more past it fades, so no
    page is hidden with nothing to say it's there (audit P2 23). It used to wrap: Stock's nine took four lines, a third of a phone, before any stock. */
-.views { display: flex; flex-wrap: nowrap; gap: var(--space-4); padding: var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.views { display: flex; flex-wrap: nowrap; gap: var(--ds-space-1); padding: var(--ds-space-1); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
 .views::-webkit-scrollbar { display: none; }
 /* Where Tab or a link brings something into view: clear of the bar at the top (its height kept by useUnderTop.ts) and of the tabs along the
    foot of a phone, not half under either (audit, 20 October 2026, finding 78). A desk's tabs are down the side. */
-html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-padding-bottom: calc(68px + env(safe-area-inset-bottom) + var(--space-8)); }
-@media (min-width: 900px) { html { scroll-padding-bottom: var(--space-8); } }
+html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--ds-space-2)); scroll-padding-bottom: calc(68px + env(safe-area-inset-bottom) + var(--ds-space-2)); }
+@media (min-width: 900px) { html { scroll-padding-bottom: var(--ds-space-2); } }
 /* More this way (more.tsx): wherever a row or a table scrolls sideways, the edge with more past it fades, the same on every screen (audit P2 23;
    20 October 2026, finding 13). A fade, not a shadow, so it reads the same on any surface. --more-from keeps a column that stays put (the
    planner's names) out of the left fade. */
@@ -212,50 +213,50 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .more-edges[data-more='right'] { mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
 .more-edges[data-more='left'] { mask-image: linear-gradient(to right, #000 var(--more-at), transparent var(--more-at), #000 calc(var(--more-at) + 48px)); }
 .more-edges[data-more='both'] { mask-image: linear-gradient(to right, #000 var(--more-at), transparent var(--more-at), #000 calc(var(--more-at) + 48px), #000 calc(100% - 48px), transparent); }
-.views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; gap: var(--space-6); min-height: 44px; padding-inline: var(--space-12); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.views a { flex: 1 0 auto; display: grid; grid-auto-flow: column; place-items: center; place-content: center; gap: var(--ds-space-2); min-height: 44px; padding-inline: var(--ds-space-3); border-radius: var(--radius-control); font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .views a[aria-current='page'] { background: var(--ink); color: var(--bg); }
 .views a:not([aria-current]):hover { color: var(--ink); }
 .views-count { font-weight: 600; opacity: .8; }
 /* The way up (Up.tsx), in the bar so it stays in view down a long page: one link to the parent on a phone, as tall as a thumb; from 900px, where the places are a sidebar, the whole way down as breadcrumbs, the page itself last and not a link. The separators are drawn here and not read out. */
-.top .up { grid-column: 1 / -1; min-width: 0; margin-top: calc(-1 * var(--space-6)); }
+.top .up { grid-column: 1 / -1; min-width: 0; margin-top: calc(-1 * var(--ds-space-2)); }
 .top .up-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 600; text-decoration: none; }
 .top .crumbs { display: none; }
 .crumbs ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; min-width: 0; font-size: var(--text-small); color: var(--muted); }
 .crumbs li { display: flex; align-items: center; min-width: 0; flex: none; }
 .crumbs li:last-child { flex: 0 1 auto; }
-.crumbs li + li::before { content: '›' / ''; padding-inline: var(--space-8); }
-.crumbs a { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-block: var(--space-6); color: var(--muted); font-weight: 600; text-decoration: none; }
+.crumbs li + li::before { content: '›' / ''; padding-inline: var(--ds-space-2); }
+.crumbs a { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-block: var(--ds-space-2); color: var(--muted); font-weight: 600; text-decoration: none; }
 .crumbs [aria-current] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
 @media (min-width: 900px) {
   .top .up-link { display: none; }
   .top .crumbs { display: block; }
 }
-.app .title { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
+.app .title { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
 .app h1 { margin: 0; font-size: var(--text-title); line-height: 1.25; }
 /* Every page's head, in the same place on every screen and outside any card: its title, large, naming this page (Calls, Labels, Admin), so
    checking you're in the right place is one look in one place; and a line under it, quieter, saying what matters most about it. */
-.page-head { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
-.page-words { display: grid; gap: var(--space-4); min-width: 0; flex: 1; }
-.page-title-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); }
-.app .page-head .page-sub { margin: 0; color: var(--muted); display: grid; gap: var(--space-2); }
+.page-head { display: grid; gap: var(--ds-space-1); margin-top: var(--ds-space-1); }
+.page-words { display: grid; gap: var(--ds-space-1); min-width: 0; flex: 1; }
+.page-title-row { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-3); }
+.app .page-head .page-sub { margin: 0; color: var(--muted); display: grid; gap: var(--ds-space-half); }
 .app .page-head .page-sub p { margin: 0; }
 /* The page's title, large, so Home, Calls, Catalogue and Admin read as different places (ADR 0033), and the biggest words on the screen. */
 .app h1.page-title, .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; }
-.app h1.area-title { margin-top: calc(-1 * var(--space-6)); }
+.app h1.area-title { margin-top: calc(-1 * var(--ds-space-2)); }
 /* On this screen: the parts of a long screen by name, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
    row of pages, so it doesn't read as the area's row (Views.tsx): plain words, no box round them, the part in view underlined in ink. It
    sits straight above the first part, under the screen's title and its choices, so it belongs to what it lists; scrolled up to the bar it
    stays there (top set by OnThisScreen.tsx to the bar's height). Its parts never widen the screen: they scroll inside it. */
-.app > .on-screen { position: sticky; z-index: 1; contain: inline-size; margin: 0 calc(-1 * var(--space-16)) calc(-1 * var(--space-4)); background: var(--bg); }
-.on-screen ul { list-style: none; margin: 0; padding: 0 var(--space-16); display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: var(--space-16); border-bottom: 1px solid var(--line); }
+.app > .on-screen { position: sticky; z-index: 1; contain: inline-size; margin: 0 calc(-1 * var(--gutter)) calc(var(--stack) - var(--section)); background: var(--bg); }
+.on-screen ul { list-style: none; margin: 0; padding: 0 var(--gutter); display: flex; gap: var(--ds-space-half); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: var(--gutter); border-bottom: 1px solid var(--line); }
 .on-screen ul::-webkit-scrollbar { display: none; }
-.on-screen button { min-height: 44px; padding: var(--space-4) var(--space-10); border: 0; border-bottom: 2px solid transparent; border-radius: 0; white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--space-6); }
+.on-screen button { min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 0; border-bottom: 2px solid transparent; border-radius: 0; white-space: nowrap; font-size: var(--text-small); font-weight: 600; color: var(--muted); background: transparent; display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .on-screen button[aria-current] { color: var(--ink); border-bottom-color: var(--ink); }
 @media (hover: hover) {
   .on-screen button:hover { color: var(--ink); background-image: none; }
 }
 .on-screen .count { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink); }
-.app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8) var(--space-12); }
+.app .facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2) var(--ds-space-3); }
 .app .facts dt { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .app .facts dd { margin: 0; }
 .app .also-emails { list-style: none; margin: 0; padding: 0; }
@@ -264,41 +265,41 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .app .muted { color: var(--muted); font-weight: 500; }
 .app .card > button { justify-self: start; }
 .app .search { width: 100%; }
-.app .filters { display: flex; gap: var(--space-6); flex-wrap: wrap; }
-.app .filters button { display: inline-flex; align-items: center; gap: var(--space-6); }
+.app .filters { display: flex; gap: var(--ds-space-2); flex-wrap: wrap; }
+.app .filters button { display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .app .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 /* Filter and sort on a long list (ADR 0099, ListTools.tsx): Sort and Filter on one line under the search, the filters' selects in a grid
    when open, and the filters that are on as chips that take them off, so a short list always says why it's short. */
-.app .list-tools { display: grid; gap: var(--space-8); }
-.app .list-tools-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
-.app .list-sort { display: inline-flex; align-items: center; gap: var(--space-6); color: var(--muted); font-size: var(--text-small); }
+.app .list-tools { display: grid; gap: var(--ds-space-2); }
+.app .list-tools-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.app .list-sort { display: inline-flex; align-items: center; gap: var(--ds-space-2); color: var(--muted); font-size: var(--text-small); }
 .app .list-sort select { color: var(--ink); }
-.app .list-filter-button { display: inline-flex; align-items: center; gap: var(--space-6); }
+.app .list-filter-button { display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .app .list-filter-button[aria-expanded='true'] { background: var(--ds-surface-inset); }
 .app .list-tools .icon { width: 18px; height: 18px; flex: none; }
-.app .list-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: var(--space-8) var(--space-12); padding: var(--space-10); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
+.app .list-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: var(--ds-space-2) var(--ds-space-3); padding: var(--ds-space-3); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
 .app .list-filters[hidden] { display: none; }
-.app .list-filters label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.app .list-filters label { display: grid; gap: var(--stack); font-size: var(--text-hint); color: var(--muted); }
 .app .list-filters select { color: var(--ink); width: 100%; }
-.app .list-active { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6) var(--space-8); font-size: var(--text-small); }
-.app .list-chip { display: inline-flex; align-items: center; gap: var(--space-4); min-height: 36px; padding: var(--space-4) var(--space-10); border-radius: 999px; background: var(--ink); color: var(--bg); border-color: var(--ink); font-size: var(--text-small); }
+.app .list-active { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2) var(--ds-space-2); font-size: var(--text-small); }
+.app .list-chip { display: inline-flex; align-items: center; gap: var(--ds-space-1); min-height: 36px; padding: var(--ds-space-1) var(--ds-space-3); border-radius: 999px; background: var(--ink); color: var(--bg); border-color: var(--ink); font-size: var(--text-small); }
 .app .list-chip .icon { width: 14px; height: 14px; }
 .app .list-count { color: var(--muted); }
-.menu .places { display: grid; gap: var(--space-14); }
+.menu .places { display: grid; gap: var(--section); }
 .menu .job-row { justify-content: flex-start; }
 .menu .job-row > div:not(.side) { flex: 1; min-width: 0; }
-.menu .place-icon { flex: none; padding-top: var(--space-2); color: var(--muted); }
+.menu .place-icon { flex: none; padding-top: var(--ds-space-half); color: var(--muted); }
 .menu .place-icon .icon { width: 22px; height: 22px; }
 .menu .job-row .side { align-content: center; color: var(--muted); }
-.app .job-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.app .job-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 /* A long list (audit finding 11, ADR 0050): only the rows near the screen are drawn, the rest standing in as padding at their heights
    (windowed.ts), which moves the page itself when a row above the screen changes height, so the browser's own anchoring is off. Back
    finds the place by its rows (data-place, places.ts). The first row has no line above it, wherever the window starts. */
 .app .windowed { overflow-anchor: none; }
-.app .job-row { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.app .job-row { display: flex; justify-content: space-between; gap: var(--ds-space-3); padding: var(--group) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .app .job-list li:first-child:not([aria-posinset]) .job-row, .app .job-list li[aria-posinset='1'] .job-row { border-top: 0; padding-top: 0; }
-.app .job-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.app .job-row .side { display: grid; justify-items: end; align-content: start; gap: var(--space-4); text-align: right; }
+.app .job-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.app .job-row .side { display: grid; justify-items: end; align-content: start; gap: var(--ds-space-1); text-align: right; }
 .app .job-row small { color: var(--muted); font-size: var(--text-hint); white-space: nowrap; }
 .app .job-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .app .job-row .kit-note { font-size: var(--text-hint); }
@@ -312,34 +313,34 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .app .pick-lists h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 /* Something just added: kit on a job, items and counts on Stock. */
 /* It worked, so it's quiet (the design system's "healthy is quiet", green never for "saved"): ink on the inset surface, the words saying what was done. */
-.app .added { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); background: var(--ds-surface-inset); color: var(--ink); font-size: var(--text-small); }
+.app .added { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); background: var(--ds-surface-inset); color: var(--ink); font-size: var(--text-small); }
 .app fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
-.app legend { padding: 0; font-size: var(--text-hint); color: var(--muted); margin-bottom: var(--space-4); }
-.app textarea { font: inherit; font-size: var(--text-body); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
-.app .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
-.app .grid-form label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.app legend { padding: 0; font-size: var(--text-hint); color: var(--muted); margin-bottom: var(--ds-space-1); }
+.app textarea { font: inherit; font-size: var(--text-body); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); color: var(--ink); width: 100%; resize: vertical; }
+.app .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--group); align-items: end; }
+.app .grid-form label { display: grid; gap: var(--stack); font-size: var(--text-hint); color: var(--muted); }
 .app .grid-form .wide { grid-column: 1 / -1; }
 /* Skills as picks (ADR 0063, SkillsField.tsx): chips in a box drawn as a field, the skills in use offered in the overlay under it. */
-.skills-field { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.skills-field { display: grid; gap: var(--stack); font-size: var(--text-hint); color: var(--muted); }
 .skills-anchor { position: relative; }
-.skills-box { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); min-height: 44px; padding: var(--space-4); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); cursor: text; }
+.skills-box { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-1); min-height: 44px; padding: var(--ds-space-1); border-radius: var(--radius-control); border: 1px solid var(--field-line); background: var(--bg); cursor: text; }
 .skills-box:hover { border-color: var(--ds-ink-tertiary); }
-.skills-box input { flex: 1 1 8em; min-height: 34px; border: 0; padding: var(--space-4) var(--space-6); background: transparent; }
+.skills-box input { flex: 1 1 8em; min-height: 34px; border: 0; padding: var(--ds-space-1) var(--ds-space-2); background: transparent; }
 .skills-box input:focus-visible { outline: 0; }
 .skills-box:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .skill-chips { display: contents; list-style: none; margin: 0; padding: 0; }
-.skill-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding-inline-start: var(--space-8); border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--panel); color: var(--ink); font-size: var(--text-small); }
+.skill-chip { display: inline-flex; align-items: center; gap: var(--ds-space-half); padding-inline-start: var(--ds-space-2); border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--panel); color: var(--ink); font-size: var(--text-small); }
 .skill-chip button { display: grid; place-items: center; width: 34px; height: 34px; min-height: 0; padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--muted); }
 .skill-chip button:hover { color: var(--ink); background: var(--line); }
 /* Drawn at 34px, as a chip's own control is, but a finger's 44px to hit (audit, 20 October 2026, finding 58). */
 .skill-chip button { position: relative; }
 .skill-chip button::after { content: ''; position: absolute; inset: -5px; }
 .skill-chip .icon { width: 16px; height: 16px; }
-.skill-options { position: absolute; z-index: 5; top: calc(100% + var(--space-4)); left: 0; right: 0; max-height: 16em; overflow-y: auto; list-style: none; margin: 0; padding: var(--space-4); border: 1px solid var(--ds-line-strong); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); box-shadow: var(--ds-elevation-menu); }
+.skill-options { position: absolute; z-index: 5; top: calc(100% + var(--ds-space-1)); left: 0; right: 0; max-height: 16em; overflow-y: auto; list-style: none; margin: 0; padding: var(--ds-space-1); border: 1px solid var(--ds-line-strong); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); box-shadow: var(--ds-elevation-menu); }
 .skill-options[hidden] { display: none; }
 /* Opened above the box where there's no room under it before the tabs along a phone's foot (SkillsField.tsx). */
-.skill-options.up { top: auto; bottom: calc(100% + var(--space-4)); }
-.skill-options li { display: flex; align-items: center; min-height: 44px; padding: 0 var(--space-10); border-radius: var(--radius-control); color: var(--ink); font-size: var(--text-body); cursor: pointer; }
+.skill-options.up { top: auto; bottom: calc(100% + var(--ds-space-1)); }
+.skill-options li { display: flex; align-items: center; min-height: 44px; padding: 0 var(--ds-space-3); border-radius: var(--radius-control); color: var(--ink); font-size: var(--text-body); cursor: pointer; }
 /* The highlighted offer is the one Enter takes: drawn as the current row is here (the accent bar) on the pressed wash, so it
    reads apart from a row the pointer only rests on, which takes the hover wash and only where a pointer hovers. The new one
    is in the secondary ink: tertiary ink is kept off anything that can be pressed. */
@@ -350,76 +351,76 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--space-8)); scroll-pa
 .skill-options li.new { color: var(--ds-ink-secondary); }
 /* The product picker (ADR 0070): a field like the others in a form, its offers two lines, the name then why it's offered
    and where it belongs; notes in the list ("Most like it", "40 more") aren't offers, so they're quiet and never highlight. */
-.picker-field { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.picker-field { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .picker-field input { width: 100%; }
-.picker-options li[role='option'] { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-2); padding-block: var(--space-4); }
+.picker-options li[role='option'] { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--ds-space-half); padding-block: var(--ds-space-1); }
 .picker-options li small { color: var(--ds-ink-secondary); font-size: var(--text-hint); }
-.picker-options li.note { min-height: 0; padding-block: var(--space-6) var(--space-2); color: var(--ds-ink-secondary); font-size: var(--text-hint); cursor: default; }
+.picker-options li.note { min-height: 0; padding-block: var(--ds-space-2) var(--ds-space-half); color: var(--ds-ink-secondary); font-size: var(--text-hint); cursor: default; }
 @media (hover: hover) {
   .picker-options li.note:hover { background: none; }
 }
 /* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. It looks like every other link (Links, below). */
-.app button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
-.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) 0; color: var(--accent-ink); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
+.app button.link { border: 0; background: none; padding: var(--ds-space-1) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) 0; color: var(--accent-ink); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
 .app .end { justify-content: flex-end; }
 /* A row that opens on a tap: the name as the button, its detail under it. */
 .app .person { align-items: center; }
 .app .who { border: 0; background: none; padding: 0; text-align: left; font-weight: 400; flex: 1; min-width: 60%; }
 .app .who b { display: block; }
 .app .who small { display: block; font-size: var(--text-status); }
-.app .detail { flex-basis: 100%; display: grid; gap: var(--space-6); font-size: var(--text-small); }
+.app .detail { flex-basis: 100%; display: grid; gap: var(--ds-space-2); font-size: var(--text-small); }
 .app .detail p { margin: 0; color: var(--ink); }
 .app .detail .alert { font-size: var(--text-hint); }
 /* A yes-or-no in a form, such as "Can approve time off" (ADR 0024) or why an item is retired. */
-.app .grid-form label.tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; color: var(--ink); cursor: pointer; }
-.app .grid-form label.tick input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .grid-form label.tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; min-height: 44px; color: var(--ink); cursor: pointer; }
+.app .grid-form label.tick input { width: 22px; height: 22px; flex: none; margin-top: var(--ds-space-half); accent-color: var(--accent); }
 .app .grid-form label.tick small { display: block; color: var(--muted); font-size: var(--text-hint); }
 
 /* Keeping a screen short on a phone (audit finding 16, Fold.tsx): a form behind its button, and a list's first few with "Show all". */
-.fold { display: grid; gap: var(--space-10); }
+.fold { display: grid; gap: var(--ds-space-3); }
 /* A form put away keeps what was typed (Fold.tsx), hidden rather than gone. */
 .fold[hidden] { display: none; }
 .fold > button.link, .app button.show-all { justify-self: start; }
 
 /* Sign-in and account. */
-a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--space-8) var(--space-12); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
+a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* 44px touch targets: easier with gloves on or in a dark venue. */
 input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
-.alert { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); background: var(--bad-soft); color: var(--bad); font-size: var(--text-small); }
-.signin .card { gap: var(--space-14); padding: var(--space-20) var(--space-16); }
+.alert { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); background: var(--bad-soft); color: var(--bad); font-size: var(--text-small); }
+.signin .card { gap: var(--ds-space-4); padding: var(--ds-space-5) var(--ds-space-4); }
 .signin p { margin: 0; }
-.signin .button { padding: var(--space-12) var(--space-16); font-size: var(--text-body); }
-.signin .passcode { display: grid; gap: var(--space-14); }
-.signin .passcode button { padding: var(--space-12) var(--space-16); font-size: var(--text-body); }
+.signin .button { padding: var(--ds-space-3) var(--ds-space-4); font-size: var(--text-body); }
+.signin .passcode { display: grid; gap: var(--ds-space-4); }
+.signin .passcode button { padding: var(--ds-space-3) var(--ds-space-4); font-size: var(--text-body); }
 .account .card p { margin: 0; }
 .account .who b, .account .who span { display: block; }
 .account .who span { color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
 .account .card button { justify-self: start; }
-.account button.link { border: 0; background: none; padding: var(--space-4) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
-.account .invites { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.account button.link { border: 0; background: none; padding: var(--ds-space-1) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.account .invites { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .account .feed input { font-size: var(--text-hint); color: var(--muted); }
 .account .invites h3 { margin: 0; font-size: var(--text-subheading); }
-.choices { display: grid; gap: var(--space-8); }
+.choices { display: grid; gap: var(--ds-space-2); }
 .choices .signal b { display: block; overflow-wrap: anywhere; }
 
 /* History. */
-.field { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.field { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .entries { list-style: none; margin: 0; padding: 0; display: grid; }
-.entry { display: grid; gap: var(--space-4); padding: var(--space-10) 0; border-top: 1px solid var(--line); }
+.entry { display: grid; gap: var(--ds-space-1); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
 .entry:first-child { border-top: 0; padding-top: 0; }
 .entry p { margin: 0; }
 .entry .meta { color: var(--muted); font-size: var(--text-hint); }
 .history .card > button { justify-self: start; }
 /* A card for each day, and one person's changes one after another as one line that opens (ADR 0006, amended), with a triangle like the browser's own on a fold, kept out of what a screen reader says. */
-.history .run-line { display: grid; gap: var(--space-4); align-content: center; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.history .run-line { display: grid; gap: var(--ds-space-1); align-content: center; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .history .run-line .what { display: flex; font-weight: 600; }
 .history .run-line .chevron { flex: none; width: 1.1em; height: 1.5em; display: grid; place-items: center; color: var(--muted); transition: transform .15s; }
 .history .run-line[aria-expanded='true'] .chevron { transform: rotate(90deg); }
 .history .run-line .meta { padding-left: 1.1em; color: var(--muted); font-size: var(--text-hint); }
-.history .run > .entries { margin-left: .4em; padding-left: var(--space-12); border-left: 2px solid var(--line); }
-.history .older { display: grid; gap: var(--space-10); justify-items: start; }
+.history .run > .entries { margin-left: .4em; padding-left: var(--ds-space-3); border-left: 2px solid var(--line); }
+.history .older { display: grid; gap: var(--ds-space-3); justify-items: start; }
 
 /*
  * One page width (ADR 0091): every screen in the app is as wide as every other at the same window size, so moving
@@ -447,8 +448,8 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
  * one, each reading top to bottom, rather than every card zigzagging left and right in pairs as tall as the taller. A page with nothing for
  * the side is one column, the page's full width (ADR 0091).
  */
-.split { display: grid; gap: var(--space-14); min-width: 0; }
-.split > .main, .split > .side { display: grid; gap: var(--space-14); align-content: start; min-width: 0; }
+.split { display: grid; gap: var(--ds-space-4); min-width: 0; }
+.split > .main, .split > .side { display: grid; gap: var(--ds-space-4); align-content: start; min-width: 0; }
 .split > .side:empty { display: none; }
 @media (min-width: 1200px) {
   .split { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); align-items: start; }
@@ -458,14 +459,14 @@ input:not([type='checkbox']):not([type='radio']), select { min-height: 44px; }
 }
 
 /* Two columns on a laptop (audit finding 25, Beside in jobs/common.tsx): the list down the left, kept in reach as the record beside it scrolls. Below 960px nothing changes: the list and the record are separate pages. */
-.app.beside .columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--space-16); align-items: start; }
-.app.beside .column { display: grid; gap: var(--space-14); min-width: 0; }
+.app.beside .columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--ds-space-4); align-items: start; }
+.app.beside .column { display: grid; gap: var(--ds-space-4); min-width: 0; }
 /* 64px is the top bar's height and 80px the tab bar's with a margin, so the whole list scrolls between the two; with the sidebar there's no bar under it. */
 .app.beside .column.list { position: sticky; top: 64px; max-height: calc(100vh - 64px - 80px); overflow: auto; }
 @media (min-width: 900px) {
-  .app.beside .column.list { max-height: calc(100vh - 64px - var(--space-16)); }
+  .app.beside .column.list { max-height: calc(100vh - 64px - var(--ds-space-4)); }
 }
-.app.beside .job-row[aria-current='page'] { box-shadow: inset 3px 0 0 var(--accent); padding-left: var(--space-10); }
+.app.beside .job-row[aria-current='page'] { box-shadow: inset 3px 0 0 var(--accent); padding-left: var(--ds-space-3); }
 
 /*
  * States, as the design system draws them (its states.md), on Session Hire's own parts: every press shows at once that it landed, and
@@ -498,36 +499,36 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .notices-button { position: relative; flex: none; display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--radius-control); color: var(--muted); }
 .notices-button .icon { width: 22px; height: 22px; }
 .notices-button[aria-current='page'] { color: var(--ink); }
-.notices-button .badge { position: absolute; top: 2px; right: 0; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-6); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg); }
+.notices-button .badge { position: absolute; top: 2px; right: 0; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg); }
 @media (hover: hover) {
   .notices-button:hover { background: var(--ds-wash-hover); color: var(--ink); }
 }
 .notices-button:active { background: var(--ds-wash-pressed); }
-.toaster { position: fixed; inset-inline-end: var(--space-16); inset-block-end: calc(76px + env(safe-area-inset-bottom)); z-index: var(--ds-layer-toast); width: min(26rem, calc(100% - 2 * var(--space-16))); pointer-events: none; }
-.toaster .toasts { display: grid; justify-items: end; gap: var(--space-8); }
+.toaster { position: fixed; inset-inline-end: var(--ds-space-4); inset-block-end: calc(76px + env(safe-area-inset-bottom)); z-index: var(--ds-layer-toast); width: min(26rem, calc(100% - 2 * var(--ds-space-4))); pointer-events: none; }
+.toaster .toasts { display: grid; justify-items: end; gap: var(--ds-space-2); }
 @media (min-width: 900px) {
-  .toaster { inset-block-end: var(--space-16); }
+  .toaster { inset-block-end: var(--ds-space-4); }
 }
-.toast { pointer-events: auto; display: flex; align-items: center; gap: var(--space-8); width: 100%; padding: var(--space-10) var(--space-8) var(--space-10) var(--space-12); border: 1px solid var(--ds-line-strong); border-inline-start-width: var(--space-4); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); color: var(--ink); box-shadow: var(--ds-elevation-menu);
+.toast { pointer-events: auto; display: flex; align-items: center; gap: var(--ds-space-2); width: 100%; padding: var(--ds-space-3) var(--ds-space-2) var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--ds-line-strong); border-inline-start-width: var(--ds-space-1); border-radius: var(--ds-radius-overlay); background: var(--ds-surface-overlay); color: var(--ink); box-shadow: var(--ds-elevation-menu);
   transition: opacity var(--ds-duration-slow) var(--ds-ease-emphasized-enter), translate var(--ds-duration-slow) var(--ds-ease-emphasized-enter); }
 @starting-style {
   .toast { opacity: 0; translate: 0 var(--ds-motion-offset-medium); }
 }
 .toast[data-leaving='true'] { opacity: 0; translate: 0 var(--ds-motion-offset-medium); transition-duration: var(--ds-duration-base); transition-timing-function: var(--ds-ease-exit); }
-.toast-body { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+.toast-body { flex: 1; min-width: 0; display: grid; gap: var(--ds-space-half); }
 .toast-body b { overflow-wrap: anywhere; }
 .toast-body small { color: var(--muted); font-size: var(--text-hint); }
-.toast-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
+.toast-actions { flex: none; display: flex; align-items: center; gap: var(--ds-space-1); }
 .toast-dismiss { display: grid; place-items: center; width: 44px; padding: 0; color: var(--muted); background: transparent; border-color: transparent; }
 .toast-dismiss .icon { width: 20px; height: 20px; }
 /* The list: the History tab's rows, a new one marked in words beside a dot of the accent. */
 .notices .card > button { justify-self: start; }
-.notice .new-mark { display: inline-flex; align-items: center; gap: var(--space-4); margin-right: var(--space-6); color: var(--accent-ink); font-size: var(--text-hint); font-weight: 700; }
+.notice .new-mark { display: inline-flex; align-items: center; gap: var(--ds-space-1); margin-right: var(--ds-space-2); color: var(--accent-ink); font-size: var(--text-hint); font-weight: 700; }
 .notice .new-mark .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent-fill); }
 .notice.new p { font-weight: 600; }
 /* A line of several changes (audit, 20 October 2026, finding 68): what they were, behind a tap. */
-.notice-fold summary { padding: var(--space-8) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
-.notice-fold ol { list-style: none; margin: 0; padding: 0 0 0 var(--space-12); border-left: 2px solid var(--line); display: grid; gap: var(--space-6); font-size: var(--text-small); }
+.notice-fold summary { padding: var(--ds-space-2) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.notice-fold ol { list-style: none; margin: 0; padding: 0 0 0 var(--ds-space-3); border-left: 2px solid var(--line); display: grid; gap: var(--ds-space-2); font-size: var(--text-small); }
 
 /*
  * Links (audit, P3): one look everywhere, a link in words and a button drawn as one alike: the accent's ink, semibold and underlined,
@@ -538,11 +539,11 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 :where(a:not([class])) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 /* As tall as a thumb on a touch screen, a fact's Map or a line's "All jobs" alike, the words where they were: padding on a link in a line moves no line. */
 @media (pointer: coarse) {
-  :where(a:not([class])) { padding-block: var(--space-14); }
+  :where(a:not([class])) { padding-block: var(--ds-space-4); }
 }
 
 /* The way past the places to the screen (Shell.tsx, the design system's skip link): out of sight until a keyboard reaches it, first thing in the page. */
-.skip-to-content { position: fixed; top: var(--space-8); left: var(--space-8); z-index: 10; padding: var(--space-10) var(--space-14); border-radius: var(--radius-control); background: var(--accent-fill); color: var(--on-accent); font-weight: 700; text-decoration: none; translate: 0 calc(-100% - var(--space-16)); }
+.skip-to-content { position: fixed; top: var(--ds-space-2); left: var(--ds-space-2); z-index: 10; padding: var(--ds-space-3) var(--ds-space-4); border-radius: var(--radius-control); background: var(--accent-fill); color: var(--on-accent); font-weight: 700; text-decoration: none; translate: 0 calc(-100% - var(--ds-space-4)); }
 .skip-to-content:focus { translate: 0 0; }
 
 /* Offline on a narrow phone (audit, P3): "No signal" and what's waiting take a line of their own under the bell rather than squeezing the company's name to "S…". */
@@ -550,7 +551,7 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
   /* The name sets the column's least width whatever the phone's font; the line under it never widens it. */
   .top:has(.conn.offline) { grid-template-columns: minmax(min-content, 1fr) auto; }
   .top:has(.conn.offline) .brand small { contain: inline-size; }
-  .top .state:has(.conn.offline) { flex-wrap: wrap; row-gap: var(--space-4); }
+  .top .state:has(.conn.offline) { flex-wrap: wrap; row-gap: var(--ds-space-1); }
   /* What's waiting can wrap under "No signal" rather than push the page wider. */
   .top .state > .conn.offline { order: 1; white-space: normal; }
 }
@@ -565,22 +566,22 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 }
 
 /* Admin › What's changed (ADR 0071): one entry per version, newest first. */
-.release { display: grid; gap: var(--space-4); }
-.release + .release { padding-top: var(--space-14); border-top: 1px solid var(--line); }
+.release { display: grid; gap: var(--ds-space-1); }
+.release + .release { padding-top: var(--ds-space-4); border-top: 1px solid var(--line); }
 .release h2, .release h3 { margin: 0; font-size: var(--text-subheading); text-transform: none; letter-spacing: 0; }
-.release-version { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: var(--space-4); }
-.release-refs { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-12); }
+.release-version { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: var(--ds-space-1); }
+.release-refs { display: flex; flex-wrap: wrap; gap: var(--ds-space-1) var(--ds-space-3); }
 .card > a[href="#admin/changes"] { justify-self: start; }
 
 /* A page's parts as tabs (Tabs.tsx, ADR 0082): the open part's cards one after another under the row, as a job's (jobs.css draws the row). */
-.tab-part { display: grid; gap: var(--space-14); min-width: 0; }
+.tab-part { display: grid; gap: var(--ds-space-4); min-width: 0; }
 
 /* Admin › Status (ADR 0093): one row a check, its name and word on a line, then what it says and what to do. */
-.status-checks, .status-wrong { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-14); }
-.status-wrong { gap: var(--space-4); }
-.status-check { display: grid; gap: var(--space-4); }
-.status-check + .status-check { border-top: 1px solid var(--line); padding-top: var(--space-14); }
-.status-check-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
+.status-checks, .status-wrong { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--ds-space-4); }
+.status-wrong { gap: var(--ds-space-1); }
+.status-check { display: grid; gap: var(--ds-space-1); }
+.status-check + .status-check { border-top: 1px solid var(--line); padding-top: var(--ds-space-4); }
+.status-check-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-2); }
 .status-check p { margin: 0; }
 .status-todo { font-size: var(--text-small); }
 
@@ -588,7 +589,7 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
  * While the app opens (Opening.tsx; audit, 20 October 2026, finding 11): the screen's shape in the design system's skeleton,
  * a line, a row or a block, pulsing in place, so reduced motion keeps it (its components.md). The region holding it is busy.
  */
-.opening-shape { display: grid; gap: var(--space-14); }
+.opening-shape { display: grid; gap: var(--ds-space-4); }
 .skeleton { display: block; height: 1rem; border-radius: var(--radius-control); background: var(--ds-surface-inset); animation: skeleton-pulse var(--ds-motion-cycle-pulse) var(--ds-ease-standard) infinite; }
 .skeleton.row { height: 44px; }
 .skeleton.block { height: 132px; border-radius: var(--radius-card); }

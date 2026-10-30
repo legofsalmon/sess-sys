@@ -52,7 +52,14 @@ it's next updated. Every colour token carries its CSS name (for example
   `warn`, `bad` with a `-soft` background each. Dark follows the phone's
   setting, as the app does. `field-line` and `on-line` aren't in Figma
   yet; until they are, the code is the reference.
-- **Spacing**: 2, 4, 6, 8, 10, 12, 14, 16, 20, 40 px.
+- **Spacing** (since 30 October 2026): the shared design system's 4px grid,
+  `--ds-space-half` (2px) and `--ds-space-1` to `--ds-space-16` (N × 4px).
+  Six layout roles in `app.css` say which step goes where: `--inline` 8
+  (side by side), `--stack` 4 (lines of one group, a label and its field),
+  `--group` 12 (one group and the next inside a card), `--section` 24
+  (card and card, the parts of a page), `--inset` 16 (inside a card) and
+  `--gutter` 16 (the page's edge). The old 6, 10 and 14 steps were off the
+  grid and went to the next step up.
 - **Radius**: control 8, tab 10, card 12, full (pills).
 - **Type**: 13 text styles: page title 1.3rem, brand 1rem, section heading
   1rem, subheading .95rem, body 1rem, small .9rem, hint .85rem, button
@@ -60,8 +67,7 @@ it's next updated. Every colour token carries its CSS name (for example
   The app uses the phone's own font (`system-ui`: SF on iPhone, Roboto on
   Android); Inter stands in inside Figma.
 
-Spacing, radius and type carry their CSS names the same way: `space/8` is
-`var(--space-8)`, `radius/card` is `var(--radius-card)` and the hint style is
+Radius and type carry their CSS names the same way: `radius/card` is `var(--radius-card)` and the hint style is
 `var(--text-hint)`, set on `:root` in `app.css` next to the colours. The web
 app's stylesheets use them wherever a value is on the scale, and anything off
 it, such as a 1px line or a 3px nudge, stays in px. A radius is named for

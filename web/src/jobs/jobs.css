@@ -1,58 +1,58 @@
 /* Jobs. The screens also carry the crew class, so crew call cards and forms look the same here; what every area shares (the way back, titles, facts, rows, forms) is in app.css. */
-.jobs .phase-rows { display: grid; gap: var(--space-6); }
-.jobs .phase-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: var(--space-6); align-items: center; }
-.jobs .contact { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
-.jobs .phase { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.jobs .phase-rows { display: grid; gap: var(--ds-space-2); }
+.jobs .phase-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: var(--ds-space-2); align-items: center; }
+.jobs .contact { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); }
+.jobs .phase { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .jobs .phase:first-of-type { border-top: 0; padding-top: 0; }
-.jobs .phase > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
-.jobs .phase > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
-.jobs .phase .job { padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-radius: 10px; }
+.jobs .phase > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
+.jobs .phase > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
+.jobs .phase .job { padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-radius: 10px; }
 .jobs .cal { margin: 0; font-size: .82rem; color: var(--muted); }
 .jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
-.jobs .add-phase { padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.jobs .add-phase { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 /* A phase's running order, calendar line, call sheet and contact wait folded under its name (audit finding 16), behind the browser's own triangle; a calendar line to act on stays out. */
-.jobs .phase-details summary { padding: var(--space-12) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
-.jobs .phase-details > div { display: grid; gap: var(--space-8); }
+.jobs .phase-details summary { padding: var(--ds-space-3) 0; color: var(--muted); font-size: var(--text-small); font-weight: 600; cursor: pointer; }
+.jobs .phase-details > div { display: grid; gap: var(--ds-space-2); }
 
 /* Kit on jobs (ADR 0014): lines by department, each saying whether there's enough; red when short on a confirmed job, amber when pencilled in. */
-.jobs .kit-group { display: grid; gap: var(--space-8); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.jobs .kit-group { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .jobs .kit .kit-group:first-of-type { padding-top: 0; border-top: 0; }
-.jobs .kit-group h3 { display: flex; align-items: center; gap: var(--space-6); margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .kit-group h3 { display: flex; align-items: center; gap: var(--ds-space-2); margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .jobs .kit-group h3 .icon { width: 16px; height: 16px; }
-.jobs .kit-line { display: grid; gap: var(--space-6); }
-.jobs .kit-line + .kit-line { padding-top: var(--space-8); border-top: 1px dashed var(--line); }
-.jobs .kit-line > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
+.jobs .kit-line { display: grid; gap: var(--ds-space-2); }
+.jobs .kit-line + .kit-line { padding-top: var(--ds-space-2); border-top: 1px dashed var(--line); }
+.jobs .kit-line > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
 .jobs .kit-line > header > div { flex: 1; min-width: 0; }
-.jobs .kit-line > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
+.jobs .kit-line > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
 .jobs .kit-line > button { justify-self: start; }
 .jobs .kit-state { margin: 0; font-size: .85rem; }
-.jobs .kit-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
-.jobs .kit-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
+.jobs .kit-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.jobs .kit-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .jobs .kit-state.ok { color: var(--ink); }
 .jobs .kit-state.quiet { color: var(--muted); }
 /* What's short, said once above the lines, with one way to subhire it (audit finding 21); with many short, each line says its own in a few words, without the box. */
-.jobs .short-kit { display: grid; gap: var(--space-8); justify-items: start; }
+.jobs .short-kit { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .jobs .short-kit > * { margin: 0; }
 .jobs .short-kit > .kit-state, .jobs .short-kit > form { justify-self: stretch; }
-.jobs .short-kit .short-list { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-.jobs .short-kit .short-list legend { padding: 0; margin-bottom: var(--space-4); font-weight: 700; }
-.jobs .short-kit .short-list .hint { margin: 0 0 var(--space-4); }
+.jobs .short-kit .short-list { border: 0; margin: 0; padding: 0; display: grid; gap: var(--ds-space-half); }
+.jobs .short-kit .short-list legend { padding: 0; margin-bottom: var(--ds-space-1); font-weight: 700; }
+.jobs .short-kit .short-list .hint { margin: 0 0 var(--ds-space-1); }
 .jobs .kit-state.brief { background: none; padding: 0; font-weight: 600; }
-.jobs .add-kit { padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.jobs .add-kit { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .jobs .kit > h2 + .add-kit, .jobs .kit > .empty + .add-kit { padding-top: 0; border-top: 0; }
 .jobs .add-kit h3 { margin: 0; font-size: var(--text-subheading); }
 
 /* The jobs list (audit finding 22): New job at the top on a phone, and the jobs under their weeks, each week's heading kept in view under the top bar while its jobs scroll. */
 .jobs .jobs-card > button.new-job { justify-self: start; }
-.jobs .jobs-card .week-head { position: sticky; top: var(--under-top, 0px); z-index: 1; padding: var(--space-8) 0 var(--space-6); background: var(--panel); }
+.jobs .jobs-card .week-head { position: sticky; top: var(--under-top, 0px); z-index: 1; padding: var(--ds-space-2) 0 var(--ds-space-2); background: var(--panel); }
 .jobs .jobs-card .week-head h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.jobs .jobs-card .week-head + li .job-row { border-top: 0; padding-top: var(--space-4); }
+.jobs .jobs-card .week-head + li .job-row { border-top: 0; padding-top: var(--ds-space-1); }
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
 
 /* The planner: the same width as every other page (ADR 0091), so List, Week and Month don't jump. */
-.plan .plan-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
-.plan .plan-bar .steps { display: flex; gap: var(--space-6); flex: 1 1 18rem; max-width: 30rem; }
+.plan .plan-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-3); flex-wrap: wrap; }
+.plan .plan-bar .steps { display: flex; gap: var(--ds-space-2); flex: 1 1 18rem; max-width: 30rem; }
 .plan .plan-bar .steps .button { flex: 1 1 0; white-space: nowrap; }
 /* On the days that hold today, This week is where you are already: said, and quieter. */
 .plan .plan-bar .steps [aria-current] { color: var(--muted); }
@@ -64,7 +64,7 @@
    sideways: the rows add to the page's height, so a thumb moving down the planner moves the page and is never caught in a box inside it.
    On a desk it ends at the foot of the screen, so a long month scrolls inside it with its days and names kept in view. */
 .plan .scroller { position: relative; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: 10px; }
-@media (min-width: 900px) { .plan .scroller { overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
+@media (min-width: 900px) { .plan .scroller { overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - var(--ds-space-10)); } }
 /* Its days row can't stick to the page from inside a sideways scroller, so on a phone a copy (PlanScreen) waits at the bar's foot, taking no
    room, and shows once the real row has gone under the bar; it scrolls sideways with the days. The desk's framed planner keeps its own. */
 .plan .days-float { position: sticky; top: var(--under-top, 72px); z-index: 4; height: 0; visibility: hidden; }
@@ -75,11 +75,11 @@
 .plan .scroller { --more-from: 7rem; }
 @media (min-width: 900px) { .plan .scroller { --more-from: 12rem; } }
 .plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plan .timeline { --names: 7rem; --pad: var(--space-4); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
+.plan .timeline { --names: 7rem; --pad: var(--ds-space-1); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
 /* A desk has room for a job's name on one line; a month's days then fit a laptop without scrolling sideways. */
 @media (min-width: 900px) { .plan .timeline { --names: 12rem; } }
 .plan .timeline.week { min-width: calc(var(--names) + 7 * 6.5rem); }
-.plan .timeline.month { --pad: var(--space-2); min-width: calc(var(--names) + var(--days) * 1.9rem); }
+.plan .timeline.month { --pad: var(--ds-space-half); min-width: calc(var(--names) + var(--days) * 1.9rem); }
 .plan .timeline col.names { width: var(--names); }
 .plan .timeline th, .plan .timeline td { padding: var(--pad); text-align: left; vertical-align: top; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 /* Lets a day's block fill its row, so the days of a run line up. */
@@ -112,13 +112,13 @@
 .plan .timeline td.today { background-color: color-mix(in srgb, var(--ink) 5%, var(--panel)); }
 .plan .timeline .today-word { display: block; font-size: .7rem; font-weight: 700; }
 .plan .timeline.month th, .plan .timeline.month td { text-align: center; vertical-align: middle; }
-.plan .timeline.month tr > :first-child { text-align: left; padding: var(--space-4) var(--space-6); }
+.plan .timeline.month tr > :first-child { text-align: left; padding: var(--ds-space-1) var(--ds-space-2); }
 .plan .timeline.month thead a { display: grid; min-height: 44px; place-content: center; color: inherit; text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .plan .timeline.month thead a:hover { background: var(--bg); }
 .plan .timeline.month thead small { font-size: .7rem; font-weight: 500; }
 /* A job's day: solid when confirmed, dashed when pencilled in; amber while crew are still to find. Crew all found is the quiet case
    and has no colour of its own (healthy is quiet), so the amber days stand out. */
-.plan .blk { display: grid; align-content: start; gap: 1px; padding: var(--space-4) var(--space-6); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--ds-surface-raised); }
+.plan .blk { display: grid; align-content: start; gap: 1px; padding: var(--ds-space-1) var(--ds-space-2); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--ds-surface-raised); }
 .plan .week .blk { height: 100%; }
 .plan .blk.dashed { border-style: dashed; border-color: var(--muted); box-shadow: none; background: var(--panel); }
 .plan .blk.short { background: var(--warn-soft); }
@@ -130,7 +130,7 @@ a.blk:hover b { text-decoration: underline; }
 a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .blk small { color: var(--muted); }
 .plan .blk.short small, .plan .blk.stray small { color: var(--warn); }
-.plan .month .blk { padding: 3px 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
+.plan .month .blk { padding: var(--ds-space-1) 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
 .plan .month .blk.solid:not(.stray) { border-width: 1px 1px 1px 3px; }
 /* The days of one phase, or of one job for a person or a van, join into one bar over the lines between them: square where they meet,
    the start marked once. */
@@ -139,8 +139,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .month .blk.solid:not(.stray):is(.join-l, .join-lr) { border-left-width: 0; }
 .plan .month .blk.solid:not(.stray):is(.join-r, .join-lr) { border-right-width: 0; }
 /* A person's day: solid where booked, dashed where offered, grey where unavailable; a clash or a check around it all. */
-.plan .item { display: grid; padding: 3px var(--space-6); border-radius: 6px; }
-.plan .item + .item { margin-top: 3px; }
+.plan .item { display: grid; padding: 3px var(--ds-space-2); border-radius: 6px; }
+.plan .item + .item { margin-top: var(--ds-space-1); }
 .plan .item a { color: inherit; font-weight: 700; text-decoration: none; }
 .plan .item a:hover { text-decoration: underline; }
 .plan .item small { color: var(--muted); }
@@ -154,17 +154,17 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .item.busy b { font-weight: 600; }
 .plan .timeline td.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .timeline td.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
-.plan .tag { display: block; margin-bottom: 3px; font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.plan .tag { display: block; margin-bottom: var(--ds-space-1); font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .plan td.clash .tag { color: var(--bad); }
 .plan td.check .tag { color: var(--warn); }
 .plan .code { position: relative; display: grid; place-items: center; min-height: 1.9rem; border-radius: 4px; font-size: .72rem; font-weight: 700; }
 .plan td.clash .code::after, .plan td.check .code::after { position: absolute; top: -3px; right: -1px; font-size: .7rem; font-weight: 800; }
 .plan td.clash .code::after { content: '!'; color: var(--bad); }
 .plan td.check .code::after { content: '?'; color: var(--warn); }
-.plan .everyone { display: flex; align-items: center; gap: var(--space-8); min-height: 44px; font-size: .9rem; cursor: pointer; }
+.plan .everyone { display: flex; align-items: center; gap: var(--ds-space-2); min-height: 44px; font-size: .9rem; cursor: pointer; }
 .plan .everyone input { width: 20px; height: 20px; accent-color: var(--accent); }
-.plan .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-6) var(--space-16); font-size: .8rem; color: var(--muted); }
-.plan .legend li { display: flex; align-items: center; gap: var(--space-6); }
+.plan .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ds-space-2) var(--ds-space-4); font-size: .8rem; color: var(--muted); }
+.plan .legend li { display: flex; align-items: center; gap: var(--ds-space-2); }
 .plan .legend i { display: inline-block; width: 22px; height: 14px; padding: 0; border-radius: 4px; }
 .plan .legend .swatch.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .legend .swatch.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
@@ -174,29 +174,29 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .import .card > p { margin: 0; }
 .import .card > button.link { justify-self: start; }
 :is(.import, .combine) .found { list-style: none; margin: 0; padding: 0; display: grid; }
-:is(.import, .combine) .found > li { display: grid; gap: var(--space-4); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
+:is(.import, .combine) .found > li { display: grid; gap: var(--ds-space-1); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
 :is(.import, .combine) .found > li:first-child { border-top: 0; padding-top: 0; }
 :is(.import, .combine) .found p { margin: 0; color: var(--muted); font-size: .9rem; }
 :is(.import, .combine) .found a { color: var(--accent-ink); font-weight: 700; }
-:is(.import, .combine) .found .head { display: flex; gap: var(--space-8); align-items: center; }
+:is(.import, .combine) .found .head { display: flex; gap: var(--ds-space-2); align-items: center; }
 :is(.import, .combine) .found .head b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 :is(.import, .combine) .found .head .name { flex: 1; width: 0; min-width: 0; font-weight: 700; }
 :is(.import, .combine) .found .head input[type='checkbox'], :is(.import, .combine) .tick input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 :is(.import, .combine) .found li.is-off > :not(.head) { opacity: .5; }
 :is(.import, .combine) .found .guess { color: var(--warn); }
-:is(.import, .combine) .tick { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; cursor: pointer; }
-:is(.import, .combine) .tick input { margin-top: var(--space-2); }
+:is(.import, .combine) .tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; min-height: 44px; cursor: pointer; }
+:is(.import, .combine) .tick input { margin-top: var(--ds-space-half); }
 :is(.import, .combine) .tick b, :is(.import, .combine) .tick small { display: block; overflow-wrap: anywhere; }
 :is(.import, .combine) .tick small { color: var(--muted); font-size: .8rem; }
-:is(.import, .combine) .tick > span { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+:is(.import, .combine) .tick > span { flex: 1; min-width: 0; display: grid; gap: var(--ds-space-half); }
 :is(.import, .combine) .tick .name { width: 100%; font-weight: 700; }
-:is(.import, .combine) .found .kind { display: flex; gap: var(--space-8); align-items: center; font-size: .9rem; color: var(--muted); }
+:is(.import, .combine) .found .kind { display: flex; gap: var(--ds-space-2); align-items: center; font-size: .9rem; color: var(--muted); }
 :is(.import, .combine) .found .kind select { flex: none; width: auto; }
 .import details summary { display: flex; align-items: center; min-height: 44px; font-weight: 700; cursor: pointer; }
-.import .left-out { margin: var(--space-4) 0 0; padding-left: var(--space-20); display: grid; gap: var(--space-6); font-size: .9rem; }
+.import .left-out { margin: var(--ds-space-1) 0 0; padding-left: var(--ds-space-5); display: grid; gap: var(--ds-space-2); font-size: .9rem; }
 .import .left-out small { display: block; color: var(--muted); overflow-wrap: anywhere; }
 /* Kept in reach above the area tabs while scrolling through what was found; kit from the notes keeps its Add in the same bar (audit, P3). */
-:is(.import, .notes-kit) .bring { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); display: grid; gap: var(--space-8); padding: var(--space-10) 0; background: var(--bg); }
+:is(.import, .notes-kit) .bring { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); display: grid; gap: var(--ds-space-2); padding: var(--ds-space-3) 0; background: var(--bg); }
 .import .bring button { width: 100%; }
 
 @media (max-width: 480px) {
@@ -206,45 +206,45 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 /* Pick lists (ADR 0017): each product on the job's kit, what's out, and where to find the rest. */
-.jobs .pick-link { display: flex; align-items: center; gap: var(--space-10); flex-wrap: wrap; }
+.jobs .pick-link { display: flex; align-items: center; gap: var(--ds-space-3); flex-wrap: wrap; }
 .jobs .pick-link span { color: var(--muted); font-size: .9rem; }
 .pick .scan-dock.docked { position: sticky; top: var(--under-top, 0px); z-index: 1; }
-.pick .from details { display: inline; margin-left: var(--space-6); font-size: .9rem; }
+.pick .from details { display: inline; margin-left: var(--ds-space-2); font-size: .9rem; }
 .pick .from details > summary { display: inline; cursor: pointer; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
-.pick .from details > p { margin: var(--space-4) 0 0; color: var(--muted); }
+.pick .from details > p { margin: var(--ds-space-1) 0 0; color: var(--muted); }
 .pick .pick-done > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-weight: 600; }
 .pick .pick-total { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pick .said { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); font-size: .9rem; }
+.pick .said { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); font-size: .9rem; }
 .pick .said.ok { background: var(--good-soft); color: var(--good); }
 .pick .said.warn { background: var(--warn-soft); color: var(--warn); }
 .pick .said.quiet { background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
-.pick .pick-row { display: grid; gap: var(--space-6); }
-.pick .pick-row + .pick-row { padding-top: var(--space-8); border-top: 1px dashed var(--line); }
-.pick .pick-row > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
-.pick .pick-row > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
+.pick .pick-row { display: grid; gap: var(--ds-space-2); }
+.pick .pick-row + .pick-row { padding-top: var(--ds-space-2); border-top: 1px dashed var(--line); }
+.pick .pick-row > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
+.pick .pick-row > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
 .pick .pick-row .count { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pick .pick-row.done .count { color: var(--ink); }
-.pick .from { margin: 0; padding-left: var(--space-16); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.pick .from { margin: 0; padding-left: var(--ds-space-4); font-size: .9rem; font-variant-numeric: tabular-nums; }
 /* Back and Missing apart, each a 44 px target, Missing the quieter (audit, 20 October 2026, finding 40). */
-.pick .out-items li { display: flex; align-items: center; gap: var(--space-12); }
-.pick .out-items button.link { min-width: 44px; min-height: 44px; padding-inline: var(--space-4); }
+.pick .out-items li { display: flex; align-items: center; gap: var(--ds-space-3); }
+.pick .out-items button.link { min-width: 44px; min-height: 44px; padding-inline: var(--ds-space-1); }
 .pick .out-items button.link.quiet { color: var(--muted); }
 /* A number never breaks at its hyphen (audit, 20 October 2026, finding 41). */
 .pick .from .number { white-space: nowrap; }
-.pick .count-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; }
+.pick .count-row { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: center; }
 .pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1 0 100%; }
 .pick .count-row input { width: 7.5rem; }
 .pick .count-row .alert { flex: 1 0 100%; }
 /* Picking on the phone (ADR 0072): whose kit and in what order, what to know before starting, the kit's own notes, and Undo beside the answer. */
 /* Done is settled, so it's ink: green stays for a scan that read (audit, 20 October 2026, finding 59). */
 .pick .pick-total.done { color: var(--ink); }
-.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: .9rem; }
-.pick .pick-ways { display: grid; gap: var(--space-8); }
+.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--ds-space-half); font-size: .9rem; }
+.pick .pick-ways { display: grid; gap: var(--ds-space-2); }
 .pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: .85rem; }
 .pick .pick-ways button[aria-pressed='true'] .left { color: inherit; }
 .pick .pick-note { margin: 0; font-size: .9rem; }
-.pick .pick-note b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--space-4); }
-.pick .said-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: stretch; }
+.pick .pick-note b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--ds-space-1); }
+.pick .said-row { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: stretch; }
 .pick .said-row .said { flex: 1; }
 .pick .said-row .alert { flex: 1 0 100%; }
 
@@ -252,15 +252,15 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .jobs .lines, .call-sheet .lines { white-space: pre-line; }
 .sheet-screen .card p { margin: 0; }
-.sheet-screen h3 { margin: var(--space-6) 0 0; font-size: .95rem; }
-.sheet-screen .sheet-call { display: grid; gap: var(--space-4); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.sheet-screen h3 { margin: var(--ds-space-2) 0 0; font-size: .95rem; }
+.sheet-screen .sheet-call { display: grid; gap: var(--ds-space-1); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .sheet-screen .sheet-call:first-of-type { border-top: 0; padding-top: 0; }
-.sheet-screen .sheet-call header { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: baseline; }
-.sheet-screen .sheet-call ul, .sheet-screen .sheet-kit ul, .sheet-screen .sheet-contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
-.sheet-screen .sheet-call li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-8); }
+.sheet-screen .sheet-call header { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: baseline; }
+.sheet-screen .sheet-call ul, .sheet-screen .sheet-kit ul, .sheet-screen .sheet-contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
+.sheet-screen .sheet-call li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-1) var(--ds-space-2); }
 .sheet-screen .sheet-call li > span:first-child { flex: 1 1 10em; }
 /* Send and a crew phone number, a finger's 44px to hit (audit, 20 October 2026, finding 58). */
-.sheet-screen .sheet-call button.link { min-height: 44px; min-width: 44px; padding: var(--space-2) var(--space-6); }
+.sheet-screen .sheet-call button.link { min-height: 44px; min-width: 44px; padding: var(--ds-space-half) var(--ds-space-2); }
 .sheet-screen .sheet-call li a[href^='tel:'] { display: inline-flex; align-items: center; min-height: 44px; }
 .sheet-screen .card a:not(.button) { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 .sheet-screen a[href^='tel:'] { white-space: nowrap; }
@@ -286,24 +286,24 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* When a job's kit is held (ADR 0031): its days, with getting it ready and checking it back. */
 .jobs .kit-days p { margin: 0; color: var(--muted); font-size: .9rem; }
 .jobs .kit-days p b { color: var(--ink); }
-.jobs .kit-days form { margin-top: var(--space-8); }
-.pick .scan-failed { display: grid; gap: var(--space-6); justify-items: start; }
+.jobs .kit-days form { margin-top: var(--ds-space-2); }
+.pick .scan-failed { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .pick .scan-failed p, .pick .scan-failed ul { margin: 0; }
-.pick .scan-failed ul { padding-left: var(--space-16); }
+.pick .scan-failed ul { padding-left: var(--ds-space-4); }
 
 /* Quotes and money (ADR 0042): the lines as a table, typed in a row each while a draft, the sums under them, and the A4 page. */
-.quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
-.quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
+.quote-screen .quote-group { border: 0; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
+.quote-screen .quote-group legend { font-weight: 700; padding: 0; margin-bottom: var(--ds-space-1); }
 .quote-screen .quote-draft { container-type: inline-size; }
-.quote-screen .quote-line { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(5.5em, 1.2fr) minmax(0, 0.8fr); gap: var(--space-4) var(--space-8); align-items: end; padding-top: var(--space-8); border-top: 1px solid var(--line); }
-.quote-screen .quote-line label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .quote-line { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(5.5em, 1.2fr) minmax(0, 0.8fr); gap: var(--ds-space-1) var(--ds-space-2); align-items: end; padding-top: var(--ds-space-2); border-top: 1px solid var(--line); }
+.quote-screen .quote-line label { display: grid; gap: var(--ds-space-half); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line label input, .quote-screen .quote-line label select { min-width: 0; width: 100%; color: var(--ink); }
 .quote-screen .quote-line .what, .quote-screen .quote-line .line-problem { grid-column: 1 / -1; }
 .quote-screen .quote-line .link.vat { grid-column: 1 / 3; justify-self: start; align-self: center; font-size: var(--text-small); }
 .quote-screen .quote-line .vat-rate { grid-column: 1 / 3; }
 .quote-screen .quote-line .amount { grid-column: 3 / -1; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; }
 .quote-screen .quote-line .amount small { display: block; font-weight: 400; }
-.quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--space-16); }
+.quote-screen .quote-line .line-actions { grid-column: 1 / -1; justify-self: end; display: inline-flex; gap: var(--ds-space-4); }
 .quote-screen .quote-line .last-charged { grid-column: 1 / -1; font-size: var(--text-small); }
 .quote-screen .quote-line .last-charged p { margin: 0; }
 .quote-screen .quote-line .line-problem { margin: 0; font-size: var(--text-small); color: var(--warn); }
@@ -318,16 +318,16 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-screen .quote-line .last-charged { grid-column: 1 / -1; }
 }
 /* A line reads shut, as a row to press: what, how it's charged, what it comes to. */
-.quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); width: 100%; text-align: left; padding: var(--space-8) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
+.quote-screen .quote-line-shut { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-half) var(--ds-space-2); width: 100%; text-align: left; padding: var(--ds-space-2) 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; min-height: 44px; }
 .quote-screen .quote-line-shut .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-line-shut .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* The cost side (ADR 0089): whether there's kit enough, under a line; hired in and what it costs, never printed; and a director's margin. */
-.quote-screen .quote-line-row { display: grid; gap: var(--space-4); }
-.quote-screen .quote-line-row .kit-note { margin: 0 0 var(--space-6); }
+.quote-screen .quote-line-row { display: grid; gap: var(--ds-space-1); }
+.quote-screen .quote-line-row .kit-note { margin: 0 0 var(--ds-space-2); }
 .quote-screen .kit-note { font-size: var(--text-hint); }
 .quote-screen .kit-note .link { font-weight: 600; }
 .quote-screen .quote-line .kit-note, .quote-screen .quote-line .line-cost { grid-column: 1 / -1; }
-.quote-screen .line-cost { border: 0; border-top: 1px dashed var(--line); margin: 0; padding: var(--space-8) 0 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8) var(--space-12); }
+.quote-screen .line-cost { border: 0; border-top: 1px dashed var(--line); margin: 0; padding: var(--ds-space-2) 0 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--ds-space-2) var(--ds-space-3); }
 .quote-screen .line-cost legend { float: left; width: 100%; padding: 0; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .line-cost label { flex: 0 1 9em; }
 .quote-screen .line-cost label.supplier { flex: 1 1 14em; }
@@ -340,48 +340,48 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .quote-screen .margin-words small { color: var(--muted); }
 .quote-screen .quote-margin { margin: 0; }
 /* Travel and subsistence (ADR 0086): worked out, not typed, so each reads as a shut line, with what the office says about the job under it. */
-.quote-screen .quote-extra { display: grid; gap: var(--space-8); padding-bottom: var(--space-8); }
-.quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2) var(--space-8); padding: var(--space-8) 0; border-top: 1px solid var(--line); min-height: 44px; }
+.quote-screen .quote-extra { display: grid; gap: var(--ds-space-2); padding-bottom: var(--ds-space-2); }
+.quote-screen .quote-extra .extra-line { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-half) var(--ds-space-2); padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); min-height: 44px; }
 .quote-screen .quote-extra .how { grid-column: 1; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-extra .amount { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .quote-screen .quote-extra .signal b, .quote-screen .quote-extra .signal small { display: block; }
 .quote-screen .quote-extra .extra-km { max-width: 22em; }
-.office-form .fuel-field { display: grid; gap: var(--space-8); align-content: start; }
+.office-form .fuel-field { display: grid; gap: var(--ds-space-2); align-content: start; }
 .office-form .fuel-field button { justify-self: start; }
 /* What it comes to stays in view under the top bar while the lines are changed. */
-.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4) var(--space-16); padding: var(--space-8) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.quote-screen .quote-summary { position: sticky; top: var(--under-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ds-space-1) var(--ds-space-4); padding: var(--ds-space-2) 0; background: var(--panel); border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .quote-screen .quote-summary .save-state { margin-left: auto; font-size: var(--text-small); color: var(--muted); }
 .quote-screen .undo-line { margin: 0; font-size: var(--text-small); }
-.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--space-8); }
-.quote-screen .quote-add .adding { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); width: 100%; }
+.quote-screen .quote-add { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.quote-screen .quote-add .adding { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ds-space-2); width: 100%; }
 .quote-screen .quote-add .adding > :first-child { flex: 1 1 16em; }
-.quote-screen .job-changes { border: 1px solid var(--warn); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--warn-soft); }
-.quote-screen .job-changes p, .quote-screen .job-changes ul { margin: 0 0 var(--space-6); }
-.quote-screen .job-changes ul { padding-left: var(--space-16); }
-.quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
-.quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-screen .job-changes { border: 1px solid var(--warn); border-radius: var(--radius-control); padding: var(--ds-space-2) var(--ds-space-3); background: var(--warn-soft); }
+.quote-screen .job-changes p, .quote-screen .job-changes ul { margin: 0 0 var(--ds-space-2); }
+.quote-screen .job-changes ul { padding-left: var(--ds-space-4); }
+.quote-screen .kit-days-all { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.quote-screen .kit-days-all label { display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .quote-screen .kit-days-all input { width: 4.5em; }
-.quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
-.quote-screen .group-discount label { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-screen .group-discount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .group-discount label { display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .quote-screen .group-discount input { width: 4.5em; color: var(--ink); }
-.quote-screen .agreed-note { margin: var(--space-2) 0 0; color: var(--ink); }
-.quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); }
-.quote-screen .quote-send label { display: grid; gap: var(--space-2); font-size: var(--text-small); color: var(--muted); }
+.quote-screen .agreed-note { margin: var(--ds-space-half) 0 0; color: var(--ink); }
+.quote-screen .quote-send { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ds-space-2); }
+.quote-screen .quote-send label { display: grid; gap: var(--ds-space-half); font-size: var(--text-small); color: var(--muted); }
 .quote-screen .quote-send .hint { flex-basis: 100%; }
 .quote-table-wrap { overflow-x: auto; }
 .quote-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.quote-table th, .quote-table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); vertical-align: top; }
+.quote-table th, .quote-table td { text-align: left; padding: var(--ds-space-1) var(--ds-space-2); border-bottom: 1px solid var(--line); vertical-align: top; }
 .quote-table thead th { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
-.quote-table .group th { padding-top: var(--space-10); font-weight: 700; }
+.quote-table .group th { padding-top: var(--ds-space-3); font-weight: 700; }
 .quote-table .n { text-align: right; white-space: nowrap; }
 .quote-table small { display: block; color: var(--muted); font-weight: 400; }
 .quote-table th a { color: var(--accent-ink); font-weight: 600; }
 .quote-table .bad { color: var(--bad); font-weight: 700; }
-.quote-totals { margin: var(--space-10) 0 0 auto; display: grid; gap: var(--space-2); max-width: 22em; font-variant-numeric: tabular-nums; }
-.quote-totals div { display: flex; justify-content: space-between; gap: var(--space-12); }
+.quote-totals { margin: var(--ds-space-3) 0 0 auto; display: grid; gap: var(--ds-space-half); max-width: 22em; font-variant-numeric: tabular-nums; }
+.quote-totals div { display: flex; justify-content: space-between; gap: var(--ds-space-3); }
 .quote-totals dt { color: var(--muted); }
 .quote-totals dd { margin: 0; white-space: nowrap; }
-.quote-totals .total { border-top: 1px solid var(--line); padding-top: var(--space-4); font-weight: 700; }
+.quote-totals .total { border-top: 1px solid var(--line); padding-top: var(--ds-space-1); font-weight: 700; }
 .quote-totals .total dt { color: var(--ink); }
 .jobs .margin-line { margin: 0; }
 .jobs .margin-line.bad b { color: var(--bad); }
@@ -389,25 +389,25 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .money .money-facts dd { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .money .money-facts dd small { display: block; font-size: var(--text-small); font-weight: 400; color: var(--muted); }
 /* Accepted, unpaid in two groups, a row a client with its quotes folded under it (audit findings 29 and 31). */
-.money .owed-group { display: grid; gap: var(--space-4); }
-.money .owed-group + .owed-group { margin-top: var(--space-12); }
-.money .owed-group h3 { margin: 0; display: flex; justify-content: space-between; gap: var(--space-8); }
+.money .owed-group { display: grid; gap: var(--ds-space-1); }
+.money .owed-group + .owed-group { margin-top: var(--ds-space-3); }
+.money .owed-group h3 { margin: 0; display: flex; justify-content: space-between; gap: var(--ds-space-2); }
 .money .owed-group .hint { margin: 0; }
 .money .owed { border-top: 1px solid var(--line); }
-.money .owed summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-8); min-height: 44px; padding: var(--space-6) 0; cursor: pointer; }
+.money .owed summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-half) var(--ds-space-2); min-height: 44px; padding: var(--ds-space-2) 0; cursor: pointer; }
 .money .owed summary b { flex: 1 1 10em; }
 .money .owed summary .count { color: var(--muted); font-size: var(--text-small); }
-.below-zero { margin: 0 0 var(--space-8); color: var(--bad); font-weight: 600; }
+.below-zero { margin: 0 0 var(--ds-space-2); color: var(--bad); font-weight: 600; }
 .money .owed .amount, .money .price-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
-.money .owed ul.plain { list-style: none; margin: 0; padding: 0 0 var(--space-8) var(--space-12); display: grid; gap: var(--space-6); }
+.money .owed ul.plain { list-style: none; margin: 0; padding: 0 0 var(--ds-space-2) var(--ds-space-3); display: grid; gap: var(--ds-space-2); }
 .money .owed a { color: var(--accent-ink); font-weight: 600; }
-.money .price-group h3 { margin: var(--space-12) 0 var(--space-6); }
+.money .price-group h3 { margin: var(--ds-space-3) 0 var(--ds-space-2); }
 .money .price-row { align-items: center; }
 .money .price-row > div:first-child { flex: 1 1 12em; }
-.money .price-row .euro { display: inline-flex; align-items: center; gap: var(--space-4); }
+.money .price-row .euro { display: inline-flex; align-items: center; gap: var(--ds-space-1); }
 .money .price-row .euro input { width: 6.5em; }
 .money .price-row .alert { flex-basis: 100%; }
-.money .rate-rules { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-12); }
+.money .rate-rules { display: grid; gap: var(--ds-space-2); justify-items: start; margin-bottom: var(--ds-space-3); }
 .money .rate-rules .hint { margin: 0; }
 @media print {
   .print-sheet.quote-sheet { color: #000; background: #fff; font: 10.5pt/1.4 system-ui, sans-serif; display: grid; gap: 8pt; }
@@ -438,17 +438,17 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .quote-sheet footer { margin-top: 6pt; padding-top: 4pt; border-top: 1px solid #999; font-size: 9pt; color: #444; }
 }
 /* The printed quote's terms on the draft (ADR 0084): two short fields side by side. */
-.quote-terms { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.quote-terms { display: flex; flex-wrap: wrap; gap: var(--ds-space-3); }
 .quote-terms .field { flex: 1 1 14em; }
-.quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--space-6); }
+.quote-terms .with-unit, .quote-extra .with-unit, .office-form .with-unit { display: inline-flex; align-items: center; gap: var(--ds-space-2); }
 .quote-terms .with-unit input, .quote-terms input, .quote-extra .with-unit input, .office-form .with-unit input { max-width: 7em; }
-.version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-4); }
+.version-changes ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--ds-space-1); }
 .money .card .hint a, .quote-screen .hint a, .quote-card .hint a { color: var(--accent-ink); font-weight: 600; text-underline-offset: 2px; }
 
 /* Kit from the notes (ADR 0043): each line as the notes write it, over what it matched. */
 .jobs .note-line .written { font-weight: 600; overflow-wrap: anywhere; }
 .jobs .note-line .grid-form { grid-template-columns: 2fr 1fr; }
-.jobs .note-line .new-product { grid-template-columns: 1fr 1fr; padding: var(--space-10); border-radius: var(--radius-control); background: var(--bg); }
+.jobs .note-line .new-product { grid-template-columns: 1fr 1fr; padding: var(--ds-space-3); border-radius: var(--radius-control); background: var(--bg); }
 .jobs .notes-kit-add { z-index: 1; border-top: 1px solid var(--line); }
 .jobs .notes-kit-add p { margin: 0; }
 .app .notes-kit-nudge p { margin: 0; }
@@ -456,8 +456,8 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Tidy up what came in (ADR 0050): groups of jobs to make one, names to type, venues and clients to put on jobs. */
 .tidy .found .kind { flex-wrap: wrap; }
 .tidy .found .kind .name { flex: 1; min-width: 12rem; font-weight: 700; }
-.tidy .found .people { margin: var(--space-4) 0; }
-.tidy .found .people > li { padding: var(--space-6) 0; }
+.tidy .found .people { margin: var(--ds-space-1) 0; }
+.tidy .found .people > li { padding: var(--ds-space-2) 0; }
 .tidy form.tick { align-items: center; }
 .tidy form.tick .name { width: 100%; }
 .tidy .filters { flex-wrap: wrap; }
@@ -471,13 +471,13 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  */
 .jobs .map { isolation: isolate; height: 240px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); font: inherit; }
 /* The map's code not on this phone yet, with no signal to fetch it (lazyPart.tsx): said where the map would be. */
-.jobs .map .map-missing { margin: 0; padding: var(--space-14); }
+.jobs .map .map-missing { margin: 0; padding: var(--ds-space-4); }
 .jobs .map.tall { height: 320px; }
 @media (min-width: 900px) {
   .jobs .map { height: 300px; }
   .jobs .map.tall { height: 440px; }
 }
-.jobs .map-box { display: grid; gap: var(--space-6); }
+.jobs .map-box { display: grid; gap: var(--ds-space-2); }
 :root[data-theme='dark'] .jobs .map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.85); }
 @media (prefers-color-scheme: dark) {
   :root[data-theme='auto'] .jobs .map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.85); }
@@ -494,12 +494,12 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .jobs .map .leaflet-control-attribution { background: var(--panel); color: var(--muted); font-size: var(--text-footer); }
 .jobs .map .leaflet-control-attribution a, .jobs .map .leaflet-popup-content a { color: var(--ink); }
 .jobs .map .leaflet-popup-content-wrapper, .jobs .map .leaflet-popup-tip { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
-.jobs .map .leaflet-popup-content { margin: var(--space-10) var(--space-14); font-size: var(--text-small); line-height: 1.4; }
+.jobs .map .leaflet-popup-content { margin: var(--ds-space-3) var(--ds-space-4); font-size: var(--text-small); line-height: 1.4; }
 .jobs .map .leaflet-popup-content a { font-weight: 600; }
-.jobs .map .leaflet-popup-content p { margin: var(--space-2) 0 0; color: var(--muted); }
+.jobs .map .leaflet-popup-content p { margin: var(--ds-space-half) 0 0; color: var(--muted); }
 .jobs .map a.leaflet-popup-close-button { color: var(--muted); }
-.jobs .paste-pin { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: end; }
-.jobs .find-rest { display: grid; gap: var(--space-8); }
+.jobs .paste-pin { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); align-items: end; }
+.jobs .find-rest { display: grid; gap: var(--ds-space-2); }
 
 /*
  * A job's page (JobScreen): the whole width, with no list beside it, its
@@ -507,86 +507,86 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  * underlined in the accent, the rest muted). One column, as its forms and
  * calls read down, at the same width as every other page (ADR 0091).
  */
-.part-tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.part-tabs { display: flex; gap: var(--ds-space-1); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .part-tabs::-webkit-scrollbar { display: none; }
-.app .part-tabs [role='tab'] { flex: none; display: inline-flex; align-items: center; gap: var(--space-6); min-height: 44px; margin-bottom: -1px; padding: var(--space-8) var(--space-12); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.app .part-tabs [role='tab'] { flex: none; display: inline-flex; align-items: center; gap: var(--ds-space-2); min-height: 44px; margin-bottom: -1px; padding: var(--ds-space-2) var(--ds-space-3); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-weight: 700; white-space: nowrap; }
 .app .part-tabs [role='tab']:hover { color: var(--ink); }
 .app .part-tabs [role='tab'][aria-selected='true'] { color: var(--ink); border-bottom-color: var(--accent); }
 .part-count { font-weight: 600; font-variant-numeric: tabular-nums; opacity: .8; }
-.job-part { display: grid; gap: var(--space-14); min-width: 0; }
+.job-part { display: grid; gap: var(--ds-space-4); min-width: 0; }
 .jobs .phase-crew { margin: 0; }
 /* A person's first and last name side by side (ADR 0066), wrapping to two lines on a narrow phone. */
-:is(.import, .tidy) .names { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); }
+:is(.import, .tidy) .names { display: flex; flex-wrap: wrap; gap: var(--ds-space-1) var(--ds-space-2); }
 :is(.import, .tidy) .names .name { flex: 1 1 8rem; width: auto; min-width: 0; }
 
 /* Past quotes from Current RMS (ADR 0078): a group's name heads its lines, as Current RMS lists them. */
-.past-quote .rms-lines .rms-group { padding-top: var(--space-12); }
+.past-quote .rms-lines .rms-group { padding-top: var(--ds-space-3); }
 .past-quote .rms-lines .rms-group:first-child { padding-top: 0; }
 
 /* Under a job's name (ADR 0082): its client, venue and dates, then its crew and kit, as lines rather than a card of facts, so its parts start on the first screen. Its notes and Change details follow, unboxed until they're being changed. */
 .job-page .job-line { color: var(--ink); }
 .job-page .job-line + .job-line { color: var(--muted); }
-.job-page .job-notes { display: grid; gap: var(--space-6); justify-items: start; }
+.job-page .job-notes { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .job-page .job-notes .notes { margin: 0; color: var(--muted); }
 
 /* Quotes to follow up (ADR 0081): on Money and Notifications, each group a short list, the oldest waiting first. */
-.quotes-to-follow .follow-group h3 { margin: var(--space-12) 0 var(--space-4); font-size: var(--text-small); color: var(--muted); }
-.quotes-to-follow .follow-group li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
-.quotes-to-follow .follow-group li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .follow-group h3 { margin: var(--ds-space-3) 0 var(--ds-space-1); font-size: var(--text-small); color: var(--muted); }
+.quotes-to-follow .follow-group li { align-items: center; padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); }
+.quotes-to-follow .follow-group li p { margin: var(--ds-space-half) 0 0; font-size: var(--text-small); color: var(--muted); }
 .quotes-to-follow .warn { color: var(--warn); }
-.quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); }
-.quotes-to-follow .new-quote { margin-bottom: var(--space-8); }
+.quotes-to-follow .in-step { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.quotes-to-follow .new-quote { margin-bottom: var(--ds-space-2); }
 /* Every quote (ADR 0088): a row a job, its quote's state on the right, as the rows to follow up. */
-.quote-list .filters { margin: var(--space-8) 0; }
+.quote-list .filters { margin: var(--ds-space-2) 0; }
 .quote-list ul.plain { list-style: none; margin: 0; padding: 0; }
-.quote-list li { align-items: center; padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.quote-list li { align-items: center; padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); }
 .quote-list li a { font-weight: 600; }
-.quote-list li p { margin: var(--space-2) 0 0; font-size: var(--text-small); color: var(--muted); }
-.quote-screen .in-step { display: grid; gap: var(--space-6); justify-items: start; margin-bottom: var(--space-8); }
+.quote-list li p { margin: var(--ds-space-half) 0 0; font-size: var(--text-small); color: var(--muted); }
+.quote-screen .in-step { display: grid; gap: var(--ds-space-2); justify-items: start; margin-bottom: var(--ds-space-2); }
 .quote-screen .in-step p { margin: 0; }
 
 /* Packages (ADR 0087): what one holds, under its line and on the price list. */
 .quote-screen .includes, .quote-sheet .includes { display: block; font-size: var(--text-small); color: var(--muted); font-weight: 400; }
 .money .package-row { align-items: center; }
 .money .package-row > div:first-child { flex: 1 1 14em; }
-.money .package-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.money .package-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .money .package-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
-.money .package-editor { display: grid; gap: var(--space-12); padding: var(--space-12) 0; border-top: 1px solid var(--line); }
-.money .package-fields { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.money .package-editor { display: grid; gap: var(--ds-space-3); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
+.money .package-fields { display: flex; flex-wrap: wrap; gap: var(--ds-space-3); }
 .money .package-fields .field { flex: 1 1 10em; }
-.money .package-items { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
-.money .package-items legend { font-weight: 700; padding: 0; margin-bottom: var(--space-4); }
-.money .package-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.money .package-items { border: 0; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
+.money .package-items legend { font-weight: 700; padding: 0; margin-bottom: var(--ds-space-1); }
+.money .package-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
 .money .package-item > span { flex: 1 1 6em; }
-.money .package-item label { display: inline-flex; align-items: center; gap: var(--space-6); font-size: var(--text-small); color: var(--muted); }
+.money .package-item label { display: inline-flex; align-items: center; gap: var(--ds-space-2); font-size: var(--text-small); color: var(--muted); }
 .money .package-item input { width: 4.5em; color: var(--ink); }
 
 /* Matching past quotes to jobs (ADR 0092). */
-.rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
+.rms-match .match-row .row { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: center; }
 .rms-match .match-row select { flex: 1 1 18em; min-width: 0; }
 
 /* Claude inside the app (ADR 0096): what it suggests sits apart, in no colour of its own, labelled as Claude's. */
 .from-enquiry textarea, .ask-claude textarea { width: 100%; }
-.from-enquiry .actions, .ask-claude .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); margin-top: var(--space-6); }
-.ask-claude { margin: var(--space-8) 0; }
-.claude-advice { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--ds-surface-inset); margin: var(--space-8) 0; }
-.claude-advice h3 { margin: var(--space-8) 0 var(--space-4); font-size: var(--text-body); }
-.claude-advice p, .claude-advice ul { margin: 0 0 var(--space-6); }
+.from-enquiry .actions, .ask-claude .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); margin-top: var(--ds-space-2); }
+.ask-claude { margin: var(--ds-space-2) 0; }
+.claude-advice { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--ds-space-2) var(--ds-space-3); background: var(--ds-surface-inset); margin: var(--ds-space-2) 0; }
+.claude-advice h3 { margin: var(--ds-space-2) 0 var(--ds-space-1); font-size: var(--text-body); }
+.claude-advice p, .claude-advice ul { margin: 0 0 var(--ds-space-2); }
 .by-claude { color: var(--muted); font-size: var(--text-small); }
-.app .claude-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+.app .claude-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
 /* Each line ticks as the shared tick does: a 44px row, the box beside what it is. */
-.app .claude-lines label.take { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; color: var(--ink); font-size: var(--text-body); cursor: pointer; }
-.app .claude-lines label.take input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .claude-lines label.take { display: flex; gap: var(--ds-space-3); align-items: flex-start; min-height: 44px; color: var(--ink); font-size: var(--text-body); cursor: pointer; }
+.app .claude-lines label.take input { width: 22px; height: 22px; flex: none; margin-top: var(--ds-space-half); accent-color: var(--accent); }
 .app .claude-lines label.take small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .app .claude-line.left b { color: var(--muted); font-weight: normal; }
-.app .claude-line .grid-form { margin: 0 0 var(--space-8) calc(22px + var(--space-10)); }
+.app .claude-line .grid-form { margin: 0 0 var(--ds-space-2) calc(22px + var(--ds-space-3)); }
 
 /* Claude's to-do list (ADR 0097): the shared tick's 44px rows, the box beside a link to the job. */
-.app .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
-.app .todo-item { display: flex; gap: var(--space-10); align-items: flex-start; min-height: 44px; }
-.app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--space-2); accent-color: var(--accent); }
+.app .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
+.app .todo-item { display: flex; gap: var(--ds-space-3); align-items: flex-start; min-height: 44px; }
+.app .todo-item input { width: 22px; height: 22px; flex: none; margin-top: var(--ds-space-half); accent-color: var(--accent); }
 .app .todo-item small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .app .todo-item.done a { color: var(--muted); text-decoration: line-through; }
 /* The quotes from before the app, under the app's own on Quotes (ADR 0092). */
-.quotes .from-rms { margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--line); }
-.quotes .from-rms h3 { margin: 0 0 var(--space-8); }
+.quotes .from-rms { margin-top: var(--ds-space-5); padding-top: var(--ds-space-4); border-top: 1px solid var(--line); }
+.quotes .from-rms h3 { margin: 0 0 var(--ds-space-2); }

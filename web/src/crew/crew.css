@@ -1,81 +1,81 @@
 /* Area tabs, pinned to the bottom where a thumb reaches them: a picture over a word for each (ADR 0033). */
 body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
-.tabs { position: fixed; inset: auto 0 0 0; display: flex; justify-content: center; gap: var(--space-4); padding: var(--space-6) var(--space-8) calc(var(--space-6) + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); z-index: 5; }
-.tabs a { position: relative; flex: 1; max-width: 160px; min-height: 52px; display: grid; justify-items: center; align-content: center; gap: var(--space-2); padding: var(--space-4) var(--space-2); border-radius: var(--radius-tab); font-weight: 700; font-size: var(--text-small); color: var(--muted); text-decoration: none; }
+.tabs { position: fixed; inset: auto 0 0 0; display: flex; justify-content: center; gap: var(--ds-space-1); padding: var(--ds-space-2) var(--ds-space-2) calc(var(--ds-space-2) + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); z-index: 5; }
+.tabs a { position: relative; flex: 1; max-width: 160px; min-height: 52px; display: grid; justify-items: center; align-content: center; gap: var(--ds-space-half); padding: var(--ds-space-1) var(--ds-space-half); border-radius: var(--radius-tab); font-weight: 700; font-size: var(--text-small); color: var(--muted); text-decoration: none; }
 .tabs[hidden] { display: none; }
 .tabs .area-icon { display: block; width: 24px; height: 24px; }
 /* The current tab is white on accent-fill, 5.7:1; on the brand red it was 4.0:1 (audit finding 22). */
 .tabs a[aria-current='page'] { background: var(--accent-fill); color: var(--on-accent); }
 /* Answers waiting for the office, on the Crew tab (audit finding 9), on the picture's shoulder. */
-.tabs .badge { position: absolute; top: var(--space-2); left: calc(50% + 6px); display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-6); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--panel); }
+.tabs .badge { position: absolute; top: var(--ds-space-half); left: calc(50% + 6px); display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--panel); }
 .tabs a[aria-current='page'] .badge { background: var(--on-accent); color: var(--accent-fill); box-shadow: 0 0 0 2px var(--accent-fill); }
 /* On a desk (900px and up, ADR 0036) the same five go down the left, a picture beside each word, always in view: the design system's expanded rail. The page moves over for it. */
 @media (min-width: 900px) {
   body { padding-bottom: 0; padding-left: var(--rail); }
   :root { --rail: 208px; }
-  .tabs { inset: 0 auto 0 0; width: var(--rail); flex-direction: column; justify-content: flex-start; gap: var(--space-4); padding: max(var(--space-16), env(safe-area-inset-top)) var(--space-12) var(--space-16) max(var(--space-12), env(safe-area-inset-left)); border-top: 0; border-right: 1px solid var(--line); overflow-y: auto; }
-  .tabs a { flex: none; max-width: none; min-height: 48px; display: flex; align-items: center; justify-content: flex-start; gap: var(--space-12); padding: 0 var(--space-12); font-size: var(--text-body); }
+  .tabs { inset: 0 auto 0 0; width: var(--rail); flex-direction: column; justify-content: flex-start; gap: var(--ds-space-1); padding: max(var(--ds-space-4), env(safe-area-inset-top)) var(--ds-space-3) var(--ds-space-4) max(var(--ds-space-3), env(safe-area-inset-left)); border-top: 0; border-right: 1px solid var(--line); overflow-y: auto; }
+  .tabs a { flex: none; max-width: none; min-height: 48px; display: flex; align-items: center; justify-content: flex-start; gap: var(--ds-space-3); padding: 0 var(--ds-space-3); font-size: var(--text-body); }
   .tabs .badge { position: static; margin-left: auto; }
   /* A new version's line runs across the top, the sidebar starting under it. */
   .update ~ .tabs { top: calc(56px + env(safe-area-inset-top)); }
 }
 
-.crew .job { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.crew .job { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .crew .job:first-of-type { border-top: 0; padding-top: 0; }
 .crew .job.is-pending { opacity: .8; }
-.crew .offers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
-.crew .offers li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-8); flex-wrap: wrap; padding: var(--space-4) 0; }
+.crew .offers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-1); }
+.crew .offers li { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-2); flex-wrap: wrap; padding: var(--ds-space-1) 0; }
 .crew .offers small, .crew .who small { color: var(--muted); }
-.crew .offers .on-cal { flex-basis: 100%; margin-top: -4px; font-size: .82rem; }
-.crew .offers .warn-line { flex-basis: 100%; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
-.crew .offer-form { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
-.crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--space-8); align-items: flex-start; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); }
-.crew .offer-form .warn input { accent-color: var(--accent); margin-top: 3px; }
+.crew .offers .on-cal { flex-basis: 100%; margin-top: calc(-1 * var(--ds-space-1)); font-size: .82rem; }
+.crew .offers .warn-line { flex-basis: 100%; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.crew .offer-form { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); }
+.crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: flex-start; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.crew .offer-form .warn input { accent-color: var(--accent); margin-top: var(--ds-space-half); }
 .crew .offer-form .alert { grid-column: 1 / -1; }
 /* "Offer…" beside a decline or a pull-out in Answers to check: opened, the picker takes its own line under the answer. */
 .crew .actions > .fold, .crew .row > .fold { flex-basis: 100%; }
 .crew .share { border-color: var(--accent); }
-.crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+.crew .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); }
 .crew .away-form .wide, .crew .away-form button { grid-column: 1 / -1; }
 /* Their own calendar (ADR 0044): the address to add, and the busy days read from it, one line each. */
-.crew .share-calendar { display: grid; gap: var(--space-6); }
+.crew .share-calendar { display: grid; gap: var(--ds-space-2); }
 .crew .share-calendar .hint { margin: 0; }
-.crew .busy-days { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+.crew .busy-days { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-1); }
 /* Leavers, folded away under the list (audit finding 7), and filled calls under the ones short of people (audit finding 10). */
-.crew details.archived, .crew details.filled-calls { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.crew details.archived, .crew details.filled-calls { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .crew details.archived summary, .crew details.filled-calls summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
-.crew details.archived .row { padding-top: var(--space-8); }
+.crew details.archived .row { padding-top: var(--ds-space-2); }
 /* Bring back and "Erase details…" beside the name where there's room (ADR 0027); under it on a phone. */
 .crew details.archived .row > .who { min-width: 50%; }
 
 /* The office's details on the Account tab (audit finding 10), laid out like the crew forms. */
-.account .office-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
-.account .office-form label { display: grid; gap: var(--space-4); font-size: .85rem; color: var(--muted); }
+.account .office-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; }
+.account .office-form label { display: grid; gap: var(--ds-space-1); font-size: .85rem; color: var(--muted); }
 .account .office-form .wide { grid-column: 1 / -1; }
 .account .office-form button { justify-self: start; }
 
 /* The profile (ADR 0025): the department filter over the list, the level on a card, what they've worked, the form's "More", and the picker's applicants tick. */
 .crew .dept-filter { justify-self: start; }
-.crew .level-pick { display: flex; gap: var(--space-8); align-items: center; font-size: .85rem; color: var(--muted); }
+.crew .level-pick { display: flex; gap: var(--ds-space-2); align-items: center; font-size: .85rem; color: var(--muted); }
 .crew .level-pick select { min-width: 9em; }
 .crew .grid-form details.more summary { display: flex; align-items: center; min-height: 44px; font-weight: 600; color: var(--muted); cursor: pointer; }
-.crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; padding-top: var(--space-4); }
-.crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: end; }
-.crew .offer-form .applicants { grid-column: 1 / -1; display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; padding-top: var(--ds-space-1); }
+.crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; }
+.crew .offer-form .applicants { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
 .crew .offer-form .applicants input { width: 22px; height: 22px; accent-color: var(--accent); }
 
 /* Bringing in the crew list (ADR 0025): the Account tab's card, and the screen's rows, each a card with its fields to fix. */
 .account .import-people-card .warn-line { margin: 0; }
 .account .import-people-card a.button { justify-self: start; }
-.import-people .field input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.import-people .field input[type='file'] { min-height: 44px; padding: var(--ds-space-2) 0; border: 0; background: none; }
 .import-people .people-rows .head { justify-content: space-between; }
 .import-people .people-rows .head b { font-size: 1.05rem; }
-.import-people .people-rows .skip { display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.import-people .people-rows .skip { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
 .import-people .people-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .import-people .people-rows .updates { color: var(--ink); }
 .import-people .people-rows .updates b { color: var(--accent-ink); }
-.import-people .fix { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-8); align-items: start; padding-top: var(--space-4); }
-.import-people .fix label { display: grid; gap: var(--space-4); font-size: .85rem; color: var(--muted); }
+.import-people .fix { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--ds-space-2); align-items: start; padding-top: var(--ds-space-1); }
+.import-people .fix label { display: grid; gap: var(--ds-space-1); font-size: .85rem; color: var(--muted); }
 .import-people .fix input { width: 100%; }
 .import-people .fix .warn-line { display: block; font-size: .8rem; }
 .import-people .bring .hint { text-align: center; }
@@ -86,18 +86,18 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 /* Staff leave (ADR 0024): the Crew tab's card, and the Leave screen's balances, forms, requests and queue. */
 .crew .leave-card a.button { justify-self: start; }
 .leave-screen .card p { margin: 0; }
-.leave-screen h3 { margin: var(--space-4) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.leave-screen h3 { margin: var(--ds-space-1) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .leave-screen .facts { grid-template-columns: 1fr 1fr 1fr; }
 .leave-screen .facts dd small { color: var(--muted); font-weight: 400; }
 .leave-screen .facts dd.bad { color: var(--bad); }
 .leave-screen .filters button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.leave-screen .who-form { display: grid; gap: var(--space-10); }
+.leave-screen .who-form { display: grid; gap: var(--ds-space-3); }
 .leave-screen .who-form button { justify-self: start; }
 .leave-screen .ts-total small { font-weight: 400; }
 .leave-screen .leave-row > div:first-child { flex: 1 1 14em; }
 .leave-screen .leave-row .hint { align-self: center; }
-.leave-screen .leave-warnings { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; gap: var(--space-4); }
-.leave-screen .decline-form { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-6); align-items: center; flex-basis: 100%; }
+.leave-screen .leave-warnings { list-style: none; margin: var(--ds-space-2) 0 0; padding: 0; display: grid; gap: var(--ds-space-1); }
+.leave-screen .decline-form { display: grid; grid-template-columns: 1fr auto auto; gap: var(--ds-space-2); align-items: center; flex-basis: 100%; }
 .leave-screen .allowance-row .actions { align-items: flex-end; }
 .leave-screen .allowance-row .field input { width: 6em; }
 .leave-screen .allowance-row .alert { flex-basis: 100%; }
@@ -108,63 +108,63 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 
 /* Timesheets (ADR 0022): what's waiting on the office in the Crew tab, and a booking's timesheet to check and approve. */
-.crew .ts-group { display: grid; gap: var(--space-8); }
-.crew .ts-group + .ts-group { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.crew .ts-group { display: grid; gap: var(--ds-space-2); }
+.crew .ts-group + .ts-group { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .crew .ts-group h3, .timesheet-screen h3 { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .ts-group .row:first-of-type { border-top: 0; padding-top: 0; }
 .crew .ts-row > div:first-child { flex: 1 1 14em; }
 .crew .ts-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
 /* Fill in, Open and Ask, each a finger's 44px wide as well as tall (audit, 20 October 2026, finding 58). */
 .crew .ts-row .actions :is(a.link, button) { min-width: 44px; justify-content: center; }
-.timesheet-screen .ts-days { display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.timesheet-screen .ts-days label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
+.timesheet-screen .ts-days { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.timesheet-screen .ts-days label { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
 .timesheet-screen .ts-days label.extra-day { border-style: dashed; }
 .timesheet-screen .ts-days input { width: 20px; height: 20px; accent-color: var(--accent); }
 .timesheet-screen .ts-days small { color: var(--muted); }
-.timesheet-screen .ts-extras { display: grid; gap: var(--space-6); }
-.timesheet-screen .ts-extra { display: grid; grid-template-columns: 1fr 6.5em auto; gap: var(--space-6); align-items: center; }
+.timesheet-screen .ts-extras { display: grid; gap: var(--ds-space-2); }
+.timesheet-screen .ts-extra { display: grid; grid-template-columns: 1fr 6.5em auto; gap: var(--ds-space-2); align-items: center; }
 .timesheet-screen button.link.start { justify-self: start; min-height: 44px; }
-.timesheet-screen .ts-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
-.timesheet-screen .ts-lines li { display: flex; justify-content: space-between; gap: var(--space-10); }
+.timesheet-screen .ts-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-1); }
+.timesheet-screen .ts-lines li { display: flex; justify-content: space-between; gap: var(--ds-space-3); }
 .timesheet-screen .ts-lines li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.timesheet-screen .ts-changes { margin: var(--space-4) 0 0; padding-left: 1.2em; }
+.timesheet-screen .ts-changes { margin: var(--ds-space-1) 0 0; padding-left: 1.2em; }
 .timesheet-screen .ts-total { margin: 0; font-weight: 700; }
 
 /* A crew call at rest is one line (audit finding 16): a button with the role that opens the rest of the call under it, on the right its state as a pill, who's on it under them, and "Offer…" on the right under that while there are places to fill. On the Crew tab the calls are grouped by job and then by days. */
-.crew .call-group { display: grid; gap: var(--space-8); padding-top: var(--space-12); border-top: 1px solid var(--line); }
-.crew .call-groups { display: grid; gap: var(--space-10); }
+.crew .call-group { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
+.crew .call-groups { display: grid; gap: var(--ds-space-3); }
 .crew .filled-calls .call-groups { gap: 0; }
 .crew .card > h2 + .call-groups > [data-first] { padding-top: 0; border-top: 0; }
-.crew .call-group > header { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; }
-.crew .call-group > header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.crew .call-date { display: grid; gap: var(--space-6); }
-.crew h3.calls-part { margin: var(--space-10) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.crew .call-group > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
+.crew .call-group > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.crew .call-date { display: grid; gap: var(--ds-space-2); }
+.crew h3.calls-part { margin: var(--ds-space-3) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .call-date h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.crew .call-date .job { padding: var(--space-4) var(--space-12) var(--space-8); border: 1px solid var(--line); border-radius: 10px; }
-.crew .job.call { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-10); align-items: start; }
+.crew .call-date .job { padding: var(--ds-space-1) var(--ds-space-3) var(--ds-space-2); border: 1px solid var(--line); border-radius: 10px; }
+.crew .job.call { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--ds-space-3); align-items: start; }
 .crew .call > * { grid-column: 1 / -1; }
 .crew .call > .call-line { grid-column: 1; grid-row: 1; }
-.crew .call > .pill { grid-column: 2; grid-row: 1; justify-self: end; margin-top: var(--space-8); }
+.crew .call > .pill { grid-column: 2; grid-row: 1; justify-self: end; margin-top: var(--ds-space-2); }
 /* Who's on it under the line, across the whole card, so a long list isn't a column of one word a line beside a wide pill (audit of 18 October, finding 20). */
-.crew .call > .who-line { grid-row: 2; margin: calc(-1 * var(--space-4)) 0 var(--space-4); font-size: var(--text-small); line-height: 1.5; }
-.crew .call > .who-line .avatars { margin-right: var(--space-8); }
+.crew .call > .who-line { grid-row: 2; margin: calc(-1 * var(--ds-space-1)) 0 var(--ds-space-1); font-size: var(--text-small); line-height: 1.5; }
+.crew .call > .who-line .avatars { margin-right: var(--ds-space-2); }
 .crew .call > .who-line .avatar { --pic: 26px; }
 /* "and 17 more" sits in the sentence, its tap area grown to 44px tall without moving the line. */
 .crew .call > .who-line button.link { position: relative; min-height: 0; padding: 0; font: inherit; }
 .crew .call > .who-line button.link::after { content: ''; position: absolute; inset: -12px -4px; }
 .crew .call > button.offer { grid-column: 2; justify-self: end; }
-.crew .call-line { display: grid; gap: var(--space-2); justify-items: start; width: 100%; min-height: 44px; padding: var(--space-6) 0; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; font: inherit; }
+.crew .call-line { display: grid; gap: var(--ds-space-half); justify-items: start; width: 100%; min-height: 44px; padding: var(--ds-space-2) 0; border: 0; border-radius: 0; background: none; color: inherit; text-align: left; font: inherit; }
 .crew .call .facts-line { margin: 0; color: var(--muted); font-size: var(--text-small); }
 /* The picker (ADR 0025) narrowed as you type: the search over the select, the select and Offer side by side. */
 .crew .offer-form .find { grid-column: 1 / -1; }
 
 /* The certificates a call needs, and running late (ADR 0028). The ticks for what a call needs wrap as chips; a certificate's note sits beside its expiry, or under it on a phone. */
-.app .grid-form .needs > div, .app .grid-form .chips > div { display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.app .grid-form .needs label, .app .grid-form .chips label { display: flex; gap: var(--space-6); align-items: center; min-height: 44px; padding: var(--space-4) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
+.app .grid-form .needs > div, .app .grid-form .chips > div { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.app .grid-form .needs label, .app .grid-form .chips label { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font-size: var(--text-small); cursor: pointer; }
 .app .grid-form .needs input, .app .grid-form .chips input { width: 20px; height: 20px; accent-color: var(--accent); }
 .crew .more-grid .cert { grid-template-columns: 1fr 1fr 1.2fr; }
 .crew .offer-form .warn-line { grid-column: 1 / -1; }
-.crew .call > .warn-line { margin-top: calc(-1 * var(--space-4)); }
+.crew .call > .warn-line { margin-top: calc(-1 * var(--ds-space-1)); }
 /* Running late on a call's line: the warn tone while they're on their way, and quiet once they're there. */
 .crew .late-line { margin: 0; font-size: var(--text-hint); font-weight: 600; color: var(--warn); }
 .crew .late-line.there { color: var(--muted); font-weight: 500; }
@@ -182,34 +182,34 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 
 /* People's documents (ADR 0029): a line each on the person's card, in the warn tone when one runs out soon and the bad tone once it has, the form to add or change one, and one sent from a link in "Answers to check". */
-.crew .documents { display: grid; gap: var(--space-6); }
+.crew .documents { display: grid; gap: var(--ds-space-2); }
 /* A card's detail sets its lines in ink; what's only a hint here keeps the hint's tone. */
 .crew .documents .hint, .crew .documents .row.doc p { color: var(--muted); }
 /* A title typed as one long word, such as a file's name, wraps rather than pushing the card wider than a phone. */
 .crew .documents .row.doc > div:first-child, .crew .doc-check > div:first-child { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
 .crew .documents .row.doc .warn { color: var(--warn); font-weight: 600; }
 .crew .documents .row.doc .bad { color: var(--bad); font-weight: 600; }
-.crew .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.crew .doc-form input[type='file'] { min-height: 44px; padding: var(--ds-space-2) 0; border: 0; background: none; }
 .crew .doc-form small { color: var(--muted); }
-.crew .doc-check .field { display: flex; gap: var(--space-6); align-items: center; font-size: var(--text-hint); color: var(--muted); }
+.crew .doc-check .field { display: flex; gap: var(--ds-space-2); align-items: center; font-size: var(--text-hint); color: var(--muted); }
 
 /* A person's page (#crew/person/<id>): their name with a place for their picture before it, a line of who they are under it, and cards for what's ahead, what they hold, what they've worked and their link. */
 .person-page .card p { margin: 0; }
 .person-page .who-card .title { align-items: center; }
-.person-page .who-name { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
+.person-page .who-name { flex: 1; min-width: 0; display: grid; gap: var(--ds-space-half); }
 .person-page .who-name p { font-size: var(--text-small); }
 .person-page .facts dd { overflow-wrap: anywhere; }
 .person-page .card > p, .person-page .documents p { font-size: var(--text-small); }
 .crew a.who { color: inherit; text-decoration: none; }
-.person-page .who-card a.button, .person-page .reach a.button { gap: var(--space-6); }
+.person-page .who-card a.button, .person-page .reach a.button { gap: var(--ds-space-2); }
 /* Their photo (ADR 0065): the file field is hidden inside its button (a label, drawn as a.button is), which shows the field's focus ring. */
-.person-page .person-photo { display: grid; gap: var(--space-6); }
-.person-page .person-photo label.button { gap: var(--space-6); cursor: pointer; }
+.person-page .person-photo { display: grid; gap: var(--ds-space-2); }
+.person-page .person-photo label.button { gap: var(--ds-space-2); cursor: pointer; }
 .person-page .person-photo label.button:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .person-page .person-photo label.button[aria-busy="true"] { cursor: progress; }
 
 /* Combining people brought in twice (ADR 0055): the ticks are Tidy up's; the search sits above them. */
-.person-page .combine { display: grid; gap: var(--space-10); }
-.person-page .combine .field { display: grid; gap: var(--space-4); }
+.person-page .combine { display: grid; gap: var(--ds-space-3); }
+.person-page .combine .field { display: grid; gap: var(--ds-space-1); }
 .person-page .combine .field input { width: 100%; }
 .person-page .combine .actions { margin: 0; }

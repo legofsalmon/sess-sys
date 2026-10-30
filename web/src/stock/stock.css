@@ -5,50 +5,50 @@
 .warehouse .facts .wide { grid-column: 1 / -1; }
 .warehouse input[type='number'] { width: 100%; }
 /* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
-.warehouse .card > form:has(> h3) { padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.warehouse .card > form:has(> h3) { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .warehouse .card > h2 + form:has(> h3) { padding-top: 0; border-top: 0; }
 
 /* Items, by number. */
 .warehouse .item-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-12); min-height: 44px; padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ds-space-3); min-height: 44px; padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .warehouse .item-list li:first-child .item-row { border-top: 0; padding-top: 0; }
-.warehouse .item-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
+.warehouse .item-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
 .warehouse .item-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-.warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: var(--space-10) 0; }
+.warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: var(--ds-space-3) 0; }
 
 /* On a place: items grouped by product, each number a link. */
-.warehouse .group { display: grid; gap: var(--space-6); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.warehouse .group { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .warehouse .card > h2 + .group { padding-top: 0; border-top: 0; }
 .warehouse .group-name { margin: 0; }
 .warehouse .group-name a, .warehouse .count .what a { color: var(--accent-ink); font-weight: 600; }
-.warehouse .group-name small { color: var(--muted); margin-left: var(--space-4); }
-.warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-4) var(--space-12); border: 1px solid var(--line); border-radius: var(--radius-full); color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
+.warehouse .group-name small { color: var(--muted); margin-left: var(--ds-space-1); }
+.warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-full); color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
 .warehouse .numbers a.is-pending { border-style: dashed; color: var(--warn); }
 .warehouse .numbers a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Counts. */
 .warehouse .count { align-items: center; }
-.warehouse .item-list + .row, .warehouse .group + .row { padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.warehouse .item-list + .row, .warehouse .group + .row { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .warehouse .count small { color: var(--muted); }
 .warehouse .count .what { flex: 1; min-width: 45%; }
-.warehouse .count .n { font-size: 1.1rem; margin-right: var(--space-2); }
+.warehouse .count .n { font-size: 1.1rem; margin-right: var(--ds-space-half); }
 
 /* Numbered or counted, when adding or changing a product; ticks and reasons. */
-.warehouse .tracking { display: grid; gap: var(--space-6); }
+.warehouse .tracking { display: grid; gap: var(--ds-space-2); }
 /* Also inside the shared forms, whose labels stack their text over the field. */
-.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: var(--space-10); align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
-.warehouse .choice { padding: var(--space-8) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); }
+.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
+.warehouse .choice { padding: var(--ds-space-2) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); }
 .warehouse .choice:has(input:checked) { border-color: var(--ink); }
 .warehouse .choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
 .warehouse .choice b, .warehouse .choice small { display: block; }
 .warehouse .choice small { color: var(--muted); font-size: .8rem; }
-.warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: var(--space-2) 0 0; accent-color: var(--accent); }
-.warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 var(--space-16); }
+.warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: var(--ds-space-half) 0 0; accent-color: var(--accent); }
+.warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 var(--ds-space-4); }
 .warehouse .reasons legend { width: 100%; }
 .warehouse .reasons .tick { min-height: 44px; align-items: center; }
 .warehouse .reasons .tick input { margin: 0; }
-.warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
+.warehouse .inline-add { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); }
 
 /* Labels (ADR 0015). Black on white whatever the screen's theme, at their real size in millimetres. */
 .label { box-sizing: border-box; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm; background: #fff; color: #000; overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.15; }
@@ -67,15 +67,15 @@
 .label.sheet small { font-size: 2mm; }
 
 .warehouse .nowrap { white-space: nowrap; }
-.warehouse .print-labels { display: grid; gap: var(--space-10); }
+.warehouse .print-labels { display: grid; gap: var(--ds-space-3); }
 .warehouse .print-labels > button { justify-self: start; }
 .warehouse .layouts { display: grid; gap: 0; }
 .warehouse .layouts .tick { min-height: 44px; align-items: center; }
 .warehouse .layouts .tick input { margin: 0; }
 /* The first few at their real size, on white as they'll print. */
-.warehouse .preview { display: flex; flex-wrap: wrap; gap: var(--space-8); padding: var(--space-10); border-radius: var(--radius-control); background: var(--bg); }
+.warehouse .preview { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); padding: var(--ds-space-3); border-radius: var(--radius-control); background: var(--bg); }
 .warehouse .preview .label { box-shadow: 0 0 0 1px var(--line); border-radius: 1.5mm; }
-.warehouse .claim { padding: var(--space-12); border: 1px solid var(--accent); border-radius: 10px; }
+.warehouse .claim { padding: var(--ds-space-3); border: 1px solid var(--accent); border-radius: 10px; }
 
 /* Cable labels (ADR 0095): the words as big as fit, a barcode under them or a QR code beside; a flag says it at both ends with the part round the cable blank. */
 .label.cable { width: 50mm; height: 25mm; padding: 1.5mm; gap: 0; }
@@ -91,7 +91,7 @@
 .label.cable .bars { display: grid; justify-items: center; width: 100%; }
 .label.cable .bars svg { display: block; width: 100%; height: 9mm; }
 .label.cable .bars small { font-size: 2.2mm; line-height: 1; margin-top: .4mm; }
-.warehouse .cable-labels { display: grid; gap: var(--space-10); }
+.warehouse .cable-labels { display: grid; gap: var(--ds-space-3); }
 .warehouse .cable-labels > button { justify-self: start; }
 .warehouse .cable-labels .layouts small { display: block; color: var(--muted); font-size: .8rem; }
 .warehouse .cable-labels .preview { overflow-x: auto; }
@@ -111,8 +111,8 @@
 }
 
 /* Scanning with the camera (ADR 0016): a square picture, as the reader looks at its middle square. */
-.warehouse .scan-row { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); }
-.warehouse .scanner { display: grid; gap: var(--space-8); }
+.warehouse .scan-row { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); }
+.warehouse .scanner { display: grid; gap: var(--ds-space-2); }
 .warehouse .viewfinder { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; justify-self: center; overflow: hidden; border-radius: var(--radius-card); background: #000; }
 .warehouse .scanner.small .viewfinder { max-width: 180px; }
 .warehouse .scan-row button[aria-pressed='true'], .warehouse .scan-controls button[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -120,92 +120,92 @@
 .warehouse .viewfinder .frame { position: absolute; inset: 14%; border: 3px solid #fff8; border-radius: 10px; box-shadow: 0 0 0 999px #0005; pointer-events: none; }
 .warehouse .viewfinder .frame[data-read] { animation: scan-read .6s ease-out; }
 @keyframes scan-read { from { border-color: var(--good); background: var(--good-soft); } to { border-color: #fff8; background: transparent; } }
-.warehouse .viewfinder .starting { position: absolute; inset: auto 0 12px; margin: 0; text-align: center; color: #fff; font-size: .9rem; }
+.warehouse .viewfinder .starting { position: absolute; inset: auto 0 var(--ds-space-3); margin: 0; text-align: center; color: #fff; font-size: .9rem; }
 .warehouse .scan-status { margin: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 1.4em; }
-.warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: var(--space-6); justify-content: center; }
-.warehouse .scanner .alert { display: grid; gap: var(--space-8); justify-items: start; }
+.warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); justify-content: center; }
+.warehouse .scanner .alert { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .warehouse .scanner .alert p { margin: 0; }
 
 /* Faults and missing kit (ADR 0018): a stripe down the side says whether it stops the kit going out. */
-.warehouse .fault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
-.warehouse .fault { display: grid; gap: var(--space-6); padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius-control); }
+.warehouse .fault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-2); }
+.warehouse .fault { display: grid; gap: var(--ds-space-2); padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius-control); }
 .warehouse .fault.stops { border-left-color: var(--bad); }
 .warehouse .fault.usable { border-left-color: var(--warn); }
 .warehouse .fault.closed { color: var(--muted); }
-.warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: var(--space-8); }
-.warehouse .fault header p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: var(--ds-space-2); }
+.warehouse .fault header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .85rem; }
 .warehouse .fault a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .fault header > div > a { color: inherit; }
 .warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: .9rem; }
 /* The repair list's headings stay under the top bar while their faults scroll by (audit, 20 October 2026, finding 93). */
-.warehouse .repairs .repair-group { display: grid; gap: var(--space-8); }
-.warehouse .repairs .repair-group h3 { position: sticky; top: var(--under-top, 0px); z-index: 1; margin: 0; padding: var(--space-8) 0 var(--space-6); background: var(--panel); }
+.warehouse .repairs .repair-group { display: grid; gap: var(--ds-space-2); }
+.warehouse .repairs .repair-group h3 { position: sticky; top: var(--under-top, 0px); z-index: 1; margin: 0; padding: var(--ds-space-2) 0 var(--ds-space-2); background: var(--panel); }
 .warehouse .fault button.sort-out { justify-self: start; min-height: 44px; color: var(--muted); }
 .warehouse .fault .repair { color: var(--muted); }
 .warehouse .fault .actions { margin: 0; }
-.warehouse .faults h3 { margin: var(--space-12) 0 var(--space-6); }
-.warehouse .faults details { margin-top: var(--space-10); }
-.warehouse .faults details .fault-list { margin-top: var(--space-8); }
+.warehouse .faults h3 { margin: var(--ds-space-3) 0 var(--ds-space-2); }
+.warehouse .faults details { margin-top: var(--ds-space-3); }
+.warehouse .faults details .fault-list { margin-top: var(--ds-space-2); }
 .warehouse .facts dd.bad, .warehouse .flag.bad { color: var(--bad); font-weight: 600; }
 .warehouse .numbers.missing-items a { border-style: dashed; border-color: var(--bad); color: var(--bad); }
 .warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: .85rem; font-weight: 600; }
 
 /* Inspections (ADR 0020): where an item stands on each test, the same stripes as faults. */
-.warehouse .due-list { list-style: none; margin: 0 0 var(--space-10); padding: 0; display: grid; gap: var(--space-8); }
-.warehouse .due { display: grid; gap: var(--space-2); padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: var(--radius-control); }
+.warehouse .due-list { list-style: none; margin: 0 0 var(--ds-space-3); padding: 0; display: grid; gap: var(--ds-space-2); }
+.warehouse .due { display: grid; gap: var(--ds-space-half); padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: var(--radius-control); }
 .warehouse .due span { color: var(--muted); font-size: .9rem; }
 .warehouse .due.soon, .warehouse .due.unrecorded { border-left-color: var(--warn); }
 .warehouse .due.failed, .warehouse .due.overdue { border-left-color: var(--bad); }
 .warehouse .due.failed b, .warehouse .due.overdue b { color: var(--bad); }
-.warehouse .inspections details { margin-top: var(--space-10); }
-.warehouse .inspections .inspection { display: flex; justify-content: space-between; gap: var(--space-8); padding: var(--space-8) 0; border-top: 1px dashed var(--line); }
-.warehouse .inspections .inspection p { margin: var(--space-2) 0 0; color: var(--muted); font-size: .85rem; }
-.warehouse .inspections-due h3 { margin: var(--space-12) 0 var(--space-6); }
+.warehouse .inspections details { margin-top: var(--ds-space-3); }
+.warehouse .inspections .inspection { display: flex; justify-content: space-between; gap: var(--ds-space-2); padding: var(--ds-space-2) 0; border-top: 1px dashed var(--line); }
+.warehouse .inspections .inspection p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .inspections-due h3 { margin: var(--ds-space-3) 0 var(--ds-space-2); }
 /* Certificates on items (ADR 0094): a line each, as a venue's documents are, in the warn tone when another runs out soon and the bad tone once it has; a test's own opens from its line. */
-.warehouse .certificates { display: grid; gap: var(--space-6); }
+.warehouse .certificates { display: grid; gap: var(--ds-space-2); }
 .warehouse .certificates .row.doc > div:first-child { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
 .warehouse .certificates .row.doc .warn { color: var(--warn); font-weight: 600; }
 .warehouse .certificates .row.doc .bad { color: var(--bad); font-weight: 600; }
-.warehouse .doc-form input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.warehouse .doc-form input[type='file'] { min-height: 44px; padding: var(--ds-space-2) 0; border: 0; background: none; }
 .warehouse .doc-form small { color: var(--muted); }
 .warehouse .inspections .inspection { flex-wrap: wrap; }
 .warehouse .inspections .inspection > div:first-child { flex: 1 1 12em; min-width: 0; }
-.warehouse .inspections .inspection .actions { display: flex; gap: var(--space-6); align-items: center; }
+.warehouse .inspections .inspection .actions { display: flex; gap: var(--ds-space-2); align-items: center; }
 .warehouse .inspections .inspection form { flex: 1 1 100%; }
 .warehouse .numbers a.failed { border-color: var(--bad); color: var(--bad); }
 
 /* Audit round three (findings 17 to 19): a pass held before it's recorded, what the last scan did under the camera, zoom, and the address to open elsewhere. */
-.warehouse .held { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--ink); }
+.warehouse .held { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--ds-space-2); padding: var(--ds-space-2) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--ink); }
 .warehouse .held p { margin: 0; font-variant-numeric: tabular-nums; }
 .warehouse .held .actions { margin: 0; }
-.warehouse .scan-result { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: center; }
+.warehouse .scan-result { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); align-items: center; }
 .warehouse .scan-result .added { margin: 0; }
-.warehouse .scan-misses h4 { margin: 0 0 var(--space-4); font-size: var(--text-small); color: var(--warn); }
-.warehouse .scan-misses li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-8); color: var(--ink); }
+.warehouse .scan-misses h4 { margin: 0 0 var(--ds-space-1); font-size: var(--text-small); color: var(--warn); }
+.warehouse .scan-misses li { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-2); color: var(--ink); }
 .warehouse .grid-form .scan-row { align-items: end; }
-.warehouse .zoom { display: grid; grid-template-columns: auto 1fr; gap: var(--space-8); align-items: center; width: 100%; max-width: 420px; justify-self: center; font-size: var(--text-hint); color: var(--muted); }
+.warehouse .zoom { display: grid; grid-template-columns: auto 1fr; gap: var(--ds-space-2); align-items: center; width: 100%; max-width: 420px; justify-self: center; font-size: var(--text-hint); color: var(--muted); }
 .warehouse .zoom input { width: 100%; min-height: 0; padding: 0; accent-color: var(--accent); }
 .warehouse .scanner .elsewhere input { justify-self: stretch; width: 100%; font-size: var(--text-hint); color: var(--muted); }
 
 /* Bringing in the stock list (ADR 0026), on the crew list's pattern: a card per row, its fields to fix, the one button stuck above the tabs. */
-.import-stock .field input[type='file'] { min-height: 44px; padding: var(--space-8) 0; border: 0; background: none; }
+.import-stock .field input[type='file'] { min-height: 44px; padding: var(--ds-space-2) 0; border: 0; background: none; }
 .import-stock .card > p { margin: 0; }
-.import-stock .links { display: flex; flex-wrap: wrap; gap: 0 var(--space-16); }
+.import-stock .links { display: flex; flex-wrap: wrap; gap: 0 var(--ds-space-4); }
 .import-stock .stock-rows .head { justify-content: space-between; }
 .import-stock .stock-rows .head b { font-size: 1.05rem; }
-.import-stock .stock-rows .skip { display: flex; gap: var(--space-8); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
+.import-stock .stock-rows .skip { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
 .import-stock .stock-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .import-stock .stock-rows p.does { color: var(--ink); }
 .import-stock .stock-rows p.same { color: var(--muted); }
-.import-stock .fix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-8); align-items: start; padding-top: var(--space-4); }
-.import-stock .fix label { display: grid; gap: var(--space-4); font-size: var(--text-hint); color: var(--muted); }
+.import-stock .fix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--ds-space-2); align-items: start; padding-top: var(--ds-space-1); }
+.import-stock .fix label { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .import-stock .fix input { width: 100%; }
 .import-stock .fix .warn-line { display: block; font-size: .8rem; }
 .import-stock .bring .hint { text-align: center; }
 .import-stock .columns-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.import-stock .columns-list li { padding: var(--space-10) 0; border-top: 1px solid var(--line); }
+.import-stock .columns-list li { padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
 .import-stock .columns-list li:first-child { border-top: 0; padding-top: 0; }
-.import-stock .columns-list label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 50%); gap: var(--space-10); align-items: center; }
+.import-stock .columns-list label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 50%); gap: var(--ds-space-3); align-items: center; }
 .import-stock .columns-list b, .import-stock .columns-list small { display: block; overflow-wrap: anywhere; }
 .import-stock .columns-list small { color: var(--muted); font-size: var(--text-hint); }
 .import-stock .columns-list select { width: 100%; }
@@ -213,66 +213,66 @@
 
 /* An item's log (ADR 0026): what happened, then when and who, newest first. */
 .warehouse .log { list-style: none; margin: 0; padding: 0; display: grid; }
-.warehouse .log li { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-12); padding: var(--space-8) 0; border-top: 1px solid var(--line); }
+.warehouse .log li { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ds-space-3); padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); }
 .warehouse .log li:first-child { border-top: 0; padding-top: 0; }
 .warehouse .log .what { display: block; overflow-wrap: anywhere; }
-.warehouse .log small { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--text-hint); }
+.warehouse .log small { display: block; margin-top: var(--ds-space-half); color: var(--muted); font-size: var(--text-hint); }
 .warehouse .item-log > .link { justify-self: start; }
 
 /* Counts (ADR 0030): the tally big at the top, a big field per product, a big Finish, and each difference a row with its fix. */
 .warehouse .count-tally { margin: 0; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.warehouse.counting .said { margin: 0; padding: var(--space-8) var(--space-10); border-radius: var(--radius-control); font-size: var(--text-small); }
+.warehouse.counting .said { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); font-size: var(--text-small); }
 .warehouse.counting .said.ok { background: var(--good-soft); color: var(--good); }
 .warehouse.counting .said.warn { background: var(--warn-soft); color: var(--warn); }
 .warehouse.counting .said.quiet { background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
 .warehouse.counting .group h3 { margin: 0; }
 .warehouse .said-list, .warehouse .count-lines { list-style: none; margin: 0; padding: 0; display: grid; }
-.warehouse .said-list li { padding: var(--space-6) 0; border-top: 1px solid var(--line); font-size: var(--text-small); color: var(--muted); }
+.warehouse .said-list li { padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); font-size: var(--text-small); color: var(--muted); }
 .warehouse .said-list li:first-child { border-top: 0; }
 .warehouse .said-list b { color: var(--ink); }
-.warehouse .count-field { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; gap: var(--space-10); align-items: center; padding: var(--space-8) 0; border-top: 1px solid var(--line); }
+.warehouse .count-field { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; gap: var(--ds-space-3); align-items: center; padding: var(--ds-space-2) 0; border-top: 1px solid var(--line); }
 .warehouse .count-field b, .warehouse .count-field small { display: block; }
 .warehouse .count-field small { color: var(--muted); font-size: var(--text-hint); }
 .warehouse .count-field input { min-height: 52px; font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 .warehouse .count-field input::placeholder { font-size: var(--text-small); font-weight: 400; }
-.warehouse .add-product { display: grid; grid-template-columns: 1fr auto; gap: var(--space-6); align-items: end; padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.warehouse .add-product { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); align-items: end; padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .warehouse .finish button.big, .warehouse .finish-bar button.big { min-height: 56px; font-size: var(--text-body); width: 100%; }
 /* Kept in reach above the tabs while scrolling a long count, as the bring-in's bar is (audit, 20 October 2026, finding 43). */
-.warehouse .finish-bar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 1; display: grid; gap: var(--space-8); padding: var(--space-10) 0; background: var(--bg); }
+.warehouse .finish-bar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 1; display: grid; gap: var(--ds-space-2); padding: var(--ds-space-3) 0; background: var(--bg); }
 .warehouse .finish .hint { text-align: center; }
 .warehouse .finish > button.link { justify-self: center; }
-.warehouse .count-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-8); padding: var(--space-10) 0; border-top: 1px solid var(--line); }
+.warehouse .count-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--ds-space-2); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
 .warehouse .count-line:first-child { border-top: 0; padding-top: 0; }
 .warehouse .count-line > div:first-child { flex: 1; min-width: 55%; }
 .warehouse .count-line a { color: var(--accent-ink); font-weight: 600; }
-.warehouse .count-line p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
+.warehouse .count-line p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .warehouse .count-line .alert { flex-basis: 100%; }
 /* Done, held and the same as before are settled: ink or muted, so green is left for a scan that read (audit, 20 October 2026, finding 59). */
 .warehouse .count-line .done { color: var(--ink); font-weight: 600; font-size: var(--text-small); }
 /* A number no item has can be a long web address from a maker's QR code: it wraps rather than widening the page. */
 .warehouse .said-list li, .warehouse.counting .said, .warehouse .count-line > div:first-child { overflow-wrap: anywhere; }
 .warehouse .count-fixes > button.all { justify-self: start; }
-.warehouse .counts h3 { margin: var(--space-4) 0 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.warehouse .counts h3 { margin: var(--ds-space-1) 0 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .warehouse .counts .last-counted { margin: 0; }
 .warehouse .counts .done-line { margin: 0; color: var(--ink); font-weight: 600; }
-.warehouse .counts .under-way { display: grid; gap: var(--space-8); padding: var(--space-10) var(--space-12); border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-soft); color: var(--warn); }
+.warehouse .counts .under-way { display: grid; gap: var(--ds-space-2); padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-soft); color: var(--warn); }
 .warehouse .counts .under-way p { margin: 0; }
 .warehouse .counts .under-way .button { justify-self: start; }
-.warehouse .count-due { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); border-top: 1px solid var(--line); }
+.warehouse .count-due { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); border-top: 1px solid var(--line); }
 .warehouse .count-due:first-child { border-top: 0; }
 /* A count's row, as a list row looks (.job-row), under a class of its own: a place's name on the Counts card isn't its row in Places. */
-.warehouse .count-link { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-10) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.warehouse .count-link { display: flex; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .warehouse .job-list li:first-child .count-link { border-top: 0; padding-top: 0; }
-.warehouse .count-link p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.warehouse .count-link .side { display: grid; justify-items: end; align-content: start; gap: var(--space-4); text-align: right; }
+.warehouse .count-link p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.warehouse .count-link .side { display: grid; justify-items: end; align-content: start; gap: var(--ds-space-1); text-align: right; }
 .warehouse .count-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .warehouse .count-due .count-link { flex: 1; border-top: 0; min-width: 55%; }
-.warehouse .count-due .confirm { flex-basis: 100%; padding-bottom: var(--space-10); }
+.warehouse .count-due .confirm { flex-basis: 100%; padding-bottom: var(--ds-space-3); }
 .warehouse .counts > button { justify-self: start; }
 
 /* A product's photo on its page (ADR 0083), at its own shape: often a rack panel, wide and short. */
-.warehouse .product-photo { display: grid; gap: var(--space-6); justify-items: start; }
+.warehouse .product-photo { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .warehouse .product-photo img { max-width: 100%; max-height: 16rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ds-surface-inset); }
-.warehouse .product-photo label.button { gap: var(--space-6); cursor: pointer; }
+.warehouse .product-photo label.button { gap: var(--ds-space-2); cursor: pointer; }
 .warehouse .product-photo label.button:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .warehouse .product-photo label.button[aria-busy="true"] { cursor: progress; }

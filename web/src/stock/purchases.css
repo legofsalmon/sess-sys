@@ -1,15 +1,15 @@
 /* The purchase list (ADR 0077): the list ranked by votes, a request's page, and bringing a list in. Roles only, both themes. */
 .purchase-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.purchase-row { display: flex; gap: var(--space-12); align-items: flex-start; border-top: 1px solid var(--line); }
+.purchase-row { display: flex; gap: var(--ds-space-3); align-items: flex-start; border-top: 1px solid var(--line); }
 .purchase-row:first-child { border-top: 0; }
 .purchase-row > .job-row { flex: 1; min-width: 0; border-top: 0; }
-.purchase-row .job-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
-.purchase-row .job-row .side { display: flex; gap: var(--space-8); align-items: center; color: var(--muted); }
-.purchase-row > .vote, .purchase-row > .vote-count { padding-top: var(--space-10); }
+.purchase-row .job-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
+.purchase-row .job-row .side { display: flex; gap: var(--ds-space-2); align-items: center; color: var(--muted); }
+.purchase-row > .vote, .purchase-row > .vote-count { padding-top: var(--ds-space-3); }
 
 /* The vote: a toggle with one name, the count in figures. On is "you", in the app's own accent, as the shared toggled-on state has it. */
-.vote { display: grid; gap: var(--space-4); justify-items: center; }
-.app .vote-button { display: grid; justify-items: center; gap: 0; min-width: 3.5rem; min-height: 44px; padding: var(--space-4) var(--space-8); line-height: 1.15; }
+.vote { display: grid; gap: var(--ds-space-1); justify-items: center; }
+.app .vote-button { display: grid; justify-items: center; gap: 0; min-width: 3.5rem; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-2); line-height: 1.15; }
 .vote-button b, .vote-count b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .vote-button span { font-size: var(--text-hint); color: var(--muted); }
 .app .vote-button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
@@ -17,18 +17,18 @@
 .vote-count { display: grid; justify-items: center; min-width: 3.5rem; color: var(--muted); }
 .vote .alert { max-width: 12rem; font-size: var(--text-hint); }
 
-.purchases .purchase-filter { display: grid; gap: var(--space-4); max-width: 20rem; margin: 0 0 var(--space-12); }
-.purchases .purchase-votes { display: flex; gap: var(--space-12); align-items: center; margin: var(--space-12) 0; }
+.purchases .purchase-filter { display: grid; gap: var(--ds-space-1); max-width: 20rem; margin: 0 0 var(--ds-space-3); }
+.purchases .purchase-votes { display: flex; gap: var(--ds-space-3); align-items: center; margin: var(--ds-space-3) 0; }
 .purchases .purchase-votes p { margin: 0; color: var(--muted); }
 .purchases .said { white-space: pre-line; overflow-wrap: anywhere; }
 .purchases .purchase-link { overflow-wrap: anywhere; }
-.purchases .purchase-status { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-10) var(--space-12); display: grid; gap: var(--space-8); }
-.purchases .purchase-status .tick { display: flex; gap: var(--space-8); align-items: flex-start; min-height: 44px; }
+.purchases .purchase-status { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--ds-space-3) var(--ds-space-3); display: grid; gap: var(--ds-space-2); }
+.purchases .purchase-status .tick { display: flex; gap: var(--ds-space-2); align-items: flex-start; min-height: 44px; }
 .purchases .purchase-status .hint { display: inline; }
 
 /* A list brought in: a row that can't be read is marked bad by its edge and says why; one already on the list is quiet. */
-.purchase-list.bring-in li { padding: var(--space-10) var(--space-12); border-top: 1px solid var(--line); border-left: 4px solid transparent; }
+.purchase-list.bring-in li { padding: var(--ds-space-3) var(--ds-space-3); border-top: 1px solid var(--line); border-left: 4px solid transparent; }
 .purchase-list.bring-in li.bad { border-left-color: var(--bad); }
 .purchase-list.bring-in li.quiet b { color: var(--muted); }
-.purchase-list.bring-in p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
+.purchase-list.bring-in p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
 .purchase-list.bring-in .alert { color: var(--bad); }
