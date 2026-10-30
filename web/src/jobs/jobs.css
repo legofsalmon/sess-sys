@@ -60,10 +60,11 @@
 .plan .checks h2 { color: var(--warn); }
 .plan .problem > div { flex: 1; min-width: 60%; }
 .plan .problem p { color: var(--ink); }
-/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. It ends at the foot of the
-   screen (under the bar, over the phone's tabs), so a long month scrolls inside it with its days and names kept in view. */
-.plan .scroller { position: relative; overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - 96px - env(safe-area-inset-bottom)); border: 1px solid var(--line); border-radius: 10px; }
-@media (min-width: 900px) { .plan .scroller { max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
+/* Positioned, so the words kept for screen readers scroll with their cells instead of widening the page. On a phone it only scrolls
+   sideways: the rows add to the page's height, so a thumb moving down the planner moves the page and is never caught in a box inside it.
+   On a desk it ends at the foot of the screen, so a long month scrolls inside it with its days and names kept in view. */
+.plan .scroller { position: relative; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: 10px; }
+@media (min-width: 900px) { .plan .scroller { overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
 /* The names stay put as the days scroll, so the left fade starts past them (more.tsx). */
 .plan .scroller { --more-from: 7rem; }
 @media (min-width: 900px) { .plan .scroller { --more-from: 12rem; } }
