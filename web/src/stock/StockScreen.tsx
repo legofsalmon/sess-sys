@@ -15,12 +15,16 @@ import {
   type PickList,
   type Tracking,
   type View,
+  listed,
+  PRODUCT_SORTS,
+  productFilters,
 } from '@sh/shared'
-import { useRef, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
 import { useWindowed } from '../windowed.ts'
+import { ListTools, useListChoices } from '../ListTools.tsx'
 import { Beside, JobStatusPill, Top, useHash } from '../jobs/common.tsx'
 import { productName } from '../jobs/Kit.tsx'
 import { Pending } from '../StatusPill.tsx'
@@ -189,8 +193,10 @@ function StockCard({ view, current }: { view: View; current?: string }) {
   const mayAdd = useAccess().can('stock')
   const wide = useWide()
   const [department, setDepartment] = useState<Department | 'all'>('all')
-  // Our own stock or dry hire (ADR 0075), once there's any dry hire to tell apart.
-  const [whose, setWhose] = useState<'all' | 'ours' | 'dryHire'>('all')
+  // Filter and sort (ADR 0099) under the department's chips: ours or dry hire (ADR 0075) once there's any dry hire to tell apart, the
+  // category, and whether any is in stock; in the order chosen.
+  const [choices, setChoices] = useListChoices('products')
+  const filters = useMemo(() => productFilters(w.models), [w.models])
   const [search, setSearch] = useState('')
   const q = search.trim().toLowerCase()
   const words = q.split(/\s+/).filter(Boolean)
@@ -216,14 +222,12 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           .sort((a, b) => a.number.localeCompare(b.number))
           .slice(0, 20)
       : []
-  const inDepartment = (m: ModelView) =>
-    (department === 'all' || m.department === department) && (whose === 'all' || (whose === 'dryHire') === m.dryHire)
-  const dryHires = w.models.filter((m) => m.dryHire).length
   const matches = (m: ModelView) => {
     const text = `${m.name} ${m.code} ${m.category} ${DEPARTMENT_LABELS[m.department]}`.toLowerCase()
     return words.every((x) => text.includes(x))
   }
-  const shown = w.models.filter((m) => inDepartment(m) && matches(m))
+  const searched = w.models.filter((m) => (department === 'all' || m.department === department) && matches(m))
+  const shown = listed(searched, filters, PRODUCT_SORTS, choices)
   const count = (d: Department) => w.models.filter((m) => m.department === d).length
 
   // A scanner types a label's number and Enter: straight to the item, or to saying what a new label is on.
@@ -319,18 +323,8 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           </button>
         ))}
       </div>
-      {dryHires > 0 && (
-        <div className="filters" role="group" aria-label="Whose">
-          <button type="button" aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
-            Ours and dry hire
-          </button>
-          <button type="button" aria-pressed={whose === 'ours'} onClick={() => setWhose('ours')}>
-            Ours ({w.models.length - dryHires})
-          </button>
-          <button type="button" aria-pressed={whose === 'dryHire'} onClick={() => setWhose('dryHire')}>
-            Dry hire ({dryHires})
-          </button>
-        </div>
+      {w.models.length > 0 && (
+        <ListTools name="products" items={searched} filters={filters} sorts={PRODUCT_SORTS} choices={choices} onChange={setChoices} shown={shown.length} what="products" />
       )}
       {(exact || items.length > 0) && (
         <ul className="item-list" aria-label="Items found">
@@ -352,7 +346,8 @@ function StockCard({ view, current }: { view: View; current?: string }) {
           ))}
         </ul>
       )}
-      {shown.length === 0 && !exact && !unclaimed && items.length === 0 && (
+      {shown.length === 0 && searched.length > 0 && !exact && !unclaimed && items.length === 0 && <p className="empty">No product here matches those filters.</p>}
+      {searched.length === 0 && !exact && !unclaimed && items.length === 0 && (
         <Empty>
           {w.models.length === 0 && (
             <>
