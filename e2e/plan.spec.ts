@@ -192,6 +192,17 @@ test('a week by job on a phone, then by person with its clashes', async ({ brows
   // Its rows add to the page's height: the planner has no box of its own to scroll up and down, however many rows it has.
   const frame = await phone.locator('.scroller').evaluate(el => ({ cap: getComputedStyle(el).maxHeight, inner: el.scrollHeight - el.clientHeight }))
   expect(frame).toEqual({ cap: 'none', inner: 0 })
+  // So the days row can't stick by itself: a copy of it shows under the bar once the real one has scrolled away, and moves sideways with the days.
+  const days = phone.locator('.days-float')
+  await phone.evaluate(() => scrollTo(0, 0))
+  await expect(days).not.toHaveClass(/\bon\b/)
+  await phone.locator('.scroller').evaluate((el) => {
+    scrollBy(0, el.getBoundingClientRect().top + 120)
+    el.scrollLeft = 90
+  })
+  await expect(days).toHaveClass(/\bon\b/)
+  await expect.poll(() => days.locator('.days-clip').evaluate((el) => el.scrollLeft)).toBe(await phone.locator('.scroller').evaluate((el) => el.scrollLeft))
+  expect(await days.evaluate((el) => el.getBoundingClientRect().top)).toBeCloseTo(await phone.locator('.top').evaluate((el) => el.getBoundingClientRect().bottom), 0)
   await phone.getByLabel(/Show everyone/).uncheck()
 
   // The clash's job opens from the list.
