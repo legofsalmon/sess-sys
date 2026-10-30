@@ -38,7 +38,8 @@ with their dates long past.
    the job and Current RMS don't change.
 3. **Old quotes with no job of ours stay past quotes.** Colly chose "Link and
    look up only": they are not made into jobs, so the calendars stay the
-   one source of jobs.
+   one source of jobs. (30 October 2026: Colly asked to make a job from one
+   after all, one at a time, by a press: [ADR 0102](0102-a-job-from-a-past-quote.md).)
 4. **What went ahead is an order.** An order that wasn't cancelled went
    ahead; lost, dead or cancelled, or a quote whose days are past with no
    order, didn't; anything still to come isn't counted (`rmsOutcome`).
