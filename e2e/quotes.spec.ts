@@ -40,6 +40,15 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await quoting.getByRole('button', { name: 'Save printed quotes' }).click()
   await expect(office.locator('.conn')).toHaveText('Up to date')
   await expect(quoting).toContainText('The next one sent will be 1115.')
+  // Sending quotes by email (ADR 0101) is off until the office turns it on, under Connections with the mailbox.
+  await office.goto('/#admin/connections')
+  const mailbox = office.getByRole('region', { name: 'The operations mailbox' })
+  await expect(mailbox).toContainText('needs the Google key')
+  const emailing = mailbox.getByRole('switch', { name: /Send quotes by email/ })
+  await expect(emailing).not.toBeChecked()
+  await emailing.click()
+  await expect(emailing).toBeChecked()
+  await expect(office.locator('.conn')).toHaveText('Up to date')
   await office.goto('/#jobs')
   await office.locator('.job-row', { hasText: 'Liffey Brands Launch' }).click()
   await office.getByRole('tab', { name: 'Quote' }).click()
@@ -82,7 +91,7 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await draft.getByLabel('Deposit, %').fill('50')
   await expect(draft.locator('.quote-terms:not(.quote-discount)')).toContainText('€933.83 before the job')
   await expect(draft.locator('.save-state')).toHaveText('Saved')
-  await expect(draft).toContainText('Marked sent, it becomes quote 1115')
+  await expect(draft).toContainText('becomes quote 1115')
 
   // A line half typed when a call comes in can't save yet, but going to Crew and back keeps it (audit finding 27).
   await draft.getByRole('button', { name: 'Add something else' }).click()
@@ -120,10 +129,40 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await office.evaluate(() => dispatchEvent(new Event('afterprint')))
   await expect(printed).toHaveCount(0)
 
-  // Sent by the office itself, then a second version with Liffey's 10% off; the first is kept as it went.
-  await draft.getByRole('button', { name: 'Mark as sent' }).click()
+  // Send to the client opens a compose box the server fills in (stood in for here: this server has no mailbox to send from).
+  const prefill = {
+    to: ['ruairi@example.com'],
+    subject: 'Quote 1115 from Session Hire: Liffey Brands Launch',
+    message: 'Hi Ruairí,\n\nPlease find our quote attached.\n\nKind regards,\nSession Hire',
+    from: 'operations@sessionhire.com',
+    fileName: 'Quote 1115 - Liffey Brands Launch.pdf',
+    number: 1115,
+    canSend: true,
+    why: null,
+  }
+  await office.route('**/api/quotes/*/email', (route) => (route.request().method() === 'GET' ? route.fulfill({ json: prefill }) : route.continue()))
+  await expect(draft).toContainText('it goes by email from the operations mailbox')
+  await draft.getByRole('button', { name: 'Send to the client' }).click()
+  const compose = draft.getByRole('form', { name: 'Send the quote by email' })
+  await expect(compose.getByLabel('To')).toHaveValue('ruairi@example.com')
+  await expect(compose.getByLabel('Subject')).toHaveValue('Quote 1115 from Session Hire: Liffey Brands Launch')
+  await expect(compose.getByLabel('Message')).toHaveValue(/Please find our quote attached/)
+  await expect(compose).toContainText('From operations@sessionhire.com, with Quote 1115 - Liffey Brands Launch.pdf attached.')
+  await expect(compose).toContainText('Sending marks it sent, as quote 1115')
+  // A wrong address is said once the field is left, not while it's typed.
+  await compose.getByLabel('To').fill('ruairi@example.com, not-an-address')
+  await expect(compose.locator('.line-problem')).toHaveCount(0)
+  await compose.getByLabel('Subject').focus()
+  await expect(compose.locator('.line-problem')).toHaveText('“not-an-address” doesn’t look like an email address.')
+  await compose.getByRole('button', { name: 'Cancel' }).click()
+  await expect(compose).toHaveCount(0)
+
+  // Sent another way by the office itself, then a second version with Liffey's 10% off; the first is kept as it went.
+  await draft.getByRole('button', { name: 'Sent another way? Mark as sent' }).click()
+  await draft.getByRole('button', { name: 'Mark as sent', exact: true }).click()
   const v1 = office.getByRole('region', { name: 'Version 1' })
   await expect(v1.getByText('Sent', { exact: true })).toBeVisible()
+  await expect(v1.getByRole('button', { name: 'Send by email' })).toBeVisible()
   await expect(v1.locator('.quote-facts')).toContainText('Quote 1115 · Valid until')
   await v1.getByRole('button', { name: 'Print or save as PDF' }).click()
   await expect(printed.locator('.sheet-facts')).toContainText('Quote1115')
@@ -139,7 +178,8 @@ test('the office quotes a job, records the answer and the invoice, and sees who 
   await expect(since).toContainText('Discount 10%, was 0%')
   await expect(since).toContainText('€186.76 less than version 1')
   await expect(v2.getByLabel('Deposit, %')).toHaveValue('50')
-  await v2.getByRole('button', { name: 'Mark as sent' }).click()
+  await v2.getByRole('button', { name: 'Sent another way? Mark as sent' }).click()
+  await v2.getByRole('button', { name: 'Mark as sent', exact: true }).click()
   await expect(office.getByRole('region', { name: 'Version 2' }).locator('.quote-facts')).toContainText('Quote 1115')
 
   // The client said yes; the office invoiced it outside the app and records that here.

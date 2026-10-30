@@ -58,6 +58,8 @@ export const ERASED_WHEN_DUE_ACTION = 'person.erase-due'
 export const LATE_CLEARED_ACTION = 'late.clear-old'
 /** And taking the fuel price from a new month of the AA's survey (ADR 0086). */
 export const FUEL_FROM_AA_ACTION = 'quoting.fuel-from-aa'
+/** A quote emailed to the client from the operations mailbox (ADR 0101): the server's own record of the send. */
+export const QUOTE_EMAIL_ACTION = 'quote.email'
 
 /**
  * Whose documents a reader reads in full in the history (ADR 0062, audit, 20 October 2026, finding 38): true for everyone's,
@@ -679,6 +681,14 @@ export function describe(command: string, a: Data, look: Look, left?: Data, from
       if (command === 'quote.invoiced') return a.on === null ? `Took back the invoice for ${of}` : `Marked ${of} invoiced${on}${typeof a.ref === 'string' && a.ref.trim() ? `, as ${clip(a.ref.trim())}` : ''}`
       return a.on === null ? `Took back the payment for ${of}` : `Marked ${of} paid${on}`
     }
+    case QUOTE_EMAIL_ACTION: {
+      const q = look('quote', a.id)
+      const version = typeof q?.version === 'number' ? `version ${q.version} of ` : ''
+      const to = typeof a.to === 'number' && a.to > 1 ? `, to ${a.to} addresses` : ''
+      return `Emailed ${version}the quote for ${job(q?.projectId ?? a.projectId)} to the client${a.again === true ? ' again' : ''}${to}`
+    }
+    case 'quoting.email':
+      return a.on === true ? 'Turned on sending quotes to clients by email from the operations mailbox' : 'Turned off sending quotes by email'
     case 'quoting.update':
       return `Set what printed quotes say: ${typeof a.nextNumber === 'number' ? `the next is number ${a.nextNumber}` : 'numbers carry on from the highest'}, with the terms and bank details`
     case FUEL_FROM_AA_ACTION:

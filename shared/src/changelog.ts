@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.68.0',
+    date: '2026-10-30',
+    title: 'Send a quote to the client by email',
+    what: "Once the office turns on Send quotes by email under Admin › Connections › The operations mailbox, a quote has Send to the client. It opens an email filled in from the quote and the client's contacts, with the quote attached as a PDF, to read over and send from operations@sessionhire.com; replies come to whoever sent it and to the mailbox. Sending marks the quote sent and gives it its number. The quote's page lists each email that went, with the PDF the client got, and the history says who sent it. Off, nothing changes: quotes are printed and sent by hand, and Mark as sent stays as a quiet link. Connecting the mailbox now asks Google to send as well as read, so operations@ needs connecting again once to allow it; the connection has moved from the Claude card to Admin › Connections.",
+    prs: [0],
+    adrs: [101],
+  },
+  {
     version: '1.67.0',
     date: '2026-10-30',
     title: 'Claude drafts quotes from the operations mailbox',

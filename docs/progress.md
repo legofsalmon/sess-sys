@@ -3,6 +3,30 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 October 2026: Send a quote to the client by email
+
+**Done**
+
+- [ADR 0101](adr/0101-sending-a-quote-to-the-client-by-email.md) (PR #TBD):
+  Send to the client on a quote, once the office turns it on under Admin ›
+  Connections › The operations mailbox. The compose box is filled in from
+  the quote and the client's contacts; the quote goes from operations@
+  with its PDF, drawn on the server to say what the printed page says;
+  sending marks the quote sent and numbers it; each email that went is
+  listed on the quote with its PDF, and in the history. The mailbox
+  connection (ADR 0098) now asks Google to send as well as read and moves
+  to Admin › Connections. App 1.68.0.
+- Checked: typecheck, the shared and server tests (a new server test sends
+  through a stood-in Gmail and reads the email back), and the browser tests
+  for quotes and Claude. The PDF looked at as an image.
+
+**Waiting**
+
+- Colly to connect operations@ again once this is live, allowing sending,
+  and to turn the switch on when ready. Stacked on PR #185 (the quote form)
+  and PR #173 (the mailbox); the version numbers move if either lands
+  under a different one.
+
 ## 30 October 2026: The quote form, redrawn
 
 **Done**

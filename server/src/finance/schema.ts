@@ -104,6 +104,30 @@ const MIGRATIONS: string[] = [
   ALTER TABLE product_prices DROP CONSTRAINT IF EXISTS product_prices_model_id_fkey;
   ALTER TABLE product_prices ADD CONSTRAINT product_prices_model_id_fkey FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE;
   `,
+  // Sending a quote to the client by email (ADR 0101): whether the office has turned it on, and a row for each email that
+  // went: the quote as it was (version and number), when, by whom (a staff account's id, no key to it), from and to which
+  // addresses, the subject and message, what Gmail called it, and the PDF that went, as base64 text so the backups and
+  // the export, which write rows as text, carry it like any other column.
+  `
+  ALTER TABLE quote_settings ADD COLUMN IF NOT EXISTS email_quotes boolean NOT NULL DEFAULT false;
+  CREATE TABLE IF NOT EXISTS quote_emails (
+    id            text PRIMARY KEY,
+    quote_id      text NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+    project_id    text NOT NULL,
+    version       integer NOT NULL,
+    number        integer,
+    sent_at       timestamptz NOT NULL DEFAULT now(),
+    sent_by       text,
+    from_address  text NOT NULL,
+    to_addresses  text[] NOT NULL,
+    subject       text NOT NULL,
+    message       text NOT NULL DEFAULT '',
+    gmail_id      text,
+    thread_id     text,
+    pdf_base64    text NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS quote_emails_quote ON quote_emails (quote_id);
+  `,
 ]
 
 export const FINANCE: Module = { versionTable: 'finance_schema_version', migrations: MIGRATIONS }

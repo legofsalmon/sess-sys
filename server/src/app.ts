@@ -56,6 +56,7 @@ import { Todo } from './assistant/todo.ts'
 import type { Gmail } from './assistant/gmail.ts'
 import { Mailbox } from './assistant/mailbox.ts'
 import { registerMailboxRoutes } from './assistant/mailbox-routes.ts'
+import { registerQuoteEmailRoutes } from './finance/email-routes.ts'
 import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
@@ -636,6 +637,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const mailbox = new Mailbox(db, assistant, google, calendar?.clientSecret, () => void poke(), app.log, options.gmail)
   app.decorate('assistantMailbox', mailbox)
   registerMailboxRoutes(app, { mailbox, google, secret: calendar?.clientSecret })
+  registerQuoteEmailRoutes(app, { db, mailbox, onChange: () => void poke() })
   registerStatusRoutes(
     app,
     new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, mailbox, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })

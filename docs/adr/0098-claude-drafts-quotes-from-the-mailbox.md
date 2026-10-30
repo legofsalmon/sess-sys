@@ -13,6 +13,9 @@
   paste box functionality but only as a secondary option."
 - **Changes:** [ADR 0096](0096-claude-inside-the-app.md) (no more asking
   Claude in words to change a quote; pasting an enquiry stays, folded away)
+- **Changed by:** [ADR 0101](0101-sending-a-quote-to-the-client-by-email.md)
+  (the connection also asks to send from the mailbox, for quotes, and sits
+  under Admin › Connections)
 - **Builds on:** [ADR 0008](0008-calendar-sync.md) (the Google
   key, a lasting key locked in the database),
   [ADR 0097](0097-claudes-to-do-list.md) (the to-do list)
@@ -28,9 +31,10 @@ keeps it private.
 ## Decision
 
 1. **operations@ is a mailbox of its own,** a Workspace user, connected once
-   under Admin › Company by signing in as it. The app asks Google only to
-   read its mail (`gmail.readonly`), so it can't send, reply, delete or file
-   anything there. Its lasting key is locked in the database as the
+   under Admin by signing in as it. The app asked Google only to read its
+   mail (`gmail.readonly`), so it couldn't send, reply, delete or file
+   anything there; since ADR 0101 it also asks to send, so the office can
+   email a quote from it, and still nothing more. Its lasting key is locked in the database as the
    calendar's is, and handed back on Disconnect. A Google Group or an alias
    on someone's own account won't do: a group can't be read this way, and
    an alias would show Claude that person's private mail.
@@ -85,9 +89,9 @@ keeps it private.
 - A draft opened on a device while Claude redrafts it shows the new lines
   once it syncs; a change saved over an older copy is turned down as for
   any edit (seen.ts).
-- Claude never sends anything: a draft is still checked, sent by the
-  office, and marked sent as before.
+- Claude never sends anything: a draft is still checked and sent by the
+  office, by hand as before or, since ADR 0101, with Send to the client.
 
 ## Setting it up
 
-[Sign-in setup, step 9](../sign-in-setup.md#9-connect-the-operations-mailbox-for-claude).
+[Sign-in setup, step 9](../sign-in-setup.md#9-connect-the-operations-mailbox).

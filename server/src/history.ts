@@ -12,6 +12,7 @@ export {
   IMPORT_PEOPLE_ACTION,
   IMPORT_STOCK_ACTION,
   LATE_CLEARED_ACTION,
+  QUOTE_EMAIL_ACTION,
   type DocumentsRead,
 } from './history-words.ts'
 

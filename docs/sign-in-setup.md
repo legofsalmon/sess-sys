@@ -237,13 +237,16 @@ Whoever keeps building and setting the app up goes in `SYSTEM_ADMINS`
 (step 2) before handing the directing over: an address there can change
 everything whatever their role, and nobody can take that away in the app.
 
-## 9. Connect the operations mailbox for Claude
+## 9. Connect the operations mailbox
 
-Claude reads operations@sessionhire.com and drafts quotes from the mail
-copied to it ([Decision 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md)).
-It can only read: it never sends, replies, deletes or files anything there.
-Copy operations@ on client mail to share a thread; leave it off to keep one
-private.
+operations@sessionhire.com does two things once connected: Claude reads the
+mail copied to it and drafts quotes from it
+([Decision 0098](adr/0098-claude-drafts-quotes-from-the-mailbox.md)), and
+quotes go to clients from it when the office presses Send
+([Decision 0101](adr/0101-sending-a-quote-to-the-client-by-email.md)). The
+app asks Google to read the mailbox and send from it, and nothing more: it
+never replies to, deletes or files anything there. Copy operations@ on
+client mail to share a thread; leave it off to keep one private.
 
 1. **Make the mailbox.** In the Google Admin console
    ([admin.google.com](https://admin.google.com)), **Directory**, **Users**,
@@ -252,7 +255,7 @@ private.
    group or an alias: the app can't read a group, and an alias would let
    Claude read that person's own mail. Sign in as it once to set its
    password.
-2. **Let the Google key read mail.** In
+2. **Let the Google key at Gmail.** In
    [console.cloud.google.com](https://console.cloud.google.com), project
    **Session Hire**:
    - Search for **Gmail API**, open it and press **Enable**.
@@ -262,16 +265,25 @@ private.
      and save. The Client ID and secret stay the same.
    - Keep the audience **Internal**, so only company accounts can be
      connected and Google doesn't need to review the app.
-3. **Claude's key.** In Railway, **shserver**, **Variables**, check
-   `ANTHROPIC_API_KEY` is there (from console.anthropic.com). Optional:
-   `CLAUDE_MONTHLY_LIMIT_USD` (50 unless set).
-4. **Turn it on.** In the app, **Admin**, **Company**, **Claude**: **Turn
-   Claude on**, then **Connect operations@** and sign in to Google as
+3. **Connect it.** In the app, **Admin**, **Connections**, **The
+   operations mailbox**: **Connect operations@** and sign in to Google as
    operations@sessionhire.com (use a private window if your own account
-   gets in the way), and allow it to read mail.
-5. **Check it.** Admin › Company shows "Reading operations@sessionhire.com",
-   and Admin › Status shows the operations mailbox. Within about five
-   minutes, enquiries from the last week show on **Quotes** under "From the
+   gets in the way), and allow both things it asks for: reading mail and
+   sending. A mailbox connected before sending was asked for says
+   "connected to read only": press **Connect again** and allow sending.
+4. **Sending quotes.** On the same card, turn on **Send quotes by email
+   from operations@**. A quote then has **Send to the client**, which opens
+   an email filled in from the quote and the client's contacts, with the
+   quote attached as a PDF; replies come to whoever sent it and to
+   operations@. Off, quotes are printed and sent by hand as before.
+5. **Claude.** In Railway, **shserver**, **Variables**, check
+   `ANTHROPIC_API_KEY` is there (from console.anthropic.com). Optional:
+   `CLAUDE_MONTHLY_LIMIT_USD` (50 unless set). Then in the app, **Admin**,
+   **Company**, **Claude**: **Turn Claude on**.
+6. **Check it.** Admin › Connections shows "Connected as
+   operations@sessionhire.com, to read and send", and Admin › Status shows
+   the operations mailbox. With Claude on, within about five minutes,
+   enquiries from the last week show on **Quotes** under "From the
    operations mailbox", each with a draft quote.
 
 To stop it, press **Disconnect** under Admin › Company (the app hands the
