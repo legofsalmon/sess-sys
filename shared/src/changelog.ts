@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.64.1',
+    date: '2026-10-30',
+    title: 'Tools brought up to date',
+    what: 'Behind the scenes: the tools that build, test and compress the app are on their newest versions, which clears the last serious security warnings on them. Nothing you see is different.',
+    prs: [179],
+  },
+  {
     version: '1.64.0',
     date: '2026-10-29',
     title: "Heads see clients' documents",
