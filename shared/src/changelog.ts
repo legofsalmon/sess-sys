@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-30',
     title: "The planner's days stay in view on a phone",
     what: "On a phone, the row of days along the top of the week and month planner now stays under the bar as you scroll down past it, and moves sideways with the days, so you can always see which day a box is on.",
-    prs: [0],
+    prs: [186],
   },
   {
     version: '1.64.4',
