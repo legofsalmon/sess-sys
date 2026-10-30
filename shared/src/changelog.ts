@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.64.3',
+    date: '2026-10-30',
+    title: 'Tidier code behind the scenes',
+    what: "Behind the scenes: the nine biggest files of the app's code are split into smaller ones, so changes are easier and safer to make. Nothing you see is different.",
+    prs: [182],
+  },
+  {
     version: '1.64.2',
     date: '2026-10-30',
     title: 'A long stock list that keeps up',

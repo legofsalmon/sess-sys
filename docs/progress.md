@@ -3,6 +3,20 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 October 2026: The big files split
+
+**Done**
+
+- Finding 114 of the [20 October audit](audit-2026-10-20.md) (PR #182):
+  the nine hand-written files over 900 lines are split along their seams
+  (Quote, stock-import, history, calendar sync, Counts, RackDesigner,
+  crew, the sync client, the import plan), code moved and not changed,
+  each old file re-exporting what it did. Three stay between 700 and 870
+  lines where one class or function is that long. App 1.64.3.
+- Checked: typecheck, shared and server tests, the web build (same lazy
+  screens), and the browser tests for quotes, racks, counts, stock and
+  calendar bring-ins.
+
 ## 30 October 2026: A long stock list that keeps up
 
 **Done**
