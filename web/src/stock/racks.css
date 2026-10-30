@@ -5,10 +5,10 @@
 .warehouse .rack-elevation { margin: 0; display: grid; gap: var(--ds-space-1); }
 .warehouse .rack-elevation figcaption { color: var(--muted); font-size: var(--text-small); font-weight: 600; }
 .warehouse .rack-units { display: grid; grid-template-columns: 2.2em repeat(12, minmax(0, 1fr)); background: var(--ds-surface-inset); border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--ds-space-half); }
-.warehouse .rack-u { grid-column: 1; display: flex; align-items: center; justify-content: flex-end; padding-right: var(--ds-space-1); color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; border-top: 1px dashed var(--line); }
+.warehouse .rack-u { grid-column: 1; display: flex; align-items: center; justify-content: flex-end; padding-right: var(--ds-space-1); color: var(--muted); font-size: var(--text-pill); font-variant-numeric: tabular-nums; border-top: 1px dashed var(--line); }
 .warehouse .rack-u:first-child { border-top: 0; }
 .warehouse .rack-u.past { color: var(--warn); }
-.warehouse .rack-thing { grid-column: 2 / -1; display: flex; align-items: center; min-width: 0; margin: 1px 0; padding: 0 var(--ds-space-2); background: var(--panel); border: 1px solid var(--ds-line-strong); border-radius: 4px; font-size: .78rem; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.warehouse .rack-thing { grid-column: 2 / -1; display: flex; align-items: center; min-width: 0; margin: 1px 0; padding: 0 var(--ds-space-2); background: var(--panel); border: 1px solid var(--ds-line-strong); border-radius: 4px; font-size: var(--text-pill); font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .warehouse .rack-thing.bad { border-color: var(--warn); color: var(--warn); }
 .warehouse .rack-thing.is-pending { border-style: dashed; }
 .warehouse .slot-list .item-row { align-items: center; }
@@ -38,7 +38,7 @@
 .warehouse .palette-item[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 1px; }
 .warehouse .free-on { display: flex; align-items: center; gap: var(--ds-space-2); color: var(--muted); font-size: var(--text-small); }
 .warehouse .holding { margin: 0; font-weight: 600; }
-.warehouse .rack-slot { grid-column: 1 / -1; display: flex; align-items: center; min-height: 0; padding: 0; margin: 0; border: 0; border-top: 1px dashed var(--line); border-radius: 0; background: transparent; color: var(--muted); font-size: .7rem; box-shadow: none; }
+.warehouse .rack-slot { grid-column: 1 / -1; display: flex; align-items: center; min-height: 0; padding: 0; margin: 0; border: 0; border-top: 1px dashed var(--line); border-radius: 0; background: transparent; color: var(--muted); font-size: var(--text-pill); box-shadow: none; }
 .warehouse .rack-slot .rack-u-n { width: 2.2em; text-align: right; padding-right: var(--ds-space-1); font-variant-numeric: tabular-nums; }
 .warehouse .rack-slot:first-child { border-top: 0; }
 .warehouse .rack-slot.lit { background: var(--ds-wash-hover); }

@@ -50,21 +50,25 @@
   --radius-tab: 10px;
   --radius-card: 12px;
   --radius-full: 999px;
-  /* Type: the 13 text styles, named as in Figma, in the phone's own font. */
-  --text-title: 1.3rem;
-  --text-brand: 1rem;
-  --text-heading: 1rem;
-  --text-subheading: .95rem;
-  --text-body: 1rem;
-  --text-small: .9rem;
-  --text-hint: .85rem;
-  --text-button: .9rem;
-  --text-link: .9rem;
-  --text-tab: 1rem;
-  --text-status: .82rem;
-  --text-pill: .75rem;
-  --text-footer: .75rem;
-  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Type is the design system's (Colly's call, 30 October 2026): IBM Plex Sans, Plex Mono for numbers that change, Archivo for a
+     page's title (fonts.ts bundles them), at the touch density's sizes (index.html). Each old name points at the style that does its
+     job, so a screen has five sizes, not thirteen, and weight and colour do the ranking before size does. Field text stays 16px,
+     so iOS never zooms into a field. */
+  --text-title: var(--ds-text-heading-size); /* a record's own title */
+  --text-brand: var(--ds-text-title-size);
+  --text-heading: var(--ds-text-title-size); /* a card's heading */
+  --text-subheading: var(--ds-text-title-size);
+  --text-body: var(--ds-text-field-size);
+  --text-small: var(--ds-text-body-size); /* a row's second line: quieter by colour, not smaller */
+  --text-hint: var(--ds-text-caption-size);
+  --text-button: var(--ds-text-control-size);
+  --text-link: var(--ds-text-control-size);
+  --text-tab: var(--ds-text-control-size);
+  --text-status: var(--ds-text-caption-size);
+  --text-pill: var(--ds-text-label-size);
+  --text-footer: var(--ds-text-caption-size);
+  font: var(--ds-weight-regular) var(--ds-text-prose-size)/var(--ds-text-prose-leading) var(--ds-font-sans);
+  font-variant-numeric: tabular-nums;
 }
 :root[data-theme='dark'] { --accent: #ee3744; --accent-ink: #ff737d; --accent-fill: #c8202e; --on-accent: #ffffff; --bad: #f0a064; --bad-soft: #3a2414; }
 @media (prefers-color-scheme: dark) {
@@ -177,7 +181,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .pill.cancelled { background: var(--line); color: var(--on-line); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.waiting { background: transparent; color: var(--muted); border: 1px dashed var(--field-line); }
-button { font: 600 var(--text-button) system-ui, sans-serif; min-height: 44px; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button { font: 600 var(--text-button) var(--ds-font-sans); min-height: 44px; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
 button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 /* Deleting everything (ADR 0019): the bad tone, never the brand red, which marks the one thing to do next. 4.7:1 light, 6.9:1 dark. */
 button.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-soft); }
@@ -241,7 +245,7 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--ds-space-2)); scroll
 .app .page-head .page-sub { margin: 0; color: var(--muted); display: grid; gap: var(--ds-space-half); }
 .app .page-head .page-sub p { margin: 0; }
 /* The page's title, large, so Home, Calls, Catalogue and Admin read as different places (ADR 0033), and the biggest words on the screen. */
-.app h1.page-title, .app h1.area-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -.01em; }
+.app h1.page-title, .app h1.area-title { font-family: var(--ds-font-display); font-size: var(--ds-text-heading-size); font-weight: 800; letter-spacing: -.01em; }
 .app h1.area-title { margin-top: calc(-1 * var(--ds-space-2)); }
 /* On this screen: the parts of a long screen by name, scrolling sideways on a phone (ADR 0033). Drawn as a page's contents rather than as a
    row of pages, so it doesn't read as the area's row (Views.tsx): plain words, no box round them, the part in view underlined in ink. It
@@ -361,7 +365,7 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--ds-space-2)); scroll
 }
 /* A link-like button sits on the text's own edge, so it lines up with the words above it; its 44px height is still the target. It looks like every other link (Links, below). */
 .app button.link { border: 0; background: none; padding: var(--ds-space-1) 0; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
-.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) 0; color: var(--accent-ink); font: 600 var(--text-link) system-ui, sans-serif; text-underline-offset: 2px; }
+.app a.link { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) 0; color: var(--accent-ink); font: 600 var(--text-link) var(--ds-font-sans); text-underline-offset: 2px; }
 .app .end { justify-content: flex-end; }
 /* A row that opens on a tap: the name as the button, its detail under it. */
 .app .person { align-items: center; }
@@ -383,7 +387,7 @@ html { scroll-padding-top: calc(var(--top-bar, 0px) + var(--ds-space-2)); scroll
 .fold > button.link, .app button.show-all { justify-self: start; }
 
 /* Sign-in and account. */
-a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) system-ui, sans-serif; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
+a.button, label.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; font: 600 var(--text-button) var(--ds-font-sans); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; }
 a.button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* 44px touch targets: easier with gloves on or in a dark venue. */
@@ -499,7 +503,7 @@ button[aria-busy='true'] { cursor: progress; opacity: 1; }
 .notices-button { position: relative; flex: none; display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--radius-control); color: var(--muted); }
 .notices-button .icon { width: 22px; height: 22px; }
 .notices-button[aria-current='page'] { color: var(--ink); }
-.notices-button .badge { position: absolute; top: 2px; right: 0; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg); }
+.notices-button .badge { position: absolute; top: 2px; right: 0; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: var(--text-pill); font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg); }
 @media (hover: hover) {
   .notices-button:hover { background: var(--ds-wash-hover); color: var(--ink); }
 }

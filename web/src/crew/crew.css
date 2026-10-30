@@ -7,7 +7,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 /* The current tab is white on accent-fill, 5.7:1; on the brand red it was 4.0:1 (audit finding 22). */
 .tabs a[aria-current='page'] { background: var(--accent-fill); color: var(--on-accent); }
 /* Answers waiting for the office, on the Crew tab (audit finding 9), on the picture's shoulder. */
-.tabs .badge { position: absolute; top: var(--ds-space-half); left: calc(50% + 6px); display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: .72rem; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--panel); }
+.tabs .badge { position: absolute; top: var(--ds-space-half); left: calc(50% + 6px); display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--ds-space-2); border-radius: var(--radius-full); background: var(--accent-fill); color: var(--on-accent); font-size: var(--text-pill); font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--panel); }
 .tabs a[aria-current='page'] .badge { background: var(--on-accent); color: var(--accent-fill); box-shadow: 0 0 0 2px var(--accent-fill); }
 /* On a desk (900px and up, ADR 0036) the same five go down the left, a picture beside each word, always in view: the design system's expanded rail. The page moves over for it. */
 @media (min-width: 900px) {
@@ -26,10 +26,10 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .offers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space-1); }
 .crew .offers li { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-2); flex-wrap: wrap; padding: var(--ds-space-1) 0; }
 .crew .offers small, .crew .who small { color: var(--muted); }
-.crew .offers .on-cal { flex-basis: 100%; margin-top: calc(-1 * var(--ds-space-1)); font-size: .82rem; }
-.crew .offers .warn-line { flex-basis: 100%; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.crew .offers .on-cal { flex-basis: 100%; margin-top: calc(-1 * var(--ds-space-1)); font-size: var(--text-hint); }
+.crew .offers .warn-line { flex-basis: 100%; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .crew .offer-form { display: grid; grid-template-columns: 1fr auto; gap: var(--ds-space-2); }
-.crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: flex-start; font-size: .85rem; background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.crew .offer-form .warn { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: flex-start; font-size: var(--text-hint); background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .crew .offer-form .warn input { accent-color: var(--accent); margin-top: var(--ds-space-half); }
 .crew .offer-form .alert { grid-column: 1 / -1; }
 /* "Offer…" beside a decline or a pull-out in Answers to check: opened, the picker takes its own line under the answer. */
@@ -50,18 +50,18 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 
 /* The office's details on the Account tab (audit finding 10), laid out like the crew forms. */
 .account .office-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; }
-.account .office-form label { display: grid; gap: var(--ds-space-1); font-size: .85rem; color: var(--muted); }
+.account .office-form label { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .account .office-form .wide { grid-column: 1 / -1; }
 .account .office-form button { justify-self: start; }
 
 /* The profile (ADR 0025): the department filter over the list, the level on a card, what they've worked, the form's "More", and the picker's applicants tick. */
 .crew .dept-filter { justify-self: start; }
-.crew .level-pick { display: flex; gap: var(--ds-space-2); align-items: center; font-size: .85rem; color: var(--muted); }
+.crew .level-pick { display: flex; gap: var(--ds-space-2); align-items: center; font-size: var(--text-hint); color: var(--muted); }
 .crew .level-pick select { min-width: 9em; }
 .crew .grid-form details.more summary { display: flex; align-items: center; min-height: 44px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .crew .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; padding-top: var(--ds-space-1); }
 .crew .more-grid .cert { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: end; }
-.crew .offer-form .applicants { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.crew .offer-form .applicants { grid-column: 1 / -1; display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
 .crew .offer-form .applicants input { width: 22px; height: 22px; accent-color: var(--accent); }
 
 /* Bringing in the crew list (ADR 0025): the Account tab's card, and the screen's rows, each a card with its fields to fix. */
@@ -69,15 +69,15 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .account .import-people-card a.button { justify-self: start; }
 .import-people .field input[type='file'] { min-height: 44px; padding: var(--ds-space-2) 0; border: 0; background: none; }
 .import-people .people-rows .head { justify-content: space-between; }
-.import-people .people-rows .head b { font-size: 1.05rem; }
-.import-people .people-rows .skip { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.import-people .people-rows .head b { font-size: var(--text-heading); }
+.import-people .people-rows .skip { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
 .import-people .people-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .import-people .people-rows .updates { color: var(--ink); }
 .import-people .people-rows .updates b { color: var(--accent-ink); }
 .import-people .fix { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--ds-space-2); align-items: start; padding-top: var(--ds-space-1); }
-.import-people .fix label { display: grid; gap: var(--ds-space-1); font-size: .85rem; color: var(--muted); }
+.import-people .fix label { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .import-people .fix input { width: 100%; }
-.import-people .fix .warn-line { display: block; font-size: .8rem; }
+.import-people .fix .warn-line { display: block; font-size: var(--text-hint); }
 .import-people .bring .hint { text-align: center; }
 @media (max-width: 480px) {
   .import-people .fix { grid-template-columns: 1fr; }
@@ -86,7 +86,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 /* Staff leave (ADR 0024): the Crew tab's card, and the Leave screen's balances, forms, requests and queue. */
 .crew .leave-card a.button { justify-self: start; }
 .leave-screen .card p { margin: 0; }
-.leave-screen h3 { margin: var(--ds-space-1) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.leave-screen h3 { margin: var(--ds-space-1) 0 0; font-size: var(--text-hint); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .leave-screen .facts { grid-template-columns: 1fr 1fr 1fr; }
 .leave-screen .facts dd small { color: var(--muted); font-weight: 400; }
 .leave-screen .facts dd.bad { color: var(--bad); }
@@ -110,7 +110,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 /* Timesheets (ADR 0022): what's waiting on the office in the Crew tab, and a booking's timesheet to check and approve. */
 .crew .ts-group { display: grid; gap: var(--ds-space-2); }
 .crew .ts-group + .ts-group { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
-.crew .ts-group h3, .timesheet-screen h3 { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.crew .ts-group h3, .timesheet-screen h3 { margin: 0; font-size: var(--text-hint); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .ts-group .row:first-of-type { border-top: 0; padding-top: 0; }
 .crew .ts-row > div:first-child { flex: 1 1 14em; }
 .crew .ts-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -138,7 +138,7 @@ body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .crew .call-group > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
 .crew .call-group > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .crew .call-date { display: grid; gap: var(--ds-space-2); }
-.crew h3.calls-part { margin: var(--ds-space-3) 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.crew h3.calls-part { margin: var(--ds-space-3) 0 0; font-size: var(--text-hint); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .call-date h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .crew .call-date .job { padding: var(--ds-space-1) var(--ds-space-3) var(--ds-space-2); border: 1px solid var(--line); border-radius: 10px; }
 .crew .job.call { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--ds-space-3); align-items: start; }

@@ -4,7 +4,7 @@
 .vehicle-row.warn { border-left-color: var(--warn); }
 .vehicle-row.bad { border-left-color: var(--bad); }
 .vehicle-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
-.van-state { margin: var(--ds-space-1) 0 0; font-size: .85rem; }
+.van-state { margin: var(--ds-space-1) 0 0; font-size: var(--text-hint); }
 .van-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .van-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .van-state.quiet { color: var(--muted); }

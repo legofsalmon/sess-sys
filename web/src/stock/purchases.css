@@ -10,7 +10,7 @@
 /* The vote: a toggle with one name, the count in figures. On is "you", in the app's own accent, as the shared toggled-on state has it. */
 .vote { display: grid; gap: var(--ds-space-1); justify-items: center; }
 .app .vote-button { display: grid; justify-items: center; gap: 0; min-width: 3.5rem; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-2); line-height: 1.15; }
-.vote-button b, .vote-count b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.vote-button b, .vote-count b { font-size: var(--text-heading); font-variant-numeric: tabular-nums; }
 .vote-button span { font-size: var(--text-hint); color: var(--muted); }
 .app .vote-button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
 .app .vote-button[aria-pressed='true'] span { color: var(--accent-ink); }

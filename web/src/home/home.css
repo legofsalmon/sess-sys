@@ -9,7 +9,7 @@
 /* Counts as tiles: the number first and large, what it's of under it. Two across on a phone, more on a laptop. */
 .home .tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--ds-space-2); }
 .home .tile { display: grid; align-content: start; gap: var(--ds-space-half); min-height: 88px; padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: inherit; text-decoration: none; }
-.home .tile b { font-size: 1.75rem; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.home .tile b { font-size: var(--ds-text-heading-size); line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
 .home .tile span { color: var(--muted); font-size: var(--text-small); line-height: 1.3; }
 .home .tile.bad b { color: var(--bad); }
 .home .tile:hover { background: var(--ds-wash-hover); }

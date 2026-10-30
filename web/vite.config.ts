@@ -71,7 +71,8 @@ export default defineConfig({
         // the rack in 3D (ADR 0076), which most phones never open: kept from the first time they're shown (lazyPart.tsx;
         // audit, 20 October 2026, finding 65). The QR code reader stays: scanning works with no signal from the first time
         // (ADR 0016), and the warehouse's iPhones need it.
-        globPatterns: ['**/*.{js,css,html}', 'version.json'],
+        // The fonts are kept too (fonts.ts), so the type is the same with no signal.
+        globPatterns: ['**/*.{js,css,html,woff2}', 'version.json'],
         globIgnores: ['**/errorsSdk-*.js', ...ON_FIRST_USE.map((name) => `**/${name}-*.{js,css}`)],
         // Freelancer links and calendar feeds come from the server, never the app shell.
         navigateFallbackDenylist: [/^\/api\//, /^\/f\//, /^\/cal\//],

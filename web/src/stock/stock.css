@@ -1,7 +1,7 @@
 /* Stock (ADR 0013). The screens also carry the jobs and crew classes, so lists, facts and forms look the same here. */
 .warehouse h1.number, .warehouse .item-row b, .warehouse .numbers a, .warehouse .count .n { font-variant-numeric: tabular-nums; }
 .warehouse h1.number { letter-spacing: .02em; }
-.warehouse h3 { margin: 0; font-size: .95rem; }
+.warehouse h3 { margin: 0; font-size: var(--text-small); }
 .warehouse .facts .wide { grid-column: 1 / -1; }
 .warehouse input[type='number'] { width: 100%; }
 /* A form with its own heading is a step of its own on the card: labelling, putting away, counting. */
@@ -12,7 +12,7 @@
 .warehouse .item-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .warehouse .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ds-space-3); min-height: 44px; padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .warehouse .item-list li:first-child .item-row { border-top: 0; padding-top: 0; }
-.warehouse .item-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
+.warehouse .item-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .warehouse .item-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .warehouse details summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: var(--ds-space-3) 0; }
 
@@ -23,7 +23,7 @@
 .warehouse .group-name a, .warehouse .count .what a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .group-name small { color: var(--muted); margin-left: var(--ds-space-1); }
 .warehouse .numbers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
-.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-full); color: var(--ink); text-decoration: none; font-weight: 600; font-size: .85rem; }
+.warehouse .numbers a { display: inline-flex; align-items: center; min-height: 44px; padding: var(--ds-space-1) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-full); color: var(--ink); text-decoration: none; font-weight: 600; font-size: var(--text-hint); }
 .warehouse .numbers a.is-pending { border-style: dashed; color: var(--warn); }
 .warehouse .numbers a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -32,17 +32,17 @@
 .warehouse .item-list + .row, .warehouse .group + .row { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .warehouse .count small { color: var(--muted); }
 .warehouse .count .what { flex: 1; min-width: 45%; }
-.warehouse .count .n { font-size: 1.1rem; margin-right: var(--ds-space-half); }
+.warehouse .count .n { font-size: var(--text-heading); margin-right: var(--ds-space-half); }
 
 /* Numbered or counted, when adding or changing a product; ticks and reasons. */
 .warehouse .tracking { display: grid; gap: var(--ds-space-2); }
 /* Also inside the shared forms, whose labels stack their text over the field. */
-.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; color: var(--ink); font-size: .9rem; cursor: pointer; }
+.warehouse .choice, .warehouse .tick, .warehouse .grid-form label.choice, .warehouse .grid-form label.tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; color: var(--ink); font-size: var(--text-small); cursor: pointer; }
 .warehouse .choice { padding: var(--ds-space-2) var(--ds-space-3); border: 1px solid var(--line); border-radius: var(--radius-control); }
 .warehouse .choice:has(input:checked) { border-color: var(--ink); }
 .warehouse .choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
 .warehouse .choice b, .warehouse .choice small { display: block; }
-.warehouse .choice small { color: var(--muted); font-size: .8rem; }
+.warehouse .choice small { color: var(--muted); font-size: var(--text-hint); }
 .warehouse .choice input, .warehouse .tick input { flex: none; width: 20px; height: 20px; margin: var(--ds-space-half) 0 0; accent-color: var(--accent); }
 .warehouse .reasons { display: flex; flex-wrap: wrap; gap: 0 var(--ds-space-4); }
 .warehouse .reasons legend { width: 100%; }
@@ -93,7 +93,7 @@
 .label.cable .bars small { font-size: 2.2mm; line-height: 1; margin-top: .4mm; }
 .warehouse .cable-labels { display: grid; gap: var(--ds-space-3); }
 .warehouse .cable-labels > button { justify-self: start; }
-.warehouse .cable-labels .layouts small { display: block; color: var(--muted); font-size: .8rem; }
+.warehouse .cable-labels .layouts small { display: block; color: var(--muted); font-size: var(--text-hint); }
 .warehouse .cable-labels .preview { overflow-x: auto; }
 
 /* Printing: only the print sheet, where its Print button has drawn one (labels a label to a page on a label printer or 65 to an A4 sheet, a
@@ -120,7 +120,7 @@
 .warehouse .viewfinder .frame { position: absolute; inset: 14%; border: 3px solid #fff8; border-radius: 10px; box-shadow: 0 0 0 999px #0005; pointer-events: none; }
 .warehouse .viewfinder .frame[data-read] { animation: scan-read .6s ease-out; }
 @keyframes scan-read { from { border-color: var(--good); background: var(--good-soft); } to { border-color: #fff8; background: transparent; } }
-.warehouse .viewfinder .starting { position: absolute; inset: auto 0 var(--ds-space-3); margin: 0; text-align: center; color: #fff; font-size: .9rem; }
+.warehouse .viewfinder .starting { position: absolute; inset: auto 0 var(--ds-space-3); margin: 0; text-align: center; color: #fff; font-size: var(--text-small); }
 .warehouse .scan-status { margin: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 1.4em; }
 .warehouse .scan-controls { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); justify-content: center; }
 .warehouse .scanner .alert { display: grid; gap: var(--ds-space-2); justify-items: start; }
@@ -133,10 +133,10 @@
 .warehouse .fault.usable { border-left-color: var(--warn); }
 .warehouse .fault.closed { color: var(--muted); }
 .warehouse .fault header { display: flex; justify-content: space-between; align-items: start; gap: var(--ds-space-2); }
-.warehouse .fault header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .fault header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-hint); }
 .warehouse .fault a { color: var(--accent-ink); font-weight: 600; }
 .warehouse .fault header > div > a { color: inherit; }
-.warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: .9rem; }
+.warehouse .fault .notes, .warehouse .fault .repair { margin: 0; font-size: var(--text-small); }
 /* The repair list's headings stay under the top bar while their faults scroll by (audit, 20 October 2026, finding 93). */
 .warehouse .repairs .repair-group { display: grid; gap: var(--ds-space-2); }
 .warehouse .repairs .repair-group h3 { position: sticky; top: var(--under-top, 0px); z-index: 1; margin: 0; padding: var(--ds-space-2) 0 var(--ds-space-2); background: var(--panel); }
@@ -148,18 +148,18 @@
 .warehouse .faults details .fault-list { margin-top: var(--ds-space-2); }
 .warehouse .facts dd.bad, .warehouse .flag.bad { color: var(--bad); font-weight: 600; }
 .warehouse .numbers.missing-items a { border-style: dashed; border-color: var(--bad); color: var(--bad); }
-.warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: .85rem; font-weight: 600; }
+.warehouse .numbers.missing-items::before { content: 'Missing:'; align-self: center; color: var(--bad); font-size: var(--text-hint); font-weight: 600; }
 
 /* Inspections (ADR 0020): where an item stands on each test, the same stripes as faults. */
 .warehouse .due-list { list-style: none; margin: 0 0 var(--ds-space-3); padding: 0; display: grid; gap: var(--ds-space-2); }
 .warehouse .due { display: grid; gap: var(--ds-space-half); padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: var(--radius-control); }
-.warehouse .due span { color: var(--muted); font-size: .9rem; }
+.warehouse .due span { color: var(--muted); font-size: var(--text-small); }
 .warehouse .due.soon, .warehouse .due.unrecorded { border-left-color: var(--warn); }
 .warehouse .due.failed, .warehouse .due.overdue { border-left-color: var(--bad); }
 .warehouse .due.failed b, .warehouse .due.overdue b { color: var(--bad); }
 .warehouse .inspections details { margin-top: var(--ds-space-3); }
 .warehouse .inspections .inspection { display: flex; justify-content: space-between; gap: var(--ds-space-2); padding: var(--ds-space-2) 0; border-top: 1px dashed var(--line); }
-.warehouse .inspections .inspection p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .85rem; }
+.warehouse .inspections .inspection p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-hint); }
 .warehouse .inspections-due h3 { margin: var(--ds-space-3) 0 var(--ds-space-2); }
 /* Certificates on items (ADR 0094): a line each, as a venue's documents are, in the warn tone when another runs out soon and the bad tone once it has; a test's own opens from its line. */
 .warehouse .certificates { display: grid; gap: var(--ds-space-2); }
@@ -192,7 +192,7 @@
 .import-stock .card > p { margin: 0; }
 .import-stock .links { display: flex; flex-wrap: wrap; gap: 0 var(--ds-space-4); }
 .import-stock .stock-rows .head { justify-content: space-between; }
-.import-stock .stock-rows .head b { font-size: 1.05rem; }
+.import-stock .stock-rows .head b { font-size: var(--text-heading); }
 .import-stock .stock-rows .skip { display: flex; gap: var(--ds-space-2); align-items: center; min-height: 44px; font-size: var(--text-hint); color: var(--muted); cursor: pointer; }
 .import-stock .stock-rows .skip input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .import-stock .stock-rows p.does { color: var(--ink); }
@@ -200,7 +200,7 @@
 .import-stock .fix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--ds-space-2); align-items: start; padding-top: var(--ds-space-1); }
 .import-stock .fix label { display: grid; gap: var(--ds-space-1); font-size: var(--text-hint); color: var(--muted); }
 .import-stock .fix input { width: 100%; }
-.import-stock .fix .warn-line { display: block; font-size: .8rem; }
+.import-stock .fix .warn-line { display: block; font-size: var(--text-hint); }
 .import-stock .bring .hint { text-align: center; }
 .import-stock .columns-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .import-stock .columns-list li { padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }

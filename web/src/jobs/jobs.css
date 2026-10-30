@@ -5,9 +5,9 @@
 .jobs .phase { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .jobs .phase:first-of-type { border-top: 0; padding-top: 0; }
 .jobs .phase > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
-.jobs .phase > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
+.jobs .phase > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .jobs .phase .job { padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-radius: 10px; }
-.jobs .cal { margin: 0; font-size: .82rem; color: var(--muted); }
+.jobs .cal { margin: 0; font-size: var(--text-hint); color: var(--muted); }
 .jobs .cal a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
 .jobs .add-phase { padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 /* A phase's running order, calendar line, call sheet and contact wait folded under its name (audit finding 16), behind the browser's own triangle; a calendar line to act on stays out. */
@@ -17,15 +17,15 @@
 /* Kit on jobs (ADR 0014): lines by department, each saying whether there's enough; red when short on a confirmed job, amber when pencilled in. */
 .jobs .kit-group { display: grid; gap: var(--ds-space-2); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .jobs .kit .kit-group:first-of-type { padding-top: 0; border-top: 0; }
-.jobs .kit-group h3 { display: flex; align-items: center; gap: var(--ds-space-2); margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .kit-group h3 { display: flex; align-items: center; gap: var(--ds-space-2); margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .jobs .kit-group h3 .icon { width: 16px; height: 16px; }
 .jobs .kit-line { display: grid; gap: var(--ds-space-2); }
 .jobs .kit-line + .kit-line { padding-top: var(--ds-space-2); border-top: 1px dashed var(--line); }
 .jobs .kit-line > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
 .jobs .kit-line > header > div { flex: 1; min-width: 0; }
-.jobs .kit-line > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
+.jobs .kit-line > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .jobs .kit-line > button { justify-self: start; }
-.jobs .kit-state { margin: 0; font-size: .85rem; }
+.jobs .kit-state { margin: 0; font-size: var(--text-hint); }
 .jobs .kit-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .jobs .kit-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .jobs .kit-state.ok { color: var(--ink); }
@@ -45,7 +45,7 @@
 /* The jobs list (audit finding 22): New job at the top on a phone, and the jobs under their weeks, each week's heading kept in view under the top bar while its jobs scroll. */
 .jobs .jobs-card > button.new-job { justify-self: start; }
 .jobs .jobs-card .week-head { position: sticky; top: var(--under-top, 0px); z-index: 1; padding: var(--ds-space-2) 0 var(--ds-space-2); background: var(--panel); }
-.jobs .jobs-card .week-head h3 { margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.jobs .jobs-card .week-head h3 { margin: 0; font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .jobs .jobs-card .week-head + li .job-row { border-top: 0; padding-top: var(--ds-space-1); }
 
 /* List, Week and Month: the same jobs three ways (ADR 0010). */
@@ -75,7 +75,7 @@
 .plan .scroller { --more-from: 7rem; }
 @media (min-width: 900px) { .plan .scroller { --more-from: 12rem; } }
 .plan .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plan .timeline { --names: 7rem; --pad: var(--ds-space-1); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; line-height: 1.3; }
+.plan .timeline { --names: 7rem; --pad: var(--ds-space-1); width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: var(--text-hint); line-height: 1.3; }
 /* A desk has room for a job's name on one line; a month's days then fit a laptop without scrolling sideways. */
 @media (min-width: 900px) { .plan .timeline { --names: 12rem; } }
 .plan .timeline.week { min-width: calc(var(--names) + 7 * 6.5rem); }
@@ -105,17 +105,17 @@
 /* A public holiday (ADR 0024): a faint band in the off tone, a shade deeper than a weekend, named under its date. */
 .plan .timeline .holiday { background-color: color-mix(in srgb, var(--line) 55%, var(--panel)); }
 .plan .timeline thead th.holiday { color: var(--ink); }
-.plan .timeline .holiday-name { display: block; font-size: .7rem; font-weight: 600; color: var(--muted); white-space: normal; line-height: 1.2; }
+.plan .timeline .holiday-name { display: block; font-size: var(--text-pill); font-weight: 600; color: var(--muted); white-space: normal; line-height: 1.2; }
 .plan .legend .swatch.holiday { background: color-mix(in srgb, var(--line) 55%, var(--panel)); box-shadow: inset 0 0 0 1px var(--line); }
 .plan .timeline th.today { color: var(--ink); box-shadow: inset 0 -3px 0 var(--ink); }
 /* Today's column, faintly, all the way down, so it can be found in the middle of a long month. */
 .plan .timeline td.today { background-color: color-mix(in srgb, var(--ink) 5%, var(--panel)); }
-.plan .timeline .today-word { display: block; font-size: .7rem; font-weight: 700; }
+.plan .timeline .today-word { display: block; font-size: var(--text-pill); font-weight: 700; }
 .plan .timeline.month th, .plan .timeline.month td { text-align: center; vertical-align: middle; }
 .plan .timeline.month tr > :first-child { text-align: left; padding: var(--ds-space-1) var(--ds-space-2); }
 .plan .timeline.month thead a { display: grid; min-height: 44px; place-content: center; color: inherit; text-decoration: none; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .plan .timeline.month thead a:hover { background: var(--bg); }
-.plan .timeline.month thead small { font-size: .7rem; font-weight: 500; }
+.plan .timeline.month thead small { font-size: var(--text-pill); font-weight: 500; }
 /* A job's day: solid when confirmed, dashed when pencilled in; amber while crew are still to find. Crew all found is the quiet case
    and has no colour of its own (healthy is quiet), so the amber days stand out. */
 .plan .blk { display: grid; align-content: start; gap: 1px; padding: var(--ds-space-1) var(--ds-space-2); border-radius: 6px; border: 1px solid var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--ds-surface-raised); }
@@ -130,7 +130,7 @@ a.blk:hover b { text-decoration: underline; }
 a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .blk small { color: var(--muted); }
 .plan .blk.short small, .plan .blk.stray small { color: var(--warn); }
-.plan .month .blk { padding: var(--ds-space-1) 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: .75rem; border-radius: 4px; box-shadow: none; }
+.plan .month .blk { padding: var(--ds-space-1) 0; place-items: center; align-content: center; min-height: 1.9rem; font-weight: 700; font-size: var(--text-pill); border-radius: 4px; box-shadow: none; }
 .plan .month .blk.solid:not(.stray) { border-width: 1px 1px 1px 3px; }
 /* The days of one phase, or of one job for a person or a van, join into one bar over the lines between them: square where they meet,
    the start marked once. */
@@ -154,16 +154,16 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan .item.busy b { font-weight: 600; }
 .plan .timeline td.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
 .plan .timeline td.check { background: var(--warn-soft); box-shadow: inset 0 0 0 2px var(--warn); }
-.plan .tag { display: block; margin-bottom: var(--ds-space-1); font-size: .7rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.plan .tag { display: block; margin-bottom: var(--ds-space-1); font-size: var(--text-pill); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .plan td.clash .tag { color: var(--bad); }
 .plan td.check .tag { color: var(--warn); }
-.plan .code { position: relative; display: grid; place-items: center; min-height: 1.9rem; border-radius: 4px; font-size: .72rem; font-weight: 700; }
-.plan td.clash .code::after, .plan td.check .code::after { position: absolute; top: -3px; right: -1px; font-size: .7rem; font-weight: 800; }
+.plan .code { position: relative; display: grid; place-items: center; min-height: 1.9rem; border-radius: 4px; font-size: var(--text-pill); font-weight: 700; }
+.plan td.clash .code::after, .plan td.check .code::after { position: absolute; top: -3px; right: -1px; font-size: var(--text-pill); font-weight: 800; }
 .plan td.clash .code::after { content: '!'; color: var(--bad); }
 .plan td.check .code::after { content: '?'; color: var(--warn); }
-.plan .everyone { display: flex; align-items: center; gap: var(--ds-space-2); min-height: 44px; font-size: .9rem; cursor: pointer; }
+.plan .everyone { display: flex; align-items: center; gap: var(--ds-space-2); min-height: 44px; font-size: var(--text-small); cursor: pointer; }
 .plan .everyone input { width: 20px; height: 20px; accent-color: var(--accent); }
-.plan .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ds-space-2) var(--ds-space-4); font-size: .8rem; color: var(--muted); }
+.plan .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ds-space-2) var(--ds-space-4); font-size: var(--text-hint); color: var(--muted); }
 .plan .legend li { display: flex; align-items: center; gap: var(--ds-space-2); }
 .plan .legend i { display: inline-block; width: 22px; height: 14px; padding: 0; border-radius: 4px; }
 .plan .legend .swatch.clash { background: var(--bad-soft); box-shadow: inset 0 0 0 2px var(--bad); }
@@ -176,7 +176,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 :is(.import, .combine) .found { list-style: none; margin: 0; padding: 0; display: grid; }
 :is(.import, .combine) .found > li { display: grid; gap: var(--ds-space-1); padding: var(--ds-space-3) 0; border-top: 1px solid var(--line); }
 :is(.import, .combine) .found > li:first-child { border-top: 0; padding-top: 0; }
-:is(.import, .combine) .found p { margin: 0; color: var(--muted); font-size: .9rem; }
+:is(.import, .combine) .found p { margin: 0; color: var(--muted); font-size: var(--text-small); }
 :is(.import, .combine) .found a { color: var(--accent-ink); font-weight: 700; }
 :is(.import, .combine) .found .head { display: flex; gap: var(--ds-space-2); align-items: center; }
 :is(.import, .combine) .found .head b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -187,13 +187,13 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 :is(.import, .combine) .tick { display: flex; gap: var(--ds-space-3); align-items: flex-start; min-height: 44px; cursor: pointer; }
 :is(.import, .combine) .tick input { margin-top: var(--ds-space-half); }
 :is(.import, .combine) .tick b, :is(.import, .combine) .tick small { display: block; overflow-wrap: anywhere; }
-:is(.import, .combine) .tick small { color: var(--muted); font-size: .8rem; }
+:is(.import, .combine) .tick small { color: var(--muted); font-size: var(--text-hint); }
 :is(.import, .combine) .tick > span { flex: 1; min-width: 0; display: grid; gap: var(--ds-space-half); }
 :is(.import, .combine) .tick .name { width: 100%; font-weight: 700; }
-:is(.import, .combine) .found .kind { display: flex; gap: var(--ds-space-2); align-items: center; font-size: .9rem; color: var(--muted); }
+:is(.import, .combine) .found .kind { display: flex; gap: var(--ds-space-2); align-items: center; font-size: var(--text-small); color: var(--muted); }
 :is(.import, .combine) .found .kind select { flex: none; width: auto; }
 .import details summary { display: flex; align-items: center; min-height: 44px; font-weight: 700; cursor: pointer; }
-.import .left-out { margin: var(--ds-space-1) 0 0; padding-left: var(--ds-space-5); display: grid; gap: var(--ds-space-2); font-size: .9rem; }
+.import .left-out { margin: var(--ds-space-1) 0 0; padding-left: var(--ds-space-5); display: grid; gap: var(--ds-space-2); font-size: var(--text-small); }
 .import .left-out small { display: block; color: var(--muted); overflow-wrap: anywhere; }
 /* Kept in reach above the area tabs while scrolling through what was found; kit from the notes keeps its Add in the same bar (audit, P3). */
 :is(.import, .notes-kit) .bring { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); display: grid; gap: var(--ds-space-2); padding: var(--ds-space-3) 0; background: var(--bg); }
@@ -207,24 +207,24 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Pick lists (ADR 0017): each product on the job's kit, what's out, and where to find the rest. */
 .jobs .pick-link { display: flex; align-items: center; gap: var(--ds-space-3); flex-wrap: wrap; }
-.jobs .pick-link span { color: var(--muted); font-size: .9rem; }
+.jobs .pick-link span { color: var(--muted); font-size: var(--text-small); }
 .pick .scan-dock.docked { position: sticky; top: var(--under-top, 0px); z-index: 1; }
-.pick .from details { display: inline; margin-left: var(--ds-space-2); font-size: .9rem; }
+.pick .from details { display: inline; margin-left: var(--ds-space-2); font-size: var(--text-small); }
 .pick .from details > summary { display: inline; cursor: pointer; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
 .pick .from details > p { margin: var(--ds-space-1) 0 0; color: var(--muted); }
 .pick .pick-done > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-weight: 600; }
 .pick .pick-total { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pick .said { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); font-size: .9rem; }
+.pick .said { margin: 0; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); font-size: var(--text-small); }
 .pick .said.ok { background: var(--good-soft); color: var(--good); }
 .pick .said.warn { background: var(--warn-soft); color: var(--warn); }
 .pick .said.quiet { background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
 .pick .pick-row { display: grid; gap: var(--ds-space-2); }
 .pick .pick-row + .pick-row { padding-top: var(--ds-space-2); border-top: 1px dashed var(--line); }
 .pick .pick-row > header { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; }
-.pick .pick-row > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: .9rem; }
+.pick .pick-row > header p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
 .pick .pick-row .count { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pick .pick-row.done .count { color: var(--ink); }
-.pick .from { margin: 0; padding-left: var(--ds-space-4); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.pick .from { margin: 0; padding-left: var(--ds-space-4); font-size: var(--text-small); font-variant-numeric: tabular-nums; }
 /* Back and Missing apart, each a 44 px target, Missing the quieter (audit, 20 October 2026, finding 40). */
 .pick .out-items li { display: flex; align-items: center; gap: var(--ds-space-3); }
 .pick .out-items button.link { min-width: 44px; min-height: 44px; padding-inline: var(--ds-space-1); }
@@ -232,27 +232,27 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* A number never breaks at its hyphen (audit, 20 October 2026, finding 41). */
 .pick .from .number { white-space: nowrap; }
 .pick .count-row { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: center; }
-.pick .count-row p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1 0 100%; }
+.pick .count-row p { margin: 0; color: var(--muted); font-size: var(--text-small); flex: 1 0 100%; }
 .pick .count-row input { width: 7.5rem; }
 .pick .count-row .alert { flex: 1 0 100%; }
 /* Picking on the phone (ADR 0072): whose kit and in what order, what to know before starting, the kit's own notes, and Undo beside the answer. */
 /* Done is settled, so it's ink: green stays for a scan that read (audit, 20 October 2026, finding 59). */
 .pick .pick-total.done { color: var(--ink); }
-.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--ds-space-half); font-size: .9rem; }
+.pick .pick-brief { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--ds-space-half); font-size: var(--text-small); }
 .pick .pick-ways { display: grid; gap: var(--ds-space-2); }
-.pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.pick .pick-ways .left { color: var(--muted); font-weight: 400; font-size: var(--text-hint); }
 .pick .pick-ways button[aria-pressed='true'] .left { color: inherit; }
-.pick .pick-note { margin: 0; font-size: .9rem; }
-.pick .pick-note b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--ds-space-1); }
+.pick .pick-note { margin: 0; font-size: var(--text-small); }
+.pick .pick-note b { font-size: var(--text-pill); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: var(--ds-space-1); }
 .pick .said-row { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: stretch; }
 .pick .said-row .said { flex: 1; }
 .pick .said-row .alert { flex: 1 0 100%; }
 
 /* Call sheets (ADR 0021): the office's, and a plain one on paper. */
-.jobs .kicker, .call-sheet .kicker { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.jobs .kicker, .call-sheet .kicker { margin: 0; font-size: var(--text-pill); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .jobs .lines, .call-sheet .lines { white-space: pre-line; }
 .sheet-screen .card p { margin: 0; }
-.sheet-screen h3 { margin: var(--ds-space-2) 0 0; font-size: .95rem; }
+.sheet-screen h3 { margin: var(--ds-space-2) 0 0; font-size: var(--text-small); }
 .sheet-screen .sheet-call { display: grid; gap: var(--ds-space-1); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .sheet-screen .sheet-call:first-of-type { border-top: 0; padding-top: 0; }
 .sheet-screen .sheet-call header { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); align-items: baseline; }
@@ -284,7 +284,7 @@ a.blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 /* When a job's kit is held (ADR 0031): its days, with getting it ready and checking it back. */
-.jobs .kit-days p { margin: 0; color: var(--muted); font-size: .9rem; }
+.jobs .kit-days p { margin: 0; color: var(--muted); font-size: var(--text-small); }
 .jobs .kit-days p b { color: var(--ink); }
 .jobs .kit-days form { margin-top: var(--ds-space-2); }
 .pick .scan-failed { display: grid; gap: var(--ds-space-2); justify-items: start; }
