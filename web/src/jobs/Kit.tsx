@@ -1,4 +1,7 @@
 import {
+  kitFromQuote,
+  type KitToAdd,
+  type QuoteLine,
   dayLabel,
   DEFAULT_PREP_DAYS,
   DEFAULT_RETURN_DAYS,
@@ -190,6 +193,7 @@ export function KitCard({ job, view }: { job: JobView; view: View }) {
       {lines.length > 0 && !STOPPED.includes(job.status) && <KitDays job={job} mayChange={access.can('jobs')} />}
       {STOPPED.includes(job.status) && lines.length > 0 && <p className="hint">This job is {job.status}, so its kit is free for other jobs.</p>}
       {lines.length === 0 && <Empty>{mayKit && 'Add what the job needs from the stock list, for the whole job or one phase.'}</Empty>}
+      {mayKit && !STOPPED.includes(job.status) && <FromQuote job={job} view={view} lines={lines} />}
       {short.length > 0 && <ShortKit job={job} short={short} mayChange={mayKit} />}
       <ShowAll items={byDepartment} limit={3} what="lines" keep={brief ? undefined : toAct}>
         {(shown) =>
@@ -568,6 +572,44 @@ function EditKit({ line, job, onDone }: { line: KitLineView; job: JobView; onDon
         </div>
       )}
     </form>
+  )
+}
+
+/** What a quote's lines want that a job's kit list hasn't got yet (ADR 0102), by the quote's packages as well as its lines. */
+export function kitToAdd(view: View, lines: readonly QuoteLine[], jobId: string): KitToAdd[] {
+  return kitFromQuote(lines, (id) => view.money.package(id)?.items, view.kit.byJob.get(jobId) ?? [])
+}
+
+/** Puts what the quote wants on the job's kit list, for the whole job, each as a line of its own. */
+export async function addKitFromQuote(jobId: string, adds: readonly KitToAdd[]): Promise<void> {
+  for (const a of adds)
+    await client.mutate('kit.add', { id: newId(), projectId: jobId, phaseId: null, modelId: a.modelId, qty: Math.min(MAX_QTY, a.qty), subhireQty: Math.min(MAX_QTY, a.subhireQty), supplier: a.supplier, notes: 'From the quote' })
+}
+
+/**
+ * The kit on the job's quote that isn't on its kit list yet (ADR 0102), its newest version, to put on in one press:
+ * only ever more, so what the warehouse took off or changed isn't put back without asking. Quotes are only on the
+ * devices of those who see money, so nobody else is offered it.
+ */
+function FromQuote({ job, view, lines }: { job: JobView; view: View; lines: readonly KitLineView[] }) {
+  const { run, error } = useAct()
+  const quote = view.money.quotesOf(job.id)[0]
+  if (!quote) return null
+  const adds = kitToAdd(view, quote.lines, job.id)
+  if (adds.length === 0) return null
+  const name = (id: string) => view.warehouse.models.find((m) => m.id === id)?.name ?? 'a product'
+  return (
+    <div className="kit-from-quote" role="group" aria-label="Kit on the quote">
+      <p>
+        {lines.length ? 'On the quote but not the kit list yet: ' : 'The quote has kit to put on the list: '}
+        {adds.map((a) => `${a.qty} × ${name(a.modelId)}`).join(', ')}.
+      </p>
+      <Refusal error={error} />
+      <button type="button" className="secondary" onClick={() => void run(() => addKitFromQuote(job.id, adds))}>
+        {adds.length === 1 ? 'Add it to the kit list' : `Add all ${adds.length} to the kit list`}
+      </button>
+      <p className="hint">For the whole job. Change or take off any of them after, as with kit added by hand.</p>
+    </div>
   )
 }
 
