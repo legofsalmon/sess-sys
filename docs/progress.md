@@ -3,6 +3,18 @@
 Newest first. Each entry says what changed, what was checked, and what is
 waiting on someone.
 
+## 30 October 2026: A long stock list that keeps up
+
+**Done**
+
+- Finding 97 of the [20 October audit](audit-2026-10-20.md) (PR #181):
+  the catalogue's Show all is windowed as Jobs is (ADR 0050), so 300
+  products build a few dozen rows rather than a 30,000 px page; search
+  first and the first twenty on a laptop (five on a phone) as before.
+  App 1.64.2.
+- Checked: typecheck, a new browser test with 150 products, and the
+  stock and screens browser tests.
+
 ## 30 October 2026: Major upgrades
 
 **Done**
