@@ -1,5 +1,6 @@
 import type { CommandArgs, Mutation } from '../commands.ts'
 import { byWhen, jobSpan, type Client, type JobEntities, type Phase, type Project, type Venue } from '../jobs.ts'
+import { joinedPhaseName, tailOf } from '../tidy.ts'
 import type { CallView } from './crew-view.ts'
 
 /**
@@ -117,10 +118,19 @@ export function jobsView(
         phases.delete((m.args as CommandArgs<'phase.remove'>).id)
         break
       case 'project.merge': {
-        // Shown as one straight away; the server names the phases and moves the rest.
+        // Shown as one straight away, each day named as the server will name it (audit, 20 October 2026, finding 108); the server moves the rest.
         const a = m.args as CommandArgs<'project.merge'>
         const p = projects.get(a.id)
         if (!p) break
+        for (const job of [p, ...a.from.map((id) => projects.get(id))]) {
+          if (!job) continue
+          const tail = tailOf(job.name, a.name)
+          for (const ph of phases.values()) {
+            if (ph.projectId !== job.id) continue
+            const name = joinedPhaseName(ph.name, tail, job.kind)
+            if (name !== ph.name) phases.set(ph.id, { ...ph, name, pending: true })
+          }
+        }
         projects.set(a.id, { ...p, name: a.name, pending: true })
         for (const id of a.from) {
           projects.delete(id)

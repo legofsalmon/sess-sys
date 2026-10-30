@@ -1,5 +1,5 @@
 import type { Db } from '../db.ts'
-import { runMigrations, type Module } from '../migrations.ts'
+import type { Module } from '../migrations.ts'
 
 /**
  * The warehouse catalogue (ADR 0013): products (models), numbered items
@@ -354,7 +354,3 @@ const MIGRATIONS: string[] = [
 ]
 
 export const STOCK: Module = { versionTable: 'stock_schema_version', migrations: MIGRATIONS }
-
-export function migrateStock(db: Db, upTo?: number) {
-  return runMigrations(db, STOCK, upTo)
-}

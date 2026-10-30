@@ -24,6 +24,7 @@ import {
 } from '@sh/shared'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { personHref } from '../crew/PersonScreen.tsx'
+import { useMoreEdges } from '../more.tsx'
 import { useAccess } from '../role.ts'
 import { StatusPill, WAITING_TO_SYNC } from '../StatusPill.tsx'
 import { useUnderTop } from '../useUnderTop.ts'
@@ -118,6 +119,59 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
     const first = el?.querySelector<HTMLElement>('thead .today')
     if (el && names && first) el.scrollLeft = Math.max(0, first.offsetLeft - names.offsetWidth)
   }, [hash, shown])
+  const head = (
+      <thead>
+        <tr>
+          <th scope="col">{rows === 'jobs' ? 'Job' : rows === 'people' ? 'Person' : 'Vehicle'}</th>
+          {days.map((d) => (
+            <th scope="col" key={d} className={dayClass(d, now, p.holidays)} aria-current={d === now ? 'date' : undefined} title={p.holidays[d]}>
+              {scale === 'week' ? (
+                <>
+                  {dayLabel(d)}
+                  {d === now && <small className="today-word">Today</small>}
+                  {/* A public holiday (ADR 0024) is named on its day, so nobody counts it as a working day. */}
+                  {p.holidays[d] && <small className="holiday-name">{p.holidays[d]}</small>}
+                </>
+              ) : (
+                <a href={at({ scale: 'week', day: d })} aria-label={`${dayLabel(d)}${p.holidays[d] ? `, ${p.holidays[d]}` : ''}: open its week`}>
+                  <small>{dayLabel(d).slice(0, 2)}</small>
+                  {Number(d.slice(8))}
+                </a>
+              )}
+            </th>
+          ))}
+        </tr>
+      </thead>
+  )
+  // On a phone the planner adds to the page's height rather than scrolling inside a box (1.64.4), so its own days row can't stick: a copy
+  // of it sticks under the bar once the real one has scrolled away, moved sideways with the days. Hidden from screen readers and taps,
+  // which have the real row.
+  const float = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scroller.current
+    const copy = float.current
+    const clip = copy?.firstElementChild
+    if (!el || !copy || !(clip instanceof HTMLElement)) return
+    const days = el.querySelector('thead')
+    const side = () => (clip.scrollLeft = el.scrollLeft)
+    const place = () => {
+      const line = copy.getBoundingClientRect().top
+      const box = el.getBoundingClientRect()
+      copy.classList.toggle('on', !!days && box.top + days.offsetHeight < line + 1 && box.bottom > line + days.offsetHeight)
+    }
+    side()
+    place()
+    el.addEventListener('scroll', side, { passive: true })
+    addEventListener('scroll', place, { passive: true })
+    addEventListener('resize', place)
+    return () => {
+      el.removeEventListener('scroll', side)
+      removeEventListener('scroll', place)
+      removeEventListener('resize', place)
+    }
+  }, [hash, shown, lanes])
+  // A week is wider than a phone: the edge with more days past it fades, as Money's tables do (audit, 20 October 2026, finding 77).
+  useMoreEdges(scroller, shown)
 
   return (
     <div className="app crew jobs plan">
@@ -167,33 +221,24 @@ export function PlanScreen({ view, hash }: { view: View; hash: string }) {
           </p>
         )}
         {lanes > 0 && (
-          <div className="scroller" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rowWord}`}>
+          <div className="days-float" ref={float} aria-hidden="true" inert>
+            <div className="days-clip">
+              <table className={`timeline ${scale}`} style={{ '--days': days.length } as CSSProperties}>
+                <colgroup>
+                  <col className="names" />
+                </colgroup>
+                {head}
+              </table>
+            </div>
+          </div>
+        )}
+        {lanes > 0 && (
+          <div className="scroller more-edges" ref={scroller} tabIndex={0} role="region" aria-label={`${title}, by ${rowWord}`}>
             <table className={`timeline ${scale}`} style={{ '--days': days.length } as CSSProperties}>
               <colgroup>
                 <col className="names" />
               </colgroup>
-              <thead>
-                <tr>
-                  <th scope="col">{rows === 'jobs' ? 'Job' : rows === 'people' ? 'Person' : 'Vehicle'}</th>
-                  {days.map((d) => (
-                    <th scope="col" key={d} className={dayClass(d, now, p.holidays)} aria-current={d === now ? 'date' : undefined} title={p.holidays[d]}>
-                      {scale === 'week' ? (
-                        <>
-                          {dayLabel(d)}
-                          {d === now && <small className="today-word">Today</small>}
-                          {/* A public holiday (ADR 0024) is named on its day, so nobody counts it as a working day. */}
-                          {p.holidays[d] && <small className="holiday-name">{p.holidays[d]}</small>}
-                        </>
-                      ) : (
-                        <a href={at({ scale: 'week', day: d })} aria-label={`${dayLabel(d)}${p.holidays[d] ? `, ${p.holidays[d]}` : ''}: open its week`}>
-                          <small>{dayLabel(d).slice(0, 2)}</small>
-                          {Number(d.slice(8))}
-                        </a>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              {head}
               <tbody>
                 {rows === 'jobs'
                   ? p.jobs.map((lane) => {

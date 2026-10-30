@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useMoreEdges } from './more.tsx'
 
 /**
  * The parts of the screen by name, each a tap away (ADR 0033): so a long
@@ -160,6 +161,9 @@ export function OnThisScreen() {
   }
 
   const shown = parts.length >= FEWEST
+  // On a phone the strip is wider than the screen: the edge with more past it fades (audit, 20 October 2026, finding 13).
+  const row = useRef<HTMLUListElement>(null)
+  useMoreEdges(row, parts)
   useLayoutEffect(() => {
     strip.hidden = !shown
   }, [strip, shown])
@@ -167,7 +171,7 @@ export function OnThisScreen() {
     <span ref={anchor} hidden>
       {shown &&
         createPortal(
-        <ul>
+        <ul className="more-edges" ref={row}>
           {parts.map((p, i) => (
             <li key={`${i} ${p.label}`}>
               <button type="button" onClick={() => go(p)} aria-current={i === current ? 'location' : undefined} title={`Go to ${p.label}`}>

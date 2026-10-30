@@ -180,9 +180,12 @@ test('counted, labelled, put in a case, found by number, and kept at a place', a
   await expect(page.locator('.conn')).toHaveText('Up to date')
 
   await ready(page)
-  // The catalogue shows its first few (five on a phone, twenty on a laptop), with the rest behind "Show all" (audit finding 16).
-  const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
-  if (await all.count()) await all.click()
+  // The catalogue shows its first few (five on a phone, twenty on a laptop), with the rest behind "Show all" (audit finding 16), drawn
+  // only near the screen (finding 97); with other tests' products about, this test's two are found by name.
+  if (process.env.SHOTS) {
+    const all = page.getByRole('button', { name: /^Show all \d+ products$/ })
+    if (await all.count()) await all.click()
+  } else await page.getByLabel('Find').fill(id)
   await expect(page.locator('.job-row', { hasText: speaker })).toContainText('2 items · 4 not labelled yet')
   await expect(page.locator('.job-row', { hasText: cable })).toContainText('8 counted')
   await page.screenshot(shot('stock-list'))
@@ -231,7 +234,8 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await add.getByLabel("Where it's kept").fill(bay)
   await add.getByRole('button', { name: 'Add item' }).click()
   await add.getByRole('button', { name: 'Make the place' }).click()
-  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
   // The question answered, the number field is ready for the next label.
   await expect(add.getByLabel('Number', { exact: true })).toBeFocused()
   const number = (await add.locator('.added').textContent())!.slice(6, -1)
@@ -276,7 +280,8 @@ test('a product added by mistake is hidden with its items and counts, and its la
   await newProduct(page, spot, 'numbered')
   await add.getByLabel("Where it's kept").fill(bay)
   await add.getByRole('button', { name: 'Add item' }).click()
-  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+  // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+  await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
   await add.locator('.added a').click()
   await page.getByRole('button', { name: 'Retire' }).click()
   await page.getByRole('radio', { name: 'Added by mistake' }).check()

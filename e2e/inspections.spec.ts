@@ -51,7 +51,8 @@ test('PAT tests recorded one at a time and in a batch; failed and overdue kit ca
     await add.getByRole('button', { name: 'Add item' }).click()
     if (i === 0) await page.getByRole('button', { name: 'Make the place' }).click()
     if (speakers.length) await expect(add.locator('.added')).not.toHaveText(`Added ${speakers.at(-1)}.`)
-    await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/)
+    // The number comes back with a sync round trip, slower when the machine is busy (audit, 20 October 2026, finding 109).
+    await expect(add.locator('.added')).toHaveText(/^Added SH-\d{6}\.$/, { timeout: 20_000 })
     speakers.push((await add.locator('.added').textContent())!.slice(6, -1))
   }
   await page.getByRole('tab', { name: /^Details/ }).click()

@@ -777,7 +777,7 @@ describe('backups encrypted under BACKUP_KEY', () => {
     expect((await fresh.query(`SELECT id FROM places ORDER BY id`)).rows.map((r) => r.id)).toEqual(['a3', 'van1'])
     await expect(restoreFrom(await database(), store, 'latest')).rejects.toThrow('This backup is encrypted')
 
-    // The Account tab says so; and a plain backup from before the key still restores on a server that has one.
+    // Admin says so; and a plain backup from before the key still restores on a server that has one.
     expect((await app.inject({ method: 'GET', url: '/api/backups' })).json()).toMatchObject({ configured: true, encrypted: true })
     const plain = await writeBackup(db)
     expect((await checkRestores(plain.data, key)).rows).toBe(plain.rows)

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useMoreEdges } from './more.tsx'
 
 /**
  * A page's parts as tabs (the design system's tabs), one at a time: a job's
@@ -27,10 +28,24 @@ export function Tabs<K extends string>({
   onPick: (p: K) => void
 }) {
   const row = useRef<HTMLDivElement>(null)
-  // The current part in view, where the row is wider than the phone.
+  // The current part in view, where the row is wider than the phone, with a part either side of it where there's room, so the row shows it
+  // goes on; the edge with more past it fades (audit, 20 October 2026, finding 13: Quote was off the edge of a job's row with nothing to say so).
   useEffect(() => {
-    row.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const el = row.current
+    const at = el?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!el || !at) return
+    const show = (tab: Element | null) => {
+      if (!tab) return
+      const box = el.getBoundingClientRect()
+      const r = tab.getBoundingClientRect()
+      if (r.right > box.right) el.scrollLeft += r.right - box.right
+      else if (r.left < box.left) el.scrollLeft -= box.left - r.left
+    }
+    show(at.nextElementSibling)
+    show(at.previousElementSibling)
+    show(at)
   }, [current])
+  useMoreEdges(row)
   const key = (e: KeyboardEvent<HTMLButtonElement>) => {
     const at = parts.indexOf(current)
     const to =
@@ -41,7 +56,7 @@ export function Tabs<K extends string>({
     row.current?.querySelector<HTMLElement>(`#${id}-tab-${parts[to]}`)?.focus()
   }
   return (
-    <div className="part-tabs" role="tablist" aria-label={label} ref={row}>
+    <div className="part-tabs more-edges" role="tablist" aria-label={label} ref={row}>
       {parts.map((p) => (
         <button
           key={p}

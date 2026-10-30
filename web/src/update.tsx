@@ -96,7 +96,7 @@ export function UpdateBar({ unkept = 0 }: { unkept?: number }) {
   if (!ready && said)
     return (
       <div className="update">
-        <span>Started again on the new version: the old one's files had gone.</span>
+        <span role="status">Started again on the new version: the old one's files had gone.</span>
         <button
           type="button"
           onClick={() => {
@@ -116,7 +116,8 @@ export function UpdateBar({ unkept = 0 }: { unkept?: number }) {
   }
   return (
     <div className="update">
-      <span>
+      {/* A status, so a screen reader is told a reload waits, not only shown it (audit, 20 October 2026, finding 60b). */}
+      <span role="status">
         A new version is ready.
         {unkept > 0 &&
           ` ${unkept === 1 ? "1 change hasn't" : `${unkept} changes haven't`} synced yet, and this browser keeps nothing over a reload, so loading it now loses ${unkept === 1 ? 'it' : 'them'}. It can wait until ${unkept === 1 ? "it's" : "they've"} gone.`}

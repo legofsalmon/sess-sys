@@ -193,11 +193,6 @@ export async function guestPlaces(q: Queryable, offerId: string, today: string):
   return rows
 }
 
-/** How many days from `today` on are on a calendar. */
-export async function countOn(q: Queryable, today: string): Promise<number> {
-  const { rows } = await q.query<{ n: string }>(`SELECT count(*) AS n FROM calendar_days WHERE day >= $1::date AND state <> 'removed'`, [today])
-  return Number(rows[0]?.n ?? 0)
-}
 
 export function dayEntity(d: DayRow): CalendarDay {
   return {

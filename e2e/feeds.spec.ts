@@ -4,7 +4,7 @@ import { fillName } from './names.ts'
 /**
  * Personal calendar feeds (ADR 0012): a read-only address for each person,
  * which the office copies from the Crew tab, freelancers find on their
- * page, and staff who also work jobs find on the Account tab.
+ * page, and staff who also work jobs find on You.
  * To refresh the blueprint screenshots, run this file on its own with SHOTS=1.
  */
 

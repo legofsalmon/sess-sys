@@ -356,7 +356,7 @@ function CrewChart({ view, today, department }: { view: View; today: string; dep
       empty={department ? `No ${department} calls in the next fourteen days.` : 'No crew called in the next fourteen days.'}
       more={
         <a className="link chart-more" href="#crew">
-          Crew calls
+          Calls
         </a>
       }
     />

@@ -70,7 +70,7 @@ export const checkWords = (kind: CheckKind, vehicle: VehicleKind) => (kind === '
  */
 export const vehicleCheck = z.object({ needed: z.boolean(), expires: day.nullable() })
 export type VehicleCheck = z.infer<typeof vehicleCheck>
-export const vehicleChecks = z.record(z.enum(CHECK_KINDS), vehicleCheck)
+export const vehicleChecks = z.partialRecord(z.enum(CHECK_KINDS), vehicleCheck)
 export type VehicleChecks = z.infer<typeof vehicleChecks>
 
 /** What a new vehicle of a kind needs, before anyone says otherwise. A truck has a tachograph; a trailer is checked with what tows it. */
@@ -93,7 +93,6 @@ export function checkOf(v: Pick<Vehicle, 'kind' | 'checks'>, kind: CheckKind): V
 export const offRoad = z
   .object({ since: day, until: day.nullable(), note: text(500, 'Why') })
   .refine((o) => o.until === null || o.since <= o.until, { message: "It can't be back before it goes off the road." })
-export type OffRoad = z.infer<typeof offRoad>
 
 export const vehicle = z.object({
   id,

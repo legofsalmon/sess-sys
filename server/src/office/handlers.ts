@@ -3,7 +3,7 @@ import { emit, type Ctx } from '../kernel.ts'
 import { getSetting } from './store.ts'
 
 /**
- * The office's details (audit finding 10): set from the Account tab, shown
+ * The office's details (audit finding 10): set from Admin, shown
  * on every freelancer page. One office, so the command replaces them whole.
  */
 

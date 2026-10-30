@@ -2,6 +2,38 @@ import { z } from 'zod'
 import { day } from './day.ts'
 import { euroCents, needed, text, whole } from './plain.ts'
 import { ROLES } from './roles.ts'
+import { DEFAULT_LEVEL, mostNamed, ROLE_WORDS, roleKey } from './crew-departments.ts'
+import { certificates, needs, needsLabel, tidyNeeds, type Certificate, type CertificateKind } from './crew-certificates.ts'
+import { dayLabel, daysLabel, eachDay, euro } from './crew-days.ts'
+
+export {
+  APPLICANT_LEVEL,
+  CREW_DEPARTMENTS,
+  DEFAULT_LEVEL,
+  departmentInWords,
+  departmentOfPeople,
+  levelLabel,
+  levelLine,
+  LEVELS,
+  sameDepartment,
+  tidyDepartment,
+} from './crew-departments.ts'
+export {
+  certificate,
+  CERTIFICATE_KINDS,
+  CERTIFICATE_LABELS,
+  CERTIFICATE_WORDS,
+  certificateName,
+  certificates,
+  certificatesAfter,
+  needsLabel,
+  tidyNeeds,
+  type Certificate,
+  type CertificateKind,
+  type Certificates,
+} from './crew-certificates.ts'
+export { fullName, NAME_ARTICLES, NAME_PARTICLES, nameParts, namesAfter, splitName, type NameParts } from './crew-names.ts'
+export { dayLabel, daysBetween, daysLabel, eachDay, euro, movedCallSpan, offerDaysAfter, phaseOnlyGrew, suggestedReplyBy } from './crew-days.ts'
 
 /**
  * Crew booking: people, the roles a job needs (calls), the offers that fill
@@ -29,69 +61,6 @@ const cents = euroCents(100_000_00, 'A day rate')
  * their certificates and the company they trade through.
  */
 
-/** The departments the form offers as you type. Free text, so a new one needs no change here. */
-export const CREW_DEPARTMENTS = ['Audio', 'LX', 'Video', 'Backline', 'Laser', 'Transport', 'Production', 'LED Tech', 'Rigger', 'Stage Manager', 'SFX'] as const
-
-/** 0 is an applicant nobody has vetted; 1 is known; higher is more preferred. */
-export const LEVELS = [0, 1, 2, 3, 4, 5] as const
-export const APPLICANT_LEVEL = 0
-export const DEFAULT_LEVEL = 1
-export const levelLabel = (level: number) => `Level ${level}`
-/** The level with "applicant" said for 0, where nothing else on the screen says it: the crew list, the card's select and the import's preview. */
-export const levelLine = (level: number) => (level === APPLICANT_LEVEL ? `${levelLabel(level)} (applicant)` : levelLabel(level))
-
-/** A department as typed, tidied: spaces collapsed, and a known one in its own spelling, so "audio" and "Audio" are one department. Null for nothing. */
-export function tidyDepartment(typed: string): string | null {
-  const s = typed.trim().replace(/\s+/g, ' ')
-  if (!s) return null
-  return CREW_DEPARTMENTS.find((d) => d.toLowerCase() === s.toLowerCase()) ?? s
-}
-
-/** Whether two departments as typed are the same one: "audio" and "Audio " are. Nothing is never the same as anything. */
-export const sameDepartment = (a: string | null | undefined, b: string | null | undefined) => !!a?.trim() && a.trim().toLowerCase() === b?.trim().toLowerCase()
-
-/**
- * Words in a role that say its department (ADR 0046), the first that fits:
- * "Sound No.1" is audio, "LX op" is LX, "Camera" is video. A role that says
- * nothing about one, such as a stagehand, has none until someone gives it one.
- */
-const ROLE_WORDS: readonly [RegExp, (typeof CREW_DEPARTMENTS)[number]][] = [
-  [/\blaser/, 'Laser'],
-  [/\bled\b/, 'LED Tech'],
-  [/\b(sound|audio|monitors?|foh|a[12]|pa|rf|mics?)\b/, 'Audio'],
-  [/\b(lx|light(s|ing)?|lamp|follow ?spot|dimmer)\b/, 'LX'],
-  [/\b(video|camera|cam|vision|projection(ist)?|vt)\b/, 'Video'],
-  [/\b(backline|guitar tech|drum tech)\b/, 'Backline'],
-  [/\brigg(er|ers|ing)\b/, 'Rigger'],
-  [/\b(stage manager|asm|dsm|sm)\b/, 'Stage Manager'],
-  [/\b(sfx|pyro|special effects|confetti)\b/, 'SFX'],
-  [/\b(driver|transport|truck|van)\b/, 'Transport'],
-  [/\b(production|crew chief|producer|production manager|site manager|runner)\b/, 'Production'],
-]
-
-/**
- * The department some words name, from the same list: "Smirnoff LX" is LX,
- * "Audio Main" is Audio. For a job's name or a phase's, where a calendar's
- * title said which department a day was for. None when they name none.
- */
-export const departmentInWords = (words: string): (typeof CREW_DEPARTMENTS)[number] | null =>
-  ROLE_WORDS.find(([re]) => re.test(roleKey(words)))?.[1] ?? null
-
-/** What a role is called, as compared: "Sound  No.1" and "sound no.1" are one. */
-const roleKey = (role: string) => role.trim().replace(/\s+/g, ' ').toLowerCase()
-
-/** The department named most often, the first by name on a tie; none when nothing is named. */
-function mostNamed(departments: readonly (string | null)[]): string | null {
-  const counts = new Map<string, { name: string; n: number }>()
-  for (const d of departments) {
-    const name = d && tidyDepartment(d)
-    if (!name) continue
-    const was = counts.get(name.toLowerCase())
-    counts.set(name.toLowerCase(), { name: was?.name ?? name, n: (was?.n ?? 0) + 1 })
-  }
-  return [...counts.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name))[0]?.name ?? null
-}
-
 /**
  * The department a call for this role most likely belongs to (ADR 0046),
  * offered when a call is made and given to calls brought in from the
@@ -113,76 +82,9 @@ export function departmentForRole(
   return ROLE_WORDS.find(([words]) => words.test(key))?.[1] ?? null
 }
 
-/**
- * The department of a call brought in from the calendar (ADR 0046), whose
- * role says only "Crew": the one more than half the people on it are in.
- * None when they're mixed, or nobody on it has one; the office gives those
- * one, many at a time, on Crew › Calls.
- */
-export function departmentOfPeople(departments: readonly (string | null | undefined)[]): string | null {
-  if (departments.length === 0) return null
-  const most = mostNamed(departments.map((d) => d ?? null))
-  if (!most) return null
-  const n = departments.filter((d) => sameDepartment(d, most)).length
-  return n * 2 > departments.length ? most : null
-}
-
 /** How much the notes hold; the crew list's notes are added to fit it. */
 export const NOTES_LENGTH = 2000
 const level = whole(0, 5, 'The level')
-
-/** Safe Pass, working at height and IPAF came with what a call needs (ADR 0028). An IPAF card's categories, such as 3a, go in its note. */
-export const CERTIFICATE_KINDS = ['first-aid', 'manual-handling', 'driving-licence', 'safe-pass', 'working-at-height', 'ipaf'] as const
-export type CertificateKind = (typeof CERTIFICATE_KINDS)[number]
-export const CERTIFICATE_LABELS: Record<CertificateKind, string> = {
-  'first-aid': 'First aid',
-  'manual-handling': 'Manual handling',
-  'driving-licence': 'Driving licence',
-  'safe-pass': 'Safe Pass',
-  'working-at-height': 'Working at height',
-  ipaf: 'IPAF',
-}
-/** Two are names, so they keep their capitals mid-sentence: "needs working at height and IPAF". */
-export const certificateName = (kind: CertificateKind) => (kind === 'safe-pass' || kind === 'ipaf' ? CERTIFICATE_LABELS[kind] : CERTIFICATE_LABELS[kind].toLowerCase())
-/** The thing itself, as a sentence says someone has it or not: "Tadhg Brady's manual handling certificate ran out". */
-export const CERTIFICATE_WORDS: Record<CertificateKind, string> = {
-  'first-aid': 'first aid certificate',
-  'manual-handling': 'manual handling certificate',
-  'driving-licence': 'driving licence',
-  'safe-pass': 'Safe Pass',
-  'working-at-height': 'working at height certificate',
-  ipaf: 'IPAF',
-}
-/** Each kind once, in the list's order, whatever order they were ticked or sent in. */
-export const tidyNeeds = (needs: readonly string[] | null | undefined): CertificateKind[] => CERTIFICATE_KINDS.filter((k) => needs?.includes(k))
-/** "working at height and IPAF". */
-export function needsLabel(needs: readonly CertificateKind[]): string {
-  const names = tidyNeeds(needs).map(certificateName)
-  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
-}
-const needs = z.array(z.enum(CERTIFICATE_KINDS)).max(CERTIFICATE_KINDS.length)
-
-/** One certificate: held, not held, or unknown (null), with an expiry day where there is one. */
-export const certificate = z.object({ held: z.boolean().nullable(), expires: day.nullable(), note: text(200, 'The note') })
-export type Certificate = z.infer<typeof certificate>
-/** By kind; a kind that isn't there is unknown. */
-export const certificates = z.record(z.enum(CERTIFICATE_KINDS), certificate)
-export type Certificates = z.infer<typeof certificates>
-
-/** The kinds that came with ADR 0028, which a version of the app from before can't send. */
-const LATER_KINDS: readonly CertificateKind[] = ['safe-pass', 'working-at-height', 'ipaf']
-
-/**
- * A person's certificates after an edit, on the server and on a device
- * alike. This version's form sends every kind. One from before sends only
- * the three it knows, and leaves one out to clear it: so a kind left out
- * is kept only if it came later, and an edit that sends none keeps them all.
- */
-export function certificatesAfter(was: Certificates | undefined, sent: Certificates | undefined): Certificates {
-  if (!sent) return was ?? {}
-  const kept = LATER_KINDS.filter((k) => was?.[k] && !(k in sent)).map((k) => [k, was![k]] as const)
-  return { ...Object.fromEntries(kept), ...sent }
-}
 
 /** The company a freelancer trades through. VAT-registered is derived: a VAT number is held. */
 export const company = z.object({
@@ -197,72 +99,6 @@ const knownAs = text(100, 'The name they go by').nullable()
 // Trimmed, so spaces alone are no first name.
 const givenName = z.string().transform((s) => s.trim()).pipe(needed(100, 'The first name', 'A first name'))
 const familyName = z.string().transform((s) => s.trim()).pipe(text(100, 'The last name'))
-
-/**
- * Words that start a last name rather than end a first one, as Irish and
- * other names have them: "Seán Ó Briain", "Áine Nic Dhonnchadha", "Jan van
- * der Berg". Each as it's usually written, capitalised and in capitals, and
- * matched exactly, so the server's own split of the names already held
- * (crew/schema.ts) reads them the same way, whatever its database's locale.
- */
-const PARTICLES = ['ó', 'ní', 'nic', 'mac', 'mc', 'ua', 'uí', 'mhic', 'o', 'de', 'van', 'von', 'der', 'den', 'da', 'di', 'du', 'le', 'la', 'del', 'della', 'st', 'st.']
-export const NAME_PARTICLES: readonly string[] = [...new Set(PARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
-const PARTICLE = new Set(NAME_PARTICLES)
-/**
- * "an" and "na", which carry a last name on after a word that starts one: "Pádraig Mac an tSaoi", "Seosamh Mac na
- * Mara". Only after one, so a first name is never cut short by them alone (audit, 20 October 2026, finding 85).
- */
-const ARTICLES = ['an', 'na']
-export const NAME_ARTICLES: readonly string[] = [...new Set(ARTICLES.flatMap((w) => [w, w[0]!.toUpperCase() + w.slice(1), w.toUpperCase()]))]
-const ARTICLE = new Set(NAME_ARTICLES)
-
-export interface NameParts {
-  firstName: string
-  lastName: string
-}
-
-/**
- * A whole name as a first and a last name: the last word is the last name,
- * with any words before it that start one ("Ó", "Mac", "van", "Mac an"); one word is a
- * first name alone. Names typed before the two were asked for are split this
- * way, and the office corrects any it gets wrong.
- */
-export function splitName(name: string): NameParts {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length < 2) return { firstName: words[0] ?? '', lastName: '' }
-  let i = words.length - 1
-  for (;;) {
-    if (i > 1 && PARTICLE.has(words[i - 1]!)) i--
-    else if (i > 2 && ARTICLE.has(words[i - 1]!) && PARTICLE.has(words[i - 2]!)) i -= 2
-    else break
-  }
-  return { firstName: words.slice(0, i).join(' '), lastName: words.slice(i).join(' ') }
-}
-
-/** The whole name, as lists, call sheets and messages show it: "Seán Ó Briain", or the first name alone. */
-export function fullName(p: NameParts): string {
-  return [p.firstName.trim(), p.lastName.trim()].filter(Boolean).join(' ')
-}
-
-/** A person's first and last name: as held, or split from the whole name for a record from before they were (or a copy that lacks them). */
-export function nameParts(p: { name: string; firstName?: string; lastName?: string }): NameParts {
-  return p.firstName?.trim() ? { firstName: p.firstName.trim(), lastName: p.lastName?.trim() ?? '' } : splitName(p.name)
-}
-
-/**
- * The name a change to someone's details leaves them with, on the server and
- * on a device alike. The whole name is the one sent. A first and last name
- * sent with it are kept when they make it, as the form sends them. A whole
- * name alone (an older version of the app, a calendar or crew-list bring-in),
- * or with two that no longer make it, keeps the two they have when it's the
- * name they had, and is split otherwise.
- */
-export function namesAfter(a: { name: string; firstName?: string; lastName?: string }, was: { name: string; firstName?: string; lastName?: string } | undefined): NameParts & { name: string } {
-  const sent = { firstName: a.firstName?.trim() ?? '', lastName: a.lastName?.trim() ?? '' }
-  if (sent.firstName && fullName(sent) === a.name.trim().replace(/\s+/g, ' ')) return { name: fullName(sent), ...sent }
-  const parts = was && was.name === a.name ? nameParts(was) : splitName(a.name)
-  return { name: a.name, ...parts }
-}
 
 export const person = z.object({
   id,
@@ -636,118 +472,6 @@ export const crewCommandSchemas = {
   /** The office has seen a decline or a pull-out, so it leaves "Answers to check". */
   'offer.seen': z.object({ id }),
 } as const
-
-/** Every day from start to end, inclusive. */
-export function eachDay(start: string, end: string): string[] {
-  const out: string[] = []
-  const d = new Date(`${start}T00:00:00Z`)
-  for (let i = 0; i < 400; i++) {
-    const s = d.toISOString().slice(0, 10)
-    if (s > end) break
-    out.push(s)
-    d.setUTCDate(d.getUTCDate() + 1)
-  }
-  return out
-}
-
-const dayMs = 86_400_000
-const shiftDay = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * dayMs).toISOString().slice(0, 10)
-
-/** How many days `to` is after `from`; negative when before. */
-export function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / dayMs)
-}
-
-/**
- * The day to ask for an answer by, offered when a call is made (audit
- * finding 21): two days before the first day, or the day before when the
- * job is close, so an answer comes before the job does; none for a job
- * that's over, which a reply-by can't come after. The office can clear it
- * or pick another.
- */
-export function suggestedReplyBy(start: string, end: string, today: string): string | null {
-  if (end < today) return null
-  // Two days before only while that leaves a day to answer in; a job that starts today, or has started, wants its answers today.
-  const twoBefore = shiftDay(start, -2)
-  const day = twoBefore > today ? twoBefore : shiftDay(start, -1)
-  return day > today ? day : today
-}
-
-/**
- * Whether a phase's new span holds the whole of its old one: it got longer
- * at one end or both, but didn't move, so nothing on it needs to.
- */
-export function phaseOnlyGrew(from: { start: string; end: string }, to: { start: string; end: string }): boolean {
-  return to.start <= from.start && to.end >= from.end
-}
-
-/**
- * Where a call lands when its phase moves: shifted by the same number of
- * days as the phase's start. A call that was inside the phase stays inside
- * it, cut to the phase's new span, or given the phase's days when none of
- * its own fit; a call that was already outside its phase just moves with
- * it. A phase that only grows hasn't moved, so its calls stay where they
- * are: the crew keep the days they agreed. The server and the device's
- * view work it out the same way.
- */
-export function movedCallSpan(
-  call: { start: string; end: string },
-  from: { start: string; end: string },
-  to: { start: string; end: string }
-): { start: string; end: string } {
-  if (phaseOnlyGrew(from, to)) return { start: call.start, end: call.end }
-  const shift = daysBetween(from.start, to.start)
-  let start = shiftDay(call.start, shift)
-  let end = shiftDay(call.end, shift)
-  if (call.start < from.start || call.end > from.end) return { start, end }
-  if (start < to.start) start = to.start
-  if (end > to.end) end = to.end
-  return start > end ? { start: to.start, end: to.end } : { start, end }
-}
-
-/**
- * An offer's days once its call's days change: all the new days when it
- * held all the old ones, otherwise the days the person chose that are
- * still in range. When the whole job has moved, `shift` moves the chosen
- * days with it first, so the second day's person is still on the second
- * day. Empty means the person would be left with nothing, which the server
- * refuses for anyone booked rather than quietly un-booking them.
- */
-export function offerDaysAfter(held: readonly string[], oldDays: readonly string[], newDays: readonly string[], shift = 0): string[] {
-  if (oldDays.every((d) => held.includes(d))) return [...newDays]
-  return held.map((d) => (shift ? shiftDay(d, shift) : d)).filter((d) => newDays.includes(d))
-}
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-/**
- * "Fri 3 Oct", the way crew write dates. Built by hand so it reads the same on every phone. Given today, a day outside
- * this calendar year or more than six months from today carries its year, "Sun 25 Jan 2026", so a page that runs from
- * April to March, or a timesheet approved last year, says which year it means (audit, 20 October 2026, finding 89).
- */
-export function dayLabel(d: string, today?: string): string {
-  const date = new Date(`${d}T12:00:00Z`)
-  const label = `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`
-  return today && (d.slice(0, 4) !== today.slice(0, 4) || Math.abs(daysBetween(today, d)) > HALF_A_YEAR) ? `${label} ${d.slice(0, 4)}` : label
-}
-
-/** More than this many days from today, a date says its year. */
-const HALF_A_YEAR = 183
-
-export function daysLabel(days: string[], today?: string): string {
-  if (days.length === 0) return ''
-  const sorted = [...days].sort()
-  const all = eachDay(sorted[0]!, sorted[sorted.length - 1]!)
-  const label = (d: string) => dayLabel(d, today)
-  if (all.length === sorted.length && sorted.length > 1) return `${label(sorted[0]!)} to ${label(sorted[sorted.length - 1]!)}`
-  return sorted.map(label).join(', ')
-}
-
-export function euro(c: number | null | undefined): string {
-  if (c === null || c === undefined) return 'rate to agree'
-  return `€${(c / 100).toFixed(c % 100 === 0 ? 0 : 2)}`
-}
 
 /**
  * Who a message is to. Staff are paid through payroll, so no message to

@@ -27,6 +27,124 @@ waiting on someone.
   the mailbox's redirect address to the Google key, then connect it under
   Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
+## 30 October 2026: Filter and sort on the long lists
+
+**Done**
+
+- Colly asked for a filter and sort system on the long lists (ADR 0099,
+  PR #183): one shared part under the search on Jobs, Quotes, People, the
+  catalogue, Venues and Clients. Sort select, Filter button with a select
+  per filter (each choice with its count), filters that are on as chips
+  that take them off, "N of M" and Clear filters. Kept for the tab's life;
+  the order kept on the device. Clients get a search. App 1.65.0.
+- Checked: typecheck, unit tests for the orders, filters and counts, a
+  new browser test (lists.spec.ts), the layout test's department filter,
+  and the whole browser suite.
+
+## 30 October 2026: The big files split
+
+**Done**
+
+- Finding 114 of the [20 October audit](audit-2026-10-20.md) (PR #182):
+  the nine hand-written files over 900 lines are split along their seams
+  (Quote, stock-import, history, calendar sync, Counts, RackDesigner,
+  crew, the sync client, the import plan), code moved and not changed,
+  each old file re-exporting what it did. Three stay between 700 and 870
+  lines where one class or function is that long. App 1.64.3.
+- Checked: typecheck, shared and server tests, the web build (same lazy
+  screens), and the browser tests for quotes, racks, counts, stock and
+  calendar bring-ins.
+
+## 30 October 2026: A long stock list that keeps up
+
+**Done**
+
+- Finding 97 of the [20 October audit](audit-2026-10-20.md) (PR #181):
+  the catalogue's Show all is windowed as Jobs is (ADR 0050), so 300
+  products build a few dozen rows rather than a 30,000 px page; search
+  first and the first twenty on a laptop (five on a phone) as before.
+  Show all (every list) now keeps the page where it was: with the button
+  below the fold the browser had carried the page to the list's end.
+  App 1.64.2.
+- Checked: typecheck, a new browser test with 150 products, and the
+  stock and screens browser tests.
+
+## 30 October 2026: Major upgrades
+
+**Done**
+
+- The rest of finding 115 of the [20 October audit](audit-2026-10-20.md)
+  (PR #180): vitest 3 to 5 (both critical tinypool advisories gone), PGlite
+  0.3 to 0.5, vite 7 to 8 with the React plugin 5 to 6, @fastify/compress 8
+  to 9, concurrently 9 to 10. npm audit now shows only four low ones, all
+  in deepmerge under vite-plugin-pwa's workbox, used only while building;
+  deepmerge has no fixed version and vite-plugin-pwa 2 carries the same
+  one, so it stays at 1 until there is. App 1.64.1.
+- Left open: TypeScript 7 (later), vite-plugin-pwa 2 (when it clears the
+  advisory).
+- Checked: typecheck, shared and server tests, the web build and every
+  browser test.
+
+## 29 October 2026: Heads see clients' documents
+
+**Done**
+
+- Colly's answer to the open question from finding 39 of the [20 October
+  audit](audit-2026-10-20.md): heads of department are sent clients'
+  documents and can open their files (PR #178). Staff crew and freelancers
+  still aren't. ADR 0062 notes it. App 1.64.0.
+- Checked: typecheck, shared tests and the roles tests.
+
+## 29 October 2026: zod 4
+
+**Done**
+
+- Moved zod from 3 to 4 (PR #177), closing the high advisory on oversized
+  collections (finding 115 of the [20 October audit](audit-2026-10-20.md)).
+  Number fields keep their own wording; a field left out altogether still
+  says to reload for the newer app, now told apart by the input zod reports;
+  certificate and vehicle check records are partial records; the browser
+  runs zod without building code on the fly, which the app's security policy
+  refuses. App 1.63.5.
+- Left open: vitest 5 and PGlite 0.5.
+- Checked: typecheck, shared, server and parity tests, and the browser
+  tests for quotes, timesheets, crew and vans.
+
+## 29 October 2026: Tidying behind the scenes
+
+**Done**
+
+- Findings 108, 109 and 111 to 115 of the [20 October
+  audit](audit-2026-10-20.md) (PR #171): the parity test compares nested
+  records in full and caught joined days keeping their old names offline
+  (fixed), and untidy typed text now settles to the same view on both sides; slow label waits get room; the docs say Admin rather than the
+  Account tab, freelancer rather than warehouse, and that the Google,
+  backups and Sentry keys were all set on 19 October; the field test no
+  longer says Start fresh now real data is live; the design system's files
+  match what main carries; nine unused parts deleted; one put-away form for places and
+  cases; and the security updates that need no major version. App 1.63.4.
+- Left open: splitting the six files over 900 lines (when next touched),
+  and the major upgrades (zod 4, now first since zod 3 has a high advisory
+  on oversized arrays; vitest 5; PGlite 0.5), as one dependency afternoon.
+- Checked: typecheck, shared, server, parity and real-Postgres tests, and
+  nine browser test files.
+
+## 29 October 2026: Easier on a phone, and printing any screen
+
+**Done**
+
+- Findings 13, 58 to 61, 63 and 74 to 78 of the [20 October
+  audit](audit-2026-10-20.md) (PR #170): one fade wherever a row or table
+  runs off the edge, 44 px taps on links, folds and small buttons, the
+  fortnight charts a week at a time on a phone, settled things quiet
+  rather than green, plainer words and a lasting bad-email line, any
+  screen printable in light, text trimmed on the phone as on the server,
+  the skills offers clear of the tab bar and out of the Tab order, a find
+  box on Venues, and rows focused with Tab kept clear of both bars. ADR
+  0067 notes it. App 1.63.3.
+- Checked: typecheck, shared, server and real-Postgres tests, and 26
+  browser test files including a new one for the fades.
+
 ## 29 October 2026: Current RMS quotes in the quote history
 
 **Done**

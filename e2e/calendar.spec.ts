@@ -279,7 +279,7 @@ test('each phase of a job says how it stands on the calendar', async ({ browser 
   await expect(build.locator('.cal')).toHaveText(`Going on Test calendar as “${renamed} - Build 1/2” and “${renamed} - Build 2/2”…`)
 })
 
-test('crew invites: turned on from the Account tab, with answers from Google on the job page', async ({ browser }) => {
+test('crew invites: turned on from Admin, with answers from Google on the job page', async ({ browser }) => {
   const id = tag()
   const job = named('Web Summit', id)
   const [niamh, conor, sean] = [named('Niamh Kelly', id), named('Conor Walsh', id), named('Seán Murphy', id)]

@@ -13,7 +13,7 @@ import {
   type TellContext,
   type TellEvent,
 } from '@sh/shared'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAccess } from '../role.ts'
 import { useView } from '../view.ts'
 
@@ -114,8 +114,15 @@ export const usePromptsMessages = () => useView().office.promptMessages
 export function QuietPanel({ names, what, onLink = true, onClose }: { names: readonly string[]; what: string; onLink?: boolean; onClose: () => void }) {
   const admin = useAccess().can('settings')
   const who = names.length === 1 ? names[0] : `${names.length} people`
+  // Opened by Offer or Send, perhaps below the fold on a desk: brought into view, and focus with it, so it's seen and read rather than
+  // left under the fold with focus nowhere (audit, 20 October 2026, finding 77c).
+  const panel = useRef<HTMLElement>(null)
+  useEffect(() => {
+    panel.current?.scrollIntoView?.({ block: 'nearest' })
+    panel.current?.focus({ preventScroll: true })
+  }, [])
   return (
-    <section className="card share" aria-label={`Messages to crew are off: ${what} for ${who}`}>
+    <section className="card share" aria-label={`Messages to crew are off: ${what} for ${who}`} ref={panel} tabIndex={-1}>
       <h2>Messages to crew are off</h2>
       <p className="empty">
         Nothing opened to send {who} the {what}.{onLink ? ` ${names.length === 1 ? 'Their link' : 'Their links'} already say${names.length === 1 ? 's' : ''} so.` : ''} Messages

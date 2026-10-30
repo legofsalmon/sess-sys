@@ -121,7 +121,8 @@ chose to close them before staff sign in.
   documents, another person's document is "Saved one of Dara Quinn's
   documents", with no title, expiry or file. The notices read the same way.
 - **Clients' documents are for roles with jobs or money** (the office and
-  directors), in the feed and on the file's address: a client's contract or
+  directors, and heads of department since Colly's choice later on 29
+  October), in the feed and on the file's address: a client's contract or
   purchase order carries the prices kept from everyone else. Venues' stay
   open to everyone, as crew need floor plans and access notes. ADR 0032's
   open line about who opens which is settled here.

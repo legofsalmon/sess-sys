@@ -195,7 +195,7 @@ describe('inspections', () => {
     expect(await refused(app, 'inspection.record', test(speakers[1]!, true, new Date().toISOString(), { kind: 'lifting' }))).toBe(
       `${number(speakers[1]!)} is marked as sold, so its thorough examination wasn't kept. Bring it back first if it's still here.`
     )
-    expect(await refused(app, 'model.update', { id: y10p.id, patMonths: 0 })).toMatch(/greater than or equal to 1/)
+    expect(await refused(app, 'model.update', { id: y10p.id, patMonths: 0 })).toMatch(/>=1/)
   })
 
   it('are described in the history, with the product\'s intervals', async () => {

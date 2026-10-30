@@ -1,14 +1,11 @@
 import {
   answerFromCalendar,
-  dayAnswer,
   eachDay,
   irishToday,
   newId,
   type CalendarCheck,
   type CalendarChoice,
   type CalendarInvites,
-  type DayAnswer,
-  type GuestResponse,
   type ImportCalendar,
 } from '@sh/shared'
 import { applyMutationIn } from '../commands.ts'
@@ -17,8 +14,13 @@ import { faultForLog, type Db, type Queryable } from '../db.ts'
 import { serverChange, type Ctx } from '../kernel.ts'
 import { open } from './crypto.ts'
 import { eventId, wantedEvents, type Wanted } from './events.ts'
-import { GoogleError, type Attendee, type EventBody, type Google, type GoogleEvent, type SendUpdates } from './google.ts'
+import { GoogleError, type EventBody, type Google, type GoogleEvent, type SendUpdates } from './google.ts'
 import { guestPlaces, readDays, readDaysById, readLink, saveDay, saveLink, type DayRow, type GuestRow, type Link } from './store.ts'
+import { byDay, guestsFor, knownFrom, sameContent, sameEmail, sameGuests, withGuests, type Answer, type Known } from './sync-guests.ts'
+import { apiOff, FAULT_RETRY_MS, Halt, problems, RETRY_MS } from './sync-problems.ts'
+
+export { guestsFor, withGuests } from './sync-guests.ts'
+export { Halt } from './sync-problems.ts'
 
 /**
  * The calendar sync (ADR 0008): makes the connected calendar hold exactly
@@ -75,67 +77,10 @@ export interface CalendarSyncOptions {
   writes?: boolean
 }
 
-/** After Google was busy: a minute, five, a quarter of an hour, then hourly. */
-const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000]
-/** After a run failed on something unexpected (the database, say): a minute, five, then twenty-five; after that, the next change. */
-const FAULT_RETRY_MS = [60_000, 5 * 60_000, 25 * 60_000]
-
-const problems = {
-  revoked: (account: string | null) =>
-    `Google no longer accepts the app's access to ${account ?? 'the account'}'s calendars, so the calendar isn't being updated. Connect again to carry on.`,
-  locked: "The app's Google key has changed since the calendar was connected, so its saved access can't be used. Connect again to carry on.",
-  apiOff:
-    "The Google Calendar API is switched off in the app's Google Cloud project, so nothing can be written. Switch it on (see the setup steps), then press Check the calendar.",
-  noAccess: (calendar: string, account: string | null) =>
-    `${account ?? 'The connected account'} can't change ${calendar} any more: it may have been deleted, or its sharing changed. Choose another calendar, or give that account permission to change it again.`,
-  writesOff:
-    "Writing to Google Calendar is switched off on the server, so the app puts nothing on the calendar and invites nobody. Bringing jobs in from Google still works. To switch writing on, set CALENDAR_WRITES to on in Railway.",
-  busy: (at: Date) =>
-    `Google Calendar isn't answering, so some days are still on their way. Trying again at ${at.toLocaleTimeString('en-IE', { timeZone: 'Europe/Dublin', hour: '2-digit', minute: '2-digit' })}.`,
-  badClient:
-    "Google doesn't accept the app's own Google key (its client id and secret), so nothing can be written. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Railway, then press Check the calendar.",
-  refused: (reason: string) => `Google turned this day down${reason ? ` (${reason})` : ''}. It is tried again when the job changes, and each night.`,
-  leftBehind: (n: number, calendar: string) =>
-    `${n === 1 ? '1 day was' : `${n} days were`} left on ${calendar}, because Google no longer accepts the app's access. Delete ${n === 1 ? 'it' : 'them'} in Google Calendar if ${n === 1 ? "it isn't" : "they aren't"} wanted.`,
-  /** An answer in Google the offer couldn't take, with the reason the link would have given. */
-  notTaken: (answer: 'accept' | 'decline', reason: string) =>
-    `Said ${answer === 'accept' ? 'yes' : 'no'} on Google Calendar, but the app couldn't take it: ${reason.replace(/^Sorry, (\w)/, (_, c: string) => c.toUpperCase())}`,
-}
-
-/** The Calendar API is switched off in the app's Google Cloud project. */
-const apiOff = (err: GoogleError) => err.reason === 'accessNotConfigured' || err.reason === 'SERVICE_DISABLED'
-
-/** Stops a run, or a request from the Account tab: the calendar or the account needs a person, or Google needs time. */
-export class Halt extends Error {
-  constructor(
-    readonly why: 'revoked' | 'blocked' | 'busy',
-    readonly problem: string | null
-  ) {
-    super(why)
-  }
-}
-
 type Op =
   | { kind: 'write'; wanted: Wanted; row: DayRow | undefined; event: GoogleEvent | undefined }
   | { kind: 'remove'; row: DayRow }
   | { kind: 'orphan'; event: GoogleEvent }
-
-/** The app's guests on one event, as last written or taken in: what answers in Google are compared with. */
-interface Known {
-  dayId: string
-  day: string
-  guests: GuestRow[]
-}
-
-/** A guest whose answer in Google differs from the one the app last took in. */
-interface Answer {
-  dayId: string
-  personId: string
-  email: string
-  response: GuestResponse
-  /** What they wrote with it in Google, if anything. */
-  comment: string
-}
 
 export class CalendarSync {
   private active = false
@@ -919,94 +864,4 @@ function dayBefore(day: string): string {
   const d = new Date(`${day}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() - 1)
   return d.toISOString()
-}
-
-/** Email addresses as Google compares them. */
-const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
-
-/** The events whose guests' answers matter: the app's days on the calendar being written to that have guests. */
-function knownFrom(rows: DayRow[], calendarId: string | null): Map<string, Known> {
-  const out = new Map<string, Known>()
-  for (const r of rows) if (r.state === 'on' && r.calendarId === calendarId && r.guests.length) out.set(r.eventId, { dayId: r.id, day: r.day, guests: r.guests })
-  return out
-}
-
-/** Each day's answer from the answers on its events. */
-function byDay(entries: [string, GuestResponse][]): Record<string, DayAnswer> {
-  const all: Record<string, GuestResponse[]> = {}
-  for (const [day, response] of entries) all[day] = [...(all[day] ?? []), response]
-  return Object.fromEntries(Object.entries(all).map(([day, responses]) => [day, dayAnswer(responses)]))
-}
-
-/**
- * Who should be on a day's event (ADR 0009): everyone offered the day or
- * booked on it, with their answers so far, and, on the same event, anyone
- * who said No to it in Google, who stays on as a No rather than being sent
- * a cancellation for something they turned down.
- */
-export function guestsFor(w: Wanted, previous: GuestRow[], sameEvent: boolean): GuestRow[] {
-  const out: GuestRow[] = w.guests.map((g) => {
-    const had = previous.find((p) => p.personId === g.personId && sameEmail(p.email, g.email))
-    return { ...g, response: had?.response ?? 'needsAction', problem: had?.offerId === g.offerId ? had.problem : null }
-  })
-  if (sameEvent) for (const p of previous) if (p.response === 'declined' && !out.some((g) => g.personId === p.personId)) out.push(p)
-  return out.sort((a, b) => a.personId.localeCompare(b.personId))
-}
-
-/** The same people on the event, for the same offers. */
-function sameGuests(a: GuestRow[], b: GuestRow[]): boolean {
-  return a.length === b.length && a.every((g, i) => g.personId === b[i]!.personId && g.offerId === b[i]!.offerId && sameEmail(g.email, b[i]!.email))
-}
-
-/** The event still says what the app wrote: its title, day, place, description and marks. */
-function sameContent(ev: GoogleEvent, body: EventBody): boolean {
-  const theirs = ev.extendedProperties?.private ?? {}
-  return (
-    ev.status === 'confirmed' &&
-    (ev.summary ?? '') === body.summary &&
-    (ev.location ?? '') === body.location &&
-    (ev.description ?? '') === body.description &&
-    ev.start?.date === body.start.date &&
-    ev.end?.date === body.end.date &&
-    Object.entries(body.extendedProperties.private).every(([k, v]) => theirs[k] === v)
-  )
-}
-
-/**
- * The event as the app wants it, with its guest list (ADR 0009): everyone
- * on it the app didn't put there stays, and so does everyone's answer.
- * With invites off (`guests` unset) the guest list stays as it is and
- * nobody is told anything. Otherwise guests are told when someone is added
- * or taken off, or the title, day or place changes, or it comes back after
- * being deleted; not when only the description does. When the description
- * changes as people are added or taken off (someone taking the last place
- * changes the crew list too), `quietly` is the event with the new
- * description and the guests as they were, to write first without telling
- * anyone, so that only the people added or taken off hear from Google.
- */
-export function withGuests(
-  ev: GoogleEvent,
-  body: EventBody,
-  previous: GuestRow[],
-  guests: GuestRow[] | undefined
-): { body: EventBody; send: SendUpdates; quietly?: EventBody } {
-  const now = ev.attendees ?? []
-  if (!guests) return { body: now.length ? { ...body, attendees: now } : body, send: 'none' }
-  const ours = [...previous, ...guests].map((g) => g.email)
-  const theirs = now.filter((a) => !ours.some((e) => sameEmail(e, a.email)))
-  const invited: Attendee[] = guests.map((g) => now.find((a) => sameEmail(a.email, g.email)) ?? { email: g.email })
-  const attendees = [...theirs, ...invited]
-  const restored = ev.status === 'cancelled'
-  const added = invited.some((a) => !now.includes(a))
-  const dropped = !restored && now.some((a) => ours.some((e) => sameEmail(e, a.email)) && !guests.some((g) => sameEmail(g.email, a.email)))
-  const noticed =
-    restored ||
-    (ev.summary ?? '') !== body.summary ||
-    (ev.location ?? '') !== body.location ||
-    ev.start?.date !== body.start.date ||
-    ev.end?.date !== body.end.date
-  const told = added || dropped || (noticed && attendees.some((a) => !a.organizer))
-  const next = { body: attendees.length ? { ...body, attendees } : body, send: told ? ('all' as const) : ('none' as const) }
-  if (!told || noticed || (ev.description ?? '') === body.description) return next
-  return { ...next, quietly: now.length ? { ...body, attendees: now } : body }
 }
