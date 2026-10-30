@@ -138,3 +138,58 @@ test('the quotes from Current RMS are kept under the app’s own on Quotes, foun
 
   expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
 })
+
+test('the office makes a job from a past quote, its lines matched to the stock list and charged as they were (ADR 0102)', async ({ browser, request }) => {
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+  expect((await request.post('/api/data/made-up')).ok()).toBe(true)
+  const office = await (await browser.newContext({ viewport: phoneSize })).newPage()
+
+  const expo = { ...opp(7, '1077', 'Expo stand', 'Other Co', 'Quotation', 'Provisional', '2027-02-01', 65000), endsAt: '2027-02-02T10:00:00.000Z' }
+  const line = (id: number, path: string, more: Record<string, unknown>) => ({
+    id, opportunityId: 7, path, kind: 'Principal', transaction: 'Rental', itemType: 'Product', itemId: null, name: '', description: '', quantity: 1, priceCents: 0,
+    discountPct: 0, chargeableDays: 2, rateDefinition: '', period: '', unitCents: 0, totalCents: 0, taxCents: 0, subRent: false, startsAt: null, endsAt: null, ...more,
+  })
+  await office.route(/\/api\/rms\/opportunities\?/, (route) => route.fulfill({ json: { opportunities: [expo], total: 1, links: {} } }))
+  await office.route('**/api/rms/opportunities/7', (route) =>
+    route.fulfill({
+      json: {
+        opportunity: { ...expo, venue: '', grossCents: 0, rentalCents: 0, saleCents: 0, serviceCents: 0, surchargeCents: 0, taxCents: 0, undiscountedCents: 0, chargeableDays: 2, discountCategory: '', priceCategory: '', tags: [], createdAt: null, updatedAt: null },
+        lines: [
+          line(1, '0001', { kind: 'Group', name: 'Audio', transaction: '', itemType: '' }),
+          line(2, '0001-0001', { name: 'Shure SM58', quantity: 4, priceCents: 1500, discountPct: 10, rateDefinition: '3 Day Week Rate', unitCents: 2700, totalCents: 10800 }),
+          line(3, '0001-0002', { name: 'Mic stand', quantity: 4 }),
+          line(4, '0002', { transaction: 'Service', itemType: 'Service', name: 'Sound engineer', priceCents: 27100, unitCents: 54200, totalCents: 54200 }),
+        ],
+        job: null,
+      },
+    })
+  )
+  let linked: unknown
+  await office.route('**/api/rms/matches', (route) => {
+    linked = route.request().postDataJSON()
+    return route.fulfill({ json: { linked: 1 } })
+  })
+
+  await office.goto('/#quotes')
+  await office.getByRole('group', { name: 'From Current RMS' }).getByRole('link', { name: 'Make a job from it' }).click()
+  const form = office.getByRole('region', { name: 'Make a job from this' })
+  await expect(form.getByLabel("What's the job?")).toHaveValue('Expo stand')
+  await expect(form.getByLabel('From')).toHaveValue('2027-02-01')
+  await expect(form.getByLabel('To')).toHaveValue('2027-02-02')
+  await expect(form.getByLabel('Make it')).toHaveValue('enquiry')
+  const lines = form.getByRole('region', { name: 'Lines for the quote' })
+  await expect(lines).toContainText('1 of 1 kit line found in the stock list')
+  await expect(lines).toContainText('1 charged nothing there is left unticked.')
+  await expect(lines.getByRole('listitem').filter({ hasText: 'Shure SM58' })).toContainText('3 Day Week · €15.00 a day · 10% off')
+  if (process.env.SHOT) await office.screenshot({ path: process.env.SHOT, fullPage: true })
+  await form.getByRole('button', { name: 'Make the job, with 2 lines on the quote' }).click()
+
+  await expect(office).toHaveURL(/#jobs\/[^/]+\/quote$/)
+  const draft = office.getByRole('form', { name: 'Version 1, a draft' })
+  await expect(draft).toContainText('Shure SM58')
+  await expect(draft).toContainText('Sound engineer')
+  const jobId = decodeURIComponent(/#jobs\/([^/]+)/.exec(office.url())![1]!)
+  await expect.poll(() => linked).toEqual({ links: [{ opportunityId: 7, projectId: jobId }] })
+
+  expect((await request.post('/api/data/start-fresh', fresh)).ok()).toBe(true)
+})

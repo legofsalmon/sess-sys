@@ -227,10 +227,15 @@ function RmsRowItem({ o, job }: { o: RmsOpportunity; job: { id: string; name: st
           {[o.client, a && b && a !== b ? `${a} to ${b}` : a, o.number && `No. ${o.number}`].filter(Boolean).join(' · ')}
           <br />
           {[[o.state, o.status].filter(Boolean).join(', '), money(o.netCents)].filter(Boolean).join(' · ')}
-          {job && (
+          {job ? (
             <>
               {' · For '}
               <a href={`#jobs/${encodeURIComponent(job.id)}/quote`}>{job.name}</a>
+            </>
+          ) : (
+            <>
+              {' · '}
+              <a href={`#jobs/money/current-rms/${o.id}/job`}>Make a job from it</a>
             </>
           )}
         </p>

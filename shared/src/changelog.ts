@@ -28,6 +28,14 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.66.0',
+    date: '2026-10-30',
+    title: 'Make a job from a past quote',
+    what: "A quote from Current RMS can be made into a job here. Open it under Quotes or Past quotes and press Make a job from this, or Make a job from it on the Quotes page. The job starts with the name, client, venue and days Current RMS had, confirmed if it was an order, and a draft quote with its lines: kit matched to the stock list where it's the same product, crew under our own role names, and each line charged as it was there, at the same price, rate, days and discount. Check it all, change the days for a job still to come, untick what you don't want, and press. Nothing changes in Current RMS.",
+    prs: [189],
+    adrs: [102],
+  },
+  {
     version: '1.65.0',
     date: '2026-10-30',
     title: 'Filter and sort on the long lists',
