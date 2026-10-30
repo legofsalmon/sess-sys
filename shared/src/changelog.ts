@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.68.0',
+    version: '1.69.0',
     date: '2026-10-30',
     title: 'A clearer quote form',
     what: "A draft quote is easier to read and fill in. What it comes to stays at the top with anything that needs a look, such as a line with no price, and pressing that opens the line. Each line is a row that opens to change, with its numbers on one row and the cost side folded underneath. Travel and subsistence are rows like any other. The terms and Mark as sent sit beside the lines on a laptop. A line isn't marked wrong until you've left it, and the unit (€, %, days) sits in the box so there's less to type.",
     prs: [185],
     adrs: [100],
+  },
+  {
+    version: '1.68.0',
+    date: '2026-10-30',
+    title: 'Moving a job on from its steps',
+    what: "The steps across the top of a job now have a button for the step the job is at, such as Open the quote or Open Crew. At Confirmed, it's the client's answer: Confirm the job puts it on the calendar, holds its kit and marks the quote accepted in one go, and The client said no marks it lost. The steps no longer say a job is confirmed while it's still an enquiry. A past quote from Current RMS for a job that's already here now offers Put it on that job's quote first, so you don't end up with the same job twice.",
+    prs: [191],
+    adrs: [103],
   },
   {
     version: '1.67.0',
