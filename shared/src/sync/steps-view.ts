@@ -142,11 +142,13 @@ export function stepsView(
         : job.status === 'quoted' || job.status === 'confirmed'
           ? { auto: `The job is ${STATUS_LABELS[job.status].toLowerCase()}` }
           : { hint: draft ? 'A draft is started' : 'No quote yet' },
+      // Only the job's own status is the yes (ADR 0103): it's what puts the job on the calendar and holds its kit, so a
+      // quote accepted on a job still an enquiry is the step to take, not a step done.
       confirmed:
         job.status === 'confirmed'
           ? { auto: 'The job is confirmed' }
           : accepted
-            ? { auto: accepted.answeredOn ? `The client said yes ${dayLabel(accepted.answeredOn)}` : 'The client said yes' }
+            ? { hint: `The client said yes${accepted.answeredOn ? ` ${dayLabel(accepted.answeredOn)}` : ''}, and the job is still ${STATUS_LABELS[job.status].toLowerCase()}` }
             : { hint: `Still ${STATUS_LABELS[job.status].toLowerCase()}` },
       crew:
         crewOn.needed === 0

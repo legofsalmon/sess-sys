@@ -184,7 +184,11 @@ test('the office makes a job from a past quote, its lines matched to the stock l
   if (process.env.SHOT) await office.screenshot({ path: process.env.SHOT, fullPage: true })
   await form.getByRole('button', { name: 'Make the job, with 2 lines on the quote' }).click()
 
-  await expect(office).toHaveURL(/#jobs\/[^/]+\/quote$/)
+  // The job page, on its quote, with the steps saying what's next (ADR 0103); the draft is a press away.
+  await expect(office).toHaveURL(/#jobs\/[^/]+\/money$/)
+  const steps = office.getByRole('region', { name: 'Steps' })
+  await expect(steps.getByText(/· at Quote sent$/)).toBeVisible()
+  await steps.getByRole('link', { name: 'Open the quote' }).click()
   const draft = office.getByRole('form', { name: 'Version 1, a draft' })
   await expect(draft).toContainText('Shure SM58')
   await expect(draft).toContainText('Sound engineer')

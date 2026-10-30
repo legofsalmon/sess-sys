@@ -41,6 +41,8 @@ export function InCurrentRms({ jobId }: { jobId: string }) {
                   <span aria-hidden="true"> ›</span>
                 </div>
               </a>
+              {/* Its lines onto this job's quote, charged as they were there (ADR 0103). */}
+              <a href={`#jobs/money/current-rms/${o.id}/onto`}>Put its lines on this quote</a>
             </li>
           ))}
         </ul>

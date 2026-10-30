@@ -28,7 +28,7 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.70.0',
+    version: '1.71.0',
     date: '2026-10-30',
     title: 'Send a quote to the client by email',
     what: "Once the office turns on Send quotes by email under Admin › Connections › The operations mailbox, a quote has Send to the client. It opens an email filled in from the quote and the client's contacts, with the quote attached as a PDF, to read over and send from operations@sessionhire.com; replies come to whoever sent it and to the mailbox. Sending marks the quote sent and gives it its number. The quote's page lists each email that went, with the PDF the client got, and the history says who sent it. Off, nothing changes: quotes are printed and sent by hand, and Mark as sent stays as a quiet link. Connecting the mailbox now asks Google to send as well as read, so operations@ needs connecting again once to allow it; the connection has moved from the Claude card to Admin › Connections.",
@@ -36,7 +36,7 @@ export const CHANGELOG: readonly Release[] = [
     adrs: [101],
   },
   {
-    version: '1.69.0',
+    version: '1.70.0',
     date: '2026-10-30',
     title: 'Claude drafts quotes from the operations mailbox',
     what: "Once operations@sessionhire.com is connected under Admin › Company, Claude reads the mail copied to it every five minutes. A new enquiry becomes a job and a draft quote, filled in from the thread, and Claude keeps the draft up to date as the mail goes on until someone changes it; after that it offers what new mail changes, to take or leave on the quote. Quotes lists what it read under From the operations mailbox. It can only read the mailbox, never send. Leave operations@ off a mail to keep it private. Asking Claude in words to change a quote is gone, and pasting an enquiry is now folded away on New quote.",
@@ -44,12 +44,20 @@ export const CHANGELOG: readonly Release[] = [
     adrs: [98],
   },
   {
-    version: '1.68.0',
+    version: '1.69.0',
     date: '2026-10-30',
     title: 'A clearer quote form',
     what: "A draft quote is easier to read and fill in. What it comes to stays at the top with anything that needs a look, such as a line with no price, and pressing that opens the line. Each line is a row that opens to change, with its numbers on one row and the cost side folded underneath. Travel and subsistence are rows like any other. The terms and Mark as sent sit beside the lines on a laptop. A line isn't marked wrong until you've left it, and the unit (€, %, days) sits in the box so there's less to type.",
     prs: [185],
     adrs: [100],
+  },
+  {
+    version: '1.68.0',
+    date: '2026-10-30',
+    title: 'Moving a job on from its steps',
+    what: "The steps across the top of a job now have a button for the step the job is at, such as Open the quote or Open Crew. At Confirmed, it's the client's answer: Confirm the job puts it on the calendar, holds its kit and marks the quote accepted in one go, and The client said no marks it lost. The steps no longer say a job is confirmed while it's still an enquiry. A past quote from Current RMS for a job that's already here now offers Put it on that job's quote first, so you don't end up with the same job twice.",
+    prs: [191],
+    adrs: [103],
   },
   {
     version: '1.67.0',

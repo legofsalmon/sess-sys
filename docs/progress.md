@@ -15,7 +15,7 @@ waiting on someone.
   sending marks the quote sent and numbers it; each email that went is
   listed on the quote with its PDF, and in the history. The mailbox
   connection (ADR 0098) now asks Google to send as well as read and moves
-  to Admin › Connections. App 1.70.0.
+  to Admin › Connections. App 1.71.0.
 - Checked: typecheck, the shared and server tests (a new server test sends
   through a stood-in Gmail and reads the email back), and the browser tests
   for quotes and Claude. The PDF looked at as an image.
@@ -39,7 +39,7 @@ waiting on someone.
   the box; the cost side folded under the line and saying what it holds;
   travel and subsistence as rows; terms and sending beside the lines on a
   laptop; a line faulted only once it's left. Every feature, name and saved
-  shape kept. App 1.68.0 (PRs #183, #189 and #190 took 1.65.0 to 1.67.0 first).
+  shape kept. App 1.69.0 (PRs #183 and #189 to #191 took 1.65.0 to 1.68.0 first).
 - Checked: typecheck, the shared and server tests, the web build, and the
   browser tests for quotes, quote follow-up, Current RMS history, Claude,
   access and the shell. Looked at on a phone and a laptop in both themes.
