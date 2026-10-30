@@ -27,6 +27,20 @@ waiting on someone.
   the mailbox's redirect address to the Google key, then connect it under
   Admin › Company ([sign-in setup, step 9](sign-in-setup.md#9-connect-the-operations-mailbox-for-claude)).
 
+## 30 October 2026: The job's kit from its quote
+
+**Done**
+
+- Colly asked for the kit to fill in from what was quoted, still to be
+  changed, added to and taken off (ADR 0102 point 7). Jobs made from a past
+  quote or by New quote get the quote's kit (products and package pieces,
+  hired in as quoted) on the kit list; the Kit card offers what the newest
+  quote has that the list hasn't, in one press; the quote's "The job has
+  changed" card no longer offers that kit back as new.
+- Checked: typecheck, unit tests (kitFromQuote, changesFromJob), the past
+  quote browser test now checks the kit list, and the kit, quote and
+  Claude browser tests.
+
 ## 30 October 2026: A job from a past quote
 
 **Done**

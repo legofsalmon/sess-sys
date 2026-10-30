@@ -28,12 +28,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.68.0',
+    version: '1.69.0',
     date: '2026-10-30',
     title: 'Claude drafts quotes from the operations mailbox',
     what: "Once operations@sessionhire.com is connected under Admin › Company, Claude reads the mail copied to it every five minutes. A new enquiry becomes a job and a draft quote, filled in from the thread, and Claude keeps the draft up to date as the mail goes on until someone changes it; after that it offers what new mail changes, to take or leave on the quote. Quotes lists what it read under From the operations mailbox. It can only read the mailbox, never send. Leave operations@ off a mail to keep it private. Asking Claude in words to change a quote is gone, and pasting an enquiry is now folded away on New quote.",
     prs: [173],
     adrs: [98],
+  },
+  {
+    version: '1.67.0',
+    date: '2026-10-30',
+    title: "The job's kit fills in from its quote",
+    what: "A job made from a past Current RMS quote, or with New quote, now gets the quote's kit on its kit list straight away: each product, the pieces of each package, and how many are hired in. Change, add or take off any of it on the Kit card as usual. When the quote later has kit the list hasn't got, the Kit card says what and adds it all in one press. Nothing is taken off the list when it comes off the quote.",
+    prs: [190],
+    adrs: [102],
   },
   {
     version: '1.66.0',
