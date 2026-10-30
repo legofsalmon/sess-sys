@@ -37,7 +37,7 @@ export interface Windowed<T> {
 }
 
 /** The page, or the nearest column that scrolls on its own. */
-function scrollerOf(el: HTMLElement): HTMLElement | null {
+export function scrollerOf(el: HTMLElement): HTMLElement | null {
   for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p
   return null
 }

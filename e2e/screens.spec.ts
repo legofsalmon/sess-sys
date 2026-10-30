@@ -117,7 +117,8 @@ test('a long list draws only the rows near the screen, and Back finds a place de
 
 test('Show all on a long catalogue draws only the products near the screen', async ({ browser, request }) => {
   // Proves (audit, 20 October 2026, finding 97): three hundred products under Show all build a few dozen rows, each saying where it
-  // is in the whole list, and the ones further down are built as the page comes near them.
+  // is in the whole list, and the ones further down are built as the page comes near them. On a short screen the button is below
+  // the fold, and the list opens where it was read rather than carrying the page to its end.
   const mutations = Array.from({ length: 150 }, (_, i) => ({
     id: `long-model-${i}`,
     name: 'model.create',
@@ -126,7 +127,7 @@ test('Show all on a long catalogue draws only the products near the screen', asy
   const res = await request.post('/api/sync/push', { data: { clientId: 'long-catalogue', mutations: mutations.map((m) => ({ ...m, createdAt: new Date().toISOString() })) } })
   expect((await res.json()).results.every((r: { status: string }) => r.status === 'applied')).toBe(true)
 
-  const page = await (await browser.newContext({ viewport: phoneSize })).newPage()
+  const page = await (await browser.newContext({ viewport: { width: 390, height: 500 } })).newPage()
   await page.goto('/#stock')
   await expect(page.getByRole('status')).toHaveText('Up to date')
   await page.getByRole('button', { name: /^Show all [\d,]+ products$/ }).click()
