@@ -1,21 +1,77 @@
-import { BAD_LETTERS_HINT } from './crew-import.ts'
-import { blankRecord, parseCsv } from './csv.ts'
-import { isDay } from './day.ts'
-import { INSPECTION_MONTHS } from './inspections.ts'
-import { parseEuro } from './money.ts'
 import {
   DEPARTMENT_LABELS,
   inShForm,
-  MAX_QTY,
   normaliseNumber,
   plural,
   RETIRED_LABELS,
   valueLabel,
   type Department,
-  type RetiredReason,
   type Tracking,
 } from './stock.ts'
-import type { WarehouseView } from './sync/stock-view.ts'
+import { fullDayLabel, norm, type StockListRow } from './stock-import-file.ts'
+import type {
+  KnownItem,
+  KnownProduct,
+  KnownStock,
+  PlannedChange,
+  PlannedItem,
+  PlannedProductChange,
+  PlannedWhere,
+  StockListCounts,
+  StockListOptions,
+  StockListPreview,
+  StockListPreviewRow,
+  StockPlan,
+  StockRef,
+} from './stock-import-plan.ts'
+import { dayLabel, inWords, LIST_PAT_MONTHS, NUMBERED_FROM_CENTS, readRow, refKey, UNCHANGED, whereKey, withNotes, type Read } from './stock-import-rows.ts'
+
+export {
+  columnLetter,
+  columnsFor,
+  DATE_HINT,
+  departmentNamed,
+  fullDayLabel,
+  needsColumnStep,
+  productNameOf,
+  readQuantity,
+  readStockDay,
+  readStockFile,
+  splitNumbers,
+  STOCK_FIELD_LABELS,
+  STOCK_FIELDS,
+  stockRows,
+  tidyHeader,
+  unreadColumns,
+  type StockField,
+  type StockFile,
+  type StockListRow,
+} from './stock-import-file.ts'
+export {
+  bringInStockLabel,
+  knownStockOf,
+  stockListSaid,
+  type KnownItem,
+  type KnownProduct,
+  type KnownStock,
+  type PlannedChange,
+  type PlannedCount,
+  type PlannedItem,
+  type PlannedPrice,
+  type PlannedProduct,
+  type PlannedProductChange,
+  type PlannedWhere,
+  type StockListCounts,
+  type StockListOptions,
+  type StockListPreview,
+  type StockListPreviewRow,
+  type StockListReading,
+  type StockListResult,
+  type StockPlan,
+  type StockProblem,
+  type StockRef,
+} from './stock-import-plan.ts'
+export { UNCHANGED, withNotes } from './stock-import-rows.ts'
 
 /**
  * Bringing in the stock list (ADR 0026): a spreadsheet nobody here has seen,
@@ -28,704 +84,6 @@ import type { WarehouseView } from './sync/stock-view.ts'
  * and on the server again as the rows go in, so a second import of the same
  * file finds everything as the list says and changes nothing.
  */
-
-// The columns.
-
-export const STOCK_FIELDS = ['product', 'make', 'model', 'department', 'category', 'quantity', 'serial', 'number', 'place', 'case', 'value', 'patDue', 'notes', 'dayPrice', 'listId'] as const
-export type StockField = (typeof STOCK_FIELDS)[number]
-
-export const STOCK_FIELD_LABELS: Record<StockField, string> = {
-  product: 'Product',
-  make: 'Make',
-  model: 'Model',
-  department: 'Department',
-  category: 'Category',
-  quantity: 'How many',
-  serial: "Maker's serial",
-  number: 'Asset number',
-  place: "Where it's kept",
-  case: 'Case',
-  value: 'Value of one',
-  patDue: 'PAT due',
-  notes: 'Notes',
-  dayPrice: 'Day price',
-  listId: 'Id in the old system',
-}
-
-/** What each field is headed in a file, as `tidyHeader` leaves it; the first column found for a field is read. */
-const HEADERS: Record<StockField, readonly string[]> = {
-  product: ['product', 'product name', 'item', 'item name', 'description', 'name', 'equipment'],
-  make: ['make', 'manufacturer', 'brand'],
-  model: ['model', 'model no', 'model number'],
-  department: ['department', 'dept'],
-  category: ['category', 'type', 'group', 'sub category', 'subcategory'],
-  // Not "No.", which is as often a line's number or an asset number as a quantity, so it's asked about.
-  quantity: ['quantity', 'qty', 'count', 'how many', 'units'],
-  serial: ['serial', 'serial number', 'serial no', 's/n', 'sn', 'serials', 'serial numbers'],
-  number: ['asset number', 'asset', 'asset no', 'asset tag', 'tag', 'tag number', 'sh number', 'barcode', 'label', 'asset numbers', 'tags'],
-  place: ['location', 'place', 'shelf', 'bay', 'store', 'storage', 'where'],
-  case: ['case', 'flight case', 'container', 'road case', 'in case'],
-  value: ['value', 'replacement value', 'cost', 'price', 'unit price', 'replacement cost', 'unit value'],
-  patDue: ['pat due', 'pat due date', 'next test', 'next test due', 'next pat', 'next pat due', 'inspection due'],
-  notes: ['notes', 'note', 'comments', 'comment', 'remarks'],
-  // A hire price for one day, for quotes (ADR 0042); a "price" alone is the value of one, as it always was.
-  dayPrice: ['day price', 'day rate', 'daily rate', 'price a day', 'hire price', 'rental price'],
-  // The product's own id where the list came from (audit, 20 October 2026, finding 7). Never a bare "Id", which is as often a line's number or an asset number.
-  listId: ['current rms id', 'rms id', 'old system id', 'id in the old system'],
-}
-
-/** A header as it's compared: capitals, anything in brackets ("Value (€)"), and marks other than letters, digits, "/" and "&" left out. */
-export const tidyHeader = (h: string) =>
-  h
-    .toLowerCase()
-    .replace(/\(.*?\)/g, ' ')
-    .replace(/[^a-z0-9/&]+/g, ' ')
-    .trim()
-
-/** Which field each column is read as, by its header; null for one the app doesn't know. */
-export function columnsFor(header: readonly string[]): (StockField | null)[] {
-  const tidy = header.map(tidyHeader)
-  const columns: (StockField | null)[] = header.map(() => null)
-  for (const field of STOCK_FIELDS) {
-    for (const name of HEADERS[field]) {
-      const i = tidy.findIndex((t, j) => t === name && columns[j] === null)
-      if (i >= 0) {
-        columns[i] = field
-        break
-      }
-    }
-  }
-  return columns
-}
-
-/** A stock list as read, before anyone has said which column is which. */
-export interface StockFile {
-  /** The header row as the file has it. */
-  header: string[]
-  /** The header's row in the spreadsheet, counting from 1. */
-  headerRow: number
-  /** Which field each column is read as, by its header; null for one the app doesn't know. */
-  columns: (StockField | null)[]
-  /** Each column's first few values, for saying which column is which. */
-  samples: string[][]
-  /** The rows under the header, with their row in the spreadsheet; blank ones left out. */
-  records: { row: number; cells: string[] }[]
-}
-
-/** How far down a title may push the header. */
-const HEADER_WITHIN = 10
-
-/** The row, of the first ten, with the most headers the app knows, and how many; -1 for none. */
-function headerOf(lines: string[][]): { at: number; known: number } {
-  let at = -1
-  let best = 0
-  lines.slice(0, HEADER_WITHIN).forEach((line, i) => {
-    const known = columnsFor(line).filter(Boolean).length
-    if (known > best) [best, at] = [known, i]
-  })
-  return { at, known: best }
-}
-
-/**
- * The file as a header and rows, or why it can't be read at all. The
- * header is the row, of the first ten, with the most headers the app
- * knows, so a title above it is passed over. Fields are split by commas,
- * or by semicolons where that finds more of the headers, or more columns
- * when it knows none of them: Excel saves CSV that way where a comma is
- * the decimal mark.
- */
-export function readStockFile(text: string): { file: StockFile; problem?: undefined } | { file?: undefined; problem: string } {
-  // A sheet saved as plain CSV on Windows isn't UTF-8, and its accented letters arrive as the replacement mark.
-  if (text.includes('�')) return { problem: BAD_LETTERS_HINT }
-  const commas = parseCsv(text)
-  const semicolons = parseCsv(text, ';')
-  const [byComma, bySemicolon] = [headerOf(commas), headerOf(semicolons)]
-  const widthOf = (lines: string[][]) => lines.find((line) => !blankRecord(line))?.length ?? 0
-  const semi = bySemicolon.known > byComma.known || (bySemicolon.known === byComma.known && widthOf(semicolons) > widthOf(commas))
-  const lines = semi ? semicolons : commas
-  let at = (semi ? bySemicolon : byComma).at
-  if (at < 0) at = lines.findIndex((line) => !blankRecord(line))
-  if (at < 0) return { problem: 'The file is empty.' }
-  const header = lines[at]!.map((h) => h.trim())
-  // A record's index is its row in the spreadsheet, less one.
-  const records = lines
-    .slice(at + 1)
-    .map((cells, i) => ({ row: at + i + 2, cells }))
-    .filter((r) => !blankRecord(r.cells))
-  if (records.length === 0) return { problem: 'The file has column names but no rows under them.' }
-  const width = Math.max(header.length, ...records.map((r) => r.cells.length))
-  const full = [...header, ...Array<string>(width - header.length).fill('')]
-  const samples = full.map((_, c) =>
-    records
-      .map((r) => (r.cells[c] ?? '').trim())
-      .filter(Boolean)
-      .slice(0, 3)
-  )
-  return { file: { header: full, headerRow: at + 1, columns: columnsFor(full), samples, records } }
-}
-
-/** Columns with something in them that no field is read from: the ones to ask about, or to list as not read. */
-export function unreadColumns(file: StockFile, columns: readonly (StockField | null)[] = file.columns): number[] {
-  return file.header.map((_, i) => i).filter((i) => columns[i] == null && (file.header[i]!.trim() !== '' || file.samples[i]!.length > 0))
-}
-
-/** Whether to ask which column is which before the preview: a column the app doesn't know, or none for the product. */
-export function needsColumnStep(file: StockFile): boolean {
-  return unreadColumns(file).length > 0 || !(file.columns.includes('product') || file.columns.includes('model'))
-}
-
-/** "Column C", as a spreadsheet names it, for a column with no header. */
-export function columnLetter(i: number): string {
-  let s = ''
-  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s
-  return s
-}
-
-/** A row as the file has it: what's in each field, trimmed. What the office fixes in place. */
-export interface StockListRow {
-  /** Its row in the spreadsheet, so the office can find it there. */
-  row: number
-  cells: Partial<Record<StockField, string>>
-}
-
-/** The rows, read with the columns as the office said; the first column for a field wins. */
-export function stockRows(file: StockFile, columns: readonly (StockField | null)[] = file.columns): StockListRow[] {
-  const first = new Map<StockField, number>()
-  columns.forEach((f, i) => {
-    if (f && !first.has(f)) first.set(f, i)
-  })
-  return file.records.map((r) => {
-    const cells: Partial<Record<StockField, string>> = {}
-    for (const [f, i] of first) {
-      const v = (r.cells[i] ?? '').trim()
-      if (v) cells[f] = v
-    }
-    return { row: r.row, cells }
-  })
-}
-
-// Reading a cell.
-
-/** "12", "x12", "12 pcs", "1,200": a whole number of things; null for nothing said. */
-export function readQuantity(cell: string): { qty: number | null; problem?: string } {
-  const t = cell
-    .trim()
-    .toLowerCase()
-    .replace(/^x\s*/, '')
-    .replace(/\s*(x|pcs|pieces|units|off)\.?$/, '')
-  if (!t) return { qty: null }
-  const digits = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replaceAll(',', '') : t
-  if (/^\d+$/.test(digits) && Number(digits) <= MAX_QTY) return { qty: Number(digits) }
-  return { qty: null, problem: `Couldn't read the quantity "${cell.trim()}". Put in a whole number, like 12.` }
-}
-
-export const DATE_HINT = 'Put it as day, month and year, like 30/09/2027.'
-const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
-const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-/** "Sep", "sept.", "September": the month's number; undefined for anything else. */
-const monthOf = (word: string) => {
-  const w = word.toLowerCase().replace(/\.$/, '')
-  const i = w.length >= 3 ? MONTHS.findIndex((m) => m.startsWith(w)) : -1
-  return i < 0 ? undefined : i + 1
-}
-const pad = (n: number) => String(n).padStart(2, '0')
-/** A two-digit year is this century: a PAT due in "27" is due in 2027. */
-const fullYear = (y: string) => (y.length === 2 ? 2000 + Number(y) : Number(y))
-
-/** "30 Sep 2027", the day as the preview and the log write it, with its year. */
-export function fullDayLabel(day: string): string {
-  const [y, m, d] = day.split('-').map(Number) as [number, number, number]
-  return `${d} ${SHORT_MONTHS[m - 1]} ${y}`
-}
-
-/** A day written in numbers alone, "30/09/2027" or "3.4.27", with any time Excel adds; its two first parts as written. */
-const inNumbers = (t: string) => {
-  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/.exec(t)
-  return m ? { first: Number(m[1]), second: Number(m[2]), year: fullYear(m[3]!) } : undefined
-}
-/** "09/30/2027": the month first, as only a sheet written the American way has it. */
-const writtenMonthFirst = (cell: string) => {
-  const n = inNumbers(cell.trim())
-  return !!n && n.second > 12 && n.first <= 12
-}
-/** "03/04/2027": 3 April the Irish way, 4 March the American way. */
-const readsEitherWay = (cell: string) => {
-  const n = inNumbers(cell.trim())
-  return !!n && n.first <= 12 && n.second <= 12 && n.first !== n.second
-}
-
-/**
- * A day the Irish way, day first: "30/09/2027", "30.9.27", "30-Sep-27",
- * "30 September 2027", or "2027-09-30". Anything that could be read two
- * ways is a problem, never a guess: a month over 12 (written month first),
- * a spreadsheet's date number, a month with no day, or a day that doesn't
- * exist. A list with one date written month first may write them all that
- * way, which the preview checks across the rows.
- */
-export function readStockDay(cell: string): { day: string | null; problem?: string } {
-  const t = cell.trim()
-  if (!t) return { day: null }
-  const notRead = { day: null, problem: `Couldn't read "${t}" as a date. ${DATE_HINT}` }
-  const real = (y: number, m: number, d: number) => {
-    const s = `${y}-${pad(m)}-${pad(d)}`
-    return isDay(s) ? { day: s } : notRead
-  }
-  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ][\d:.]+Z?)?$/.exec(t)
-  if (m) return real(Number(m[1]), Number(m[2]), Number(m[3]))
-  const n = inNumbers(t)
-  if (n) {
-    if (writtenMonthFirst(t)) return { day: null, problem: `"${t}" looks like the month first. ${DATE_HINT}` }
-    return real(n.year, n.second, n.first)
-  }
-  m = /^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([a-z]+)\.?,?[\s-]+(\d{4}|\d{2})$/i.exec(t)
-  if (m && monthOf(m[2]!)) return real(fullYear(m[3]!), monthOf(m[2]!)!, Number(m[1]))
-  m = /^([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i.exec(t)
-  if (m && monthOf(m[1]!)) return real(Number(m[3]), monthOf(m[1]!)!, Number(m[2]))
-  if (/^\d{5}(\.\d+)?$/.test(t)) return { day: null, problem: `"${t}" is a spreadsheet's number for a date, not the date. Format the column as dates and save the file again.` }
-  if (/^([a-z]+\.?[\s-]+\d{2,4}|\d{1,2}[/.-]\d{4}|\d{4}[/.-]\d{1,2})$/i.test(t)) return { day: null, problem: `"${t}" has no day. ${DATE_HINT}` }
-  return notRead
-}
-
-/** What a department cell can say, beyond the app's own names. */
-const DEPARTMENT_WORDS: Record<string, Department> = {
-  audio: 'audio',
-  sound: 'audio',
-  lighting: 'lighting',
-  lights: 'lighting',
-  lx: 'lighting',
-  video: 'video',
-  vision: 'video',
-  staging: 'staging',
-  stage: 'staging',
-  rigging: 'rigging',
-  power: 'power',
-  electrical: 'power',
-  distro: 'power',
-  other: 'other',
-  misc: 'other',
-  miscellaneous: 'other',
-  general: 'other',
-}
-export const departmentNamed = (text: string): Department | undefined => DEPARTMENT_WORDS[text.trim().toLowerCase()]
-
-/** Cells that mean no number at all. */
-const NO_NUMBER = new Set(['-', '–', 'n/a', 'na', 'none', 'tbc', '?'])
-/** Several numbers in a cell, split by commas, semicolons or line breaks. */
-export function splitNumbers(cell: string): string[] {
-  return cell
-    .split(/[,;\n]+/)
-    .map((x) => x.trim())
-    .filter((x) => x && !NO_NUMBER.has(x.toLowerCase()))
-}
-/** "SH-000001 to SH-000010": a range, which isn't read, so the office writes the numbers out. */
-const RANGE = /^sh[\s-]*\d{1,6}\s*(?:-|–|to)\s*(?:sh[\s-]*)?\d{1,6}$/i
-/** "#N/A", "#REF!": what a spreadsheet shows where a formula went wrong, never what the cell meant. */
-const SHEET_ERROR = /^#(n\/a|ref!|value!|name\?|div\/0!|null!|num!|spill!|calc!)$/i
-/** "Total", "Grand total", "Subtotal:": a sum at the foot of a list, not kit. */
-const TOTALS = /^(grand |sub ?)?totals?:?$|^sum:?$/i
-
-const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
-/** Whether `text` has `part` in it, capitals and spacing aside. */
-const holds = (text: string, part: string) => norm(text).includes(norm(part))
-
-/** The product's name: the model with the make in front, or the product column with the make in front; a product column beside a model is its description. */
-export function productNameOf(cells: StockListRow['cells']): { name: string; description: string } {
-  const product = cells.product?.trim() ?? ''
-  const make = cells.make?.trim() ?? ''
-  const model = cells.model?.trim() ?? ''
-  const tidy = (s: string) => s.replace(/\s+/g, ' ').trim()
-  if (model) {
-    const name = tidy(make && !holds(model, make) ? `${make} ${model}` : model)
-    return { name, description: product && !holds(name, product) ? product : '' }
-  }
-  if (!product) return { name: '', description: '' }
-  return { name: tidy(make && !holds(product, make) ? `${make} ${product}` : product), description: '' }
-}
-
-// What's here already.
-
-export interface KnownProduct {
-  id: string
-  name: string
-  tracking: Tracking
-  isCase: boolean
-  valueCents: number | null
-  patMonths: number | null
-  notes: string
-  mistake: boolean
-  /** Its day price on the price list (ADR 0042); null for none, undefined where this device isn't sent prices. */
-  dayCents?: number | null
-  /** Its id in the list it was brought in from, such as Current RMS's; empty or left out for none. */
-  listId?: string
-  /** For saying a new product looks like one here renamed; left out where it isn't known. */
-  category?: string
-}
-export interface KnownItem {
-  id: string
-  modelId: string
-  number: string
-  formerNumbers: string[]
-  oldNumber: string
-  serial: string
-  placeId: string | null
-  caseId: string | null
-  status: 'active' | 'retired'
-  retiredReason: RetiredReason | null
-  patDue: string | null
-  notes: string
-}
-/** The catalogue as the server holds it, or as a device does: what the rows are matched against. */
-export interface KnownStock {
-  products: KnownProduct[]
-  items: KnownItem[]
-  places: { id: string; name: string }[]
-  counts: { modelId: string; placeId: string | null; caseId: string | null; qty: number }[]
-}
-
-/** What a device holds, as the rows are checked again while the office fixes them, with its day prices where it's sent them. */
-export function knownStockOf(w: WarehouseView, priceOf?: (modelId: string) => number | undefined): KnownStock {
-  return {
-    products: [...w.models, ...w.mistakes.values()].map((m) => ({
-      id: m.id,
-      name: m.name,
-      tracking: m.tracking,
-      isCase: m.isCase,
-      valueCents: m.valueCents,
-      patMonths: m.patMonths,
-      notes: m.notes,
-      mistake: m.mistake,
-      dayCents: priceOf ? (priceOf(m.id) ?? null) : undefined,
-      listId: m.listId ?? '',
-      category: m.category,
-    })),
-    items: [...w.assets.values()].map((a) => ({
-      id: a.id,
-      modelId: a.modelId,
-      number: a.number,
-      formerNumbers: a.formerNumbers,
-      oldNumber: a.oldNumber,
-      serial: a.serial,
-      placeId: a.placeId,
-      caseId: a.caseId,
-      status: a.status,
-      retiredReason: a.retiredReason,
-      patDue: a.patDue,
-      notes: a.notes,
-    })),
-    places: w.places.map((p) => ({ id: p.id, name: p.name })),
-    counts: w.models.flatMap((m) => m.counted.map((s) => ({ modelId: s.modelId, placeId: s.placeId, caseId: s.caseId, qty: s.qty }))),
-  }
-}
-
-// The preview and the plan.
-
-export interface StockListOptions {
-  /** Make the places and cases the list names that aren't here yet. */
-  make: boolean
-  /** Where kit is kept when its row says neither a place nor a case; empty for nowhere. */
-  defaultPlace: string
-  /** Everything goes to that one place, whatever the list's place column says (ADR 0061); kit in a case stays in it. Left out by an older app. */
-  allAt?: boolean
-}
-
-export interface StockProblem {
-  /** The field it's about, whose cell is fixed in place; null for the row as a whole. */
-  field: StockField | null
-  text: string
-  /** Ticking “Make the places and cases this list names” solves it, so it needn't open the field. */
-  tick?: true
-}
-
-export interface StockListPreviewRow extends StockListRow {
-  skip: boolean
-  /** The product's name as it will be. */
-  product: string
-  /** "4 items · Audio · Speakers · €1,250 · PAT due 30 Sep 2027". */
-  facts: string
-  /** "At Bay A1", "In Amp rack 1 (new case)"; empty when it doesn't say. */
-  where: string
-  /** What bringing it in does, in words, or "Already as the list says." */
-  does: string[]
-  /** Said, but not a problem: a PAT due day on counted stock, say. */
-  asides: string[]
-  problems: StockProblem[]
-  /** Bringing it in changes something. */
-  changes: boolean
-  /** It changes something already here, rather than only adding. */
-  updates: boolean
-}
-
-export interface StockListCounts {
-  rows: number
-  /** New products, and new items, the rows not skipped would add. */
-  products: number
-  items: number
-  /** Counts set to something new. */
-  counted: number
-  /** Rows changing something already here. */
-  updates: number
-  /** Rows not skipped that would change nothing. */
-  unchanged: number
-  skipped: number
-  /** Rows not skipped that still have a problem. */
-  problems: number
-}
-
-export interface StockListPreview {
-  rows: StockListPreviewRow[]
-  counts: StockListCounts
-  /** Places and cases the list names that aren't here yet, made only if the office ticks to. */
-  places: string[]
-  cases: string[]
-}
-
-/** What the server's preview answers with: the rows as read, and the columns no field is read from, by their headers. */
-export interface StockListReading extends StockListPreview {
-  notRead: string[]
-}
-
-
-/** What one call bringing the rows in did. */
-export interface StockListResult {
-  /** Rows brought in, and skipped. */
-  rows: number
-  skipped: number
-  products: number
-  items: number
-  /** Counts set. */
-  counted: number
-  places: number
-  /** Items already here that were moved or changed. */
-  changed: number
-  /**
-   * What's left when a long list didn't all go in within one call: how
-   * many changes, and what each row now does, for the rows to be sent
-   * again with, so the next call carries on.
-   */
-  left?: { changes: number; rows: { row: number; does: string[] }[] }
-}
-
-/** A record already here, by its id, or one the import makes, by its key. */
-export type StockRef = { id: string; key?: undefined } | { key: string; id?: undefined }
-export interface PlannedWhere {
-  place: StockRef | null
-  case: StockRef | null
-}
-export interface PlannedProduct {
-  key: string
-  /** The first row that names it, for a refusal to name. */
-  row: number
-  name: string
-  department: Department
-  category: string
-  tracking: Tracking
-  isCase: boolean
-  valueCents: number | null
-  patMonths: number | null
-  notes: string
-  /** Its id in the list, for the next bring-in to match it by. */
-  listId?: string
-}
-export interface PlannedProductChange {
-  id: string
-  /** Its name here now, for a refusal to name. */
-  name: string
-  row: number
-  /** Renamed in the list, as its id there says. */
-  rename?: string
-  listId?: string
-  tracking?: 'serialised'
-  isCase?: true
-  valueCents?: number
-  patMonths?: number
-  notes?: string
-}
-export interface PlannedItem {
-  key: string
-  row: number
-  model: StockRef
-  /** A Session Hire number kept from the list; null for the next free one. */
-  number: string | null
-  oldNumber: string
-  serial: string
-  patDue: string | null
-  notes: string
-  where: PlannedWhere
-  /** One of those counted there, labelled now: the count goes down by one. */
-  fromCount: boolean
-  isCase: boolean
-}
-export interface PlannedChange {
-  row: number
-  id: string
-  where?: PlannedWhere
-  serial?: string
-  oldNumber?: string
-  patDue?: string
-  notes?: string
-}
-/** A day price for the price list (ADR 0042), for a new product or one with none. */
-export interface PlannedPrice {
-  row: number
-  model: StockRef
-  dayCents: number
-}
-export interface PlannedCount {
-  row: number
-  model: StockRef
-  where: PlannedWhere
-  qty: number
-}
-/** What bringing the rows in does, for the server to turn into commands. */
-export interface StockPlan {
-  places: { key: string; name: string; row: number }[]
-  products: PlannedProduct[]
-  productChanges: PlannedProductChange[]
-  items: PlannedItem[]
-  changes: PlannedChange[]
-  counts: PlannedCount[]
-  prices: PlannedPrice[]
-}
-
-/** "Bring in 212 rows", or why not yet. */
-export function bringInStockLabel(counts: StockListCounts): string {
-  const n = counts.rows - counts.skipped
-  if (n === 0) return 'Nothing to bring in'
-  if (counts.unchanged === n) return 'Nothing to bring in: it’s all here'
-  return `Bring in ${plural(n, 'row')}`
-}
-
-/** "10 rows read: 9 new products, 12 new items, 4 counts, 1 with a problem." */
-export function stockListSaid(c: StockListCounts): string {
-  const parts = [
-    c.products > 0 && plural(c.products, 'new product'),
-    c.items > 0 && plural(c.items, 'new item'),
-    c.counted > 0 && plural(c.counted, 'count'),
-    c.updates > 0 && `${c.updates} updating something`,
-    c.unchanged > 0 && `${c.unchanged} already as the list says`,
-    c.skipped > 0 && `${c.skipped} skipped`,
-    c.problems > 0 && `${c.problems} with ${c.problems === 1 ? 'a problem' : 'problems'}`,
-  ].filter(Boolean)
-  return `${plural(c.rows, 'row')} read${parts.length ? `: ${parts.join(', ')}` : ''}.`
-}
-
-export const UNCHANGED = 'Already as the list says.'
-/** The PAT is every year unless the office says otherwise on the product's page. */
-const LIST_PAT_MONTHS = INSPECTION_MONTHS.pat
-/** ADR 0013's line between numbered and counted: anything worth more than about €150. */
-const NUMBERED_FROM_CENTS = 150_00
-const MOST_CENTS = 1_000_000_00
-/** As the price list takes (quotes.ts). */
-const MOST_DAY_CENTS = 100_000_00
-const dayLabel = (cents: number) => `${valueLabel(cents)} a day`
-
-const inWords = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`)
-const refKey = (r: StockRef | null) => (r ? (r.id ?? `new ${r.key}`) : '')
-const whereKey = (w: PlannedWhere) => (w.case ? `c:${refKey(w.case)}` : w.place ? `p:${refKey(w.place)}` : '')
-/** The text added to notes once, as the crew list adds to them, cut to what they hold. */
-export function withNotes(was: string, added: string, room = 2000): string {
-  const kept = was.trim()
-  const text = added.trim().slice(0, Math.max(0, room - kept.length - (kept ? 1 : 0)))
-  if (!text || kept.includes(text)) return was
-  return [kept, text].filter(Boolean).join('\n')
-}
-
-/** A row as read on its own, before it's matched to anything. */
-interface Read {
-  input: StockListRow & { skip?: boolean }
-  live: boolean
-  name: string
-  description: string
-  department: Department | undefined
-  category: string
-  qty: number | null
-  tags: string[]
-  serials: string[]
-  numbered: boolean
-  valueCents: number | null
-  dayCents: number | null
-  patDue: string | null
-  notes: string
-  placeCell: string
-  caseCell: string
-  /** Its place is the one the office typed for the whole list, not one of its own. */
-  typedPlace: boolean
-  /** The product's id in the old system, such as Current RMS's. */
-  listId: string
-  /** Its PAT due day is written month first, or could be read either way. */
-  monthFirst: boolean
-  eitherWay: boolean
-  problems: StockProblem[]
-  asides: string[]
-}
-
-function readRow(input: StockListRow & { skip?: boolean }, options: StockListOptions): Read {
-  const c = input.cells
-  const problems: StockProblem[] = []
-  const { name, description } = productNameOf(c)
-  if (!name) problems.push({ field: 'product', text: 'No product: the row needs a product name, or a make and a model.' })
-  else if (name.length > 200) problems.push({ field: 'product', text: "The product's name can be up to 200 characters." })
-  else if (TOTALS.test(name)) problems.push({ field: null, text: `"${name}" looks like a row of totals, not kit. Skip it.` })
-  for (const f of STOCK_FIELDS) {
-    const cell = c[f]?.trim() ?? ''
-    if (SHEET_ERROR.test(cell)) problems.push({ field: f, text: `"${cell}" is the spreadsheet's error where a formula went wrong. Put in what it should say, or skip the row.` })
-  }
-  const deptCell = c.department ?? ''
-  const catCell = c.category ?? ''
-  const department = departmentNamed(deptCell) ?? departmentNamed(catCell)
-  if (!department && deptCell)
-    problems.push({ field: 'department', text: `Couldn't tell which department "${deptCell}" is: Audio, Lighting, Video, Staging, Rigging, Power or Other.` })
-  const qty = readQuantity(c.quantity ?? '')
-  if (qty.problem) problems.push({ field: 'quantity', text: qty.problem })
-  const tags = splitNumbers(c.number ?? '')
-  const serials = splitNumbers(c.serial ?? '')
-  for (const t of tags) {
-    if (RANGE.test(t)) problems.push({ field: 'number', text: `"${t}" is a range. Write each number out, separated by commas.` })
-    else if (t.length > 100) problems.push({ field: 'number', text: 'An asset number can be up to 100 characters.' })
-  }
-  if (serials.some((s) => s.length > 100)) problems.push({ field: 'serial', text: 'A serial can be up to 100 characters.' })
-  const numbered = tags.length > 0 || serials.length > 0
-  const n = Math.max(tags.length, serials.length)
-  if (tags.length && serials.length && tags.length !== serials.length)
-    problems.push({ field: 'serial', text: `${plural(tags.length, 'asset number')} but ${plural(serials.length, 'serial')}: one of each for every item, in the same order.` })
-  if (numbered && qty.qty !== null && qty.qty !== n)
-    problems.push({ field: 'quantity', text: `The quantity is ${qty.qty}, but there ${n === 1 ? 'is 1 number' : `are ${n} numbers`}: one for each item, or fix the quantity.` })
-  if (!numbered && qty.qty === null && !qty.problem) problems.push({ field: 'quantity', text: 'No quantity and no numbers: say how many there are.' })
-  const value = parseEuro(c.value ?? '')
-  if (value.reason !== undefined) problems.push({ field: 'value', text: `Couldn't read the value "${c.value}". ${value.reason}` })
-  else if (value.cents !== null && value.cents > MOST_CENTS) problems.push({ field: 'value', text: 'A value can be up to €1,000,000.' })
-  const day = parseEuro(c.dayPrice ?? '')
-  if (day.reason !== undefined) problems.push({ field: 'dayPrice', text: `Couldn't read the day price "${c.dayPrice}". ${day.reason}` })
-  else if (day.cents !== null && day.cents > MOST_DAY_CENTS) problems.push({ field: 'dayPrice', text: 'A day price can be up to €100,000.' })
-  const due = readStockDay(c.patDue ?? '')
-  if (due.problem) problems.push({ field: 'patDue', text: due.problem })
-  const caseCell = c.case ?? ''
-  return {
-    input,
-    live: !input.skip,
-    name,
-    description,
-    department,
-    category: departmentNamed(catCell) ? '' : catCell.slice(0, 100),
-    qty: qty.qty,
-    tags,
-    serials,
-    numbered,
-    valueCents: value.reason === undefined ? value.cents : null,
-    dayCents: day.reason === undefined && (day.cents ?? 0) <= MOST_DAY_CENTS ? day.cents : null,
-    patDue: due.day ?? null,
-    notes: (c.notes ?? '').slice(0, 2000),
-    // Kit the row doesn't place goes where the office said, if it said; all of it, when the office said all of it.
-    placeCell: caseCell ? (c.place ?? '') : options.allAt && options.defaultPlace.trim() ? options.defaultPlace.trim() : (c.place ?? options.defaultPlace.trim()),
-    caseCell,
-    typedPlace: !caseCell && !!options.defaultPlace.trim() && (!!options.allAt || !c.place),
-    listId: (c.listId ?? '').slice(0, 100),
-    monthFirst: writtenMonthFirst(c.patDue ?? ''),
-    eitherWay: readsEitherWay(c.patDue ?? ''),
-    problems,
-    asides: [],
-  }
-}
 
 /** One item a row names: one already here, or a new one with its key. */
 type ItemOf =
