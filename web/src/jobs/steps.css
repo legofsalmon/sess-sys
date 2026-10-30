@@ -6,6 +6,10 @@
  */
 .job-steps .steps-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-4) var(--space-12); }
 .job-steps .steps-head h2 { margin: 0; }
+/* The step the job is at, as one button beside where it's at (ADR 0103): pushed to the end of the head, under it on a phone. */
+.job-steps .steps-head .next-thing { margin-left: auto; }
+.clients-answer { display: grid; gap: var(--space-8); justify-items: start; }
+.clients-answer > p { margin: 0; }
 .steps-flow { --dot: 30px; --gap: 4px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
 .steps-flow li { position: relative; min-width: 0; }
 /* The rule joining each dot to the next, behind the dots: it runs from the edge of one dot to the edge of the next, a little clear of

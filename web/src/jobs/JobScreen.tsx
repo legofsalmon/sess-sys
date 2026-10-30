@@ -137,7 +137,7 @@ export function JobScreen({ view, id, part: asked }: { view: View; id: string; p
       <Summary job={job} view={view} onTell={setShare} />
       {telling}
       {/* The way the job goes, from the quote to the kit put away, and who each step is down to (ADR 0073). */}
-      <StepsCard job={job} view={view} onPart={pick} />
+      <StepsCard job={job} view={view} onPart={pick} onTell={setShare} />
 
       <Tabs label="Parts of the job" id="job" parts={parts} labels={PART_LABELS} current={part} counts={counts} onPick={pick} />
       <div className="job-part" role="tabpanel" id="job-part" aria-labelledby={`job-tab-${part}`}>
