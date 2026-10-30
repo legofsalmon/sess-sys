@@ -28,12 +28,34 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
-    version: '1.65.0',
+    version: '1.66.0',
     date: '2026-10-30',
     title: 'A clearer quote form',
     what: "A draft quote is easier to read and fill in. What it comes to stays at the top with anything that needs a look, such as a line with no price, and pressing that opens the line. Each line is a row that opens to change, with its numbers on one row and the cost side folded underneath. Travel and subsistence are rows like any other. The terms and Mark as sent sit beside the lines on a laptop. A line isn't marked wrong until you've left it, and the unit (€, %, days) sits in the box so there's less to type.",
     prs: [185],
     adrs: [100],
+  },
+  {
+    version: '1.65.0',
+    date: '2026-10-30',
+    title: 'Filter and sort on the long lists',
+    what: "Jobs, Quotes, People, the stock catalogue, Venues and Clients each have a Sort and a Filter under their search, the same on every list. Put jobs in order by date, name, client or most crew still needed, and narrow them by status, kind, crew still needed or kit short; quotes by biggest total or job date; people by last name, department or level, and narrow to staff, freelancers or a level; products by category or how many are in stock. Each choice says how many it would show, a filter that's on shows as a chip you can tap to take off, and the list says how many of how many are showing. Clients have a search now too.",
+    prs: [183],
+    adrs: [99],
+  },
+  {
+    version: '1.64.5',
+    date: '2026-10-30',
+    title: "The planner's days stay in view on a phone",
+    what: "On a phone, the row of days along the top of the week and month planner now stays under the bar as you scroll down past it, and moves sideways with the days, so you can always see which day a box is on.",
+    prs: [186],
+  },
+  {
+    version: '1.64.4',
+    date: '2026-10-30',
+    title: 'The planner scrolls with the page on a phone',
+    what: "On a phone, the week and month planner no longer scrolls up and down inside its own box, where a thumb got caught. Its rows now make the page longer, so scrolling down moves the whole page; swiping sideways still moves through the days. On a computer it stays as it was.",
+    prs: [184],
   },
   {
     version: '1.64.3',

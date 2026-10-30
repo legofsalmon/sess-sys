@@ -15,17 +15,29 @@ waiting on someone.
   the box; the cost side folded under the line and saying what it holds;
   travel and subsistence as rows; terms and sending beside the lines on a
   laptop; a line faulted only once it's left. Every feature, name and saved
-  shape kept. App 1.65.0.
+  shape kept. App 1.66.0 (PR #183, filter and sort, took 1.65.0 first).
 - Checked: typecheck, the shared and server tests, the web build, and the
   browser tests for quotes, quote follow-up, Current RMS history, Claude,
   access and the shell. Looked at on a phone and a laptop in both themes.
 
 **Waiting**
 
-- PR #183 (filter and sort) takes 1.65.0 if it merges first; this one moves
-  to 1.66.0 then. PR #173 (the operations mailbox) replaces Ask Claude on
-  the draft, which now has one slot in the add row.
+- PR #173 (the operations mailbox) replaces Ask Claude on the draft with a
+  card of what the mail asks for.
 - The six learnings for the design system, as a PR there.
+## 30 October 2026: Filter and sort on the long lists
+
+**Done**
+
+- Colly asked for a filter and sort system on the long lists (ADR 0099,
+  PR #183): one shared part under the search on Jobs, Quotes, People, the
+  catalogue, Venues and Clients. Sort select, Filter button with a select
+  per filter (each choice with its count), filters that are on as chips
+  that take them off, "N of M" and Clear filters. Kept for the tab's life;
+  the order kept on the device. Clients get a search. App 1.65.0.
+- Checked: typecheck, unit tests for the orders, filters and counts, a
+  new browser test (lists.spec.ts), the layout test's department filter,
+  and the whole browser suite.
 
 ## 30 October 2026: The big files split
 

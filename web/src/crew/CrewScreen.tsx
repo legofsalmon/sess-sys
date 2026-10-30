@@ -19,12 +19,17 @@ import {
   type View,
   emailBackRefusal,
   emailTakenBy,
+  listed,
+  NO_DEPARTMENT_KEY,
+  peopleFilters,
+  peopleSorts,
 } from '@sh/shared'
 import { VehicleReminders } from '../stock/Vehicles.tsx'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { arrival } from '../arrival.ts'
 import { inDepartment, Narrowed, useNarrowed } from '../Narrowed.tsx'
 import { useWindowed } from '../windowed.ts'
+import { ListTools, useListChoices } from '../ListTools.tsx'
 import { Confirm, Refusal, useAct } from '../act.tsx'
 import { Empty } from '../Empty.tsx'
 import { Fold, ShowAll } from '../Fold.tsx'
@@ -46,7 +51,7 @@ import { Split } from '../Split.tsx'
 import { ImportPeopleScreen } from './ImportPeople.tsx'
 import { Heading } from '../Icon.tsx'
 import { CallCard, NewCall, OfferForm } from './Calls.tsx'
-import { NamedFromAddress, NewPerson, PersonRow, dept, found, wordsOf } from './People.tsx'
+import { NamedFromAddress, NewPerson, PersonRow, found, wordsOf } from './People.tsx'
 import { type Share, SharePanelFor, promptFor, tellTo } from './Messages.tsx'
 
 /**
@@ -81,6 +86,10 @@ const madeHere = new Set<string>()
 
 /** The filter's choice for people with no department. */
 const NO_DEPARTMENT = '-'
+
+/** The People list's filters as a count on Home for a department opens it. */
+const startOn = (department: string | undefined) =>
+  department ? { department: department === NO_DEPARTMENT ? NO_DEPARTMENT_KEY : department.trim().toLowerCase() } : undefined
 
 /**
  * What the call needs after a no, under "Aoife Byrne declined": "The call is 1 short",
@@ -162,29 +171,27 @@ export function CrewScreen() {
   // Archived people (leavers) are kept for the record but out of the way.
   const active = crew.people.filter((p) => !p.archived)
   const archived = crew.people.filter((p) => p.archived)
-  // The list narrowed to one department (ADR 0025): the ones in use, not a fixed list. Opened from a count on Home for a department, that one (audit, 20 October 2026, finding 4).
-  const [department, setDepartment] = useState(() => arrival('#crew/people')?.department ?? '')
-  const departments: string[] = []
-  for (const p of active) if (p.department && !departments.some((d) => d.toLowerCase() === dept(p))) departments.push(p.department)
-  departments.sort((a, b) => a.localeCompare(b))
-  // A department whose last person was edited or archived away narrows to nobody, so it's no filter at all until it's back.
-  const chosen =
-    department === NO_DEPARTMENT
-      ? active.some((p) => !p.department)
-        ? department
-        : ''
-      : departments.some((d) => d.toLowerCase() === department.toLowerCase())
-        ? department
-        : ''
+  // Filter and sort (ADR 0099): by department (the ones in use, ADR 0025), staff or freelancer, and level, in the order chosen. Opened
+  // from a count on Home for a department, that one (audit, 20 October 2026, finding 4). A department whose last person was edited
+  // or archived away is no choice any more, so it narrows nothing until it's back.
+  const [peopleChoices, setPeopleChoices] = useListChoices('people', startOn(arrival('#crew/people')?.department))
+  const peopleFilterList = useMemo(() => peopleFilters(active), [crew.people])
+  const peopleSortList = useMemo(() => {
+    const ahead = new Map<string, number>()
+    for (const c of crew.calls)
+      if (c.status === 'open' && c.end >= today)
+        for (const o of c.offers) if (o.status === 'accepted' || o.status === 'confirmed') ahead.set(o.personId, (ahead.get(o.personId) ?? 0) + 1)
+    return peopleSorts((p) => ahead.get(p.id) ?? 0)
+  }, [crew.calls, today])
   // Found as in the picker, and folded to the first ten (audit finding 16). Whoever is added stays in view, whatever the
   // search, filter or fold, until the tab is next opened: on a phone the form pushes the list out of sight, so it says so too.
   const [find, setFind] = useState('')
   const [added, setAdded] = useState<readonly { id: string; name: string }[]>([])
   const justAdded = (p: PersonView) => added.some((a) => a.id === p.id)
   const words = wordsOf(find)
-  const shown = active.filter(
-    (p) => justAdded(p) || ((!chosen || (chosen === NO_DEPARTMENT ? !p.department : dept(p) === chosen.toLowerCase())) && found(p, words)),
-  )
+  const foundPeople = active.filter((p) => found(p, words))
+  const listedPeople = listed(foundPeople, peopleFilterList, peopleSortList, peopleChoices)
+  const shown = [...listedPeople, ...active.filter((p) => justAdded(p) && !listedPeople.includes(p))]
   const upcoming = crew.calls.filter((c) => c.end >= today && c.status === 'open')
   // Crew needed narrowed to a department (ADR 0046). A head of department starts on their own, everyone else on all.
   const access = useAccess()
@@ -625,16 +632,17 @@ export function CrewScreen() {
                 aria-label="Find a person"
               />
             )}
-            {departments.length > 0 && (
-              <select className="dept-filter" value={chosen} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
-                <option value="">All departments</option>
-                {departments.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-                {active.some((p) => !p.department) && <option value={NO_DEPARTMENT}>No department</option>}
-              </select>
+            {active.length > 0 && (
+              <ListTools
+                name="people"
+                items={foundPeople}
+                filters={peopleFilterList}
+                sorts={peopleSortList}
+                choices={peopleChoices}
+                onChange={setPeopleChoices}
+                shown={listedPeople.length}
+                what="people"
+              />
             )}
             {active.length > 0 && shown.length === 0 && <p className="empty">Nobody matches.</p>}
             <ShowAll items={shown} limit={10} what="people" keep={justAdded}>
