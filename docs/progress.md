@@ -7,7 +7,7 @@ waiting on someone.
 
 **Done**
 
-- [ADR 0101](adr/0101-sending-a-quote-to-the-client-by-email.md) (PR #TBD):
+- [ADR 0101](adr/0101-sending-a-quote-to-the-client-by-email.md) (PR #188):
   Send to the client on a quote, once the office turns it on under Admin ›
   Connections › The operations mailbox. The compose box is filled in from
   the quote and the client's contacts; the quote goes from operations@
