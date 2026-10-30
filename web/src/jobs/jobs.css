@@ -65,6 +65,12 @@
    On a desk it ends at the foot of the screen, so a long month scrolls inside it with its days and names kept in view. */
 .plan .scroller { position: relative; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: 10px; }
 @media (min-width: 900px) { .plan .scroller { overflow: auto; overscroll-behavior: contain; max-height: calc(100dvh - var(--under-top, 72px) - var(--space-40)); } }
+/* Its days row can't stick to the page from inside a sideways scroller, so on a phone a copy (PlanScreen) waits at the bar's foot, taking no
+   room, and shows once the real row has gone under the bar; it scrolls sideways with the days. The desk's framed planner keeps its own. */
+.plan .days-float { position: sticky; top: var(--under-top, 72px); z-index: 4; height: 0; visibility: hidden; }
+.plan .days-float.on { visibility: visible; }
+.plan .days-clip { position: absolute; left: 0; right: 0; overflow: hidden; border: 1px solid var(--line); border-top: 0; background: var(--panel); box-shadow: var(--ds-elevation-menu); }
+@media (min-width: 900px) { .plan .days-float { display: none; } }
 /* The names stay put as the days scroll, so the left fade starts past them (more.tsx). */
 .plan .scroller { --more-from: 7rem; }
 @media (min-width: 900px) { .plan .scroller { --more-from: 12rem; } }
