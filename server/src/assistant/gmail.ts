@@ -142,17 +142,49 @@ export function bodyOf(p: Part | undefined): string {
   return html === undefined ? '' : textOfHtml(html)
 }
 
+/** Tags whose contents are never text. */
+const HIDDEN = new Set(['style', 'script', 'head', 'title'])
+/** Tags that end a line: br where it stands, the rest where they close. */
+const BREAKS = new Set(['br', 'p', 'div', 'li', 'tr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }
+
+/**
+ * The text of an HTML email, read tag by tag rather than by patching the markup with patterns: what's outside a tag is
+ * text, what's inside style or script is not, and a line ends where a block does. Entities are decoded once, in one
+ * pass, so "&amp;lt;" stays "&lt;". The result is only ever shown as text, never as HTML.
+ */
 function textOfHtml(html: string): string {
-  return html
-    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, '')
-    .replace(/<br\s*\/?>|<\/(p|div|li|tr|h\d)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+  let out = ''
+  let at = 0
+  let hidden: string | null = null
+  while (at < html.length) {
+    if (hidden) {
+      // Inside style or script, "<" is just a character: skip to the tag that closes it.
+      const ends = new RegExp(`</${hidden}\\b[^>]*>`, 'ig')
+      ends.lastIndex = at
+      const end = ends.exec(html)
+      if (!end) break
+      hidden = null
+      at = end.index + end[0].length
+      continue
+    }
+    const open = html.indexOf('<', at)
+    if (open < 0) {
+      out += html.slice(at)
+      break
+    }
+    out += html.slice(at, open)
+    const close = html.indexOf('>', open + 1)
+    if (close < 0) break // a tag never finished: nothing after it is text
+    const tag = html.slice(open + 1, close)
+    const closing = tag.startsWith('/')
+    const name = /^\/?\s*([a-z][a-z0-9]*)/i.exec(tag)?.[1]?.toLowerCase() ?? ''
+    if (!closing && HIDDEN.has(name)) hidden = name
+    else if (name === 'br' || (closing && BREAKS.has(name))) out += '\n'
+    at = close + 1
+  }
+  return out
+    .replace(/&(nbsp|amp|lt|gt|quot|apos|#39);/g, (_, e: string) => ENTITIES[e] ?? '')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n\s*\n+/g, '\n\n')
     .trim()
