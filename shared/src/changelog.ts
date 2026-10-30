@@ -32,7 +32,7 @@ export const CHANGELOG: readonly Release[] = [
     date: '2026-10-30',
     title: 'Tools brought up to date',
     what: 'Behind the scenes: the tools that build, test and compress the app are on their newest versions, which clears the last serious security warnings on them. Nothing you see is different.',
-    prs: [179],
+    prs: [180],
   },
   {
     version: '1.64.0',

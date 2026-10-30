@@ -8,7 +8,7 @@ waiting on someone.
 **Done**
 
 - The rest of finding 115 of the [20 October audit](audit-2026-10-20.md)
-  (PR #179): vitest 3 to 5 (both critical tinypool advisories gone), PGlite
+  (PR #180): vitest 3 to 5 (both critical tinypool advisories gone), PGlite
   0.3 to 0.5, vite 7 to 8 with the React plugin 5 to 6, @fastify/compress 8
   to 9, concurrently 9 to 10. npm audit now shows only four low ones, all
   in vite-plugin-pwa's workbox, which goes next on its own. App 1.64.1.
