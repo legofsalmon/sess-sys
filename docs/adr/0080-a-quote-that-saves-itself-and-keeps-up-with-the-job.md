@@ -10,6 +10,7 @@
   [ADR 0070](0070-finding-a-product-by-typing.md) (picking one product).
 - **Part of:** the quoting engine plan, part 1a (the editor). 1b, starting a
   quote and following it up, and 1c, the printed quote, come next.
+- **Amended:** 30 October 2026 by [ADR 0100](0100-the-quote-form-redrawn.md): the draft is redrawn. The lines are rows under label-capital heads, the open line's numbers sit on one row with the unit in the box, the readout strip carries the warnings as chips that open the line, the terms and the sending stand beside the lines on a desk, and a line is faulted only once it's left. One line open at a time, saving itself, and the device keeping what can't save all stay.
 
 ## Context
 

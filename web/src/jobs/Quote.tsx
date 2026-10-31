@@ -34,6 +34,7 @@ import { MarginWords } from './QuoteLine.tsx'
 import { Lines, QuoteSheet, Totals } from './QuoteSheet.tsx'
 import { InCurrentRms, NewVersion, Records } from './QuoteRecords.tsx'
 import { Draft } from './QuoteDraft.tsx'
+import { Emails, SendQuote } from './QuoteEmail.tsx'
 
 export { InStep, QuotePill } from './QuoteStatus.tsx'
 
@@ -42,9 +43,10 @@ export { InStep, QuotePill } from './QuoteStatus.tsx'
  * built from the job's kit and crew at the price list, every line open to
  * change while it's a draft, then kept as it went once it's gone to the
  * client, with a new version for any change after. It prints as an A4 page
- * to save as a PDF, as the call sheet does: nothing is sent from the app.
- * The client's answer, the invoice and the payment are records the office
- * keeps here of what happened outside it.
+ * to save as a PDF, as the call sheet does, and once the office has turned
+ * it on it goes to the client by email from the operations mailbox with
+ * that page attached (ADR 0101). The client's answer, the invoice and the
+ * payment are records the office keeps here of what happened outside it.
  */
 
 /** "€1,250.00 before VAT": what a quote is talked about as. */
@@ -116,6 +118,7 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
   const versions = m.quotesOf(jobId)
   const [picked, setPicked] = useState<string>()
   const [printing, setPrinting] = useState(false)
+  const [composing, setComposing] = useState<string>()
   useEffect(() => {
     if (!printing) return
     const done = () => setPrinting(false)
@@ -194,15 +197,25 @@ export function QuoteScreen({ view, jobId }: { view: View; jobId: string }) {
               </p>
             )}
             {q.notes && <p className="notes">{q.notes}</p>}
-            <div className="actions">
-              <button type="button" className="primary" onClick={() => setPrinting(true)} disabled={printing}>
-                Print or save as PDF
-              </button>
-              {q.latest && !settled && <NewVersion q={q} onMade={setPicked} />}
-            </div>
+            <Emails emails={q.emails} />
+            {composing === q.id ? (
+              <SendQuote q={q} onSent={() => setComposing(undefined)} onCancel={() => setComposing(undefined)} />
+            ) : (
+              <div className="actions">
+                {m.quoting.emailQuotes && q.latest && (
+                  <button type="button" className={q.emails.length ? undefined : 'primary'} onClick={() => setComposing(q.id)}>
+                    {q.emails.length ? 'Send again' : 'Send by email'}
+                  </button>
+                )}
+                <button type="button" className={m.quoting.emailQuotes && q.latest && !q.emails.length ? undefined : 'primary'} onClick={() => setPrinting(true)} disabled={printing}>
+                  Print or save as PDF
+                </button>
+                {q.latest && !settled && <NewVersion q={q} onMade={setPicked} />}
+              </div>
+            )}
             {settled && q.latest && <p className="hint">The quote is invoiced, so it's settled: no new version.</p>}
           </section>
-          {q.id === current?.id && <Records q={q} job={job} />}
+          {q.id === current?.id && <Records q={q} job={job} canEmail={!!m.quoting.emailQuotes} />}
         </>
       )}
 

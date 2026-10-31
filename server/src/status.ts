@@ -10,6 +10,7 @@ import type { DocumentFiles } from './documents/files.ts'
 import type { FuelLookup } from './finance/fuel.ts'
 import { getQuoteSettings } from './finance/store.ts'
 import type { RmsReader } from './rms/reader.ts'
+import type { Mailbox } from './assistant/mailbox.ts'
 import type { Assistant } from './assistant/routes.ts'
 
 /**
@@ -72,6 +73,8 @@ export interface StatusSources {
   rms: RmsReader
   /** Claude inside the app (ADR 0096); a test without it has no Claude check. */
   assistant?: Assistant
+  /** The operations mailbox Claude reads (ADR 0098). */
+  mailbox?: Mailbox
   fuel: FuelLookup
   outside: OutsideLooks
   commit?: string
@@ -129,6 +132,7 @@ export class Status {
       this.ownCalendars(),
       this.currentRms(),
       this.claude(),
+      this.mailbox(),
       this.fuel(),
       this.maps(),
     ].map((p, i) => p.catch((err): StatusCheck => ({ id: `check-${i}`, group: 'app', name: 'A check', state: 'bad', says: `This check went wrong itself: ${why(err)}` })))
@@ -317,6 +321,19 @@ export class Status {
     if (!s.on) return { ...base, state: 'off', says: `Set up, and turned off. ${spent}.`, todo: 'Turn it on under Admin › Company to offer it.' }
     if (s.spentCents >= s.limitCents) return { ...base, state: 'warn', says: `This month’s limit is used: ${spent}.`, todo: 'It starts again on the 1st, or raise CLAUDE_MONTHLY_LIMIT_USD in Railway.' }
     return { ...base, state: 'ok', says: `On, using ${s.model}: ${spent}.` }
+  }
+
+  /** The operations mailbox (ADR 0098): connected, and when Claude last read it. Nothing is read here. */
+  private async mailbox(): Promise<StatusCheck> {
+    const base = { id: 'mailbox', group: 'outside' as const, name: 'Operations mailbox' }
+    const m = this.s.mailbox
+    if (!m?.available) return { ...base, state: 'off', says: 'Not set up: it needs the Google key and Claude.' }
+    const s = await m.status()
+    if (s.state === 'reconnect') return { ...base, state: 'bad', says: s.problem ?? 'Google stopped letting the app read it.', todo: 'Connect operations@ again under Admin › Company.', at: s.lookedAt }
+    if (s.state !== 'on') return { ...base, state: 'off', says: 'Not connected.', todo: 'Connect operations@ under Admin › Company for Claude to draft quotes from its mail.' }
+    const looked = s.lookedAt ? `last read ${new Date(s.lookedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'not read yet'
+    if (s.problem) return { ...base, state: 'warn', says: `Reading ${s.account}, ${looked}, but the last look stopped: ${s.problem}`, todo: 'It tries again every five minutes.', at: s.lookedAt }
+    return { ...base, state: 'ok', says: `Reading ${s.account}, ${looked}${s.canSend ? ', and quotes can be sent from it' : '; connected to read only, so quotes can’t be sent from it'}.`, at: s.lookedAt }
   }
 
   private async fuel(): Promise<StatusCheck> {

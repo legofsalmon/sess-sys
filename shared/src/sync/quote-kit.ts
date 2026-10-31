@@ -99,3 +99,44 @@ export function quoteWants(
   }
   return wanted
 }
+
+/** A product the quote has more of than the job's kit list, and how many to add for the list to hold what was quoted. */
+export interface KitToAdd {
+  modelId: string
+  qty: number
+  /** Of those, how many the quote has hired in, and who from. */
+  subhireQty: number
+  supplier: string
+}
+
+/**
+ * What a job's kit list is missing of its quote (ADR 0102): each product on the quote's kit lines, and the pieces of
+ * each package on it, against all the job's kit lines of that product, whatever phase they're for. Only ever more:
+ * kit on the list that isn't on the quote, or more of it, stays, since the list is the warehouse's to change.
+ */
+export function kitFromQuote(
+  lines: readonly { kind: string; modelId?: string | null; qty: number; subhireQty?: number; supplier?: string; packageId?: string }[],
+  packageItems: (packageId: string) => readonly { modelId: string; qty: number }[] | undefined,
+  kit: readonly { modelId: string; qty: number; subhireQty: number }[]
+): KitToAdd[] {
+  const wanted = new Map<string, { qty: number; subhireQty: number; supplier: string }>()
+  const want = (modelId: string, qty: number, subhireQty = 0, supplier = '') => {
+    if (qty <= 0) return
+    const w = wanted.get(modelId) ?? { qty: 0, subhireQty: 0, supplier: '' }
+    wanted.set(modelId, { qty: w.qty + qty, subhireQty: w.subhireQty + subhireQty, supplier: w.supplier || supplier })
+  }
+  for (const l of lines) {
+    if (l.kind !== 'kit') continue
+    if (l.modelId) want(l.modelId, l.qty, Math.min(l.qty, l.subhireQty ?? 0), l.supplier ?? '')
+    else if (l.packageId) for (const i of packageItems(l.packageId) ?? []) want(i.modelId, i.qty * l.qty)
+  }
+  const out: KitToAdd[] = []
+  for (const [modelId, w] of wanted) {
+    const have = kit.filter((k) => k.modelId === modelId)
+    const qty = w.qty - have.reduce((n, k) => n + k.qty, 0)
+    if (qty <= 0) continue
+    const subhireQty = Math.min(qty, Math.max(0, w.subhireQty - have.reduce((n, k) => n + k.subhireQty, 0)))
+    out.push({ modelId, qty, subhireQty, supplier: subhireQty ? w.supplier : '' })
+  }
+  return out
+}

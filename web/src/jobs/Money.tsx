@@ -51,6 +51,7 @@ import { JOBS, MONEY } from '../Up.tsx'
 import { useToday } from '../view.ts'
 import { ByClaude, FromEnquiry, offer, pricingOf, Suggestions, takingWords, useClaude, type Offered } from './Claude.tsx'
 import { Choices, clientNamed, Top, venueNamed } from './common.tsx'
+import { addKitFromQuote, kitToAdd } from './Kit.tsx'
 import { PackagesCard } from './Packages.tsx'
 import { JobViews } from './PlanScreen.tsx'
 import { InStep, QuotePill } from './Quote.tsx'
@@ -279,11 +280,19 @@ function NewQuote({ view, onCancel }: { view: View; onCancel: () => void }) {
         await client.mutate('phase.add', { id: newId(), projectId: id, name: ph.name, start: ph.start, end: ph.end, venueId: null, notes: '' })
       const quoteLines = taking.map((x) => suggestionLine(x.s, newId())).slice(0, MAX_LINES)
       await client.mutate('quote.save', { id: newId(), projectId: id, lines: quoteLines, discountPct: view.money.discountOf(clientId) ?? 0, notes: '' })
+      // Its kit on the job's kit list as well (ADR 0102), to change there as any kit is.
+      await addKitFromQuote(id, kitToAdd(view, quoteLines, id))
     }).then((ok) => ok && (location.hash = `#jobs/${encodeURIComponent(id)}/quote`))
   }
   return (
     <form className="grid-form new-quote" onSubmit={submit} aria-label="New quote">
-      {claude.offered && <FromEnquiry status={claude.status} onRead={onRead} />}
+      {/* Enquiries cc'd to operations@ are drafted by themselves (ADR 0098); pasting one is for those that came another way. */}
+      {claude.offered && (
+        <details className="wide paste-enquiry" open={!!read}>
+          <summary>Or paste an enquiry for Claude to read</summary>
+          <FromEnquiry status={claude.status} onRead={onRead} />
+        </details>
+      )}
       {read && (
         <section className="claude-advice wide" aria-label="Suggested by Claude">
           <ByClaude>Read by Claude from the enquiry. Check the job and each line below before you start the quote.</ByClaude>
@@ -301,7 +310,7 @@ function NewQuote({ view, onCancel }: { view: View; onCancel: () => void }) {
         </section>
       )}
       <label className="wide">
-        What's the job? <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Nissan launch" required autoFocus={!claude.offered} />
+        What's the job? <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Nissan launch" required autoFocus />
       </label>
       <label>
         Client <input list="new-quote-clients" value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })} placeholder="Pick or add one" />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lineCostOf, linesFor, quoteMargin, type QuoteLine } from '../src/quotes.ts'
 import type { KitLineView, KitView } from '../src/sync/kit-view.ts'
-import { quoteKit, quoteWants } from '../src/sync/quote-kit.ts'
+import { kitFromQuote, quoteKit, quoteWants } from '../src/sync/quote-kit.ts'
 import type { ModelView } from '../src/sync/stock-view.ts'
 
 /**
@@ -65,5 +65,28 @@ describe("what a quote's lines cost", () => {
   it("starts a line with the job's kit hired in, and who from", () => {
     const [k] = linesFor([{ id: 'k', modelId: 'y10', name: 'Y10', group: 'Audio', qty: 4, days: 2, subhireQty: 6, supplier: ' Hire Co ' }], [], { product: () => 100, role: () => undefined }, () => 'n')
     expect(k).toMatchObject({ qty: 4, subhireQty: 4, supplier: 'Hire Co' })
+  })
+})
+
+describe("filling a job's kit list from its quote (ADR 0102)", () => {
+  const pkg = (id: string) => (id === 'pa' ? [{ modelId: 'y10', qty: 4 }, { modelId: 'sm58', qty: 2 }] : undefined)
+
+  it('adds each product quoted and the pieces of its packages, hired in as the quote has them', () => {
+    const lines = [
+      { kind: 'kit', modelId: 'y10', qty: 6, subhireQty: 2, supplier: 'Audio Hire Co' },
+      { kind: 'kit', packageId: 'pa', qty: 2 },
+      { kind: 'kit', modelId: null, qty: 3 },
+      { kind: 'crew', qty: 2 },
+    ]
+    expect(kitFromQuote(lines, pkg, [])).toEqual([
+      { modelId: 'y10', qty: 14, subhireQty: 2, supplier: 'Audio Hire Co' },
+      { modelId: 'sm58', qty: 4, subhireQty: 0, supplier: '' },
+    ])
+  })
+
+  it('only ever adds what the kit list is short of, whatever phase it is for', () => {
+    const lines = [{ kind: 'kit', modelId: 'y10', qty: 6 }, { kind: 'kit', modelId: 'sm58', qty: 2 }]
+    const kit = [{ modelId: 'y10', qty: 2, subhireQty: 0 }, { modelId: 'y10', qty: 1, subhireQty: 0 }, { modelId: 'sm58', qty: 5, subhireQty: 0 }]
+    expect(kitFromQuote(lines, pkg, kit)).toEqual([{ modelId: 'y10', qty: 3, subhireQty: 0, supplier: '' }])
   })
 })

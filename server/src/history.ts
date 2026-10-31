@@ -1,4 +1,5 @@
 import { newId, OFFLINE_AFTER_SECONDS, type HistoryEntry, type HistoryPage } from '@sh/shared'
+import { CLAUDE_CLIENT } from '@sh/shared'
 import type { Queryable } from './db.ts'
 import { describe, EXPORT_COMMAND, type Data, type DocumentsRead, type Look } from './history-words.ts'
 
@@ -11,6 +12,7 @@ export {
   IMPORT_PEOPLE_ACTION,
   IMPORT_STOCK_ACTION,
   LATE_CLEARED_ACTION,
+  QUOTE_EMAIL_ACTION,
   type DocumentsRead,
 } from './history-words.ts'
 
@@ -185,11 +187,13 @@ export async function toEntries(q: Queryable, rows: Row[], rates = true, notes =
         ? { kind: 'link', name: r.link_name ?? 'A freelancer', key: r.client_id }
         : calendar
           ? { kind: 'calendar', name: r.link_name ?? 'A freelancer', key: `link:${r.client_id.slice(9)}` }
-          : r.user_id
-            ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
-            : { kind: 'unknown', name: 'Someone' },
+          : r.client_id === CLAUDE_CLIENT
+            ? { kind: 'claude', name: 'Claude', key: 'claude' }
+            : r.user_id
+              ? { kind: 'staff', name: r.staff_name ?? 'A member of staff', key: `user:${r.user_id}` }
+              : { kind: 'unknown', name: 'Someone' },
       ...(r.device ? { device: r.device } : {}),
-      ...(link || calendar || r.client_id === 'server' ? {} : { deviceCode: r.client_id.slice(-6) }),
+      ...(link || calendar || r.client_id === 'server' || r.client_id === CLAUDE_CLIENT ? {} : { deviceCode: r.client_id.slice(-6) }),
       madeAt: r.made,
       arrivedAt: r.received,
       ...(waited === undefined ? {} : { waitedSeconds: waited }),

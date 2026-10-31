@@ -92,6 +92,7 @@ async function main() {
   // The fuel price from each new month of the AA's survey (ADR 0086). Not waited for: it reads their page.
   void app.fuelUpdates.start()
   app.assistantTodo.start()
+  app.assistantMailbox.start()
   app.log.info({ db: db.kind }, db.kind === 'memory' ? 'Database: in memory (nothing is kept after a restart)' : `Database: ${db.kind}`)
   if (auth) app.log.info({ domains: auth.domains, emails: auth.emails.length }, 'Sign-in: Google, staff only')
   else if (passcode) {

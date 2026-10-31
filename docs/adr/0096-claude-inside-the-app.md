@@ -102,6 +102,13 @@ presses each, across several lines.
 - The kit match is the same as kit from notes, so a product's other names
   ([ADR 0070](0070-finding-a-product-by-typing.md)) help Claude's lines too.
 
+## Later
+
+- 29 October 2026, [ADR 0098](0098-claude-drafts-quotes-from-the-mailbox.md):
+  Claude drafts quotes from the operations mailbox instead. Asking Claude in
+  words to change a quote (decision 4) is gone, as Colly asked; pasting an
+  enquiry stays, folded away as the second way in.
+
 ## Open
 
 - The to-do list and notifications for the office and directors: built in

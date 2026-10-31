@@ -95,3 +95,5 @@ on a stopped job); the step it's at has its name in the heaviest weight; on
 a phone the dots are a little smaller so the rule between them still shows.
 The step opened below puts its name first and largest. Your steps on Home
 say "step 3 of 8" beside the job's name.
+
+**30 October 2026:** the Confirmed step is now the client's answer rather than a tick, and done only once the job is confirmed; the strip offers the next thing for the step the job is at ([ADR 0103](0103-how-a-job-moves-on.md)).

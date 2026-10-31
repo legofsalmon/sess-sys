@@ -29,7 +29,9 @@ const NOT_EXPORTED = new Set(['sessions', 'server_meta', ...MODULES.map((m) => m
  * it could read their whole calendar. Devices never see it either; the busy
  * times stay in.
  */
-const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], person_merges: ['link_token'], calendar_link: ['refresh_token'], own_calendars: ['address'] }
+const SECRET_COLUMNS: Record<string, string[]> = { people: ['link_token'], person_merges: ['link_token'], calendar_link: ['refresh_token'], assistant_mailbox: ['refresh_token'], own_calendars: ['address'] }
+/** Not secret, but no use in a spreadsheet and far too big for one: the PDF that went with each emailed quote (ADR 0101). The backups keep it. */
+SECRET_COLUMNS.quote_emails = ['pdf_base64']
 const SECRET_FIELDS: Record<string, string[]> = { person: ['linkToken'] }
 
 type Row = Record<string, unknown>
@@ -235,7 +237,7 @@ function historyCsv(history: HistoryEntry[]): string {
     history.map((h) => [
       irishTime(h.madeAt),
       h.who.name,
-      h.who.kind === 'link' ? 'Private link' : h.who.kind === 'calendar' ? 'Google Calendar' : h.deviceCode ? `App, device ${h.deviceCode}` : '',
+      h.who.kind === 'link' ? 'Private link' : h.who.kind === 'calendar' ? 'Google Calendar' : h.who.kind === 'claude' ? 'Claude, from the operations mailbox' : h.deviceCode ? `App, device ${h.deviceCode}` : '',
       h.device ?? '',
       h.what,
       h.outcome === 'done' ? 'Done' : 'Turned down',
@@ -308,7 +310,9 @@ const ABOUT: Record<string, string> = {
   projects: 'Jobs: who for, where, whether they are going ahead, and the calendar a job was brought in from.',
   quotes:
     "Each job's quotes, a row for each version: its lines (what, how many, days charged, the price for a day in cents and the VAT rate), the discount, the notes for the client, how many days its prices hold and any deposit, when it was sent and the quote number it was given then, the client's answer, and the invoice and payment the office recorded for it.",
-  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details.",
+  quote_settings: "What every printed quote says: the number the next quote gets, the company's terms and its bank details; and whether quotes can be emailed to clients from the operations mailbox.",
+  quote_emails:
+    "Each quote emailed to a client from the operations mailbox: which quote, its version and number as sent, when, by whom, from and to which addresses, the subject and the message. The PDF that went is left out of this file; the app's own copy is on the quote's page.",
   role_prices: "The price list for crew: each role's price for a day, in cents. A role not here is quoted at the rate its crew were booked at.",
   running_late: "People saying on their private link that they're running late on a day they're booked, or the office noting it when they rang: how late or when they'll be there, their note, when they said they'd arrived, and when the office noted it. Shown only until the day is over, and deleted 30 days after it.",
   settings: "The office's own details: the name, phone and email shown to freelancers on their pages, and the VAT number and address printed on quotes; whether heads of department see crew rates; and whether the app prompts messages to crew.",
@@ -323,6 +327,11 @@ const ABOUT: Record<string, string> = {
   purchase_votes: 'Who voted for each request on the purchase list, one vote each.',
   // Current RMS, read through its API (ADR 0078).
   assistant_lists: "Claude's to-do lists for the office and directors (ADR 0097), the last two weeks of them: when each was written, whether in the morning or on request, its summary, and each thing on it with when it was ticked done.",
+  // The operations mailbox (ADR 0098).
+  assistant_mailbox: 'The operations mailbox Claude reads: the account connected, by whom and when, from when its mail is read, and when it was last looked at. Its key is left out.',
+  mail_threads: 'Each thread of mail Claude read in the operations mailbox: what it was (an enquiry, about a job, or neither), the job it went with, how many mails, when the last came, and the lines Claude last drafted from it.',
+  mail_notes: 'What Claude read in each thread: its subject, who it was from, a summary, what to ask the client, and any changes it asks for on the quote. Emptied when anyone is erased.',
+  mail_seen: 'The mail Claude has read in the operations mailbox, by Gmail’s id and thread. Not the mail itself, which stays in Gmail.',
   assistant_uses: 'Each time Claude was asked (ADR 0096): when, what for, the model, how many tokens went in and out, and what it cost in US cents. Not the words asked or answered, and not who asked.',
   rms_lines: "The lines of each opportunity read from Current RMS: its group, product or service, how many, the price, the discount, the chargeable days and rate, the total and VAT in cents, and whether it was subhired.",
   rms_opportunities: "Every opportunity read from Current RMS (enquiries, quotes, orders, lost and dead ones): its number, subject, client and venue by name, state, dates, totals in cents and the client's discount and price category there. No contacts.",

@@ -1,4 +1,4 @@
-import { DEFAULT_CREW_PER_CAR, QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type Department, type Package, type PackageItem, type ProductPrice, type Quote, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
+import { DEFAULT_CREW_PER_CAR, QUOTE_SETTINGS_ID, type ClientDiscount, type CostPaid, type Department, type Package, type PackageItem, type ProductPrice, type Quote, type QuoteEmail, type QuoteSettings, type RateRule, type RolePrice } from '@sh/shared'
 import type { Queryable } from '../db.ts'
 
 /** Reading money's records back as the entities devices see (ADR 0042). */
@@ -75,13 +75,14 @@ export async function getCostPaid(q: Queryable, timesheetId: string): Promise<Co
 /** What every printed quote says (ADR 0084), once anything about it is saved or a number given. */
 export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | undefined> {
   const { rows } = await q.query<Row>(
-    `SELECT id, next_number, terms, bank, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on::text AS fuel_set_on, fuel_auto, fuel_month, crew_per_car
+    `SELECT id, next_number, terms, bank, travel_from_km, fuel_cents_per_litre, litres_per_100_km, per_diem_cents, fuel_set_on::text AS fuel_set_on, fuel_auto, fuel_month, crew_per_car, email_quotes
      FROM quote_settings WHERE id = $1`,
     [QUOTE_SETTINGS_ID]
   )
   const r = rows[0]
   if (!r) return undefined
-  const settings: QuoteSettings = { id: r.id, nextNumber: r.next_number, terms: r.terms, bank: r.bank }
+  // Sending quotes by email (ADR 0101) only once it's on, so a device or a test that knows nothing of it sees the settings as before.
+  const settings: QuoteSettings = { id: r.id, nextNumber: r.next_number, terms: r.terms, bank: r.bank, ...(r.email_quotes ? { emailQuotes: true } : {}) }
   // Travel and subsistence (ADR 0086) once they've been set, which sets them all: until then each takes its default.
   if (r.travel_from_km === null) return settings
   const n = (v: unknown) => (v === null ? null : Number(v))
@@ -102,4 +103,32 @@ export async function getQuoteSettings(q: Queryable): Promise<QuoteSettings | un
 export async function highestNumber(q: Queryable): Promise<number> {
   const { rows } = await q.query<{ n: number | null }>('SELECT max(number) AS n FROM quotes')
   return Number(rows[0]?.n ?? 0)
+}
+
+// A quote emailed to the client (ADR 0101): the record every device sees, and the PDF that went, kept here.
+
+const QUOTE_EMAIL = `e.id, e.quote_id, e.project_id, e.version, e.number, e.sent_at, e.from_address, e.to_addresses, e.subject, coalesce(u.name, '') AS by`
+const toQuoteEmail = (r: Row): QuoteEmail => ({
+  id: r.id,
+  quoteId: r.quote_id,
+  projectId: r.project_id,
+  version: r.version,
+  number: r.number ?? null,
+  at: new Date(r.sent_at).toISOString(),
+  by: r.by,
+  from: r.from_address,
+  to: r.to_addresses,
+  subject: r.subject,
+})
+
+export async function getQuoteEmail(q: Queryable, id: string): Promise<QuoteEmail | undefined> {
+  const { rows } = await q.query<Row>(`SELECT ${QUOTE_EMAIL} FROM quote_emails e LEFT JOIN users u ON u.id = e.sent_by WHERE e.id = $1`, [id])
+  return rows[0] ? toQuoteEmail(rows[0]) : undefined
+}
+
+/** The PDF that went in an email, with what to call the file. */
+export async function getQuoteEmailPdf(q: Queryable, id: string): Promise<{ bytes: Buffer; version: number; number: number | null; projectId: string } | undefined> {
+  const { rows } = await q.query<Row>('SELECT pdf_base64, version, number, project_id FROM quote_emails WHERE id = $1', [id])
+  const r = rows[0]
+  return r ? { bytes: Buffer.from(r.pdf_base64, 'base64'), version: r.version, number: r.number ?? null, projectId: r.project_id } : undefined
 }

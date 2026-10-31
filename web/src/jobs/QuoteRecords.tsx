@@ -41,6 +41,8 @@ export function InCurrentRms({ jobId }: { jobId: string }) {
                   <span aria-hidden="true"> ›</span>
                 </div>
               </a>
+              {/* Its lines onto this job's quote, charged as they were there (ADR 0103). */}
+              <a href={`#jobs/money/current-rms/${o.id}/onto`}>Put its lines on this quote</a>
             </li>
           ))}
         </ul>
@@ -73,7 +75,7 @@ export function NewVersion({ q, onMade }: { q: QuoteView; onMade: (id: string) =
 }
 
 /** The office's records of what happened outside the app: the client's answer, the invoice, the payment. */
-export function Records({ q, job }: { q: QuoteView; job: JobView }) {
+export function Records({ q, job, canEmail }: { q: QuoteView; job: JobView; canEmail: boolean }) {
   const today = useToday()
   const [on, setOn] = useState(today)
   const [ref, setRef] = useState('')
@@ -92,7 +94,7 @@ export function Records({ q, job }: { q: QuoteView; job: JobView }) {
       <dl className="facts">
         <div>
           <dt>Sent</dt>
-          <dd>{q.sentOn ? dayLabel(q.sentOn) : 'Not yet'}</dd>
+          <dd>{q.sentOn ? `${dayLabel(q.sentOn)}${q.emails.length ? ', by email' : ''}` : 'Not yet'}</dd>
         </div>
         <div>
           <dt>Client's answer</dt>
@@ -171,7 +173,11 @@ export function Records({ q, job }: { q: QuoteView; job: JobView }) {
           </button>
         )
       })()}
-      <p className="hint">These are the office's records of what happened: the app sends nothing to the client.</p>
+      <p className="hint">
+        {canEmail
+          ? "The quote itself goes by email from the operations mailbox; the rest here is the office's record of what happened outside the app."
+          : "These are the office's records of what happened: the app sends nothing to the client."}
+      </p>
     </section>
   )
 }

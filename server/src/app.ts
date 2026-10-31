@@ -53,6 +53,10 @@ import { registerRmsRoutes } from './rms/routes.ts'
 import type { ClaudeConfig } from './assistant/claude.ts'
 import { Assistant, registerAssistantRoutes } from './assistant/routes.ts'
 import { Todo } from './assistant/todo.ts'
+import type { Gmail } from './assistant/gmail.ts'
+import { Mailbox } from './assistant/mailbox.ts'
+import { registerMailboxRoutes } from './assistant/mailbox-routes.ts'
+import { registerQuoteEmailRoutes } from './finance/email-routes.ts'
 import { registerStatusRoutes, Status, type OutsideLooks } from './status.ts'
 
 const PULL_LIMIT = 500
@@ -141,6 +145,8 @@ export interface AppOptions {
   currentRms?: RmsConfig
   /** Claude inside the app (ADR 0096): Anthropic's key, the model and the monthly limit. Without it, Admin says it isn't set up. */
   claude?: ClaudeConfig
+  /** Gmail for the operations mailbox (ADR 0098), when a test stands one in. */
+  gmail?: Gmail
   /** Where what the server notices about itself is reported: Sentry's (reportError) unless a test listens instead. */
   report?: typeof reportError
   /** Admin › Status's looks outside the server (ADR 0093): the map search and GitHub. Without them, those two say so. */
@@ -174,6 +180,8 @@ declare module 'fastify' {
     rms: RmsReader
     /** Claude's to-do list each weekday morning (ADR 0097); the caller starts it once the server is listening. */
     assistantTodo: Todo
+    /** Claude reading the operations mailbox (ADR 0098); the caller starts it once the server is listening. */
+    assistantMailbox: Mailbox
   }
 }
 
@@ -626,9 +634,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const todo = new Todo(db, assistant, app.log)
   app.decorate('assistantTodo', todo)
   registerAssistantRoutes(app, { assistant, todo })
+  const mailbox = new Mailbox(db, assistant, google, calendar?.clientSecret, () => void poke(), app.log, options.gmail)
+  app.decorate('assistantMailbox', mailbox)
+  registerMailboxRoutes(app, { mailbox, google, secret: calendar?.clientSecret })
+  registerQuoteEmailRoutes(app, { db, mailbox, onChange: () => void poke() })
   registerStatusRoutes(
     app,
-    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
+    new Status({ db, auth, passcode, errorReporting: !!errorReporting, backups, backupStore, documents, calendar: calendarSync, rms, assistant, mailbox, fuel, outside: options.outside ?? {}, commit, live: () => sockets.size })
   )
 
   // The history (ADR 0006): newest first, a page at a time, for everyone, one person or one record.
@@ -719,6 +731,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     app.dueErasures.stop()
     app.fuelUpdates.stop()
     app.assistantTodo.stop()
+    app.assistantMailbox.stop()
     documents.stop()
     calendarSync?.stop()
     ownCalendars.stop()

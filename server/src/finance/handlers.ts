@@ -21,7 +21,7 @@ import { getClientDiscount, getCostPaid, getPackage, getProductPrice, getQuote, 
  * Sending the same change twice, as a phone may, changes nothing.
  */
 
-type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quoting.travel' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'package.save' | 'package.remove' | 'price.role' | 'price.client' | 'cost.paid'
+type FinanceCommand = 'quote.save' | 'quote.sent' | 'quoting.update' | 'quoting.travel' | 'quoting.email' | 'quote.answer' | 'quote.invoiced' | 'quote.paid' | 'price.product' | 'price.rulesFromRms' | 'package.save' | 'package.remove' | 'price.role' | 'price.client' | 'cost.paid'
 type Handler<N extends FinanceCommand> = (ctx: Ctx, args: CommandArgs<N>) => Promise<void>
 
 const emitQuote = async (ctx: Ctx, id: string) => emit(ctx, 'quote', id, await getQuote(ctx.tx, id))
@@ -156,6 +156,12 @@ export const financeHandlers: { [N in FinanceCommand]: Handler<N> } = {
     if (a.fuelMonth !== undefined) await ctx.tx.query('UPDATE quote_settings SET fuel_month = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.fuelMonth])
     if (a.fuelAuto !== undefined) await ctx.tx.query('UPDATE quote_settings SET fuel_auto = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.fuelAuto])
     if (a.crewPerCar !== undefined) await ctx.tx.query('UPDATE quote_settings SET crew_per_car = $2 WHERE id = $1', [QUOTE_SETTINGS_ID, a.crewPerCar])
+    await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
+  },
+
+  /** Whether quotes can be sent to the client by email from the operations mailbox (ADR 0101): off until the office says. */
+  async 'quoting.email'(ctx, a) {
+    await ctx.tx.query(`INSERT INTO quote_settings (id, email_quotes) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET email_quotes = EXCLUDED.email_quotes`, [QUOTE_SETTINGS_ID, a.on])
     await emit(ctx, 'quoteSettings', QUOTE_SETTINGS_ID, await getQuoteSettings(ctx.tx))
   },
 
