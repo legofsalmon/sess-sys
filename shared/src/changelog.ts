@@ -28,6 +28,13 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '1.71.1',
+    date: '2026-10-30',
+    title: 'A new typeface, more room between things, and Home fits a phone',
+    what: "The app now uses the same typeface as the rest of the studio's tools, IBM Plex, built in so it looks the same with no signal, with fewer text sizes so the important words stand out. The space between things follows one pattern on every screen: close together inside a group, more between groups, and the most between the cards on a page. On a phone, Home no longer runs off the right-hand edge.",
+    prs: [187],
+  },
+  {
     version: '1.71.0',
     date: '2026-10-30',
     title: 'Send a quote to the client by email',

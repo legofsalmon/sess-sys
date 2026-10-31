@@ -1,6 +1,7 @@
 import './noEval.ts'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './fonts.ts'
 import './app.css'
 import './crew/crew.css'
 import './jobs/jobs.css'

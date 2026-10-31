@@ -1,22 +1,22 @@
 /* Vans and drivers (ADR 0047): the Vehicles page, a vehicle's page, and a job's Vehicles card. Roles only, both themes. */
-.vehicle-list { list-style: none; margin: 0 0 var(--space-10); padding: 0; display: grid; gap: var(--space-8); }
-.vehicle-row { display: flex; justify-content: space-between; gap: var(--space-10); align-items: flex-start; padding: var(--space-10) var(--space-12); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius-control); color: var(--ink); text-decoration: none; }
+.vehicle-list { list-style: none; margin: 0 0 var(--ds-space-3); padding: 0; display: grid; gap: var(--ds-space-2); }
+.vehicle-row { display: flex; justify-content: space-between; gap: var(--ds-space-3); align-items: flex-start; padding: var(--ds-space-3) var(--ds-space-3); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius-control); color: var(--ink); text-decoration: none; }
 .vehicle-row.warn { border-left-color: var(--warn); }
 .vehicle-row.bad { border-left-color: var(--bad); }
-.vehicle-row p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.van-state { margin: var(--space-4) 0 0; font-size: .85rem; }
-.van-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
-.van-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--space-6) var(--space-10); border-radius: var(--radius-control); }
+.vehicle-row p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.van-state { margin: var(--ds-space-1) 0 0; font-size: var(--text-hint); }
+.van-state.bad { background: var(--bad-soft); color: var(--bad); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
+.van-state.warn { background: var(--warn-soft); color: var(--warn); padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--radius-control); }
 .van-state.quiet { color: var(--muted); }
 p.van-state.bad, p.van-state.warn { font-weight: 600; }
 .vehicle-row p.van-state.bad { color: var(--bad); }
 .vehicle-row p.van-state.warn { color: var(--warn); }
-.van-line { display: grid; gap: var(--space-4); padding-top: var(--space-10); border-top: 1px solid var(--line); }
+.van-line { display: grid; gap: var(--ds-space-1); padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .van-line:first-of-type { border-top: 0; padding-top: 0; }
-.van-line p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-small); }
-.van-line .actions { display: flex; gap: var(--space-8); flex-wrap: wrap; }
-.vehicle-form fieldset.checks { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-10) var(--space-12); display: grid; gap: var(--space-8); }
-.vehicle-form .check-field { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: center; }
+.van-line p { margin: var(--ds-space-half) 0 0; color: var(--muted); font-size: var(--text-small); }
+.van-line .actions { display: flex; gap: var(--ds-space-2); flex-wrap: wrap; }
+.vehicle-form fieldset.checks { border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--ds-space-3) var(--ds-space-3); display: grid; gap: var(--ds-space-2); }
+.vehicle-form .check-field { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); align-items: center; }
 .warehouse .due.not-needed { border-left-color: var(--line); }
 .warehouse .due.not-needed b { color: var(--muted); }
 .reminders .reminder { color: var(--ink); text-decoration: none; }

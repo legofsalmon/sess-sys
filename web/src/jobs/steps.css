@@ -4,22 +4,22 @@
  * with a ring, steps to come are outlined, and a step not needed is dashed. The step opened below is selected, as a
  * tab is: the accent under it. On a phone the names give way to the dots, and the step opened below says its name.
  */
-.job-steps .steps-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-4) var(--space-12); }
+.job-steps .steps-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ds-space-1) var(--ds-space-3); }
 .job-steps .steps-head h2 { margin: 0; }
 /* The step the job is at, as one button beside where it's at (ADR 0103): pushed to the end of the head, under it on a phone. */
 .job-steps .steps-head .next-thing { margin-left: auto; }
-.clients-answer { display: grid; gap: var(--space-8); justify-items: start; }
+.clients-answer { display: grid; gap: var(--ds-space-2); justify-items: start; }
 .clients-answer > p { margin: 0; }
 .steps-flow { --dot: 30px; --gap: 4px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
 .steps-flow li { position: relative; min-width: 0; }
 /* The rule joining each dot to the next, behind the dots: it runs from the edge of one dot to the edge of the next, a little clear of
    each, and never through a number. The part of the way already come is drawn thicker, in the
    done tone, up to the step the job is at, so how far along the job is reads at a glance. */
-.steps-flow li + li::before { content: ''; position: absolute; z-index: 0; top: calc(var(--space-4) + var(--dot) / 2 - 1px); right: calc(50% + var(--dot) / 2 + var(--gap)); width: calc(100% - var(--dot) - 2 * var(--gap)); height: 2px; border-radius: 2px; background: var(--line); }
-.steps-flow li[data-come] + li::before { top: calc(var(--space-4) + var(--dot) / 2 - 1.5px); height: 3px; background: var(--muted); }
+.steps-flow li + li::before { content: ''; position: absolute; z-index: 0; top: calc(var(--ds-space-1) + var(--dot) / 2 - 1px); right: calc(50% + var(--dot) / 2 + var(--gap)); width: calc(100% - var(--dot) - 2 * var(--gap)); height: 2px; border-radius: 2px; background: var(--line); }
+.steps-flow li[data-come] + li::before { top: calc(var(--ds-space-1) + var(--dot) / 2 - 1.5px); height: 3px; background: var(--muted); }
 .app .steps-flow button {
-  position: relative; z-index: 1; display: grid; justify-items: center; align-content: start; gap: var(--space-4); width: 100%; min-height: 44px;
-  padding: var(--space-4) var(--space-2) var(--space-8); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); text-align: center;
+  position: relative; z-index: 1; display: grid; justify-items: center; align-content: start; gap: var(--ds-space-1); width: 100%; min-height: 44px;
+  padding: var(--ds-space-1) var(--ds-space-half) var(--ds-space-2); border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); text-align: center;
 }
 .app .steps-flow button[aria-expanded='true'] { border-bottom-color: var(--accent); color: var(--ink); }
 @media (hover: hover) {
@@ -38,13 +38,13 @@
 .steps-flow [data-state='now'] .step-label { color: var(--ink); font-weight: 800; }
 .steps-flow [data-state='done'] .step-label { font-weight: 600; }
 .step-owner { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-pill); }
-.step-open { display: grid; gap: var(--space-8); justify-items: start; padding-top: var(--space-12); border-top: 1px solid var(--line); }
+.step-open { display: grid; gap: var(--ds-space-2); justify-items: start; padding-top: var(--ds-space-3); border-top: 1px solid var(--line); }
 .step-open > * { margin: 0; }
 /* The step's name first and largest, then how it stands, then what it means: the order a glance reads them in. */
 .step-open h3 { font-size: var(--text-heading); }
 .step-open .step-state { color: var(--ink); }
 .step-open .step-state[data-state='now'] { font-weight: 600; }
-.step-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-8) var(--space-12); }
+.step-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ds-space-2) var(--ds-space-3); }
 .step-actions .field { min-width: 12rem; }
 /* A phone: the dots alone, closer; the step opened below names itself. */
 @media (max-width: 639px) {
